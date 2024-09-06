@@ -886,7 +886,7 @@
         <span class="comment">// unset allocation bit
         // Note: We cannot use `unset_vo_bit_unsafe` because two threads may attempt to free
         // objects at adjacent addresses, and they may share the same byte in the VO bit metadata.
-        </span><span class="kw">crate</span>::util::metadata::vo_bit::unset_vo_bit::&lt;VM&gt;(<span class="kw">unsafe </span>{
+        </span><span class="kw">crate</span>::util::metadata::vo_bit::unset_vo_bit(<span class="kw">unsafe </span>{
             ObjectReference::from_raw_address_unchecked(addr)
         })
     }

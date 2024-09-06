@@ -1654,13 +1654,30 @@ You can also take a look at one of our officially maintained language bindings a
 <p>For example, the <em>Forwarding bits and pointer</em> metadata is a local metadata used by copying policies to store forwarding bits (2-bits) and forwarding pointers (word size). Often runtimes require word-aligned addresses which means we can use the last two bits in the object header (due to alignment) and the entire object header to store the forwarding bits and pointer respectively. This metadata is almost always in the header.</p>
 <p>We recommend going through the <a href="https://docs.mmtk.io/api/mmtk/vm/trait.ObjectModel.html#required-associated-consts">list of metadata specifications</a> that are defined by MMTk. You should set them to locations that are appropriate for your runtime.</p>
 <h4 id="objectreference-vs-address"><a class="header" href="#objectreference-vs-address"><code>ObjectReference</code> vs <code>Address</code></a></h4>
-<p>A key principle in MMTk is the distinction between <a href="https://docs.mmtk.io/api/mmtk/util/address/struct.ObjectReference.html"><code>ObjectReference</code></a> and <a href="https://docs.mmtk.io/api/mmtk/util/address/struct.Address.html"><code>Address</code></a>. The idea is that very few operations are allowed on an <code>ObjectReference</code>. For example, MMTk does not allow address arithmetic on <code>ObjectReference</code>s. This allows us to preserve memory-safety, only performing unsafe operations when required, and gives us a cleaner and more flexible abstraction to work with as it can allow object handles or offsets etc. <code>Address</code>, on the other hand, represents an arbitrary machine address. You might be interested in reading the <em>Demystifying Magic: High-level Low-level Programming</em> paper<sup class="footnote-reference"><a href="#3">3</a></sup> which describes the above in more detail.</p>
-<p>In MMTk, <code>ObjectReference</code> is a special address that represents an object. A binding may use tagged references, compressed pointers, etc.
-They need to deal with the encoding and the decoding in their <a href="https://docs.mmtk.io/api/mmtk/vm/slot/trait.Slot.html"><code>Slot</code></a> implementation,
-and always present plain <code>ObjectReference</code>s to MMTk. See <a href="https://github.com/mmtk/mmtk-core/blob/master/src/vm/tests/mock_tests/mock_test_slots.rs">this test</a> for some <code>Slot</code> implementation examples.</p>
-<div class="footnote-definition" id="3"><sup class="footnote-definition-label">3</sup>
-<p>https://users.cecs.anu.edu.au/~steveb/pubs/papers/vmmagic-vee-2009.pdf</p>
-</div>
+<p>A key principle in MMTk is the distinction between <a href="https://docs.mmtk.io/api/mmtk/util/address/struct.ObjectReference.html"><code>ObjectReference</code></a> and <a href="https://docs.mmtk.io/api/mmtk/util/address/struct.Address.html"><code>Address</code></a>. The idea is that very few operations are allowed on an <code>ObjectReference</code>. For example, MMTk does not allow address arithmetic on <code>ObjectReference</code>s. This allows us to preserve memory-safety, only performing unsafe operations when required, and gives us a cleaner and more flexible abstraction to work with as it can allow object handles or offsets etc. <code>Address</code>, on the other hand, represents an arbitrary machine address. You might be interested in reading the <a href="https://users.cecs.anu.edu.au/~steveb/pubs/papers/vmmagic-vee-2009.pdf"><em>Demystifying Magic: High-level Low-level Programming</em></a> paper which describes the above in more detail.</p>
+<p>In MMTk, <code>ObjectReference</code> is a special address that represents an object.  It is required to be
+within the address range of the object it refers to, and must be word-aligned.  This address is used
+by MMTk to access side metadata, and find the space or regions (chunk, block, line, etc.) that
+contains the object.  It must also be efficient to locate the object header (where in-header MMTk
+metadata are held) and the object's VM-specific metadata, such as type information, from a given
+<code>ObjectReference</code>.  MMTk will need to access those information, either directly or indirectly via
+traits implemented by the binding, during tracing, which is performance-critical.</p>
+<p>The address used as <code>ObjectReference</code> is nominated by the VM binding when an object is allocated (or
+moved by a moving GC, which we can ignore for now when supporting NoGC).  VMs usually have their own
+concepts of "object reference" which refer to objects.  Some of them, including OpenJDK and CRuby,
+uses addresses to the object (the starting address or at an offset within the object) to refer to an
+object.  Such VMs can directly use their "object reference" for the address of MMTk's
+<code>ObjectReference</code>.</p>
+<p>Some VMs, such as JikesRVM, refers to an object by an address at a constant offset after the header,
+and can be outside the object.  This does not satisfy the requirement of MMTk's <code>ObjectReference</code>,
+and the VM binding needs to make a clear distinction between the VM-level object reference and
+MMTk's <code>ObjectReference</code> type.  A detailed example for supporting such a VM can be found
+<a href="https://github.com/mmtk/mmtk-jikesrvm/issues/178">here</a>.</p>
+<p>Other VMs may use tagged references, compressed pointers, etc.  They need to convert them to plain
+addresses to be used as MMTk's <code>ObjectReference</code>.  Specifically, if the VM use such representations
+in object fields, the VM binding can deal with the encoding and the decoding in its
+<a href="https://docs.mmtk.io/api/mmtk/vm/slot/trait.Slot.html"><code>Slot</code></a> implementation, and always present plain <code>ObjectReference</code>s to MMTk. See [this
+test] for some <code>Slot</code> implementation examples.</p>
 <h4 id="miscellaneous-configuration-options"><a class="header" href="#miscellaneous-configuration-options">Miscellaneous configuration options</a></h4>
 <p>There are many constants in the <code>ObjectModel</code> trait that can be overridden in your binding in order to meet your runtime's requirements. For example, the <code>OBJECT_REF_OFFSET_LOWER_BOUND</code> constant which defines the minimum offset from allocation result start (i.e. the address that MMTk will return to the runtime) and the actual start of the object, i.e. the <code>ObjectReference</code>. In other words, the constant represents the minimum offset from the allocation result start such that the following invariant always holds:</p>
 <pre><code>OBJECT_REFERENCE &gt;= ALLOCATION_RESULT_START + OFFSET
@@ -1786,7 +1803,7 @@ void *mmtk_alloc(MmtkMutator mutator, size_t size, size_t align,
  * Set relevant object metadata
  *
  * @param mutator the mutator instance that is requesting the allocation
- * @param object the returned address of the allocated object
+ * @param object the ObjectReference address chosen by the VM binding
  * @param size the size of the allocated object
  * @param allocator the allocation semantics to use for the allocation
  */
@@ -1796,10 +1813,16 @@ void mmtk_post_alloc(MmtkMutator mutator, void* object, size_t size, int allocat
 </code></pre>
 <p>In order to perform allocations, you will need to know what object alignment the runtime expects. Runtimes often align allocations at word boundaries (i.e. 4- or 8-bytes) as it allows the CPU to access the data faster at execution time. Additionally, the runtime may use the unused lowest order bits to store flags (e.g. type information), so it is important that MMTk respects these expectations. Once you have figured out the alignment requirements for your runtime, you should update the <a href="https://docs.mmtk.io/api/mmtk/vm/trait.VMBinding.html#associatedconstant.MIN_ALIGNMENT"><code>MIN_ALIGNMENT</code></a> constant in <code>VMBinding</code> to the correct value.</p>
 <p>Now that MMTk is aware of each mutator thread, you have to change the runtime's allocation functions to call into MMTk to allocate using <code>mmtk_alloc</code> and set object metadata using <code>mmtk_post_alloc</code>. Note that there may be multiple allocation functions in the runtime so make sure that you edit them all!</p>
-<p>You should use the saved <code>Mutator</code> pointer as the first parameter, the requested object size as the next parameter, and any alignment requirements the runtimes has as the third parameter.</p>
+<p>When calling <code>mmtk_alloc</code>, you should use the saved <code>Mutator</code> pointer as the first parameter, the requested object size as the next parameter, and any alignment requirements the runtimes has as the third parameter.</p>
 <p>If your runtime requires a non-zero allocation offset (i.e. the alignment requirements are for the offset address, not the returned address) then you have to provide the required value as the fourth parameter. Note that you <em><strong>must</strong></em> also update the <a href="https://docs.mmtk.io/api/mmtk/vm/trait.VMBinding.html#associatedconstant.USE_ALLOCATION_OFFSET"><code>USE_ALLOCATION_OFFSET</code></a> constant in the <code>VMBinding</code> implementation if your runtime requires a non-zero allocation offset.</p>
 <p>For the time-being, you can ignore the <code>allocator</code> parameter in both these functions and always pass a value of <code>0</code> which means MMTk will pick the default allocator for your collector (a bump pointer allocator in the case of NoGC).</p>
-<p>Finally, you need to call <code>mmtk_post_alloc</code> with the object address returned from the previous <code>mmtk_alloc</code> call in order to initialize object metadata.</p>
+<p>The return value of <code>mmtk_alloc</code> is the starting address of the allocated object.</p>
+<p>Then you should nominate a word-aligned address within the allocated bytes to be the
+<code>ObjectReference</code> used to refer to that object from now on.  It doesn't have to be the starting
+address.</p>
+<p>Finally, you need to call <code>mmtk_post_alloc</code> with your chosen <code>ObjectReference</code> in order to
+initialize MMTk-level object metadata, such as logging bits, valid-object (VO) bits, etc.  As a VM
+binding developer, you can ignore the details for now.</p>
 <p><strong>Note:</strong> Currently MMTk assumes object sizes are multiples of the <code>MIN_ALIGNMENT</code>. If you encounter errors with alignment, a simple workaround would be to align the requested object size up to the <code>MIN_ALIGNMENT</code>. See <a href="https://github.com/mmtk/mmtk-core/issues/730">here</a> for the tracking issue to fix this bug.</p>
 <h3 id="mmtk-side-changes-2"><a class="header" href="#mmtk-side-changes-2">MMTk-side changes</a></h3>
 <p>The Rust side of the binding should simply defer the actual implementation to <a href="https://docs.mmtk.io/api/mmtk/memory_manager/fn.alloc.html"><code>mmtk::memory_manager::alloc</code></a> and <a href="https://docs.mmtk.io/api/mmtk/memory_manager/fn.post_alloc.html"><code>mmtk::memory_manager::post_alloc</code></a> respectively. See the <a href="https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L125-L136">OpenJDK</a> <a href="https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L151-L161">binding</a> for an example.</p>
@@ -2119,14 +2142,97 @@ Notes for the mmtk-core developers:
 -->
 <div id="api-migration-detail-body"><!-- We use JavaScript to process things within this div. -->
 <!-- Insert new versions here -->
-<h2 id="0270"><a class="header" href="#0270">0.27.0</a></h2>
-<h3 id="is_mmtk_object-returns-option"><a class="header" href="#is_mmtk_object-returns-option"><code>is_mmtk_object</code> returns `Option<ObjectReference></a></h3>
+<h2 id="0280"><a class="header" href="#0280">0.28.0</a></h2>
+<h3 id="objectreference-must-point-inside-an-object"><a class="header" href="#objectreference-must-point-inside-an-object"><code>ObjectReference</code> must point inside an object</a></h3>
 <div id="admonition-tldr" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-title">
 <div class="admonition-title">
 <div id="admonition-tldr-title">
 <p>TL;DR</p>
 </div>
 <a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr"></a>
+</div>
+<div>
+<p><code>ObjectReference</code> is now required to be an address within an object.  The concept of "in-object
+address" and related methods are removed.  Some methods which used to depend on the "in-object
+address" no longer need the <code>&lt;VM&gt;</code> type argument.</p>
+</div>
+</div>
+<p>API changes:</p>
+<ul>
+<li>struct <code>ObjectReference</code>
+<ul>
+<li>Its "raw address" must be within an object now.</li>
+<li>The following methods which were used to access the in-object address are removed.
+<ul>
+<li><code>from_address</code></li>
+<li><code>to_address</code></li>
+<li>When accessing side metadata, the "raw address" should be used, instead.</li>
+</ul>
+</li>
+<li>The following methods no longer have the <code>&lt;VM&gt;</code> type argument.
+<ul>
+<li><code>get_forwarded_object</code></li>
+<li><code>is_in_any_space</code></li>
+<li><code>is_live</code></li>
+<li><code>is_movable</code></li>
+<li><code>is_reachable</code></li>
+</ul>
+</li>
+</ul>
+</li>
+<li>module <code>memory_manager</code>
+<ul>
+<li><code>is_mmtk_object</code>: It now requires the address parameter to be non-zero and word-aligned.
+<ul>
+<li>Otherwise it will not be a legal <code>ObjectReference</code> in the first place.  The user should
+filter out such illegal values.</li>
+</ul>
+</li>
+<li>The following functions no longer have the <code>&lt;VM&gt;</code> type argument.
+<ul>
+<li><code>find_object_from_internal_pointer</code></li>
+<li><code>is_in_mmtk_space</code></li>
+<li><code>is_live_object</code></li>
+<li><code>is_pinned</code></li>
+<li><code>pin_object</code></li>
+<li><code>unpin_object</code></li>
+</ul>
+</li>
+</ul>
+</li>
+<li>struct <code>Region</code>
+<ul>
+<li>The following methods no longer have the <code>&lt;VM&gt;</code> type argument.
+<ul>
+<li><code>containing</code></li>
+</ul>
+</li>
+</ul>
+</li>
+<li>trait <code>ObjectModel</code>
+<ul>
+<li><code>IN_OBJECT_ADDRESS_OFFSET</code>: removed because it is no longer needed.</li>
+</ul>
+</li>
+</ul>
+<p>See also:</p>
+<ul>
+<li>PR: <a href="https://github.com/mmtk/mmtk-core/issues/1170">https://github.com/mmtk/mmtk-core/issues/1170</a></li>
+<li>Examples:
+<ul>
+<li>https://github.com/mmtk/mmtk-openjdk/pull/286: a simple case</li>
+<li>https://github.com/mmtk/mmtk-jikesrvm/issues/178: a VM that needs much change for this</li>
+</ul>
+</li>
+</ul>
+<h2 id="0270"><a class="header" href="#0270">0.27.0</a></h2>
+<h3 id="is_mmtk_object-returns-option"><a class="header" href="#is_mmtk_object-returns-option"><code>is_mmtk_object</code> returns `Option<ObjectReference></a></h3>
+<div id="admonition-tldr-1" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-1-title">
+<div class="admonition-title">
+<div id="admonition-tldr-1-title">
+<p>TL;DR</p>
+</div>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-1"></a>
 </div>
 <div>
 <p><code>memory_manager::is_mmtk_object</code> now returns <code>Option&lt;ObjectReference&gt;</code> instead of <code>bool</code>.
@@ -2147,12 +2253,12 @@ Bindings can use the returned object reference instead of computing the object r
 <li>Example: <a href="https://github.com/mmtk/mmtk-ruby/pull/86">https://github.com/mmtk/mmtk-ruby/pull/86</a></li>
 </ul>
 <h3 id="introduce-objectmodelin_object_address_offset"><a class="header" href="#introduce-objectmodelin_object_address_offset">Introduce <code>ObjectModel::IN_OBJECT_ADDRESS_OFFSET</code></a></h3>
-<div id="admonition-tldr-1" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-1-title">
+<div id="admonition-tldr-2" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-2-title">
 <div class="admonition-title">
-<div id="admonition-tldr-1-title">
+<div id="admonition-tldr-2-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-1"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-2"></a>
 </div>
 <div>
 <p>We used to have <code>ObjectModel::ref_to_address</code> and <code>ObjectModel::address_to_ref</code>, and require
@@ -2183,12 +2289,12 @@ to the word size. This is checked in debug builds when an <code>ObjectReference<
 </ul>
 <h2 id="0260"><a class="header" href="#0260">0.26.0</a></h2>
 <h3 id="rename-edge-to-slot"><a class="header" href="#rename-edge-to-slot">Rename "edge" to "slot"</a></h3>
-<div id="admonition-tldr-2" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-2-title">
+<div id="admonition-tldr-3" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-3-title">
 <div class="admonition-title">
-<div id="admonition-tldr-2-title">
+<div id="admonition-tldr-3-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-2"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-3"></a>
 </div>
 <div>
 <p>The word "edge" <strong>in many identifiers</strong> have been changed to "slot" if it actaully means slot.
@@ -2257,12 +2363,12 @@ the refactoring/renaming tools in IDEs should be helpful.</p>
 </ul>
 <h2 id="0250"><a class="header" href="#0250">0.25.0</a></h2>
 <h3 id="objectreference-is-no-longer-nullable"><a class="header" href="#objectreference-is-no-longer-nullable"><code>ObjectReference</code> is no longer nullable</a></h3>
-<div id="admonition-tldr-3" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-3-title">
+<div id="admonition-tldr-4" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-4-title">
 <div class="admonition-title">
-<div id="admonition-tldr-3-title">
+<div id="admonition-tldr-4-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-3"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-4"></a>
 </div>
 <div>
 <p><code>ObjectReference</code> can no longer represent a NULL reference.  Some methods of <code>ObjectReference</code> and
@@ -2401,12 +2507,12 @@ by wrapping them into <code>extern "C"</code> functions that return <code>Object
 <li>Example: <a href="https://github.com/mmtk/mmtk-openjdk/pull/273">https://github.com/mmtk/mmtk-openjdk/pull/273</a> (for write barriers)</li>
 </ul>
 <h3 id="instance-methods-of-objectreference-changed"><a class="header" href="#instance-methods-of-objectreference-changed">Instance methods of <code>ObjectReference</code> changed</a></h3>
-<div id="admonition-tldr-4" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-4-title">
+<div id="admonition-tldr-5" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-5-title">
 <div class="admonition-title">
-<div id="admonition-tldr-4-title">
+<div id="admonition-tldr-5-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-4"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-5"></a>
 </div>
 <div>
 <p>Some methods of <code>ObjectReference</code> now have a type parameter <code>&lt;VM&gt;</code>.  <code>ObjectReference::value()</code> is
@@ -2441,12 +2547,12 @@ removed.</p>
 <li>Example: <a href="https://github.com/mmtk/mmtk-openjdk/pull/272">https://github.com/mmtk/mmtk-openjdk/pull/272</a></li>
 </ul>
 <h3 id="the-gc-controller-aka-coordinator-is-removed"><a class="header" href="#the-gc-controller-aka-coordinator-is-removed">The GC controller (a.k.a. coordinator) is removed</a></h3>
-<div id="admonition-tldr-5" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-5-title">
+<div id="admonition-tldr-6" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-6-title">
 <div class="admonition-title">
-<div id="admonition-tldr-5-title">
+<div id="admonition-tldr-6-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-5"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-6"></a>
 </div>
 <div>
 <p>The GC controller thread is removed from MMTk core.  The VM binding needs to re-implement

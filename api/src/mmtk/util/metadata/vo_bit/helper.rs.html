@@ -346,7 +346,7 @@ We currently don't have an appropriate strategy for this case."
         <span class="comment">// If the VO bits are available during tracing,
         // we validate the objects we trace using the VO bits.
         </span><span class="macro">debug_assert!</span>(
-            vo_bit::is_vo_bit_set::&lt;VM&gt;(object),
+            vo_bit::is_vo_bit_set(object),
             <span class="string">"{:x}: VO bit not set"</span>,
             object
         );
@@ -357,7 +357,7 @@ We currently don't have an appropriate strategy for this case."
     <span class="kw">match </span>strategy::&lt;VM&gt;() {
         VOBitUpdateStrategy::ClearAndReconstruct =&gt; {
             <span class="comment">// In this strategy, we set the VO bit when an object is marked.
-            </span>vo_bit::set_vo_bit::&lt;VM&gt;(object);
+            </span>vo_bit::set_vo_bit(object);
         }
         VOBitUpdateStrategy::CopyFromMarkBits =&gt; {
             <span class="comment">// VO bit was not cleared before tracing in this strategy.  Do nothing.
@@ -369,7 +369,7 @@ We currently don't have an appropriate strategy for this case."
     <span class="kw">match </span>strategy::&lt;VM&gt;() {
         VOBitUpdateStrategy::ClearAndReconstruct =&gt; {
             <span class="comment">// In this strategy, we set the VO bit of the to-space object when forwarded.
-            </span>vo_bit::set_vo_bit::&lt;VM&gt;(new_object);
+            </span>vo_bit::set_vo_bit(new_object);
         }
         VOBitUpdateStrategy::CopyFromMarkBits =&gt; {
             <span class="comment">// In this strategy, we will copy mark bits to VO bits.
@@ -382,7 +382,7 @@ We currently don't have an appropriate strategy for this case."
             );
 
             <span class="comment">// We set the VO bit for the to-space object eagerly.
-            </span>vo_bit::set_vo_bit::&lt;VM&gt;(new_object);
+            </span>vo_bit::set_vo_bit(new_object);
         }
     }
 }

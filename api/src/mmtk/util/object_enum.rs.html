@@ -167,7 +167,7 @@
 
     <span class="kw">fn </span>visit_address_range(<span class="kw-2">&amp;mut </span><span class="self">self</span>, start: Address, end: Address) {
         VO_BIT.scan_non_zero_values::&lt;u8&gt;(start, end, <span class="kw-2">&amp;mut </span>|address| {
-            <span class="kw">let </span>object = vo_bit::get_object_ref_for_vo_addr::&lt;VM&gt;(address);
+            <span class="kw">let </span>object = vo_bit::get_object_ref_for_vo_addr(address);
             (<span class="self">self</span>.object_callback)(object);
         })
     }

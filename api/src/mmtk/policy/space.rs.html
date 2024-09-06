@@ -928,7 +928,7 @@
     }
 
     <span class="kw">fn </span>in_space(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool {
-        <span class="self">self</span>.address_in_space(object.to_address::&lt;VM&gt;())
+        <span class="self">self</span>.address_in_space(object.to_raw_address())
     }
 
     <span class="doccomment">/**

@@ -284,11 +284,11 @@
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::&lt;VM&gt;(object, Ordering::SeqCst);
         }
         <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-        </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit::&lt;VM&gt;(object);
+        </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit(object);
     }
     <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
     </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr)
+        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
     }
     <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
     </span><span class="kw">fn </span>find_object_from_internal_pointer(
@@ -430,7 +430,7 @@
     ) -&gt; ObjectReference {
         <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
         </span><span class="macro">debug_assert!</span>(
-            <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set::&lt;VM&gt;(object),
+            <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set(object),
             <span class="string">"{:x}: VO bit not set"</span>,
             object
         );

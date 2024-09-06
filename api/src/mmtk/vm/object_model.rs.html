@@ -637,19 +637,6 @@
 <a href="#635" id="635">635</a>
 <a href="#636" id="636">636</a>
 <a href="#637" id="637">637</a>
-<a href="#638" id="638">638</a>
-<a href="#639" id="639">639</a>
-<a href="#640" id="640">640</a>
-<a href="#641" id="641">641</a>
-<a href="#642" id="642">642</a>
-<a href="#643" id="643">643</a>
-<a href="#644" id="644">644</a>
-<a href="#645" id="645">645</a>
-<a href="#646" id="646">646</a>
-<a href="#647" id="647">647</a>
-<a href="#648" id="648">648</a>
-<a href="#649" id="649">649</a>
-<a href="#650" id="650">650</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="self">self</span>::specs::<span class="kw-2">*</span>;
@@ -716,24 +703,17 @@
 /// Instead, MMTk only uses the following addresses for an object. If you find the MMTk's approach does not work for your language in practice, you are welcome to submit an issue
 /// or engage with MMTk team on Zulip to disucss further.
 ///
-/// ## Object Reference
+/// ## (Raw) Object Reference
 ///
-/// See [`crate::util::address::ObjectReference`]. This is a special address that represents the object.
-/// MMTk refers to an object by its object reference. An object reference cannot be NULL, and has to be
-/// word aligned ([`crate::util::address::ObjectReference::ALIGNMENT`]). It is allowed that an object
-/// reference is not in the allocated memory for the object.
+/// See [`crate::util::address::ObjectReference`]. This is a special address that represents the
+/// object. MMTk refers to an object by its object reference. An object reference cannot be NULL,
+/// must be inside the address range of the object, and must be word aligned
+/// ([`crate::util::address::ObjectReference::ALIGNMENT`]).
 ///
 /// ## Object Start Address
 ///
 /// This address is returned by an allocation call [`crate::memory_manager::alloc`]. This is the start of the address range of the allocation.
 /// [`ObjectModel::ref_to_object_start`] should return this address for a given object.
-///
-/// ## In-object Address
-///
-/// As the object reference address may be outside the allocated memory, and calculating the object start address may
-/// be complex, MMTk requires a fixed and efficient in-object address for each object. The in-object address must be a constant
-/// offset from the object reference address, and must be inside the allocated memory. MMTk requires the binding to
-/// specify the offset from the object reference to the in-object address by [`ObjectModel::IN_OBJECT_ADDRESS_OFFSET`].
 ///
 /// ## Object header address
 ///
@@ -1084,10 +1064,9 @@
     /// mature space for generational plans.
     </span><span class="kw">const </span>VM_WORST_CASE_COPY_EXPANSION: f64 = <span class="number">1.5</span>;
 
-    <span class="doccomment">/// If this is true, the binding guarantees that the object reference's raw address,
-    /// the in-object address, and the object start are always the same address. To be precise,
-    /// 1. an object reference's raw address is always equal to the return value of the `ref_to_object_start` method,
-    /// 2. `IN_OBJECT_ADDRESS_OFFSET` is 0.
+    <span class="doccomment">/// If this is true, the binding guarantees that the object reference's raw address and the
+    /// object start are always the same address.  In other words, an object reference's raw
+    /// address is always equal to the return value of the `ref_to_object_start` method,
     ///
     /// This is a very strong guarantee, but it is also helpful for MMTk to
     /// make some assumptions and optimize for this case.
@@ -1124,11 +1103,6 @@
     /// Arguments:
     /// * `object`: The object to be queried.
     </span><span class="kw">fn </span>ref_to_header(object: ObjectReference) -&gt; Address;
-
-    <span class="doccomment">/// The offset from the object reference to an in-object address.
-    /// The binding needs to guarantee that obj_ref.to_raw_address() + IN_OBJECT_ADDRESS_OFFSET
-    /// is inside the storage associated with the object.
-    </span><span class="kw">const </span>IN_OBJECT_ADDRESS_OFFSET: isize;
 
     <span class="doccomment">/// Dump debugging information for an object.
     ///

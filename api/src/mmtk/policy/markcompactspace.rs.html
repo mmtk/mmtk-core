@@ -509,7 +509,7 @@
     </span>}
 
     <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, _alloc: bool) {
-        <span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit::&lt;VM&gt;(object);
+        <span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit(object);
     }
 
     <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
@@ -519,7 +519,7 @@
 
     <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
     </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr)
+        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
     }
 
     <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
@@ -683,7 +683,7 @@
         object: ObjectReference,
     ) -&gt; ObjectReference {
         <span class="macro">debug_assert!</span>(
-            <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set::&lt;VM&gt;(object),
+            <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set(object),
             <span class="string">"{:x}: VO bit not set"</span>,
             object
         );
@@ -699,7 +699,7 @@
         object: ObjectReference,
     ) -&gt; ObjectReference {
         <span class="macro">debug_assert!</span>(
-            <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set::&lt;VM&gt;(object),
+            <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set(object),
             <span class="string">"{:x}: VO bit not set"</span>,
             object
         );
@@ -845,7 +845,7 @@
             <span class="kw">for </span>obj <span class="kw">in </span><span class="self">self</span>.linear_scan_objects(from_start..from_end) {
                 <span class="kw">let </span>copied_size = VM::VMObjectModel::get_size_when_copied(obj);
                 <span class="comment">// clear the VO bit
-                </span>vo_bit::unset_vo_bit::&lt;VM&gt;(obj);
+                </span>vo_bit::unset_vo_bit(obj);
 
                 <span class="kw">let </span>maybe_forwarding_pointer = <span class="self">Self</span>::get_header_forwarding_pointer(obj);
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(forwarding_pointer) = maybe_forwarding_pointer {
@@ -858,7 +858,7 @@
                     <span class="kw">let </span>end_of_new_object =
                         VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
                     <span class="comment">// update VO bit,
-                    </span>vo_bit::set_vo_bit::&lt;VM&gt;(new_object);
+                    </span>vo_bit::set_vo_bit(new_object);
                     to = new_object.to_object_start::&lt;VM&gt;() + copied_size;
                     <span class="macro">debug_assert_eq!</span>(end_of_new_object, to);
                 } <span class="kw">else </span>{

@@ -398,7 +398,7 @@
         mask: <span class="prelude-ty">Option</span>&lt;T&gt;,
     ) -&gt; T {
         <span class="kw">match </span><span class="self">self </span>{
-            MetadataSpec::OnSide(metadata_spec) =&gt; metadata_spec.load(object.to_address::&lt;VM&gt;()),
+            MetadataSpec::OnSide(metadata_spec) =&gt; metadata_spec.load(object.to_raw_address()),
             MetadataSpec::InHeader(metadata_spec) =&gt; {
                 VM::VMObjectModel::load_metadata::&lt;T&gt;(metadata_spec, object, mask)
             }
@@ -422,7 +422,7 @@
     ) -&gt; T {
         <span class="kw">match </span><span class="self">self </span>{
             MetadataSpec::OnSide(metadata_spec) =&gt; {
-                metadata_spec.load_atomic(object.to_address::&lt;VM&gt;(), ordering)
+                metadata_spec.load_atomic(object.to_raw_address(), ordering)
             }
             MetadataSpec::InHeader(metadata_spec) =&gt; {
                 VM::VMObjectModel::load_metadata_atomic::&lt;T&gt;(metadata_spec, object, mask, ordering)
@@ -448,7 +448,7 @@
     ) {
         <span class="kw">match </span><span class="self">self </span>{
             MetadataSpec::OnSide(metadata_spec) =&gt; {
-                metadata_spec.store(object.to_address::&lt;VM&gt;(), val);
+                metadata_spec.store(object.to_raw_address(), val);
             }
             MetadataSpec::InHeader(metadata_spec) =&gt; {
                 VM::VMObjectModel::store_metadata::&lt;T&gt;(metadata_spec, object, val, mask)
@@ -473,7 +473,7 @@
     ) {
         <span class="kw">match </span><span class="self">self </span>{
             MetadataSpec::OnSide(metadata_spec) =&gt; {
-                metadata_spec.store_atomic(object.to_address::&lt;VM&gt;(), val, ordering);
+                metadata_spec.store_atomic(object.to_raw_address(), val, ordering);
             }
             MetadataSpec::InHeader(metadata_spec) =&gt; VM::VMObjectModel::store_metadata_atomic::&lt;T&gt;(
                 metadata_spec,
@@ -508,7 +508,7 @@
     ) -&gt; std::result::Result&lt;T, T&gt; {
         <span class="kw">match </span><span class="self">self </span>{
             MetadataSpec::OnSide(metadata_spec) =&gt; metadata_spec.compare_exchange_atomic(
-                object.to_address::&lt;VM&gt;(),
+                object.to_raw_address(),
                 old_val,
                 new_val,
                 success_order,
@@ -545,7 +545,7 @@
     ) -&gt; T {
         <span class="kw">match </span><span class="self">self </span>{
             MetadataSpec::OnSide(metadata_spec) =&gt; {
-                metadata_spec.fetch_add_atomic(object.to_address::&lt;VM&gt;(), val, order)
+                metadata_spec.fetch_add_atomic(object.to_raw_address(), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) =&gt; {
                 VM::VMObjectModel::fetch_add_metadata::&lt;T&gt;(metadata_spec, object, val, order)
@@ -570,7 +570,7 @@
     ) -&gt; T {
         <span class="kw">match </span><span class="self">self </span>{
             MetadataSpec::OnSide(metadata_spec) =&gt; {
-                metadata_spec.fetch_sub_atomic(object.to_address::&lt;VM&gt;(), val, order)
+                metadata_spec.fetch_sub_atomic(object.to_raw_address(), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) =&gt; {
                 VM::VMObjectModel::fetch_sub_metadata::&lt;T&gt;(metadata_spec, object, val, order)
@@ -595,7 +595,7 @@
     ) -&gt; T {
         <span class="kw">match </span><span class="self">self </span>{
             MetadataSpec::OnSide(metadata_spec) =&gt; {
-                metadata_spec.fetch_and_atomic(object.to_address::&lt;VM&gt;(), val, order)
+                metadata_spec.fetch_and_atomic(object.to_raw_address(), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) =&gt; {
                 VM::VMObjectModel::fetch_and_metadata::&lt;T&gt;(metadata_spec, object, val, order)
@@ -620,7 +620,7 @@
     ) -&gt; T {
         <span class="kw">match </span><span class="self">self </span>{
             MetadataSpec::OnSide(metadata_spec) =&gt; {
-                metadata_spec.fetch_or_atomic(object.to_address::&lt;VM&gt;(), val, order)
+                metadata_spec.fetch_or_atomic(object.to_raw_address(), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) =&gt; {
                 VM::VMObjectModel::fetch_or_metadata::&lt;T&gt;(metadata_spec, object, val, order)
@@ -651,7 +651,7 @@
     ) -&gt; std::result::Result&lt;T, T&gt; {
         <span class="kw">match </span><span class="self">self </span>{
             MetadataSpec::OnSide(metadata_spec) =&gt; metadata_spec.fetch_update_atomic(
-                object.to_address::&lt;VM&gt;(),
+                object.to_raw_address(),
                 set_order,
                 fetch_order,
                 f,

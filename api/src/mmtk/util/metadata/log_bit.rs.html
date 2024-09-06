@@ -60,7 +60,7 @@
             // know we are setting log bit for mature space, and every object in the space should have log
             // bit as 1.
             </span>MetadataSpec::OnSide(spec) =&gt; <span class="kw">unsafe </span>{
-                spec.set_raw_byte_atomic(object.to_address::&lt;VM&gt;(), order)
+                spec.set_raw_byte_atomic(object.to_raw_address(), order)
             },
         }
     }

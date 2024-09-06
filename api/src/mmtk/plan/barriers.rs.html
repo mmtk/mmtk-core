@@ -436,7 +436,7 @@
     </span><span class="kw">fn </span>log_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool {
         <span class="attr">#[cfg(all(feature = <span class="string">"vo_bit"</span>, feature = <span class="string">"extreme_assertions"</span>))]
         </span><span class="macro">debug_assert!</span>(
-            <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set::&lt;S::VM&gt;(object),
+            <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set(object),
             <span class="string">"object bit is unset"
         </span>);
         <span class="kw">loop </span>{

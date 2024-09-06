@@ -1289,11 +1289,11 @@
     </span>}
     <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference, _alloc: bool) {
         <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-        </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit::&lt;VM&gt;(_object);
+        </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit(_object);
     }
     <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
     </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr)
+        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
     }
     <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
     </span><span class="kw">fn </span>find_object_from_internal_pointer(
@@ -1357,7 +1357,7 @@
         <span class="kw">if </span>KIND == TRACE_KIND_TRANSITIVE_PIN {
             <span class="self">self</span>.trace_object_without_moving(queue, object)
         } <span class="kw">else if </span>KIND == TRACE_KIND_DEFRAG {
-            <span class="kw">if </span>Block::containing::&lt;VM&gt;(object).is_defrag_source() {
+            <span class="kw">if </span>Block::containing(object).is_defrag_source() {
                 <span class="macro">debug_assert!</span>(<span class="self">self</span>.in_defrag());
                 <span class="macro">debug_assert!</span>(
                     !<span class="kw">crate</span>::plan::is_nursery_gc(worker.mmtk.get_plan()),
@@ -1726,7 +1726,7 @@
                     <span class="self">self</span>.mark_lines(object);
                 }
             } <span class="kw">else </span>{
-                Block::containing::&lt;VM&gt;(object).set_state(BlockState::Marked);
+                Block::containing(object).set_state(BlockState::Marked);
             }
 
             <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
@@ -1775,9 +1775,9 @@
                 } <span class="kw">else </span>{
                     <span class="comment">// new_object != object
                     </span><span class="macro">debug_assert!</span>(
-                        !Block::containing::&lt;VM&gt;(new_object).is_defrag_source(),
+                        !Block::containing(new_object).is_defrag_source(),
                         <span class="string">"Block {:?} containing forwarded object {} should not be a defragmentation source"</span>,
-                        Block::containing::&lt;VM&gt;(new_object),
+                        Block::containing(new_object),
                         new_object,
                     );
                 }
@@ -1796,7 +1796,7 @@
             {
                 <span class="self">self</span>.attempt_mark(object, <span class="self">self</span>.mark_state);
                 object_forwarding::clear_forwarding_bits::&lt;VM&gt;(object);
-                Block::containing::&lt;VM&gt;(object).set_state(BlockState::Marked);
+                Block::containing(object).set_state(BlockState::Marked);
 
                 <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
                 </span>vo_bit::helper::on_object_marked::&lt;VM&gt;(object);
@@ -1821,12 +1821,12 @@
                 new_object
             };
             <span class="macro">debug_assert_eq!</span>(
-                Block::containing::&lt;VM&gt;(new_object).get_state(),
+                Block::containing(new_object).get_state(),
                 BlockState::Marked
             );
 
             queue.enqueue(new_object);
-            <span class="macro">debug_assert!</span>(new_object.is_live::&lt;VM&gt;());
+            <span class="macro">debug_assert!</span>(new_object.is_live());
             <span class="self">self</span>.unlog_object_if_needed(new_object);
             new_object
         }

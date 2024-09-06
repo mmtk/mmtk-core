@@ -224,21 +224,6 @@
 <a href="#222" id="222">222</a>
 <a href="#223" id="223">223</a>
 <a href="#224" id="224">224</a>
-<a href="#225" id="225">225</a>
-<a href="#226" id="226">226</a>
-<a href="#227" id="227">227</a>
-<a href="#228" id="228">228</a>
-<a href="#229" id="229">229</a>
-<a href="#230" id="230">230</a>
-<a href="#231" id="231">231</a>
-<a href="#232" id="232">232</a>
-<a href="#233" id="233">233</a>
-<a href="#234" id="234">234</a>
-<a href="#235" id="235">235</a>
-<a href="#236" id="236">236</a>
-<a href="#237" id="237">237</a>
-<a href="#238" id="238">238</a>
-<a href="#239" id="239">239</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Valid object bit (VO bit)
 //!
 //! The valid object bit, or "VO bit" for short", is a global per-address metadata.  It is set at
@@ -302,24 +287,20 @@
 <span class="kw">pub const </span>VO_BIT_SIDE_METADATA_ADDR: Address = VO_BIT_SIDE_METADATA_SPEC.get_absolute_offset();
 
 <span class="doccomment">/// Atomically set the VO bit for an object.
-</span><span class="kw">pub fn </span>set_vo_bit&lt;VM: VMBinding&gt;(object: ObjectReference) {
-    <span class="macro">debug_assert!</span>(
-        !is_vo_bit_set::&lt;VM&gt;(object),
-        <span class="string">"{:x}: VO bit already set"</span>,
-        object
-    );
-    VO_BIT_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_address::&lt;VM&gt;(), <span class="number">1</span>, Ordering::SeqCst);
+</span><span class="kw">pub fn </span>set_vo_bit(object: ObjectReference) {
+    <span class="macro">debug_assert!</span>(!is_vo_bit_set(object), <span class="string">"{:x}: VO bit already set"</span>, object);
+    VO_BIT_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_raw_address(), <span class="number">1</span>, Ordering::SeqCst);
 }
 
 <span class="doccomment">/// Atomically unset the VO bit for an object.
-</span><span class="kw">pub fn </span>unset_vo_bit&lt;VM: VMBinding&gt;(object: ObjectReference) {
-    <span class="macro">debug_assert!</span>(is_vo_bit_set::&lt;VM&gt;(object), <span class="string">"{:x}: VO bit not set"</span>, object);
-    VO_BIT_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_address::&lt;VM&gt;(), <span class="number">0</span>, Ordering::SeqCst);
+</span><span class="kw">pub fn </span>unset_vo_bit(object: ObjectReference) {
+    <span class="macro">debug_assert!</span>(is_vo_bit_set(object), <span class="string">"{:x}: VO bit not set"</span>, object);
+    VO_BIT_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_raw_address(), <span class="number">0</span>, Ordering::SeqCst);
 }
 
 <span class="doccomment">/// Atomically unset the VO bit for an object, regardless whether the bit is set or not.
-</span><span class="kw">pub fn </span>unset_vo_bit_nocheck&lt;VM: VMBinding&gt;(object: ObjectReference) {
-    VO_BIT_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_address::&lt;VM&gt;(), <span class="number">0</span>, Ordering::SeqCst);
+</span><span class="kw">pub fn </span>unset_vo_bit_nocheck(object: ObjectReference) {
+    VO_BIT_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_raw_address(), <span class="number">0</span>, Ordering::SeqCst);
 }
 
 <span class="doccomment">/// Non-atomically unset the VO bit for an object. The caller needs to ensure the side
@@ -328,41 +309,42 @@
 /// # Safety
 ///
 /// This is unsafe: check the comment on `side_metadata::store`
-</span><span class="kw">pub unsafe fn </span>unset_vo_bit_unsafe&lt;VM: VMBinding&gt;(object: ObjectReference) {
-    <span class="macro">debug_assert!</span>(is_vo_bit_set::&lt;VM&gt;(object), <span class="string">"{:x}: VO bit not set"</span>, object);
-    VO_BIT_SIDE_METADATA_SPEC.store::&lt;u8&gt;(object.to_address::&lt;VM&gt;(), <span class="number">0</span>);
+</span><span class="kw">pub unsafe fn </span>unset_vo_bit_unsafe(object: ObjectReference) {
+    <span class="macro">debug_assert!</span>(is_vo_bit_set(object), <span class="string">"{:x}: VO bit not set"</span>, object);
+    VO_BIT_SIDE_METADATA_SPEC.store::&lt;u8&gt;(object.to_raw_address(), <span class="number">0</span>);
 }
 
 <span class="doccomment">/// Check if the VO bit is set for an object.
-</span><span class="kw">pub fn </span>is_vo_bit_set&lt;VM: VMBinding&gt;(object: ObjectReference) -&gt; bool {
-    VO_BIT_SIDE_METADATA_SPEC.load_atomic::&lt;u8&gt;(object.to_address::&lt;VM&gt;(), Ordering::SeqCst) == <span class="number">1
+</span><span class="kw">pub fn </span>is_vo_bit_set(object: ObjectReference) -&gt; bool {
+    VO_BIT_SIDE_METADATA_SPEC.load_atomic::&lt;u8&gt;(object.to_raw_address(), Ordering::SeqCst) == <span class="number">1
 </span>}
 
 <span class="doccomment">/// Check if an address can be turned directly into an object reference using the VO bit.
 /// If so, return `Some(object)`. Otherwise return `None`.
-</span><span class="kw">pub fn </span>is_vo_bit_set_for_addr&lt;VM: VMBinding&gt;(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-    <span class="comment">// if the address is not aligned, it cannot be an object reference.
-    </span><span class="kw">if </span>!address.is_aligned_to(ObjectReference::ALIGNMENT) {
-        <span class="kw">return </span><span class="prelude-val">None</span>;
-    }
-    is_vo_bit_set_inner::&lt;<span class="bool-val">true</span>, VM&gt;(address)
+///
+/// The `address` must be word-aligned.
+</span><span class="kw">pub fn </span>is_vo_bit_set_for_addr(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+    is_vo_bit_set_inner::&lt;<span class="bool-val">true</span>&gt;(address)
 }
 
 <span class="doccomment">/// Check if an address can be turned directly into an object reference using the VO bit.
 /// If so, return `Some(object)`. Otherwise return `None`. The caller needs to ensure the side
 /// metadata for the VO bit for the object is accessed by only one thread.
 ///
+/// The `address` must be word-aligned.
+///
 /// # Safety
 ///
 /// This is unsafe: check the comment on `side_metadata::load`
-</span><span class="kw">pub unsafe fn </span>is_vo_bit_set_unsafe&lt;VM: VMBinding&gt;(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-    is_vo_bit_set_inner::&lt;<span class="bool-val">false</span>, VM&gt;(address)
+</span><span class="kw">pub unsafe fn </span>is_vo_bit_set_unsafe(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+    is_vo_bit_set_inner::&lt;<span class="bool-val">false</span>&gt;(address)
 }
 
-<span class="kw">fn </span>is_vo_bit_set_inner&lt;<span class="kw">const </span>ATOMIC: bool, VM: VMBinding&gt;(
-    address: Address,
-) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-    <span class="kw">let </span>addr = get_in_object_address_for_potential_object::&lt;VM&gt;(address);
+<span class="kw">fn </span>is_vo_bit_set_inner&lt;<span class="kw">const </span>ATOMIC: bool&gt;(addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+    <span class="macro">debug_assert!</span>(
+        addr.is_aligned_to(ObjectReference::ALIGNMENT),
+        <span class="string">"Address is not word-aligned: {addr}"
+    </span>);
 
     <span class="comment">// If we haven't mapped VO bit for the address, it cannot be an object
     </span><span class="kw">if </span>!VO_BIT_SIDE_METADATA_SPEC.is_mapped(addr) {
@@ -375,12 +357,7 @@
         <span class="kw">unsafe </span>{ VO_BIT_SIDE_METADATA_SPEC.load::&lt;u8&gt;(addr) }
     };
 
-    <span class="kw">if </span>vo_bit == <span class="number">1 </span>{
-        <span class="kw">let </span>obj = get_object_ref_for_vo_addr::&lt;VM&gt;(addr);
-        <span class="prelude-val">Some</span>(obj)
-    } <span class="kw">else </span>{
-        <span class="prelude-val">None
-    </span>}
+    (vo_bit == <span class="number">1</span>).then(|| get_object_ref_for_vo_addr(addr))
 }
 
 <span class="doccomment">/// Bulk zero the VO bit.
@@ -436,16 +413,12 @@
     </span>}
 }
 
-<span class="doccomment">/// Turning a potential object reference into its in-object address (the ref_to_address address) where the metadata is set for.
-</span><span class="kw">fn </span>get_in_object_address_for_potential_object&lt;VM: VMBinding&gt;(potential_obj: Address) -&gt; Address {
-    potential_obj.offset(VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET)
-}
-
 <span class="doccomment">/// Get the object reference from an aligned address where VO bit is set.
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_object_ref_for_vo_addr&lt;VM: VMBinding&gt;(vo_addr: Address) -&gt; ObjectReference {
-    <span class="kw">let </span>addr = vo_addr.offset(-VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET);
-    <span class="kw">let </span>aligned = addr.align_up(ObjectReference::ALIGNMENT);
-    <span class="kw">unsafe </span>{ ObjectReference::from_raw_address_unchecked(aligned) }
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_object_ref_for_vo_addr(vo_addr: Address) -&gt; ObjectReference {
+    <span class="comment">// VO bit should be set on the address.
+    </span><span class="macro">debug_assert!</span>(vo_addr.is_aligned_to(ObjectReference::ALIGNMENT));
+    <span class="macro">debug_assert!</span>(<span class="kw">unsafe </span>{ is_vo_addr(vo_addr) });
+    <span class="kw">unsafe </span>{ ObjectReference::from_raw_address_unchecked(vo_addr) }
 }
 
 <span class="doccomment">/// Check if the address could be an internal pointer in the object.
@@ -460,10 +433,7 @@
     vo_addr: Address,
     internal_ptr: Address,
 ) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-    <span class="comment">// VO bit should be set on the address.
-    </span><span class="macro">debug_assert!</span>(<span class="kw">unsafe </span>{ is_vo_addr(vo_addr) });
-
-    <span class="kw">let </span>obj = get_object_ref_for_vo_addr::&lt;VM&gt;(vo_addr);
+    <span class="kw">let </span>obj = get_object_ref_for_vo_addr(vo_addr);
     <span class="kw">if </span>is_internal_ptr::&lt;VM&gt;(obj, internal_ptr) {
         <span class="prelude-val">Some</span>(obj)
     } <span class="kw">else </span>{

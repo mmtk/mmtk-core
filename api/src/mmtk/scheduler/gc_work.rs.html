@@ -1890,7 +1890,7 @@
         </span><span class="kw">let </span>worker = GCWorkerMutRef::new(<span class="self">self</span>.worker());
 
         <span class="comment">// Invoke trace object on sft
-        </span><span class="kw">let </span>sft = <span class="kw">unsafe </span>{ <span class="kw">crate</span>::mmtk::SFT_MAP.get_unchecked(object.to_address::&lt;VM&gt;()) };
+        </span><span class="kw">let </span>sft = <span class="kw">unsafe </span>{ <span class="kw">crate</span>::mmtk::SFT_MAP.get_unchecked(object.to_raw_address()) };
         sft.sft_trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>.base.nodes, object, worker)
     }
 

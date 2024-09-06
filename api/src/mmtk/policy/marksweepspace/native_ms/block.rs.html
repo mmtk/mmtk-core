@@ -745,7 +745,7 @@
                 <span class="comment">// clear VO bit if it is ever set. It is possible that the VO bit is never set for this cell (i.e. there was no object in this cell before this GC),
                 // we unset the bit anyway.
                 </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-                </span><span class="kw">crate</span>::util::metadata::vo_bit::unset_vo_bit_nocheck::&lt;VM&gt;(potential_object);
+                </span><span class="kw">crate</span>::util::metadata::vo_bit::unset_vo_bit_nocheck(potential_object);
                 <span class="kw">unsafe </span>{
                     cell.store::&lt;Address&gt;(last);
                 }

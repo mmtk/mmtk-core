@@ -253,7 +253,7 @@
         <span class="kw">for </span><span class="kw-2">mut </span>f <span class="kw">in </span><span class="self">self</span>.candidates.drain(start..).collect::&lt;Vec&lt;F&gt;&gt;() {
             <span class="kw">let </span>reff = f.get_reference();
             <span class="macro">trace!</span>(<span class="string">"Pop {:?} for finalization"</span>, reff);
-            <span class="kw">if </span>reff.is_live::&lt;E::VM&gt;() {
+            <span class="kw">if </span>reff.is_live() {
                 FinalizableProcessor::&lt;F&gt;::forward_finalizable_reference(e, <span class="kw-2">&amp;mut </span>f);
                 <span class="macro">trace!</span>(<span class="string">"{:?} is live, push {:?} back to candidates"</span>, reff, f);
                 <span class="self">self</span>.candidates.push(f);

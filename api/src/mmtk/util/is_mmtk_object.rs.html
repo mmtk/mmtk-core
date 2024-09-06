@@ -27,6 +27,11 @@
 <a href="#25" id="25">25</a>
 <a href="#26" id="26">26</a>
 <a href="#27" id="27">27</a>
+<a href="#28" id="28">28</a>
+<a href="#29" id="29">29</a>
+<a href="#30" id="30">30</a>
+<a href="#31" id="31">31</a>
+<a href="#32" id="32">32</a>
 </pre></div><pre class="rust"><code><span class="doccomment">/// The region size (in bytes) of the `VO_BIT` side metadata.
 /// The VM can use this to check if an object is properly aligned.
 </span><span class="kw">pub const </span>VO_BIT_REGION_SIZE: usize =
@@ -36,6 +41,11 @@
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>check_object_reference(addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
     <span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
+    <span class="macro">debug_assert_ne!</span>(addr, Address::ZERO, <span class="string">"Address is zero"</span>);
+    <span class="macro">debug_assert!</span>(
+        addr.is_aligned_to(ObjectReference::ALIGNMENT),
+        <span class="string">"Address is not aligned to word size: {addr}"
+    </span>);
     SFT_MAP.get_checked(addr).is_mmtk_object(addr)
 }
 
