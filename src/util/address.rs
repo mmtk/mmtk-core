@@ -536,10 +536,6 @@ use crate::vm::VMBinding;
 /// that do not hold a reference to an object.  Specifically, [`crate::vm::slot::Slot::load`]
 /// returns `Option<ObjectReference>`.  It can return `None` so that MMTk skips that slot.
 ///
-/// (Note: Although the VM binding can implement `crate::vm::ActivePlan::vm_trace_object` to ignore
-/// special addresses outside MMTk spaces that represent `null`, it is advisable not to let MMTk
-/// trace such `ObjectReference` values in the first place.)
-///
 /// `Option<ObjectReference>` should be used for the cases where a non-null object reference may or
 /// may not exist,  That includes several API functions, including [`crate::vm::slot::Slot::load`].
 /// [`ObjectReference`] is backed by `NonZeroUsize` which cannot be zero, and it has the
@@ -549,15 +545,24 @@ use crate::vm::VMBinding;
 /// For the convenience of passing `Option<ObjectReference>` to and from native (C/C++) programs,
 /// mmtk-core provides [`crate::util::api_util::NullableObjectReference`].
 ///
+/// ## About the `VMSpace`
+///
+/// The `VMSpace` is managed by the VM binding.  The VM binding declare ranges of memory as part of
+/// the `VMSpace`, but MMTk never allocates into it.  The VM binding allocates objects into the
+/// `VMSpace` (usually by mapping boot-images), and refers to objects in the `VMSpace` using
+/// `ObjectReference`s whose raw addresses point inside those objects (and must be word-aligned,
+/// too).  MMTk will access metadata using methods of [`ObjectModel`] like other objects.  MMTk also
+/// has side metadata available for objects in the `VMSpace`.
+///
 /// ## About `ObjectReference` pointing outside MMTk spaces
 ///
-/// If a VM binding implements `ActivePlan::vm_trace_object`, `ObjectReference` is allowed to point
-/// to locations outside any MMTk spaces.  When tracing objects, such `ObjectReference` values will
-/// be processed by `ActivePlan::vm_trace_object` so that the VM binding can trace its own allocated
-/// objects during GC.  However, **this is an experimental feature**, and may not interact well with
-/// other parts of MMTk.  Notably, MMTk will not allocate side metadata for such `ObjectReference`,
-/// and attempts to access side metadata with a non-MMTk `ObjectReference` will result in crash. Use
-/// with caution.
+/// If a VM binding implements [`crate::vm::ActivePlan::vm_trace_object`], `ObjectReference` is
+/// allowed to point to locations outside any MMTk spaces.  When tracing objects, such
+/// `ObjectReference` values will be processed by `ActivePlan::vm_trace_object` so that the VM
+/// binding can trace its own allocated objects during GC.  However, **this is an experimental
+/// feature**, and may not interact well with other parts of MMTk.  Notably, MMTk will not allocate
+/// side metadata for such `ObjectReference`, and attempts to access side metadata with a non-MMTk
+/// `ObjectReference` will result in crash. Use with caution.
 ///
 /// [FBC09]: https://dl.acm.org/doi/10.1145/1508293.1508305
 /// [JikesRVM]: https://www.jikesrvm.org/
