@@ -1,5 +1,3 @@
-extern crate mmtk;
-
 use mmtk::util::Address;
 
 #[test]

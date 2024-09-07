@@ -27,15 +27,10 @@
 //!   i.e. [the memory manager API](memory_manager/index.html) that allows a language's memory manager to use MMTk
 //!   and [the VMBinding trait](vm/trait.VMBinding.html) that allows MMTk to call the language implementation.
 
-extern crate libc;
-extern crate strum_macros;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
-extern crate atomic_traits;
-extern crate crossbeam;
-extern crate num_cpus;
 #[macro_use]
 extern crate downcast_rs;
 #[macro_use]
