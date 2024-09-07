@@ -80,7 +80,7 @@ See also:
 
 ## 0.27.0
 
-### `is_mmtk_object` returns `Option<ObjectReference>
+### `is_mmtk_object` returns `Option<ObjectReference>`
 
 ```admonish tldr
 `memory_manager::is_mmtk_object` now returns `Option<ObjectReference>` instead of `bool`.
