@@ -223,7 +223,7 @@ impl ReferenceProcessor {
 
     // These funcions call `trace_object()`, which will ensure the object and its descendents will
     // be traced.  They are only called in steps that expand the transitive closure.  That include
-    // retaining soft references, and (for MarkSweep) tracing objects for forwarding.
+    // retaining soft references, and (for MarkCompact) tracing objects for forwarding.
     // Note that finalizers also expand the transitive closure.
     // These functions are intended to make the code easier to understand.
 
