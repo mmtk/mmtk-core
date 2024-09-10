@@ -203,6 +203,7 @@ impl Stats {
                 c.print_total(Some(false));
             }
             print!("\t");
+            // c.print_count(phase);
         }
         for value in scheduler_stat.values() {
             print!("{}\t", value);

@@ -13,6 +13,7 @@ use crossbeam::queue::ArrayQueue;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
+use std::ffi::CString;
 
 /// Represents the ID of a GC worker thread.
 pub type ThreadId = usize;
@@ -206,6 +207,12 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// * `tls`: The VM-specific thread-local storage for this GC worker thread.
     /// * `mmtk`: A reference to an MMTk instance.
     pub fn run(mut self: Box<Self>, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
+        // Rename GC worker threads (so they're distinguishable in VTune)
+        unsafe{
+            let set_name = ittapi_sys::__itt_thread_set_name_ptr__3_0.unwrap();
+            let thread_name = format!("GC worker thread {}",self.ordinal);
+            set_name(CString::new(thread_name).unwrap().to_bytes_with_nul().as_ptr() as *const i8);
+        }
         probe!(mmtk, gcworker_run);
         debug!(
             "Worker started. ordinal: {}, {}",
