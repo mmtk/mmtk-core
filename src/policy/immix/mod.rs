@@ -17,7 +17,7 @@ pub const BLOCK_ONLY: bool = false;
 /// Do we allow Immix to do defragmentation?
 pub const DEFRAG: bool = !cfg!(feature = "immix_non_moving"); // defrag if we are allowed to move.
 
-// STRESS COPYING: Set the following options so that Immix will copy as many objects as possible.
+// STRESS COPYING: Set the feature 'immix_stress_copying' so that Immix will copy as many objects as possible.
 // Useful for debugging copying GC if you cannot use SemiSpace.
 //
 // | constant                  | when    | value   | comment                                                              |
@@ -32,15 +32,19 @@ pub const DEFRAG: bool = !cfg!(feature = "immix_non_moving"); // defrag if we ar
 // | `DEFRAG_HEADROOM_PERCENT` | stress  | `50`    | Reserve enough headroom to copy all objects.  50% is like SemiSpace. |
 
 /// Make every GC a defragment GC. (for debugging)
-pub const STRESS_DEFRAG: bool = false;
+pub const STRESS_DEFRAG: bool = cfg!(feature = "immix_stress_copying");
 
 /// Mark every allocated block as defragmentation source before GC. (for debugging)
-pub const DEFRAG_EVERY_BLOCK: bool = false;
+pub const DEFRAG_EVERY_BLOCK: bool = cfg!(feature = "immix_stress_copying");
 
 /// Percentage of heap size reserved for defragmentation.
 /// According to [this paper](https://doi.org/10.1145/1375581.1375586), Immix works well with
 /// headroom between 1% to 3% of the heap size.
-pub const DEFRAG_HEADROOM_PERCENT: usize = 2;
+pub const DEFRAG_HEADROOM_PERCENT: usize = if cfg!(feature = "immix_stress_copying") {
+    50
+} else {
+    2
+};
 
 /// If Immix is used as a nursery space, do we prefer copy?
 pub const PREFER_COPY_ON_NURSERY_GC: bool =
