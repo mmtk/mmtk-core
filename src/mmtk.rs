@@ -401,7 +401,7 @@ impl<VM: VMBinding> MMTK<VM> {
     }
 
     /// The application code has requested a collection. This is just a GC hint, and
-    /// we may ignore it.
+    /// we may ignore it. Returns whether a GC was ran or not.
     ///
     /// # Arguments
     /// * `tls`: The mutator thread that requests the GC
@@ -412,11 +412,11 @@ impl<VM: VMBinding> MMTK<VM> {
         tls: VMMutatorThread,
         force: bool,
         exhaustive: bool,
-    ) {
+    ) -> bool {
         use crate::vm::Collection;
         if !self.get_plan().constraints().collects_garbage {
             warn!("User attempted a collection request, but the plan can not do GC. The request is ignored.");
-            return;
+            return false;
         }
 
         if force || !*self.options.ignore_system_gc && VM::VMCollection::is_collection_enabled() {
@@ -432,7 +432,10 @@ impl<VM: VMBinding> MMTK<VM> {
                 .store(true, Ordering::Relaxed);
             self.gc_requester.request();
             VM::VMCollection::block_for_gc(tls);
+            return true;
         }
+
+        false
     }
 
     /// MMTK has requested stop-the-world activity (e.g., stw within a concurrent gc).
