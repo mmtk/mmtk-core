@@ -566,13 +566,21 @@ pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
     mmtk.get_plan().get_total_pages() << LOG_BYTES_IN_PAGE
 }
 
-/// Trigger a garbage collection as requested by the user.
+/// The application code has requested a collection. This is just a GC hint, and
+/// we may ignore it.
+///
+/// Returns whether a GC was ran or not. If MMTk triggers a GC, this method will block the
+/// calling thread and return true when the GC finishes. Otherwise, this method returns
+/// false immediately.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that triggers this collection request.
-pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
-    mmtk.handle_user_collection_request(tls, false, false);
+pub fn handle_user_collection_request<VM: VMBinding>(
+    mmtk: &MMTK<VM>,
+    tls: VMMutatorThread,
+) -> bool {
+    mmtk.handle_user_collection_request(tls, false, false)
 }
 
 /// Is the object alive?
