@@ -522,6 +522,13 @@
 <a href="#520" id="520">520</a>
 <a href="#521" id="521">521</a>
 <a href="#522" id="522">522</a>
+<a href="#523" id="523">523</a>
+<a href="#524" id="524">524</a>
+<a href="#525" id="525">525</a>
+<a href="#526" id="526">526</a>
+<a href="#527" id="527">527</a>
+<a href="#528" id="528">528</a>
+<a href="#529" id="529">529</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! MMTk instance.
 </span><span class="kw">use </span><span class="kw">crate</span>::global_state::{GcStatus, GlobalState};
 <span class="kw">use </span><span class="kw">crate</span>::plan::gc_requester::GCRequester;
@@ -927,6 +934,10 @@
     <span class="doccomment">/// The application code has requested a collection. This is just a GC hint, and
     /// we may ignore it.
     ///
+    /// Returns whether a GC was ran or not. If MMTk triggers a GC, this method will block the
+    /// calling thread and return true when the GC finishes. Otherwise, this method returns
+    /// false immediately.
+    ///
     /// # Arguments
     /// * `tls`: The mutator thread that requests the GC
     /// * `force`: The request cannot be ignored (except for NoGC)
@@ -936,11 +947,11 @@
         tls: VMMutatorThread,
         force: bool,
         exhaustive: bool,
-    ) {
+    ) -&gt; bool {
         <span class="kw">use </span><span class="kw">crate</span>::vm::Collection;
         <span class="kw">if </span>!<span class="self">self</span>.get_plan().constraints().collects_garbage {
             <span class="macro">warn!</span>(<span class="string">"User attempted a collection request, but the plan can not do GC. The request is ignored."</span>);
-            <span class="kw">return</span>;
+            <span class="kw">return </span><span class="bool-val">false</span>;
         }
 
         <span class="kw">if </span>force || !<span class="kw-2">*</span><span class="self">self</span>.options.ignore_system_gc &amp;&amp; VM::VMCollection::is_collection_enabled() {
@@ -956,8 +967,11 @@
                 .store(<span class="bool-val">true</span>, Ordering::Relaxed);
             <span class="self">self</span>.gc_requester.request();
             VM::VMCollection::block_for_gc(tls);
+            <span class="kw">return </span><span class="bool-val">true</span>;
         }
-    }
+
+        <span class="bool-val">false
+    </span>}
 
     <span class="doccomment">/// MMTK has requested stop-the-world activity (e.g., stw within a concurrent gc).
     </span><span class="comment">// This is not used, as we do not have a concurrent plan.
