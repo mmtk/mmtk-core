@@ -401,7 +401,11 @@ impl<VM: VMBinding> MMTK<VM> {
     }
 
     /// The application code has requested a collection. This is just a GC hint, and
-    /// we may ignore it. Returns whether a GC was ran or not.
+    /// we may ignore it.
+    ///
+    /// Returns whether a GC was ran or not. If MMTk triggers a GC, this method will block the
+    /// calling thread and return true when the GC finishes. Otherwise, this method returns
+    /// false immediately.
     ///
     /// # Arguments
     /// * `tls`: The mutator thread that requests the GC
