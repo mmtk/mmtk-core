@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.7.6"
+          ref: "ci-epoch"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
@@ -116,7 +116,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.7.6"
+          ref: "ci-epoch"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
@@ -191,7 +191,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.7.6"
+          ref: "ci-epoch"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
