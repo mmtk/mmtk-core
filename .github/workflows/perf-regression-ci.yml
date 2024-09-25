@@ -98,17 +98,18 @@ jobs:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     timeout-minutes: 1440
     steps:
-      - name: Checkout MMTk Core
+      # checkout latest versions
+      - name: Checkout MMTk Core (latest)
         uses: actions/checkout@v4
         with:
-          path: mmtk-core
-      - name: Checkout OpenJDK Binding
+          path: latest/mmtk-core
+      - name: Checkout OpenJDK Binding (latest)
         uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
-          path: mmtk-openjdk
-      - name: Checkout OpenJDK
-        working-directory: mmtk-openjdk
+          path: latest/mmtk-openjdk
+      - name: Checkout OpenJDK (latest)
+        working-directory: latest/mmtk-openjdk
         run: |
           ./.github/scripts/ci-checkout.sh
       # checkout perf-kit
@@ -120,21 +121,42 @@ jobs:
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
+      # checkout canary versions.
+      # Currently using a release version.
+      # We need a script to find the latest stable version from a list of tags (`git tags -l`).
+      # Alternatively, we may use the latest commit in the last epoch once we stablize the idea of epoch.
+      - name: Checkout MMTk Core (canary)
+        uses: actions/checkout@v4
+        with:
+          ref: "v0.27.0"
+          path: canary/mmtk-core
+      - name: Checkout OpenJDK Binding (canary)
+        uses: actions/checkout@v4
+        with:
+          ref: "v0.27.0"
+          repository: mmtk/mmtk-openjdk
+          path: canary/mmtk-openjdk
+      - name: Checkout OpenJDK (canary)
+        working-directory: canary/mmtk-openjdk
+        run: |
+          ./.github/scripts/ci-checkout.sh
       # setup
-      - name: Overwrite MMTk core in openjdk binding
-        run: cp -r mmtk-core mmtk-openjdk/repos/
+      - name: Setup directory structures
+        run: |
+          for BASE_DIR in . ./canary; do
+            pushd $BASE_DIR
+              # copy mmtk-core repo
+              cp -r mmtk-core mmtk-openjdk/repos/
+              # replace dependency
+              ./mmtk-core/.github/scripts/ci-replace-mmtk-dep.sh mmtk-openjdk/mmtk/Cargo.toml --mmtk-core-path repos/mmtk-core
+              # cleanup previous build
+              rm -rf mmtk-openjdk/repos/openjdk/scratch
+              rm -rf mmtk-openjdk/repos/openjdk/build
+            popd
+          done
       - name: Setup Rust Toolchain
+        # This seems unused.
         run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
-      # cleanup previosu build
-      - name: Cleanup previous build
-        run: |
-          rm -rf mmtk-openjdk/repos/openjdk/scratch
-          rm -rf mmtk-openjdk/repos/openjdk/build
-      - name: Setup
-        run: |
-          ./ci-perf-kit/scripts/history-run-setup.sh
-          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
-          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
       - id: branch
         # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
         run: echo "branch_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_OUTPUT
@@ -145,7 +167,10 @@ jobs:
           export RESULT_REPO_BRANCH=${{ env.RESULT_REPO_BRANCH }}
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
-          ./ci-perf-kit/scripts/openjdk-history-run.sh ./mmtk-openjdk ./reports/${{ steps.branch.outputs.branch_name }}
+          ./ci-perf-kit/scripts/openjdk-history-run.sh \
+            ./latest/mmtk-openjdk \
+            ./canary/mmtk-openjdk \
+            ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
       - name: Deploy to Github Page
         if: ${{ env.DEPLOY == 'true' }}
