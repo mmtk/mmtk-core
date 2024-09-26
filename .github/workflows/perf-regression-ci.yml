@@ -8,13 +8,13 @@ on:
   # READ BEFORE ENABLING THE TRIGGER BELOW
   # This trigger is only used when testing the scripts in a branch, and should be commented out in other cases.
   # If this trigger is used, please change the following env: RESULT_REPO_BRANCH -> 'test' (MUST), DEPLOY -> 'false' (optional)
-  # pull_request:
-  #   branches:
-  #     - master
+  pull_request:
+    branches:
+      - master
 
 env:
   # The branch to save run data and plot graph from. Use 'self-hosted' for master, use 'test' or anything else for testing in a branch.
-  RESULT_REPO_BRANCH: 'self-hosted'
+  RESULT_REPO_BRANCH: 'test'
   # Whether we deploy the generated page. Set to true for master.
   DEPLOY: true
   # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
@@ -24,6 +24,7 @@ env:
 jobs:
   # JikesRVM
   jikesrvm-perf-regression:
+    if: false # Disable this to test openjdk regression, only.
     runs-on: [self-hosted, Linux, freq-scaling-off]
     timeout-minutes: 1440
     steps:
@@ -114,6 +115,12 @@ jobs:
         with:
           repository: mmtk/mmtk-openjdk
           path: latest/mmtk-openjdk
+      - name: Modify latest version toolchain
+        working-directory: latest/mmtk-openjdk
+        run: |
+          cat mmtk/rust-toolchain
+          echo "stable" > mmtk/rust-toolchain
+          cat mmtk/rust-toolchain
       - name: Checkout OpenJDK (latest)
         working-directory: latest/mmtk-openjdk
         run: |
@@ -122,8 +129,8 @@ jobs:
       - name: Checkout Perf Kit
         uses: actions/checkout@v4
         with:
-          repository: mmtk/ci-perf-kit
-          ref: "0.8.0"
+          repository: wks/ci-perf-kit
+          ref: "feature/history-canary"
           path: ci-perf-kit
           submodules: true
       # checkout canary versions.
@@ -168,6 +175,7 @@ jobs:
           export RESULT_REPO_BRANCH=${{ env.RESULT_REPO_BRANCH }}
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
+          export OPENJDK_HISTORY_RUN_TEST_FAST=1
           ./ci-perf-kit/scripts/openjdk-history-run.sh \
             ./latest/mmtk-openjdk \
             ./canary/mmtk-openjdk \
@@ -196,6 +204,7 @@ jobs:
           if-no-files-found: error
 
   openjdk-mutator-perf:
+    if: false # Disable this to test openjdk regression, only.
     runs-on: [self-hosted, Linux, freq-scaling-off]
     timeout-minutes: 1440
     steps:
