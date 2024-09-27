@@ -49,7 +49,7 @@ API changes:
 See also:
 
 -   PR: <https://github.com/mmtk/mmtk-core/issues/1205>
--   Exampels:
+-   Examples:
     + https://github.com/mmtk/mmtk-julia/pull/177: Ignore return value.
 
 
