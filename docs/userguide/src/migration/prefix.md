@@ -32,6 +32,27 @@ Notes for the mmtk-core developers:
 
 ## 0.28.0
 
+### `handle_user_collection_request` returns `bool`
+
+```admonish tldr
+`memory_manager::handle_user_collection_request` now returns a boolean value to indicate whether a GC
+is triggered by the method or not. Bindings may use the return value to do some post-gc cleanup, or
+simply ignore the return value.
+```
+
+API changes:
+
+-   module `memory_manager`
+    +   `handle_user_collection_request` now returns `bool` to indicate if a GC is triggered by the method.
+        Bindings may use the value, or simply ignore it.
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/issues/1205>
+-   Examples:
+    + https://github.com/mmtk/mmtk-julia/pull/177: Ignore return value.
+
+
 ### `ObjectReference` must point inside an object
 
 ```admonish tldr
