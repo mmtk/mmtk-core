@@ -1810,15 +1810,15 @@
                 <span class="comment">// We are forwarding objects. When the copy allocator allocates the block, it should
                 // mark the block. So we do not need to explicitly mark it here.
 
-                // Clippy complains if the "vo_bit" feature is not enabled.
-                </span><span class="attr">#[allow(clippy::let_and_return)]
-                </span><span class="kw">let </span>new_object =
-                    object_forwarding::forward_object::&lt;VM&gt;(object, semantics, copy_context);
-
-                <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-                </span>vo_bit::helper::on_object_forwarded::&lt;VM&gt;(new_object);
-
-                new_object
+                </span>object_forwarding::forward_object::&lt;VM&gt;(
+                    object,
+                    semantics,
+                    copy_context,
+                    |_new_object| {
+                        <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+                        </span>vo_bit::helper::on_object_forwarded::&lt;VM&gt;(_new_object);
+                    },
+                )
             };
             <span class="macro">debug_assert_eq!</span>(
                 Block::containing(new_object).get_state(),

@@ -346,6 +346,7 @@
 <a href="#344" id="344">344</a>
 <a href="#345" id="345">345</a>
 <a href="#346" id="346">346</a>
+<a href="#347" id="347">347</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
@@ -600,10 +601,11 @@
                 object,
                 semantics.unwrap(),
                 worker.get_copy_context_mut(),
+                |_new_object| {
+                    <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+                    </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit(_new_object);
+                },
             );
-
-            <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-            </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit(new_object);
 
             <span class="macro">trace!</span>(<span class="string">"Forwarding pointer"</span>);
             queue.enqueue(new_object);
