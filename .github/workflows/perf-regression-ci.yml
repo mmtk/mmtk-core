@@ -128,12 +128,12 @@ jobs:
       - name: Checkout MMTk Core (canary)
         uses: actions/checkout@v4
         with:
-          ref: "v0.27.0"
+          ref: "v0.28.0"
           path: canary/mmtk-core
       - name: Checkout OpenJDK Binding (canary)
         uses: actions/checkout@v4
         with:
-          ref: "v0.27.0"
+          ref: "v0.28.0"
           repository: mmtk/mmtk-openjdk
           path: canary/mmtk-openjdk
       - name: Checkout OpenJDK (canary)
@@ -143,7 +143,7 @@ jobs:
       # setup
       - name: Setup directory structures
         run: |
-          for BASE_DIR in . ./canary; do
+          for BASE_DIR in ./latest ./canary; do
             pushd $BASE_DIR
               # copy mmtk-core repo
               cp -r mmtk-core mmtk-openjdk/repos/
