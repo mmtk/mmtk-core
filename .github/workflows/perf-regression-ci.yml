@@ -145,10 +145,11 @@ jobs:
         run: |
           for BASE_DIR in ./latest ./canary; do
             pushd $BASE_DIR
-              # copy mmtk-core repo
-              cp -r mmtk-core mmtk-openjdk/repos/
               # replace dependency
-              ./mmtk-core/.github/scripts/ci-replace-mmtk-dep.sh mmtk-openjdk/mmtk/Cargo.toml --mmtk-core-path ../repos/mmtk-core
+              # Note that ci-replace-mmtk-dep.sh will apply `realpath()` to the `--mmtk-core-path` option.
+              # so we specify the relative path from the PWD to the mmtk-core repo.
+              ./mmtk-core/.github/scripts/ci-replace-mmtk-dep.sh mmtk-openjdk/mmtk/Cargo.toml \
+                --mmtk-core-path mmtk-core
               # cleanup previous build
               rm -rf mmtk-openjdk/repos/openjdk/scratch
               rm -rf mmtk-openjdk/repos/openjdk/build
