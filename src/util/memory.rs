@@ -299,9 +299,34 @@ pub fn get_process_memory_maps() -> String {
     data
 }
 
+#[cfg(target_os = "macos")]
+pub fn get_process_memory_maps() -> String {
+    // Get the current process ID (replace this with a specific PID if needed)
+    let pid = std::process::id();
+
+    // Execute the vmmap command
+    let output = std::process::Command::new("vmmap")
+        .arg(pid.to_string())  // Pass the PID as an argument
+        .output()              // Capture the output
+        .expect("Failed to execute vmmap command");
+
+    // Check if the command was successful
+    if output.status.success() {
+        // Convert the command output to a string
+        let output_str = std::str::from_utf8(&output.stdout)
+            .expect("Failed to convert output to string");
+        output_str.to_string()
+    } else {
+        // Handle the error case
+        let error_message = std::str::from_utf8(&output.stderr)
+            .expect("Failed to convert error message to string");
+        panic!("Failed to get process memory map: {}", error_message)
+    }
+}
+
 /// Get the memory maps for the process. The returned string is a multi-line string.
 /// This is only meant to be used for debugging. For example, log process memory maps after detecting a clash.
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
+#[cfg(not(any(target_os = "linux", target_os = "android", target_os = "macos")))]
 pub fn get_process_memory_maps() -> String {
     "(process map unavailable)".to_string()
 }
