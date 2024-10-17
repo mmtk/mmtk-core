@@ -303,6 +303,8 @@ pub fn get_process_memory_maps() -> String {
     data
 }
 
+/// Get the memory maps for the process. The returned string is a multi-line string.
+/// This is only meant to be used for debugging. For example, log process memory maps after detecting a clash.
 #[cfg(target_os = "macos")]
 pub fn get_process_memory_maps() -> String {
     // Get the current process ID (replace this with a specific PID if needed)

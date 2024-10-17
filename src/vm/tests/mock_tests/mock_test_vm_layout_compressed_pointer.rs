@@ -13,7 +13,12 @@ fn test_vm_layout_compressed_pointer() {
     with_mockvm(
         default_setup,
         || {
-            let start = 0x4000_0000;
+            let start = if cfg!(target_os = "macos") {
+                // Impossible to map 0x4000_0000 on maocOS. SO choose a different address.
+                0x60_0000_0000
+            } else {
+                0x4000_0000
+            };
             let heap_size = 1024 * 1024;
             let end = match start + heap_size {
                 end if end <= (4usize << 30) => 4usize << 30,
