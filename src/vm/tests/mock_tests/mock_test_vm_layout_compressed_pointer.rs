@@ -15,7 +15,7 @@ fn test_vm_layout_compressed_pointer() {
         || {
             let start = if cfg!(target_os = "macos") {
                 // Impossible to map 0x4000_0000 on maocOS. SO choose a different address.
-                0x20_0000_0000
+                0x2_0000_0000
             } else {
                 0x4000_0000
             };
