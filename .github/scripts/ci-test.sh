@@ -34,7 +34,7 @@ find ./src ./tests -type f -name "mock_test_*" | while read -r file; do
 
     # Run the test with each plan it needs.
     for MMTK_PLAN in $PLANS; do
-        env MMTK_PLAN=$MMTK_PLAN cargo test --features mock_test,"$FEATURES" -- $t --nocapture;
+        env MMTK_PLAN=$MMTK_PLAN cargo test --features mock_test,"$FEATURES" -- $t;
     done
 done
 

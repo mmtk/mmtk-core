@@ -356,25 +356,6 @@ pub(crate) fn get_system_total_memory() -> u64 {
     sys.total_memory()
 }
 
-/// Find the given bytes that can be mmapped. This will do an anonymous mapping, record the return
-/// address and then unmap the mapping. This is only used for testing.
-#[cfg(test)]
-pub fn find_usable_address(bytes: usize, align: usize) -> Option<Address> {
-    let flags = libc::MAP_ANON | libc::MAP_PRIVATE;
-    let prot = MmapStrategy::TEST.prot.into_native_flags();
-    // Map extra to make sure that the return address is aligned.
-    let size_to_map = bytes + align;
-    let ret = unsafe { libc::mmap(std::ptr::null_mut(), size_to_map, prot, flags, -1, 0) };
-    if ret as isize == -1 {
-        None
-    } else {
-        let usable_addr = Address::from_mut_ptr(ret);
-        munmap(usable_addr, size_to_map).unwrap();
-        let ret = usable_addr.align_up(align);
-        Some(ret)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
