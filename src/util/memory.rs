@@ -195,7 +195,7 @@ pub fn handle_mmap_error<VM: VMBinding>(
 ) -> ! {
     use std::io::ErrorKind;
 
-    eprintln!("Failed to mmap {} - {}", addr, addr + bytes);
+    eprintln!("Failed to mmap {}, size {}", addr, bytes);
     eprintln!("{}", get_process_memory_maps());
 
     match error.kind() {
