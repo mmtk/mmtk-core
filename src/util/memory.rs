@@ -187,13 +187,20 @@ pub fn munmap(start: Address, size: usize) -> Result<()> {
 
 /// Properly handle errors from a mmap Result, including invoking the binding code in the case of
 /// an OOM error.
-pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
+pub fn handle_mmap_error<VM: VMBinding>(
+    error: Error,
+    tls: VMThread,
+    addr: Address,
+    bytes: usize,
+) -> ! {
     use std::io::ErrorKind;
+
+    eprintln!("Failed to mmap {} - {}", addr, addr + bytes);
+    eprintln!("{}", get_process_memory_maps());
 
     match error.kind() {
         // From Rust nightly 2021-05-12, we started to see Rust added this ErrorKind.
         ErrorKind::OutOfMemory => {
-            eprintln!("{}", get_process_memory_maps());
             // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
             trace!("Signal MmapOutOfMemory!");
             VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
@@ -206,7 +213,6 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
             if let Some(os_errno) = error.raw_os_error() {
                 // If it is OOM, we invoke out_of_memory() through the VM interface.
                 if os_errno == libc::ENOMEM {
-                    eprintln!("{}", get_process_memory_maps());
                     // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
                     trace!("Signal MmapOutOfMemory!");
                     VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
@@ -215,12 +221,10 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
             }
         }
         ErrorKind::AlreadyExists => {
-            eprintln!("{}", get_process_memory_maps());
             panic!("Failed to mmap, the address is already mapped. Should MMTk quarantine the address range first?");
         }
         _ => {}
     }
-    eprintln!("{}", get_process_memory_maps());
     panic!("Unexpected mmap failure: {:?}", error)
 }
 
@@ -306,20 +310,20 @@ pub fn get_process_memory_maps() -> String {
 
     // Execute the vmmap command
     let output = std::process::Command::new("vmmap")
-        .arg(pid.to_string())  // Pass the PID as an argument
-        .output()              // Capture the output
+        .arg(pid.to_string()) // Pass the PID as an argument
+        .output() // Capture the output
         .expect("Failed to execute vmmap command");
 
     // Check if the command was successful
     if output.status.success() {
         // Convert the command output to a string
-        let output_str = std::str::from_utf8(&output.stdout)
-            .expect("Failed to convert output to string");
+        let output_str =
+            std::str::from_utf8(&output.stdout).expect("Failed to convert output to string");
         output_str.to_string()
     } else {
         // Handle the error case
-        let error_message = std::str::from_utf8(&output.stderr)
-            .expect("Failed to convert error message to string");
+        let error_message =
+            std::str::from_utf8(&output.stderr).expect("Failed to convert error message to string");
         panic!("Failed to get process memory map: {}", error_message)
     }
 }

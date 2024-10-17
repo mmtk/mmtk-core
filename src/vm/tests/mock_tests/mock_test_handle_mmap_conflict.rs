@@ -22,6 +22,8 @@ pub fn test_handle_mmap_conflict() {
                 memory::handle_mmap_error::<MockVM>(
                     mmap2_res.err().unwrap(),
                     VMThread::UNINITIALIZED,
+                    start,
+                    one_megabyte,
                 );
             });
 
