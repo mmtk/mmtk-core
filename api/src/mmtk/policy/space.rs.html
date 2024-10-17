@@ -837,7 +837,7 @@
                                     .try_map_metadata_space(res.start, bytes),
                             )
                         {
-                            memory::handle_mmap_error::&lt;VM&gt;(mmap_error, tls);
+                            memory::handle_mmap_error::&lt;VM&gt;(mmap_error, tls, res.start, bytes);
                         }
                     };
                     <span class="kw">let </span>grow_space = || {
