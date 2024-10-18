@@ -24,6 +24,8 @@ pub fn test_handle_mmap_oom() {
                 memory::handle_mmap_error::<MockVM>(
                     mmap_res.err().unwrap(),
                     VMThread::UNINITIALIZED,
+                    start,
+                    LARGE_SIZE,
                 );
             });
             assert!(panic_res.is_err());
