@@ -97,6 +97,12 @@ jobs:
   openjdk-perf-regression:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     timeout-minutes: 1440
+    env:
+      # This version will be used as the canary version, and will be used to checkout both
+      # `mmtk-core` and `mmtk-openjdk`.  We choose one release version for this purpose. We may
+      # change to another release version if necessary, or introduce a mechanism to dynamically
+      # choose the canary in the future.
+      CANARY_VERSION: "v0.28.0"
     steps:
       # checkout latest versions
       - name: Checkout MMTk Core (latest)
@@ -119,21 +125,17 @@ jobs:
           repository: mmtk/ci-perf-kit
           ref: "0.8.0"
           path: ci-perf-kit
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
       # checkout canary versions.
-      # Currently using a release version.
-      # We need a script to find the latest stable version from a list of tags (`git tags -l`).
-      # Alternatively, we may use the latest commit in the last epoch once we stablize the idea of epoch.
       - name: Checkout MMTk Core (canary)
         uses: actions/checkout@v4
         with:
-          ref: "v0.28.0"
+          ref: $CANARY_VERSION
           path: canary/mmtk-core
       - name: Checkout OpenJDK Binding (canary)
         uses: actions/checkout@v4
         with:
-          ref: "v0.28.0"
+          ref: $CANARY_VERSION
           repository: mmtk/mmtk-openjdk
           path: canary/mmtk-openjdk
       - name: Checkout OpenJDK (canary)
@@ -155,7 +157,8 @@ jobs:
               rm -rf mmtk-openjdk/repos/openjdk/build
             popd
           done
-      - id: branch
+      - name: Setup branch name
+        id: branch
         # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
         run: echo "branch_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_OUTPUT
       # run
