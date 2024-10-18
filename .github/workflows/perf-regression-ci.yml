@@ -130,12 +130,12 @@ jobs:
       - name: Checkout MMTk Core (canary)
         uses: actions/checkout@v4
         with:
-          ref: $CANARY_VERSION
+          ref: ${{ env.CANARY_VERSION }}
           path: canary/mmtk-core
       - name: Checkout OpenJDK Binding (canary)
         uses: actions/checkout@v4
         with:
-          ref: $CANARY_VERSION
+          ref: ${{ env.CANARY_VERSION }}
           repository: mmtk/mmtk-openjdk
           path: canary/mmtk-openjdk
       - name: Checkout OpenJDK (canary)
