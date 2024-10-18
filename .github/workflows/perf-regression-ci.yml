@@ -155,9 +155,6 @@ jobs:
               rm -rf mmtk-openjdk/repos/openjdk/build
             popd
           done
-      - name: Setup Rust Toolchain
-        # This seems unused.
-        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
       - id: branch
         # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
         run: echo "branch_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_OUTPUT
