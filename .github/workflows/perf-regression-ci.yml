@@ -111,9 +111,10 @@ jobs:
       # Running the canary alongside regular regression tests help us identify unnoticed environment
       # changes and the level of noise.
       #
-      # Currently, we choose one release version as the canary.  We may change to another release
-      # version if necessary, or introduce a mechanism to dynamically choose the canary in the
-      # future.
+      # Currently, we choose one release version as the canary, and will use it until we can no
+      # longer run it for any reason, such as the toolchain for compiling that version is no longer
+      # available.  Then we may change to another release version and mark the change of canary on
+      # the timeline, or introduce a mechanism to dynamically choose the canary version.
       CANARY_VERSION: "v0.28.0"
     steps:
       # checkout latest versions
@@ -135,7 +136,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.8.0"
+          ref: "0.8.1"
           path: ci-perf-kit
           submodules: true
       # checkout canary versions.
