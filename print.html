@@ -1701,8 +1701,7 @@ with a fixed heap range. However, both setting options and VM layouts are option
 <li>Create an <code>MMTK</code> instance via <a href="https://docs.mmtk.io/api/mmtk/memory_manager/fn.mmtk_init.html"><code>memory_manager::mmtk_init()</code></a>. This
 enables the binding to use most of the MMTk APIs in <a href="https://docs.mmtk.io/api/mmtk/memory_manager/index.html"><code>memory_manager</code></a>, as most
 APIs require a reference to <code>MMTK</code>.</li>
-<li>When the runtime is ready for GCs (including getting its thread system ready to spawn GC threads), it is expected to call [<code>memory_manager::initialize_collection</code>]
-(https://docs.mmtk.io/api/mmtk/memory_manager/fn.initialize_collection.html). Once the function returns, MMTk may trigger a GC at any appropriate time.
+<li>When the runtime is ready for GCs (including getting its thread system ready to spawn GC threads), it is expected to call <a href="https://docs.mmtk.io/api/mmtk/memory_manager/fn.initialize_collection.html"><code>memory_manager::initialize_collection</code></a>. Once the function returns, MMTk may trigger a GC at any appropriate time.
 In terms of getting NoGC to work, this step is optional, as NoGC will not trigger GCs.</li>
 </ol>
 <p>In practice, it greatly depends on the runtime about how to expose the MMTk's Rust API above to native, and when to call the native API in the runtime.
