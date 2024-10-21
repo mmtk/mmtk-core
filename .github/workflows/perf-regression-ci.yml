@@ -99,9 +99,21 @@ jobs:
     timeout-minutes: 1440
     env:
       # This version will be used as the canary version, and will be used to checkout both
-      # `mmtk-core` and `mmtk-openjdk`.  We choose one release version for this purpose. We may
-      # change to another release version if necessary, or introduce a mechanism to dynamically
-      # choose the canary in the future.
+      # `mmtk-core` and `mmtk-openjdk`.
+      #
+      # A "canary" is a chosen version that is tested alongside each merged pull request.  The
+      # performance of the canary should not change unless
+      #
+      # 1.  There is an environment change, such as changes of the operating system, the hardware,
+      #     the firmware, or the methodology we use for testing, or
+      # 2.  There are non-deterministic factors (i.e. noises) affecting each execution.
+      #
+      # Running the canary alongside regular regression tests help us identify unnoticed environment
+      # changes and the level of noise.
+      #
+      # Currently, we choose one release version as the canary.  We may change to another release
+      # version if necessary, or introduce a mechanism to dynamically choose the canary in the
+      # future.
       CANARY_VERSION: "v0.28.0"
     steps:
       # checkout latest versions
