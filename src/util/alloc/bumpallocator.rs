@@ -199,7 +199,11 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         }
 
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-        let acquired_start = self.space.acquire(self.tls, bytes_to_pages_up(block_size));
+        let acquired_start = self.space.acquire(
+            self.tls,
+            bytes_to_pages_up(block_size),
+            self.get_context().is_no_gc_on_fail(),
+        );
         if acquired_start.is_zero() {
             trace!("Failed to acquire a new block");
             acquired_start

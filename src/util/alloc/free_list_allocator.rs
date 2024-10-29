@@ -296,7 +296,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     ) -> Option<Block> {
         let bin = mi_bin::<VM>(size, align);
         loop {
-            match self.space.acquire_block(self.tls, size, align) {
+            match self.space.acquire_block(self.tls, size, align, self.get_context().is_no_gc_on_fail()) {
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::Exhausted => {
                     debug!("Acquire global block: None");
                     // GC

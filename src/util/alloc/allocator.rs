@@ -6,6 +6,7 @@ use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::options::Options;
 use crate::MMTK;
 
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -130,8 +131,31 @@ pub fn get_maximum_aligned_size_inner<VM: VMBinding>(
     }
 }
 
+#[cfg(debug_assertions)]
+pub(crate) fn asset_allocation_args<VM: VMBinding>(size: usize, align: usize, offset: usize) {
+    // MMTk has assumptions about minimal object size.
+    // We need to make sure that all allocations comply with the min object size.
+    // Ideally, we check the allocation size, and if it is smaller, we transparently allocate the min
+    // object size (the VM does not need to know this). However, for the VM bindings we support at the moment,
+    // their object sizes are all larger than MMTk's min object size, so we simply put an assertion here.
+    // If you plan to use MMTk with a VM with its object size smaller than MMTk's min object size, you should
+    // meet the min object size in the fastpath.
+    debug_assert!(size >= MIN_OBJECT_SIZE);
+    // Assert alignment
+    debug_assert!(align >= VM::MIN_ALIGNMENT);
+    debug_assert!(align <= VM::MAX_ALIGNMENT);
+    // Assert offset
+    debug_assert!(VM::USE_ALLOCATION_OFFSET || offset == 0);
+}
+
 /// The context an allocator needs to access in order to perform allocation.
 pub struct AllocatorContext<VM: VMBinding> {
+    /// Whether we should trigger a GC when the current alloccation fails.
+    /// The default value is `false`. This value is only set to `true` when
+    /// the binding requests a 'no-gc' alloc, and will be set back to `false`
+    /// when the allocation is done (successfully or not).
+    /// As allocators are thread-local data structures, this should be fine.
+    pub no_gc_on_fail: AtomicBool,
     pub state: Arc<GlobalState>,
     pub options: Arc<Options>,
     pub gc_trigger: Arc<GCTrigger<VM>>,
@@ -142,12 +166,22 @@ pub struct AllocatorContext<VM: VMBinding> {
 impl<VM: VMBinding> AllocatorContext<VM> {
     pub fn new(mmtk: &MMTK<VM>) -> Self {
         Self {
+            no_gc_on_fail: AtomicBool::new(false),
             state: mmtk.state.clone(),
             options: mmtk.options.clone(),
             gc_trigger: mmtk.gc_trigger.clone(),
             #[cfg(feature = "analysis")]
             analysis_manager: mmtk.analysis_manager.clone(),
         }
+    }
+
+    pub fn set_no_gc_on_fail(&self, v: bool) {
+        trace!("set_no_gc_on_fail: {}", v);
+        self.no_gc_on_fail.store(v, Ordering::Relaxed);
+    }
+
+    pub fn is_no_gc_on_fail(&self) -> bool {
+        self.no_gc_on_fail.load(Ordering::Relaxed)
     }
 }
 
@@ -180,9 +214,13 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// If an allocator supports thread local allocations, then the allocation will be serviced
     /// from its TLAB, otherwise it will default to using the slowpath, i.e. [`alloc_slow`](Allocator::alloc_slow).
     ///
+    /// If the heap is full, we trigger a GC and attempt to free up
+    /// more memory, and re-attempt the allocation.
+    ///
     /// Note that in the case where the VM is out of memory, we invoke
     /// [`Collection::out_of_memory`] to inform the binding and then return a null pointer back to
     /// it. We have no assumptions on whether the VM will continue executing or abort immediately.
+    /// If the VM continues execution, the function will return a null address.
     ///
     /// An allocator needs to make sure the object reference for the returned address is in the same
     /// chunk as the returned address (so the side metadata and the SFT for an object reference is valid).
@@ -194,6 +232,20 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `offset` the required offset in bytes.
     fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address;
 
+    /// An allocation attempt. Mostly the same as [`Allocator::alloc`], except that MMTk will
+    /// not trigger a GC on allocation failure.
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
+    fn alloc_no_gc(&mut self, size: usize, align: usize, offset: usize) -> Address {
+        self.get_context().set_no_gc_on_fail(true);
+        let ret = self.alloc(size, align, offset);
+        self.get_context().set_no_gc_on_fail(false);
+        ret
+    }
+
     /// Slowpath allocation attempt. This function is explicitly not inlined for performance
     /// considerations.
     ///
@@ -204,6 +256,24 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     #[inline(never)]
     fn alloc_slow(&mut self, size: usize, align: usize, offset: usize) -> Address {
         self.alloc_slow_inline(size, align, offset)
+    }
+
+    /// Slowpath allocation attempt. Mostly the same as [`Allocator::alloc_slow`], except that MMTk will
+    /// not trigger a GC on allocation failure.
+    ///
+    /// This function is not used internally. It is mostly for the bindings.
+    /// [`Allocator::alloc_no_gc`] still calls the normal [`Allocator::alloc_slow`].
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
+    fn alloc_slow_no_gc(&mut self, size: usize, align: usize, offset: usize) -> Address {
+        // The function is not used internally. We won't set no_gc_on_fail redundantly.
+        self.get_context().set_no_gc_on_fail(true);
+        let ret = self.alloc_slow(size, align, offset);
+        self.get_context().set_no_gc_on_fail(false);
+        ret
     }
 
     /// Slowpath allocation attempt. This function executes the actual slowpath allocation.  A
@@ -253,6 +323,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
 
             if !is_mutator {
                 debug_assert!(!result.is_zero());
+                return result;
+            }
+
+            if result.is_zero() && self.get_context().is_no_gc_on_fail() {
                 return result;
             }
 

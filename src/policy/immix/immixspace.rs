@@ -516,8 +516,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Allocate a clean block.
-    pub fn get_clean_block(&self, tls: VMThread, copy: bool) -> Option<Block> {
-        let block_address = self.acquire(tls, Block::PAGES);
+    pub fn get_clean_block(&self, tls: VMThread, copy: bool, no_gc_on_fail: bool) -> Option<Block> {
+        let block_address = self.acquire(tls, Block::PAGES, no_gc_on_fail);
         if block_address.is_zero() {
             return None;
         }

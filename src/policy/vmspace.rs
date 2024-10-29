@@ -136,7 +136,7 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
         unreachable!()
     }
 
-    fn acquire(&self, _tls: VMThread, _pages: usize) -> Address {
+    fn acquire(&self, _tls: VMThread, _pages: usize, _no_gc_on_fail: bool) -> Address {
         unreachable!()
     }
 

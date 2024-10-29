@@ -18,7 +18,7 @@ use crate::plan::{Mutator, MutatorContext};
 use crate::scheduler::WorkBucketStage;
 use crate::scheduler::{GCWork, GCWorker};
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
@@ -140,7 +140,19 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
     mutator.flush()
 }
 
-/// Allocate memory for an object. For performance reasons, a VM should
+/// Allocate memory for an object. This function is a GC safepoint. If MMTk fails
+/// to allocate memory, it will attempt a GC to free up some memory and retry
+/// the allocation.
+///
+/// This function in most cases returns a valid memory address.
+/// This function may return a zero address iif 1. MMTk attempts at least one GC,
+/// 2. the GC does not free up enough memory, 3. MMTk calls [`crate::vm::Collection::out_of_memory`]
+/// to the binding, and 4. the binding returns from [`crate::vm::Collection::out_of_memory`]
+/// instead of throwing an exception/error.
+///
+/// * Note
+///
+/// For performance reasons, a VM should
 /// implement the allocation fast-path on their side rather than just calling this function.
 ///
 /// If the VM provides a non-zero `offset` parameter, then the returned address will be
@@ -159,24 +171,48 @@ pub fn alloc<VM: VMBinding>(
     offset: usize,
     semantics: AllocationSemantics,
 ) -> Address {
-    // MMTk has assumptions about minimal object size.
-    // We need to make sure that all allocations comply with the min object size.
-    // Ideally, we check the allocation size, and if it is smaller, we transparently allocate the min
-    // object size (the VM does not need to know this). However, for the VM bindings we support at the moment,
-    // their object sizes are all larger than MMTk's min object size, so we simply put an assertion here.
-    // If you plan to use MMTk with a VM with its object size smaller than MMTk's min object size, you should
-    // meet the min object size in the fastpath.
-    debug_assert!(size >= MIN_OBJECT_SIZE);
-    // Assert alignment
-    debug_assert!(align >= VM::MIN_ALIGNMENT);
-    debug_assert!(align <= VM::MAX_ALIGNMENT);
-    // Assert offset
-    debug_assert!(VM::USE_ALLOCATION_OFFSET || offset == 0);
+    #[cfg(debug_assertions)]
+    crate::util::alloc::allocator::asset_allocation_args::<VM>(size, align, offset);
 
     mutator.alloc(size, align, offset, semantics)
 }
 
-/// Invoke the allocation slow path. This is only intended for use when a binding implements the fastpath on
+/// Allocate memory for an object. This function is NOT a GC safepoint. If MMTk fails
+/// to allocate memory, it will not attempt a GC, nor call [`crate::vm::Collection::out_of_memory`],
+/// MMTk instead return a zero address.
+///
+/// Generally [`alloc`] is preferred over this function. This function should only be used
+/// when the binding does not want GCs to happen during the particular allocationq requests,
+/// and is willing to deal with the allocation failure.
+///
+/// Notes on [`alloc`] also apply to this function.
+///
+/// Arguments:
+/// * `mutator`: The mutator to perform this allocation request.
+/// * `size`: The number of bytes required for the object.
+/// * `align`: Required alignment for the object.
+/// * `offset`: Offset associated with the alignment.
+/// * `semantics`: The allocation semantic required for the allocation.
+pub fn alloc_no_gc<VM: VMBinding>(
+    mutator: &mut Mutator<VM>,
+    size: usize,
+    align: usize,
+    offset: usize,
+    semantics: AllocationSemantics,
+) -> Address {
+    #[cfg(debug_assertions)]
+    crate::util::alloc::allocator::asset_allocation_args::<VM>(size, align, offset);
+
+    mutator.alloc_no_gc(size, align, offset, semantics)
+}
+
+/// Invoke the allocation slow path. This function is a GC safepoint. If MMTk fails
+/// to allocate memory, it will attempt a GC to free up some memory and retry
+/// the allocation. See [`alloc`] for more details.
+///
+/// * Notes
+///
+/// This is only intended for use when a binding implements the fastpath on
 /// the binding side. When the binding handles fast path allocation and the fast path fails, it can use this
 /// method for slow path allocation. Calling before exhausting fast path allocaiton buffer will lead to bad
 /// performance.
@@ -195,6 +231,28 @@ pub fn alloc_slow<VM: VMBinding>(
     semantics: AllocationSemantics,
 ) -> Address {
     mutator.alloc_slow(size, align, offset, semantics)
+}
+
+/// Invoke the allocation slow path. This function is NOT a GC safepoint. If MMTk fails
+/// to allocate memory, it will not attempt a GC, nor call [`crate::vm::Collection::out_of_memory`],
+/// MMTk instead return a zero address. See [`alloc_no_gc`] for more details.
+///
+/// Notes on [`alloc_slow_no_gc`] also apply to this function.
+///
+/// Arguments:
+/// * `mutator`: The mutator to perform this allocation request.
+/// * `size`: The number of bytes required for the object.
+/// * `align`: Required alignment for the object.
+/// * `offset`: Offset associated with the alignment.
+/// * `semantics`: The allocation semantic required for the allocation.
+pub fn alloc_slow_no_gc<VM: VMBinding>(
+    mutator: &mut Mutator<VM>,
+    size: usize,
+    align: usize,
+    offset: usize,
+    semantics: AllocationSemantics,
+) -> Address {
+    mutator.alloc_slow_no_gc(size, align, offset, semantics)
 }
 
 /// Perform post-allocation actions, usually initializing object metadata. For many allocators none are
