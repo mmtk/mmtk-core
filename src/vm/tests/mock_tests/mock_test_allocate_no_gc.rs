@@ -13,22 +13,30 @@ pub fn allocate_no_gc() {
             const MB: usize = 1024 * 1024;
             let mut fixture = MutatorFixture::create_with_heapsize(MB);
 
-            // Attempt allocation: allocate 1024 bytes. We should fill up the heap by 10 allocations or fewer (some plans reserves more memory, such as semispace and generational GCs)
+            let mut last_result = crate::util::Address::MAX;
+
+            // Attempt allocation: allocate 1024 bytes. We should fill up the heap by 1024 allocations or fewer (some plans reserves more memory, such as semispace and generational GCs)
             // Run a few more times to test if we set/unset no_gc_on_fail properly.
-            for _ in 0..20 {
-                let addr = memory_manager::alloc_no_gc(
+            for _ in 0..1100 {
+                last_result = memory_manager::alloc_no_gc(
                     &mut fixture.mutator,
                     1024,
                     8,
                     0,
                     AllocationSemantics::Default,
                 );
-                if addr.is_zero() {
+                if last_result.is_zero() {
                     read_mockvm(|mock| {
                         assert!(!mock.block_for_gc.is_called());
                     });
+                    read_mockvm(|mock| {
+                        assert!(!mock.out_of_memory.is_called());
+                    });
                 }
             }
+
+            // The allocation should consume all the heap, and the last result should be zero (failure).
+            assert!(last_result.is_zero());
         },
         no_cleanup,
     )
