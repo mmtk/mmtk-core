@@ -5,7 +5,7 @@ use crate::AllocationSemantics;
 /// This test will do alloc_no_gc in a loop, and evetually fill up the heap.
 /// As alloc_no_gc will not trigger a GC, we expect to see a return value of zero, and no GC is triggered.
 #[test]
-pub fn allocate_no_gc() {
+pub fn allocate_no_gc_simple() {
     // 1MB heap
     with_mockvm(
         default_setup,

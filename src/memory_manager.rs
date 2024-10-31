@@ -160,12 +160,6 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
 /// not limited to throwing exceptions or errors. If [`crate::vm::Collection::out_of_memory`] returns
 /// normally without panicking or throwing exceptions, this function will return zero.
 ///
-/// This function in most cases returns a valid memory address.
-/// This function may return a zero address iif 1. MMTk attempts at least one GC,
-/// 2. the GC does not free up enough memory, 3. MMTk calls [`crate::vm::Collection::out_of_memory`]
-/// to the binding, and 4. the binding returns from [`crate::vm::Collection::out_of_memory`]
-/// instead of throwing an exception/error.
-///
 /// For performance reasons, a VM should implement the allocation fast-path on their side rather
 /// than just calling this function.
 ///
@@ -183,7 +177,7 @@ pub fn alloc<VM: VMBinding>(
     semantics: AllocationSemantics,
 ) -> Address {
     #[cfg(debug_assertions)]
-    crate::util::alloc::allocator::asset_allocation_args::<VM>(size, align, offset);
+    crate::util::alloc::allocator::assert_allocation_args::<VM>(size, align, offset);
 
     mutator.alloc(size, align, offset, semantics)
 }
@@ -212,7 +206,7 @@ pub fn alloc_no_gc<VM: VMBinding>(
     semantics: AllocationSemantics,
 ) -> Address {
     #[cfg(debug_assertions)]
-    crate::util::alloc::allocator::asset_allocation_args::<VM>(size, align, offset);
+    crate::util::alloc::allocator::assert_allocation_args::<VM>(size, align, offset);
 
     mutator.alloc_no_gc(size, align, offset, semantics)
 }

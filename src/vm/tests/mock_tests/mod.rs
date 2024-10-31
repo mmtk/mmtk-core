@@ -24,7 +24,8 @@ pub(crate) mod mock_test_prelude {
 }
 
 mod mock_test_allocate_align_offset;
-mod mock_test_allocate_no_gc;
+mod mock_test_allocate_no_gc_oom_on_acquire;
+mod mock_test_allocate_no_gc_simple;
 mod mock_test_allocate_with_disable_collection;
 mod mock_test_allocate_with_initialize_collection;
 mod mock_test_allocate_with_re_enable_collection;

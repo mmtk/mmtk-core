@@ -132,7 +132,7 @@ pub fn get_maximum_aligned_size_inner<VM: VMBinding>(
 }
 
 #[cfg(debug_assertions)]
-pub(crate) fn asset_allocation_args<VM: VMBinding>(size: usize, align: usize, offset: usize) {
+pub(crate) fn assert_allocation_args<VM: VMBinding>(size: usize, align: usize, offset: usize) {
     // MMTk has assumptions about minimal object size.
     // We need to make sure that all allocations comply with the min object size.
     // Ideally, we check the allocation size, and if it is smaller, we transparently allocate the min
@@ -150,7 +150,7 @@ pub(crate) fn asset_allocation_args<VM: VMBinding>(size: usize, align: usize, of
 
 /// The context an allocator needs to access in order to perform allocation.
 pub struct AllocatorContext<VM: VMBinding> {
-    /// Whether we should trigger a GC when the current alloccation fails.
+    /// Whether we should avoid trigger a GC when the current allocation fails.
     /// The default value is `false`. This value is only set to `true` when
     /// the binding requests a 'no-gc' alloc, and will be set back to `false`
     /// when the allocation is done (successfully or not).

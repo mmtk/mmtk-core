@@ -300,7 +300,7 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     fn prepare(&mut self, tls: VMWorkerThread);
     /// Do the release work for this mutator.
     fn release(&mut self, tls: VMWorkerThread);
-    /// Allocate memory for an object. This is a GC safepoint. GC will be triggered if the allocation fails.
+    /// Allocate memory for an object. This function will trigger a GC on failed allocation.
     ///
     /// Arguments:
     /// * `size`: the number of bytes required for the object.
@@ -314,8 +314,7 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
         offset: usize,
         allocator: AllocationSemantics,
     ) -> Address;
-    /// Allocate memory for an object. This is NOT a GC safepoint. If the allocation fails,
-    /// the function returns a zero value without triggering a GC.
+    /// Allocate memory for an object. This function will not trigger a GC on failed allocation.
     ///
     /// Arguments:
     /// * `size`: the number of bytes required for the object.
@@ -329,7 +328,7 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
         offset: usize,
         allocator: AllocationSemantics,
     ) -> Address;
-    /// The slow path allocation. This is a GC safepoint. GC will be triggered if the allocation fails.
+    /// The slow path allocation for [`MutatorContext::alloc`]. This function will trigger a GC on failed allocation.
     ///
     ///  This is only useful when the binding
     /// implements the fast path allocation, and would like to explicitly
@@ -341,8 +340,7 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
         offset: usize,
         allocator: AllocationSemantics,
     ) -> Address;
-    /// The slow path allocation. This is NOT a GC safepoint. If the allocation fails,
-    /// the function returns a zero value without triggering a GC.
+    /// The slow path allocation for [`MutatorContext::alloc_no_gc`]. This function will not trigger a GC on failed allocation.
     ///
     /// This is only useful when the binding
     /// implements the fast path allocation, and would like to explicitly
