@@ -67,10 +67,17 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// avoid arithmatic overflow. If we have to do computation in the allocation fastpath and
     /// overflow happens there, there is nothing we can do about it.
     /// Return a boolean to indicate if we will be out of memory, determined by the check.
-    fn will_oom_on_acquire(&self, tls: VMThread, size: usize, allow_oom_call: bool) -> bool {
+    fn will_oom_on_acquire(&self, size: usize) -> bool {
         let max_pages = self.get_gc_trigger().policy.get_max_heap_size_in_pages();
         let requested_pages = size >> LOG_BYTES_IN_PAGE;
-        if requested_pages > max_pages {
+        requested_pages > max_pages
+    }
+
+    /// Check if the requested `size` is an obvious out-of-memory case using
+    /// [`Self::will_oom_on_acquire`] and, if it is, call `Collection::out_of_memory`.  Return the
+    /// result of `will_oom_on_acquire`.
+    fn handle_obvious_oom_request(&self, tls: VMThread, size: usize, allow_oom_call: bool) -> bool {
+        if self.will_oom_on_acquire(size) {
             if allow_oom_call {
                 VM::VMCollection::out_of_memory(
                     tls,
@@ -90,7 +97,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         );
 
         debug_assert!(
-            !self.will_oom_on_acquire(tls, pages << LOG_BYTES_IN_PAGE, !no_gc_on_fail),
+            !self.will_oom_on_acquire(pages << LOG_BYTES_IN_PAGE),
             "The requested pages is larger than the max heap size. Is will_go_oom_on_acquire used before acquring memory?"
         );
 
