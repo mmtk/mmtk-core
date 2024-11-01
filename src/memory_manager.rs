@@ -149,9 +149,9 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
 ///
 /// If MMTk fails to allocate memory, it will attempt a GC to free up some memory and retry the
 /// allocation.  After triggering GC, it will call [`crate::vm::Collection::block_for_gc`] to suspend
-/// the current thread that is allocating. Callers of this function must be aware of this behavior.
+/// the current thread that is allocating. Callers of `alloc` must be aware of this behavior.
 /// For example, JIT compilers that support
-/// precise stack scanning need to make the call site a GC-safe point by generating stack maps. See
+/// precise stack scanning need to make the call site of `alloc` a GC-safe point by generating stack maps. See
 /// [`alloc_no_gc`] if it is undesirable to trigger GC at this allocation site.
 ///
 /// If MMTk has attempted at least one GC, and still cannot free up enough memory, it will call
