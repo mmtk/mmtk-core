@@ -69,6 +69,17 @@ on:
 jobs:
   binding-refs:
     runs-on: ubuntu-latest
+    env:
+      OPENJDK_BINDING_REPO_DEFAULT: mmtk/mmtk-openjdk
+      OPENJDK_BINDING_REF_DEFAULT: master
+      JIKESRVM_BINDING_REPO_DEFAULT: mmtk/mmtk-jikesrvm
+      JIKESRVM_BINDING_REF_DEFAULT: master
+      V8_BINDING_REPO_DEFAULT: mmtk/mmtk-v8
+      V8_BINDING_REF_DEFAULT: master
+      JULIA_BINDING_REPO_DEFAULT: mmtk/mmtk-julia
+      JULIA_BINDING_REF_DEFAULT: dev
+      RUBY_BINDING_REPO_DEFAULT: mmtk/mmtk-ruby
+      RUBY_BINDING_REF_DEFAULT: master
     outputs:
         openjdk_binding_repo: ${{ steps.print.outputs.openjdk_binding_repo }}
         openjdk_binding_ref: ${{ steps.print.outputs.openjdk_binding_ref }}
@@ -86,7 +97,7 @@ jobs:
           with:
             pull_request: ${{ inputs.pull_request }}
             token: ${{ secrets.GITHUB_TOKEN }}
-            default_env: 'OPENJDK_BINDING_REPO=mmtk/mmtk-openjdk,OPENJDK_BINDING_REF=master,JIKESRVM_BINDING_REPO=mmtk/mmtk-jikesrvm,JIKESRVM_BINDING_REF=master,V8_BINDING_REPO=mmtk/mmtk-v8,V8_BINDING_REF=master,JULIA_BINDING_REPO=mmtk/mmtk-julia,JULIA_BINDING_REF=master,RUBY_BINDING_REPO=mmtk/mmtk-ruby,RUBY_BINDING_REF=master'
+            default_env: 'OPENJDK_BINDING_REPO=${{ env.OPENJDK_BINDING_REPO_DEFAULT }},OPENJDK_BINDING_REF=${{ env.OPENJDK_BINDING_REF_DEFAULT }},JIKESRVM_BINDING_REPO=${{ env.JIKESRVM_BINDING_REPO_DEFAULT }},JIKESRVM_BINDING_REF=${{ env.JIKESRVM_BINDING_REF_DEFAULT }},V8_BINDING_REPO=${{ env.V8_BINDING_REPO_DEFAULT }},V8_BINDING_REF=${{ env.V8_BINDING_REF_DEFAULT }},JULIA_BINDING_REPO=${{ env.JULIA_BINDING_REPO_DEFAULT }},JULIA_BINDING_REF=${{ env.JULIA_BINDING_REF_DEFAULT }},RUBY_BINDING_REPO=${{ env.RUBY_BINDING_REPO_DEFAULT }},RUBY_BINDING_REF=${{ env.RUBY_BINDING_REF_DEFAULT }}'
         - id: print
           run: |
             echo "openjdk_binding_repo=${{ env.OPENJDK_BINDING_REPO }}" >> $GITHUB_OUTPUT
