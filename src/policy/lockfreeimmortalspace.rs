@@ -135,7 +135,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         data_pages + meta_pages
     }
 
-    fn acquire(&self, _tls: VMThread, pages: usize) -> Address {
+    fn acquire(&self, _tls: VMThread, pages: usize, no_gc_on_fail: bool) -> Address {
         trace!("LockFreeImmortalSpace::acquire");
         let bytes = conversions::pages_to_bytes(pages);
         let start = self
@@ -145,7 +145,11 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             })
             .expect("update cursor failed");
         if start + bytes > self.limit {
-            panic!("OutOfMemory")
+            if no_gc_on_fail {
+                return Address::ZERO;
+            } else {
+                panic!("OutOfMemory");
+            }
         }
         if self.slow_path_zeroing {
             crate::util::memory::zero(start, bytes);

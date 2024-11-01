@@ -67,24 +67,37 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// avoid arithmatic overflow. If we have to do computation in the allocation fastpath and
     /// overflow happens there, there is nothing we can do about it.
     /// Return a boolean to indicate if we will be out of memory, determined by the check.
-    fn will_oom_on_acquire(&self, tls: VMThread, size: usize) -> bool {
+    fn will_oom_on_acquire(&self, size: usize) -> bool {
         let max_pages = self.get_gc_trigger().policy.get_max_heap_size_in_pages();
         let requested_pages = size >> LOG_BYTES_IN_PAGE;
-        if requested_pages > max_pages {
-            VM::VMCollection::out_of_memory(
-                tls,
-                crate::util::alloc::AllocationError::HeapOutOfMemory,
-            );
+        requested_pages > max_pages
+    }
+
+    /// Check if the requested `size` is an obvious out-of-memory case using
+    /// [`Self::will_oom_on_acquire`] and, if it is, call `Collection::out_of_memory`.  Return the
+    /// result of `will_oom_on_acquire`.
+    fn handle_obvious_oom_request(&self, tls: VMThread, size: usize, allow_oom_call: bool) -> bool {
+        if self.will_oom_on_acquire(size) {
+            if allow_oom_call {
+                VM::VMCollection::out_of_memory(
+                    tls,
+                    crate::util::alloc::AllocationError::HeapOutOfMemory,
+                );
+            }
             return true;
         }
         false
     }
 
-    fn acquire(&self, tls: VMThread, pages: usize) -> Address {
-        trace!("Space.acquire, tls={:?}", tls);
+    fn acquire(&self, tls: VMThread, pages: usize, no_gc_on_fail: bool) -> Address {
+        trace!(
+            "Space.acquire, tls={:?}, no_gc_on_fail={:?}",
+            tls,
+            no_gc_on_fail
+        );
 
         debug_assert!(
-            !self.will_oom_on_acquire(tls, pages << LOG_BYTES_IN_PAGE),
+            !self.will_oom_on_acquire(pages << LOG_BYTES_IN_PAGE),
             "The requested pages is larger than the max heap size. Is will_go_oom_on_acquire used before acquring memory?"
         );
 
@@ -95,7 +108,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             VM::VMActivePlan::is_mutator(tls) && VM::VMCollection::is_collection_enabled();
         // Is a GC allowed here? If we should poll but are not allowed to poll, we will panic.
         // initialize_collection() has to be called so we know GC is initialized.
-        let allow_gc = should_poll && self.common().global_state.is_initialized();
+        let allow_gc = should_poll && self.common().global_state.is_initialized() && !no_gc_on_fail;
 
         trace!("Reserving pages");
         let pr = self.get_page_resource();
@@ -104,17 +117,25 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         trace!("Polling ..");
 
         if should_poll && self.get_gc_trigger().poll(false, Some(self.as_space())) {
+            // Clear the request
+            pr.clear_request(pages_reserved);
+
+            // If we do not want GC on fail, just return zero.
+            if no_gc_on_fail {
+                return Address::ZERO;
+            }
+
+            // Otherwise do GC here
             debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
-
-            // Clear the request, and inform GC trigger about the pending allocation.
-            pr.clear_request(pages_reserved);
+            // Inform GC trigger about the pending allocation.
             self.get_gc_trigger()
                 .policy
                 .on_pending_allocation(pages_reserved);
-
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
-            unsafe { Address::zero() }
+
+            // Return zero -- the caller will handle re-allocation
+            Address::ZERO
         } else {
             debug!("Collection not required");
 
@@ -211,6 +232,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 Err(_) => {
                     drop(lock); // drop the lock immediately
 
+                    // Clear the request
+                    pr.clear_request(pages_reserved);
+
+                    // If we do not want GC on fail, just return zero.
+                    if no_gc_on_fail {
+                        return Address::ZERO;
+                    }
+
                     // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
                     assert!(
                         allow_gc,
@@ -220,14 +249,13 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     let gc_performed = self.get_gc_trigger().poll(true, Some(self.as_space()));
                     debug_assert!(gc_performed, "GC not performed when forced.");
 
-                    // Clear the request, and inform GC trigger about the pending allocation.
-                    pr.clear_request(pages_reserved);
+                    // Inform GC trigger about the pending allocation.
                     self.get_gc_trigger()
                         .policy
                         .on_pending_allocation(pages_reserved);
 
                     VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
-                    unsafe { Address::zero() }
+                    Address::ZERO
                 }
             }
         }
