@@ -68,6 +68,9 @@ harness = false
 [features]
 default = []
 
+# Enable this feature if you want to use nightly features and compiler
+nightly = []
+
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts
 perf_counter = ["pfm"]
