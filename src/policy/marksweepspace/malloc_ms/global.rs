@@ -9,6 +9,7 @@ use crate::policy::space::CommonSpace;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::PageResource;
+use crate::util::log;
 use crate::util::malloc::library::{BYTES_IN_MALLOC_PAGE, LOG_BYTES_IN_MALLOC_PAGE};
 use crate::util::malloc::malloc_ms_util::*;
 use crate::util::metadata::side_metadata::{
@@ -23,6 +24,7 @@ use crate::util::{conversions, metadata};
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout::BYTES_IN_CHUNK};
+
 #[cfg(debug_assertions)]
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -123,7 +125,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        trace!("initialize_object_metadata for object {}", object);
+        log::trace!("initialize_object_metadata for object {}", object);
         set_vo_bit(object);
     }
 
@@ -397,12 +399,12 @@ impl<VM: VMBinding> MallocSpace<VM> {
     // indirect call instructions in the generated assembly
     fn free_internal(&self, addr: Address, bytes: usize, offset_malloc_bit: bool) {
         if offset_malloc_bit {
-            trace!("Free memory {:x}", addr);
+            log::trace!("Free memory {:x}", addr);
             offset_free(addr);
             unsafe { unset_offset_malloc_bit_unsafe(addr) };
         } else {
             let ptr = addr.to_mut_ptr();
-            trace!("Free memory {:?}", ptr);
+            log::trace!("Free memory {:?}", ptr);
             unsafe {
                 free(ptr);
             }
@@ -499,7 +501,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             chunk += BYTES_IN_CHUNK;
         }
 
-        debug!("Generated {} sweep work packets", work_packets.len());
+        log::debug!("Generated {} sweep work packets", work_packets.len());
         #[cfg(debug_assertions)]
         {
             self.total_work_packets
@@ -551,11 +553,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // We are the only thread that is dealing with the object. We can use non-atomic methods for the metadata.
         if !unsafe { is_marked_unsafe::<VM>(object) } {
             // Dead object
-            trace!("Object {} has been allocated but not marked", object);
+            log::trace!("Object {} has been allocated but not marked", object);
 
             // Free object
             self.free_internal(obj_start, bytes, offset_malloc);
-            trace!("free object {}", object);
+            log::trace!("free object {}", object);
             unsafe { unset_vo_bit_unsafe(object) };
 
             true
@@ -586,7 +588,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// Used when each chunk is done. Only called in debug build.
     #[cfg(debug_assertions)]
     fn debug_sweep_chunk_done(&self, live_bytes_in_the_chunk: usize) {
-        debug!(
+        log::debug!(
             "Used bytes after releasing: {}",
             self.active_bytes.load(Ordering::SeqCst)
         );
@@ -596,7 +598,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             .fetch_add(live_bytes_in_the_chunk, Ordering::SeqCst);
 
         if completed_packets == self.total_work_packets.load(Ordering::Relaxed) {
-            trace!(
+            log::trace!(
                 "work_live_bytes = {}, live_bytes = {}, active_bytes = {}",
                 self.work_live_bytes.load(Ordering::Relaxed),
                 live_bytes_in_the_chunk,
@@ -628,7 +630,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             #[cfg(debug_assertions)]
             let mut live_bytes = 0;
 
-            debug!("Check active chunk {:?}", chunk_start);
+            log::debug!("Check active chunk {:?}", chunk_start);
             let mut address = chunk_start;
             let chunk_end = chunk_start + BYTES_IN_CHUNK;
 
@@ -748,7 +750,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         #[cfg(debug_assertions)]
         let mut live_bytes = 0;
 
-        debug!("Check active chunk {:?}", chunk_start);
+        log::debug!("Check active chunk {:?}", chunk_start);
 
         // The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
         let mut empty_page_start = Address::ZERO;

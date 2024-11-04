@@ -8,12 +8,14 @@ use crate::policy::copyspace::CopySpaceCopyContext;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::immix::{ImmixCopyContext, ImmixHybridCopyContext};
 use crate::policy::space::Space;
+use crate::util::log;
 use crate::util::object_forwarding;
 use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::MMTK;
+
 use std::sync::atomic::Ordering;
 
 use enum_map::Enum;
@@ -83,7 +85,7 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
     ) -> Address {
         #[cfg(debug_assertions)]
         if bytes > self.config.constraints.max_non_los_default_alloc_bytes {
-            warn!(
+            log::warn!(
                 "Attempted to copy an object of {} bytes (> {}) which should be allocated with LOS and not be copied.",
                 bytes, self.config.constraints.max_non_los_default_alloc_bytes
             );

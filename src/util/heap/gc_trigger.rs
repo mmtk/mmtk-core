@@ -6,9 +6,11 @@ use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions;
+use crate::util::log;
 use crate::util::options::{GCTriggerSelector, Options, DEFAULT_MAX_NURSERY, DEFAULT_MIN_NURSERY};
 use crate::vm::VMBinding;
 use crate::MMTK;
+
 use std::mem::MaybeUninit;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
@@ -76,7 +78,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
             .policy
             .is_gc_required(space_full, space.map(|s| SpaceStats::new(s)), plan)
         {
-            info!(
+            log::info!(
                 "[POLL] {}{} ({}/{} pages)",
                 if let Some(space) = space {
                     format!("{}: ", space.get_name())
@@ -121,7 +123,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 let max_bytes = heap_size_bytes as f64 * max;
                 let max_bytes = conversions::raw_align_up(max_bytes as usize, BYTES_IN_PAGE);
                 if max_bytes > DEFAULT_MAX_NURSERY {
-                    warn!("Proportional nursery with max size {} ({}) is larger than DEFAULT_MAX_NURSERY ({}). Use DEFAULT_MAX_NURSERY instead.", max, max_bytes, DEFAULT_MAX_NURSERY);
+                    log::warn!("Proportional nursery with max size {} ({}) is larger than DEFAULT_MAX_NURSERY ({}). Use DEFAULT_MAX_NURSERY instead.", max, max_bytes, DEFAULT_MAX_NURSERY);
                     DEFAULT_MAX_NURSERY
                 } else {
                     max_bytes
@@ -144,7 +146,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
                         * min;
                 let min_bytes = conversions::raw_align_up(min_bytes as usize, BYTES_IN_PAGE);
                 if min_bytes < DEFAULT_MIN_NURSERY {
-                    warn!("Proportional nursery with min size {} ({}) is smaller than DEFAULT_MIN_NURSERY ({}). Use DEFAULT_MIN_NURSERY instead.", min, min_bytes, DEFAULT_MIN_NURSERY);
+                    log::warn!("Proportional nursery with min size {} ({}) is smaller than DEFAULT_MIN_NURSERY ({}). Use DEFAULT_MIN_NURSERY instead.", min, min_bytes, DEFAULT_MIN_NURSERY);
                     DEFAULT_MIN_NURSERY
                 } else {
                     min_bytes
@@ -362,13 +364,13 @@ impl MemBalancerStats {
                 .gc_release_live_pages
                 .saturating_sub(self.gc_end_live_pages);
             self.allocation_pages = promoted as f64;
-            trace!(
+            log::trace!(
                 "promoted = mature live before release {} - mature live at prev gc end {} = {}",
                 self.gc_release_live_pages,
                 self.gc_end_live_pages,
                 promoted
             );
-            trace!(
+            log::trace!(
                 "allocated pages (accumulated to) = {}",
                 self.allocation_pages
             );
@@ -383,7 +385,7 @@ impl MemBalancerStats {
             self.gc_end_live_pages = plan.get_mature_reserved_pages();
             // Use live pages as an estimate for pages traversed during GC
             self.collection_pages = self.gc_end_live_pages as f64;
-            trace!(
+            log::trace!(
                 "collected pages = mature live at gc end {} - mature live at gc release {} = {}",
                 self.gc_release_live_pages,
                 self.gc_end_live_pages,
@@ -404,7 +406,7 @@ impl MemBalancerStats {
             .get_plan()
             .get_reserved_pages()
             .saturating_sub(self.gc_end_live_pages) as f64;
-        trace!(
+        log::trace!(
             "allocated pages = used {} - live in last gc {} = {}",
             mmtk.get_plan().get_reserved_pages(),
             self.gc_end_live_pages,
@@ -413,14 +415,14 @@ impl MemBalancerStats {
     }
     fn non_generational_mem_stats_on_gc_release<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
         self.gc_release_live_pages = mmtk.get_plan().get_reserved_pages();
-        trace!("live before release = {}", self.gc_release_live_pages);
+        log::trace!("live before release = {}", self.gc_release_live_pages);
     }
     fn non_generational_mem_stats_on_gc_end<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
         self.gc_end_live_pages = mmtk.get_plan().get_reserved_pages();
-        trace!("live pages = {}", self.gc_end_live_pages);
+        log::trace!("live pages = {}", self.gc_end_live_pages);
         // Use live pages as an estimate for pages traversed during GC
         self.collection_pages = self.gc_end_live_pages as f64;
-        trace!(
+        log::trace!(
             "collected pages = live at gc end {} - live at gc release {} = {}",
             self.gc_release_live_pages,
             self.gc_end_live_pages,
@@ -445,11 +447,11 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
     }
 
     fn on_gc_start(&self, mmtk: &'static MMTK<VM>) {
-        trace!("=== on_gc_start ===");
+        log::trace!("=== on_gc_start ===");
         self.access_stats(|stats| {
             stats.gc_start_time = Instant::now();
             stats.allocation_time += (stats.gc_start_time - stats.gc_end_time).as_secs_f64();
-            trace!(
+            log::trace!(
                 "gc_start = {:?}, allocation_time = {}",
                 stats.gc_start_time,
                 stats.allocation_time
@@ -464,7 +466,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
     }
 
     fn on_gc_release(&self, mmtk: &'static MMTK<VM>) {
-        trace!("=== on_gc_release ===");
+        log::trace!("=== on_gc_release ===");
         self.access_stats(|stats| {
             if let Some(plan) = mmtk.get_plan().generational() {
                 stats.generational_mem_stats_on_gc_release(plan);
@@ -475,11 +477,11 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
     }
 
     fn on_gc_end(&self, mmtk: &'static MMTK<VM>) {
-        trace!("=== on_gc_end ===");
+        log::trace!("=== on_gc_end ===");
         self.access_stats(|stats| {
             stats.gc_end_time = Instant::now();
             stats.collection_time += (stats.gc_end_time - stats.gc_start_time).as_secs_f64();
-            trace!(
+            log::trace!(
                 "gc_end = {:?}, collection_time = {}",
                 stats.gc_end_time,
                 stats.collection_time
@@ -552,7 +554,7 @@ impl MemBalancerTrigger {
         extra_reserve: usize,
         stats: &mut MemBalancerStats,
     ) {
-        trace!("compute new heap limit: {:?}", stats);
+        log::trace!("compute new heap limit: {:?}", stats);
 
         // Constants from the original paper
         const ALLOCATION_SMOOTH_FACTOR: f64 = 0.95;
@@ -584,12 +586,12 @@ impl MemBalancerTrigger {
             stats.collection_time,
             COLLECTION_SMOOTH_FACTOR,
         );
-        trace!(
+        log::trace!(
             "after smoothing, alloc mem = {}, alloc_time = {}",
             alloc_mem,
             alloc_time
         );
-        trace!(
+        log::trace!(
             "after smoothing, gc mem    = {}, gc_time    = {}",
             gc_mem,
             gc_time
@@ -623,7 +625,7 @@ impl MemBalancerTrigger {
 
         // This is the optimal heap limit due to mem balancer. We will need to clamp the value to the defined min/max range.
         let optimal_heap = live + e as usize + extra_reserve + pending_pages;
-        trace!(
+        log::trace!(
             "optimal = live {} + sqrt(live) {} + extra {}",
             live,
             e,
@@ -632,9 +634,12 @@ impl MemBalancerTrigger {
 
         // The new heap size must be within min/max.
         let new_heap = optimal_heap.clamp(self.min_heap_pages, self.max_heap_pages);
-        debug!(
+        log::debug!(
             "MemBalander: new heap limit = {} pages (optimal = {}, clamped to [{}, {}])",
-            new_heap, optimal_heap, self.min_heap_pages, self.max_heap_pages
+            new_heap,
+            optimal_heap,
+            self.min_heap_pages,
+            self.max_heap_pages
         );
         self.current_heap_pages.store(new_heap, Ordering::Relaxed);
     }

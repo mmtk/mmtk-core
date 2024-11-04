@@ -54,7 +54,7 @@ impl<C: GCWorkContext> Prepare<C> {
 
 impl<C: GCWorkContext> GCWork<C::VM> for Prepare<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
-        trace!("Prepare Global");
+        log::trace!("Prepare Global");
         // We assume this is the only running work packet that accesses plan at the point of execution
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.prepare(worker.tls);
@@ -93,7 +93,7 @@ impl<VM: VMBinding> PrepareMutator<VM> {
 
 impl<VM: VMBinding> GCWork<VM> for PrepareMutator<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        trace!("Prepare Mutator");
+        log::trace!("Prepare Mutator");
         self.mutator.prepare(worker.tls);
     }
 }
@@ -104,7 +104,7 @@ pub struct PrepareCollector;
 
 impl<VM: VMBinding> GCWork<VM> for PrepareCollector {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        trace!("Prepare Collector");
+        log::trace!("Prepare Collector");
         worker.get_copy_context_mut().prepare();
         mmtk.get_plan().prepare_worker(worker);
     }
@@ -131,7 +131,7 @@ unsafe impl<C: GCWorkContext> Send for Release<C> {}
 
 impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
-        trace!("Release Global");
+        log::trace!("Release Global");
 
         mmtk.gc_trigger.policy.on_gc_release(mmtk);
         // We assume this is the only running work packet that accesses plan at the point of execution
@@ -180,7 +180,7 @@ impl<VM: VMBinding> ReleaseMutator<VM> {
 
 impl<VM: VMBinding> GCWork<VM> for ReleaseMutator<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        trace!("Release Mutator");
+        log::trace!("Release Mutator");
         self.mutator.release(worker.tls);
     }
 }
@@ -191,7 +191,7 @@ pub struct ReleaseCollector;
 
 impl<VM: VMBinding> GCWork<VM> for ReleaseCollector {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        trace!("Release Collector");
+        log::trace!("Release Collector");
         worker.get_copy_context_mut().release();
     }
 }
@@ -210,7 +210,7 @@ impl<C: GCWorkContext> StopMutators<C> {
 
 impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
-        trace!("stop_all_mutators start");
+        log::trace!("stop_all_mutators start");
         mmtk.state.prepare_for_stack_scanning();
         <C::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
             // TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
@@ -218,7 +218,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(ScanMutatorRoots::<C>(mutator));
         });
-        trace!("stop_all_mutators end");
+        log::trace!("stop_all_mutators end");
         mmtk.scheduler.notify_mutators_paused(mmtk);
         mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanVMSpecificRoots::<C>::new());
     }
@@ -330,7 +330,7 @@ impl<E: ProcessEdgesWork> VMProcessWeakRefs<E> {
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
-        trace!("VMProcessWeakRefs");
+        log::trace!("VMProcessWeakRefs");
 
         let stage = WorkBucketStage::VMRefClosure;
 
@@ -373,7 +373,7 @@ impl<E: ProcessEdgesWork> VMForwardWeakRefs<E> {
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for VMForwardWeakRefs<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
-        trace!("VMForwardWeakRefs");
+        log::trace!("VMForwardWeakRefs");
 
         let stage = WorkBucketStage::VMRefForwarding;
 
@@ -398,9 +398,9 @@ pub struct VMPostForwarding<VM: VMBinding> {
 
 impl<VM: VMBinding> GCWork<VM> for VMPostForwarding<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        trace!("VMPostForwarding start");
+        log::trace!("VMPostForwarding start");
         <VM as VMBinding>::VMCollection::post_forwarding(worker.tls);
-        trace!("VMPostForwarding end");
+        log::trace!("VMPostForwarding end");
     }
 }
 
@@ -408,7 +408,7 @@ pub struct ScanMutatorRoots<C: GCWorkContext>(pub &'static mut Mutator<C::VM>);
 
 impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
-        trace!("ScanMutatorRoots for mutator {:?}", self.0.get_tls());
+        log::trace!("ScanMutatorRoots for mutator {:?}", self.0.get_tls());
         let mutators = <C::VM as VMBinding>::VMActivePlan::number_of_mutators();
         let factory = ProcessEdgesWorkRootsWorkFactory::<
             C::VM,
@@ -442,7 +442,7 @@ impl<C: GCWorkContext> ScanVMSpecificRoots<C> {
 
 impl<C: GCWorkContext> GCWork<C::VM> for ScanVMSpecificRoots<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
-        trace!("ScanStaticRoots");
+        log::trace!("ScanStaticRoots");
         let factory = ProcessEdgesWorkRootsWorkFactory::<
             C::VM,
             C::DefaultProcessEdges,
@@ -659,7 +659,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
         if self.roots && !_mmtk.is_in_sanity() {
             self.cache_roots_for_sanity_gc();
         }
-        trace!("ProcessEdgesWork End");
+        log::trace!("ProcessEdgesWork End");
     }
 }
 
@@ -839,7 +839,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                     .increase_live_bytes(VM::VMObjectModel::get_current_size(object));
 
                 if <VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, object) {
-                    trace!("Scan object (slot) {}", object);
+                    log::trace!("Scan object (slot) {}", object);
                     // If an object supports slot-enqueuing, we enqueue its slots.
                     <VM as VMBinding>::VMScanning::scan_object(tls, object, &mut closure);
                     self.post_scan_object(object);
@@ -869,7 +869,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
             object_tracer_context.with_tracer(worker, |object_tracer| {
                 // Scan objects and trace their outgoing edges at the same time.
                 for object in scan_later.iter().copied() {
-                    trace!("Scan object (node) {}", object);
+                    log::trace!("Scan object (node) {}", object);
                     <VM as VMBinding>::VMScanning::scan_object_and_trace_edges(
                         tls,
                         object,
@@ -922,9 +922,9 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>> ScanObjectsWork<VM> for ScanOb
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        trace!("ScanObjects");
+        log::trace!("ScanObjects");
         self.do_work_common(&self.buffer, worker, mmtk);
-        trace!("ScanObjects End");
+        log::trace!("ScanObjects End");
     }
 }
 
@@ -1048,9 +1048,9 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> GCWork<E
     for PlanScanObjects<E, P>
 {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        trace!("PlanScanObjects");
+        log::trace!("PlanScanObjects");
         self.do_work_common(&self.buffer, worker, mmtk);
-        trace!("PlanScanObjects End");
+        log::trace!("PlanScanObjects End");
     }
 }
 
@@ -1099,7 +1099,7 @@ impl<VM: VMBinding, R2OPE: ProcessEdgesWork<VM = VM>, O2OPE: ProcessEdgesWork<VM
     for ProcessRootNode<VM, R2OPE, O2OPE>
 {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        trace!("ProcessRootNode");
+        log::trace!("ProcessRootNode");
 
         #[cfg(feature = "sanity")]
         {
@@ -1143,7 +1143,7 @@ impl<VM: VMBinding, R2OPE: ProcessEdgesWork<VM = VM>, O2OPE: ProcessEdgesWork<VM
         let work = process_edges_work.create_scan_work(scanned_root_objects);
         crate::memory_manager::add_work_packet(mmtk, self.bucket, work);
 
-        trace!("ProcessRootNode End");
+        log::trace!("ProcessRootNode End");
     }
 }
 

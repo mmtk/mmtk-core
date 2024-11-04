@@ -4,8 +4,10 @@ use super::{
     ImmixSpace,
 };
 use crate::util::linear_scan::Region;
+use crate::util::log;
 use crate::{policy::space::Space, Plan};
 use crate::{util::constants::LOG_BYTES_IN_PAGE, vm::*};
+
 use spin::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -78,7 +80,7 @@ impl Defrag {
                 || !exhausted_reusable_space
                 || super::STRESS_DEFRAG
                 || (collect_whole_heap && user_triggered && full_heap_system_gc));
-        info!("Defrag: {}", in_defrag);
+        log::info!("Defrag: {}", in_defrag);
         probe!(mmtk, immix_defrag, in_defrag);
         self.in_defrag_collection
             .store(in_defrag, Ordering::Release)

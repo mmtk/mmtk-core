@@ -4,6 +4,7 @@ use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
 use crate::util::heap::{MonotonePageResource, PageResource};
+use crate::util::log;
 use crate::util::metadata::mark_bit::MarkState;
 
 use crate::util::object_enum::{self, ObjectEnumerator};
@@ -186,7 +187,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         } else {
             // Otherwise, we reset the mark bit for the allocated regions.
             for (addr, size) in self.pr.iterate_allocated_regions() {
-                debug!(
+                log::debug!(
                     "{:?}: reset mark bit from {} to {}",
                     self.name(),
                     addr,

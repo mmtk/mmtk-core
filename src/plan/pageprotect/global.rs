@@ -10,6 +10,7 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
+use crate::util::log;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use crate::{
@@ -86,7 +87,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
 impl<VM: VMBinding> PageProtect<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
         // Warn users that the plan may fail due to maximum mapping allowed.
-        warn!(
+        log::warn!(
             "PageProtect uses a high volume of memory mappings. \
             If you encounter failures in memory protect/unprotect in this plan,\
             consider increase the maximum mapping allowed by the OS{}.",

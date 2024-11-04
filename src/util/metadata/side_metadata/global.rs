@@ -2,11 +2,13 @@ use super::*;
 use crate::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
 use crate::util::conversions::raw_align_up;
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
+use crate::util::log;
 use crate::util::memory;
 use crate::util::metadata::metadata_val_traits::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::Address;
+
 use num_traits::FromPrimitive;
 use ranges::BitByteRange;
 use std::fmt;
@@ -116,7 +118,7 @@ impl SideMetadataSpec {
     pub(crate) fn assert_metadata_mapped(&self, data_addr: Address) {
         let meta_start = address_to_meta_address(self, data_addr).align_down(BYTES_IN_PAGE);
 
-        trace!(
+        log::trace!(
             "ensure_metadata_is_mapped({}).meta_start({})",
             data_addr,
             meta_start
@@ -1014,7 +1016,7 @@ impl SideMetadataSpec {
             // TODO: We should be able to optimize further for this case. However, we need to be careful that the side metadata
             // is not contiguous, and we need to skip to the next chunk's side metadata when we search to a different chunk.
             // This won't be used for VO bit, as VO bit is global and is always contiguous. So for now, I am not bothered to do it.
-            warn!("We are trying to search non zero bits in an discontiguous side metadata. The performance is slow, as MMTk does not optimize for this case.");
+            log::warn!("We are trying to search non zero bits in an discontiguous side metadata. The performance is slow, as MMTk does not optimize for this case.");
             self.find_prev_non_zero_value_simple::<T>(data_addr, search_limit_bytes)
         }
     }
@@ -1156,7 +1158,7 @@ impl SideMetadataSpec {
             // side mark bits, we need to refactor `bulk_update_metadata` to support `FnMut`, too,
             // and use it to apply `scan_non_zero_values_fast` on each contiguous side metadata
             // range.
-            warn!(
+            log::warn!(
                 "We are trying to search for non zero bits in a discontiguous side metadata \
             or the metadata has more than one bit per region. \
                 The performance is slow, as MMTk does not optimize for this case."
@@ -1372,7 +1374,7 @@ impl SideMetadataContext {
     /// Tries to map the required metadata space and returns `true` is successful.
     /// This can be called at page granularity.
     pub fn try_map_metadata_space(&self, start: Address, size: usize) -> Result<()> {
-        debug!(
+        log::debug!(
             "try_map_metadata_space({}, 0x{:x}, {}, {})",
             start,
             size,
@@ -1390,7 +1392,7 @@ impl SideMetadataContext {
     ///
     /// NOTE: Accessing addresses in this range will produce a segmentation fault if swap-space is not mapped using the `try_map_metadata_space` function.
     pub fn try_map_metadata_address_range(&self, start: Address, size: usize) -> Result<()> {
-        debug!(
+        log::debug!(
             "try_map_metadata_address_range({}, 0x{:x}, {}, {})",
             start,
             size,
@@ -1472,7 +1474,7 @@ impl SideMetadataContext {
     ///     the actual unmapped space will be bigger than what you specify.
     #[cfg(test)]
     pub fn ensure_unmap_metadata_space(&self, start: Address, size: usize) {
-        trace!("ensure_unmap_metadata_space({}, 0x{:x})", start, size);
+        log::trace!("ensure_unmap_metadata_space({}, 0x{:x})", start, size);
         debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
         debug_assert!(size % BYTES_IN_PAGE == 0);
 

@@ -7,6 +7,7 @@ use std::vec::Vec;
 use crate::plan::is_nursery_gc;
 use crate::scheduler::ProcessEdgesWork;
 use crate::scheduler::WorkBucketStage;
+use crate::util::log;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::ReferenceGlue;
@@ -39,17 +40,17 @@ impl ReferenceProcessors {
     }
 
     pub fn add_soft_candidate(&self, reff: ObjectReference) {
-        trace!("Add soft candidate: {}", reff);
+        log::trace!("Add soft candidate: {}", reff);
         self.soft.add_candidate(reff);
     }
 
     pub fn add_weak_candidate(&self, reff: ObjectReference) {
-        trace!("Add weak candidate: {}", reff);
+        log::trace!("Add weak candidate: {}", reff);
         self.weak.add_candidate(reff);
     }
 
     pub fn add_phantom_candidate(&self, reff: ObjectReference) {
-        trace!("Add phantom candidate: {}", reff);
+        log::trace!("Add phantom candidate: {}", reff);
         self.phantom.add_candidate(reff);
     }
 
@@ -278,7 +279,7 @@ impl ReferenceProcessor {
         }
 
         if !sync.enqueued_references.is_empty() {
-            trace!("enqueue: {:?}", sync.enqueued_references);
+            log::trace!("enqueue: {:?}", sync.enqueued_references);
             VM::VMReferenceGlue::enqueue_references(&sync.enqueued_references, tls);
             sync.enqueued_references.clear();
         }
@@ -291,7 +292,7 @@ impl ReferenceProcessor {
     /// nursery is not used for this.
     pub fn forward<E: ProcessEdgesWork>(&self, trace: &mut E, _nursery: bool) {
         let mut sync = self.sync.lock().unwrap();
-        debug!("Starting ReferenceProcessor.forward({:?})", self.semantics);
+        log::debug!("Starting ReferenceProcessor.forward({:?})", self.semantics);
 
         // Forward a single reference
         fn forward_reference<E: ProcessEdgesWork>(
@@ -300,7 +301,7 @@ impl ReferenceProcessor {
         ) -> ObjectReference {
             {
                 use crate::vm::ObjectModel;
-                trace!(
+                log::trace!(
                     "Forwarding reference: {} (size: {})",
                     reference,
                     <E::VM as VMBinding>::VMObjectModel::get_current_size(reference)
@@ -313,7 +314,7 @@ impl ReferenceProcessor {
                 let new_referent = ReferenceProcessor::trace_forward_object(trace, old_referent);
                 <E::VM as VMBinding>::VMReferenceGlue::set_referent(reference, new_referent);
 
-                trace!(
+                log::trace!(
                     " referent: {} (forwarded to {})",
                     old_referent,
                     new_referent
@@ -321,7 +322,7 @@ impl ReferenceProcessor {
             }
 
             let new_reference = ReferenceProcessor::trace_forward_object(trace, reference);
-            trace!(" reference: forwarded to {}", new_reference);
+            log::trace!(" reference: forwarded to {}", new_reference);
 
             new_reference
         }
@@ -338,7 +339,7 @@ impl ReferenceProcessor {
             .map(|reff| forward_reference::<E>(trace, *reff))
             .collect();
 
-        debug!("Ending ReferenceProcessor.forward({:?})", self.semantics);
+        log::debug!("Ending ReferenceProcessor.forward({:?})", self.semantics);
 
         // We finish forwarding. No longer accept new candidates.
         self.disallow_new_candidate();
@@ -352,9 +353,9 @@ impl ReferenceProcessor {
     fn scan<VM: VMBinding>(&self, _nursery: bool) {
         let mut sync = self.sync.lock().unwrap();
 
-        debug!("Starting ReferenceProcessor.scan({:?})", self.semantics);
+        log::debug!("Starting ReferenceProcessor.scan({:?})", self.semantics);
 
-        trace!(
+        log::trace!(
             "{:?} Reference table is {:?}",
             self.semantics,
             sync.references
@@ -371,7 +372,7 @@ impl ReferenceProcessor {
             .filter_map(|reff| self.process_reference::<VM>(*reff, &mut enqueued_references))
             .collect();
 
-        debug!(
+        log::debug!(
             "{:?} reference table from {} to {} ({} enqueued)",
             self.semantics,
             sync.references.len(),
@@ -381,7 +382,7 @@ impl ReferenceProcessor {
         sync.references = new_set;
         sync.enqueued_references.extend(enqueued_references);
 
-        debug!("Ending ReferenceProcessor.scan({:?})", self.semantics);
+        log::debug!("Ending ReferenceProcessor.scan({:?})", self.semantics);
     }
 
     /// Retain referent in the reference table. This method deals only with soft references.
@@ -393,15 +394,15 @@ impl ReferenceProcessor {
 
         let sync = self.sync.lock().unwrap();
 
-        debug!("Starting ReferenceProcessor.retain({:?})", self.semantics);
-        trace!(
+        log::debug!("Starting ReferenceProcessor.retain({:?})", self.semantics);
+        log::trace!(
             "{:?} Reference table is {:?}",
             self.semantics,
             sync.references
         );
 
         for reference in sync.references.iter() {
-            trace!("Processing reference: {:?}", reference);
+            log::trace!("Processing reference: {:?}", reference);
 
             if !reference.is_live() {
                 // Reference is currently unreachable but may get reachable by the
@@ -412,11 +413,11 @@ impl ReferenceProcessor {
             if let Some(referent) = <E::VM as VMBinding>::VMReferenceGlue::get_referent(*reference)
             {
                 Self::keep_referent_alive(trace, referent);
-                trace!(" ~> {:?} (retained)", referent);
+                log::trace!(" ~> {:?} (retained)", referent);
             }
         }
 
-        debug!("Ending ReferenceProcessor.retain({:?})", self.semantics);
+        log::debug!("Ending ReferenceProcessor.retain({:?})", self.semantics);
     }
 
     /// Process a reference.
@@ -431,30 +432,30 @@ impl ReferenceProcessor {
         reference: ObjectReference,
         enqueued_references: &mut Vec<ObjectReference>,
     ) -> Option<ObjectReference> {
-        trace!("Process reference: {}", reference);
+        log::trace!("Process reference: {}", reference);
 
         // If the reference is dead, we're done with it. Let it (and
         // possibly its referent) be garbage-collected.
         if !reference.is_live() {
             VM::VMReferenceGlue::clear_referent(reference);
-            trace!(" UNREACHABLE reference: {}", reference);
+            log::trace!(" UNREACHABLE reference: {}", reference);
             return None;
         }
 
         // The reference object is live.
         let new_reference = Self::get_forwarded_reference(reference);
-        trace!(" forwarded to: {}", new_reference);
+        log::trace!(" forwarded to: {}", new_reference);
 
         // Get the old referent.
         let maybe_old_referent = VM::VMReferenceGlue::get_referent(reference);
-        trace!(" referent: {:?}", maybe_old_referent);
+        log::trace!(" referent: {:?}", maybe_old_referent);
 
         // If the application has cleared the referent the Java spec says
         // this does not cause the Reference object to be enqueued. We
         // simply allow the Reference object to fall out of our
         // waiting list.
         let Some(old_referent) = maybe_old_referent else {
-            trace!("  (cleared referent) ");
+            log::trace!("  (cleared referent) ");
             return None;
         };
 
@@ -463,7 +464,7 @@ impl ReferenceProcessor {
             // or stronger than the current reference level.
             let new_referent = Self::get_forwarded_referent(old_referent);
             debug_assert!(new_referent.is_live());
-            trace!("  forwarded referent to: {}", new_referent);
+            log::trace!("  forwarded referent to: {}", new_referent);
 
             // The reference object stays on the waiting list, and the
             // referent is untouched. The only thing we must do is
@@ -476,7 +477,7 @@ impl ReferenceProcessor {
             Some(new_reference)
         } else {
             // Referent is unreachable. Clear the referent and enqueue the reference object.
-            trace!("  UNREACHABLE referent: {}", old_referent);
+            log::trace!("  UNREACHABLE referent: {}", old_referent);
 
             VM::VMReferenceGlue::clear_referent(new_reference);
             enqueued_references.push(new_reference);

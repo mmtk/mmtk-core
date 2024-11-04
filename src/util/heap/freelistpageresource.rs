@@ -14,10 +14,12 @@ use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::layout::CreateFreeListResult;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
+use crate::util::log;
 use crate::util::memory;
 use crate::util::opaque_pointer::*;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::vm::*;
+
 use std::marker::PhantomData;
 
 const UNINITIALIZED_WATER_MARK: i32 = -1;
@@ -153,9 +155,10 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         // If it is RawMemoryFreeList, it will occupy `space_displacement` bytes at the start of
         // the space.  We add it to the start address.
         let actual_start = start + space_displacement;
-        debug!(
+        log::debug!(
             "  in new_contiguous: space_displacement = {:?}, actual_start = {}",
-            space_displacement, actual_start
+            space_displacement,
+            actual_start
         );
 
         let growable = cfg!(target_pointer_width = "64");
@@ -195,7 +198,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         // Discontiguous free list page resources are only used by `Map32` which uses
         // `IntArrayFreeList` exclusively.  It does not have space displacement.
         debug_assert_eq!(space_displacement, 0);
-        debug!("new_discontiguous. start: {start})");
+        log::debug!("new_discontiguous. start: {start})");
 
         FreeListPageResource {
             common: CommonPageResource::new(false, true, vm_map),

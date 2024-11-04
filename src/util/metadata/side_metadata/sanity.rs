@@ -1,4 +1,6 @@
+use crate::util::log;
 use crate::util::Address;
+
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Result};
 use std::sync::{Mutex, RwLock};
@@ -380,9 +382,10 @@ fn verify_metadata_address_bound(spec: &SideMetadataSpec, data_addr: Address) {
         data_addr <= unsafe { Address::from_usize(1usize << vm_layout().log_address_space) };
 
     if !data_addr_in_address_space {
-        warn!(
+        log::warn!(
             "We try get metadata {} for {}, which is not within the address space we should use",
-            data_addr, spec.name
+            data_addr,
+            spec.name
         );
     }
 

@@ -15,6 +15,7 @@ use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::heap::layout::{self, Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
+use crate::util::log;
 use crate::util::opaque_pointer::*;
 use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
@@ -25,6 +26,7 @@ use crate::util::slot_logger::SlotLogger;
 use crate::util::statistics::stats::Stats;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
+
 use std::cell::UnsafeCell;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -419,12 +421,12 @@ impl<VM: VMBinding> MMTK<VM> {
     ) -> bool {
         use crate::vm::Collection;
         if !self.get_plan().constraints().collects_garbage {
-            warn!("User attempted a collection request, but the plan can not do GC. The request is ignored.");
+            log::warn!("User attempted a collection request, but the plan can not do GC. The request is ignored.");
             return false;
         }
 
         if force || !*self.options.ignore_system_gc && VM::VMCollection::is_collection_enabled() {
-            info!("User triggering collection");
+            log::info!("User triggering collection");
             if exhaustive {
                 if let Some(gen) = self.get_plan().generational() {
                     gen.force_full_heap_collection();

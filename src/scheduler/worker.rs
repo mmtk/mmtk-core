@@ -3,8 +3,10 @@ use super::work_bucket::*;
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::copy::GCWorkerCopyContext;
+use crate::util::log;
 use crate::util::opaque_pointer::*;
 use crate::vm::{Collection, GCThreadContext, VMBinding};
+
 use atomic::Atomic;
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 use crossbeam::deque::{self, Stealer};
@@ -207,7 +209,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// * `mmtk`: A reference to an MMTk instance.
     pub fn run(mut self: Box<Self>, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         probe!(mmtk, gcworker_run);
-        debug!(
+        log::debug!(
             "Worker started. ordinal: {}, {}",
             self.ordinal,
             crate::util::rust_util::debug_process_thread_id(),
@@ -243,7 +245,7 @@ impl<VM: VMBinding> GCWorker<VM> {
             probe!(mmtk, work, typename.as_ptr(), typename.len());
             work.do_work_with_stat(&mut self, mmtk);
         }
-        debug!(
+        log::debug!(
             "Worker exiting. ordinal: {}, {}",
             self.ordinal,
             crate::util::rust_util::debug_process_thread_id(),
@@ -346,7 +348,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         local_work_queues: Vec<deque::Worker<Box<dyn GCWork<VM>>>>,
         mmtk: &'static MMTK<VM>,
     ) -> Vec<Box<GCWorker<VM>>> {
-        debug!("Creating GCWorker instances...");
+        log::debug!("Creating GCWorker instances...");
 
         assert_eq!(self.workers_shared.len(), local_work_queues.len());
 
@@ -365,14 +367,14 @@ impl<VM: VMBinding> WorkerGroup<VM> {
             })
             .collect::<Vec<_>>();
 
-        debug!("Created {} GCWorker instances.", workers.len());
+        log::debug!("Created {} GCWorker instances.", workers.len());
         workers
     }
 
     /// Spawn all the worker threads
     #[allow(clippy::vec_box)] // See `WorkerCreationState::Surrendered`.
     fn spawn(&self, workers: Vec<Box<GCWorker<VM>>>, tls: VMThread) {
-        debug!(
+        log::debug!(
             "Spawning GC workers.  {}",
             crate::util::rust_util::debug_process_thread_id(),
         );
@@ -382,7 +384,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
             VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Worker(worker));
         }
 
-        debug!(
+        log::debug!(
             "Spawned {} worker threads.  {}",
             self.worker_count(),
             crate::util::rust_util::debug_process_thread_id(),
@@ -408,7 +410,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         };
         let ordinal = worker.ordinal;
         workers.push(worker);
-        trace!(
+        log::trace!(
             "Worker {} surrendered. ({}/{})",
             ordinal,
             workers.len(),

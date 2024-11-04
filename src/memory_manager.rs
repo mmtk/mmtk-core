@@ -20,6 +20,7 @@ use crate::scheduler::{GCWork, GCWorker};
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
 use crate::util::heap::layout::vm_layout::vm_layout;
+use crate::util::log;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::slot::MemorySlice;
@@ -52,8 +53,8 @@ use crate::vm::VMBinding;
 /// * `builder`: The reference to a MMTk builder.
 pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     match crate::util::logger::try_init() {
-        Ok(_) => debug!("MMTk initialized the logger."),
-        Err(_) => debug!(
+        Ok(_) => log::debug!("MMTk initialized the logger."),
+        Err(_) => log::debug!(
             "MMTk failed to initialize the logger. Possibly a logger has been initialized by user."
         ),
     }
@@ -69,19 +70,20 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
             if split[0] == "Threads:" {
                 let threads = split[1].parse::<i32>().unwrap();
                 if threads != 1 {
-                    warn!("Current process has {} threads, process-wide perf event measurement will only include child threads spawned from this thread", threads);
+                    log::warn!("Current process has {} threads, process-wide perf event measurement will only include child threads spawned from this thread", threads);
                 }
             }
         }
     }
     let mmtk = builder.build();
 
-    info!(
+    log::info!(
         "Initialized MMTk with {:?} ({:?})",
-        *mmtk.options.plan, *mmtk.options.gc_trigger
+        *mmtk.options.plan,
+        *mmtk.options.gc_trigger
     );
     #[cfg(feature = "extreme_assertions")]
-    warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
+    log::warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
     Box::new(mmtk)
 }
 
@@ -115,7 +117,7 @@ pub fn bind_mutator<VM: VMBinding>(
 
     const LOG_ALLOCATOR_MAPPING: bool = false;
     if LOG_ALLOCATOR_MAPPING {
-        info!("{:?}", mutator.config);
+        log::info!("{:?}", mutator.config);
     }
     mutator
 }
@@ -477,7 +479,7 @@ pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
     );
 
     if VM::VMCollection::is_collection_enabled() && mmtk.gc_trigger.poll(false, None) {
-        debug!("Collection required");
+        log::debug!("Collection required");
         assert!(mmtk.state.is_initialized(), "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
         VM::VMCollection::block_for_gc(tls);
     }
@@ -764,7 +766,7 @@ pub fn add_finalizer<VM: VMBinding>(
     object: <VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType,
 ) {
     if *mmtk.options.no_finalizer {
-        warn!("add_finalizer() is called when no_finalizer = true");
+        log::warn!("add_finalizer() is called when no_finalizer = true");
     }
 
     mmtk.finalizable_processor.lock().unwrap().add(object);
@@ -823,7 +825,7 @@ pub fn get_finalized_object<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
 ) -> Option<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
     if *mmtk.options.no_finalizer {
-        warn!("get_finalized_object() is called when no_finalizer = true");
+        log::warn!("get_finalized_object() is called when no_finalizer = true");
     }
 
     mmtk.finalizable_processor
@@ -843,7 +845,7 @@ pub fn get_all_finalizers<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
 ) -> Vec<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
     if *mmtk.options.no_finalizer {
-        warn!("get_all_finalizers() is called when no_finalizer = true");
+        log::warn!("get_all_finalizers() is called when no_finalizer = true");
     }
 
     mmtk.finalizable_processor
@@ -863,7 +865,7 @@ pub fn get_finalizers_for<VM: VMBinding>(
     object: ObjectReference,
 ) -> Vec<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
     if *mmtk.options.no_finalizer {
-        warn!("get_finalizers() is called when no_finalizer = true");
+        log::warn!("get_finalizers() is called when no_finalizer = true");
     }
 
     mmtk.finalizable_processor

@@ -1,6 +1,8 @@
 use super::worker::*;
 use crate::mmtk::MMTK;
+use crate::util::log;
 use crate::vm::VMBinding;
+
 #[cfg(feature = "work_packet_stats")]
 use std::any::{type_name, TypeId};
 
@@ -31,7 +33,7 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
     /// If the feature "work_packet_stats" is not enabled, this call simply forwards the call
     /// to `do_work()`.
     fn do_work_with_stat(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        debug!("{}", std::any::type_name::<Self>());
+        log::debug!("{}", std::any::type_name::<Self>());
         debug_assert!(!worker.tls.0.0.is_null(), "TLS must be set correctly for a GC worker before the worker does any work. GC Worker {} has no valid tls.", worker.ordinal);
 
         #[cfg(feature = "work_packet_stats")]

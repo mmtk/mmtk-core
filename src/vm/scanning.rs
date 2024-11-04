@@ -1,5 +1,6 @@
 use crate::plan::Mutator;
 use crate::scheduler::GCWorker;
+use crate::util::log;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::slot::Slot;
@@ -15,7 +16,7 @@ pub trait SlotVisitor<SL: Slot> {
 impl<SL: Slot, F: FnMut(SL)> SlotVisitor<SL> for F {
     fn visit_slot(&mut self, slot: SL) {
         #[cfg(debug_assertions)]
-        trace!(
+        log::trace!(
             "(FunctionClosure) Visit slot {:?} (pointing to {:?})",
             slot,
             slot.load()

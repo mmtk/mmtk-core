@@ -4,6 +4,7 @@ use super::allocator::AllocatorContext;
 use super::BumpAllocator;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
+use crate::util::log;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::vm::VMBinding;
@@ -64,7 +65,7 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        trace!("alloc_slow");
+        log::trace!("alloc_slow");
         self.bump_allocator.alloc_slow_once(size, align, offset)
     }
 

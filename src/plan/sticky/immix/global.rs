@@ -15,6 +15,7 @@ use crate::util::copy::CopyConfig;
 use crate::util::copy::CopySelector;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::gc_trigger::SpaceStats;
+use crate::util::log;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::statistics::counter::EventCounter;
 use crate::vm::ObjectModel;
@@ -90,11 +91,11 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         probe!(mmtk, gen_full_heap, is_full_heap);
 
         if !is_full_heap {
-            info!("Nursery GC");
+            log::info!("Nursery GC");
             // nursery GC -- we schedule it
             scheduler.schedule_common_work::<StickyImmixNurseryGCWorkContext<VM>>(self);
         } else {
-            info!("Full heap GC");
+            log::info!("Full heap GC");
             use crate::plan::immix::Immix;
             use crate::policy::immix::TRACE_KIND_DEFRAG;
             Immix::schedule_immix_full_heap_collection::<
@@ -182,14 +183,14 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         if self.is_current_gc_nursery() {
             // Every reachable object should be logged
             if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::SeqCst) {
-                error!("Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
+                log::error!("Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
                 return false;
             }
 
             // Every reachable object should be marked
             if self.immix.immix_space.in_space(object) && !self.immix.immix_space.is_marked(object)
             {
-                error!(
+                log::error!(
                     "Object {} is not marked (all objects that have been traced should be marked)",
                     object
                 );
@@ -197,7 +198,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             } else if self.immix.common.los.in_space(object)
                 && !self.immix.common.los.is_live(object)
             {
-                error!("LOS Object {} is not marked", object);
+                log::error!("LOS Object {} is not marked", object);
                 return false;
             }
         }
@@ -251,11 +252,11 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
         if self.immix.immix_space.in_space(object) {
             if !self.is_object_in_nursery(object) {
                 // Mature object
-                trace!("Immix mature object {}, skip", object);
+                log::trace!("Immix mature object {}, skip", object);
                 return object;
             } else {
                 let object = if KIND == TRACE_KIND_TRANSITIVE_PIN || KIND == TRACE_KIND_FAST {
-                    trace!(
+                    log::trace!(
                         "Immix nursery object {} is being traced without moving",
                         object
                     );
@@ -272,7 +273,7 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                         worker,
                         true,
                     );
-                    trace!(
+                    log::trace!(
                         "Immix nursery object {} is being traced with opportunistic copy {}",
                         object,
                         if ret == object {
@@ -283,7 +284,7 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                     );
                     ret
                 } else {
-                    trace!(
+                    log::trace!(
                         "Immix nursery object {} is being traced without moving",
                         object
                     );
@@ -346,7 +347,7 @@ impl<VM: VMBinding> StickyImmix<VM> {
         // Separate each condition so the code is clear
         #[allow(clippy::if_same_then_else, clippy::needless_bool)]
         if crate::plan::generational::FULL_NURSERY_GC {
-            trace!("full heap: forced full heap");
+            log::trace!("full heap: forced full heap");
             // For barrier overhead measurements, we always do full gc in nursery collections.
             true
         } else if self

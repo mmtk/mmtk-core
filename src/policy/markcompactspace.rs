@@ -10,6 +10,7 @@ use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::LOG_BYTES_IN_WORD;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::{MonotonePageResource, PageResource};
+use crate::util::log;
 use crate::util::metadata::{extract_side_metadata, vo_bit};
 use crate::util::object_enum::{self, ObjectEnumerator};
 use crate::util::{Address, ObjectReference};
@@ -383,7 +384,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 );
                 // update forwarding pointer
                 Self::store_header_forwarding_pointer(obj, new_obj);
-                trace!(
+                log::trace!(
                     "Calculate forward: {} (size when copied = {}) ~> {} (size = {})",
                     obj,
                     VM::VMObjectModel::get_size_when_copied(obj),
@@ -407,12 +408,12 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
                 let maybe_forwarding_pointer = Self::get_header_forwarding_pointer(obj);
                 if let Some(forwarding_pointer) = maybe_forwarding_pointer {
-                    trace!("Compact {} to {}", obj, forwarding_pointer);
+                    log::trace!("Compact {} to {}", obj, forwarding_pointer);
                     let new_object = forwarding_pointer;
                     Self::clear_header_forwarding_pointer(new_object);
 
                     // copy object
-                    trace!(" copy from {} to {}", obj, new_object);
+                    log::trace!(" copy from {} to {}", obj, new_object);
                     let end_of_new_object =
                         VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
                     // update VO bit,
@@ -420,12 +421,12 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                     to = new_object.to_object_start::<VM>() + copied_size;
                     debug_assert_eq!(end_of_new_object, to);
                 } else {
-                    trace!("Skipping dead object {}", obj);
+                    log::trace!("Skipping dead object {}", obj);
                 }
             }
         }
 
-        debug!("Compact end: to = {}", to);
+        log::debug!("Compact end: to = {}", to);
 
         // reset the bump pointer
         self.pr.reset_cursor(to);

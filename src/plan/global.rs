@@ -19,6 +19,7 @@ use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
+use crate::util::log;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::Options;
@@ -233,7 +234,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         let vm_live_pages = conversions::bytes_to_pages_up(vm_live_bytes);
         let total = used_pages + collection_reserve + vm_live_pages;
 
-        trace!(
+        log::trace!(
             "Reserved pages = {}, used pages: {}, collection reserve: {}, VM live pages: {}",
             total,
             used_pages,
@@ -267,7 +268,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         //    may be larger than the reserved pages before a GC, as we may end up using more memory for thread local
         //    buffers for copy allocators).
         let available_pages = total_pages.saturating_sub(reserved_pages);
-        trace!(
+        log::trace!(
             "Total pages = {}, reserved pages = {}, available pages = {}",
             total_pages,
             reserved_pages,
@@ -491,25 +492,25 @@ impl<VM: VMBinding> BasePlan<VM> {
     ) -> ObjectReference {
         #[cfg(feature = "code_space")]
         if self.code_space.in_space(object) {
-            trace!("trace_object: object in code space");
+            log::trace!("trace_object: object in code space");
             return self.code_space.trace_object::<Q>(queue, object);
         }
 
         #[cfg(feature = "code_space")]
         if self.code_lo_space.in_space(object) {
-            trace!("trace_object: object in large code space");
+            log::trace!("trace_object: object in large code space");
             return self.code_lo_space.trace_object::<Q>(queue, object);
         }
 
         #[cfg(feature = "ro_space")]
         if self.ro_space.in_space(object) {
-            trace!("trace_object: object in ro_space space");
+            log::trace!("trace_object: object in ro_space space");
             return self.ro_space.trace_object(queue, object);
         }
 
         #[cfg(feature = "vm_space")]
         if self.vm_space.in_space(object) {
-            trace!("trace_object: object in boot space");
+            log::trace!("trace_object: object in boot space");
             return self.vm_space.trace_object(queue, object);
         }
 
@@ -545,18 +546,18 @@ impl<VM: VMBinding> BasePlan<VM> {
                 &self.options,
             );
         if stress_force_gc {
-            debug!(
+            log::debug!(
                 "Stress GC: allocation_bytes = {}, stress_factor = {}",
                 self.global_state.allocation_bytes.load(Ordering::Relaxed),
                 *self.options.stress_factor
             );
-            debug!("Doing stress GC");
+            log::debug!("Doing stress GC");
             self.global_state
                 .allocation_bytes
                 .store(0, Ordering::SeqCst);
         }
 
-        debug!(
+        log::debug!(
             "self.get_reserved_pages()={}, self.get_total_pages()={}",
             plan.get_reserved_pages(),
             plan.get_total_pages()
@@ -622,15 +623,15 @@ impl<VM: VMBinding> CommonPlan<VM> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         if self.immortal.in_space(object) {
-            trace!("trace_object: object in immortal space");
+            log::trace!("trace_object: object in immortal space");
             return self.immortal.trace_object(queue, object);
         }
         if self.los.in_space(object) {
-            trace!("trace_object: object in los");
+            log::trace!("trace_object: object in los");
             return self.los.trace_object(queue, object);
         }
         if self.nonmoving.in_space(object) {
-            trace!("trace_object: object in nonmoving space");
+            log::trace!("trace_object: object in nonmoving space");
             return self.nonmoving.trace_object(queue, object);
         }
         self.base.trace_object::<Q>(queue, object, worker)

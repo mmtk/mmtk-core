@@ -34,7 +34,6 @@ itertools = "0.12.0"
 jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
 lazy_static = "1.1"
 libc = "0.2"
-log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 memoffset = "0.9"
 mimalloc-sys = { version = "0.1.6", optional = true }
 # MMTk macros - we have to specify a version here in order to publish the crate, even though we use the dependency from a local path.
@@ -51,6 +50,9 @@ static_assertions = "1.1.0"
 strum = "0.26.2"
 strum_macros = "0.26.2"
 sysinfo = "0.30.9"
+# mmtk-core internally uses wrapper macros in the `mmtk::util::log` module.
+# We rename the crate so that programmers don't unintentially use the `log` crate directly.
+the_log_crate = { package = "log", version = "0.4"}
 
 [dev-dependencies]
 paste = "1.0.8"
@@ -170,6 +172,11 @@ count_live_bytes_in_gc = []
 # Workaround a problem where bpftrace scripts (see tools/tracing/timeline/capture.bt) cannot
 # capture the type names of work packets.
 bpftrace_workaround = []
+
+# Enable verbose logs in release build.  Those are placed on hot paths, so merely checking whether
+# logging is enabled may degrade performance.  Currently such logs include `debug!` and `trace!`
+# levels.
+hot_log = []
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --

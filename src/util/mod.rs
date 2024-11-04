@@ -26,6 +26,8 @@ pub mod heap;
 pub mod is_mmtk_object;
 /// Linear scan through a heap range
 pub mod linear_scan;
+/// Logging
+pub mod log;
 /// Various malloc implementations (conditionally compiled by features)
 pub mod malloc;
 /// Wrapper functions for memory syscalls such as mmap, mprotect, etc.

@@ -3,11 +3,13 @@ use super::SideMetadataSpec;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 use crate::util::heap::layout::vm_layout::VMLayout;
+use crate::util::log;
 use crate::util::memory::MmapStrategy;
 #[cfg(target_pointer_width = "32")]
 use crate::util::metadata::side_metadata::address_to_chunked_meta_address;
 use crate::util::Address;
 use crate::MMAPPER;
+
 use std::io::Result;
 
 /// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)
@@ -93,7 +95,7 @@ pub(super) fn align_metadata_address(
 #[cfg(test)]
 pub(crate) fn ensure_munmap_metadata(start: Address, size: usize) {
     use crate::util::memory;
-    trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
+    log::trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
 
     assert!(memory::munmap(start, size).is_ok())
 }
@@ -172,7 +174,7 @@ pub(crate) fn address_to_meta_address(
     #[cfg(target_pointer_width = "64")]
     let res = { address_to_contiguous_meta_address(metadata_spec, data_addr) };
 
-    trace!(
+    log::trace!(
         "address_to_meta_address({:?}, addr: {}) -> 0x{:x}",
         metadata_spec,
         data_addr,

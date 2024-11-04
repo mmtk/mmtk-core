@@ -1,11 +1,12 @@
 use super::mmapper::MapState;
 use super::Mmapper;
-use crate::util::Address;
-
 use crate::util::constants::*;
 use crate::util::conversions::pages_to_bytes;
 use crate::util::heap::layout::vm_layout::*;
+use crate::util::log;
 use crate::util::memory::MmapStrategy;
+use crate::util::Address;
+
 use std::fmt;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
@@ -47,7 +48,7 @@ impl Mmapper for ByteMapMmapper {
     fn ensure_mapped(&self, start: Address, pages: usize, strategy: MmapStrategy) -> Result<()> {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
-        trace!(
+        log::trace!(
             "Calling ensure_mapped with start={:?} and {} pages, {}-{}",
             start,
             pages,
@@ -76,7 +77,7 @@ impl Mmapper for ByteMapMmapper {
     ) -> Result<()> {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
-        trace!(
+        log::trace!(
             "Calling quarantine_address_range with start={:?} and {} pages, {}-{}",
             start,
             pages,
