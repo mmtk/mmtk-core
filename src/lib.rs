@@ -38,6 +38,10 @@ extern crate static_assertions;
 #[macro_use]
 extern crate probe;
 
+// Use the `{likely, unlikely}` provided by compiler when using nightly
+#[rustversion::nightly]
+#![feature(core_intrinsics)]
+
 mod mmtk;
 pub use mmtk::MMTKBuilder;
 pub(crate) use mmtk::MMAPPER;
