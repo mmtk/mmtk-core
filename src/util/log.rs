@@ -11,29 +11,33 @@
 // macros such as `log::info!` from the IDE.
 use the_log_crate;
 
-pub use the_log_crate::{error, info, warn};
+pub(crate) use the_log_crate::{error, info, warn};
 
 cfg_if::cfg_if! {
     if #[cfg(all(not(debug_assertions), not(feature = "hot_log")))] {
         // If it is release build and the feature "hot_log" is not enabled,
         // then we define verbose logs as no-op in release build.
 
-        /// The `log::debug!` macro is disabled in release build.  Use the "hot_log" feature to enable.
-        #[cfg(not(feature = "hot_log"))]
+        /// The `log::debug!` macro is disabled in release build.
+        /// Use the "hot_log" feature to enable.
         macro_rules! debug {
-            (target: $target:expr, $($arg:tt)+) => {};
             ($($arg:tt)+) => {}
         }
 
-        /// The `log::trace!` macro is disabled in release build.  Use the "hot_log" feature to enable.
-        #[cfg(not(feature = "hot_log"))]
+        /// The `log::trace!` macro is disabled in release build.
+        /// Use the "hot_log" feature to enable.
         macro_rules! trace {
-            (target: $target:expr, $($arg:tt)+) => {};
             ($($arg:tt)+) => {}
         }
+
+        // By default, a macro has no path-based scope.
+        // The following allows other modules to access the macros with `crate::util::log::debug`
+        // and `crate::util::log::trace`.
+        pub(crate) use debug;
+        pub(crate) use trace;
 
     } else {
         // Otherwise simply import the macros from the `log` crate.
-        pub use the_log_crate::{debug, trace};
+        pub(crate) use the_log_crate::{debug, trace};
     }
 }
