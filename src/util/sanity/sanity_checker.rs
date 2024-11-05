@@ -1,5 +1,6 @@
 use crate::plan::Plan;
 use crate::scheduler::gc_work::*;
+use crate::util::log;
 use crate::util::ObjectReference;
 use crate::vm::slot::Slot;
 use crate::vm::*;
@@ -127,7 +128,7 @@ impl<P: Plan> SanityPrepare<P> {
 
 impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
-        info!("Sanity GC prepare");
+        log::info!("Sanity GC prepare");
         {
             let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
             sanity_checker.refs.clear();
@@ -147,7 +148,7 @@ impl<P: Plan> SanityRelease<P> {
 
 impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
-        info!("Sanity GC release");
+        log::info!("Sanity GC release");
         mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
         mmtk.sanity_end();
     }
@@ -210,7 +211,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
 
             // Object is not "marked"
             sanity_checker.refs.insert(object); // "Mark" it
-            trace!("Sanity mark object {}", object);
+            log::trace!("Sanity mark object {}", object);
             self.nodes.enqueue(object);
         }
 

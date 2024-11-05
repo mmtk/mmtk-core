@@ -7,6 +7,7 @@ use super::MarkSweepSpace;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
+use crate::util::log;
 use crate::util::object_enum::BlockMayHaveObjects;
 use crate::vm::ObjectModel;
 use crate::{
@@ -328,7 +329,7 @@ impl Block {
         // Current cursor
         let mut cursor = cell;
 
-        debug!("Sweep block {:?}, cell size {}", self, cell_size);
+        log::debug!("Sweep block {:?}, cell size {}", self, cell_size);
 
         while cell + cell_size <= self.end() {
             // possible object ref
@@ -338,7 +339,7 @@ impl Block {
                     cursor + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
                 )
             };
-            trace!(
+            log::trace!(
                 "{:?}: cell = {}, last cell in free list = {}, cursor = {}, potential object = {}",
                 self,
                 cell,
@@ -350,7 +351,7 @@ impl Block {
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
                 .is_marked::<VM>(potential_object_ref, Ordering::SeqCst)
             {
-                debug!("{:?} Live cell: {}", self, cell);
+                log::debug!("{:?} Live cell: {}", self, cell);
                 // If the mark bit is set, the cell is alive.
                 // We directly jump to the end of the cell.
                 cell += cell_size;
@@ -361,9 +362,11 @@ impl Block {
 
                 if cursor >= cell + cell_size {
                     // We now stepped to the next cell. This means we did not find mark bit in the current cell, and we can add this cell to free list.
-                    debug!(
+                    log::debug!(
                         "{:?} Free cell: {}, last cell in freelist is {}",
-                        self, cell, last
+                        self,
+                        cell,
+                        last
                     );
 
                     // Clear VO bit: we don't know where the object reference actually is, so we bulk zero the cell.

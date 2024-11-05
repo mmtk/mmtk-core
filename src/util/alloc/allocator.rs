@@ -1,20 +1,20 @@
 use crate::global_state::GlobalState;
+use crate::policy::space::Space;
 use crate::util::address::Address;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
-use crate::util::heap::gc_trigger::GCTrigger;
-use crate::util::options::Options;
-use crate::MMTK;
-
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-
-use crate::policy::space::Space;
 use crate::util::constants::*;
+use crate::util::heap::gc_trigger::GCTrigger;
+use crate::util::log;
 use crate::util::opaque_pointer::*;
+use crate::util::options::Options;
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection};
+use crate::MMTK;
+
 use downcast_rs::Downcast;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -113,7 +113,7 @@ pub fn get_maximum_aligned_size_inner<VM: VMBinding>(
     alignment: usize,
     known_alignment: usize,
 ) -> usize {
-    trace!(
+    log::trace!(
         "size={}, alignment={}, known_alignment={}, MIN_ALIGNMENT={}",
         size,
         alignment,
@@ -295,7 +295,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                     // an analysis counter specific allocation hook, then here is the place to do so
                     #[cfg(feature = "analysis")]
                     if _allocation_bytes > *self.get_context().options.analysis_factor {
-                        trace!(
+                        log::trace!(
                             "Analysis: allocation_bytes = {} more than analysis_factor = {}",
                             _allocation_bytes,
                             *self.get_context().options.analysis_factor
@@ -318,7 +318,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             // We cannot just rely on the local var. Instead, we get the emergency collection value again,
             // and check both.
             if emergency_collection && self.get_context().state.is_emergency_collection() {
-                trace!("Emergency collection");
+                log::trace!("Emergency collection");
                 // Report allocation success to assist OutOfMemory handling.
                 // This seems odd, but we must allow each OOM to run its course (and maybe give us back memory)
                 let fail_with_oom = !self
@@ -326,10 +326,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                     .state
                     .allocation_success
                     .swap(true, Ordering::SeqCst);
-                trace!("fail with oom={}", fail_with_oom);
+                log::trace!("fail with oom={}", fail_with_oom);
                 if fail_with_oom {
                     // Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
-                    trace!("Throw HeapOutOfMemory!");
+                    log::trace!("Throw HeapOutOfMemory!");
                     VM::VMCollection::out_of_memory(tls, AllocationError::HeapOutOfMemory);
                     self.get_context()
                         .state
@@ -352,7 +352,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             // Record whether last collection was an Emergency collection. If so, we make one more
             // attempt to allocate before we signal an OOM.
             emergency_collection = self.get_context().state.is_emergency_collection();
-            trace!("Got emergency collection as {}", emergency_collection);
+            log::trace!("Got emergency collection as {}", emergency_collection);
             previous_result_zero = true;
         }
     }
@@ -422,7 +422,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         // If an allocator does thread local allocation but does not override this method to
         // provide a correct implementation, we will log a warning.
         if self.does_thread_local_allocation() && need_poll {
-            warn!("{} does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).", std::any::type_name::<Self>());
+            log::warn!("{} does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).", std::any::type_name::<Self>());
         }
         self.alloc_slow_once_traced(size, align, offset)
     }

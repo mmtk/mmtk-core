@@ -29,6 +29,7 @@ use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
+use crate::util::log;
 use crate::util::memory::{self, HugePageSupport, MmapProtection, MmapStrategy};
 use crate::vm::VMBinding;
 
@@ -81,7 +82,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn acquire(&self, tls: VMThread, pages: usize) -> Address {
-        trace!("Space.acquire, tls={:?}", tls);
+        log::trace!("Space.acquire, tls={:?}", tls);
 
         debug_assert!(
             !self.will_oom_on_acquire(tls, pages << LOG_BYTES_IN_PAGE),
@@ -97,14 +98,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // initialize_collection() has to be called so we know GC is initialized.
         let allow_gc = should_poll && self.common().global_state.is_initialized();
 
-        trace!("Reserving pages");
+        log::trace!("Reserving pages");
         let pr = self.get_page_resource();
         let pages_reserved = pr.reserve_pages(pages);
-        trace!("Pages reserved");
-        trace!("Polling ..");
+        log::trace!("Pages reserved");
+        log::trace!("Polling ..");
 
         if should_poll && self.get_gc_trigger().poll(false, Some(self.as_space())) {
-            debug!("Collection required");
+            log::debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
 
             // Clear the request, and inform GC trigger about the pending allocation.
@@ -116,7 +117,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
         } else {
-            debug!("Collection not required");
+            log::debug!("Collection not required");
 
             // We need this lock: Othrewise, it is possible that one thread acquires pages in a new chunk, but not yet
             // set SFT for it (in grow_space()), and another thread acquires pages in the same chunk, which is not
@@ -128,7 +129,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
             match pr.get_new_pages(self.common().descriptor, pages_reserved, pages, tls) {
                 Ok(res) => {
-                    debug!(
+                    log::debug!(
                         "Got new pages {} ({} pages) for {} in chunk {}, new_chunk? {}",
                         res.start,
                         res.pages,
@@ -205,7 +206,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         );
                     }
 
-                    debug!("Space.acquire(), returned = {}", res.start);
+                    log::debug!("Space.acquire(), returned = {}", res.start);
                     res.start
                 }
                 Err(_) => {
@@ -255,7 +256,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      * @param new_chunk {@code true} if the new space encroached upon or started a new chunk or chunks.
      */
     fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
-        trace!(
+        log::trace!(
             "Grow space from {} for {} bytes (new chunk = {})",
             start,
             bytes,
@@ -618,7 +619,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             panic!("failed to mmap meta memory");
         }
 
-        debug!(
+        log::debug!(
             "Created space {} [{}, {}) for {} bytes",
             rtn.name,
             start,
@@ -666,15 +667,15 @@ impl<VM: VMBinding> CommonSpace<VM> {
 }
 
 fn get_frac_available(frac: f32) -> usize {
-    trace!("AVAILABLE_START={}", vm_layout().available_start());
-    trace!("AVAILABLE_END={}", vm_layout().available_end());
+    log::trace!("AVAILABLE_START={}", vm_layout().available_start());
+    log::trace!("AVAILABLE_END={}", vm_layout().available_end());
     let bytes = (frac * vm_layout().available_bytes() as f32) as usize;
-    trace!("bytes={}*{}={}", frac, vm_layout().available_bytes(), bytes);
+    log::trace!("bytes={}*{}={}", frac, vm_layout().available_bytes(), bytes);
     let mb = bytes >> LOG_BYTES_IN_MBYTE;
     let rtn = mb << LOG_BYTES_IN_MBYTE;
-    trace!("rtn={}", rtn);
+    log::trace!("rtn={}", rtn);
     let aligned_rtn = raw_align_up(rtn, BYTES_IN_CHUNK);
-    trace!("aligned_rtn={}", aligned_rtn);
+    log::trace!("aligned_rtn={}", aligned_rtn);
     aligned_rtn
 }
 

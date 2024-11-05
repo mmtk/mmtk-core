@@ -1,22 +1,22 @@
 use super::layout::vm_layout::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
-use crate::policy::space::required_chunks;
-use crate::util::address::Address;
-use crate::util::constants::BYTES_IN_PAGE;
-use crate::util::conversions::*;
-use std::ops::Range;
-use std::sync::{Mutex, MutexGuard};
-
-use crate::util::alloc::embedded_meta_data::*;
-use crate::util::heap::layout::vm_layout::LOG_BYTES_IN_CHUNK;
-use crate::util::heap::pageresource::CommonPageResource;
-use crate::util::opaque_pointer::*;
-
 use super::layout::VMMap;
 use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::PageResource;
+use crate::policy::space::required_chunks;
+use crate::util::address::Address;
+use crate::util::alloc::embedded_meta_data::*;
+use crate::util::constants::BYTES_IN_PAGE;
+use crate::util::conversions::*;
+use crate::util::heap::layout::vm_layout::LOG_BYTES_IN_CHUNK;
+use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
+use crate::util::log;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
+
 use std::marker::PhantomData;
+use std::ops::Range;
+use std::sync::{Mutex, MutexGuard};
 
 pub struct MonotonePageResource<VM: VMBinding> {
     common: CommonPageResource,
@@ -73,16 +73,19 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         required_pages: usize,
         tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail> {
-        debug!(
+        log::debug!(
             "In MonotonePageResource, reserved_pages = {}, required_pages = {}",
-            reserved_pages, required_pages
+            reserved_pages,
+            required_pages
         );
         let mut new_chunk = false;
         let mut sync = self.sync.lock().unwrap();
         let mut rtn = sync.cursor;
-        debug!(
+        log::debug!(
             "cursor = {}, sentinel = {}, current_chunk = {}",
-            sync.cursor, sync.sentinel, sync.current_chunk
+            sync.cursor,
+            sync.sentinel,
+            sync.current_chunk
         );
 
         if cfg!(debug_assertions) {
@@ -106,9 +109,9 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         }
 
         let bytes = pages_to_bytes(required_pages);
-        debug!("bytes={}", bytes);
+        log::debug!("bytes={}", bytes);
         let mut tmp = sync.cursor + bytes;
-        debug!("tmp={:?}", tmp);
+        log::debug!("tmp={:?}", tmp);
 
         if !self.common().contiguous && tmp > sync.sentinel {
             /* we're out of virtual memory within our discontiguous region, so ask for more */
@@ -131,12 +134,12 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
 
         debug_assert!(rtn >= sync.cursor && rtn < sync.cursor + bytes);
         if tmp > sync.sentinel {
-            //debug!("tmp={:?} > sync.sentinel={:?}", tmp, sync.sentinel);
+            //log::debug!("tmp={:?} > sync.sentinel={:?}", tmp, sync.sentinel);
             Result::Err(PRAllocFail)
         } else {
-            //debug!("tmp={:?} <= sync.sentinel={:?}", tmp, sync.sentinel);
+            //log::debug!("tmp={:?} <= sync.sentinel={:?}", tmp, sync.sentinel);
             sync.cursor = tmp;
-            debug!("update cursor = {}", tmp);
+            log::debug!("update cursor = {}", tmp);
 
             /* In a contiguous space we can bump along into the next chunk, so preserve the currentChunk invariant */
             if self.common().contiguous && chunk_align_down(sync.cursor) != sync.current_chunk {
@@ -199,7 +202,7 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
 
     fn log_chunk_fields(&self, space_descriptor: SpaceDescriptor, site: &str) {
         let sync = self.sync.lock().unwrap();
-        debug!(
+        log::debug!(
             "[{:?}]{}: cursor={}, current_chunk={}, delta={}",
             space_descriptor,
             site,

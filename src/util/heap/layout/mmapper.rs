@@ -1,7 +1,9 @@
 use crate::util::heap::layout::vm_layout::*;
+use crate::util::log;
 use crate::util::memory::*;
 use crate::util::rust_util::rev_group::RevisitableGroupByForIterator;
 use crate::util::Address;
+
 use atomic::{Atomic, Ordering};
 use bytemuck::NoUninit;
 use std::io::Result;
@@ -89,7 +91,7 @@ impl MapState {
         mmap_start: Address,
         strategy: MmapStrategy,
     ) -> Result<()> {
-        trace!(
+        log::trace!(
             "Trying to map {} - {}",
             mmap_start,
             mmap_start + MMAP_CHUNK_BYTES
@@ -114,7 +116,7 @@ impl MapState {
         mmap_start: Address,
         strategy: MmapStrategy,
     ) -> Result<()> {
-        trace!(
+        log::trace!(
             "Trying to quarantine {} - {}",
             mmap_start,
             mmap_start + MMAP_CHUNK_BYTES
@@ -158,7 +160,7 @@ impl MapState {
         mmap_start: Address,
         strategy: MmapStrategy,
     ) -> Result<()> {
-        trace!(
+        log::trace!(
             "Trying to bulk-quarantine {} - {}",
             mmap_start,
             mmap_start + MMAP_CHUNK_BYTES * state_slices.iter().map(|s| s.len()).sum::<usize>(),
@@ -178,7 +180,7 @@ impl MapState {
 
             match group.key {
                 MapState::Unmapped => {
-                    trace!("Trying to quarantine {} - {}", start_addr, end_addr);
+                    log::trace!("Trying to quarantine {} - {}", start_addr, end_addr);
                     mmap_noreserve(start_addr, end_addr - start_addr, strategy)?;
 
                     for state in group {
@@ -186,10 +188,10 @@ impl MapState {
                     }
                 }
                 MapState::Quarantined => {
-                    trace!("Already quarantine {} - {}", start_addr, end_addr);
+                    log::trace!("Already quarantine {} - {}", start_addr, end_addr);
                 }
                 MapState::Mapped => {
-                    trace!("Already mapped {} - {}", start_addr, end_addr);
+                    log::trace!("Already mapped {} - {}", start_addr, end_addr);
                 }
                 MapState::Protected => {
                     panic!("Cannot quarantine protected memory")

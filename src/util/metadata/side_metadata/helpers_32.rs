@@ -143,7 +143,7 @@ pub(super) fn try_map_per_chunk_metadata_space(
                     panic!("We have failed mmap");
                 }
             }
-            trace!(
+            log::trace!(
                 "try_map_per_chunk_metadata_space({}, 0x{:x}, 0x{:x}) -> {:#?}",
                 start,
                 size,
@@ -160,7 +160,7 @@ pub(super) fn try_map_per_chunk_metadata_space(
         total_mapped += local_per_chunk;
     }
 
-    trace!(
+    log::trace!(
         "try_map_per_chunk_metadata_space({}, 0x{:x}, 0x{:x}) -> OK(())",
         start,
         size,

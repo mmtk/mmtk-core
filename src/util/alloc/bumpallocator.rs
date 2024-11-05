@@ -6,6 +6,7 @@ use crate::util::alloc::Allocator;
 
 use crate::policy::space::Space;
 use crate::util::conversions::bytes_to_pages_up;
+use crate::util::log;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 
@@ -99,17 +100,17 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        trace!("alloc");
+        log::trace!("alloc");
         let result = align_allocation_no_fill::<VM>(self.bump_pointer.cursor, align, offset);
         let new_cursor = result + size;
 
         if new_cursor > self.bump_pointer.limit {
-            trace!("Thread local buffer used up, go to alloc slow path");
+            log::trace!("Thread local buffer used up, go to alloc slow path");
             self.alloc_slow(size, align, offset)
         } else {
             fill_alignment_gap::<VM>(self.bump_pointer.cursor, result);
             self.bump_pointer.cursor = new_cursor;
-            trace!(
+            log::trace!(
                 "Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}",
                 size,
                 result,
@@ -121,7 +122,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        trace!("alloc_slow");
+        log::trace!("alloc_slow");
         self.acquire_block(size, align, offset, false)
     }
 
@@ -144,7 +145,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
             return self.acquire_block(size, align, offset, true);
         }
 
-        trace!("alloc_slow stress_test");
+        log::trace!("alloc_slow stress_test");
         let result = align_allocation_no_fill::<VM>(self.bump_pointer.cursor, align, offset);
         let new_cursor = result + size;
 
@@ -157,7 +158,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
             fill_alignment_gap::<VM>(self.bump_pointer.cursor, result);
             self.bump_pointer.limit -= new_cursor - self.bump_pointer.cursor;
             self.bump_pointer.cursor = new_cursor;
-            trace!(
+            log::trace!(
                 "alloc_slow: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}",
                 size,
                 result,
@@ -201,10 +202,10 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
         let acquired_start = self.space.acquire(self.tls, bytes_to_pages_up(block_size));
         if acquired_start.is_zero() {
-            trace!("Failed to acquire a new block");
+            log::trace!("Failed to acquire a new block");
             acquired_start
         } else {
-            trace!(
+            log::trace!(
                 "Acquired a new block of size {} with start address {}",
                 block_size,
                 acquired_start

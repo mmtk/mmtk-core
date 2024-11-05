@@ -20,6 +20,7 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
+use crate::util::log;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
@@ -109,10 +110,10 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         probe!(mmtk, gen_full_heap, is_full_heap);
 
         if !is_full_heap {
-            info!("Nursery GC");
+            log::info!("Nursery GC");
             scheduler.schedule_common_work::<GenImmixNurseryGCWorkContext<VM>>(self);
         } else {
-            info!("Full heap GC");
+            log::info!("Full heap GC");
             crate::plan::immix::Immix::schedule_immix_full_heap_collection::<
                 GenImmix<VM>,
                 GenImmixMatureGCWorkContext<VM, TRACE_KIND_FAST>,

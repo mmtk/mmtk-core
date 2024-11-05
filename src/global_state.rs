@@ -1,3 +1,4 @@
+use crate::util::log;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
@@ -160,7 +161,7 @@ impl GlobalState {
     /// Increase the allocation bytes and return the current allocation bytes after increasing
     pub fn increase_allocation_bytes_by(&self, size: usize) -> usize {
         let old_allocation_bytes = self.allocation_bytes.fetch_add(size, Ordering::SeqCst);
-        trace!(
+        log::trace!(
             "Stress GC: old_allocation_bytes = {}, size = {}, allocation_bytes = {}",
             old_allocation_bytes,
             size,

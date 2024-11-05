@@ -287,7 +287,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         space_args: ImmixSpaceArgs,
     ) -> Self {
         #[cfg(feature = "immix_non_moving")]
-        info!(
+        crate::util::log::info!(
             "Creating non-moving ImmixSpace: {}. Block size: 2^{}",
             args.name,
             Block::LOG_BYTES

@@ -51,6 +51,8 @@ pub(crate) mod epilogue;
 pub(crate) mod erase_vm;
 /// Finalization implementation.
 pub(crate) mod finalizable_processor;
+/// Logging wrappers
+pub(crate) mod log;
 /// Logger initialization
 pub(crate) mod logger;
 pub(crate) mod object_enum;

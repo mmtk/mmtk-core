@@ -9,12 +9,14 @@ use super::worker_monitor::{LastParkedResult, WorkerMonitor};
 use super::*;
 use crate::global_state::GcStatus;
 use crate::mmtk::MMTK;
+use crate::util::log;
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
 use crate::util::rust_util::array_from_fn;
 use crate::vm::Collection;
 use crate::vm::VMBinding;
 use crate::Plan;
+
 use crossbeam::deque::Steal;
 use enum_map::{Enum, EnumMap};
 use std::collections::HashMap;
@@ -97,7 +99,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn stop_gc_threads_for_forking(self: &Arc<Self>) {
         self.worker_group.prepare_surrender_buffer();
 
-        debug!("A mutator is requesting GC threads to stop for forking...");
+        log::debug!("A mutator is requesting GC threads to stop for forking...");
         self.worker_monitor.make_request(WorkerGoal::StopForFork);
     }
 
@@ -106,7 +108,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let all_surrendered = self.worker_group.surrender_gc_worker(worker);
 
         if all_surrendered {
-            debug!(
+            log::debug!(
                 "All {} workers surrendered.",
                 self.worker_group.worker_count()
             );
@@ -128,7 +130,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Request a GC to be scheduled.  Called by mutator via `GCRequester`.
     pub(crate) fn request_schedule_collection(&self) {
-        debug!("A mutator is sending GC-scheduling request to workers...");
+        log::debug!("A mutator is sending GC-scheduling request to workers...");
         self.worker_monitor.make_request(WorkerGoal::Gc);
     }
 
@@ -245,7 +247,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let mut new_packets = false;
         for (id, work_bucket) in self.work_buckets.iter() {
             if work_bucket.is_activated() && work_bucket.maybe_schedule_sentinel() {
-                trace!("Scheduled sentinel packet into {:?}", id);
+                log::trace!("Scheduled sentinel packet into {:?}", id);
                 new_packets = true;
             }
         }
@@ -274,13 +276,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 new_packets = new_packets || !bucket.is_drained();
                 if new_packets {
                     // Quit the loop. There are already new packets in the newly opened buckets.
-                    trace!("Found new packets at stage {:?}.  Break.", id);
+                    log::trace!("Found new packets at stage {:?}.  Break.", id);
                     break;
                 }
                 new_packets = new_packets || bucket.maybe_schedule_sentinel();
                 if new_packets {
                     // Quit the loop. A sentinel packet is added to the newly opened buckets.
-                    trace!("Sentinel is scheduled at stage {:?}.  Break.", id);
+                    log::trace!("Sentinel is scheduled at stage {:?}.  Break.", id);
                     break;
                 }
             }
@@ -320,7 +322,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let mut error_example = None;
         for (id, bucket) in self.work_buckets.iter() {
             if bucket.is_activated() && !bucket.is_empty() {
-                error!("Work bucket {:?} is active but not empty!", id);
+                log::error!("Work bucket {:?} is active but not empty!", id);
                 // This error can be hard to reproduce.
                 // If an error happens in the release build where logs are turned off,
                 // we should show at least one abnormal bucket in the panic message
@@ -427,7 +429,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 );
 
                 // We are in the middle of GC, and the last GC worker parked.
-                trace!("The last worker parked during GC.  Try to find more work to do...");
+                log::trace!("The last worker parked during GC.  Try to find more work to do...");
 
                 // During GC, if all workers parked, all open buckets must have been drained.
                 self.assert_all_activated_buckets_are_empty();
@@ -470,7 +472,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
         match goal {
             WorkerGoal::Gc => {
-                trace!("A mutator requested a GC to be scheduled.");
+                log::trace!("A mutator requested a GC to be scheduled.");
 
                 // We set the eBPF trace point here so that bpftrace scripts can start recording
                 // work packet events before the `ScheduleCollection` work packet starts.
@@ -486,7 +488,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 LastParkedResult::WakeSelf
             }
             WorkerGoal::StopForFork => {
-                trace!("A mutator wanted to fork.");
+                log::trace!("A mutator wanted to fork.");
                 LastParkedResult::WakeAll
             }
         }
@@ -495,19 +497,19 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Find more work for workers to do.  Return true if more work is available.
     fn find_more_work_for_workers(&self) -> bool {
         if self.worker_group.has_designated_work() {
-            trace!("Some workers have designated work.");
+            log::trace!("Some workers have designated work.");
             return true;
         }
 
         // See if any bucket has a sentinel.
         if self.schedule_sentinels() {
-            trace!("Some sentinels are scheduled.");
+            log::trace!("Some sentinels are scheduled.");
             return true;
         }
 
         // Try to open new buckets.
         if self.update_buckets() {
-            trace!("Some buckets are opened.");
+            log::trace!("Some buckets are opened.");
             return true;
         }
 
@@ -543,7 +545,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         };
         let elapsed = start_time.elapsed();
 
-        info!(
+        log::info!(
             "End of GC ({}/{} pages, took {} ms)",
             mmtk.get_plan().get_reserved_pages(),
             mmtk.get_plan().get_total_pages(),
@@ -563,7 +565,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 "Live bytes of all live objects ({} bytes) is larger than used pages ({} bytes), something is wrong.",
                 live_bytes, used_bytes
             );
-            info!(
+            log::info!(
                 "Live objects = {} bytes ({:04.1}% of {} used pages)",
                 live_bytes,
                 live_bytes as f64 * 100.0 / used_bytes as f64,

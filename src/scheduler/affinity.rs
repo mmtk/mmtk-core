@@ -1,4 +1,5 @@
 use super::worker::ThreadId;
+use crate::util::log;
 use crate::util::options::AffinityKind;
 #[cfg(target_os = "linux")]
 use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_COUNT, CPU_SET, CPU_ZERO};
@@ -35,7 +36,7 @@ impl AffinityKind {
             AffinityKind::OsDefault => {}
             AffinityKind::RoundRobin(cpuset) => {
                 let cpu = cpuset[thread % cpuset.len()];
-                debug!("Set affinity for thread {} to core {}", thread, cpu);
+                log::debug!("Set affinity for thread {} to core {}", thread, cpu);
                 bind_current_thread_to_core(cpu);
             }
         }

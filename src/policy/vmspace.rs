@@ -8,6 +8,7 @@ use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::externalpageresource::{ExternalPageResource, ExternalPages};
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 use crate::util::heap::PageResource;
+use crate::util::log;
 use crate::util::metadata::mark_bit::MarkState;
 #[cfg(feature = "set_unlog_bits_vm_space")]
 use crate::util::metadata::MetadataSpec;
@@ -219,9 +220,12 @@ impl<VM: VMBinding> VMSpace<VM> {
         )
         .is_empty());
 
-        debug!(
+        log::debug!(
             "Align VM space ({}, {}) to chunk ({}, {})",
-            start, end, chunk_start, chunk_end
+            start,
+            end,
+            chunk_start,
+            chunk_end
         );
 
         // Mark as mapped in mmapper

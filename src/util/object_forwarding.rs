@@ -1,8 +1,10 @@
 use crate::util::copy::*;
+use crate::util::log;
 use crate::util::metadata::MetadataSpec;
 use crate::util::{constants, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+
 use std::sync::atomic::Ordering;
 
 const FORWARDING_NOT_TRIGGERED_YET: u8 = 0b00;
@@ -193,7 +195,7 @@ pub fn write_forwarding_pointer<VM: VMBinding>(
         get_forwarding_status::<VM>(object),
     );
 
-    trace!("write_forwarding_pointer({}, {})", object, new_object);
+    log::trace!("write_forwarding_pointer({}, {})", object, new_object);
     VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
         object,
         new_object.to_raw_address().as_usize(),

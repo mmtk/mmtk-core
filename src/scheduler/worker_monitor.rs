@@ -4,6 +4,8 @@
 //! -   letting the last parked worker take action, and
 //! -   letting workers and mutators notify workers when workers are given things to do.
 
+use crate::util::log;
+
 use std::sync::{Condvar, Mutex};
 
 use super::{
@@ -136,7 +138,7 @@ impl WorkerMonitor {
 
         // Park this worker
         let all_parked = sync.parker.inc_parked_workers();
-        trace!(
+        log::trace!(
             "Worker {} parked.  parked/total: {}/{}.  All parked: {}",
             ordinal,
             sync.parker.parked_workers,
@@ -147,7 +149,7 @@ impl WorkerMonitor {
         let mut should_wait = false;
 
         if all_parked {
-            trace!("Worker {} is the last worker parked.", ordinal);
+            log::trace!("Worker {} is the last worker parked.", ordinal);
             let result = on_last_parked(&mut sync.goals);
             match result {
                 LastParkedResult::ParkSelf => {
@@ -223,7 +225,7 @@ impl WorkerMonitor {
 
         // Unpark this worker.
         sync.parker.dec_parked_workers();
-        trace!(
+        log::trace!(
             "Worker {} unparked.  parked/total: {}/{}.",
             ordinal,
             sync.parker.parked_workers,

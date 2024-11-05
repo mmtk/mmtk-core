@@ -7,12 +7,14 @@ use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::AllocatorContext;
 use crate::util::heap::{MonotonePageResource, PageResource};
+use crate::util::log;
 use crate::util::metadata::{extract_side_metadata, MetadataSpec};
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::object_forwarding;
 use crate::util::{copy::*, object_enum};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
+
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -218,7 +220,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         semantics: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
+        log::trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
 
         // If this is not from space, we do not need to trace it (the object has been copied to the tosapce)
         if !self.is_from_space() {
@@ -236,18 +238,18 @@ impl<VM: VMBinding> CopySpace<VM> {
             object
         );
 
-        trace!("attempting to forward");
+        log::trace!("attempting to forward");
         let forwarding_status = object_forwarding::attempt_to_forward::<VM>(object);
 
-        trace!("checking if object is being forwarded");
+        log::trace!("checking if object is being forwarded");
         if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
-            trace!("... yes it is");
+            log::trace!("... yes it is");
             let new_object =
                 object_forwarding::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
-            trace!("Returning");
+            log::trace!("Returning");
             new_object
         } else {
-            trace!("... no it isn't. Copying");
+            log::trace!("... no it isn't. Copying");
             let new_object = object_forwarding::forward_object::<VM>(
                 object,
                 semantics.unwrap(),
@@ -258,9 +260,9 @@ impl<VM: VMBinding> CopySpace<VM> {
                 },
             );
 
-            trace!("Forwarding pointer");
+            log::trace!("Forwarding pointer");
             queue.enqueue(new_object);
-            trace!("Copied [{:?} -> {:?}]", object, new_object);
+            log::trace!("Copied [{:?} -> {:?}]", object, new_object);
             new_object
         }
     }
@@ -277,7 +279,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         unsafe {
             mprotect(start.to_mut_ptr(), extent, PROT_NONE);
         }
-        trace!("Protect {:x} {:x}", start, start + extent);
+        log::trace!("Protect {:x} {:x}", start, start + extent);
     }
 
     #[allow(dead_code)] // Only used with certain features (such as sanity)
@@ -296,7 +298,7 @@ impl<VM: VMBinding> CopySpace<VM> {
                 PROT_READ | PROT_WRITE | PROT_EXEC,
             );
         }
-        trace!("Unprotect {:x} {:x}", start, start + extent);
+        log::trace!("Unprotect {:x} {:x}", start, start + extent);
     }
 }
 

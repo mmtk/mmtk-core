@@ -8,6 +8,7 @@ use crate::policy::space::Space;
 use crate::util::alloc::allocator::get_maximum_aligned_size;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
+use crate::util::log;
 use crate::util::opaque_pointer::VMThread;
 use crate::util::rust_util::unlikely;
 use crate::util::Address;
@@ -73,7 +74,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         let new_cursor = result + size;
 
         if new_cursor > self.bump_pointer.limit {
-            trace!(
+            log::trace!(
                 "{:?}: Thread local buffer used up, go to alloc slow path",
                 self.tls
             );
@@ -88,7 +89,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
             // Simple bump allocation.
             fill_alignment_gap::<VM>(self.bump_pointer.cursor, result);
             self.bump_pointer.cursor = new_cursor;
-            trace!(
+            log::trace!(
                 "{:?}: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}",
                 self.tls,
                 size,
@@ -102,7 +103,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
 
     /// Acquire a clean block from ImmixSpace for allocation.
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        trace!("{:?}: alloc_slow_once", self.tls);
+        log::trace!("{:?}: alloc_slow_once", self.tls);
         self.acquire_clean_block(size, align, offset)
     }
 
@@ -117,11 +118,11 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         offset: usize,
         need_poll: bool,
     ) -> Address {
-        trace!("{:?}: alloc_slow_once_precise_stress", self.tls);
+        log::trace!("{:?}: alloc_slow_once_precise_stress", self.tls);
         // If we are required to make a poll, we call acquire_clean_block() which will acquire memory
         // from the space which includes a GC poll.
         if need_poll {
-            trace!(
+            log::trace!(
                 "{:?}: alloc_slow_once_precise_stress going to poll",
                 self.tls
             );
@@ -129,7 +130,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
             // Set fake limits so later allocation will fail in the fastpath, and end up going to this
             // special slowpath.
             self.set_limit_for_stress();
-            trace!(
+            log::trace!(
                 "{:?}: alloc_slow_once_precise_stress done - forced stress poll",
                 self.tls
             );
@@ -144,7 +145,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         let ret = if self.require_new_block(size, align, offset) {
             // We don't have enough space in thread local block to service the allocation request,
             // hence allocate a new block
-            trace!(
+            log::trace!(
                 "{:?}: alloc_slow_once_precise_stress - acquire new block",
                 self.tls
             );
@@ -152,7 +153,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         } else {
             // This `alloc()` call should always succeed given the if-branch checks if we are out
             // of thread local block space
-            trace!("{:?}: alloc_slow_once_precise_stress - alloc()", self.tls,);
+            log::trace!("{:?}: alloc_slow_once_precise_stress - alloc()", self.tls,);
             self.alloc(size, align, offset)
         };
         // Set fake limits
@@ -191,7 +192,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 
     /// Large-object (larger than a line) bump allocation.
     fn overflow_alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        trace!("{:?}: overflow_alloc", self.tls);
+        log::trace!("{:?}: overflow_alloc", self.tls);
         let start = align_allocation_no_fill::<VM>(self.large_bump_pointer.cursor, align, offset);
         let end = start + size;
         if end > self.large_bump_pointer.limit {
@@ -208,7 +209,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 
     /// Bump allocate small objects into recyclable lines (i.e. holes).
     fn alloc_slow_hot(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        trace!("{:?}: alloc_slow_hot", self.tls);
+        log::trace!("{:?}: alloc_slow_hot", self.tls);
         if self.acquire_recyclable_lines(size, align, offset) {
             // If stress test is active, then we need to go to the slow path instead of directly
             // calling `alloc()`. This is because the `acquire_recyclable_lines()` function
@@ -241,7 +242,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                 // Find recyclable lines. Update the bump allocation cursor and limit.
                 self.bump_pointer.cursor = start_line.start();
                 self.bump_pointer.limit = end_line.start();
-                trace!(
+                log::trace!(
                     "{:?}: acquire_recyclable_lines -> {:?} [{:?}, {:?}) {:?}",
                     self.tls,
                     self.line,
@@ -278,7 +279,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     fn acquire_recyclable_block(&mut self) -> bool {
         match self.immix_space().get_reusable_block(self.copy) {
             Some(block) => {
-                trace!("{:?}: acquire_recyclable_block -> {:?}", self.tls, block);
+                log::trace!("{:?}: acquire_recyclable_block -> {:?}", self.tls, block);
                 // Set the hole-searching cursor to the start of this block.
                 self.line = Some(block.start_line());
                 true
@@ -292,7 +293,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         match self.immix_space().get_clean_block(self.tls, self.copy) {
             None => Address::ZERO,
             Some(block) => {
-                trace!(
+                log::trace!(
                     "{:?}: Acquired a new block {:?} -> {:?}",
                     self.tls,
                     block.start(),
@@ -342,7 +343,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             let new_limit =
                 unsafe { Address::from_usize(self.bump_pointer.limit - self.bump_pointer.cursor) };
             self.bump_pointer.limit = new_limit;
-            trace!(
+            log::trace!(
                 "{:?}: set_limit_for_stress. normal c {} l {} -> {}",
                 self.tls,
                 self.bump_pointer.cursor,
@@ -357,7 +358,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                 Address::from_usize(self.large_bump_pointer.limit - self.large_bump_pointer.cursor)
             };
             self.large_bump_pointer.limit = new_lg_limit;
-            trace!(
+            log::trace!(
                 "{:?}: set_limit_for_stress. large c {} l {} -> {}",
                 self.tls,
                 self.large_bump_pointer.cursor,
@@ -376,7 +377,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             let old_limit = self.bump_pointer.limit;
             let new_limit = self.bump_pointer.cursor + self.bump_pointer.limit.as_usize();
             self.bump_pointer.limit = new_limit;
-            trace!(
+            log::trace!(
                 "{:?}: restore_limit_for_stress. normal c {} l {} -> {}",
                 self.tls,
                 self.bump_pointer.cursor,
@@ -390,7 +391,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             let new_lg_limit =
                 self.large_bump_pointer.cursor + self.large_bump_pointer.limit.as_usize();
             self.large_bump_pointer.limit = new_lg_limit;
-            trace!(
+            log::trace!(
                 "{:?}: restore_limit_for_stress. large c {} l {} -> {}",
                 self.tls,
                 self.large_bump_pointer.cursor,

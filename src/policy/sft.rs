@@ -131,7 +131,7 @@ impl SFT for EmptySpaceSFT {
     }
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
-        warn!("Object in empty space!");
+        crate::util::log::warn!("Object in empty space!");
         false
     }
     #[cfg(feature = "object_pinning")]

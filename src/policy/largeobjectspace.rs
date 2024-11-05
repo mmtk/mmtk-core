@@ -7,6 +7,7 @@ use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::{FreeListPageResource, PageResource};
+use crate::util::log;
 use crate::util::metadata;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
@@ -257,7 +258,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             object
         );
         let nursery_object = self.is_in_nursery(object);
-        trace!(
+        log::trace!(
             "LOS object {} {} a nursery object",
             object,
             if nursery_object { "is" } else { "is not" }
@@ -266,7 +267,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             // Note that test_and_mark() has side effects of
             // clearing nursery bit/moving objects out of logical nursery
             if self.test_and_mark(object, self.mark_state) {
-                trace!("LOS object {} is being marked now", object);
+                log::trace!("LOS object {} is being marked now", object);
                 self.treadmill.copy(object, nursery_object);
                 // We just moved the object out of the logical nursery, mark it as unlogged.
                 if nursery_object && self.common.needs_log_bit {
@@ -275,7 +276,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 }
                 queue.enqueue(object);
             } else {
-                trace!(
+                log::trace!(
                     "LOS object {} is not being marked now, it was marked before",
                     object
                 );

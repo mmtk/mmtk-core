@@ -1,7 +1,9 @@
 use crate::util::alloc::AllocationError;
+use crate::util::log;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::vm::{Collection, VMBinding};
+
 use bytemuck::NoUninit;
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::io::{Error, Result};
@@ -202,7 +204,7 @@ pub fn handle_mmap_error<VM: VMBinding>(
         // From Rust nightly 2021-05-12, we started to see Rust added this ErrorKind.
         ErrorKind::OutOfMemory => {
             // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
-            trace!("Signal MmapOutOfMemory!");
+            log::trace!("Signal MmapOutOfMemory!");
             VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
             unreachable!()
         }
@@ -214,7 +216,7 @@ pub fn handle_mmap_error<VM: VMBinding>(
                 // If it is OOM, we invoke out_of_memory() through the VM interface.
                 if os_errno == libc::ENOMEM {
                     // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
-                    trace!("Signal MmapOutOfMemory!");
+                    log::trace!("Signal MmapOutOfMemory!");
                     VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
                     unreachable!()
                 }

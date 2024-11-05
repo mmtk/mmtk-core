@@ -1,5 +1,6 @@
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
+use crate::util::log;
 use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
@@ -7,6 +8,7 @@ use crate::util::metadata::vo_bit;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::{ObjectModel, VMBinding};
+
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
@@ -92,7 +94,7 @@ fn map_active_chunk_metadata(chunk_start: Address) {
     #[cfg(target_pointer_width = "32")]
     let size = 512 * BYTES_IN_CHUNK;
 
-    debug!(
+    log::debug!(
         "chunk_start = {} mapping space for {} -> {}",
         chunk_start,
         start,
@@ -140,7 +142,7 @@ pub(super) fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size
 
         // Set the chunk mark at the end. So if we have chunk mark set, we know we have mapped side metadata
         // for the chunk.
-        trace!("set chunk mark bit for {}", start);
+        log::trace!("set chunk mark bit for {}", start);
         set_chunk_mark(start);
     };
 

@@ -7,7 +7,9 @@ use crate::util::heap::layout::heap_parameters::*;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::int_array_freelist::IntArrayFreeList;
+use crate::util::log;
 use crate::util::Address;
+
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard};
@@ -77,7 +79,7 @@ impl VMMap for Map32 {
                 self.descriptor_map[index].is_empty(),
                 "Conflicting virtual address request"
             );
-            debug!(
+            log::debug!(
                 "Set descriptor {:?} for Chunk {}",
                 descriptor,
                 conversions::chunk_index_to_address(index)
@@ -168,7 +170,7 @@ impl VMMap for Map32 {
     }
     #[allow(clippy::while_immutable_condition)]
     fn free_all_chunks(&self, any_chunk: Address) {
-        debug!("free_all_chunks: {}", any_chunk);
+        log::debug!("free_all_chunks: {}", any_chunk);
         let (_sync, self_mut) = self.mut_self_with_sync();
         debug_assert!(any_chunk == conversions::chunk_align_down(any_chunk));
         if !any_chunk.is_zero() {
@@ -186,7 +188,7 @@ impl VMMap for Map32 {
     }
 
     unsafe fn free_contiguous_chunks(&self, start: Address) -> usize {
-        debug!("free_contiguous_chunks: {}", start);
+        log::debug!("free_contiguous_chunks: {}", start);
         let (_sync, _) = self.mut_self_with_sync();
         debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = start.chunk_index();
@@ -297,7 +299,7 @@ impl Map32 {
             for offset in 0..chunks {
                 let index = (chunk + offset) as usize;
                 let chunk_start = conversions::chunk_index_to_address(index);
-                debug!("Clear descriptor for Chunk {}", chunk_start);
+                log::debug!("Clear descriptor for Chunk {}", chunk_start);
                 self.mut_self().descriptor_map[index] = SpaceDescriptor::UNINITIALIZED;
                 SFT_MAP.clear(chunk_start);
             }

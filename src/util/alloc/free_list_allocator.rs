@@ -6,6 +6,7 @@ use crate::policy::marksweepspace::native_ms::*;
 use crate::util::alloc::allocator;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
+use crate::util::log;
 use crate::util::Address;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
@@ -108,7 +109,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         offset: usize,
         need_poll: bool,
     ) -> Address {
-        trace!("allow slow precise stress s={}", size);
+        log::trace!("allow slow precise stress s={}", size);
         if need_poll {
             self.acquire_global_block(0, 0, true);
         }
@@ -298,13 +299,13 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         loop {
             match self.space.acquire_block(self.tls, size, align) {
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::Exhausted => {
-                    debug!("Acquire global block: None");
+                    log::debug!("Acquire global block: None");
                     // GC
                     return None;
                 }
 
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::Fresh(block) => {
-                    debug!("Acquire global block: Fresh {:?}", block);
+                    log::debug!("Acquire global block: Fresh {:?}", block);
                     self.add_to_available_blocks(bin, block, stress_test);
                     self.init_block(block, self.available_blocks[bin].size);
 
@@ -312,7 +313,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 }
 
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::AbandonedAvailable(block) => {
-                    debug!("Acquire global block: AbandonedAvailable {:?}", block);
+                    log::debug!("Acquire global block: AbandonedAvailable {:?}", block);
                     block.store_tls(self.tls);
                     if block.has_free_cells() {
                         self.add_to_available_blocks(bin, block, stress_test);
@@ -323,7 +324,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 }
 
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::AbandonedUnswept(block) => {
-                    debug!("Acquire global block: AbandonedUnswep {:?}", block);
+                    log::debug!("Acquire global block: AbandonedUnswep {:?}", block);
                     block.store_tls(self.tls);
                     block.sweep::<VM>();
                     if block.has_free_cells() {

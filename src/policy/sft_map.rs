@@ -1,4 +1,5 @@
 use super::sft::*;
+use crate::util::log;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::Address;
 
@@ -120,7 +121,7 @@ impl SFTRefStorage {
     pub fn pre_use_check() {
         // If we do not have lock free operations, warn the users.
         if !AtomicDoubleWord::is_lock_free() {
-            warn!(
+            log::warn!(
                 "SFT access word is not lock free on this platform. This will slow down SFT map."
             );
         }
@@ -397,7 +398,7 @@ mod dense_chunk_map {
             let first_chunk = conversions::chunk_align_down(start);
             let last_chunk = conversions::chunk_align_up(start + bytes);
             let mut chunk = first_chunk;
-            debug!(
+            log::debug!(
                 "update {} (chunk {}) to {} (chunk {})",
                 start,
                 first_chunk,
@@ -405,11 +406,11 @@ mod dense_chunk_map {
                 last_chunk
             );
             while chunk < last_chunk {
-                trace!("Update {} to index {}", chunk, index);
+                log::trace!("Update {} to index {}", chunk, index);
                 SFT_DENSE_CHUNK_MAP_INDEX.store_atomic::<u8>(chunk, index, Ordering::SeqCst);
                 chunk += BYTES_IN_CHUNK;
             }
-            debug!("update done");
+            log::debug!("update done");
         }
 
         unsafe fn clear(&self, address: Address) {
@@ -502,7 +503,7 @@ mod sparse_chunk_map {
         #[allow(dead_code)]
         unsafe fn clear(&self, chunk_start: Address) {
             if DEBUG_SFT {
-                debug!(
+                log::debug!(
                     "Clear SFT for chunk {} (was {})",
                     chunk_start,
                     self.get_checked(chunk_start).name()
@@ -524,17 +525,19 @@ mod sparse_chunk_map {
         }
 
         fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
-            debug!("Update SFT for Chunk {} as {}", start, space.name(),);
+            log::debug!("Update SFT for Chunk {} as {}", start, space.name(),);
             let first = start.chunk_index();
             let start_chunk = chunk_index_to_address(first);
-            debug!(
+            log::debug!(
                 "Update SFT for {} bytes of Chunk {} #{}",
-                bytes, start_chunk, first
+                bytes,
+                start_chunk,
+                first
             );
         }
 
         fn trace_sft_map(&self) {
-            trace!("{}", self.print_sft_map());
+            log::trace!("{}", self.print_sft_map());
         }
 
         // This can be used during debugging to print SFT map.

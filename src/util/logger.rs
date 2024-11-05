@@ -1,4 +1,6 @@
-use log::{self, SetLoggerError};
+//! This module sets up `env_logger` as the default logger.
+
+use the_log_crate::{self, SetLoggerError};
 
 /// Attempt to init a env_logger for MMTk.
 pub fn try_init() -> Result<(), SetLoggerError> {

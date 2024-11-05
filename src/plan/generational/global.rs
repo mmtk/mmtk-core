@@ -9,6 +9,7 @@ use crate::scheduler::*;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
+use crate::util::log;
 use crate::util::statistics::counter::EventCounter;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -101,7 +102,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         let cur_nursery = self.nursery.reserved_pages();
         let max_nursery = self.common.base.gc_trigger.get_max_nursery_pages();
         let nursery_full = cur_nursery >= max_nursery;
-        trace!(
+        log::trace!(
             "nursery_full = {:?} (nursery = {}, max_nursery = {})",
             nursery_full,
             cur_nursery,
@@ -143,7 +144,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         // The conditions are complex, and it is easier to read if we put them to separate if blocks.
         #[allow(clippy::if_same_then_else, clippy::needless_bool)]
         let is_full_heap = if crate::plan::generational::FULL_NURSERY_GC {
-            trace!("full heap: forced full heap");
+            log::trace!("full heap: forced full heap");
             // For barrier overhead measurements, we always do full gc in nursery collections.
             true
         } else if self
@@ -154,7 +155,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             .load(Ordering::SeqCst)
             && *self.common.base.options.full_heap_system_gc
         {
-            trace!("full heap: user triggered");
+            log::trace!("full heap: user triggered");
             // User triggered collection, and we force full heap for user triggered collection
             true
         } else if self.next_gc_full_heap.load(Ordering::SeqCst)
@@ -166,7 +167,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
                 .load(Ordering::SeqCst)
                 > 1
         {
-            trace!(
+            log::trace!(
                 "full heap: next_gc_full_heap = {}, cur_collection_attempts = {}",
                 self.next_gc_full_heap.load(Ordering::SeqCst),
                 self.common
@@ -178,7 +179,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             // Forces full heap collection
             true
         } else if Self::virtual_memory_exhausted(plan.generational().unwrap()) {
-            trace!("full heap: virtual memory exhausted");
+            log::trace!("full heap: virtual memory exhausted");
             true
         } else {
             // We use an Appel-style nursery. The default GC (even for a "heap-full" collection)
@@ -191,7 +192,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
 
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
 
-        info!(
+        log::info!(
             "{}",
             if is_full_heap {
                 "Full heap GC"
@@ -265,7 +266,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         let available = plan.get_available_pages();
         let min_nursery = plan.base().gc_trigger.get_min_nursery_pages();
         let next_gc_full_heap = available < min_nursery;
-        trace!(
+        log::trace!(
             "next gc will be full heap? {}, available pages = {}, min nursery = {}",
             next_gc_full_heap,
             available,

@@ -1,12 +1,14 @@
 use crate::plan::is_nursery_gc;
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
+use crate::util::log;
 use crate::util::reference_processor::RescanReferences;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::Finalizable;
 use crate::vm::{Collection, VMBinding};
 use crate::MMTK;
+
 use std::marker::PhantomData;
 
 /// A special processor for Finalizable objects.
@@ -53,10 +55,10 @@ impl<F: Finalizable> FinalizableProcessor<F> {
 
         for mut f in self.candidates.drain(start..).collect::<Vec<F>>() {
             let reff = f.get_reference();
-            trace!("Pop {:?} for finalization", reff);
+            log::trace!("Pop {:?} for finalization", reff);
             if reff.is_live() {
                 FinalizableProcessor::<F>::forward_finalizable_reference(e, &mut f);
-                trace!("{:?} is live, push {:?} back to candidates", reff, f);
+                log::trace!("{:?} is live, push {:?} back to candidates", reff, f);
                 self.candidates.push(f);
                 continue;
             }
@@ -153,7 +155,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
         }
 
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
-        debug!(
+        log::debug!(
             "Finalization, {} objects in candidates, {} objects ready to finalize",
             finalizable_processor.candidates.len(),
             finalizable_processor.ready_for_finalize.len()
@@ -162,7 +164,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
         let mut w = E::new(vec![], false, mmtk, WorkBucketStage::FinalRefClosure);
         w.set_worker(worker);
         finalizable_processor.scan(worker.tls, &mut w, is_nursery_gc(mmtk.get_plan()));
-        debug!(
+        log::debug!(
             "Finished finalization, {} objects in candidates, {} objects ready to finalize",
             finalizable_processor.candidates.len(),
             finalizable_processor.ready_for_finalize.len()
@@ -180,14 +182,14 @@ pub struct ForwardFinalization<E: ProcessEdgesWork>(PhantomData<E>);
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ForwardFinalization<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        trace!("Forward finalization");
+        log::trace!("Forward finalization");
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
         let mut w = E::new(vec![], false, mmtk, WorkBucketStage::FinalizableForwarding);
         w.set_worker(worker);
         finalizable_processor.forward_candidate(&mut w, is_nursery_gc(mmtk.get_plan()));
 
         finalizable_processor.forward_finalizable(&mut w, is_nursery_gc(mmtk.get_plan()));
-        trace!("Finished forwarding finlizable");
+        log::trace!("Finished forwarding finlizable");
     }
 }
 impl<E: ProcessEdgesWork> ForwardFinalization<E> {

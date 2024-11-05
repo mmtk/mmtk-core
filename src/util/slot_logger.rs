@@ -5,6 +5,7 @@
 //!
 
 use crate::plan::Plan;
+use crate::util::log;
 use crate::vm::slot::Slot;
 use crate::vm::VMBinding;
 use std::collections::HashSet;
@@ -32,7 +33,7 @@ impl<SL: Slot> SlotLogger<SL> {
     /// * `slot` - The slot to log.
     ///
     pub fn log_slot(&self, slot: SL) {
-        trace!("log_slot({:?})", slot);
+        log::trace!("log_slot({:?})", slot);
         let mut slot_log = self.slot_log.write().unwrap();
         assert!(
             slot_log.insert(slot),
