@@ -20,6 +20,7 @@ use crate::scheduler::{GCWork, GCWorker};
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
 use crate::util::heap::layout::vm_layout::vm_layout;
+use crate::util::logger::LoggerError;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::slot::MemorySlice;
@@ -38,7 +39,9 @@ use crate::vm::VMBinding;
 ///    supported. Currently we assume a binding will only need one MMTk instance. Note that GC is enabled by default and the binding should
 ///    implement `VMCollection::is_collection_enabled()` if it requires that the GC should be disabled at a particular time.
 ///
-/// Note that this method will attempt to initialize a logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
+/// This method will attempt to initialize the built-in `env_logger` if the Cargo feature "builtin_env_logger" is enabled (by default).
+/// If the VM would like to use its own logger, it should disable the default feature "builtin_env_logger" in `Cargo.toml`.
+///
 /// Note that, to allow MMTk to do GC properly, `initialize_collection()` needs to be called after this call when
 /// the VM's thread system is ready to spawn GC workers.
 ///
@@ -53,9 +56,11 @@ use crate::vm::VMBinding;
 pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     match crate::util::logger::try_init() {
         Ok(_) => debug!("MMTk initialized the logger."),
-        Err(_) => debug!(
-            "MMTk failed to initialize the logger. Possibly a logger has been initialized by user."
-        ),
+        Err(LoggerError::NoBuiltinLogger) =>
+            debug!("MMTk didn't initialize the built-in env_logger.  The Cargo feature \"builtin_env_logger\" is not enabled."),
+        Err(LoggerError::SetLoggerError(e)) =>
+            // Currently `log::SetLoggerError` can only be raised for one reason: the logger has already been initialized.
+            debug!("MMTk failed to initialize the built-in env_logger: {e}")
     }
     #[cfg(all(feature = "perf_counter", target_os = "linux"))]
     {
