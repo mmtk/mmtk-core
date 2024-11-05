@@ -10,7 +10,7 @@ pub(crate) enum LoggerError {
 
 /// Attempt to init a env_logger for MMTk.
 /// Does nothing if the "builtin_env_logger" feature is disabled.
-pub fn try_init() -> Result<(), LoggerError> {
+pub(crate) fn try_init() -> Result<(), LoggerError> {
     cfg_if::cfg_if! {
         if #[cfg(feature = "builtin_env_logger")] {
             env_logger::try_init_from_env(
