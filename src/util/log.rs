@@ -13,31 +13,43 @@ use the_log_crate;
 
 pub(crate) use the_log_crate::{error, info, warn};
 
-cfg_if::cfg_if! {
-    if #[cfg(all(not(debug_assertions), not(feature = "hot_log")))] {
-        // If it is release build and the feature "hot_log" is not enabled,
-        // then we define verbose logs as no-op in release build.
+/// Whether logs of DEBUG and TRACE levels are enabled.
+/// In debug build, they are always enabled.
+/// In release build, they are not enabled unless the "hot_log" Cargo feature is enabled.
+pub(crate) const HOT_LOG_ENABLED: bool = cfg!(any(not(debug_assertions), feature = "hot_log"));
 
-        /// The `log::debug!` macro is disabled in release build.
-        /// Use the "hot_log" feature to enable.
-        macro_rules! debug {
-            ($($arg:tt)+) => {}
+/// A wrapper of the `debug!` macro in the `log` crate.
+/// Does nothing if [`HOT_LOG_ENABLED`] is false.
+macro_rules! debug {
+    (target: $target:expr, $($arg:tt)+) => {
+        if $crate::util::log::HOT_LOG_ENABLED {
+            the_log_crate::debug!(target: $target, $($arg)+)
         }
-
-        /// The `log::trace!` macro is disabled in release build.
-        /// Use the "hot_log" feature to enable.
-        macro_rules! trace {
-            ($($arg:tt)+) => {}
+    };
+    ($($arg:tt)+) => {
+        if $crate::util::log::HOT_LOG_ENABLED {
+            the_log_crate::debug!($($arg)+)
         }
-
-        // By default, a macro has no path-based scope.
-        // The following allows other modules to access the macros with `crate::util::log::debug`
-        // and `crate::util::log::trace`.
-        pub(crate) use debug;
-        pub(crate) use trace;
-
-    } else {
-        // Otherwise simply import the macros from the `log` crate.
-        pub(crate) use the_log_crate::{debug, trace};
     }
 }
+
+/// A wrapper of the `trace!` macro in the `log` crate.
+/// Does nothing if [`HOT_LOG_ENABLED`] is false.
+macro_rules! trace {
+    (target: $target:expr, $($arg:tt)+) => {
+        if $crate::util::log::HOT_LOG_ENABLED {
+            the_log_crate::trace!(target: $target, $($arg)+)
+        }
+    };
+    ($($arg:tt)+) => {
+        if $crate::util::log::HOT_LOG_ENABLED {
+            the_log_crate::trace!($($arg)+)
+        }
+    }
+}
+
+// By default, a macro has no path-based scope.
+// The following allows other modules to access the macros with `crate::util::log::debug`
+// and `crate::util::log::trace`.
+pub(crate) use debug;
+pub(crate) use trace;

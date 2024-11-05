@@ -3,6 +3,7 @@
 
 use crate::scheduler::gc_work::{ProcessEdgesWork, SlotOf};
 use crate::scheduler::{GCWorker, WorkBucketStage};
+#[cfg(debug_assertions)]
 use crate::util::log;
 use crate::util::ObjectReference;
 use crate::vm::SlotVisitor;

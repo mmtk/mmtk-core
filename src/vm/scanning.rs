@@ -15,7 +15,6 @@ pub trait SlotVisitor<SL: Slot> {
 /// This lets us use closures as SlotVisitor.
 impl<SL: Slot, F: FnMut(SL)> SlotVisitor<SL> for F {
     fn visit_slot(&mut self, slot: SL) {
-        #[cfg(debug_assertions)]
         log::trace!(
             "(FunctionClosure) Visit slot {:?} (pointing to {:?})",
             slot,

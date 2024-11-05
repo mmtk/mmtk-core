@@ -8,6 +8,7 @@ use crate::policy::copyspace::CopySpaceCopyContext;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::immix::{ImmixCopyContext, ImmixHybridCopyContext};
 use crate::policy::space::Space;
+#[cfg(debug_assertions)]
 use crate::util::log;
 use crate::util::object_forwarding;
 use crate::util::opaque_pointer::VMWorkerThread;
