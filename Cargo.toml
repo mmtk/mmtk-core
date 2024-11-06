@@ -28,7 +28,7 @@ crossbeam = "0.8.1"
 delegate = "0.12.0"
 downcast-rs = "1.1.1"
 enum-map = "2.4.2"
-env_logger = "0.11.3"
+env_logger = { version = "0.11.3", optional = true }
 is-terminal = "0.4.7"
 itertools = "0.12.0"
 jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
@@ -71,7 +71,7 @@ default = ["builtin_env_logger"]
 # Built-in env_logger.  This feature is enabled by default.
 # The user can disable this default feature to remove `env_logger` from the dependencies.
 # See `crate::util::logger` for more details.
-builtin_env_logger = []
+builtin_env_logger = ["dep:env_logger"]
 
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts
