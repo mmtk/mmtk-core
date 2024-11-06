@@ -6,10 +6,6 @@ on:
   push:
     branches:
     - master
-  # Just for testing
-  pull_request:
-    branches:
-    - master
 
 jobs:
   # Figure out the PR that is merged.
