@@ -9,13 +9,71 @@
 <a href="#7" id="7">7</a>
 <a href="#8" id="8">8</a>
 <a href="#9" id="9">9</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>log::{<span class="self">self</span>, SetLoggerError};
+<a href="#10" id="10">10</a>
+<a href="#11" id="11">11</a>
+<a href="#12" id="12">12</a>
+<a href="#13" id="13">13</a>
+<a href="#14" id="14">14</a>
+<a href="#15" id="15">15</a>
+<a href="#16" id="16">16</a>
+<a href="#17" id="17">17</a>
+<a href="#18" id="18">18</a>
+<a href="#19" id="19">19</a>
+<a href="#20" id="20">20</a>
+<a href="#21" id="21">21</a>
+<a href="#22" id="22">22</a>
+<a href="#23" id="23">23</a>
+<a href="#24" id="24">24</a>
+<a href="#25" id="25">25</a>
+<a href="#26" id="26">26</a>
+<a href="#27" id="27">27</a>
+<a href="#28" id="28">28</a>
+<a href="#29" id="29">29</a>
+<a href="#30" id="30">30</a>
+<a href="#31" id="31">31</a>
+<a href="#32" id="32">32</a>
+<a href="#33" id="33">33</a>
+<a href="#34" id="34">34</a>
+<a href="#35" id="35">35</a>
+<a href="#36" id="36">36</a>
+<a href="#37" id="37">37</a>
+<a href="#38" id="38">38</a>
+</pre></div><pre class="rust"><code><span class="doccomment">//! This module provides a built-in logger implementation.
+//!
+//! The built-in logger implementation uses the `env_logger` crate.  It is enabled by the Cargo
+//! feature "builtin_env_logger" which is enabled by default.  When enabled, it will be initialized
+//! in [`crate::memory_manager::mmtk_init`] and will show logs of levels INFO or lower (the lower,
+//! the more important).
+//!
+//! This provides convenient out-of-the-box experience for binding developers so that they can see
+//! logs when using MMTk without configuration, and can easily configure log levels from environment
+//! variables.  Some bindings may wish to choose a different implementation, or implement their own
+//! logging implementations to integrate with the existing logging frameworks of their VMs.  In such
+//! cases, the binding can disable the Cargo feature "builtin_env_logger" and register their own
+//! implementations with the `log` crate.
 
-<span class="doccomment">/// Attempt to init a env_logger for MMTk.
-</span><span class="kw">pub fn </span>try_init() -&gt; <span class="prelude-ty">Result</span>&lt;(), SetLoggerError&gt; {
-    env_logger::try_init_from_env(
-        <span class="comment">// By default, use info level logging.
-        </span>env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, <span class="string">"info"</span>),
-    )
+/// Attempt to init a env_logger for MMTk.
+/// Does nothing if the "builtin_env_logger" feature is disabled.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>try_init() {
+    <span class="macro">cfg_if::cfg_if! </span>{
+        <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">"builtin_env_logger"</span>)] </span>{
+            <span class="kw">let </span>result = env_logger::try_init_from_env(
+                <span class="comment">// By default, show info level logging.
+                </span>env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, <span class="string">"info"</span>),
+            );
+
+            <span class="kw">match </span>result {
+                <span class="prelude-val">Ok</span>(()) =&gt; {
+                    <span class="macro">debug!</span>(<span class="string">"MMTk initialized the logger."</span>);
+                }
+                <span class="prelude-val">Err</span>(e) =&gt; {
+                    <span class="comment">// Currently `log::SetLoggerError` can only be raised for one reason: the logger has already been initialized.
+                    </span><span class="macro">debug!</span>(<span class="string">"MMTk failed to initialize the built-in env_logger: {e}"</span>);
+                }
+            }
+        } <span class="kw">else </span>{
+            <span class="macro">debug!</span>(<span class="string">"MMTk didn't initialize the built-in env_logger.  The Cargo feature \"builtin_env_logger\" is not enabled."</span>);
+        }
+    }
 }
 </code></pre></div></section></main></body></html>

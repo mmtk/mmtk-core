@@ -910,9 +910,6 @@
 <a href="#908" id="908">908</a>
 <a href="#909" id="909">909</a>
 <a href="#910" id="910">910</a>
-<a href="#911" id="911">911</a>
-<a href="#912" id="912">912</a>
-<a href="#913" id="913">913</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -953,7 +950,9 @@
 ///    supported. Currently we assume a binding will only need one MMTk instance. Note that GC is enabled by default and the binding should
 ///    implement `VMCollection::is_collection_enabled()` if it requires that the GC should be disabled at a particular time.
 ///
-/// Note that this method will attempt to initialize a logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
+/// This method will attempt to initialize the built-in `env_logger` if the Cargo feature "builtin_env_logger" is enabled (by default).
+/// If the VM would like to use its own logger, it should disable the default feature "builtin_env_logger" in `Cargo.toml`.
+///
 /// Note that, to allow MMTk to do GC properly, `initialize_collection()` needs to be called after this call when
 /// the VM's thread system is ready to spawn GC workers.
 ///
@@ -966,12 +965,7 @@
 /// Arguments:
 /// * `builder`: The reference to a MMTk builder.
 </span><span class="kw">pub fn </span>mmtk_init&lt;VM: VMBinding&gt;(builder: <span class="kw-2">&amp;</span>MMTKBuilder) -&gt; Box&lt;MMTK&lt;VM&gt;&gt; {
-    <span class="kw">match </span><span class="kw">crate</span>::util::logger::try_init() {
-        <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="macro">debug!</span>(<span class="string">"MMTk initialized the logger."</span>),
-        <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="macro">debug!</span>(
-            <span class="string">"MMTk failed to initialize the logger. Possibly a logger has been initialized by user."
-        </span>),
-    }
+    <span class="kw">crate</span>::util::logger::try_init();
     <span class="attr">#[cfg(all(feature = <span class="string">"perf_counter"</span>, target_os = <span class="string">"linux"</span>))]
     </span>{
         <span class="kw">use </span>std::fs::File;
