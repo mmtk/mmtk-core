@@ -134,7 +134,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 .on_pending_allocation(pages_reserved);
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
 
-            // Return zero -- the caller will handle re-allocation
+            // Return zero -- the caller will handle re-attempting allocation
             Address::ZERO
         } else {
             debug!("Collection not required");
