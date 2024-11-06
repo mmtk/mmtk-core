@@ -68,11 +68,9 @@ harness = false
 [features]
 default = ["builtin_env_logger"]
 
-# Built-in env_logger. This feature is enabled by default.  mmtk-core provides `env_logger` as the
-# default logging implementation which is initializes when initializing the MMTK instance.  This is
-# convenient for new binding developers because they can always see some logs after MMTk is
-# initialized without any compile-time configuration.  Bindings that want to bring their own logger
-# implementations can disable this feature so that mmtk-core won't depend on the `env_logger` crate.
+# Built-in env_logger.  This feature is enabled by default.
+# The user can disable this default feature to remove `env_logger` from the dependencies.
+# See `crate::util::logger` for more details.
 builtin_env_logger = []
 
 # This feature is only supported on x86-64 for now

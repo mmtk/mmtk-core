@@ -20,7 +20,6 @@ use crate::scheduler::{GCWork, GCWorker};
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
 use crate::util::heap::layout::vm_layout::vm_layout;
-use crate::util::logger::LoggerError;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::slot::MemorySlice;
@@ -54,14 +53,7 @@ use crate::vm::VMBinding;
 /// Arguments:
 /// * `builder`: The reference to a MMTk builder.
 pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
-    match crate::util::logger::try_init() {
-        Ok(_) => debug!("MMTk initialized the logger."),
-        Err(LoggerError::NoBuiltinLogger) =>
-            debug!("MMTk didn't initialize the built-in env_logger.  The Cargo feature \"builtin_env_logger\" is not enabled."),
-        Err(LoggerError::SetLoggerError(e)) =>
-            // Currently `log::SetLoggerError` can only be raised for one reason: the logger has already been initialized.
-            debug!("MMTk failed to initialize the built-in env_logger: {e}")
-    }
+    crate::util::logger::try_init();
     #[cfg(all(feature = "perf_counter", target_os = "linux"))]
     {
         use std::fs::File;
