@@ -75,7 +75,7 @@ builtin_env_logger = ["dep:env_logger"]
 
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts
-perf_counter = ["pfm"]
+perf_counter = ["dep:pfm"]
 
 # This feature is only used for tests with MockVM.
 # CI scripts run those tests with this feature.
@@ -184,8 +184,8 @@ bpftrace_workaround = []
 # Group:malloc
 # only one of the following features should be enabled, or none to use the default malloc from libc
 # this does not replace the global Rust allocator, but provides these libraries for GC implementation
-malloc_mimalloc = ["mimalloc-sys"]
-malloc_jemalloc = ["jemalloc-sys"]
+malloc_mimalloc = ["dep:mimalloc-sys"]
+malloc_jemalloc = ["dep:jemalloc-sys"]
 
 # Use the native mimalloc allocator for malloc. This is not tested by me (Yi) yet, and it is only used to make sure that some code
 # is not compiled in default builds.
