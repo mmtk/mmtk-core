@@ -38,33 +38,67 @@ on:
       openjdk_binding_repo:
         description: "The repository of OpenJDK binding, such as {user}/{repo}"
         value: ${{ jobs.binding-refs.outputs.openjdk_binding_repo}}
+      openjdk_binding_repo_default:
+        description: "The default repository of OpenJDK binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.openjdk_binding_repo_default }}
       openjdk_binding_ref:
         description: "The git ref of OpenJDK binding, such as sha and branch name"
         value: ${{ jobs.binding-refs.outputs.openjdk_binding_ref}}
+      openjdk_binding_ref_default:
+        description: "The default git ref of OpenJDK binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.openjdk_binding_ref_default }}
+
       jikesrvm_binding_repo:
         description: "The repository of JikesRVM binding, such as {user}/{repo}"
         value: ${{ jobs.binding-refs.outputs.jikesrvm_binding_repo}}
+      jikesrvm_binding_repo_default:
+        description: "The default repository of JikesRVM binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.jikesrvm_binding_repo_default }}
       jikesrvm_binding_ref:
         description: "The git ref of JikesRVM binding, such as sha and branch name"
         value: ${{ jobs.binding-refs.outputs.jikesrvm_binding_ref}}
+      jikesrvm_binding_ref_default:
+        description: "The default git ref of JikesRVM binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.jikesrvm_binding_ref_default }}
+
       v8_binding_repo:
         description: "The repository of V8 binding, such as {user}/{repo}"
         value: ${{ jobs.binding-refs.outputs.v8_binding_repo}}
+      v8_binding_repo_default:
+        description: "The default repository of V8 binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.v8_binding_repo_default }}
       v8_binding_ref:
         description: "The git ref of V8 binding, such as sha and branch name"
         value: ${{ jobs.binding-refs.outputs.v8_binding_ref}}
+      v8_binding_ref_default:
+        description: "The default git ref of V8 binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.v8_binding_ref_default }}
+
       julia_binding_repo:
         description: "The repository of Julia binding, such as {user}/{repo}"
         value: ${{ jobs.binding-refs.outputs.julia_binding_repo}}
+      julia_binding_repo_default:
+        description: "The default repository of Julia binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.julia_binding_repo_default }}
       julia_binding_ref:
         description: "The git ref of Julia binding, such as sha and branch name"
         value: ${{ jobs.binding-refs.outputs.julia_binding_ref}}
+      julia_binding_ref_default:
+        description: "The default git ref of Julia binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.julia_binding_ref_default }}
+
       ruby_binding_repo:
         description: "The repository of Ruby binding, such as {user}/{repo}"
         value: ${{ jobs.binding-refs.outputs.ruby_binding_repo}}
+      ruby_binding_repo_default:
+        description: "The default repository of Ruby binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.ruby_binding_repo_default }}
       ruby_binding_ref:
         description: "The git ref of Ruby binding, such as sha and branch name"
         value: ${{ jobs.binding-refs.outputs.ruby_binding_ref}}
+      ruby_binding_ref_default:
+        description: "The default git ref of Ruby binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.ruby_binding_ref_default }}
 
 jobs:
   binding-refs:
@@ -82,15 +116,25 @@ jobs:
       RUBY_BINDING_REF_DEFAULT: master
     outputs:
         openjdk_binding_repo: ${{ steps.print.outputs.openjdk_binding_repo }}
+        openjdk_binding_repo_default: ${{ env.OPENJDK_BINDING_REPO_DEFAULT }}
         openjdk_binding_ref: ${{ steps.print.outputs.openjdk_binding_ref }}
+        openjdk_binding_ref_default: ${{ env.OPENJDK_BINDING_REF_DEFAULT }}
         jikesrvm_binding_repo: ${{ steps.print.outputs.jikesrvm_binding_repo }}
+        jikesrvm_binding_repo_default: ${{ env.JIKESRVM_BINDING_REPO_DEFAULT }}
         jikesrvm_binding_ref: ${{ steps.print.outputs.jikesrvm_binding_ref }}
+        jikesrvm_binding_ref_default: ${{ env.JIKESRVM_BINDING_REF_DEFAULT }}
         v8_binding_repo: ${{ steps.print.outputs.v8_binding_repo }}
+        v8_binding_repo_default: ${{ env.V8_BINDING_REPO_DEFAULT }}
         v8_binding_ref: ${{ steps.print.outputs.v8_binding_ref }}
+        v8_binding_ref_default: ${{ env.V8_BINDING_REF_DEFAULT }}
         julia_binding_repo: ${{ steps.print.outputs.julia_binding_repo }}
+        julia_binding_repo_default: ${{ env.JULIA_BINDING_REPO_DEFAULT }}
         julia_binding_ref: ${{ steps.print.outputs.julia_binding_ref }}
+        julia_binding_ref_default: ${{ env.JULIA_BINDING_REF_DEFAULT }}
         ruby_binding_repo: ${{ steps.print.outputs.ruby_binding_repo }}
+        ruby_binding_repo_default: ${{ env.RUBY_BINDING_REPO_DEFAULT }}
         ruby_binding_ref: ${{ steps.print.outputs.ruby_binding_ref }}
+        ruby_binding_ref_default: ${{ env.RUBY_BINDING_REF_DEFAULT }}
     steps:
         - name: Check binding revisions
           uses: qinsoon/comment-env-vars@1.1.0
