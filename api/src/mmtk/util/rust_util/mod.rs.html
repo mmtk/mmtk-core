@@ -180,6 +180,9 @@
 <a href="#178" id="178">178</a>
 <a href="#179" id="179">179</a>
 <a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This module works around limitations of the Rust programming language, and provides missing
 //! functionalities that we may expect the Rust programming language and its standard libraries
 //! to provide.
@@ -196,24 +199,27 @@
     }
 }
 
-<span class="attr">#[rustversion::nightly]
+<span class="attr">#[cfg(feature = <span class="string">"nightly"</span>)]
 </span><span class="kw">pub use </span>core::intrinsics::{likely, unlikely};
 
 <span class="comment">// likely() and unlikely() compiler hints in stable Rust
 // [1]: https://github.com/rust-lang/hashbrown/blob/a41bd76de0a53838725b997c6085e024c47a0455/src/raw/mod.rs#L48-L70
 // [2]: https://users.rust-lang.org/t/compiler-hint-for-unlikely-likely-for-if-branches/62102/3
-</span><span class="attr">#[rustversion::not(nightly)]
+</span><span class="attr">#[cfg(not(feature = <span class="string">"nightly"</span>))]
+#[inline]
 #[cold]
 </span><span class="kw">fn </span>cold() {}
 
-<span class="attr">#[rustversion::not(nightly)]
+<span class="attr">#[cfg(not(feature = <span class="string">"nightly"</span>))]
+#[inline]
 </span><span class="kw">pub fn </span>likely(b: bool) -&gt; bool {
     <span class="kw">if </span>!b {
         cold();
     }
     b
 }
-<span class="attr">#[rustversion::not(nightly)]
+<span class="attr">#[cfg(not(feature = <span class="string">"nightly"</span>))]
+#[inline]
 </span><span class="kw">pub fn </span>unlikely(b: bool) -&gt; bool {
     <span class="kw">if </span>b {
         cold();

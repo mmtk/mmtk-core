@@ -59,6 +59,8 @@
 <a href="#57" id="57">57</a>
 <a href="#58" id="58">58</a>
 <a href="#59" id="59">59</a>
+<a href="#60" id="60">60</a>
+<a href="#61" id="61">61</a>
 </pre></div><pre class="rust"><code><span class="comment">// Allow this for now. Clippy suggests we should use Sft, Mmtk, rather than SFT and MMTK.
 // According to its documentation (https://rust-lang.github.io/rust-clippy/master/index.html#upper_case_acronyms),
 // with upper-case-acronyms-aggressive turned on, it should also warn us about SFTMap, VMBinding, GCWorker.
@@ -68,6 +70,8 @@
 // to me - considering it will break our API and all the efforts for all the developers to make the change, it may
 // not worth it.
 </span><span class="attr">#![allow(clippy::upper_case_acronyms)]
+</span><span class="comment">// Use the `{likely, unlikely}` provided by compiler when using nightly
+</span><span class="attr">#![cfg_attr(feature = <span class="string">"nightly"</span>, feature(core_intrinsics))]
 
 </span><span class="doccomment">//! Memory Management ToolKit (MMTk) is a portable and high performance memory manager
 //! that includes various garbage collection algorithms and provides clean and efficient
