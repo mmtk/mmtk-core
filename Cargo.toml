@@ -73,6 +73,9 @@ default = ["builtin_env_logger"]
 # See `crate::util::logger` for more details.
 builtin_env_logger = ["dep:env_logger"]
 
+# Enable this feature if you want to use nightly features and compiler
+nightly = []
+
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts
 perf_counter = ["dep:pfm"]
