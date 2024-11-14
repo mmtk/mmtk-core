@@ -13,6 +13,7 @@ use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
+use crate::util::memory::MmapAnno;
 use crate::util::memory::MmapStrategy;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
@@ -241,10 +242,18 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             *args.options.transparent_hugepages,
             crate::util::memory::MmapProtection::ReadWrite,
         );
-        crate::util::memory::dzmmap_noreplace(start, aligned_total_bytes, strategy).unwrap();
+        crate::util::memory::dzmmap_noreplace(
+            start,
+            aligned_total_bytes,
+            strategy,
+            &MmapAnno::Space {
+                name: "LockFreeImmortalSpace",
+            },
+        )
+        .unwrap();
         if space
             .metadata
-            .try_map_metadata_space(start, aligned_total_bytes)
+            .try_map_metadata_space(start, aligned_total_bytes, "mmtk:LockFreeImmortalSpace")
             .is_err()
         {
             // TODO(Javad): handle meta space allocation failure

@@ -230,7 +230,7 @@ mod tests {
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
                     assert!(metadata
-                        .try_map_metadata_space(heap_start, constants::BYTES_IN_PAGE,)
+                        .try_map_metadata_space(heap_start, constants::BYTES_IN_PAGE, "test_space")
                         .is_ok());
 
                     gspec.assert_metadata_mapped(heap_start);
@@ -259,6 +259,7 @@ mod tests {
                         .try_map_metadata_space(
                             heap_start + vm_layout::BYTES_IN_CHUNK,
                             vm_layout::BYTES_IN_CHUNK,
+                            "test_space",
                         )
                         .is_ok());
 
@@ -313,7 +314,7 @@ mod tests {
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
                     assert!(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, "test_space",)
                         .is_ok());
 
                     let zero =
@@ -380,7 +381,7 @@ mod tests {
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
                     assert!(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, "test_space",)
                         .is_ok());
 
                     let zero =
@@ -437,7 +438,7 @@ mod tests {
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
                     assert!(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, "test_space",)
                         .is_ok());
 
                     let zero =
@@ -519,7 +520,7 @@ mod tests {
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
                     assert!(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, "test_space",)
                         .is_ok());
 
                     let zero =
@@ -587,7 +588,7 @@ mod tests {
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
                     assert!(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, "test_space",)
                         .is_ok());
 
                     // First 9 regions
@@ -644,7 +645,7 @@ mod tests {
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
                     assert!(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, "test_space",)
                         .is_ok());
 
                     // First 9 regions
@@ -753,7 +754,7 @@ mod tests {
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
                     metadata
-                        .try_map_metadata_space(data_addr, total_size)
+                        .try_map_metadata_space(data_addr, total_size, "test_space")
                         .unwrap();
 
                     metadata_1_spec.bzero_metadata(data_addr, total_size);

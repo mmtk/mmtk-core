@@ -144,12 +144,19 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         if let Err(mmap_error) = self
                             .common()
                             .mmapper
-                            .ensure_mapped(res.start, res.pages, self.common().mmap_strategy())
-                            .and(
-                                self.common()
-                                    .metadata
-                                    .try_map_metadata_space(res.start, bytes),
+                            .ensure_mapped(
+                                res.start,
+                                res.pages,
+                                self.common().mmap_strategy(),
+                                &memory::MmapAnno::Space {
+                                    name: self.get_name(),
+                                },
                             )
+                            .and(self.common().metadata.try_map_metadata_space(
+                                res.start,
+                                bytes,
+                                self.name(),
+                            ))
                         {
                             memory::handle_mmap_error::<VM>(mmap_error, tls, res.start, bytes);
                         }
@@ -296,7 +303,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         if self
             .common()
             .metadata
-            .try_map_metadata_space(self.common().start, self.common().extent)
+            .try_map_metadata_space(self.common().start, self.common().extent, self.name())
             .is_err()
         {
             // TODO(Javad): handle meta space allocation failure
@@ -611,7 +618,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
         // For contiguous space, we know its address range so we reserve metadata memory for its range.
         if rtn
             .metadata
-            .try_map_metadata_address_range(rtn.start, rtn.extent)
+            .try_map_metadata_address_range(rtn.start, rtn.extent, rtn.name)
             .is_err()
         {
             // TODO(Javad): handle meta space allocation failure

@@ -2,7 +2,7 @@ use super::*;
 use crate::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
 use crate::util::conversions::raw_align_up;
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
-use crate::util::memory;
+use crate::util::memory::{self, MmapAnno};
 use crate::util::metadata::metadata_val_traits::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
@@ -122,7 +122,13 @@ impl SideMetadataSpec {
             meta_start
         );
 
-        memory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
+        memory::panic_if_unmapped(
+            meta_start,
+            BYTES_IN_PAGE,
+            &MmapAnno::Misc {
+                name: "assert_metadata_mapped",
+            },
+        );
     }
 
     /// Used only for debugging.
@@ -1371,7 +1377,12 @@ impl SideMetadataContext {
 
     /// Tries to map the required metadata space and returns `true` is successful.
     /// This can be called at page granularity.
-    pub fn try_map_metadata_space(&self, start: Address, size: usize) -> Result<()> {
+    pub fn try_map_metadata_space(
+        &self,
+        start: Address,
+        size: usize,
+        space_name: &str,
+    ) -> Result<()> {
         debug!(
             "try_map_metadata_space({}, 0x{:x}, {}, {})",
             start,
@@ -1382,14 +1393,19 @@ impl SideMetadataContext {
         // Page aligned
         debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
         debug_assert!(size % BYTES_IN_PAGE == 0);
-        self.map_metadata_internal(start, size, false)
+        self.map_metadata_internal(start, size, false, space_name)
     }
 
     /// Tries to map the required metadata address range, without reserving swap-space/physical memory for it.
     /// This will make sure the address range is exclusive to the caller. This should be called at chunk granularity.
     ///
     /// NOTE: Accessing addresses in this range will produce a segmentation fault if swap-space is not mapped using the `try_map_metadata_space` function.
-    pub fn try_map_metadata_address_range(&self, start: Address, size: usize) -> Result<()> {
+    pub fn try_map_metadata_address_range(
+        &self,
+        start: Address,
+        size: usize,
+        name: &str,
+    ) -> Result<()> {
         debug!(
             "try_map_metadata_address_range({}, 0x{:x}, {}, {})",
             start,
@@ -1400,7 +1416,7 @@ impl SideMetadataContext {
         // Chunk aligned
         debug_assert!(start.is_aligned_to(BYTES_IN_CHUNK));
         debug_assert!(size % BYTES_IN_CHUNK == 0);
-        self.map_metadata_internal(start, size, true)
+        self.map_metadata_internal(start, size, true, name)
     }
 
     /// The internal function to mmap metadata
@@ -1409,9 +1425,19 @@ impl SideMetadataContext {
     /// * `start` - The starting address of the source data.
     /// * `size` - The size of the source data (in bytes).
     /// * `no_reserve` - whether to invoke mmap with a noreserve flag (we use this flag to quarantine address range)
-    fn map_metadata_internal(&self, start: Address, size: usize, no_reserve: bool) -> Result<()> {
+    fn map_metadata_internal(
+        &self,
+        start: Address,
+        size: usize,
+        no_reserve: bool,
+        space_name: &str,
+    ) -> Result<()> {
         for spec in self.global.iter() {
-            match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
+            let anno = MmapAnno::SideMeta {
+                space: space_name,
+                meta: spec.name,
+            };
+            match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve, &anno) {
                 Ok(_) => {}
                 Err(e) => return Result::Err(e),
             }
@@ -1434,7 +1460,11 @@ impl SideMetadataContext {
             // address space size as the current not-chunked approach.
             #[cfg(target_pointer_width = "64")]
             {
-                match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
+                let anno = MmapAnno::SideMeta {
+                    space: space_name,
+                    meta: spec.name,
+                };
+                match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve, &anno) {
                     Ok(_) => {}
                     Err(e) => return Result::Err(e),
                 }
@@ -1556,6 +1586,7 @@ impl<const ENTRIES: usize> MetadataByteArrayRef<ENTRIES> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mmap_anno_test;
     use crate::util::metadata::side_metadata::SideMetadataContext;
 
     // offset is not used in these tests.
@@ -1636,12 +1667,13 @@ mod tests {
             let data_addr = vm_layout::vm_layout().heap_start;
             // Make sure the address is mapped.
             crate::MMAPPER
-                .ensure_mapped(data_addr, 1, MmapStrategy::TEST)
+                .ensure_mapped(data_addr, 1, MmapStrategy::TEST, mmap_anno_test!())
                 .unwrap();
             let meta_addr = address_to_meta_address(&spec, data_addr);
             with_cleanup(
                 || {
-                    let mmap_result = context.try_map_metadata_space(data_addr, BYTES_IN_PAGE);
+                    let mmap_result =
+                        context.try_map_metadata_space(data_addr, BYTES_IN_PAGE, "test_space");
                     assert!(mmap_result.is_ok());
 
                     f(&spec, data_addr, meta_addr);

@@ -100,7 +100,7 @@ fn map_active_chunk_metadata(chunk_start: Address) {
     );
 
     assert!(
-        CHUNK_METADATA.try_map_metadata_space(start, size).is_ok(),
+        CHUNK_METADATA.try_map_metadata_space(start, size, "mmtk:map_active_chunk_metadata:assert").is_ok(),
         "failed to mmap meta memory"
     );
 }
@@ -131,7 +131,7 @@ pub(super) fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size
         // Note that this might fail. For example, we have marked a chunk as active but later we freed all
         // the objects in it, and unset its chunk bit. However, we do not free its metadata. So for the chunk,
         // its chunk bit is mapped, but not marked, and all its local metadata is also mapped.
-        let mmap_metadata_result = metadata.try_map_metadata_space(start, BYTES_IN_CHUNK);
+        let mmap_metadata_result = metadata.try_map_metadata_space(start, BYTES_IN_CHUNK, "mmtk:malloc_ms:map_meta_space");
         debug_assert!(
             mmap_metadata_result.is_ok(),
             "mmap sidemetadata failed for chunk_start ({})",
