@@ -378,9 +378,11 @@ mod dense_chunk_map {
                 global: vec![SFT_DENSE_CHUNK_MAP_INDEX],
                 local: vec![],
             };
-            if context.try_map_metadata_space(start, bytes, "SFTDenseChunkMap").is_err() {
-                panic!("failed to mmap metadata memory");
-            }
+            context
+                .try_map_metadata_space(start, bytes, "SFTDenseChunkMap")
+                .unwrap_or_else(|e| {
+                    panic!("failed to mmap metadata memory: {e}");
+                });
 
             self.update(space, start, bytes);
         }

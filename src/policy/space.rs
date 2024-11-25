@@ -300,15 +300,13 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// Ensure this space is marked as mapped -- used when the space is already
     /// mapped (e.g. for a vm image which is externally mmapped.)
     fn ensure_mapped(&self) {
-        if self
-            .common()
+        self.common()
             .metadata
             .try_map_metadata_space(self.common().start, self.common().extent, self.name())
-            .is_err()
-        {
-            // TODO(Javad): handle meta space allocation failure
-            panic!("failed to mmap meta memory");
-        }
+            .unwrap_or_else(|e| {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory: {e}");
+            });
 
         self.common()
             .mmapper
@@ -616,14 +614,12 @@ impl<VM: VMBinding> CommonSpace<VM> {
         }
 
         // For contiguous space, we know its address range so we reserve metadata memory for its range.
-        if rtn
-            .metadata
+        rtn.metadata
             .try_map_metadata_address_range(rtn.start, rtn.extent, rtn.name)
-            .is_err()
-        {
-            // TODO(Javad): handle meta space allocation failure
-            panic!("failed to mmap meta memory");
-        }
+            .unwrap_or_else(|e| {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory: {e}");
+            });
 
         debug!(
             "Created space {} [{}, {}) for {} bytes",
