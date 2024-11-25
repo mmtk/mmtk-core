@@ -95,8 +95,18 @@ pub enum HugePageSupport {
 
 /// Annotation for an mmap entry.
 ///
-/// This is mainly for debugging purpose.  On Linux, mmtk-core will use `prctl` with `PR_SET_VMA`
-/// to set the human-readable name for the given mmap region.
+/// Invocations of [`mmap_fixed`] and other functions that may transitively call [`mmap_fixed`]
+/// require an annotation that indicates the purpose of the memory mapping.
+///
+/// This is for debugging.  On Linux, mmtk-core will use `prctl` with `PR_SET_VMA` to set the
+/// human-readable name for the given mmap region.  The annotation is ignored on other platforms.
+///
+/// Note that when using `Map32`, the discontiguous memory range is shared between different spaces.
+/// Spaces may use `mmap` to map new chunks, but the same chunk may later be reused by other spaces.
+/// The annotation only applies when `mmap` is called for a chunk for the first time, which reflects
+/// which space first attempted the mmap, not which space is currently using the chunk.  Use
+/// [`crate::policy::space::print_vm_map`] to print a more accurate mapping between address ranges
+/// and spaces.
 pub enum MmapAnno<'a> {
     Space { name: &'a str },
     SideMeta { space: &'a str, meta: &'a str },
@@ -227,7 +237,7 @@ fn mmap_fixed(
         // recognize this attribute and will return `EINVAL`.  However, `prctl` may return `EINVAL`
         // for other reasons, too.  That includes `start` being an invalid address, and the
         // formatted `anno_cstr` being longer than 80 bytes including the trailing `'\0'`.  But
-        // since this prctl is mainly used for debugging, we log the error instead of panicking.
+        // since this prctl is used for debugging, we log the error instead of panicking.
         let anno_str = _anno.to_string();
         let anno_cstr = std::ffi::CString::new(anno_str).unwrap();
         let result = wrap_libc_call(
