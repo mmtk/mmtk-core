@@ -6,6 +6,7 @@ use bytemuck::NoUninit;
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::ffi::CString;
 use std::io::{Error, Result};
+use std::sync::atomic::AtomicBool;
 use sysinfo::MemoryRefreshKind;
 use sysinfo::{RefreshKind, System};
 
@@ -15,6 +16,14 @@ const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_F
 #[cfg(target_os = "macos")]
 // MAP_FIXED is used instead of MAP_FIXED_NOREPLACE (which is not available on macOS). We are at the risk of overwriting pre-existing mappings.
 const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
+
+/// This static variable controls whether we annotate mmapped memory region using `prctl`. It can be
+/// set via `Options::mmap_anno` or the `MMTK_MMAP_ANNO` environment variable.
+///
+/// FIXME: Since it is set via `Options`, it is in theory a decision per MMTk instance. However, we
+/// currently don't have a good design for multiple MMTk instances, so we use static variable for
+/// now.
+pub(crate) static MMAP_ANNO: AtomicBool = AtomicBool::new(true);
 
 /// Strategy for performing mmap
 #[derive(Debug, Copy, Clone)]
@@ -211,21 +220,23 @@ fn mmap_fixed(
         &|| unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) },
         ptr,
     )?;
-    let anno_str = anno.to_string();
-    let anno_cstr = CString::new(anno_str).unwrap();
-    wrap_libc_call(
-        &|| unsafe {
-            libc::prctl(
-                libc::PR_SET_VMA,
-                libc::PR_SET_VMA_ANON_NAME,
-                start.to_ptr::<libc::c_void>(),
-                size,
-                anno_cstr.as_ptr(),
-            )
-        },
-        0,
-    )
-    .unwrap();
+    if MMAP_ANNO.load(std::sync::atomic::Ordering::SeqCst) {
+        let anno_str = anno.to_string();
+        let anno_cstr = CString::new(anno_str).unwrap();
+        wrap_libc_call(
+            &|| unsafe {
+                libc::prctl(
+                    libc::PR_SET_VMA,
+                    libc::PR_SET_VMA_ANON_NAME,
+                    start.to_ptr::<libc::c_void>(),
+                    size,
+                    anno_cstr.as_ptr(),
+                )
+            },
+            0,
+        )
+        .unwrap();
+    }
     match strategy.huge_page {
         HugePageSupport::No => Ok(()),
         HugePageSupport::TransparentHugePages => {
