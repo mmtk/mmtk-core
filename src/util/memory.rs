@@ -4,7 +4,6 @@ use crate::util::Address;
 use crate::vm::{Collection, VMBinding};
 use bytemuck::NoUninit;
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
-use std::ffi::CString;
 use std::io::{Error, Result};
 use std::sync::atomic::AtomicBool;
 use sysinfo::MemoryRefreshKind;
@@ -212,7 +211,7 @@ fn mmap_fixed(
     size: usize,
     flags: libc::c_int,
     strategy: MmapStrategy,
-    anno: &MmapAnno,
+    _anno: &MmapAnno,
 ) -> Result<()> {
     let ptr = start.to_mut_ptr();
     let prot = strategy.prot.into_native_flags();
@@ -220,10 +219,18 @@ fn mmap_fixed(
         &|| unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) },
         ptr,
     )?;
+
+    #[cfg(target_os = "linux")]
     if MMAP_ANNO.load(std::sync::atomic::Ordering::SeqCst) {
-        let anno_str = anno.to_string();
-        let anno_cstr = CString::new(anno_str).unwrap();
-        wrap_libc_call(
+        // `PR_SET_VMA` is new in Linux 5.17.  We compile against a version of the `libc` crate that
+        // has the `PR_SET_VMA_ANON_NAME` constant.  When runnning on an older kernel, it will not
+        // recognize this attribute and will return `EINVAL`.  However, `prctl` may return `EINVAL`
+        // for other reasons, too.  That includes `start` being an invalid address, and the
+        // formatted `anno_cstr` being longer than 80 bytes including the trailing `'\0'`.  But
+        // since this prctl is mainly used for debugging, we log the error instead of panicking.
+        let anno_str = _anno.to_string();
+        let anno_cstr = std::ffi::CString::new(anno_str).unwrap();
+        let result = wrap_libc_call(
             &|| unsafe {
                 libc::prctl(
                     libc::PR_SET_VMA,
@@ -234,9 +241,12 @@ fn mmap_fixed(
                 )
             },
             0,
-        )
-        .unwrap();
+        );
+        if let Err(e) = result {
+            debug!("Error while calling prctl: {e}");
+        }
     }
+
     match strategy.huge_page {
         HugePageSupport::No => Ok(()),
         HugePageSupport::TransparentHugePages => {
@@ -304,40 +314,36 @@ pub fn handle_mmap_error<VM: VMBinding>(
 }
 
 /// Checks if the memory has already been mapped. If not, we panic.
+///
 /// Note that the checking has a side effect that it will map the memory if it was unmapped. So we panic if it was unmapped.
 /// Be very careful about using this function.
-#[cfg(target_os = "linux")]
-pub(crate) fn panic_if_unmapped(start: Address, size: usize, anno: &MmapAnno) {
-    let flags = MMAP_FLAGS;
-    match mmap_fixed(
-        start,
-        size,
-        flags,
-        MmapStrategy {
-            huge_page: HugePageSupport::No,
-            prot: MmapProtection::ReadWrite,
-        },
-        anno,
-    ) {
-        Ok(_) => panic!("{} of size {} is not mapped", start, size),
-        Err(e) => {
-            assert!(
-                e.kind() == std::io::ErrorKind::AlreadyExists,
-                "Failed to check mapped: {:?}",
-                e
-            );
-        }
-    }
-}
-
-/// Checks if the memory has already been mapped. If not, we panic.
+///
 /// This function is currently left empty for non-linux, and should be implemented in the future.
 /// As the function is only used for assertions, MMTk will still run even if we never panic.
-#[cfg(not(target_os = "linux"))]
-pub(crate) fn panic_if_unmapped(_start: Address, _size: usize) {
-    // This is only used for assertions, so MMTk will still run even if we never panic.
-    // TODO: We need a proper implementation for this. As we do not have MAP_FIXED_NOREPLACE, we cannot use the same implementation as Linux.
-    // Possibly we can use posix_mem_offset for both OS/s.
+pub(crate) fn panic_if_unmapped(_start: Address, _size: usize, _anno: &MmapAnno) {
+    #[cfg(target_os = "linux")]
+    {
+        let flags = MMAP_FLAGS;
+        match mmap_fixed(
+            _start,
+            _size,
+            flags,
+            MmapStrategy {
+                huge_page: HugePageSupport::No,
+                prot: MmapProtection::ReadWrite,
+            },
+            _anno,
+        ) {
+            Ok(_) => panic!("{} of size {} is not mapped", _start, _size),
+            Err(e) => {
+                assert!(
+                    e.kind() == std::io::ErrorKind::AlreadyExists,
+                    "Failed to check mapped: {:?}",
+                    e
+                );
+            }
+        }
+    }
 }
 
 /// Unprotect the given memory (in page granularity) to allow access (PROT_READ/WRITE/EXEC).
