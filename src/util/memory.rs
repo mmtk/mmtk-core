@@ -101,12 +101,16 @@ pub enum HugePageSupport {
 /// This is for debugging.  On Linux, mmtk-core will use `prctl` with `PR_SET_VMA` to set the
 /// human-readable name for the given mmap region.  The annotation is ignored on other platforms.
 ///
-/// Note that when using `Map32`, the discontiguous memory range is shared between different spaces.
-/// Spaces may use `mmap` to map new chunks, but the same chunk may later be reused by other spaces.
-/// The annotation only applies when `mmap` is called for a chunk for the first time, which reflects
-/// which space first attempted the mmap, not which space is currently using the chunk.  Use
-/// [`crate::policy::space::print_vm_map`] to print a more accurate mapping between address ranges
-/// and spaces.
+/// Note that when using `Map32` (even when running on 64-bit architectures), the discontiguous
+/// memory range is shared between different spaces. Spaces may use `mmap` to map new chunks, but
+/// the same chunk may later be reused by other spaces. The annotation only applies when `mmap` is
+/// called for a chunk for the first time, which reflects which space first attempted the mmap, not
+/// which space is currently using the chunk.  Use [`crate::policy::space::print_vm_map`] to print a
+/// more accurate mapping between address ranges and spaces.
+///
+/// On 32-bit architecture, side metadata are allocated in a chunked fasion.  One single `mmap`
+/// region will contain many different metadata.  In that case, we simply annotate the whole region
+/// with a `MmapAnno::SideMeta` where `meta` is `"all"`.
 pub enum MmapAnno<'a> {
     Space { name: &'a str },
     SideMeta { space: &'a str, meta: &'a str },
