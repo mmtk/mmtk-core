@@ -4,11 +4,15 @@ use super::*;
 use crate::mmtk::MMTK;
 use crate::util::copy::GCWorkerCopyContext;
 use crate::util::opaque_pointer::*;
+#[cfg(feature = "count_live_bytes_in_gc")]
+use crate::util::ObjectReference;
 use crate::vm::{Collection, GCThreadContext, VMBinding};
 use atomic::Atomic;
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 use crossbeam::deque::{self, Stealer};
 use crossbeam::queue::ArrayQueue;
+#[cfg(feature = "count_live_bytes_in_gc")]
+use std::collections::HashMap;
 #[cfg(feature = "count_live_bytes_in_gc")]
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
@@ -44,6 +48,8 @@ pub struct GCWorkerShared<VM: VMBinding> {
     /// at the end of a GC, and reset this counter.
     #[cfg(feature = "count_live_bytes_in_gc")]
     live_bytes: AtomicUsize,
+    #[cfg(feature = "count_live_bytes_in_gc")]
+    live_bytes_detailed: AtomicRefCell<HashMap<&'static str, AtomicUsize>>,
     /// A queue of GCWork that can only be processed by the owned thread.
     pub designated_work: ArrayQueue<Box<dyn GCWork<VM>>>,
     /// Handle for stealing packets from the current worker
@@ -56,19 +62,31 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
             stat: Default::default(),
             #[cfg(feature = "count_live_bytes_in_gc")]
             live_bytes: AtomicUsize::new(0),
+            #[cfg(feature = "count_live_bytes_in_gc")]
+            live_bytes_detailed: AtomicRefCell::new(HashMap::new()),
             designated_work: ArrayQueue::new(16),
             stealer,
         }
     }
 
     #[cfg(feature = "count_live_bytes_in_gc")]
-    pub(crate) fn increase_live_bytes(&self, bytes: usize) {
-        self.live_bytes.fetch_add(bytes, Ordering::Relaxed);
-    }
+    pub(crate) fn increase_live_bytes(&self, object: ObjectReference) {
+        use crate::mmtk::SFT_MAP;
+        use crate::vm::object_model::ObjectModel;
 
-    #[cfg(feature = "count_live_bytes_in_gc")]
-    pub(crate) fn get_and_clear_live_bytes(&self) -> usize {
-        self.live_bytes.swap(0, Ordering::SeqCst)
+        let bytes = VM::VMObjectModel::get_current_size(object);
+        self.live_bytes.fetch_add(bytes, Ordering::Relaxed);
+
+        let mut map = self.live_bytes_detailed.borrow_mut();
+        let space_name = unsafe { SFT_MAP.get_unchecked(object.to_raw_address()) }.name();
+        match map.get(space_name) {
+            Some(v) => {
+                v.fetch_add(bytes, Ordering::Relaxed);
+            }
+            None => {
+                map.insert(space_name, AtomicUsize::new(bytes));
+            }
+        }
     }
 }
 
@@ -430,10 +448,21 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     }
 
     #[cfg(feature = "count_live_bytes_in_gc")]
-    pub fn get_and_clear_worker_live_bytes(&self) -> usize {
-        self.workers_shared
-            .iter()
-            .map(|w| w.get_and_clear_live_bytes())
-            .sum()
+    pub fn get_and_clear_worker_live_bytes(&self) -> HashMap<&'static str, usize> {
+        let mut ret = HashMap::new();
+        self.workers_shared.iter().for_each(|w| {
+            for (space_name, atomic_val) in w.live_bytes_detailed.borrow().iter() {
+                let val = atomic_val.load(Ordering::Relaxed);
+                match ret.get_mut(space_name) {
+                    Some(sum) => {
+                        *sum += val;
+                    }
+                    None => {
+                        ret.insert(*space_name, val);
+                    }
+                }
+            }
+        });
+        return ret;
     }
 }

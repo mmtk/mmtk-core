@@ -1,8 +1,9 @@
+use atomic_refcell::AtomicRefCell;
+#[cfg(feature = "count_live_bytes_in_gc")]
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
-
-use atomic_refcell::AtomicRefCell;
 
 /// This stores some global states for an MMTK instance.
 /// Some MMTK components like plans and allocators may keep an reference to the struct, and can access it.
@@ -47,7 +48,7 @@ pub struct GlobalState {
     pub(crate) malloc_bytes: AtomicUsize,
     /// This stores the size in bytes for all the live objects in last GC. This counter is only updated in the GC release phase.
     #[cfg(feature = "count_live_bytes_in_gc")]
-    pub(crate) live_bytes_in_last_gc: AtomicUsize,
+    pub(crate) live_bytes_in_last_gc: AtomicRefCell<HashMap<&'static str, usize>>,
 }
 
 impl GlobalState {
@@ -183,16 +184,6 @@ impl GlobalState {
     pub(crate) fn decrease_malloc_bytes_by(&self, size: usize) {
         self.malloc_bytes.fetch_sub(size, Ordering::SeqCst);
     }
-
-    #[cfg(feature = "count_live_bytes_in_gc")]
-    pub fn get_live_bytes_in_last_gc(&self) -> usize {
-        self.live_bytes_in_last_gc.load(Ordering::SeqCst)
-    }
-
-    #[cfg(feature = "count_live_bytes_in_gc")]
-    pub fn set_live_bytes_in_last_gc(&self, size: usize) {
-        self.live_bytes_in_last_gc.store(size, Ordering::SeqCst);
-    }
 }
 
 impl Default for GlobalState {
@@ -214,7 +205,7 @@ impl Default for GlobalState {
             #[cfg(feature = "malloc_counted_size")]
             malloc_bytes: AtomicUsize::new(0),
             #[cfg(feature = "count_live_bytes_in_gc")]
-            live_bytes_in_last_gc: AtomicUsize::new(0),
+            live_bytes_in_last_gc: AtomicRefCell::new(HashMap::new()),
         }
     }
 }

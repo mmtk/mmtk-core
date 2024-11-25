@@ -160,7 +160,7 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
                 .scheduler
                 .worker_group
                 .get_and_clear_worker_live_bytes();
-            mmtk.state.set_live_bytes_in_last_gc(live_bytes);
+            *mmtk.state.live_bytes_in_last_gc.borrow_mut() = live_bytes;
         }
     }
 }
@@ -833,10 +833,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
             for object in objects_to_scan.iter().copied() {
                 // For any object we need to scan, we count its liv bytes
                 #[cfg(feature = "count_live_bytes_in_gc")]
-                closure
-                    .worker
-                    .shared
-                    .increase_live_bytes(VM::VMObjectModel::get_current_size(object));
+                closure.worker.shared.increase_live_bytes(object);
 
                 if <VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, object) {
                     trace!("Scan object (slot) {}", object);

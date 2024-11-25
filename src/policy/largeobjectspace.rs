@@ -32,7 +32,7 @@ pub struct LargeObjectSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
     fn is_live(&self, object: ObjectReference) -> bool {

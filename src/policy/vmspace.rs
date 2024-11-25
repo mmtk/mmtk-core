@@ -29,7 +29,7 @@ pub struct VMSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for VMSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.common.name
     }
     fn is_live(&self, _object: ObjectReference) -> bool {
