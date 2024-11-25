@@ -1484,7 +1484,11 @@ impl SideMetadataContext {
                 lsize,
                 max
             );
-            match try_map_per_chunk_metadata_space(start, size, lsize, no_reserve) {
+            let anno = MmapAnno::SideMeta {
+                space: space_name,
+                meta: "all",
+            };
+            match try_map_per_chunk_metadata_space(start, size, lsize, no_reserve, &anno) {
                 Ok(_) => {}
                 Err(e) => return Result::Err(e),
             }
