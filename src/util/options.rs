@@ -868,7 +868,7 @@ options! {
     /// Enable mmap annotation.  By default, every time MMTk core calls `mmap`, it will annotate the
     /// mapped memory range with human-readable names, which can be seen in `/proc/pid/maps`.
     /// Setting this option to `false` will disable this annotation.
-    mmap_anno:              bool                [env_var: true, command_line: true] [always_valid] = true
+    mmap_annotation:        bool                [env_var: true, command_line: true] [always_valid] = true
 }
 
 #[cfg(test)]

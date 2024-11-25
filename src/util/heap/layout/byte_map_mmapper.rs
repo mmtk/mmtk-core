@@ -1,6 +1,6 @@
 use super::mmapper::MapState;
 use super::Mmapper;
-use crate::util::memory::MmapAnno;
+use crate::util::memory::MmapAnnotation;
 use crate::util::Address;
 
 use crate::util::constants::*;
@@ -50,7 +50,7 @@ impl Mmapper for ByteMapMmapper {
         start: Address,
         pages: usize,
         strategy: MmapStrategy,
-        anno: &MmapAnno,
+        anno: &MmapAnnotation,
     ) -> Result<()> {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
@@ -81,7 +81,7 @@ impl Mmapper for ByteMapMmapper {
         start: Address,
         pages: usize,
         strategy: MmapStrategy,
-        anno: &MmapAnno,
+        anno: &MmapAnnotation,
     ) -> Result<()> {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));

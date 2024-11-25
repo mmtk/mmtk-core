@@ -13,7 +13,7 @@ use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
-use crate::util::memory::MmapAnno;
+use crate::util::memory::MmapAnnotation;
 use crate::util::memory::MmapStrategy;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
@@ -246,7 +246,7 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             start,
             aligned_total_bytes,
             strategy,
-            &MmapAnno::Space {
+            &MmapAnnotation::Space {
                 name: space.get_name(),
             },
         )

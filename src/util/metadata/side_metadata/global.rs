@@ -2,7 +2,7 @@ use super::*;
 use crate::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
 use crate::util::conversions::raw_align_up;
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
-use crate::util::memory::{self, MmapAnno};
+use crate::util::memory::{self, MmapAnnotation};
 use crate::util::metadata::metadata_val_traits::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
@@ -125,7 +125,7 @@ impl SideMetadataSpec {
         memory::panic_if_unmapped(
             meta_start,
             BYTES_IN_PAGE,
-            &MmapAnno::Misc {
+            &MmapAnnotation::Misc {
                 name: "assert_metadata_mapped",
             },
         );
@@ -1433,7 +1433,7 @@ impl SideMetadataContext {
         space_name: &str,
     ) -> Result<()> {
         for spec in self.global.iter() {
-            let anno = MmapAnno::SideMeta {
+            let anno = MmapAnnotation::SideMeta {
                 space: space_name,
                 meta: spec.name,
             };
@@ -1460,7 +1460,7 @@ impl SideMetadataContext {
             // address space size as the current not-chunked approach.
             #[cfg(target_pointer_width = "64")]
             {
-                let anno = MmapAnno::SideMeta {
+                let anno = MmapAnnotation::SideMeta {
                     space: space_name,
                     meta: spec.name,
                 };
@@ -1484,7 +1484,7 @@ impl SideMetadataContext {
                 lsize,
                 max
             );
-            let anno = MmapAnno::SideMeta {
+            let anno = MmapAnnotation::SideMeta {
                 space: space_name,
                 meta: "all",
             };

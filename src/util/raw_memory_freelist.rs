@@ -3,7 +3,7 @@ use super::memory::MmapStrategy;
 use crate::util::address::Address;
 use crate::util::constants::*;
 use crate::util::conversions;
-use crate::util::memory::MmapAnno;
+use crate::util::memory::MmapAnnotation;
 
 /** log2 of the number of bits used by a free list entry (two entries per unit) */
 const LOG_ENTRY_BITS: usize = LOG_BITS_IN_INT as _;
@@ -203,7 +203,7 @@ impl RawMemoryFreeList {
             start,
             bytes,
             self.strategy,
-            &MmapAnno::Misc {
+            &MmapAnnotation::Misc {
                 name: "RawMemoryFreeList",
             },
         );

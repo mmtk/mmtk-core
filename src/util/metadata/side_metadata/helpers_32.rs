@@ -2,7 +2,7 @@ use super::SideMetadataSpec;
 use crate::util::{
     constants::{self, LOG_BITS_IN_BYTE},
     heap::layout::vm_layout::{BYTES_IN_CHUNK, CHUNK_MASK, LOG_BYTES_IN_CHUNK},
-    memory::{self, MmapAnno},
+    memory::{self, MmapAnnotation},
     Address,
 };
 use std::io::Result;
@@ -112,7 +112,7 @@ pub(super) fn try_map_per_chunk_metadata_space(
     size: usize,
     local_per_chunk: usize,
     no_reserve: bool,
-    anno: &MmapAnno,
+    anno: &MmapAnnotation,
 ) -> Result<usize> {
     let mut aligned_start = start.align_down(BYTES_IN_CHUNK);
     let aligned_end = (start + size).align_up(BYTES_IN_CHUNK);
@@ -176,7 +176,7 @@ pub(super) fn try_mmap_metadata_chunk(
     start: Address,
     local_per_chunk: usize,
     no_reserve: bool,
-    anno: &MmapAnno,
+    anno: &MmapAnnotation,
 ) -> Result<()> {
     debug_assert!(start.is_aligned_to(BYTES_IN_CHUNK));
 

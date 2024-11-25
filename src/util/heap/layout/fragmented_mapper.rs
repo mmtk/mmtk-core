@@ -3,7 +3,7 @@ use super::Mmapper;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout::*;
-use crate::util::memory::{MmapAnno, MmapStrategy};
+use crate::util::memory::{MmapAnnotation, MmapStrategy};
 use crate::util::Address;
 use atomic::{Atomic, Ordering};
 use std::cell::UnsafeCell;
@@ -94,7 +94,7 @@ impl Mmapper for FragmentedMapper {
         mut start: Address,
         pages: usize,
         strategy: MmapStrategy,
-        anno: &MmapAnno,
+        anno: &MmapAnnotation,
     ) -> Result<()> {
         debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
 
@@ -153,7 +153,7 @@ impl Mmapper for FragmentedMapper {
         mut start: Address,
         pages: usize,
         strategy: MmapStrategy,
-        anno: &MmapAnno,
+        anno: &MmapAnnotation,
     ) -> Result<()> {
         let end = start + conversions::pages_to_bytes(pages);
         // Iterate over the slabs covered

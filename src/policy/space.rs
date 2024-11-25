@@ -148,7 +148,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                                 res.start,
                                 res.pages,
                                 self.common().mmap_strategy(),
-                                &memory::MmapAnno::Space {
+                                &memory::MmapAnnotation::Space {
                                     name: self.get_name(),
                                 },
                             )

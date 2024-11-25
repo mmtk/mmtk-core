@@ -17,12 +17,12 @@ const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_F
 const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
 
 /// This static variable controls whether we annotate mmapped memory region using `prctl`. It can be
-/// set via `Options::mmap_anno` or the `MMTK_MMAP_ANNO` environment variable.
+/// set via `Options::mmap_annotation` or the `MMTK_MMAP_ANNOTATION` environment variable.
 ///
 /// FIXME: Since it is set via `Options`, it is in theory a decision per MMTk instance. However, we
 /// currently don't have a good design for multiple MMTk instances, so we use static variable for
 /// now.
-pub(crate) static MMAP_ANNO: AtomicBool = AtomicBool::new(true);
+pub(crate) static MMAP_ANNOTATION: AtomicBool = AtomicBool::new(true);
 
 /// Strategy for performing mmap
 #[derive(Debug, Copy, Clone)]
@@ -110,8 +110,8 @@ pub enum HugePageSupport {
 ///
 /// On 32-bit architecture, side metadata are allocated in a chunked fasion.  One single `mmap`
 /// region will contain many different metadata.  In that case, we simply annotate the whole region
-/// with a `MmapAnno::SideMeta` where `meta` is `"all"`.
-pub enum MmapAnno<'a> {
+/// with a `MmapAnnotation::SideMeta` where `meta` is `"all"`.
+pub enum MmapAnnotation<'a> {
     Space { name: &'a str },
     SideMeta { space: &'a str, meta: &'a str },
     Test { file: &'a str, line: u32 },
@@ -121,20 +121,20 @@ pub enum MmapAnno<'a> {
 #[macro_export]
 macro_rules! mmap_anno_test {
     () => {
-        &$crate::util::memory::MmapAnno::Test {
+        &$crate::util::memory::MmapAnnotation::Test {
             file: file!(),
             line: line!(),
         }
     };
 }
 
-impl<'a> std::fmt::Display for MmapAnno<'a> {
+impl<'a> std::fmt::Display for MmapAnnotation<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MmapAnno::Space { name } => write!(f, "mmtk:space:{name}"),
-            MmapAnno::SideMeta { space, meta } => write!(f, "mmtk:sidemeta:{space}:{meta}"),
-            MmapAnno::Test { file, line } => write!(f, "mmtk:test:{file}:{line}"),
-            MmapAnno::Misc { name } => write!(f, "mmtk:misc:{name}"),
+            MmapAnnotation::Space { name } => write!(f, "mmtk:space:{name}"),
+            MmapAnnotation::SideMeta { space, meta } => write!(f, "mmtk:sidemeta:{space}:{meta}"),
+            MmapAnnotation::Test { file, line } => write!(f, "mmtk:test:{file}:{line}"),
+            MmapAnnotation::Misc { name } => write!(f, "mmtk:misc:{name}"),
         }
     }
 }
@@ -174,7 +174,7 @@ pub unsafe fn dzmmap(
     start: Address,
     size: usize,
     strategy: MmapStrategy,
-    anno: &MmapAnno,
+    anno: &MmapAnnotation,
 ) -> Result<()> {
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
     let ret = mmap_fixed(start, size, flags, strategy, anno);
@@ -193,7 +193,7 @@ pub fn dzmmap_noreplace(
     start: Address,
     size: usize,
     strategy: MmapStrategy,
-    anno: &MmapAnno,
+    anno: &MmapAnnotation,
 ) -> Result<()> {
     let flags = MMAP_FLAGS;
     let ret = mmap_fixed(start, size, flags, strategy, anno);
@@ -213,7 +213,7 @@ pub fn mmap_noreserve(
     start: Address,
     size: usize,
     mut strategy: MmapStrategy,
-    anno: &MmapAnno,
+    anno: &MmapAnnotation,
 ) -> Result<()> {
     strategy.prot = MmapProtection::NoAccess;
     let flags = MMAP_FLAGS | libc::MAP_NORESERVE;
@@ -225,7 +225,7 @@ fn mmap_fixed(
     size: usize,
     flags: libc::c_int,
     strategy: MmapStrategy,
-    _anno: &MmapAnno,
+    _anno: &MmapAnnotation,
 ) -> Result<()> {
     let ptr = start.to_mut_ptr();
     let prot = strategy.prot.into_native_flags();
@@ -235,7 +235,7 @@ fn mmap_fixed(
     )?;
 
     #[cfg(target_os = "linux")]
-    if MMAP_ANNO.load(std::sync::atomic::Ordering::SeqCst) {
+    if MMAP_ANNOTATION.load(std::sync::atomic::Ordering::SeqCst) {
         // `PR_SET_VMA` is new in Linux 5.17.  We compile against a version of the `libc` crate that
         // has the `PR_SET_VMA_ANON_NAME` constant.  When runnning on an older kernel, it will not
         // recognize this attribute and will return `EINVAL`.  However, `prctl` may return `EINVAL`
@@ -334,7 +334,7 @@ pub fn handle_mmap_error<VM: VMBinding>(
 ///
 /// This function is currently left empty for non-linux, and should be implemented in the future.
 /// As the function is only used for assertions, MMTk will still run even if we never panic.
-pub(crate) fn panic_if_unmapped(_start: Address, _size: usize, _anno: &MmapAnno) {
+pub(crate) fn panic_if_unmapped(_start: Address, _size: usize, _anno: &MmapAnnotation) {
     #[cfg(target_os = "linux")]
     {
         let flags = MMAP_FLAGS;

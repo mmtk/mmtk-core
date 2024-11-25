@@ -37,7 +37,7 @@ pub trait Mmapper: Sync {
         start: Address,
         pages: usize,
         strategy: MmapStrategy,
-        anno: &MmapAnno,
+        anno: &MmapAnnotation,
     ) -> Result<()>;
 
     /// Ensure that a range of pages is mmapped (or equivalent).  If the
@@ -55,7 +55,7 @@ pub trait Mmapper: Sync {
         start: Address,
         pages: usize,
         strategy: MmapStrategy,
-        anno: &MmapAnno,
+        anno: &MmapAnnotation,
     ) -> Result<()>;
 
     /// Is the page pointed to by this address mapped? Returns true if
@@ -95,7 +95,7 @@ impl MapState {
         state: &Atomic<MapState>,
         mmap_start: Address,
         strategy: MmapStrategy,
-        anno: &MmapAnno,
+        anno: &MmapAnnotation,
     ) -> Result<()> {
         trace!(
             "Trying to map {} - {}",
@@ -123,7 +123,7 @@ impl MapState {
         state: &Atomic<MapState>,
         mmap_start: Address,
         strategy: MmapStrategy,
-        anno: &MmapAnno,
+        anno: &MmapAnnotation,
     ) -> Result<()> {
         trace!(
             "Trying to quarantine {} - {}",
@@ -168,7 +168,7 @@ impl MapState {
         state_slices: &[&[Atomic<MapState>]],
         mmap_start: Address,
         strategy: MmapStrategy,
-        anno: &MmapAnno,
+        anno: &MmapAnnotation,
     ) -> Result<()> {
         trace!(
             "Trying to bulk-quarantine {} - {}",
