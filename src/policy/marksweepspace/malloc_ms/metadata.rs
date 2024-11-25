@@ -76,7 +76,7 @@ fn is_meta_space_mapped_for_address(address: Address) -> bool {
 }
 
 /// Eagerly map the active chunk metadata surrounding `chunk_start`
-fn map_active_chunk_metadata(chunk_start: Address) {
+fn map_active_chunk_metadata(chunk_start: Address, space_name: &str) {
     debug_assert!(chunk_start.is_aligned_to(BYTES_IN_CHUNK));
     // We eagerly map 16Gb worth of space for the chunk mark bytes on 64-bits
     // We require saturating subtractions in order to not overflow the chunk_start by
@@ -99,16 +99,20 @@ fn map_active_chunk_metadata(chunk_start: Address) {
         chunk_start + (size / 2)
     );
 
-    assert!(
-        CHUNK_METADATA.try_map_metadata_space(start, size, "mmtk:map_active_chunk_metadata:assert").is_ok(),
-        "failed to mmap meta memory"
-    );
+    CHUNK_METADATA
+        .try_map_metadata_space(start, size, space_name)
+        .unwrap_or_else(|e| panic!("failed to mmap meta memory: {e}"));
 }
 
 /// We map the active chunk metadata (if not previously mapped), as well as the VO bit metadata
 /// and active page metadata here. Note that if [addr, addr + size) crosses multiple chunks, we
 /// will map for each chunk.
-pub(super) fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size: usize) {
+pub(super) fn map_meta_space(
+    metadata: &SideMetadataContext,
+    addr: Address,
+    size: usize,
+    space_name: &str,
+) {
     // In order to prevent race conditions, we synchronize on the lock first and then
     // check if we need to map the active chunk metadata for `chunk_start`
     let _lock = CHUNK_MAP_LOCK.lock().unwrap();
@@ -118,7 +122,7 @@ pub(super) fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size
         // Check if the chunk bit metadata is mapped. If it is not mapped, map it.
         // Note that the chunk bit metadata is global. It may have been mapped because other policy mapped it.
         if !is_chunk_mapped(start) {
-            map_active_chunk_metadata(start);
+            map_active_chunk_metadata(start, space_name);
         }
 
         // If we have set the chunk bit, return. This is needed just in case another thread has done this before
@@ -131,7 +135,8 @@ pub(super) fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size
         // Note that this might fail. For example, we have marked a chunk as active but later we freed all
         // the objects in it, and unset its chunk bit. However, we do not free its metadata. So for the chunk,
         // its chunk bit is mapped, but not marked, and all its local metadata is also mapped.
-        let mmap_metadata_result = metadata.try_map_metadata_space(start, BYTES_IN_CHUNK, "mmtk:malloc_ms:map_meta_space");
+        let mmap_metadata_result =
+            metadata.try_map_metadata_space(start, BYTES_IN_CHUNK, space_name);
         debug_assert!(
             mmap_metadata_result.is_ok(),
             "mmap sidemetadata failed for chunk_start ({})",

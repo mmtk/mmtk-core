@@ -247,18 +247,17 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             aligned_total_bytes,
             strategy,
             &MmapAnno::Space {
-                name: "LockFreeImmortalSpace",
+                name: space.get_name(),
             },
         )
         .unwrap();
-        if space
+        space
             .metadata
-            .try_map_metadata_space(start, aligned_total_bytes, "mmtk:LockFreeImmortalSpace")
-            .is_err()
-        {
-            // TODO(Javad): handle meta space allocation failure
-            panic!("failed to mmap meta memory");
-        }
+            .try_map_metadata_space(start, aligned_total_bytes, space.get_name())
+            .unwrap_or_else(|e| {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory: {e}")
+            });
 
         space
     }
