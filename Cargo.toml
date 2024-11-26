@@ -33,7 +33,10 @@ is-terminal = "0.4.7"
 itertools = "0.12.0"
 jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
 lazy_static = "1.1"
-libc = "0.2"
+# libc 0.2.165 introduced an API-breaking change that breaks the `sysinfo` crate on MacOS.
+# We temporarily pin the version of libc until the issue is resolved.
+# See: https://github.com/GuillaumeGomez/sysinfo/issues/1392
+libc = "=0.2.164"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 memoffset = "0.9"
 mimalloc-sys = { version = "0.1.6", optional = true }
