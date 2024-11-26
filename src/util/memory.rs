@@ -95,7 +95,7 @@ pub enum HugePageSupport {
 
 /// Annotation for an mmap entry.
 ///
-/// Invocations of [`mmap_fixed`] and other functions that may transitively call [`mmap_fixed`]
+/// Invocations of `mmap_fixed` and other functions that may transitively call `mmap_fixed`
 /// require an annotation that indicates the purpose of the memory mapping.
 ///
 /// This is for debugging.  On Linux, mmtk-core will use `prctl` with `PR_SET_VMA` to set the
@@ -105,17 +105,37 @@ pub enum HugePageSupport {
 /// memory range is shared between different spaces. Spaces may use `mmap` to map new chunks, but
 /// the same chunk may later be reused by other spaces. The annotation only applies when `mmap` is
 /// called for a chunk for the first time, which reflects which space first attempted the mmap, not
-/// which space is currently using the chunk.  Use [`crate::policy::space::print_vm_map`] to print a
+/// which space is currently using the chunk.  Use `crate::policy::space::print_vm_map` to print a
 /// more accurate mapping between address ranges and spaces.
 ///
 /// On 32-bit architecture, side metadata are allocated in a chunked fasion.  One single `mmap`
 /// region will contain many different metadata.  In that case, we simply annotate the whole region
 /// with a `MmapAnnotation::SideMeta` where `meta` is `"all"`.
 pub enum MmapAnnotation<'a> {
-    Space { name: &'a str },
-    SideMeta { space: &'a str, meta: &'a str },
-    Test { file: &'a str, line: u32 },
-    Misc { name: &'a str },
+    /// The mmap is for a space.
+    Space {
+        /// The name of the space.
+        name: &'a str,
+    },
+    /// The mmap is for a side metadata.
+    SideMeta {
+        /// The name of the space.
+        space: &'a str,
+        /// The name of the side metadata.
+        meta: &'a str,
+    },
+    /// The mmap is for a test case.  Usually constructed using the [`mmap_anno_test!`] macro.
+    Test {
+        /// The source file.
+        file: &'a str,
+        /// The line number.
+        line: u32,
+    },
+    /// For all other use cases.
+    Misc {
+        /// A human-readable descriptive name.
+        name: &'a str,
+    },
 }
 
 /// Construct an `MmapAnnotation::Test` with the current file name and line number.
