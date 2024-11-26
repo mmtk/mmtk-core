@@ -47,9 +47,7 @@ pub struct GCWorkerShared<VM: VMBinding> {
     /// objects, we increase the live bytes. We get this value from each worker
     /// at the end of a GC, and reset this counter.
     #[cfg(feature = "count_live_bytes_in_gc")]
-    live_bytes: AtomicUsize,
-    #[cfg(feature = "count_live_bytes_in_gc")]
-    live_bytes_detailed: AtomicRefCell<HashMap<&'static str, AtomicUsize>>,
+    live_bytes_per_space: AtomicRefCell<HashMap<&'static str, AtomicUsize>>,
     /// A queue of GCWork that can only be processed by the owned thread.
     pub designated_work: ArrayQueue<Box<dyn GCWork<VM>>>,
     /// Handle for stealing packets from the current worker
@@ -61,9 +59,7 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
         Self {
             stat: Default::default(),
             #[cfg(feature = "count_live_bytes_in_gc")]
-            live_bytes: AtomicUsize::new(0),
-            #[cfg(feature = "count_live_bytes_in_gc")]
-            live_bytes_detailed: AtomicRefCell::new(HashMap::new()),
+            live_bytes_per_space: AtomicRefCell::new(HashMap::new()),
             designated_work: ArrayQueue::new(16),
             stealer,
         }
@@ -75,9 +71,8 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
         use crate::vm::object_model::ObjectModel;
 
         let bytes = VM::VMObjectModel::get_current_size(object);
-        self.live_bytes.fetch_add(bytes, Ordering::Relaxed);
 
-        let mut map = self.live_bytes_detailed.borrow_mut();
+        let mut map = self.live_bytes_per_space.borrow_mut();
         let space_name = unsafe { SFT_MAP.get_unchecked(object.to_raw_address()) }.name();
         match map.get(space_name) {
             Some(v) => {
@@ -451,7 +446,8 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     pub fn get_and_clear_worker_live_bytes(&self) -> HashMap<&'static str, usize> {
         let mut ret = HashMap::new();
         self.workers_shared.iter().for_each(|w| {
-            for (space_name, atomic_val) in w.live_bytes_detailed.borrow().iter() {
+            let mut live_bytes_per_space = w.live_bytes_per_space.borrow_mut();
+            for (space_name, atomic_val) in live_bytes_per_space.iter() {
                 let val = atomic_val.load(Ordering::Relaxed);
                 match ret.get_mut(space_name) {
                     Some(sum) => {
@@ -462,6 +458,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
                     }
                 }
             }
+            live_bytes_per_space.clear();
         });
         return ret;
     }
