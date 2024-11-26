@@ -118,6 +118,7 @@ pub enum MmapAnnotation<'a> {
     Misc { name: &'a str },
 }
 
+/// Construct an `MmapAnnotation::Test` with the current file name and line number.
 #[macro_export]
 macro_rules! mmap_anno_test {
     () => {
@@ -127,6 +128,9 @@ macro_rules! mmap_anno_test {
         }
     };
 }
+
+// Export this to external crates
+pub use mmap_anno_test;
 
 impl<'a> std::fmt::Display for MmapAnnotation<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
