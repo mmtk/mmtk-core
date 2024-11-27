@@ -155,7 +155,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                             .and(self.common().metadata.try_map_metadata_space(
                                 res.start,
                                 bytes,
-                                self.name(),
+                                self.get_name(),
                             ))
                         {
                             memory::handle_mmap_error::<VM>(mmap_error, tls, res.start, bytes);
@@ -302,7 +302,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn ensure_mapped(&self) {
         self.common()
             .metadata
-            .try_map_metadata_space(self.common().start, self.common().extent, self.name())
+            .try_map_metadata_space(self.common().start, self.common().extent, self.get_name())
             .unwrap_or_else(|e| {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory: {e}");
