@@ -46,7 +46,6 @@ pub(crate) use mmtk::MMAPPER;
 pub use mmtk::MMTK;
 
 mod global_state;
-#[cfg(feature = "count_live_bytes_in_gc")]
 pub use crate::global_state::LiveBytesStats;
 
 mod policy;

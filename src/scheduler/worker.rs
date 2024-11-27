@@ -3,10 +3,8 @@ use super::work_bucket::*;
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::copy::GCWorkerCopyContext;
-#[cfg(feature = "count_live_bytes_in_gc")]
 use crate::util::heap::layout::heap_parameters::MAX_SPACES;
 use crate::util::opaque_pointer::*;
-#[cfg(feature = "count_live_bytes_in_gc")]
 use crate::util::ObjectReference;
 use crate::vm::{Collection, GCThreadContext, VMBinding};
 use atomic::Atomic;
@@ -45,7 +43,6 @@ pub struct GCWorkerShared<VM: VMBinding> {
     /// objects, we increase the live bytes. We get this value from each worker
     /// at the end of a GC, and reset this counter.
     /// The live bytes are stored in an array. The index is the index from the space descriptor.
-    #[cfg(feature = "count_live_bytes_in_gc")]
     live_bytes_per_space: AtomicRefCell<[usize; MAX_SPACES]>,
     /// A queue of GCWork that can only be processed by the owned thread.
     pub designated_work: ArrayQueue<Box<dyn GCWork<VM>>>,
@@ -57,14 +54,12 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
     pub fn new(stealer: Option<Stealer<Box<dyn GCWork<VM>>>>) -> Self {
         Self {
             stat: Default::default(),
-            #[cfg(feature = "count_live_bytes_in_gc")]
             live_bytes_per_space: AtomicRefCell::new([0; MAX_SPACES]),
             designated_work: ArrayQueue::new(16),
             stealer,
         }
     }
 
-    #[cfg(feature = "count_live_bytes_in_gc")]
     pub(crate) fn increase_live_bytes(&self, object: ObjectReference) {
         use crate::mmtk::VM_MAP;
         use crate::vm::object_model::ObjectModel;
@@ -443,7 +438,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
             .any(|w| !w.designated_work.is_empty())
     }
 
-    #[cfg(feature = "count_live_bytes_in_gc")]
+    /// Get the live bytes data from the worker, and clear the local data.
     pub fn get_and_clear_worker_live_bytes(&self) -> [usize; MAX_SPACES] {
         let mut ret = [0; MAX_SPACES];
         self.workers_shared.iter().for_each(|w| {

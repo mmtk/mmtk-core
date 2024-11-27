@@ -154,15 +154,12 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
             debug_assert!(result.is_ok());
         }
 
-        #[cfg(feature = "count_live_bytes_in_gc")]
-        {
-            let live_bytes = mmtk
-                .scheduler
-                .worker_group
-                .get_and_clear_worker_live_bytes();
-            *mmtk.state.live_bytes_in_last_gc.borrow_mut() =
-                mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
-        }
+        let live_bytes = mmtk
+            .scheduler
+            .worker_group
+            .get_and_clear_worker_live_bytes();
+        *mmtk.state.live_bytes_in_last_gc.borrow_mut() =
+            mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
     }
 }
 
@@ -821,7 +818,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         &self,
         buffer: &[ObjectReference],
         worker: &mut GCWorker<<Self::E as ProcessEdgesWork>::VM>,
-        _mmtk: &'static MMTK<<Self::E as ProcessEdgesWork>::VM>,
+        mmtk: &'static MMTK<<Self::E as ProcessEdgesWork>::VM>,
     ) {
         let tls = worker.tls;
 
@@ -833,8 +830,9 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
             let mut closure = ObjectsClosure::<Self::E>::new(worker, self.get_bucket());
             for object in objects_to_scan.iter().copied() {
                 // For any object we need to scan, we count its liv bytes
-                #[cfg(feature = "count_live_bytes_in_gc")]
-                closure.worker.shared.increase_live_bytes(object);
+                if *mmtk.get_options().count_live_bytes_in_gc {
+                    closure.worker.shared.increase_live_bytes(object);
+                }
 
                 if <VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, object) {
                     trace!("Scan object (slot) {}", object);

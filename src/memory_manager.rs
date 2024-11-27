@@ -26,7 +26,6 @@ use crate::vm::slot::MemorySlice;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 
-#[cfg(feature = "count_live_bytes_in_gc")]
 use std::collections::HashMap;
 
 /// Initialize an MMTk instance. A VM should call this method after creating an [`crate::MMTK`]
@@ -542,7 +541,6 @@ pub fn free_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// the space is fragmented.
 /// The value returned by this method is only updated when we finish tracing in a GC. A recommended timing
 /// to call this method is at the end of a GC (e.g. when the runtime is about to resume threads).
-#[cfg(feature = "count_live_bytes_in_gc")]
 pub fn live_bytes_in_last_gc<VM: VMBinding>(
     mmtk: &MMTK<VM>,
 ) -> HashMap<&'static str, crate::LiveBytesStats> {

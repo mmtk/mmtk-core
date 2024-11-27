@@ -1,5 +1,4 @@
 use atomic_refcell::AtomicRefCell;
-#[cfg(feature = "count_live_bytes_in_gc")]
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
@@ -47,7 +46,6 @@ pub struct GlobalState {
     #[cfg(feature = "malloc_counted_size")]
     pub(crate) malloc_bytes: AtomicUsize,
     /// This stores the live bytes and the used bytes (by pages) for each space in last GC. This counter is only updated in the GC release phase.
-    #[cfg(feature = "count_live_bytes_in_gc")]
     pub(crate) live_bytes_in_last_gc: AtomicRefCell<HashMap<&'static str, LiveBytesStats>>,
 }
 
@@ -204,7 +202,6 @@ impl Default for GlobalState {
             allocation_bytes: AtomicUsize::new(0),
             #[cfg(feature = "malloc_counted_size")]
             malloc_bytes: AtomicUsize::new(0),
-            #[cfg(feature = "count_live_bytes_in_gc")]
             live_bytes_in_last_gc: AtomicRefCell::new(HashMap::new()),
         }
     }
@@ -219,7 +216,6 @@ pub enum GcStatus {
 
 /// Statistics for the live bytes in the last GC. The statistics is per space.
 #[derive(Copy, Clone, Debug)]
-#[cfg(feature = "count_live_bytes_in_gc")]
 pub struct LiveBytesStats {
     /// Total accumulated bytes of live objects in the space.
     pub live_bytes: usize,

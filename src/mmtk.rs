@@ -12,7 +12,6 @@ use crate::util::address::ObjectReference;
 use crate::util::analysis::AnalysisManager;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::gc_trigger::GCTrigger;
-#[cfg(feature = "count_live_bytes_in_gc")]
 use crate::util::heap::layout::heap_parameters::MAX_SPACES;
 use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::heap::layout::{self, Mmapper, VMMap};
@@ -28,7 +27,6 @@ use crate::util::statistics::stats::Stats;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
-#[cfg(feature = "count_live_bytes_in_gc")]
 use std::collections::HashMap;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -531,7 +529,6 @@ impl<VM: VMBinding> MMTK<VM> {
         })
     }
 
-    #[cfg(feature = "count_live_bytes_in_gc")]
     /// Aggregate a hash map of live bytes per space with the space stats to produce
     /// a map of live bytes stats for the spaces.
     pub(crate) fn aggregate_live_bytes_in_last_gc(

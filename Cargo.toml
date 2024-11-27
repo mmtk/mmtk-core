@@ -172,9 +172,6 @@ work_packet_stats = []
 # Count the malloc'd memory into the heap size
 malloc_counted_size = []
 
-# Count the size of all live objects in GC
-count_live_bytes_in_gc = []
-
 # Workaround a problem where bpftrace scripts (see tools/tracing/timeline/capture.bt) cannot
 # capture the type names of work packets.
 bpftrace_workaround = []

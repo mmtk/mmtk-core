@@ -553,8 +553,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // USDT tracepoint for the end of GC.
         probe!(mmtk, gc_end);
 
-        #[cfg(feature = "count_live_bytes_in_gc")]
-        {
+        if *mmtk.get_options().count_live_bytes_in_gc {
             for (space_name, &stats) in mmtk.state.live_bytes_in_last_gc.borrow().iter() {
                 info!(
                     "{} = {} bytes ({:.1}% of {} used pages)",
