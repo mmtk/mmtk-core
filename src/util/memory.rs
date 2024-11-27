@@ -259,7 +259,9 @@ fn mmap_fixed(
     )?;
 
     #[cfg(any(target_os = "linux", target_os = "android"))]
-    if MMAP_ANNOTATION.load(std::sync::atomic::Ordering::SeqCst) {
+    // `Ordering::Relaxed`: The only store happens when `MMTK` was initialized, which happens before
+    // everything else.
+    if MMAP_ANNOTATION.load(std::sync::atomic::Ordering::Relaxed) {
         // `PR_SET_VMA` is new in Linux 5.17.  We compile against a version of the `libc` crate that
         // has the `PR_SET_VMA_ANON_NAME` constant.  When runnning on an older kernel, it will not
         // recognize this attribute and will return `EINVAL`.  However, `prctl` may return `EINVAL`
