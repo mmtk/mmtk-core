@@ -135,11 +135,6 @@ unsafe impl<VM: VMBinding> Send for MMTK<VM> {}
 impl<VM: VMBinding> MMTK<VM> {
     /// Create an MMTK instance. This is not public. Bindings should use [`MMTKBuilder::build`].
     pub(crate) fn new(options: Arc<Options>) -> Self {
-        // Set the static variable for mmap annotation.
-        // `Ordering::Relaxed`: This happens when MMTk is initialized, therefore happens before all
-        // invocations of `mmap`.
-        crate::util::memory::MMAP_ANNOTATION.store(*options.mmap_annotation, Ordering::Relaxed);
-
         // Initialize SFT first in case we need to use this in the constructor.
         // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
         crate::policy::sft_map::SFTRefStorage::pre_use_check();

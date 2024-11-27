@@ -864,11 +864,7 @@ options! {
     gc_trigger:             GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize),
     /// Enable transparent hugepage support for MMTk spaces via madvise (only Linux is supported)
     /// This only affects the memory for MMTk spaces.
-    transparent_hugepages: bool                  [env_var: true, command_line: true]  [|v: &bool| !v || cfg!(target_os = "linux")] = false,
-    /// Enable mmap annotation.  By default, every time MMTk core calls `mmap`, it will annotate the
-    /// mapped memory range with human-readable names, which can be seen in `/proc/pid/maps`.
-    /// Setting this option to `false` will disable this annotation.
-    mmap_annotation:        bool                [env_var: true, command_line: true] [always_valid] = true
+    transparent_hugepages: bool                  [env_var: true, command_line: true]  [|v: &bool| !v || cfg!(target_os = "linux")] = false
 }
 
 #[cfg(test)]
