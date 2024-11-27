@@ -3,6 +3,8 @@ use super::work_bucket::*;
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::copy::GCWorkerCopyContext;
+#[cfg(feature = "count_live_bytes_in_gc")]
+use crate::util::heap::layout::heap_parameters::MAX_SPACES;
 use crate::util::opaque_pointer::*;
 #[cfg(feature = "count_live_bytes_in_gc")]
 use crate::util::ObjectReference;
@@ -11,10 +13,6 @@ use atomic::Atomic;
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 use crossbeam::deque::{self, Stealer};
 use crossbeam::queue::ArrayQueue;
-#[cfg(feature = "count_live_bytes_in_gc")]
-use std::collections::HashMap;
-#[cfg(feature = "count_live_bytes_in_gc")]
-use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
@@ -46,8 +44,9 @@ pub struct GCWorkerShared<VM: VMBinding> {
     /// Accumulated bytes for live objects in this GC. When each worker scans
     /// objects, we increase the live bytes. We get this value from each worker
     /// at the end of a GC, and reset this counter.
+    /// The live bytes are stored in an array. The index is the index from the space descriptor.
     #[cfg(feature = "count_live_bytes_in_gc")]
-    live_bytes_per_space: AtomicRefCell<HashMap<&'static str, AtomicUsize>>,
+    live_bytes_per_space: AtomicRefCell<[usize; MAX_SPACES]>,
     /// A queue of GCWork that can only be processed by the owned thread.
     pub designated_work: ArrayQueue<Box<dyn GCWork<VM>>>,
     /// Handle for stealing packets from the current worker
@@ -59,7 +58,7 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
         Self {
             stat: Default::default(),
             #[cfg(feature = "count_live_bytes_in_gc")]
-            live_bytes_per_space: AtomicRefCell::new(HashMap::new()),
+            live_bytes_per_space: AtomicRefCell::new([0; MAX_SPACES]),
             designated_work: ArrayQueue::new(16),
             stealer,
         }
@@ -67,21 +66,23 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
 
     #[cfg(feature = "count_live_bytes_in_gc")]
     pub(crate) fn increase_live_bytes(&self, object: ObjectReference) {
-        use crate::mmtk::SFT_MAP;
+        use crate::mmtk::VM_MAP;
         use crate::vm::object_model::ObjectModel;
 
+        // The live bytes ofr the object
         let bytes = VM::VMObjectModel::get_current_size(object);
-
-        let mut map = self.live_bytes_per_space.borrow_mut();
-        let space_name = unsafe { SFT_MAP.get_unchecked(object.to_raw_address()) }.name();
-        match map.get(space_name) {
-            Some(v) => {
-                v.fetch_add(bytes, Ordering::Relaxed);
-            }
-            None => {
-                map.insert(space_name, AtomicUsize::new(bytes));
-            }
-        }
+        // Get the space index from descriptor
+        let space_descriptor = VM_MAP.get_descriptor_for_address(object.to_raw_address());
+        let space_index = space_descriptor.get_index();
+        debug_assert!(
+            space_index < MAX_SPACES,
+            "Space index {} is not in the range of [0, {})",
+            space_index,
+            MAX_SPACES
+        );
+        // Accumulate the live bytes for the index
+        let mut array = self.live_bytes_per_space.borrow_mut();
+        array[space_descriptor.get_index()] += bytes;
     }
 }
 
@@ -443,22 +444,14 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     }
 
     #[cfg(feature = "count_live_bytes_in_gc")]
-    pub fn get_and_clear_worker_live_bytes(&self) -> HashMap<&'static str, usize> {
-        let mut ret = HashMap::new();
+    pub fn get_and_clear_worker_live_bytes(&self) -> [usize; MAX_SPACES] {
+        let mut ret = [0; MAX_SPACES];
         self.workers_shared.iter().for_each(|w| {
             let mut live_bytes_per_space = w.live_bytes_per_space.borrow_mut();
-            for (space_name, atomic_val) in live_bytes_per_space.iter() {
-                let val = atomic_val.load(Ordering::Relaxed);
-                match ret.get_mut(space_name) {
-                    Some(sum) => {
-                        *sum += val;
-                    }
-                    None => {
-                        ret.insert(*space_name, val);
-                    }
-                }
+            for (idx, val) in live_bytes_per_space.iter_mut().enumerate() {
+                ret[idx] += *val;
+                *val = 0;
             }
-            live_bytes_per_space.clear();
         });
         ret
     }

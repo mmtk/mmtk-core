@@ -561,7 +561,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     space_name,
                     stats.live_bytes,
                     stats.live_bytes as f64 * 100.0 / stats.used_bytes as f64,
-                    stats.used_bytes,
+                    stats.used_pages,
                 );
             }
         }

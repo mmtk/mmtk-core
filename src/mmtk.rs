@@ -12,6 +12,8 @@ use crate::util::address::ObjectReference;
 use crate::util::analysis::AnalysisManager;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::gc_trigger::GCTrigger;
+#[cfg(feature = "count_live_bytes_in_gc")]
+use crate::util::heap::layout::heap_parameters::MAX_SPACES;
 use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::heap::layout::{self, Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
@@ -534,16 +536,17 @@ impl<VM: VMBinding> MMTK<VM> {
     /// a map of live bytes stats for the spaces.
     pub(crate) fn aggregate_live_bytes_in_last_gc(
         &self,
-        live_bytes_per_space: HashMap<&'static str, usize>,
+        live_bytes_per_space: [usize; MAX_SPACES],
     ) -> HashMap<&'static str, crate::LiveBytesStats> {
         use crate::policy::space::Space;
         let mut ret = HashMap::new();
         self.get_plan().for_each_space(&mut |space: &dyn Space<VM>| {
             let space_name = space.get_name();
+            let space_idx = space.get_descriptor().get_index();
             let used_pages = space.reserved_pages();
             if used_pages != 0 {
-                let used_bytes = space.reserved_pages() << crate::util::constants::LOG_BYTES_IN_PAGE;
-                let live_bytes = *live_bytes_per_space.get(space_name).unwrap_or(&0);
+                let used_bytes = used_pages << crate::util::constants::LOG_BYTES_IN_PAGE;
+                let live_bytes = live_bytes_per_space[space_idx];
                 debug_assert!(
                     live_bytes <= used_bytes,
                     "Live bytes of objects in {} ({} bytes) is larger than used pages ({} bytes), something is wrong.",

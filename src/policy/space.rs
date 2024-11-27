@@ -323,6 +323,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         self.common().name
     }
 
+    fn get_descriptor(&self) -> SpaceDescriptor {
+        self.common().descriptor
+    }
+
     fn common(&self) -> &CommonSpace<VM>;
     fn get_gc_trigger(&self) -> &GCTrigger<VM> {
         self.common().gc_trigger.as_ref()
