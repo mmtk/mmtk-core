@@ -460,6 +460,6 @@ impl<VM: VMBinding> WorkerGroup<VM> {
             }
             live_bytes_per_space.clear();
         });
-        return ret;
+        ret
     }
 }

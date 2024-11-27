@@ -529,9 +529,9 @@ impl<VM: VMBinding> MMTK<VM> {
         })
     }
 
-    /// Aggregate a hash map of live bytes per space with the space stats to produce
-    /// a map of [`crate::liveByteStats`] for the spaces.
     #[cfg(feature = "count_live_bytes_in_gc")]
+    /// Aggregate a hash map of live bytes per space with the space stats to produce
+    /// a map of live bytes stats for the spaces.
     pub(crate) fn aggregate_live_bytes_in_last_gc(
         &self,
         live_bytes_per_space: HashMap<&'static str, usize>,
@@ -556,6 +556,6 @@ impl<VM: VMBinding> MMTK<VM> {
                 });
             }
         });
-        return ret;
+        ret
     }
 }
