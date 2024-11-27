@@ -30,6 +30,22 @@ Notes for the mmtk-core developers:
 
 <!-- Insert new versions here -->
 
+## 0.30.0
+
+### mmap-related functions require annotation
+
+```admonish tldr
+Memory-mapping functions in `mmtk::util::memory` now take an additional `MmapAnnotation` argument.
+```
+
+API changes:
+
+-   module `util::memory`
+    +   The following functions take an additional `MmapAnnotation` argument.
+        *   `dzmmap`
+        *   `dzmmap_noreplace`
+        *   `mmap_noreserve`
+
 ## 0.28.0
 
 ### `handle_user_collection_request` returns `bool`
