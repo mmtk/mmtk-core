@@ -26,6 +26,8 @@ use crate::util::statistics::stats::Stats;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
+#[cfg(feature = "count_live_bytes_in_gc")]
+use std::collections::HashMap;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -525,5 +527,35 @@ impl<VM: VMBinding> MMTK<VM> {
         plan.for_each_space(&mut |space| {
             space.enumerate_objects(&mut enumerator);
         })
+    }
+
+    /// Aggregate a hash map of live bytes per space with the space stats to produce
+    /// a map of [`crate::liveByteStats`] for the spaces.
+    #[cfg(feature = "count_live_bytes_in_gc")]
+    pub(crate) fn aggregate_live_bytes_in_last_gc(
+        &self,
+        live_bytes_per_space: HashMap<&'static str, usize>,
+    ) -> HashMap<&'static str, crate::LiveBytesStats> {
+        use crate::policy::space::Space;
+        let mut ret = HashMap::new();
+        self.get_plan().for_each_space(&mut |space: &dyn Space<VM>| {
+            let space_name = space.get_name();
+            let used_pages = space.reserved_pages();
+            if used_pages != 0 {
+                let used_bytes = space.reserved_pages() << crate::util::constants::LOG_BYTES_IN_PAGE;
+                let live_bytes = *live_bytes_per_space.get(space_name).unwrap_or(&0);
+                debug_assert!(
+                    live_bytes <= used_bytes,
+                    "Live bytes of objects in {} ({} bytes) is larger than used pages ({} bytes), something is wrong.",
+                    space_name, live_bytes, used_bytes
+                );
+                ret.insert(space_name, crate::LiveBytesStats {
+                    live_bytes,
+                    used_pages,
+                    used_bytes,
+                });
+            }
+        });
+        return ret;
     }
 }

@@ -555,28 +555,15 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
         #[cfg(feature = "count_live_bytes_in_gc")]
         {
-            use crate::policy::space::Space;
-            let live_bytes_per_space = mmtk.state.live_bytes_in_last_gc.borrow();
-            mmtk.get_plan().for_each_space(&mut |space: &dyn Space<VM>| {
-                let space_name = space.get_name();
-                let used_pages = space.reserved_pages();
-                if used_pages != 0 {
-                    let used_bytes = space.reserved_pages() << crate::util::constants::LOG_BYTES_IN_PAGE;
-                    let live_bytes = *live_bytes_per_space.get(space_name).unwrap_or(&0);
-                    debug_assert!(
-                        live_bytes <= used_bytes,
-                        "Live bytes of objects in {} ({} bytes) is larger than used pages ({} bytes), something is wrong.",
-                        space_name, live_bytes, used_bytes
-                    );
-                    info!(
-                        "{} = {} bytes ({:.1}% of {} used pages)",
-                        space_name,
-                        live_bytes,
-                        live_bytes as f64 * 100.0 / used_bytes as f64,
-                        used_pages
-                    );
-                }
-            })
+            for (space_name, &stats) in mmtk.state.live_bytes_in_last_gc.borrow().iter() {
+                info!(
+                    "{} = {} bytes ({:.1}% of {} used pages)",
+                    space_name,
+                    stats.live_bytes,
+                    stats.live_bytes as f64 * 100.0 / stats.used_bytes as f64,
+                    stats.used_bytes,
+                );
+            }
         }
 
         #[cfg(feature = "extreme_assertions")]

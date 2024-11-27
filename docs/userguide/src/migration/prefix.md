@@ -30,6 +30,26 @@ Notes for the mmtk-core developers:
 
 <!-- Insert new versions here -->
 
+## 0.30.0
+
+### `live_bytes_in_last_gc` returns a map for live bytes in each space
+
+```admonish tldr
+The feature `count_live_bytes_in_gc` now collects live bytes statistics per space.
+Correspondingly, `memory_manager::live_bytes_in_last_gc` now returns a map for
+live bytes in each space.
+```
+
+API changes:
+
+-   module `memory_manager`
+    +   `live_bytes_in_last_gc` now returns a `HashMap<&'static str, LiveBytesStats>`. The keys are
+        strings for space names, and the values are statistics for live bytes in the space.
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/pull/1238>
+
 ## 0.28.0
 
 ### `handle_user_collection_request` returns `bool`

@@ -46,9 +46,9 @@ pub struct GlobalState {
     /// A counteer that keeps tracks of the number of bytes allocated by malloc
     #[cfg(feature = "malloc_counted_size")]
     pub(crate) malloc_bytes: AtomicUsize,
-    /// This stores the size in bytes for all the live objects in last GC. This counter is only updated in the GC release phase.
+    /// This stores the live bytes and the used bytes (by pages) for each space in last GC. This counter is only updated in the GC release phase.
     #[cfg(feature = "count_live_bytes_in_gc")]
-    pub(crate) live_bytes_in_last_gc: AtomicRefCell<HashMap<&'static str, usize>>,
+    pub(crate) live_bytes_in_last_gc: AtomicRefCell<HashMap<&'static str, LiveBytesStats>>,
 }
 
 impl GlobalState {
@@ -215,4 +215,17 @@ pub enum GcStatus {
     NotInGC,
     GcPrepare,
     GcProper,
+}
+
+/// Statistics for the live bytes in the last GC. The statistics is per space.
+#[derive(Copy, Clone, Debug)]
+#[cfg(feature = "count_live_bytes_in_gc")]
+pub struct LiveBytesStats {
+    /// Total accumulated bytes of live objects in the space.
+    pub live_bytes: usize,
+    /// Total pages used by the space.
+    pub used_pages: usize,
+    /// Total bytes used by the space, computed from `used_pages`.
+    /// The ratio of live_bytes and used_bytes reflects the utilization of the memory in the space.
+    pub used_bytes: usize,
 }

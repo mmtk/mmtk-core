@@ -160,7 +160,8 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
                 .scheduler
                 .worker_group
                 .get_and_clear_worker_live_bytes();
-            *mmtk.state.live_bytes_in_last_gc.borrow_mut() = live_bytes;
+            *mmtk.state.live_bytes_in_last_gc.borrow_mut() =
+                mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
         }
     }
 }
