@@ -169,6 +169,8 @@ impl MapState {
     ///
     /// * `state_slices`: A slice of slices. Each inner slice is a part of a `Slab`.
     /// * `mmap_start`: The start of the region to transition.
+    /// * `strategy`: The mmap strategy.
+    /// * `anno`: Human-readable annotation to apply to newly mapped memory ranges.
     pub(super) fn bulk_transition_to_quarantined(
         state_slices: &[&[Atomic<MapState>]],
         mmap_start: Address,
