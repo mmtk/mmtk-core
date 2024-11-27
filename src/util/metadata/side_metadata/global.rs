@@ -1485,6 +1485,8 @@ impl SideMetadataContext {
                 lsize,
                 max
             );
+            // We are creating a mmap for all side metadata instead of one specific metadata.  We
+            // just annotate it as "all" here.
             let anno = MmapAnnotation::SideMeta {
                 space: space_name,
                 meta: "all",
