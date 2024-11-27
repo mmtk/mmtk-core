@@ -1425,6 +1425,7 @@ impl SideMetadataContext {
     /// * `start` - The starting address of the source data.
     /// * `size` - The size of the source data (in bytes).
     /// * `no_reserve` - whether to invoke mmap with a noreserve flag (we use this flag to quarantine address range)
+    /// * `space_name`: The name of the space, used for annotating the mmap.
     fn map_metadata_internal(
         &self,
         start: Address,
