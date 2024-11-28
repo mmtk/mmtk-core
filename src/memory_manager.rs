@@ -494,25 +494,6 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
     mmtk.initialize_collection(tls);
 }
 
-/// Process MMTk run-time options. Returns true if the option is processed successfully.
-///
-/// Arguments:
-/// * `mmtk`: A reference to an MMTk instance.
-/// * `name`: The name of the option.
-/// * `value`: The value of the option (as a string).
-pub fn process(builder: &mut MMTKBuilder, name: &str, value: &str) -> bool {
-    builder.set_option(name, value)
-}
-
-/// Process multiple MMTk run-time options. Returns true if all the options are processed successfully.
-///
-/// Arguments:
-/// * `mmtk`: A reference to an MMTk instance.
-/// * `options`: a string that is key value pairs separated by white spaces, e.g. "threads=1 stress_factor=4096"
-pub fn process_bulk(builder: &mut MMTKBuilder, options: &str) -> bool {
-    builder.set_options_bulk_by_str(options)
-}
-
 /// Return used memory in bytes. MMTk accounts for memory in pages, thus this method always returns a value in
 /// page granularity.
 ///
