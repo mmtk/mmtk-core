@@ -1155,7 +1155,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="kw">pub </span>global_side_metadata_specs: Vec&lt;SideMetadataSpec&gt;,
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, VM: VMBinding&gt; CreateSpecificPlanArgs&lt;<span class="lifetime">'a</span>, VM&gt; {
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; CreateSpecificPlanArgs&lt;<span class="lifetime">'_</span>, VM&gt; {
     <span class="doccomment">/// Get a PlanCreateSpaceArgs that can be used to create a space
     </span><span class="kw">pub fn </span>get_space_args(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
