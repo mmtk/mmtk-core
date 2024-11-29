@@ -5,7 +5,6 @@ use crate::vm::{Collection, VMBinding};
 use bytemuck::NoUninit;
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::io::{Error, Result};
-use std::sync::atomic::AtomicBool;
 use sysinfo::MemoryRefreshKind;
 use sysinfo::{RefreshKind, System};
 
@@ -15,14 +14,6 @@ const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_F
 #[cfg(target_os = "macos")]
 // MAP_FIXED is used instead of MAP_FIXED_NOREPLACE (which is not available on macOS). We are at the risk of overwriting pre-existing mappings.
 const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
-
-/// This static variable controls whether we annotate mmapped memory region using `prctl`. It can be
-/// set via `Options::mmap_annotation` or the `MMTK_MMAP_ANNOTATION` environment variable.
-///
-/// FIXME: Since it is set via `Options`, it is in theory a decision per MMTk instance. However, we
-/// currently don't have a good design for multiple MMTk instances, so we use static variable for
-/// now.
-pub(crate) static MMAP_ANNOTATION: AtomicBool = AtomicBool::new(true);
 
 /// Strategy for performing mmap
 #[derive(Debug, Copy, Clone)]
