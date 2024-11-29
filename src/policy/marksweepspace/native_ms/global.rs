@@ -402,7 +402,13 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         crate::util::metadata::vo_bit::bzero_vo_bit(block.start(), Block::BYTES);
     }
 
-    pub fn acquire_block(&self, tls: VMThread, size: usize, align: usize) -> BlockAcquireResult {
+    pub fn acquire_block(
+        &self,
+        tls: VMThread,
+        size: usize,
+        align: usize,
+        no_gc_on_fail: bool,
+    ) -> BlockAcquireResult {
         {
             let mut abandoned = self.abandoned.lock().unwrap();
             let bin = mi_bin::<VM>(size, align);
@@ -424,7 +430,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             }
         }
 
-        let acquired = self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE);
+        let acquired = self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE, no_gc_on_fail);
         if acquired.is_zero() {
             BlockAcquireResult::Exhausted
         } else {

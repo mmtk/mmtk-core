@@ -289,7 +289,11 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 
     // Get a clean block from ImmixSpace.
     fn acquire_clean_block(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        match self.immix_space().get_clean_block(self.tls, self.copy) {
+        match self.immix_space().get_clean_block(
+            self.tls,
+            self.copy,
+            self.get_context().is_no_gc_on_fail(),
+        ) {
             None => Address::ZERO,
             Some(block) => {
                 trace!(
