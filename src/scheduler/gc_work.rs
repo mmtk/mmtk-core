@@ -828,12 +828,21 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         let mut scan_later = vec![];
         {
             let mut closure = ObjectsClosure::<Self::E>::new(worker, self.get_bucket());
-            for object in objects_to_scan.iter().copied() {
-                // For any object we need to scan, we count its liv bytes
-                if *mmtk.get_options().count_live_bytes_in_gc {
-                    closure.worker.shared.increase_live_bytes(object);
-                }
 
+            // For any object we need to scan, we count its live bytes.
+            // Check the option outside the loop for better performance.
+            if *mmtk.get_options().count_live_bytes_in_gc {
+                // Borrow before the loop.
+                let mut live_bytes_stats = closure.worker.shared.live_bytes_per_space.borrow_mut();
+                for object in objects_to_scan.iter().copied() {
+                    crate::scheduler::worker::GCWorkerShared::<VM>::increase_live_bytes(
+                        &mut live_bytes_stats,
+                        object,
+                    );
+                }
+            }
+
+            for object in objects_to_scan.iter().copied() {
                 if <VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, object) {
                     trace!("Scan object (slot) {}", object);
                     // If an object supports slot-enqueuing, we enqueue its slots.

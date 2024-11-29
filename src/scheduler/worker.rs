@@ -43,7 +43,7 @@ pub struct GCWorkerShared<VM: VMBinding> {
     /// objects, we increase the live bytes. We get this value from each worker
     /// at the end of a GC, and reset this counter.
     /// The live bytes are stored in an array. The index is the index from the space descriptor.
-    live_bytes_per_space: AtomicRefCell<[usize; MAX_SPACES]>,
+    pub live_bytes_per_space: AtomicRefCell<[usize; MAX_SPACES]>,
     /// A queue of GCWork that can only be processed by the owned thread.
     pub designated_work: ArrayQueue<Box<dyn GCWork<VM>>>,
     /// Handle for stealing packets from the current worker
@@ -60,7 +60,10 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
         }
     }
 
-    pub(crate) fn increase_live_bytes(&self, object: ObjectReference) {
+    pub(crate) fn increase_live_bytes(
+        live_bytes_per_space: &mut [usize; MAX_SPACES],
+        object: ObjectReference,
+    ) {
         use crate::mmtk::VM_MAP;
         use crate::vm::object_model::ObjectModel;
 
@@ -76,8 +79,7 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
             MAX_SPACES
         );
         // Accumulate the live bytes for the index
-        let mut array = self.live_bytes_per_space.borrow_mut();
-        array[space_descriptor.get_index()] += bytes;
+        live_bytes_per_space[space_descriptor.get_index()] += bytes;
     }
 }
 
