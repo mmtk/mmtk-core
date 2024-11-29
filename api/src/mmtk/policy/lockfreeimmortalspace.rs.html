@@ -256,6 +256,14 @@
 <a href="#254" id="254">254</a>
 <a href="#255" id="255">255</a>
 <a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
 
 <span class="kw">use </span>std::sync::atomic::Ordering;
@@ -271,6 +279,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::vm_layout;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::PageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
+<span class="kw">use </span><span class="kw">crate</span>::util::memory::MmapAnnotation;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory::MmapStrategy;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity;
@@ -499,15 +508,22 @@
             <span class="kw-2">*</span>args.options.transparent_hugepages,
             <span class="kw">crate</span>::util::memory::MmapProtection::ReadWrite,
         );
-        <span class="kw">crate</span>::util::memory::dzmmap_noreplace(start, aligned_total_bytes, strategy).unwrap();
-        <span class="kw">if </span>space
+        <span class="kw">crate</span>::util::memory::dzmmap_noreplace(
+            start,
+            aligned_total_bytes,
+            strategy,
+            <span class="kw-2">&amp;</span>MmapAnnotation::Space {
+                name: space.get_name(),
+            },
+        )
+        .unwrap();
+        space
             .metadata
-            .try_map_metadata_space(start, aligned_total_bytes)
-            .is_err()
-        {
-            <span class="comment">// TODO(Javad): handle meta space allocation failure
-            </span><span class="macro">panic!</span>(<span class="string">"failed to mmap meta memory"</span>);
-        }
+            .try_map_metadata_space(start, aligned_total_bytes, space.get_name())
+            .unwrap_or_else(|e| {
+                <span class="comment">// TODO(Javad): handle meta space allocation failure
+                </span><span class="macro">panic!</span>(<span class="string">"failed to mmap meta memory: {e}"</span>)
+            });
 
         space
     }

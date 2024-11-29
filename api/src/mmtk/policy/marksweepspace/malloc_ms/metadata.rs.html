@@ -286,6 +286,11 @@
 <a href="#284" id="284">284</a>
 <a href="#285" id="285">285</a>
 <a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::conversions;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata;
@@ -364,7 +369,7 @@
 }
 
 <span class="doccomment">/// Eagerly map the active chunk metadata surrounding `chunk_start`
-</span><span class="kw">fn </span>map_active_chunk_metadata(chunk_start: Address) {
+</span><span class="kw">fn </span>map_active_chunk_metadata(chunk_start: Address, space_name: <span class="kw-2">&amp;</span>str) {
     <span class="macro">debug_assert!</span>(chunk_start.is_aligned_to(BYTES_IN_CHUNK));
     <span class="comment">// We eagerly map 16Gb worth of space for the chunk mark bytes on 64-bits
     // We require saturating subtractions in order to not overflow the chunk_start by
@@ -387,16 +392,20 @@
         chunk_start + (size / <span class="number">2</span>)
     );
 
-    <span class="macro">assert!</span>(
-        CHUNK_METADATA.try_map_metadata_space(start, size).is_ok(),
-        <span class="string">"failed to mmap meta memory"
-    </span>);
+    CHUNK_METADATA
+        .try_map_metadata_space(start, size, space_name)
+        .unwrap_or_else(|e| <span class="macro">panic!</span>(<span class="string">"failed to mmap meta memory: {e}"</span>));
 }
 
 <span class="doccomment">/// We map the active chunk metadata (if not previously mapped), as well as the VO bit metadata
 /// and active page metadata here. Note that if [addr, addr + size) crosses multiple chunks, we
 /// will map for each chunk.
-</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>map_meta_space(metadata: <span class="kw-2">&amp;</span>SideMetadataContext, addr: Address, size: usize) {
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>map_meta_space(
+    metadata: <span class="kw-2">&amp;</span>SideMetadataContext,
+    addr: Address,
+    size: usize,
+    space_name: <span class="kw-2">&amp;</span>str,
+) {
     <span class="comment">// In order to prevent race conditions, we synchronize on the lock first and then
     // check if we need to map the active chunk metadata for `chunk_start`
     </span><span class="kw">let </span>_lock = CHUNK_MAP_LOCK.lock().unwrap();
@@ -406,7 +415,7 @@
         <span class="comment">// Check if the chunk bit metadata is mapped. If it is not mapped, map it.
         // Note that the chunk bit metadata is global. It may have been mapped because other policy mapped it.
         </span><span class="kw">if </span>!is_chunk_mapped(start) {
-            map_active_chunk_metadata(start);
+            map_active_chunk_metadata(start, space_name);
         }
 
         <span class="comment">// If we have set the chunk bit, return. This is needed just in case another thread has done this before
@@ -419,7 +428,8 @@
         // Note that this might fail. For example, we have marked a chunk as active but later we freed all
         // the objects in it, and unset its chunk bit. However, we do not free its metadata. So for the chunk,
         // its chunk bit is mapped, but not marked, and all its local metadata is also mapped.
-        </span><span class="kw">let </span>mmap_metadata_result = metadata.try_map_metadata_space(start, BYTES_IN_CHUNK);
+        </span><span class="kw">let </span>mmap_metadata_result =
+            metadata.try_map_metadata_space(start, BYTES_IN_CHUNK, space_name);
         <span class="macro">debug_assert!</span>(
             mmap_metadata_result.is_ok(),
             <span class="string">"mmap sidemetadata failed for chunk_start ({})"</span>,

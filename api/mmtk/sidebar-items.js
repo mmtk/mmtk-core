@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["build_info","global_state","memory_manager","mmtk","plan","policy","scheduler","util","vm"],"struct":["MMTK","MMTKBuilder"]};
+window.SIDEBAR_ITEMS = {"macro":["mmap_anno_test"],"mod":["build_info","global_state","memory_manager","mmtk","plan","policy","scheduler","util","vm"],"struct":["MMTK","MMTKBuilder"]};

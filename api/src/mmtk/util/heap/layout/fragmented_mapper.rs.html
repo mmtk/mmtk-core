@@ -601,12 +601,31 @@
 <a href="#599" id="599">599</a>
 <a href="#600" id="600">600</a>
 <a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
+<a href="#603" id="603">603</a>
+<a href="#604" id="604">604</a>
+<a href="#605" id="605">605</a>
+<a href="#606" id="606">606</a>
+<a href="#607" id="607">607</a>
+<a href="#608" id="608">608</a>
+<a href="#609" id="609">609</a>
+<a href="#610" id="610">610</a>
+<a href="#611" id="611">611</a>
+<a href="#612" id="612">612</a>
+<a href="#613" id="613">613</a>
+<a href="#614" id="614">614</a>
+<a href="#615" id="615">615</a>
+<a href="#616" id="616">616</a>
+<a href="#617" id="617">617</a>
+<a href="#618" id="618">618</a>
+<a href="#619" id="619">619</a>
+<a href="#620" id="620">620</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::mmapper::MapState;
 <span class="kw">use </span><span class="kw">super</span>::Mmapper;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">crate</span>::util::memory::MmapStrategy;
+<span class="kw">use </span><span class="kw">crate</span>::util::memory::{MmapAnnotation, MmapStrategy};
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>atomic::{Atomic, Ordering};
 <span class="kw">use </span>std::cell::UnsafeCell;
@@ -697,6 +716,7 @@
         <span class="kw-2">mut </span>start: Address,
         pages: usize,
         strategy: MmapStrategy,
+        anno: <span class="kw-2">&amp;</span>MmapAnnotation,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="macro">debug_assert!</span>(start.is_aligned_to(BYTES_IN_PAGE));
 
@@ -743,6 +763,7 @@
                 state_slices.as_slice(),
                 mmap_start,
                 strategy,
+                anno,
             )<span class="question-mark">?</span>;
         }
 
@@ -754,6 +775,7 @@
         <span class="kw-2">mut </span>start: Address,
         pages: usize,
         strategy: MmapStrategy,
+        anno: <span class="kw-2">&amp;</span>MmapAnnotation,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">let </span>end = start + conversions::pages_to_bytes(pages);
         <span class="comment">// Iterate over the slabs covered
@@ -779,7 +801,7 @@
 
                 <span class="kw">let </span>mmap_start = <span class="self">Self</span>::chunk_index_to_address(base, chunk);
                 <span class="kw">let </span>_guard = <span class="self">self</span>.lock.lock().unwrap();
-                MapState::transition_to_mapped(entry, mmap_start, strategy)<span class="question-mark">?</span>;
+                MapState::transition_to_mapped(entry, mmap_start, strategy, anno)<span class="question-mark">?</span>;
             }
             start = high;
         }
@@ -996,6 +1018,7 @@
 <span class="attr">#[cfg(test)]
 </span><span class="kw">mod </span>tests {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use </span><span class="kw">crate</span>::mmap_anno_test;
     <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
     <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::MMAP_CHUNK_BYTES;
     <span class="kw">use </span><span class="kw">crate</span>::util::memory;
@@ -1049,7 +1072,7 @@
                 || {
                     <span class="kw">let </span>mmapper = FragmentedMapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, <span class="macro">mmap_anno_test!</span>())
                         .unwrap();
 
                     <span class="kw">let </span>chunks = pages_to_chunks_up(pages);
@@ -1077,7 +1100,7 @@
                 || {
                     <span class="kw">let </span>mmapper = FragmentedMapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, <span class="macro">mmap_anno_test!</span>())
                         .unwrap();
 
                     <span class="kw">let </span>chunks = pages_to_chunks_up(pages);
@@ -1106,7 +1129,7 @@
                 || {
                     <span class="kw">let </span>mmapper = FragmentedMapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, <span class="macro">mmap_anno_test!</span>())
                         .unwrap();
 
                     <span class="kw">let </span>chunks = pages_to_chunks_up(pages);
@@ -1136,7 +1159,12 @@
                     </span><span class="kw">let </span>mmapper = FragmentedMapper::new();
                     <span class="kw">let </span>pages_per_chunk = MMAP_CHUNK_BYTES &gt;&gt; LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * <span class="number">2</span>, MmapStrategy::TEST)
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            pages_per_chunk * <span class="number">2</span>,
+                            MmapStrategy::TEST,
+                            <span class="macro">mmap_anno_test!</span>(),
+                        )
                         .unwrap();
 
                     <span class="comment">// protect 1 chunk
@@ -1167,7 +1195,12 @@
                     </span><span class="kw">let </span>mmapper = FragmentedMapper::new();
                     <span class="kw">let </span>pages_per_chunk = MMAP_CHUNK_BYTES &gt;&gt; LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * <span class="number">2</span>, MmapStrategy::TEST)
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            pages_per_chunk * <span class="number">2</span>,
+                            MmapStrategy::TEST,
+                            <span class="macro">mmap_anno_test!</span>(),
+                        )
                         .unwrap();
 
                     <span class="comment">// protect 1 chunk
@@ -1184,7 +1217,12 @@
 
                     <span class="comment">// ensure mapped - this will unprotect the previously protected chunk
                     </span>mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * <span class="number">2</span>, MmapStrategy::TEST)
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            pages_per_chunk * <span class="number">2</span>,
+                            MmapStrategy::TEST,
+                            <span class="macro">mmap_anno_test!</span>(),
+                        )
                         .unwrap();
                     <span class="macro">assert_eq!</span>(
                         get_chunk_map_state(<span class="kw-2">&amp;</span>mmapper, FIXED_ADDRESS),

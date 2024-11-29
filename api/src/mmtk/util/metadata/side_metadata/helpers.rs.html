@@ -693,12 +693,15 @@
 <a href="#691" id="691">691</a>
 <a href="#692" id="692">692</a>
 <a href="#693" id="693">693</a>
+<a href="#694" id="694">694</a>
+<a href="#695" id="695">695</a>
+<a href="#696" id="696">696</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::ranges::BitOffset;
 <span class="kw">use </span><span class="kw">super</span>::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::VMLayout;
-<span class="kw">use </span><span class="kw">crate</span>::util::memory::MmapStrategy;
+<span class="kw">use </span><span class="kw">crate</span>::util::memory::{MmapAnnotation, MmapStrategy};
 <span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::address_to_chunked_meta_address;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -821,6 +824,7 @@
     size: usize,
     spec: <span class="kw-2">&amp;</span>SideMetadataSpec,
     no_reserve: bool,
+    anno: <span class="kw-2">&amp;</span>MmapAnnotation,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;usize&gt; {
     <span class="macro">debug_assert!</span>(start.is_aligned_to(BYTES_IN_PAGE));
     <span class="macro">debug_assert!</span>(size % BYTES_IN_PAGE == <span class="number">0</span>);
@@ -837,12 +841,14 @@
                 mmap_start,
                 mmap_size &gt;&gt; LOG_BYTES_IN_PAGE,
                 MmapStrategy::SIDE_METADATA,
+                anno,
             )
         } <span class="kw">else </span>{
             MMAPPER.quarantine_address_range(
                 mmap_start,
                 mmap_size &gt;&gt; LOG_BYTES_IN_PAGE,
                 MmapStrategy::SIDE_METADATA,
+                anno,
             )
         }
         .map(|<span class="kw">_</span>| mmap_size)

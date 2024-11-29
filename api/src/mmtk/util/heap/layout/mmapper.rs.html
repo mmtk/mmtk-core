@@ -221,6 +221,25 @@
 <a href="#219" id="219">219</a>
 <a href="#220" id="220">220</a>
 <a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+<a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
+<a href="#229" id="229">229</a>
+<a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
+<a href="#233" id="233">233</a>
+<a href="#234" id="234">234</a>
+<a href="#235" id="235">235</a>
+<a href="#236" id="236">236</a>
+<a href="#237" id="237">237</a>
+<a href="#238" id="238">238</a>
+<a href="#239" id="239">239</a>
+<a href="#240" id="240">240</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::rust_util::rev_group::RevisitableGroupByForIterator;
@@ -255,11 +274,15 @@
     /// Arguments:
     /// * `start`: Address of the first page to be quarantined
     /// * `bytes`: Number of bytes to quarantine from the start
+    /// * `strategy`: The mmap strategy.  The `prot` field is ignored because we always use
+    ///   `PROT_NONE`.
+    /// * `anno`: Human-readable annotation to apply to newly mapped memory ranges.
     </span><span class="kw">fn </span>quarantine_address_range(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         start: Address,
         pages: usize,
         strategy: MmapStrategy,
+        anno: <span class="kw-2">&amp;</span>MmapAnnotation,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt;;
 
     <span class="doccomment">/// Ensure that a range of pages is mmapped (or equivalent).  If the
@@ -269,10 +292,18 @@
     /// Arguments:
     /// * `start`: The start of the range to be mapped.
     /// * `pages`: The size of the range to be mapped, in pages
+    /// * `strategy`: The mmap strategy.
+    /// * `anno`: Human-readable annotation to apply to newly mapped memory ranges.
     </span><span class="comment">// NOTE: There is a monotonicity assumption so that only updates require lock
     // acquisition.
     // TODO: Fix the above to support unmapping.
-    </span><span class="kw">fn </span>ensure_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, pages: usize, strategy: MmapStrategy) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt;;
+    </span><span class="kw">fn </span>ensure_mapped(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        start: Address,
+        pages: usize,
+        strategy: MmapStrategy,
+        anno: <span class="kw-2">&amp;</span>MmapAnnotation,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt;;
 
     <span class="doccomment">/// Is the page pointed to by this address mapped? Returns true if
     /// the page at the given address is mapped.
@@ -311,6 +342,7 @@
         state: <span class="kw-2">&amp;</span>Atomic&lt;MapState&gt;,
         mmap_start: Address,
         strategy: MmapStrategy,
+        anno: <span class="kw-2">&amp;</span>MmapAnnotation,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="macro">trace!</span>(
             <span class="string">"Trying to map {} - {}"</span>,
@@ -318,9 +350,11 @@
             mmap_start + MMAP_CHUNK_BYTES
         );
         <span class="kw">let </span>res = <span class="kw">match </span>state.load(Ordering::Relaxed) {
-            MapState::Unmapped =&gt; dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES, strategy),
+            MapState::Unmapped =&gt; dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES, strategy, anno),
             MapState::Protected =&gt; munprotect(mmap_start, MMAP_CHUNK_BYTES, strategy.prot),
-            MapState::Quarantined =&gt; <span class="kw">unsafe </span>{ dzmmap(mmap_start, MMAP_CHUNK_BYTES, strategy) },
+            MapState::Quarantined =&gt; <span class="kw">unsafe </span>{
+                dzmmap(mmap_start, MMAP_CHUNK_BYTES, strategy, anno)
+            },
             <span class="comment">// might have become MapState::Mapped here
             </span>MapState::Mapped =&gt; <span class="prelude-val">Ok</span>(()),
         };
@@ -336,6 +370,7 @@
         state: <span class="kw-2">&amp;</span>Atomic&lt;MapState&gt;,
         mmap_start: Address,
         strategy: MmapStrategy,
+        anno: <span class="kw-2">&amp;</span>MmapAnnotation,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="macro">trace!</span>(
             <span class="string">"Trying to quarantine {} - {}"</span>,
@@ -343,7 +378,7 @@
             mmap_start + MMAP_CHUNK_BYTES
         );
         <span class="kw">let </span>res = <span class="kw">match </span>state.load(Ordering::Relaxed) {
-            MapState::Unmapped =&gt; mmap_noreserve(mmap_start, MMAP_CHUNK_BYTES, strategy),
+            MapState::Unmapped =&gt; mmap_noreserve(mmap_start, MMAP_CHUNK_BYTES, strategy, anno),
             MapState::Quarantined =&gt; <span class="prelude-val">Ok</span>(()),
             MapState::Mapped =&gt; {
                 <span class="comment">// If a chunk is mapped by us and we try to quarantine it, we simply don't do anything.
@@ -376,10 +411,13 @@
     ///
     /// * `state_slices`: A slice of slices. Each inner slice is a part of a `Slab`.
     /// * `mmap_start`: The start of the region to transition.
+    /// * `strategy`: The mmap strategy.
+    /// * `anno`: Human-readable annotation to apply to newly mapped memory ranges.
     </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>bulk_transition_to_quarantined(
         state_slices: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[Atomic&lt;MapState&gt;]],
         mmap_start: Address,
         strategy: MmapStrategy,
+        anno: <span class="kw-2">&amp;</span>MmapAnnotation,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="macro">trace!</span>(
             <span class="string">"Trying to bulk-quarantine {} - {}"</span>,
@@ -402,7 +440,7 @@
             <span class="kw">match </span>group.key {
                 MapState::Unmapped =&gt; {
                     <span class="macro">trace!</span>(<span class="string">"Trying to quarantine {} - {}"</span>, start_addr, end_addr);
-                    mmap_noreserve(start_addr, end_addr - start_addr, strategy)<span class="question-mark">?</span>;
+                    mmap_noreserve(start_addr, end_addr - start_addr, strategy, anno)<span class="question-mark">?</span>;
 
                     <span class="kw">for </span>state <span class="kw">in </span>group {
                         state.store(MapState::Quarantined, Ordering::Relaxed);

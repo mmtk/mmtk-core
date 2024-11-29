@@ -684,6 +684,9 @@
 <a href="#682" id="682">682</a>
 <a href="#683" id="683">683</a>
 <a href="#684" id="684">684</a>
+<a href="#685" id="685">685</a>
+<a href="#686" id="686">686</a>
+<a href="#687" id="687">687</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
@@ -830,12 +833,19 @@
                         </span><span class="kw">if let </span><span class="prelude-val">Err</span>(mmap_error) = <span class="self">self
                             </span>.common()
                             .mmapper
-                            .ensure_mapped(res.start, res.pages, <span class="self">self</span>.common().mmap_strategy())
-                            .and(
-                                <span class="self">self</span>.common()
-                                    .metadata
-                                    .try_map_metadata_space(res.start, bytes),
+                            .ensure_mapped(
+                                res.start,
+                                res.pages,
+                                <span class="self">self</span>.common().mmap_strategy(),
+                                <span class="kw-2">&amp;</span>memory::MmapAnnotation::Space {
+                                    name: <span class="self">self</span>.get_name(),
+                                },
                             )
+                            .and(<span class="self">self</span>.common().metadata.try_map_metadata_space(
+                                res.start,
+                                bytes,
+                                <span class="self">self</span>.get_name(),
+                            ))
                         {
                             memory::handle_mmap_error::&lt;VM&gt;(mmap_error, tls, res.start, bytes);
                         }
@@ -979,15 +989,13 @@
     <span class="doccomment">/// Ensure this space is marked as mapped -- used when the space is already
     /// mapped (e.g. for a vm image which is externally mmapped.)
     </span><span class="kw">fn </span>ensure_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">if </span><span class="self">self
-            </span>.common()
+        <span class="self">self</span>.common()
             .metadata
-            .try_map_metadata_space(<span class="self">self</span>.common().start, <span class="self">self</span>.common().extent)
-            .is_err()
-        {
-            <span class="comment">// TODO(Javad): handle meta space allocation failure
-            </span><span class="macro">panic!</span>(<span class="string">"failed to mmap meta memory"</span>);
-        }
+            .try_map_metadata_space(<span class="self">self</span>.common().start, <span class="self">self</span>.common().extent, <span class="self">self</span>.get_name())
+            .unwrap_or_else(|e| {
+                <span class="comment">// TODO(Javad): handle meta space allocation failure
+                </span><span class="macro">panic!</span>(<span class="string">"failed to mmap meta memory: {e}"</span>);
+            });
 
         <span class="self">self</span>.common()
             .mmapper
@@ -1295,14 +1303,12 @@
         }
 
         <span class="comment">// For contiguous space, we know its address range so we reserve metadata memory for its range.
-        </span><span class="kw">if </span>rtn
-            .metadata
-            .try_map_metadata_address_range(rtn.start, rtn.extent)
-            .is_err()
-        {
-            <span class="comment">// TODO(Javad): handle meta space allocation failure
-            </span><span class="macro">panic!</span>(<span class="string">"failed to mmap meta memory"</span>);
-        }
+        </span>rtn.metadata
+            .try_map_metadata_address_range(rtn.start, rtn.extent, rtn.name)
+            .unwrap_or_else(|e| {
+                <span class="comment">// TODO(Javad): handle meta space allocation failure
+                </span><span class="macro">panic!</span>(<span class="string">"failed to mmap meta memory: {e}"</span>);
+            });
 
         <span class="macro">debug!</span>(
             <span class="string">"Created space {} [{}, {}) for {} bytes"</span>,

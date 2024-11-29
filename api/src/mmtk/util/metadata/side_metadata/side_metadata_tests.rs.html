@@ -821,6 +821,7 @@
 <a href="#819" id="819">819</a>
 <a href="#820" id="820">820</a>
 <a href="#821" id="821">821</a>
+<a href="#822" id="822">822</a>
 </pre></div><pre class="rust"><code><span class="attr">#[cfg(all(test, debug_assertions))]
 </span><span class="kw">mod </span>tests {
     <span class="kw">use </span>atomic::Ordering;
@@ -1053,7 +1054,7 @@
                     metadata_sanity.verify_metadata_context(<span class="string">"NoPolicy"</span>, <span class="kw-2">&amp;</span>metadata);
 
                     <span class="macro">assert!</span>(metadata
-                        .try_map_metadata_space(heap_start, constants::BYTES_IN_PAGE,)
+                        .try_map_metadata_space(heap_start, constants::BYTES_IN_PAGE, <span class="string">"test_space"</span>)
                         .is_ok());
 
                     gspec.assert_metadata_mapped(heap_start);
@@ -1082,6 +1083,7 @@
                         .try_map_metadata_space(
                             heap_start + vm_layout::BYTES_IN_CHUNK,
                             vm_layout::BYTES_IN_CHUNK,
+                            <span class="string">"test_space"</span>,
                         )
                         .is_ok());
 
@@ -1136,7 +1138,7 @@
                     metadata_sanity.verify_metadata_context(<span class="string">"NoPolicy"</span>, <span class="kw-2">&amp;</span>metadata);
 
                     <span class="macro">assert!</span>(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, <span class="string">"test_space"</span>,)
                         .is_ok());
 
                     <span class="kw">let </span>zero =
@@ -1203,7 +1205,7 @@
                     metadata_sanity.verify_metadata_context(<span class="string">"NoPolicy"</span>, <span class="kw-2">&amp;</span>metadata);
 
                     <span class="macro">assert!</span>(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, <span class="string">"test_space"</span>,)
                         .is_ok());
 
                     <span class="kw">let </span>zero =
@@ -1260,7 +1262,7 @@
                     metadata_sanity.verify_metadata_context(<span class="string">"NoPolicy"</span>, <span class="kw-2">&amp;</span>metadata);
 
                     <span class="macro">assert!</span>(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, <span class="string">"test_space"</span>,)
                         .is_ok());
 
                     <span class="kw">let </span>zero =
@@ -1342,7 +1344,7 @@
                     metadata_sanity.verify_metadata_context(<span class="string">"NoPolicy"</span>, <span class="kw-2">&amp;</span>metadata);
 
                     <span class="macro">assert!</span>(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, <span class="string">"test_space"</span>,)
                         .is_ok());
 
                     <span class="kw">let </span>zero =
@@ -1410,7 +1412,7 @@
                     metadata_sanity.verify_metadata_context(<span class="string">"NoPolicy"</span>, <span class="kw-2">&amp;</span>metadata);
 
                     <span class="macro">assert!</span>(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, <span class="string">"test_space"</span>,)
                         .is_ok());
 
                     <span class="comment">// First 9 regions
@@ -1467,7 +1469,7 @@
                     metadata_sanity.verify_metadata_context(<span class="string">"NoPolicy"</span>, <span class="kw-2">&amp;</span>metadata);
 
                     <span class="macro">assert!</span>(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, <span class="string">"test_space"</span>,)
                         .is_ok());
 
                     <span class="comment">// First 9 regions
@@ -1576,7 +1578,7 @@
                     metadata_sanity.verify_metadata_context(<span class="string">"NoPolicy"</span>, <span class="kw-2">&amp;</span>metadata);
 
                     metadata
-                        .try_map_metadata_space(data_addr, total_size)
+                        .try_map_metadata_space(data_addr, total_size, <span class="string">"test_space"</span>)
                         .unwrap();
 
                     metadata_1_spec.bzero_metadata(data_addr, total_size);

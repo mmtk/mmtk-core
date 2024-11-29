@@ -1279,7 +1279,7 @@
 
     <span class="kw">fn </span>map_metadata_and_update_bound(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address, size: usize) {
         <span class="comment">// Map the metadata space for the range [addr, addr + size)
-        </span>map_meta_space(<span class="kw-2">&amp;</span><span class="self">self</span>.metadata, addr, size);
+        </span>map_meta_space(<span class="kw-2">&amp;</span><span class="self">self</span>.metadata, addr, size, <span class="self">self</span>.get_name());
 
         <span class="comment">// Update the bounds of the max and min chunk addresses seen -- this is used later in the sweep
         // Lockless compare-and-swap loops perform better than a locking variant

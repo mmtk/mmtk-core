@@ -595,6 +595,8 @@
 <a href="#593" id="593">593</a>
 <a href="#594" id="594">594</a>
 <a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::sft::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -975,9 +977,11 @@
                 global: <span class="macro">vec!</span>[SFT_DENSE_CHUNK_MAP_INDEX],
                 local: <span class="macro">vec!</span>[],
             };
-            <span class="kw">if </span>context.try_map_metadata_space(start, bytes).is_err() {
-                <span class="macro">panic!</span>(<span class="string">"failed to mmap metadata memory"</span>);
-            }
+            context
+                .try_map_metadata_space(start, bytes, <span class="string">"SFTDenseChunkMap"</span>)
+                .unwrap_or_else(|e| {
+                    <span class="macro">panic!</span>(<span class="string">"failed to mmap metadata memory: {e}"</span>);
+                });
 
             <span class="self">self</span>.update(space, start, bytes);
         }
