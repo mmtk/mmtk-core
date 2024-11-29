@@ -117,11 +117,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
         {
             // Flip the per-object unlogged bits to "unlogged" state.
             for obj in &self.modbuf {
-                debug_assert!(
-                    (*obj).is_live(),
-                    "{} was logged but is not live",
-                    *obj
-                );
+                debug_assert!((*obj).is_live(), "{} was logged but is not live", *obj);
 
                 <E::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<E::VM, u8>(
                     *obj,
