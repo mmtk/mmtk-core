@@ -390,7 +390,7 @@ pub struct CreateSpecificPlanArgs<'a, VM: VMBinding> {
     pub global_side_metadata_specs: Vec<SideMetadataSpec>,
 }
 
-impl<'a, VM: VMBinding> CreateSpecificPlanArgs<'a, VM> {
+impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
     /// Get a PlanCreateSpaceArgs that can be used to create a space
     pub fn get_space_args(
         &mut self,
