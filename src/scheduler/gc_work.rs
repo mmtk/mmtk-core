@@ -235,7 +235,6 @@ impl<E: ProcessEdgesWork> ObjectTracer for ProcessEdgesWorkTracer<E> {
     /// Forward the `trace_object` call to the underlying `ProcessEdgesWork`,
     /// and flush as soon as the underlying buffer of `process_edges_work` is full.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        debug_assert!(!object.is_null());
         debug_assert!(
             <E::VM as VMBinding>::VMObjectModel::is_object_sane(object),
             "Object {:?} is not sane!",
@@ -699,7 +698,6 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         use crate::policy::sft::GCWorkerMutRef;
 
-        debug_assert!(!object.is_null());
         debug_assert!(
             <VM as VMBinding>::VMObjectModel::is_object_sane(object),
             "Object {:?} is not sane!",
