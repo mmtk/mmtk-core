@@ -118,7 +118,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
             // Flip the per-object unlogged bits to "unlogged" state.
             for obj in &self.modbuf {
                 debug_assert!(
-                    (*obj).is_live::<E::VM>(),
+                    (*obj).is_live(),
                     "{} was logged but is not live",
                     *obj
                 );
