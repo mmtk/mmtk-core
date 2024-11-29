@@ -248,8 +248,13 @@ impl Block {
                         holes += 1;
                     }
 
+                    // Cheeky trick to encode the released line into the poisoned value
                     #[cfg(feature = "poison_on_release")]
-                    crate::util::memory::set_pattern(line.start(), (0xdeadbeef ^ line.start().as_usize()) & !0xff, Line::BYTES);
+                    crate::util::memory::set_pattern(
+                        line.start(),
+                        (0xdeadbeef ^ line.start().as_usize()) & !0xff,
+                        Line::BYTES,
+                    );
 
                     // We need to clear the pin bit if it is on the side, as this line can be reused
                     #[cfg(feature = "object_pinning")]
