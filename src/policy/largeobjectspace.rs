@@ -292,8 +292,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             crate::util::metadata::vo_bit::unset_vo_bit(object);
             // Clear log bits for dead objects to prevent a new nursery object having the unlog bit set
             if self.common.needs_log_bit {
-                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                    .clear::<VM>(object, Ordering::SeqCst);
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
             }
             self.pr
                 .release_pages(get_super_page(object.to_object_start::<VM>()));
