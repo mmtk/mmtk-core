@@ -288,10 +288,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         let sweep = |object: ObjectReference| {
             #[cfg(feature = "vo_bit")]
             crate::util::metadata::vo_bit::unset_vo_bit(object);
-            if self.common.needs_log_bit {
-                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                    .clear::<VM>(object, Ordering::SeqCst);
-            }
             let start = object.to_object_start::<VM>();
             #[cfg(feature = "poison_on_release")]
             crate::util::memory::set(start, 0xed, VM::VMObjectModel::get_current_size(object));
