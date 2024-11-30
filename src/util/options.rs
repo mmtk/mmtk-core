@@ -128,14 +128,14 @@ fn always_valid<T>(_: &T) -> bool {
 /// This type allows us to store some metadata for the option. To get the value of an option,
 /// you can simply dereference it (for example, *options.threads).
 #[derive(Clone)]
-pub struct MMTKOption<T: Debug + Clone> {
+pub struct MMTKOption<T: Debug + Clone + FromStr> {
     /// The actual value for the option
     value: T,
     /// The validator to ensure the value is valid.
     validator: fn(&T) -> bool,
 }
 
-impl<T: Debug + Clone> MMTKOption<T> {
+impl<T: Debug + Clone + FromStr> MMTKOption<T> {
     /// Create a new MMTKOption
     pub fn new(value: T, validator: fn(&T) -> bool) -> Self {
         // FIXME: We should enable the following check to make sure the initial value is valid.
@@ -164,7 +164,7 @@ impl<T: Debug + Clone> MMTKOption<T> {
 }
 
 // Dereference an option to get its value.
-impl<T: Debug + Clone> std::ops::Deref for MMTKOption<T> {
+impl<T: Debug + Clone + FromStr> std::ops::Deref for MMTKOption<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -177,7 +177,14 @@ macro_rules! options {
         options!($(#[$outer])*$($name: $type [$validator] = $default),*);
     ];
     ($($(#[$outer:meta])*$name:ident: $type:ty [$validator:expr] = $default:expr),*) => [
-        /// MMTk command line options.
+        /// Options for an MMTk instance.  It affects many aspects of the behavior of the MMTk
+        /// instance, including the number of GC worker threads, the GC plan to use, etc.
+        ///
+        /// Options are set by the VM binding before creating an instance of MMTk.  The VM binding
+        /// usually parses command line options, environment variables, configuration files, etc.,
+        /// to determine the options.  MMTk also provides the [`Options::read_env_var_settings`]
+        /// method which reads environment variables of the form `MMTK_*` and set options.  It can
+        /// be convenient in the early development stage of a VM binding.
         #[derive(Clone)]
         pub struct Options {
             $($(#[$outer])*pub $name: MMTKOption<$type>),*
@@ -209,14 +216,14 @@ macro_rules! options {
                 }
             }
         }
-
-        impl Default for Options {
-            /// By default, `Options` instance is created with built-in default settings.
-            fn default() -> Self {
-                Self::new()
-            }
-        }
     ]
+}
+
+impl Default for Options {
+    /// By default, `Options` instance is created with built-in default settings.
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Options {
@@ -228,13 +235,12 @@ impl Options {
     ///
     /// ```rust
     /// let mut builder = MMTKBuilder::new();
-    ///
-    /// // Set values directly
     /// builder.options.threads.set(4);
     /// builder.options.plan.set(PlanSelector::GenImmix);
     ///
-    /// // or convert strings to values.
-    /// builder.options.stress_factor.set(user_input.parse());
+    /// // All `T` in `MMTKOption<T>` implement `FromStr`.
+    /// builder.options.plan.set(user_input1.parse()?);
+    /// builder.options.thread_affinity.set(user_input2.parse()?);
     /// ```
     ///
     /// Only use this method if the option name is also provided as strings, e.g. from command line
@@ -780,8 +786,6 @@ mod gc_trigger_tests {
     }
 }
 
-// Currently we allow all the options to be set by env var for the sake of convenience.
-// At some point, we may disallow this and all the options can only be set by command line.
 options! {
     /// The GC plan to use.
     plan:                   PlanSelector            [always_valid] = PlanSelector::GenImmix,
