@@ -124,6 +124,16 @@ fn always_valid<T>(_: &T) -> bool {
     true
 }
 
+/// Error when setting an option by option name and option value as strings.
+enum SetOptionByStringError {
+    /// The option name does not exist.
+    InvalidKey,
+    /// Error when converting the value from string.
+    ValueParseError,
+    /// The value failed validation.
+    ValueValidationError,
+}
+
 /// An MMTk option of a given type.
 /// This type allows us to store some metadata for the option. To get the value of an option,
 /// you can simply dereference it (for example, *options.threads).
@@ -192,20 +202,21 @@ macro_rules! options {
 
         impl Options {
             /// Set an option and run its validator for its value.
-            fn set_by_string_inner(&mut self, s: &str, val: &str) -> bool {
+            fn set_by_string_inner(&mut self, s: &str, val: &str) -> Result<(), SetOptionByStringError> {
                 match s {
                     // Parse the given value from str (by env vars or by calling process()) to the right type
-                    $(stringify!($name) => if let Ok(typed_val) = val.parse::<$type>() {
-                        let is_set = self.$name.set(typed_val);
-                        if !is_set {
-                            eprintln!("Warn: unable to set {}={:?}. Invalid value. Default value will be used.", s, val);
+                    $(stringify!($name) => {
+                        let Ok(typed_val) = val.parse::<$type>() else {
+                            return Err(SetOptionByStringError::ValueParseError);
+                        };
+
+                        if !self.$name.set(typed_val) {
+                            return Err(SetOptionByStringError::ValueValidationError);
                         }
-                        is_set
-                    } else {
-                        eprintln!("Warn: unable to set {}={:?}. Can't parse value. Default value will be used.", s, val);
-                        false
+
+                        Ok(())
                     })*
-                    _ => panic!("Invalid Options key: {}", s)
+                    _ => Err(SetOptionByStringError::InvalidKey)
                 }
             }
 
@@ -250,23 +261,23 @@ impl Options {
     /// * `s`: The name of the option, same as the field name.
     /// * `val`: The value of the option, as a string.  It will be parsed by `FromStr::from_str`.
     pub fn set_by_string(&mut self, s: &str, val: &str) -> bool {
-        self.set_by_string_inner(s, val)
+        self.set_by_string_inner(s, val).is_ok()
     }
 
     /// Set options in bulk by names and values as strings.
     ///
     /// Returns true if all the options are set successfully.
     ///
-    /// This method returns false if the option string is invalid, or if it includes any invalid
-    /// option. If error happens, some options in `self` may have been modified while others are
-    /// not.
+    /// Panics if the `options` argument contains any unrecognized keys.  Returns false if any
+    /// option given in the `options` argument cannot be set due to parsing errors or validation
+    /// errors.
     ///
     /// Arguments:
     /// * `options`: a string that is key value pairs separated by white spaces or commas, e.g.
     ///   `threads=1 stress_factor=4096`, or `threads=1,stress_factor=4096`. Each key-value pair
     ///   will be set via [`Options::set_by_string`].
     pub fn bulk_set_by_string(&mut self, options: &str) -> bool {
-        for opt in options.replace(",", " ").split_ascii_whitespace() {
+        for opt in options.replace(',', " ").split_ascii_whitespace() {
             let kv_pair: Vec<&str> = opt.split('=').collect();
             if kv_pair.len() != 2 {
                 return false;
@@ -274,7 +285,18 @@ impl Options {
 
             let key = kv_pair[0];
             let val = kv_pair[1];
-            if !self.set_by_string(key, val) {
+            if let Err(e) = self.set_by_string_inner(key, val) {
+                match e {
+                    SetOptionByStringError::InvalidKey => {
+                        panic!("Invalid Options key: {}", key);
+                    }
+                    SetOptionByStringError::ValueParseError => {
+                        eprintln!("Warn: unable to set {}={:?}. Can't parse value. Default value will be used.", key, val);
+                    }
+                    SetOptionByStringError::ValueValidationError => {
+                        eprintln!("Warn: unable to set {}={:?}. Invalid value. Default value will be used.", key, val);
+                    }
+                }
                 return false;
             }
         }
@@ -292,7 +314,19 @@ impl Options {
             // strip the prefix, and get the lower case string
             if let Some(rest_of_key) = key.strip_prefix(PREFIX) {
                 let lowercase: &str = &rest_of_key.to_lowercase();
-                self.set_by_string(lowercase, &val);
+                if let Err(e) = self.set_by_string_inner(lowercase, &val) {
+                    match e {
+                        SetOptionByStringError::InvalidKey => {
+                            /* Silently skip unrecognized keys. */
+                        }
+                        SetOptionByStringError::ValueParseError => {
+                            eprintln!("Warn: unable to set {}={:?}. Can't parse value. Default value will be used.", key, val);
+                        }
+                        SetOptionByStringError::ValueValidationError => {
+                            eprintln!("Warn: unable to set {}={:?}. Invalid value. Default value will be used.", key, val);
+                        }
+                    }
+                }
             }
         }
     }
