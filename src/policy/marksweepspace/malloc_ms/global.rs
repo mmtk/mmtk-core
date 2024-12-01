@@ -439,7 +439,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     fn map_metadata_and_update_bound(&self, addr: Address, size: usize) {
         // Map the metadata space for the range [addr, addr + size)
-        map_meta_space(&self.metadata, addr, size);
+        map_meta_space(&self.metadata, addr, size, self.get_name());
 
         // Update the bounds of the max and min chunk addresses seen -- this is used later in the sweep
         // Lockless compare-and-swap loops perform better than a locking variant

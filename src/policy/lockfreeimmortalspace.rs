@@ -13,6 +13,7 @@ use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
+use crate::util::memory::MmapAnnotation;
 use crate::util::memory::MmapStrategy;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
@@ -241,15 +242,22 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             *args.options.transparent_hugepages,
             crate::util::memory::MmapProtection::ReadWrite,
         );
-        crate::util::memory::dzmmap_noreplace(start, aligned_total_bytes, strategy).unwrap();
-        if space
+        crate::util::memory::dzmmap_noreplace(
+            start,
+            aligned_total_bytes,
+            strategy,
+            &MmapAnnotation::Space {
+                name: space.get_name(),
+            },
+        )
+        .unwrap();
+        space
             .metadata
-            .try_map_metadata_space(start, aligned_total_bytes)
-            .is_err()
-        {
-            // TODO(Javad): handle meta space allocation failure
-            panic!("failed to mmap meta memory");
-        }
+            .try_map_metadata_space(start, aligned_total_bytes, space.get_name())
+            .unwrap_or_else(|e| {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory: {e}")
+            });
 
         space
     }

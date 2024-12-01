@@ -180,7 +180,6 @@ pub fn no_cleanup() {}
 ///
 /// These are not supported at the moment. As those will change the `MockVM` type, we will have
 /// to use macros to generate a new `MockVM` type when we custimize constants or associated types.
-
 // The current implementation is not perfect, but at least it works, and it is easy enough to debug with.
 // I have tried different third-party libraries for mocking, and each has its own limitation. And
 // none of the libraries I tried can mock `VMBinding` and the associated traits out of box. Even after I attempted

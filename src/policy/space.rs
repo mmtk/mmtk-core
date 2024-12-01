@@ -144,12 +144,19 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         if let Err(mmap_error) = self
                             .common()
                             .mmapper
-                            .ensure_mapped(res.start, res.pages, self.common().mmap_strategy())
-                            .and(
-                                self.common()
-                                    .metadata
-                                    .try_map_metadata_space(res.start, bytes),
+                            .ensure_mapped(
+                                res.start,
+                                res.pages,
+                                self.common().mmap_strategy(),
+                                &memory::MmapAnnotation::Space {
+                                    name: self.get_name(),
+                                },
                             )
+                            .and(self.common().metadata.try_map_metadata_space(
+                                res.start,
+                                bytes,
+                                self.get_name(),
+                            ))
                         {
                             memory::handle_mmap_error::<VM>(mmap_error, tls, res.start, bytes);
                         }
@@ -293,15 +300,13 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// Ensure this space is marked as mapped -- used when the space is already
     /// mapped (e.g. for a vm image which is externally mmapped.)
     fn ensure_mapped(&self) {
-        if self
-            .common()
+        self.common()
             .metadata
-            .try_map_metadata_space(self.common().start, self.common().extent)
-            .is_err()
-        {
-            // TODO(Javad): handle meta space allocation failure
-            panic!("failed to mmap meta memory");
-        }
+            .try_map_metadata_space(self.common().start, self.common().extent, self.get_name())
+            .unwrap_or_else(|e| {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory: {e}");
+            });
 
         self.common()
             .mmapper
@@ -613,14 +618,12 @@ impl<VM: VMBinding> CommonSpace<VM> {
         }
 
         // For contiguous space, we know its address range so we reserve metadata memory for its range.
-        if rtn
-            .metadata
-            .try_map_metadata_address_range(rtn.start, rtn.extent)
-            .is_err()
-        {
-            // TODO(Javad): handle meta space allocation failure
-            panic!("failed to mmap meta memory");
-        }
+        rtn.metadata
+            .try_map_metadata_address_range(rtn.start, rtn.extent, rtn.name)
+            .unwrap_or_else(|e| {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory: {e}");
+            });
 
         debug!(
             "Created space {} [{}, {}) for {} bytes",

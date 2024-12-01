@@ -3,7 +3,7 @@ use super::SideMetadataSpec;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 use crate::util::heap::layout::vm_layout::VMLayout;
-use crate::util::memory::MmapStrategy;
+use crate::util::memory::{MmapAnnotation, MmapStrategy};
 #[cfg(target_pointer_width = "32")]
 use crate::util::metadata::side_metadata::address_to_chunked_meta_address;
 use crate::util::Address;
@@ -126,6 +126,7 @@ pub(super) fn try_mmap_contiguous_metadata_space(
     size: usize,
     spec: &SideMetadataSpec,
     no_reserve: bool,
+    anno: &MmapAnnotation,
 ) -> Result<usize> {
     debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
     debug_assert!(size % BYTES_IN_PAGE == 0);
@@ -142,12 +143,14 @@ pub(super) fn try_mmap_contiguous_metadata_space(
                 mmap_start,
                 mmap_size >> LOG_BYTES_IN_PAGE,
                 MmapStrategy::SIDE_METADATA,
+                anno,
             )
         } else {
             MMAPPER.quarantine_address_range(
                 mmap_start,
                 mmap_size >> LOG_BYTES_IN_PAGE,
                 MmapStrategy::SIDE_METADATA,
+                anno,
             )
         }
         .map(|_| mmap_size)
