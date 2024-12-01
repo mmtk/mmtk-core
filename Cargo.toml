@@ -180,6 +180,13 @@ count_live_bytes_in_gc = []
 # capture the type names of work packets.
 bpftrace_workaround = []
 
+# Disable mmap annotations.
+# All invocations of `mmap` in mmtk-core are accompanied by calls of `prctl` with
+# `PR_SET_VMA_ANON_NAME` to annotate the mmap ranges with human-readable names.  It is enabled by
+# default and should work fine even with large heap sizes.  However, if this is causing problems,
+# users can disable such annotations by enabling this Cargo feature.
+no_mmap_annotation = []
+
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --
 # Only one feature from each group can be provided. Otherwise build will fail.
