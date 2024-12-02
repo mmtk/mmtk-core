@@ -831,7 +831,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
 
             // For any object we need to scan, we count its live bytes.
             // Check the option outside the loop for better performance.
-            if *mmtk.get_options().count_live_bytes_in_gc {
+            if crate::util::rust_util::unlikely(*mmtk.get_options().count_live_bytes_in_gc) {
                 // Borrow before the loop.
                 let mut live_bytes_stats = closure.worker.shared.live_bytes_per_space.borrow_mut();
                 for object in objects_to_scan.iter().copied() {
