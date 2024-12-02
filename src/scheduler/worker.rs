@@ -67,7 +67,7 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
         use crate::mmtk::VM_MAP;
         use crate::vm::object_model::ObjectModel;
 
-        // The live bytes ofr the object
+        // The live bytes of the object
         let bytes = VM::VMObjectModel::get_current_size(object);
         // Get the space index from descriptor
         let space_descriptor = VM_MAP.get_descriptor_for_address(object.to_raw_address());
@@ -79,7 +79,7 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
             MAX_SPACES
         );
         // Accumulate the live bytes for the index
-        live_bytes_per_space[space_descriptor.get_index()] += bytes;
+        live_bytes_per_space[space_index] += bytes;
     }
 }
 

@@ -542,7 +542,7 @@ impl<VM: VMBinding> MMTK<VM> {
             let space_idx = space.get_descriptor().get_index();
             let used_pages = space.reserved_pages();
             if used_pages != 0 {
-                let used_bytes = used_pages << crate::util::constants::LOG_BYTES_IN_PAGE;
+                let used_bytes = crate::util::conversions::pages_to_bytes(used_pages);
                 let live_bytes = live_bytes_per_space[space_idx];
                 debug_assert!(
                     live_bytes <= used_bytes,
