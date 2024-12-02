@@ -143,7 +143,7 @@ macro_rules! mmap_anno_test {
 // Export this to external crates
 pub use mmap_anno_test;
 
-impl<'a> std::fmt::Display for MmapAnnotation<'a> {
+impl std::fmt::Display for MmapAnnotation<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             MmapAnnotation::Space { name } => write!(f, "mmtk:space:{name}"),
