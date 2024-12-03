@@ -558,4 +558,30 @@ impl<VM: VMBinding> MMTK<VM> {
         });
         ret
     }
+
+    /// Print VM maps.  It will print the memory ranges used by spaces as well as some attributes of
+    /// the spaces.
+    ///
+    /// -   "I": The space is immortal.  Its objects will never die.
+    /// -   "N": The space is non-movable.  Its objects will never move.
+    ///
+    /// Arguments:
+    /// *   `out`: the place to print the VM maps.
+    /// *   `space_name`: If `None`, print all spaces;
+    ///                   if `Some(n)`, only print the space whose name is `n`.
+    pub fn debug_print_vm_maps(
+        &self,
+        out: &mut impl std::fmt::Write,
+        space_name: Option<&str>,
+    ) -> Result<(), std::fmt::Error> {
+        let mut result_so_far = Ok(());
+        self.get_plan().for_each_space(&mut |space| {
+            if result_so_far.is_ok()
+                && (space_name.is_none() || space_name == Some(space.get_name()))
+            {
+                result_so_far = crate::policy::space::print_vm_map(space, out);
+            }
+        });
+        result_so_far
+    }
 }
