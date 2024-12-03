@@ -475,7 +475,7 @@
 <span class="kw">const </span>GC_EXTRA_HEADER_BYTES: usize = GC_EXTRA_HEADER_WORD &lt;&lt; LOG_BYTES_IN_WORD;
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; SFT <span class="kw">for </span>MarkCompactSpace&lt;VM&gt; {
-    <span class="kw">fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
+    <span class="kw">fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str {
         <span class="self">self</span>.get_name()
     }
 

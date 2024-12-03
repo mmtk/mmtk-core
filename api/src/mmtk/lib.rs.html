@@ -61,6 +61,7 @@
 <a href="#59" id="59">59</a>
 <a href="#60" id="60">60</a>
 <a href="#61" id="61">61</a>
+<a href="#62" id="62">62</a>
 </pre></div><pre class="rust"><code><span class="comment">// Allow this for now. Clippy suggests we should use Sft, Mmtk, rather than SFT and MMTK.
 // According to its documentation (https://rust-lang.github.io/rust-clippy/master/index.html#upper_case_acronyms),
 // with upper-case-acronyms-aggressive turned on, it should also warn us about SFTMap, VMBinding, GCWorker.
@@ -109,6 +110,7 @@
 <span class="kw">pub use </span>mmtk::MMTK;
 
 <span class="kw">mod </span>global_state;
+<span class="kw">pub use </span><span class="kw">crate</span>::global_state::LiveBytesStats;
 
 <span class="kw">mod </span>policy;
 

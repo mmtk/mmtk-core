@@ -221,7 +221,7 @@
 /// table of SFT rather than Space.
 </span><span class="kw">pub trait </span>SFT {
     <span class="doccomment">/// The space name
-    </span><span class="kw">fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str;
+    </span><span class="kw">fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str;
 
     <span class="doccomment">/// Get forwarding pointer if the object is forwarded.
     </span><span class="kw">fn </span>get_forwarded_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
@@ -317,7 +317,7 @@
 <span class="kw">pub const </span>EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 
 <span class="kw">impl </span>SFT <span class="kw">for </span>EmptySpaceSFT {
-    <span class="kw">fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
+    <span class="kw">fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str {
         EMPTY_SFT_NAME
     }
     <span class="kw">fn </span>is_live(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool {

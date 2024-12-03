@@ -114,7 +114,6 @@
 <a href="#112" id="112">112</a>
 <a href="#113" id="113">113</a>
 <a href="#114" id="114">114</a>
-<a href="#115" id="115">115</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::global::MarkCompact;
 <span class="kw">use </span><span class="kw">crate</span>::policy::markcompactspace::MarkCompactSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::markcompactspace::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
@@ -168,7 +167,6 @@
         </span>mmtk.slot_logger.reset();
 
         <span class="comment">// We do two passes of transitive closures. We clear the live bytes from the first pass.
-        </span><span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
         </span>mmtk.scheduler
             .worker_group
             .get_and_clear_worker_live_bytes();

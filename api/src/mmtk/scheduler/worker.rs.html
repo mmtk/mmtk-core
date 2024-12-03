@@ -439,19 +439,35 @@
 <a href="#437" id="437">437</a>
 <a href="#438" id="438">438</a>
 <a href="#439" id="439">439</a>
+<a href="#440" id="440">440</a>
+<a href="#441" id="441">441</a>
+<a href="#442" id="442">442</a>
+<a href="#443" id="443">443</a>
+<a href="#444" id="444">444</a>
+<a href="#445" id="445">445</a>
+<a href="#446" id="446">446</a>
+<a href="#447" id="447">447</a>
+<a href="#448" id="448">448</a>
+<a href="#449" id="449">449</a>
+<a href="#450" id="450">450</a>
+<a href="#451" id="451">451</a>
+<a href="#452" id="452">452</a>
+<a href="#453" id="453">453</a>
+<a href="#454" id="454">454</a>
+<a href="#455" id="455">455</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::WorkerLocalStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::MMTK;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::GCWorkerCopyContext;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_parameters::MAX_SPACES;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::vm::{Collection, GCThreadContext, VMBinding};
 <span class="kw">use </span>atomic::Atomic;
 <span class="kw">use </span>atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 <span class="kw">use </span>crossbeam::deque::{<span class="self">self</span>, Stealer};
 <span class="kw">use </span>crossbeam::queue::ArrayQueue;
-<span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
-</span><span class="kw">use </span>std::sync::atomic::AtomicUsize;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 <span class="kw">use </span>std::sync::{Arc, Mutex};
 
@@ -483,8 +499,8 @@
     <span class="doccomment">/// Accumulated bytes for live objects in this GC. When each worker scans
     /// objects, we increase the live bytes. We get this value from each worker
     /// at the end of a GC, and reset this counter.
-    </span><span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
-    </span>live_bytes: AtomicUsize,
+    /// The live bytes are stored in an array. The index is the index from the space descriptor.
+    </span><span class="kw">pub </span>live_bytes_per_space: AtomicRefCell&lt;[usize; MAX_SPACES]&gt;,
     <span class="doccomment">/// A queue of GCWork that can only be processed by the owned thread.
     </span><span class="kw">pub </span>designated_work: ArrayQueue&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
     <span class="doccomment">/// Handle for stealing packets from the current worker
@@ -495,21 +511,32 @@
     <span class="kw">pub fn </span>new(stealer: <span class="prelude-ty">Option</span>&lt;Stealer&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             stat: Default::default(),
-            <span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
-            </span>live_bytes: AtomicUsize::new(<span class="number">0</span>),
+            live_bytes_per_space: AtomicRefCell::new([<span class="number">0</span>; MAX_SPACES]),
             designated_work: ArrayQueue::new(<span class="number">16</span>),
             stealer,
         }
     }
 
-    <span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>increase_live_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>, bytes: usize) {
-        <span class="self">self</span>.live_bytes.fetch_add(bytes, Ordering::Relaxed);
-    }
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>increase_live_bytes(
+        live_bytes_per_space: <span class="kw-2">&amp;mut </span>[usize; MAX_SPACES],
+        object: ObjectReference,
+    ) {
+        <span class="kw">use </span><span class="kw">crate</span>::mmtk::VM_MAP;
+        <span class="kw">use </span><span class="kw">crate</span>::vm::object_model::ObjectModel;
 
-    <span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_and_clear_live_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.live_bytes.swap(<span class="number">0</span>, Ordering::SeqCst)
+        <span class="comment">// The live bytes of the object
+        </span><span class="kw">let </span>bytes = VM::VMObjectModel::get_current_size(object);
+        <span class="comment">// Get the space index from descriptor
+        </span><span class="kw">let </span>space_descriptor = VM_MAP.get_descriptor_for_address(object.to_raw_address());
+        <span class="kw">let </span>space_index = space_descriptor.get_index();
+        <span class="macro">debug_assert!</span>(
+            space_index &lt; MAX_SPACES,
+            <span class="string">"Space index {} is not in the range of [0, {})"</span>,
+            space_index,
+            MAX_SPACES
+        );
+        <span class="comment">// Accumulate the live bytes for the index
+        </span>live_bytes_per_space[space_index] += bytes;
     }
 }
 
@@ -870,12 +897,17 @@
             .any(|w| !w.designated_work.is_empty())
     }
 
-    <span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
-    </span><span class="kw">pub fn </span>get_and_clear_worker_live_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.workers_shared
-            .iter()
-            .map(|w| w.get_and_clear_live_bytes())
-            .sum()
+    <span class="doccomment">/// Get the live bytes data from the worker, and clear the local data.
+    </span><span class="kw">pub fn </span>get_and_clear_worker_live_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [usize; MAX_SPACES] {
+        <span class="kw">let </span><span class="kw-2">mut </span>ret = [<span class="number">0</span>; MAX_SPACES];
+        <span class="self">self</span>.workers_shared.iter().for_each(|w| {
+            <span class="kw">let </span><span class="kw-2">mut </span>live_bytes_per_space = w.live_bytes_per_space.borrow_mut();
+            <span class="kw">for </span>(idx, val) <span class="kw">in </span>live_bytes_per_space.iter_mut().enumerate() {
+                ret[idx] += <span class="kw-2">*</span>val;
+                <span class="kw-2">*</span>val = <span class="number">0</span>;
+            }
+        });
+        ret
     }
 }
 </code></pre></div></section></main></body></html>

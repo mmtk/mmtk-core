@@ -227,11 +227,11 @@
 <a href="#225" id="225">225</a>
 <a href="#226" id="226">226</a>
 <a href="#227" id="227">227</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+</pre></div><pre class="rust"><code><span class="kw">use </span>atomic_refcell::AtomicRefCell;
+<span class="kw">use </span>std::collections::HashMap;
+<span class="kw">use </span>std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 <span class="kw">use </span>std::sync::Mutex;
 <span class="kw">use </span>std::time::Instant;
-
-<span class="kw">use </span>atomic_refcell::AtomicRefCell;
 
 <span class="doccomment">/// This stores some global states for an MMTK instance.
 /// Some MMTK components like plans and allocators may keep an reference to the struct, and can access it.
@@ -274,9 +274,8 @@
     <span class="doccomment">/// A counteer that keeps tracks of the number of bytes allocated by malloc
     </span><span class="attr">#[cfg(feature = <span class="string">"malloc_counted_size"</span>)]
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) malloc_bytes: AtomicUsize,
-    <span class="doccomment">/// This stores the size in bytes for all the live objects in last GC. This counter is only updated in the GC release phase.
-    </span><span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) live_bytes_in_last_gc: AtomicUsize,
+    <span class="doccomment">/// This stores the live bytes and the used bytes (by pages) for each space in last GC. This counter is only updated in the GC release phase.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) live_bytes_in_last_gc: AtomicRefCell&lt;HashMap&lt;<span class="kw-2">&amp;</span><span class="lifetime">'static </span>str, LiveBytesStats&gt;&gt;,
 }
 
 <span class="kw">impl </span>GlobalState {
@@ -412,16 +411,6 @@
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>decrease_malloc_bytes_by(<span class="kw-2">&amp;</span><span class="self">self</span>, size: usize) {
         <span class="self">self</span>.malloc_bytes.fetch_sub(size, Ordering::SeqCst);
     }
-
-    <span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
-    </span><span class="kw">pub fn </span>get_live_bytes_in_last_gc(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.live_bytes_in_last_gc.load(Ordering::SeqCst)
-    }
-
-    <span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
-    </span><span class="kw">pub fn </span>set_live_bytes_in_last_gc(<span class="kw-2">&amp;</span><span class="self">self</span>, size: usize) {
-        <span class="self">self</span>.live_bytes_in_last_gc.store(size, Ordering::SeqCst);
-    }
 }
 
 <span class="kw">impl </span>Default <span class="kw">for </span>GlobalState {
@@ -442,8 +431,7 @@
             allocation_bytes: AtomicUsize::new(<span class="number">0</span>),
             <span class="attr">#[cfg(feature = <span class="string">"malloc_counted_size"</span>)]
             </span>malloc_bytes: AtomicUsize::new(<span class="number">0</span>),
-            <span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
-            </span>live_bytes_in_last_gc: AtomicUsize::new(<span class="number">0</span>),
+            live_bytes_in_last_gc: AtomicRefCell::new(HashMap::new()),
         }
     }
 }
@@ -453,5 +441,17 @@
     NotInGC,
     GcPrepare,
     GcProper,
+}
+
+<span class="doccomment">/// Statistics for the live bytes in the last GC. The statistics is per space.
+</span><span class="attr">#[derive(Copy, Clone, Debug)]
+</span><span class="kw">pub struct </span>LiveBytesStats {
+    <span class="doccomment">/// Total accumulated bytes of live objects in the space.
+    </span><span class="kw">pub </span>live_bytes: usize,
+    <span class="doccomment">/// Total pages used by the space.
+    </span><span class="kw">pub </span>used_pages: usize,
+    <span class="doccomment">/// Total bytes used by the space, computed from `used_pages`.
+    /// The ratio of live_bytes and used_bytes reflects the utilization of the memory in the space.
+    </span><span class="kw">pub </span>used_bytes: usize,
 }
 </code></pre></div></section></main></body></html>
