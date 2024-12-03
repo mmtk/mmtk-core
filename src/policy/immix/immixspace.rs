@@ -86,7 +86,7 @@ pub struct ImmixSpaceArgs {
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
 
 impl<VM: VMBinding> SFT for ImmixSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
 
