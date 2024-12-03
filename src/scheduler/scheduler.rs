@@ -553,22 +553,15 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // USDT tracepoint for the end of GC.
         probe!(mmtk, gc_end);
 
-        #[cfg(feature = "count_live_bytes_in_gc")]
-        {
-            let live_bytes = mmtk.state.get_live_bytes_in_last_gc();
-            let used_bytes =
-                mmtk.get_plan().get_used_pages() << crate::util::constants::LOG_BYTES_IN_PAGE;
-            debug_assert!(
-                live_bytes <= used_bytes,
-                "Live bytes of all live objects ({} bytes) is larger than used pages ({} bytes), something is wrong.",
-                live_bytes, used_bytes
-            );
-            info!(
-                "Live objects = {} bytes ({:04.1}% of {} used pages)",
-                live_bytes,
-                live_bytes as f64 * 100.0 / used_bytes as f64,
-                mmtk.get_plan().get_used_pages()
-            );
+        if *mmtk.get_options().count_live_bytes_in_gc {
+            for (space_name, &stats) in mmtk.state.live_bytes_in_last_gc.borrow().iter() {
+                info!(
+                    "{} = {} pages ({:.1}% live)",
+                    space_name,
+                    stats.used_pages,
+                    stats.live_bytes as f64 * 100.0 / stats.used_bytes as f64,
+                );
+            }
         }
 
         #[cfg(feature = "extreme_assertions")]

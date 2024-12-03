@@ -64,7 +64,7 @@ pub struct MallocSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for MallocSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
 

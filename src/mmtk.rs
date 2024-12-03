@@ -12,6 +12,7 @@ use crate::util::address::ObjectReference;
 use crate::util::analysis::AnalysisManager;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::gc_trigger::GCTrigger;
+use crate::util::heap::layout::heap_parameters::MAX_SPACES;
 use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::heap::layout::{self, Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
@@ -26,6 +27,7 @@ use crate::util::statistics::stats::Stats;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
+use std::collections::HashMap;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -525,6 +527,36 @@ impl<VM: VMBinding> MMTK<VM> {
         plan.for_each_space(&mut |space| {
             space.enumerate_objects(&mut enumerator);
         })
+    }
+
+    /// Aggregate a hash map of live bytes per space with the space stats to produce
+    /// a map of live bytes stats for the spaces.
+    pub(crate) fn aggregate_live_bytes_in_last_gc(
+        &self,
+        live_bytes_per_space: [usize; MAX_SPACES],
+    ) -> HashMap<&'static str, crate::LiveBytesStats> {
+        use crate::policy::space::Space;
+        let mut ret = HashMap::new();
+        self.get_plan().for_each_space(&mut |space: &dyn Space<VM>| {
+            let space_name = space.get_name();
+            let space_idx = space.get_descriptor().get_index();
+            let used_pages = space.reserved_pages();
+            if used_pages != 0 {
+                let used_bytes = crate::util::conversions::pages_to_bytes(used_pages);
+                let live_bytes = live_bytes_per_space[space_idx];
+                debug_assert!(
+                    live_bytes <= used_bytes,
+                    "Live bytes of objects in {} ({} bytes) is larger than used pages ({} bytes), something is wrong.",
+                    space_name, live_bytes, used_bytes
+                );
+                ret.insert(space_name, crate::LiveBytesStats {
+                    live_bytes,
+                    used_pages,
+                    used_bytes,
+                });
+            }
+        });
+        ret
     }
 
     /// Print VM maps.  It will print the memory ranges used by spaces as well as some attributes of
