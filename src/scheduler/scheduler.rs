@@ -554,14 +554,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         probe!(mmtk, gc_end);
 
         if *mmtk.get_options().count_live_bytes_in_gc {
-            info!("Live bytes in spaces:");
             for (space_name, &stats) in mmtk.state.live_bytes_in_last_gc.borrow().iter() {
                 info!(
-                    "{} = {:.1}% ({} bytes) of {} used pages",
+                    "{} = {} pages ({:.1}% live)",
                     space_name,
-                    stats.live_bytes as f64 * 100.0 / stats.used_bytes as f64,
-                    stats.live_bytes,
                     stats.used_pages,
+                    stats.live_bytes as f64 * 100.0 / stats.used_bytes as f64,
                 );
             }
         }
