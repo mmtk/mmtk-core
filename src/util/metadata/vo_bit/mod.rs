@@ -231,9 +231,15 @@ use crate::MMTK;
 /// Objects in the VM space are allocated/managed by the binding. This functio provides a way for
 /// the binding to set VO bit for an object in the space.
 #[cfg(feature = "vm_space")]
-pub fn set_vo_bit_for_vm_space_object<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: ObjectReference) {
+pub fn set_vo_bit_for_vm_space_object<VM: VMBinding>(
+    mmtk: &'static MMTK<VM>,
+    object: ObjectReference,
+) {
     use crate::policy::space::Space;
-    debug_assert!(mmtk.get_plan().base().vm_space.in_space(object), "{} is not in VM space", object);
+    debug_assert!(
+        mmtk.get_plan().base().vm_space.in_space(object),
+        "{} is not in VM space",
+        object
+    );
     set_vo_bit(object);
 }
-
