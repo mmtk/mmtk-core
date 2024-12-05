@@ -479,7 +479,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
-    pub fn prepare(&mut self) {}
+    pub fn prepare(&mut self, _full_heap: bool) {}
 
     pub fn release(&mut self) {
         use crate::scheduler::WorkBucketStage;
