@@ -58,6 +58,7 @@ use crate::vm::VMBinding;
 pub(crate) const VO_BIT_SIDE_METADATA_SPEC: SideMetadataSpec =
     crate::util::metadata::side_metadata::spec_defs::VO_BIT;
 
+#[cfg(target_pointer_width = "64")]
 pub const VO_BIT_SIDE_METADATA_ADDR: Address = VO_BIT_SIDE_METADATA_SPEC.get_absolute_offset();
 
 /// Atomically set the VO bit for an object.

@@ -189,7 +189,8 @@ no_mmap_annotation = []
 # However, in rare cases, a binding may want to directly access and manipulate VO bit. For example, a binding cannot cooperate
 # with MMTk to identify each object for setting the VO bit. This is usually due to the limitation of the VM.
 # In such cases, a binding may use this feature and manipulate the VO bit to their needs. The binding's manipulation on VO bit
-# may violate MMTk's semantics, and may result in undefined behaviors for VO bit related APIs.
+# may violate MMTk's semantics, and may result in undefined behaviors for VO bit related APIs. This feature should
+# only be used if you understand how VO bit works internally. Use at your own risk.
 vo_bit_access = []
 
 # Do not modify the following line - ci-common.sh matches it
