@@ -222,3 +222,17 @@ pub fn is_internal_ptr_from_vo_bit<VM: VMBinding>(
 pub unsafe fn is_vo_addr(addr: Address) -> bool {
     VO_BIT_SIDE_METADATA_SPEC.load::<u8>(addr) != 0
 }
+
+#[cfg(feature = "vm_space")]
+use crate::MMTK;
+
+/// Set VO bit for a VM space object.
+/// Objects in the VM space are allocated/managed by the binding. This functio provides a way for
+/// the binding to set VO bit for an object in the space.
+#[cfg(feature = "vm_space")]
+pub fn set_vo_bit_for_vm_space_object<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: ObjectReference) {
+    use crate::policy::space::Space;
+    debug_assert!(mmtk.get_plan().base().vm_space.in_space(object), "{} is not in VM space", object);
+    set_vo_bit(object);
+}
+

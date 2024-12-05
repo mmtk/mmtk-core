@@ -22,3 +22,7 @@ pub(crate) use helpers::*;
 #[allow(unused_imports)]
 pub(crate) use helpers_32::*;
 pub(crate) use sanity::SideMetadataSanity;
+
+#[cfg(feature = "vo_bit_access")]
+pub const VO_BIT_SIDE_METADATA_SPEC: SideMetadataSpec =
+    crate::util::metadata::side_metadata::spec_defs::VO_BIT;

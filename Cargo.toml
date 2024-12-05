@@ -183,6 +183,15 @@ bpftrace_workaround = []
 # users can disable such annotations by enabling this Cargo feature.
 no_mmap_annotation = []
 
+# Allow the binding to access Valid Object (VO) bit.
+# MMTk uses VO bit to identify a valid object. Thus VO bit is carefully managed by MMTk in cooperation with the binding.
+# So normally this feature is not needed, and its use should be discouraged.
+# However, in rare cases, a binding may want to directly access and manipulate VO bit. For example, a binding cannot cooperate
+# with MMTk to identify each object for setting the VO bit. This is usually due to the limitation of the VM.
+# In such cases, a binding may use this feature and manipulate the VO bit to their needs. The binding's manipulation on VO bit
+# may violate MMTk's semantics, and may result in undefined behaviors for VO bit related APIs.
+vo_bit_access = []
+
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --
 # Only one feature from each group can be provided. Otherwise build will fail.
