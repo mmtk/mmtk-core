@@ -22,9 +22,3 @@ pub(crate) use helpers::*;
 #[allow(unused_imports)]
 pub(crate) use helpers_32::*;
 pub(crate) use sanity::SideMetadataSanity;
-
-/// Side metadata spec for VO bit. This is only available when the feature "vo_bit_access" is enabled.
-/// Check the comments on "vo_bit_access" in `Cargo.toml` before use. Use at your own risk.
-#[cfg(feature = "vo_bit_access")]
-pub const VO_BIT_SIDE_METADATA_SPEC: SideMetadataSpec =
-    crate::util::metadata::side_metadata::spec_defs::VO_BIT;

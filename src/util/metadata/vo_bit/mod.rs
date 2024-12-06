@@ -54,27 +54,38 @@ use crate::util::ObjectReference;
 use crate::vm::object_model::ObjectModel;
 use crate::vm::VMBinding;
 
-/// A VO bit is required per min-object-size aligned address, rather than per object, and can only exist as side metadata.
-pub(crate) const VO_BIT_SIDE_METADATA_SPEC: SideMetadataSpec =
-    crate::util::metadata::side_metadata::spec_defs::VO_BIT;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "vo_bit_access")] {
+        /// A VO bit is required per min-object-size aligned address, rather than per object, and can only exist as side metadata.
+        /// This is only publicly available when the feature "vo_bit_access" is enabled.
+        /// Check the comments on "vo_bit_access" in `Cargo.toml` before use. Use at your own risk.
+        pub const VO_BIT_SIDE_METADATA_SPEC: SideMetadataSpec =
+        crate::util::metadata::side_metadata::spec_defs::VO_BIT;
+    } else {
+        /// A VO bit is required per min-object-size aligned address, rather than per object, and can only exist as side metadata.
+        pub(crate) const VO_BIT_SIDE_METADATA_SPEC: SideMetadataSpec =
+            crate::util::metadata::side_metadata::spec_defs::VO_BIT;
+    }
+}
 
+/// The base address for VO bit side metadata on 64 bits platforms.
 #[cfg(target_pointer_width = "64")]
 pub const VO_BIT_SIDE_METADATA_ADDR: Address = VO_BIT_SIDE_METADATA_SPEC.get_absolute_offset();
 
 /// Atomically set the VO bit for an object.
-pub fn set_vo_bit(object: ObjectReference) {
+pub(crate) fn set_vo_bit(object: ObjectReference) {
     debug_assert!(!is_vo_bit_set(object), "{:x}: VO bit already set", object);
     VO_BIT_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_raw_address(), 1, Ordering::SeqCst);
 }
 
 /// Atomically unset the VO bit for an object.
-pub fn unset_vo_bit(object: ObjectReference) {
+pub(crate) fn unset_vo_bit(object: ObjectReference) {
     debug_assert!(is_vo_bit_set(object), "{:x}: VO bit not set", object);
     VO_BIT_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_raw_address(), 0, Ordering::SeqCst);
 }
 
 /// Atomically unset the VO bit for an object, regardless whether the bit is set or not.
-pub fn unset_vo_bit_nocheck(object: ObjectReference) {
+pub(crate) fn unset_vo_bit_nocheck(object: ObjectReference) {
     VO_BIT_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_raw_address(), 0, Ordering::SeqCst);
 }
 
@@ -84,13 +95,13 @@ pub fn unset_vo_bit_nocheck(object: ObjectReference) {
 /// # Safety
 ///
 /// This is unsafe: check the comment on `side_metadata::store`
-pub unsafe fn unset_vo_bit_unsafe(object: ObjectReference) {
+pub(crate) unsafe fn unset_vo_bit_unsafe(object: ObjectReference) {
     debug_assert!(is_vo_bit_set(object), "{:x}: VO bit not set", object);
     VO_BIT_SIDE_METADATA_SPEC.store::<u8>(object.to_raw_address(), 0);
 }
 
 /// Check if the VO bit is set for an object.
-pub fn is_vo_bit_set(object: ObjectReference) -> bool {
+pub(crate) fn is_vo_bit_set(object: ObjectReference) -> bool {
     VO_BIT_SIDE_METADATA_SPEC.load_atomic::<u8>(object.to_raw_address(), Ordering::SeqCst) == 1
 }
 
@@ -98,7 +109,7 @@ pub fn is_vo_bit_set(object: ObjectReference) -> bool {
 /// If so, return `Some(object)`. Otherwise return `None`.
 ///
 /// The `address` must be word-aligned.
-pub fn is_vo_bit_set_for_addr(address: Address) -> Option<ObjectReference> {
+pub(crate) fn is_vo_bit_set_for_addr(address: Address) -> Option<ObjectReference> {
     is_vo_bit_set_inner::<true>(address)
 }
 
@@ -111,7 +122,7 @@ pub fn is_vo_bit_set_for_addr(address: Address) -> Option<ObjectReference> {
 /// # Safety
 ///
 /// This is unsafe: check the comment on `side_metadata::load`
-pub unsafe fn is_vo_bit_set_unsafe(address: Address) -> Option<ObjectReference> {
+pub(crate) unsafe fn is_vo_bit_set_unsafe(address: Address) -> Option<ObjectReference> {
     is_vo_bit_set_inner::<false>(address)
 }
 
@@ -136,7 +147,7 @@ fn is_vo_bit_set_inner<const ATOMIC: bool>(addr: Address) -> Option<ObjectRefere
 }
 
 /// Bulk zero the VO bit.
-pub fn bzero_vo_bit(start: Address, size: usize) {
+pub(crate) fn bzero_vo_bit(start: Address, size: usize) {
     VO_BIT_SIDE_METADATA_SPEC.bzero_metadata(start, size);
 }
 
@@ -146,7 +157,7 @@ pub fn bzero_vo_bit(start: Address, size: usize) {
 /// As an alternative, this function copies the mark bits metadata to VO bits.
 /// The caller needs to ensure the mark bits are set exactly wherever VO bits need to be set before
 /// calling this function.
-pub fn bcopy_vo_bit_from_mark_bit<VM: VMBinding>(start: Address, size: usize) {
+pub(crate) fn bcopy_vo_bit_from_mark_bit<VM: VMBinding>(start: Address, size: usize) {
     let mark_bit_spec = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC;
     debug_assert!(
         mark_bit_spec.is_on_side(),
@@ -159,19 +170,19 @@ pub fn bcopy_vo_bit_from_mark_bit<VM: VMBinding>(start: Address, size: usize) {
 use crate::util::constants::{LOG_BITS_IN_BYTE, LOG_BYTES_IN_ADDRESS};
 
 /// How many data memory bytes does 1 word in the VO bit side metadata represents?
-pub const VO_BIT_WORD_TO_REGION: usize = 1
+pub(crate) const VO_BIT_WORD_TO_REGION: usize = 1
     << (VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region
         + LOG_BITS_IN_BYTE as usize
         + LOG_BYTES_IN_ADDRESS as usize
         - VO_BIT_SIDE_METADATA_SPEC.log_num_of_bits);
 
 /// Bulk check if a VO bit word. Return true if there is any bit set in the word.
-pub fn get_raw_vo_bit_word(addr: Address) -> usize {
+pub(crate) fn get_raw_vo_bit_word(addr: Address) -> usize {
     unsafe { VO_BIT_SIDE_METADATA_SPEC.load_raw_word(addr) }
 }
 
 /// Find the base reference to the object from a potential internal pointer.
-pub fn find_object_from_internal_pointer<VM: VMBinding>(
+pub(crate) fn find_object_from_internal_pointer<VM: VMBinding>(
     start: Address,
     search_limit_bytes: usize,
 ) -> Option<ObjectReference> {
@@ -204,7 +215,7 @@ fn is_internal_ptr<VM: VMBinding>(obj: ObjectReference, internal_ptr: Address) -
 }
 
 /// Check if the address could be an internal pointer based on where VO bit is set.
-pub fn is_internal_ptr_from_vo_bit<VM: VMBinding>(
+pub(crate) fn is_internal_ptr_from_vo_bit<VM: VMBinding>(
     vo_addr: Address,
     internal_ptr: Address,
 ) -> Option<ObjectReference> {
@@ -220,26 +231,6 @@ pub fn is_internal_ptr_from_vo_bit<VM: VMBinding>(
 ///
 /// # Safety
 /// The caller needs to make sure that no one is modifying VO bit.
-pub unsafe fn is_vo_addr(addr: Address) -> bool {
+pub(crate) unsafe fn is_vo_addr(addr: Address) -> bool {
     VO_BIT_SIDE_METADATA_SPEC.load::<u8>(addr) != 0
-}
-
-#[cfg(feature = "vm_space")]
-use crate::MMTK;
-
-/// Set VO bit for a VM space object.
-/// Objects in the VM space are allocated/managed by the binding. This functio provides a way for
-/// the binding to set VO bit for an object in the space.
-#[cfg(feature = "vm_space")]
-pub fn set_vo_bit_for_vm_space_object<VM: VMBinding>(
-    mmtk: &'static MMTK<VM>,
-    object: ObjectReference,
-) {
-    use crate::policy::space::Space;
-    debug_assert!(
-        mmtk.get_plan().base().vm_space.in_space(object),
-        "{} is not in VM space",
-        object
-    );
-    set_vo_bit(object);
 }
