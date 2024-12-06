@@ -222,11 +222,11 @@ mod global;
 pub mod header_metadata;
 mod metadata_val_traits;
 pub mod side_metadata;
+pub mod vo_bit;
 pub use metadata_val_traits::*;
 
 pub(crate) mod log_bit;
 pub(crate) mod mark_bit;
 pub(crate) mod pin_bit;
-pub(crate) mod vo_bit;
 
 pub use global::*;

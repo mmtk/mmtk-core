@@ -584,4 +584,16 @@ impl<VM: VMBinding> MMTK<VM> {
         });
         result_so_far
     }
+
+    /// Initialize object metadata for a VM space object.
+    /// Objects in the VM space are allocated/managed by the binding. This function provides a way for
+    /// the binding to set object metadata in MMTk for an object in the space.
+    #[cfg(feature = "vm_space")]
+    pub fn initialize_vm_space_object(&self, object: crate::util::ObjectReference) {
+        use crate::policy::sft::SFT;
+        self.get_plan()
+            .base()
+            .vm_space
+            .initialize_object_metadata(object, false)
+    }
 }
