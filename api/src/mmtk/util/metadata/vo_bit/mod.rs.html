@@ -224,6 +224,18 @@
 <a href="#222" id="222">222</a>
 <a href="#223" id="223">223</a>
 <a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
+<a href="#229" id="229">229</a>
+<a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
+<a href="#233" id="233">233</a>
+<a href="#234" id="234">234</a>
+<a href="#235" id="235">235</a>
+<a href="#236" id="236">236</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Valid object bit (VO bit)
 //!
 //! The valid object bit, or "VO bit" for short", is a global per-address metadata.  It is set at
@@ -280,26 +292,38 @@
 <span class="kw">use </span><span class="kw">crate</span>::vm::object_model::ObjectModel;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 
-<span class="doccomment">/// A VO bit is required per min-object-size aligned address, rather than per object, and can only exist as side metadata.
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>VO_BIT_SIDE_METADATA_SPEC: SideMetadataSpec =
-    <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::VO_BIT;
+<span class="macro">cfg_if::cfg_if! </span>{
+    <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit_access"</span>)] </span>{
+        <span class="doccomment">/// A VO bit is required per min-object-size aligned address, rather than per object, and can only exist as side metadata.
+        /// This is only publicly available when the feature "vo_bit_access" is enabled.
+        /// Check the comments on "vo_bit_access" in `Cargo.toml` before use. Use at your own risk.
+        </span><span class="kw">pub const </span>VO_BIT_SIDE_METADATA_SPEC: SideMetadataSpec =
+        <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::VO_BIT;
+    } <span class="kw">else </span>{
+        <span class="doccomment">/// A VO bit is required per min-object-size aligned address, rather than per object, and can only exist as side metadata.
+        </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>VO_BIT_SIDE_METADATA_SPEC: SideMetadataSpec =
+            <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::VO_BIT;
+    }
+}
 
-<span class="kw">pub const </span>VO_BIT_SIDE_METADATA_ADDR: Address = VO_BIT_SIDE_METADATA_SPEC.get_absolute_offset();
+<span class="doccomment">/// The base address for VO bit side metadata on 64 bits platforms.
+</span><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
+</span><span class="kw">pub const </span>VO_BIT_SIDE_METADATA_ADDR: Address = VO_BIT_SIDE_METADATA_SPEC.get_absolute_offset();
 
 <span class="doccomment">/// Atomically set the VO bit for an object.
-</span><span class="kw">pub fn </span>set_vo_bit(object: ObjectReference) {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>set_vo_bit(object: ObjectReference) {
     <span class="macro">debug_assert!</span>(!is_vo_bit_set(object), <span class="string">"{:x}: VO bit already set"</span>, object);
     VO_BIT_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_raw_address(), <span class="number">1</span>, Ordering::SeqCst);
 }
 
 <span class="doccomment">/// Atomically unset the VO bit for an object.
-</span><span class="kw">pub fn </span>unset_vo_bit(object: ObjectReference) {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>unset_vo_bit(object: ObjectReference) {
     <span class="macro">debug_assert!</span>(is_vo_bit_set(object), <span class="string">"{:x}: VO bit not set"</span>, object);
     VO_BIT_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_raw_address(), <span class="number">0</span>, Ordering::SeqCst);
 }
 
 <span class="doccomment">/// Atomically unset the VO bit for an object, regardless whether the bit is set or not.
-</span><span class="kw">pub fn </span>unset_vo_bit_nocheck(object: ObjectReference) {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>unset_vo_bit_nocheck(object: ObjectReference) {
     VO_BIT_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_raw_address(), <span class="number">0</span>, Ordering::SeqCst);
 }
 
@@ -309,13 +333,13 @@
 /// # Safety
 ///
 /// This is unsafe: check the comment on `side_metadata::store`
-</span><span class="kw">pub unsafe fn </span>unset_vo_bit_unsafe(object: ObjectReference) {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">unsafe fn </span>unset_vo_bit_unsafe(object: ObjectReference) {
     <span class="macro">debug_assert!</span>(is_vo_bit_set(object), <span class="string">"{:x}: VO bit not set"</span>, object);
     VO_BIT_SIDE_METADATA_SPEC.store::&lt;u8&gt;(object.to_raw_address(), <span class="number">0</span>);
 }
 
 <span class="doccomment">/// Check if the VO bit is set for an object.
-</span><span class="kw">pub fn </span>is_vo_bit_set(object: ObjectReference) -&gt; bool {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_vo_bit_set(object: ObjectReference) -&gt; bool {
     VO_BIT_SIDE_METADATA_SPEC.load_atomic::&lt;u8&gt;(object.to_raw_address(), Ordering::SeqCst) == <span class="number">1
 </span>}
 
@@ -323,7 +347,7 @@
 /// If so, return `Some(object)`. Otherwise return `None`.
 ///
 /// The `address` must be word-aligned.
-</span><span class="kw">pub fn </span>is_vo_bit_set_for_addr(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_vo_bit_set_for_addr(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
     is_vo_bit_set_inner::&lt;<span class="bool-val">true</span>&gt;(address)
 }
 
@@ -336,7 +360,7 @@
 /// # Safety
 ///
 /// This is unsafe: check the comment on `side_metadata::load`
-</span><span class="kw">pub unsafe fn </span>is_vo_bit_set_unsafe(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">unsafe fn </span>is_vo_bit_set_unsafe(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
     is_vo_bit_set_inner::&lt;<span class="bool-val">false</span>&gt;(address)
 }
 
@@ -361,7 +385,7 @@
 }
 
 <span class="doccomment">/// Bulk zero the VO bit.
-</span><span class="kw">pub fn </span>bzero_vo_bit(start: Address, size: usize) {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>bzero_vo_bit(start: Address, size: usize) {
     VO_BIT_SIDE_METADATA_SPEC.bzero_metadata(start, size);
 }
 
@@ -371,7 +395,7 @@
 /// As an alternative, this function copies the mark bits metadata to VO bits.
 /// The caller needs to ensure the mark bits are set exactly wherever VO bits need to be set before
 /// calling this function.
-</span><span class="kw">pub fn </span>bcopy_vo_bit_from_mark_bit&lt;VM: VMBinding&gt;(start: Address, size: usize) {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>bcopy_vo_bit_from_mark_bit&lt;VM: VMBinding&gt;(start: Address, size: usize) {
     <span class="kw">let </span>mark_bit_spec = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC;
     <span class="macro">debug_assert!</span>(
         mark_bit_spec.is_on_side(),
@@ -384,19 +408,19 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{LOG_BITS_IN_BYTE, LOG_BYTES_IN_ADDRESS};
 
 <span class="doccomment">/// How many data memory bytes does 1 word in the VO bit side metadata represents?
-</span><span class="kw">pub const </span>VO_BIT_WORD_TO_REGION: usize = <span class="number">1
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>VO_BIT_WORD_TO_REGION: usize = <span class="number">1
     </span>&lt;&lt; (VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region
         + LOG_BITS_IN_BYTE <span class="kw">as </span>usize
         + LOG_BYTES_IN_ADDRESS <span class="kw">as </span>usize
         - VO_BIT_SIDE_METADATA_SPEC.log_num_of_bits);
 
 <span class="doccomment">/// Bulk check if a VO bit word. Return true if there is any bit set in the word.
-</span><span class="kw">pub fn </span>get_raw_vo_bit_word(addr: Address) -&gt; usize {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_raw_vo_bit_word(addr: Address) -&gt; usize {
     <span class="kw">unsafe </span>{ VO_BIT_SIDE_METADATA_SPEC.load_raw_word(addr) }
 }
 
 <span class="doccomment">/// Find the base reference to the object from a potential internal pointer.
-</span><span class="kw">pub fn </span>find_object_from_internal_pointer&lt;VM: VMBinding&gt;(
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>find_object_from_internal_pointer&lt;VM: VMBinding&gt;(
     start: Address,
     search_limit_bytes: usize,
 ) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
@@ -429,7 +453,7 @@
 }
 
 <span class="doccomment">/// Check if the address could be an internal pointer based on where VO bit is set.
-</span><span class="kw">pub fn </span>is_internal_ptr_from_vo_bit&lt;VM: VMBinding&gt;(
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_internal_ptr_from_vo_bit&lt;VM: VMBinding&gt;(
     vo_addr: Address,
     internal_ptr: Address,
 ) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
@@ -445,7 +469,7 @@
 ///
 /// # Safety
 /// The caller needs to make sure that no one is modifying VO bit.
-</span><span class="kw">pub unsafe fn </span>is_vo_addr(addr: Address) -&gt; bool {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">unsafe fn </span>is_vo_addr(addr: Address) -&gt; bool {
     VO_BIT_SIDE_METADATA_SPEC.load::&lt;u8&gt;(addr) != <span class="number">0
 </span>}
 </code></pre></div></section></main></body></html>

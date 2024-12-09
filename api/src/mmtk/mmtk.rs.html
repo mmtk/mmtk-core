@@ -587,6 +587,18 @@
 <a href="#585" id="585">585</a>
 <a href="#586" id="586">586</a>
 <a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! MMTk instance.
 </span><span class="kw">use </span><span class="kw">crate</span>::global_state::{GcStatus, GlobalState};
 <span class="kw">use </span><span class="kw">crate</span>::plan::gc_requester::GCRequester;
@@ -1172,6 +1184,18 @@
             }
         });
         result_so_far
+    }
+
+    <span class="doccomment">/// Initialize object metadata for a VM space object.
+    /// Objects in the VM space are allocated/managed by the binding. This function provides a way for
+    /// the binding to set object metadata in MMTk for an object in the space.
+    </span><span class="attr">#[cfg(feature = <span class="string">"vm_space"</span>)]
+    </span><span class="kw">pub fn </span>initialize_vm_space_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: <span class="kw">crate</span>::util::ObjectReference) {
+        <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
+        <span class="self">self</span>.get_plan()
+            .base()
+            .vm_space
+            .initialize_object_metadata(object, <span class="bool-val">false</span>)
     }
 }
 </code></pre></div></section></main></body></html>

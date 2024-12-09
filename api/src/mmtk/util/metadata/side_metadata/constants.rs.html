@@ -87,6 +87,7 @@
 <a href="#85" id="85">85</a>
 <a href="#86" id="86">86</a>
 <a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::VMLayout;
 <span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
@@ -119,6 +120,7 @@
     SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS);
 
 <span class="doccomment">/// Base address of VO bit, public to VM bindings which may need to use this.
+</span><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
 </span><span class="kw">pub const </span>VO_BIT_SIDE_METADATA_ADDR: Address =
     <span class="kw">crate</span>::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_ADDR;
 
