@@ -274,6 +274,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
     }
 
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+        if *args.options.count_live_bytes_in_gc {
+            // The implementation of counting live bytes needs a SpaceDescriptor which we do not have for MallocSpace.
+            // Besides we cannot meaningfully measure the live bytes vs total pages for MallocSpace.
+            panic!("count_live_bytes_in_gc is not supported by MallocSpace");
+        }
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
