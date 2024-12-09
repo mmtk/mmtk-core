@@ -838,6 +838,11 @@
 <a href="#836" id="836">836</a>
 <a href="#837" id="837">837</a>
 <a href="#838" id="838">838</a>
+<a href="#839" id="839">839</a>
+<a href="#840" id="840">840</a>
+<a href="#841" id="841">841</a>
+<a href="#842" id="842">842</a>
+<a href="#843" id="843">843</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
 
 <span class="kw">use </span><span class="kw">super</span>::metadata::<span class="kw-2">*</span>;
@@ -1114,6 +1119,11 @@
     }
 
     <span class="kw">pub fn </span>new(args: <span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+        <span class="kw">if </span><span class="kw-2">*</span>args.options.count_live_bytes_in_gc {
+            <span class="comment">// The implementation of counting live bytes needs a SpaceDescriptor which we do not have for MallocSpace.
+            // Besides we cannot meaningfully measure the live bytes vs total pages for MallocSpace.
+            </span><span class="macro">panic!</span>(<span class="string">"count_live_bytes_in_gc is not supported by MallocSpace"</span>);
+        }
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(<span class="number">0</span>),
