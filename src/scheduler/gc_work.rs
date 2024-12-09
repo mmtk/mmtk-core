@@ -154,12 +154,14 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
             debug_assert!(result.is_ok());
         }
 
-        let live_bytes = mmtk
-            .scheduler
-            .worker_group
-            .get_and_clear_worker_live_bytes();
-        *mmtk.state.live_bytes_in_last_gc.borrow_mut() =
-            mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
+        if *mmtk.get_options().count_live_bytes_in_gc {
+            let live_bytes = mmtk
+                .scheduler
+                .worker_group
+                .get_and_clear_worker_live_bytes();
+            *mmtk.state.live_bytes_in_last_gc.borrow_mut() =
+                mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
+        }
     }
 }
 
