@@ -303,8 +303,8 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     /// Allocate an object
-    pub fn allocate_pages(&self, tls: VMThread, pages: usize) -> Address {
-        self.acquire(tls, pages)
+    pub fn allocate_pages(&self, tls: VMThread, pages: usize, no_gc_on_fail: bool) -> Address {
+        self.acquire(tls, pages, no_gc_on_fail)
     }
 
     /// Test if the object's mark bit is the same as the given value. If it is not the same,
