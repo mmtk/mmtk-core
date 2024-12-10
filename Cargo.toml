@@ -145,8 +145,6 @@ sticky_immix_non_moving_nursery = []
 immix_stress_copying = []
 # Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
 immix_smaller_block = []
-# Zero the unmarked lines after a GC cycle in immix. This helps debug untraced objects.
-immix_zero_on_release = []
 
 # Run sanity GC
 sanity = []
@@ -159,6 +157,9 @@ nogc_no_zeroing = ["nogc_lock_free"]
 # For using a single GC thread
 # Q: Why do we need this as a compile time flat? We can always set the number of GC threads through options.
 single_worker = []
+
+# Poison dead objects on release. Each space uses a different poison value. This helps debug untraced objects.
+poison_on_release = []
 
 # To run expensive comprehensive runtime checks, such as checking duplicate edges
 extreme_assertions = []
