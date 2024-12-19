@@ -1,3 +1,23 @@
+0.30.0 (2024-12-20)
+===
+
+## What's Changed
+
+### policy
+* Allow setting object metadata for VM space objects. Expose VO bit under a feature. by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1248
+
+### Misc
+* Fix clippy warnings for Rust 1.83 by @wks in https://github.com/mmtk/mmtk-core/pull/1242
+* Annotate mmap ranges using PR_SET_VMA by @wks in https://github.com/mmtk/mmtk-core/pull/1236
+* Fix warnings for lifetime in MmapAnnotation impl by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1244
+* Collect live bytes per space, and report by space by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1238
+* Minor changes for debugging. by @wks in https://github.com/mmtk/mmtk-core/pull/1245
+* Use macos-15 for style check by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1249
+* Check the option before aggregating live bytes data. Panic if the option is enabled on malloc space. by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1250
+
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.29.0...v0.30.0
+
 0.29.0 (2024-11-08)
 ===
 
