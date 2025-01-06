@@ -24,7 +24,7 @@ use std::marker::PhantomData;
 /// table of SFT rather than Space.
 pub trait SFT {
     /// The space name
-    fn name(&self) -> &str;
+    fn name(&self) -> &'static str;
 
     /// Get forwarding pointer if the object is forwarded.
     fn get_forwarded_object(&self, _object: ObjectReference) -> Option<ObjectReference> {
@@ -120,7 +120,7 @@ pub const EMPTY_SFT_NAME: &str = "empty";
 pub const EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 
 impl SFT for EmptySpaceSFT {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         EMPTY_SFT_NAME
     }
     fn is_live(&self, object: ObjectReference) -> bool {

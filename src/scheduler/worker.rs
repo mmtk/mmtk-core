@@ -3,14 +3,14 @@ use super::work_bucket::*;
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::copy::GCWorkerCopyContext;
+use crate::util::heap::layout::heap_parameters::MAX_SPACES;
 use crate::util::opaque_pointer::*;
+use crate::util::ObjectReference;
 use crate::vm::{Collection, GCThreadContext, VMBinding};
 use atomic::Atomic;
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 use crossbeam::deque::{self, Stealer};
 use crossbeam::queue::ArrayQueue;
-#[cfg(feature = "count_live_bytes_in_gc")]
-use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
@@ -42,8 +42,8 @@ pub struct GCWorkerShared<VM: VMBinding> {
     /// Accumulated bytes for live objects in this GC. When each worker scans
     /// objects, we increase the live bytes. We get this value from each worker
     /// at the end of a GC, and reset this counter.
-    #[cfg(feature = "count_live_bytes_in_gc")]
-    live_bytes: AtomicUsize,
+    /// The live bytes are stored in an array. The index is the index from the space descriptor.
+    pub live_bytes_per_space: AtomicRefCell<[usize; MAX_SPACES]>,
     /// A queue of GCWork that can only be processed by the owned thread.
     pub designated_work: ArrayQueue<Box<dyn GCWork<VM>>>,
     /// Handle for stealing packets from the current worker
@@ -54,21 +54,32 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
     pub fn new(stealer: Option<Stealer<Box<dyn GCWork<VM>>>>) -> Self {
         Self {
             stat: Default::default(),
-            #[cfg(feature = "count_live_bytes_in_gc")]
-            live_bytes: AtomicUsize::new(0),
+            live_bytes_per_space: AtomicRefCell::new([0; MAX_SPACES]),
             designated_work: ArrayQueue::new(16),
             stealer,
         }
     }
 
-    #[cfg(feature = "count_live_bytes_in_gc")]
-    pub(crate) fn increase_live_bytes(&self, bytes: usize) {
-        self.live_bytes.fetch_add(bytes, Ordering::Relaxed);
-    }
+    pub(crate) fn increase_live_bytes(
+        live_bytes_per_space: &mut [usize; MAX_SPACES],
+        object: ObjectReference,
+    ) {
+        use crate::mmtk::VM_MAP;
+        use crate::vm::object_model::ObjectModel;
 
-    #[cfg(feature = "count_live_bytes_in_gc")]
-    pub(crate) fn get_and_clear_live_bytes(&self) -> usize {
-        self.live_bytes.swap(0, Ordering::SeqCst)
+        // The live bytes of the object
+        let bytes = VM::VMObjectModel::get_current_size(object);
+        // Get the space index from descriptor
+        let space_descriptor = VM_MAP.get_descriptor_for_address(object.to_raw_address());
+        let space_index = space_descriptor.get_index();
+        debug_assert!(
+            space_index < MAX_SPACES,
+            "Space index {} is not in the range of [0, {})",
+            space_index,
+            MAX_SPACES
+        );
+        // Accumulate the live bytes for the index
+        live_bytes_per_space[space_index] += bytes;
     }
 }
 
@@ -429,11 +440,16 @@ impl<VM: VMBinding> WorkerGroup<VM> {
             .any(|w| !w.designated_work.is_empty())
     }
 
-    #[cfg(feature = "count_live_bytes_in_gc")]
-    pub fn get_and_clear_worker_live_bytes(&self) -> usize {
-        self.workers_shared
-            .iter()
-            .map(|w| w.get_and_clear_live_bytes())
-            .sum()
+    /// Get the live bytes data from the worker, and clear the local data.
+    pub fn get_and_clear_worker_live_bytes(&self) -> [usize; MAX_SPACES] {
+        let mut ret = [0; MAX_SPACES];
+        self.workers_shared.iter().for_each(|w| {
+            let mut live_bytes_per_space = w.live_bytes_per_space.borrow_mut();
+            for (idx, val) in live_bytes_per_space.iter_mut().enumerate() {
+                ret[idx] += *val;
+                *val = 0;
+            }
+        });
+        ret
     }
 }

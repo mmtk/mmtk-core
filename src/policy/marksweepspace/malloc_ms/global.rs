@@ -64,7 +64,7 @@ pub struct MallocSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for MallocSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
 
@@ -274,6 +274,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
     }
 
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+        if *args.options.count_live_bytes_in_gc {
+            // The implementation of counting live bytes needs a SpaceDescriptor which we do not have for MallocSpace.
+            // Besides we cannot meaningfully measure the live bytes vs total pages for MallocSpace.
+            panic!("count_live_bytes_in_gc is not supported by MallocSpace");
+        }
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
@@ -439,7 +444,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     fn map_metadata_and_update_bound(&self, addr: Address, size: usize) {
         // Map the metadata space for the range [addr, addr + size)
-        map_meta_space(&self.metadata, addr, size);
+        map_meta_space(&self.metadata, addr, size, self.get_name());
 
         // Update the bounds of the max and min chunk addresses seen -- this is used later in the sweep
         // Lockless compare-and-swap loops perform better than a locking variant

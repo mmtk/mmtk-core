@@ -30,6 +30,44 @@ Notes for the mmtk-core developers:
 
 <!-- Insert new versions here -->
 
+## 0.30.0
+
+### `live_bytes_in_last_gc` becomes a runtime option, and returns a map for live bytes in each space
+
+```admonish tldr
+`count_live_bytes_in_gc` is now a runtime option instead of a features (build-time), and we collect
+live bytes statistics per space. Correspondingly, `memory_manager::live_bytes_in_last_gc` now returns a map for
+live bytes in each space.
+```
+
+API changes:
+
+-   module `util::options`
+    +   `Options` includes `count_live_bytes_in_gc`, which defaults to `false`. This can be turned on at run-time.
+    +   The old `count_live_bytes_in_gc` feature is removed.
+-   module `memory_manager`
+    +   `live_bytes_in_last_gc` now returns a `HashMap<&'static str, LiveBytesStats>`. The keys are
+        strings for space names, and the values are statistics for live bytes in the space.
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/pull/1238>
+
+
+### mmap-related functions require annotation
+
+```admonish tldr
+Memory-mapping functions in `mmtk::util::memory` now take an additional `MmapAnnotation` argument.
+```
+
+API changes:
+
+-   module `util::memory`
+    +   The following functions take an additional `MmapAnnotation` argument.
+        *   `dzmmap`
+        *   `dzmmap_noreplace`
+        *   `mmap_noreserve`
+
 ## 0.28.0
 
 ### `handle_user_collection_request` returns `bool`
