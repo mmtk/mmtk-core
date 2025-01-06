@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.8.0"
+          ref: "0.8.2"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
@@ -136,7 +136,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.8.1"
+          ref: "0.8.2"
           path: ci-perf-kit
           submodules: true
       # checkout canary versions.
@@ -230,7 +230,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.8.0"
+          ref: "0.8.2"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
