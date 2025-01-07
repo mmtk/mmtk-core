@@ -342,13 +342,15 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     /// Mark an object atomically.
     fn attempt_mark_atomic(&self, object: ObjectReference) -> bool {
+        let mark_state = 1u8;
+
         loop {
             let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
                 object,
                 None,
                 Ordering::SeqCst,
             );
-            if old_value == 1u8 {
+            if old_value == mark_state {
                 return false;
             }
 
@@ -356,7 +358,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 .compare_exchange_metadata::<VM, u8>(
                     object,
                     old_value,
-                    1u8,
+                    mark_state,
                     None,
                     Ordering::SeqCst,
                     Ordering::SeqCst,
@@ -389,8 +391,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             "Cannot mark an object {} that was not alloced by free list allocator.",
             object,
         );
-        if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_marked::<VM>(object, Ordering::SeqCst) {
-            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.mark::<VM>(object, Ordering::SeqCst);
+        if self.attempt_mark(object) {
             let block = Block::containing(object);
             block.set_state(BlockState::Marked);
             queue.enqueue(object);
