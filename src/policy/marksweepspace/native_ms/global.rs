@@ -329,6 +329,56 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         }
     }
 
+    /// Mark an object non-atomically.  If multiple GC worker threads attempt to mark the same
+    /// object, more than one of them may return `true`.
+    fn attempt_mark_non_atomic(&self, object: ObjectReference) -> bool {
+        if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_marked::<VM>(object, Ordering::SeqCst) {
+            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.mark::<VM>(object, Ordering::SeqCst);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Mark an object atomically.
+    fn attempt_mark_atomic(&self, object: ObjectReference) -> bool {
+        loop {
+            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
+                object,
+                None,
+                Ordering::SeqCst,
+            );
+            if old_value == 1u8 {
+                return false;
+            }
+
+            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+                .compare_exchange_metadata::<VM, u8>(
+                    object,
+                    old_value,
+                    1u8,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
+                break;
+            }
+        }
+        true
+    }
+
+    /// Mark an object.  Return `true` if the object is newly marked.  Return `false` if the object
+    /// was already marked.
+    fn attempt_mark(&self, object: ObjectReference) -> bool {
+        if VM::UNIQUE_OBJECT_ENQUEUING {
+            self.attempt_mark_atomic(object)
+        } else {
+            self.attempt_mark_non_atomic(object)
+        }
+    }
+
     fn trace_object<Q: ObjectQueue>(
         &self,
         queue: &mut Q,

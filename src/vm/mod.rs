@@ -79,4 +79,19 @@ where
     /// Note that MMTk does not attempt to do anything to align the cursor to this value, but
     /// it merely asserts with this constant.
     const ALLOC_END_ALIGNMENT: usize = 1;
+
+    /// When set to `true`, all plans will guarantee that during each GC, each live object is
+    /// enqueued at most once, and therefore scanned (by either [`Scanning::scan_object`] or
+    /// [`Scanning::scan_object_and_trace_edges`]) at most once.
+    ///
+    /// When set to `false`, MMTk may enqueue an object multiple times due to optimizations, such as
+    /// using non-atomic operatios to mark objects.  Consequently, an object may be scanned multiple
+    /// times during a GC.
+    ///
+    /// The default value is `false` because duplicated object-enqueuing is benign for most VMs, and
+    /// related optimizations, such as non-atomic marking, can improve GC speed. VM bindings can
+    /// override this if they need.  For example, some VMs piggyback on object-scanning to visit
+    /// objects during a GC, but may have data race if multiple GC workers visit the same object at
+    /// the same time.  Such VMs can set this constant to `true` to workaround this problem.
+    const UNIQUE_OBJECT_ENQUEUING: bool = false;
 }
