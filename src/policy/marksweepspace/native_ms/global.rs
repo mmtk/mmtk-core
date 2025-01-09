@@ -29,6 +29,7 @@ use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
 use crate::util::VMThread;
 use crate::vm::ObjectModel;
+use crate::vm::Scanning;
 use std::sync::Mutex;
 
 /// The result for `MarkSweepSpace.acquire_block()`. `MarkSweepSpace` will attempt
@@ -374,7 +375,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     /// Mark an object.  Return `true` if the object is newly marked.  Return `false` if the object
     /// was already marked.
     fn attempt_mark(&self, object: ObjectReference) -> bool {
-        if VM::UNIQUE_OBJECT_ENQUEUING {
+        if VM::VMScanning::UNIQUE_OBJECT_ENQUEUING {
             self.attempt_mark_atomic(object)
         } else {
             self.attempt_mark_non_atomic(object)
