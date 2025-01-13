@@ -61,10 +61,16 @@ pub trait ObjectTracerContext<VM: VMBinding>: Clone + Send + 'static {
 
     /// Create a temporary `ObjectTracer` and provide access in the scope of `func`.
     ///
-    /// When the `ObjectTracer::trace_object` is called, if the traced object is first visited
-    /// in this transitive closure, it will be enqueued.  After `func` returns, the implememtation
-    /// will create work packets to continue computing the transitive closure from the newly
-    /// enqueued objects.
+    /// A typical use-case of this method is to call `ObjectTracer::trace_object` in a loop for
+    /// finalization candidates to create `ProcessEdgesWork` packets.
+    //// **Note**: Do not use this API in such a way that only one object is enqueued at a time.
+    /// This can result in creating a work packet for a single object, exhausting (physical) memory
+    /// if there are enough finalization candidates.
+    ///
+    /// When the `ObjectTracer::trace_object` is called, if the traced object is visited in this
+    /// transitive closure for the first time, it will be enqueued.  After `func` returns, the
+    /// implementation will create work packets to continue computing the transitive closure from
+    /// the newly enqueued objects.
     ///
     /// API functions that provide `QueuingTracerFactory` should document
     /// 1.  on which fields the user is supposed to call `ObjectTracer::trace_object`, and
