@@ -117,9 +117,8 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         // Is the GC triggered by nursery?
         // - if space is none, it is not. Return false immediately.
         // - if space is some, we further check its descriptor.
-        let is_triggered_by_nursery = space.map_or(false, |s| {
-            s.0.common().descriptor == self.nursery.common().descriptor
-        });
+        let is_triggered_by_nursery =
+            space.is_some_and(|s| s.0.common().descriptor == self.nursery.common().descriptor);
         // If space is full and the GC is not triggered by nursery, next GC will be full heap GC.
         if space_full && !is_triggered_by_nursery {
             self.next_gc_full_heap.store(true, Ordering::SeqCst);
@@ -341,5 +340,5 @@ pub trait GenerationalPlanExt<VM: VMBinding>: GenerationalPlan<VM = VM> {
 /// with any plan (generational or not). For non generational plans, it will always return false.
 pub fn is_nursery_gc<VM: VMBinding>(plan: &dyn Plan<VM = VM>) -> bool {
     plan.generational()
-        .map_or(false, |plan| plan.is_current_gc_nursery())
+        .is_some_and(|plan| plan.is_current_gc_nursery())
 }
