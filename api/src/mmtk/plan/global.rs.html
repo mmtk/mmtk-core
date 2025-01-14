@@ -761,7 +761,13 @@
 <a href="#760" id="760">760</a>
 <a href="#761" id="761">761</a>
 <a href="#762" id="762">762</a>
-<a href="#763" id="763">763</a></pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
+<a href="#763" id="763">763</a>
+<a href="#764" id="764">764</a>
+<a href="#765" id="765">765</a>
+<a href="#766" id="766">766</a>
+<a href="#767" id="767">767</a>
+<a href="#768" id="768">768</a>
+<a href="#769" id="769">769</a></pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
@@ -1029,6 +1035,7 @@
         //    the reserved pages is larger than total pages after the copying GC (the reserved pages after a GC
         //    may be larger than the reserved pages before a GC, as we may end up using more memory for thread local
         //    buffers for copy allocators).
+        // 3. the binding disabled GC, and we end up over-allocating beyond the total pages determined by the GC trigger.
         </span><span class="kw">let </span>available_pages = total_pages.saturating_sub(reserved_pages);
         <span class="macro">trace!</span>(
             <span class="string">"Total pages = {}, reserved pages = {}, available pages = {}"</span>,
@@ -1052,7 +1059,12 @@
     <span class="doccomment">/// Get the number of pages that are NOT used. This is clearly different from available pages.
     /// Free pages are unused, but some of them may have been reserved for some reason.
     </span><span class="kw">fn </span>get_free_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.get_total_pages() - <span class="self">self</span>.get_used_pages()
+        <span class="kw">let </span>total_pages = <span class="self">self</span>.get_total_pages();
+        <span class="kw">let </span>used_pages = <span class="self">self</span>.get_used_pages();
+
+        <span class="comment">// It is possible that the used pages is larger than the total pages, so we use saturating
+        // subtraction.  See the comments in `get_available_pages`.
+        </span>total_pages.saturating_sub(used_pages)
     }
 
     <span class="doccomment">/// Return whether last GC was an exhaustive attempt to collect the heap.
