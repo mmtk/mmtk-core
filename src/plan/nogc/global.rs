@@ -46,8 +46,8 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &NOGC_CONSTRAINTS
     }
 
-    fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
-        self.base().collection_required(self, space_full)
+    fn collection_required(&self, _space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
+        false
     }
 
     fn base(&self) -> &BasePlan<VM> {
