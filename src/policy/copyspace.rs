@@ -188,6 +188,11 @@ impl<VM: VMBinding> CopySpace<VM> {
     }
 
     pub fn release(&self) {
+        #[cfg(feature = "poison_on_release")]
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            crate::util::memory::set(start, 0xbc, size);
+        }
+
         for (start, size) in self.pr.iterate_allocated_regions() {
             // Clear the forwarding bits if it is on the side.
             if let MetadataSpec::OnSide(side_forwarding_status_table) =
