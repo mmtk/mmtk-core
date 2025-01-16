@@ -639,7 +639,16 @@
 <a href="#638" id="638">638</a>
 <a href="#639" id="639">639</a>
 <a href="#640" id="640">640</a>
-<a href="#641" id="641">641</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
+<a href="#641" id="641">641</a>
+<a href="#642" id="642">642</a>
+<a href="#643" id="643">643</a>
+<a href="#644" id="644">644</a>
+<a href="#645" id="645">645</a>
+<a href="#646" id="646">646</a>
+<a href="#647" id="647">647</a>
+<a href="#648" id="648">648</a>
+<a href="#649" id="649">649</a>
+<a href="#650" id="650">650</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
 <span class="kw">use </span><span class="kw">crate</span>::plan::gc_requester::GCRequester;
@@ -681,10 +690,19 @@
                 GCTriggerSelector::FixedHeapSize(size) =&gt; Box::new(FixedHeapSizeTrigger {
                     total_pages: conversions::bytes_to_pages_up(size),
                 }),
-                GCTriggerSelector::DynamicHeapSize(min, max) =&gt; Box::new(MemBalancerTrigger::new(
-                    conversions::bytes_to_pages_up(min),
-                    conversions::bytes_to_pages_up(max),
-                )),
+                GCTriggerSelector::DynamicHeapSize(min, max) =&gt; <span class="lifetime">'dynamic_heap_size</span>: {
+                    <span class="kw">let </span>min_pages = conversions::bytes_to_pages_up(min);
+                    <span class="kw">let </span>max_pages = conversions::bytes_to_pages_up(max);
+
+                    <span class="kw">if </span><span class="kw-2">*</span>options.plan == <span class="kw">crate</span>::util::options::PlanSelector::NoGC {
+                        <span class="macro">warn!</span>(<span class="string">"Cannot use dynamic heap size with NoGC.  Using fixed heap size trigger instead."</span>);
+                        <span class="kw">break </span><span class="lifetime">'dynamic_heap_size </span>Box::new(FixedHeapSizeTrigger {
+                            total_pages: max_pages,
+                        });
+                    }
+
+                    Box::new(MemBalancerTrigger::new(min_pages, max_pages))
+                }
                 GCTriggerSelector::Delegated =&gt; {
                     &lt;VM::VMCollection <span class="kw">as </span><span class="kw">crate</span>::vm::Collection&lt;VM&gt;&gt;::create_gc_trigger()
                 }
