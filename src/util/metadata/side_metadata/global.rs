@@ -1363,7 +1363,7 @@ impl SideMetadataContext {
         let mut total = 0;
         for spec in self.global.iter() {
             // This rounds up.  No matter how small `data_pages` is, the side metadata size will be
-            // at least one page.  This behavior is *intended*.  The over-estimated amount is used
+            // at least one page.  This behavior is *intended*.  This over-estimated amount is used
             // for triggering GC and resizing the heap.
             total += data_to_meta_size_round_up(spec, data_pages);
         }
