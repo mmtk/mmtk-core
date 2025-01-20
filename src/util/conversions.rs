@@ -94,6 +94,16 @@ pub fn bytes_to_formatted_string(bytes: usize) -> String {
     format!("{}{}", num, UNITS.last().unwrap())
 }
 
+/// Shift `num` by `bits` to the right.  Add 1 to the result if any bits are shifted out to the
+/// right.  This is equivalent to dividing `num` by 2 to the power of `bits`, rounding towards
+/// infinity.
+///
+/// This function has undefined behavior if `bits` is greater or equal to the number of bits in
+/// `usize`.
+pub const fn rshift_align_up(num: usize, bits: usize) -> usize {
+    (num + ((1 << bits) - 1)) >> bits
+}
+
 #[cfg(test)]
 mod tests {
     use crate::util::conversions::*;
