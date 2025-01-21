@@ -273,10 +273,57 @@ only need to run `process_weak_refs` twice:
     objects.
 2.  Handle `PhandomReference`.
 
+To implement this, the VM binding may need to implement some kind of *state machine* so that the
+`Scanning::process_weak_refs` function behaves differently each time it is called.  For example,
+
+```rust
+fn process_weak_ref(...) -> bool {
+    let mut state = /* Get VM-specific states here. */;
+
+    match *state {
+        State::ProcessSoftReference => {
+            process_soft_references(...);
+            *state = State::ProcessWeakReference;
+            return true; // Run this function again.
+        }
+        State::ProcessWeakReference => {
+            process_weak_references(...);
+            *state = State::ProcessFinalizableObjects;
+            return true; // Run this function again.
+        }
+        State::ProcessFinalizableObjects => {
+            process_finalizable_objects(...);
+            *state = State::ProcessPhantomReferences;
+            return true; // Run this function again.
+        }
+        State::ProcessPhantomReferences => {
+            process_phantom_references(...);
+            *state = State::ProcessSoftReference
+            return false; // Proceed to the Release stage.
+        }
+    }
+
+}
+```
+
 ### Ephemerons
 
 TODO
 
+
+## Deprecated reference and finalizable processors
+
+When porting MMTk from JikesRVM to a dedicated Rust library, we also ported the `ReferenceProcessor`
+and the `FinalizableProcessor` from JikesRVM.  They are implemented in mmtk-core, and provide the
+mechanisms for handling Java-style soft/weak/phantom references and finalizable objects.  The VM
+binding can use those utilities by implementing the `mmtk::vm::ReferenceGlue` and the
+`mmtk::vm::Finalizable` traits, and calling the
+`mmtk::memory_manager::add_{soft,weak,phantom}_candidate` and the
+`mmtk::memory_manager::add_finalizer` functions.
+
+However, those mechanisms are too specific to Java, and are not applicable to most other VMs.  **New
+VM bindings should use the `Scanning::process_weak_refs` API**, and we are porting existing VM
+bindings away from the built-in reference/finalizable processors.
 
 <!--
 vim: tw=100 ts=4 sw=4 sts=4 et
