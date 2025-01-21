@@ -2147,7 +2147,8 @@
 <a href="#2146" id="2146">2146</a>
 <a href="#2147" id="2147">2147</a>
 <a href="#2148" id="2148">2148</a>
-<a href="#2149" id="2149">2149</a></pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href="#2149" id="2149">2149</a>
+<a href="#2150" id="2150">2150</a></pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::raw_align_up;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
@@ -3511,12 +3512,13 @@
     </span><span class="kw">pub fn </span>calculate_reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, data_pages: usize) -&gt; usize {
         <span class="kw">let </span><span class="kw-2">mut </span>total = <span class="number">0</span>;
         <span class="kw">for </span>spec <span class="kw">in </span><span class="self">self</span>.global.iter() {
-            <span class="kw">let </span>rshift = addr_rshift(spec);
-            total += (data_pages + ((<span class="number">1 </span>&lt;&lt; rshift) - <span class="number">1</span>)) &gt;&gt; rshift;
+            <span class="comment">// This rounds up.  No matter how small `data_pages` is, the side metadata size will be
+            // at least one page.  This behavior is *intended*.  This over-estimated amount is used
+            // for triggering GC and resizing the heap.
+            </span>total += data_to_meta_size_round_up(spec, data_pages);
         }
         <span class="kw">for </span>spec <span class="kw">in </span><span class="self">self</span>.local.iter() {
-            <span class="kw">let </span>rshift = addr_rshift(spec);
-            total += (data_pages + ((<span class="number">1 </span>&lt;&lt; rshift) - <span class="number">1</span>)) &gt;&gt; rshift;
+            total += data_to_meta_size_round_up(spec, data_pages);
         }
         total
     }

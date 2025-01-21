@@ -841,7 +841,11 @@
 <a href="#840" id="840">840</a>
 <a href="#841" id="841">841</a>
 <a href="#842" id="842">842</a>
-<a href="#843" id="843">843</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
+<a href="#843" id="843">843</a>
+<a href="#844" id="844">844</a>
+<a href="#845" id="845">845</a>
+<a href="#846" id="846">846</a>
+<a href="#847" id="847">847</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
 
 <span class="kw">use </span><span class="kw">super</span>::metadata::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
@@ -1058,6 +1062,10 @@
         <span class="string">"MallocSpace"
     </span>}
 
+    <span class="kw">fn </span>estimate_side_meta_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, data_pages: usize) -&gt; usize {
+        <span class="self">self</span>.metadata.calculate_reserved_pages(data_pages)
+    }
+
     <span class="attr">#[allow(clippy::assertions_on_constants)]
     </span><span class="kw">fn </span>reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
@@ -1065,7 +1073,7 @@
         </span><span class="macro">debug_assert!</span>(LOG_BYTES_IN_MALLOC_PAGE &gt;= LOG_BYTES_IN_PAGE);
         <span class="kw">let </span>data_pages = <span class="self">self</span>.active_pages.load(Ordering::SeqCst)
             &lt;&lt; (LOG_BYTES_IN_MALLOC_PAGE - LOG_BYTES_IN_PAGE);
-        <span class="kw">let </span>meta_pages = <span class="self">self</span>.metadata.calculate_reserved_pages(data_pages);
+        <span class="kw">let </span>meta_pages = <span class="self">self</span>.estimate_side_meta_pages(data_pages);
         data_pages + meta_pages
     }
 

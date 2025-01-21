@@ -694,10 +694,40 @@
 <a href="#693" id="693">693</a>
 <a href="#694" id="694">694</a>
 <a href="#695" id="695">695</a>
-<a href="#696" id="696">696</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::ranges::BitOffset;
+<a href="#696" id="696">696</a>
+<a href="#697" id="697">697</a>
+<a href="#698" id="698">698</a>
+<a href="#699" id="699">699</a>
+<a href="#700" id="700">700</a>
+<a href="#701" id="701">701</a>
+<a href="#702" id="702">702</a>
+<a href="#703" id="703">703</a>
+<a href="#704" id="704">704</a>
+<a href="#705" id="705">705</a>
+<a href="#706" id="706">706</a>
+<a href="#707" id="707">707</a>
+<a href="#708" id="708">708</a>
+<a href="#709" id="709">709</a>
+<a href="#710" id="710">710</a>
+<a href="#711" id="711">711</a>
+<a href="#712" id="712">712</a>
+<a href="#713" id="713">713</a>
+<a href="#714" id="714">714</a>
+<a href="#715" id="715">715</a>
+<a href="#716" id="716">716</a>
+<a href="#717" id="717">717</a>
+<a href="#718" id="718">718</a>
+<a href="#719" id="719">719</a>
+<a href="#720" id="720">720</a>
+<a href="#721" id="721">721</a>
+<a href="#722" id="722">722</a>
+<a href="#723" id="723">723</a>
+<a href="#724" id="724">724</a>
+<a href="#725" id="725">725</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::ranges::BitOffset;
 <span class="kw">use </span><span class="kw">super</span>::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
+<span class="kw">use </span><span class="kw">crate</span>::util::conversions::rshift_align_up;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::VMLayout;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory::{MmapAnnotation, MmapStrategy};
 <span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
@@ -806,7 +836,7 @@
     </span><span class="kw">let </span>metadata_start = address_to_meta_address(spec, start);
     <span class="kw">let </span>mmap_start = metadata_start.align_down(BYTES_IN_PAGE);
     <span class="comment">// nearest page-aligned ending address
-    </span><span class="kw">let </span>metadata_size = (size + ((<span class="number">1 </span>&lt;&lt; addr_rshift(spec)) - <span class="number">1</span>)) &gt;&gt; addr_rshift(spec);
+    </span><span class="kw">let </span>metadata_size = data_to_meta_size_round_up(spec, size);
     <span class="kw">let </span>mmap_size = (metadata_start + metadata_size).align_up(BYTES_IN_PAGE) - mmap_start;
     <span class="kw">if </span>mmap_size &gt; <span class="number">0 </span>{
         ensure_munmap_metadata(mmap_start, mmap_size);
@@ -831,7 +861,7 @@
     </span><span class="kw">let </span>metadata_start = address_to_meta_address(spec, start);
     <span class="kw">let </span>mmap_start = metadata_start.align_down(BYTES_IN_PAGE);
     <span class="comment">// nearest page-aligned ending address
-    </span><span class="kw">let </span>metadata_size = (size + ((<span class="number">1 </span>&lt;&lt; addr_rshift(spec)) - <span class="number">1</span>)) &gt;&gt; addr_rshift(spec);
+    </span><span class="kw">let </span>metadata_size = data_to_meta_size_round_up(spec, size);
     <span class="kw">let </span>mmap_size = (metadata_start + metadata_size).align_up(BYTES_IN_PAGE) - mmap_start;
     <span class="kw">if </span>mmap_size &gt; <span class="number">0 </span>{
         <span class="kw">if </span>!no_reserve {
@@ -881,14 +911,42 @@
     res
 }
 
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const fn </span>addr_rshift(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec) -&gt; i32 {
-    ((LOG_BITS_IN_BYTE <span class="kw">as </span>usize) + metadata_spec.log_bytes_in_region
-        - (metadata_spec.log_num_of_bits)) <span class="kw">as </span>i32
+<span class="doccomment">/// Return the base-2 logarithm of the ratio of data bits and metadata bits per region.
+///
+/// Suppose a memory region has `data_bits` bits of data, and `meta_bits` bits of metadata for
+/// `metadata_spec`, and the result of `log_data_meta_ratio(metadata_spec)` is `shift`, then
+///
+/// -   `data_bits &gt;&gt; shift == meta_bits`
+/// -   `meta_bits &lt;&lt; shift == data_bits`
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const fn </span>log_data_meta_ratio(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec) -&gt; usize {
+    <span class="kw">let </span>log_data_bits_in_region = (LOG_BITS_IN_BYTE <span class="kw">as </span>usize) + metadata_spec.log_bytes_in_region;
+    <span class="kw">let </span>log_meta_bits_in_region = metadata_spec.log_num_of_bits;
+
+    <span class="comment">// TODO: In theory, it is possible to construct a side metadata that has more metadata bits than
+    // data bits per region.  But such pathological side metadata consumes way too much memory, and
+    // should never be used in any useful applications.  It should be forbidden.
+    </span>log_data_bits_in_region - log_meta_bits_in_region
+}
+
+<span class="doccomment">/// Calculate the amount of metadata needed for the give amount of data memory, round up to nearest
+/// integer. `data_size` can be in any unit, e.g. bits, bytes, pages, blocks, chunks, etc., and the
+/// result has the same unit.
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const fn </span>data_to_meta_size_round_up(
+    metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec,
+    data_size: usize,
+) -&gt; usize {
+    rshift_align_up(data_size, log_data_meta_ratio(metadata_spec))
+}
+
+<span class="doccomment">/// Calculate the amount of data governed by the give amount of metadata.  `meta_size` can be in any
+/// unit, e.g. bits, bytes, pages, blocks, chunks, etc., and the result has the same unit.
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const fn </span>meta_to_data_size(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec, meta_size: usize) -&gt; usize {
+    meta_size &lt;&lt; log_data_meta_ratio(metadata_spec)
 }
 
 <span class="attr">#[allow(dead_code)]
 </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const fn </span>metadata_address_range_size(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec) -&gt; usize {
-    <span class="number">1usize </span>&lt;&lt; (VMLayout::LOG_ARCH_ADDRESS_SPACE - addr_rshift(metadata_spec) <span class="kw">as </span>usize)
+    <span class="number">1usize </span>&lt;&lt; (VMLayout::LOG_ARCH_ADDRESS_SPACE - log_data_meta_ratio(metadata_spec))
 }
 
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>meta_byte_lshift(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec, data_addr: Address) -&gt; u8 {

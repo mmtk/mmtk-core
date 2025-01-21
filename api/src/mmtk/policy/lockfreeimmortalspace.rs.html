@@ -262,7 +262,11 @@
 <a href="#261" id="261">261</a>
 <a href="#262" id="262">262</a>
 <a href="#263" id="263">263</a>
-<a href="#264" id="264">264</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
 
 <span class="kw">use </span>std::sync::atomic::Ordering;
 <span class="kw">use </span>std::sync::Arc;
@@ -393,10 +397,14 @@
         <span class="kw">unsafe </span>{ sft_map.eager_initialize(<span class="self">self</span>.as_sft(), <span class="self">self</span>.start, <span class="self">self</span>.total_bytes) };
     }
 
+    <span class="kw">fn </span>estimate_side_meta_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, data_pages: usize) -&gt; usize {
+        <span class="self">self</span>.metadata.calculate_reserved_pages(data_pages)
+    }
+
     <span class="kw">fn </span>reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="kw">let </span>cursor = <span class="self">self</span>.cursor.load(Ordering::Relaxed);
         <span class="kw">let </span>data_pages = conversions::bytes_to_pages_up(<span class="self">self</span>.limit - cursor);
-        <span class="kw">let </span>meta_pages = <span class="self">self</span>.metadata.calculate_reserved_pages(data_pages);
+        <span class="kw">let </span>meta_pages = <span class="self">self</span>.estimate_side_meta_pages(data_pages);
         data_pages + meta_pages
     }
 

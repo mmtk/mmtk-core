@@ -137,7 +137,16 @@
 <a href="#136" id="136">136</a>
 <a href="#137" id="137">137</a>
 <a href="#138" id="138">138</a>
-<a href="#139" id="139">139</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
@@ -231,6 +240,15 @@
         i += <span class="number">1</span>;
     }
     <span class="macro">format!</span>(<span class="string">"{}{}"</span>, num, UNITS.last().unwrap())
+}
+
+<span class="doccomment">/// Shift `num` by `bits` to the right.  Add 1 to the result if any `1` bits are shifted out to the
+/// right.  This is equivalent to dividing `num` by 2 to the power of `bits`, rounding up.
+///
+/// This function has undefined behavior if `bits` is greater or equal to the number of bits in
+/// `usize`.
+</span><span class="kw">pub const fn </span>rshift_align_up(num: usize, bits: usize) -&gt; usize {
+    (num + ((<span class="number">1 </span>&lt;&lt; bits) - <span class="number">1</span>)) &gt;&gt; bits
 }
 
 <span class="attr">#[cfg(test)]
