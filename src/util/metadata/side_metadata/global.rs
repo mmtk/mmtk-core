@@ -1362,12 +1362,13 @@ impl SideMetadataContext {
     pub fn calculate_reserved_pages(&self, data_pages: usize) -> usize {
         let mut total = 0;
         for spec in self.global.iter() {
-            let rshift = addr_rshift(spec);
-            total += (data_pages + ((1 << rshift) - 1)) >> rshift;
+            // This rounds up.  No matter how small `data_pages` is, the side metadata size will be
+            // at least one page.  This behavior is *intended*.  This over-estimated amount is used
+            // for triggering GC and resizing the heap.
+            total += data_to_meta_size_round_up(spec, data_pages);
         }
         for spec in self.local.iter() {
-            let rshift = addr_rshift(spec);
-            total += (data_pages + ((1 << rshift) - 1)) >> rshift;
+            total += data_to_meta_size_round_up(spec, data_pages);
         }
         total
     }
