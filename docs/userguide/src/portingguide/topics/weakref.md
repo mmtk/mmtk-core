@@ -311,6 +311,66 @@ fn process_weak_ref(...) -> bool {
 TODO
 
 
+## Optimizations
+
+### Generational GC
+
+MMTk provides generational GC plans.  Currently, there are `GenCopy`, `GenImmix` and `StickyImmix`.
+In a minor GC, a generational plan only consider *young objects* (i.e. objects allocated since the
+last GC) as candidates of garbage, and will assume all *old objects* (i.e. objects survived the last
+GC) are live.
+
+The VM binding can query if the current GC is a nursery GC by calling
+
+```rust
+let is_nursery_gc = mmtk.get_plan().is_some_and(|gen| gen.is_current_gc_nursery());
+```
+
+The VM binding can make use of this information when processing finalizers and weak references.  In
+a minor GC,
+
+-   The VM binding only needs to visit **finalizable objects allocated since the last GC**.  Other
+    finalizable objects must be old and will not be considered dead.
+-   The VM binding only needs to visit **weak reference slots written since the last GC**.  Other
+    slots must be pointing to old objects (if not `null`).  For weak hash tables, if existing
+    entries are immutable, it is sufficient to visit newly added entires.
+
+Implementation-wise, the VM binding can split the list or hash tables into two parts: one for old
+entries and another for young entries.
+
+### Copying versus non-copying GC
+
+During non-copying GC, objects will not be moved.  In MMTk, `MarkSweep` never moves any objects.
+`MarkCompact`, `SemiSpace` always moves all objects.  Immix-based plans sometimes do non-copying GC,
+and sometimes do copying GC.  Regardless of the plan, the VM binding can query if the current GC is
+a copying GC by calling
+
+```rust
+let may_move_object = mmtk.get_plan().current_gc_may_move_object();
+```
+
+If it returns `false`, the current GC will not move any object.
+
+The VM binding can make use of this information.  For example, if a weak hash table uses object
+addresses as keys, and the hash code is computed directly from the address, then the VM will need to
+rehash the table during copying GC because changing the address may move the entry to a different
+hash bin.  But if the current GC is non-moving, the VM binding will not need to rehash the table,
+but only needs to remove entries for dead objects.  Despite of this optimization opportunity, we
+still recommend VMs to implement *address-based hashing* if possible.
+
+```admonish info
+When using **address-based hashing**, the hash code of an object depends on whether its hash code
+has been observed before, and whether it has been moved after its hash code has been observed.
+
+-   If never observed, the hash code of an object will be its current address.
+-   When the object is moved the first time after its hash code is observed, the GC thread copy its
+    old address to a field of the new copy.  Its hash code will be read from that field.
+-   When such an object is copied again, its hash code will be copied to the new copy of the object.
+    The hash code of the object remains unchanged.
+
+The VM binding needs to implement this in `ObjectModel::copy`.
+```
+
 ## Deprecated reference and finalizable processors
 
 When porting MMTk from JikesRVM to a dedicated Rust library, we also ported the `ReferenceProcessor`
