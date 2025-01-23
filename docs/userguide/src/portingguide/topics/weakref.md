@@ -29,19 +29,18 @@ which is implemented by the VM binding.  Inside this function, the VM binding ca
     the transitive closure.
     -   **Query forwarded address**: If an object is already reached, the VM binding can further
         query the new address of an object.  This is needed to support copying GC.
-    -   **Retain object**: If an object is not reached, the VM binding can optionally request to
-        retain (i.e.  "resurrect") the object.  It will keep that object *and all descendants*
-        alive.
+    -   **Resurrect object**: If an object is not reached, the VM binding can optionally resurrect
+        the object.  It will keep that object *and all descendants* alive.
 -   **Request another invocation**: The VM binding can request `Scanning::process_weak_refs` to be
-    *called again* after computing the transitive closure that includes *retained objects and their
-    descendants*.  This helps handling multiple levels of weak reference strength.
+    *called again* after computing the transitive closure that includes *resurrected objects and
+    their descendants*.  This helps handling multiple levels of weak reference strength.
 
 Concretely,
 
 -   `ObjectReference::is_reachable()` queries reachability,
 -   `ObjectReference::get_forwarded_object()` queries forwarded address, and
--   the `tracer_context` argument provided by the `Scanning::process_weak_refs` function can retain
-    objects.
+-   the `tracer_context` argument provided by the `Scanning::process_weak_refs` function can
+    resurrect objects.
 -   Returning `true` from `Scanning::process_weak_refs` will make it called again.
 
 The `Scanning::process_weak_refs` function also gives the VM binding a chance to perform other
@@ -111,8 +110,8 @@ Some VMs, particularly the Java VM, executes finalizers during mutator time.  Th
 objects must be brought back to life so that they can still be accessed after the GC.
 
 The `Scanning::process_weak_refs` has an parameter `tracer_context: impl ObjectTracerContext<VM>`.
-This parameter provides the necessary mechanism to retain (i.e. "resurrect") objects and make them
-(and their descendants) live through the current GC.  The typical use pattern is:
+This parameter provides the necessary mechanism to resurrect objects and make them (and their
+descendants) live through the current GC.  The typical use pattern is:
 
 ```rust
 impl<VM: VMBinding> Scanning<VM> for VMScanning {
@@ -130,7 +129,7 @@ impl<VM: VMBinding> Scanning<VM> for VMScanning {
                     let new_object = object.get_forwarded_object().unwrap_or(object);
                     new_finalizable_objects.push(new_object);
                 } else {
-                    // Object is dead.  Retain it.
+                    // Object is dead.  Resurrect it.
                     let new_object = tracer.trace_object(object);
                     enqueue_finalizable_object_to_be_executed_later(new_object);
                 }
@@ -143,14 +142,14 @@ impl<VM: VMBinding> Scanning<VM> for VMScanning {
 ```
 
 The `tracer` parameter of the closure is an `ObjectTracer`.  It provides the `trace_object` method
-which retains an object and returns the forwarded address.
+which resurrects an object and returns the forwarded address.
 
 `tracer_context.with_tracer` creates a temporary `ObjectTracer` instance which the VM binding can
-use within the given closure.  Objects retained by `trace_object` in the closure are enqueued.
+use within the given closure.  Objects resurrected by `trace_object` in the closure are enqueued.
 After the closure returns, `with_tracer` will create reasonably-sized work packets for tracing the
-retained objects and their descendants.  Therefore, the VM binding is encouraged use one
-`with_tracer` invocation to retain as many objects as needed.  Do not call `with_tracer` too often,
-or it will create too many small work packets, which hurts the performance.
+resurrected objects and their descendants.  Therefore, the VM binding is encouraged use one
+`with_tracer` invocation to resurrect as many objects as needed.  Do not call `with_tracer` too
+often, or it will create too many small work packets, which hurts the performance.
 
 Keep in mind that **`ObjectTracerContext` implements `Clone`**.  If the VM has too many finalizable
 objects, it is advisable to split the list of finalizable objects into smaller chunks.  Create one
@@ -204,20 +203,21 @@ and may even resurrect the unreachable referent if we need to.
 ### Soft references
 
 Java has a special kind of weak reference: `SoftReference`.  The API allows the GC to choose whether
-to retain or clear references to softly reachable objects.  When using MMTk, there are two ways to
-implement it.
+to resurrect or clear references to softly reachable objects.  When using MMTk, there are two ways
+to implement it.
 
 The easiest way is **treating `SoftReference` as strong references in non-emergency GCs, and
 treating them as weak references in emergency GCs**.  During non-emergency GC, we let
 `Scanning::scan_objects` scan the weak reference field inside a `SoftReference` instance as if it
 were an ordinary strong reference field.  In this way, the (strong) transitive closure after the
-`Closure` stage will also include softly reachable objects, and they will be retained.  During
+`Closure` stage will also include softly reachable objects, and they will be resurrected.  During
 emergency GC, however, skip this field in `Scanning::scan_objects`, and clear `SoftReference` just
 like `WeakReference` in `Scanning::process_weak_refs`.  In this way, softly reachable objects will
 be dead if not subject to finalization.
 
-The other way is **retaining `SoftReference` after the strong closure**.  This involves supporting
-multiple levels of reference strengths, which will be introduced in the next section.
+The other way is **resurrecting referents of `SoftReference` after the strong closure**.  This
+involves supporting multiple levels of reference strengths, which will be introduced in the next
+section.
 
 ### Multiple levels of reference strength
 
@@ -228,9 +228,9 @@ order of decreasing strength.
 This can be supported by running `Scanning::process_weak_refs` multiple times.  If
 `process_weak_refs` returns `true`, it will be called again after all pending work packets in the
 `VMRefClosure` stage has been executed.  That include all work packets that compute the transitive
-closure from objects retained (i.e. "resurrected") during `process_weak_refs`.  This allows the VM
-binding to expand the transitive closure multiple times, each retaining objects at different levels
-of reachability.
+closure from objects resurrected during `process_weak_refs`.  This allows the VM binding to expand
+the transitive closure multiple times, each handling weak references at different levels of
+reachability.
 
 Take Java as an example,  we may run `process_weak_refs` four times.
 
@@ -238,10 +238,10 @@ Take Java as an example,  we may run `process_weak_refs` four times.
     -   If the referent is reachable, then
         -   forward the referent field.
     -   If the referent is unreachable, choose between one of the following:
-        -   Retain the referent and update the referent field.
+        -   Resurrect the referent and update the referent field.
         -   Clear the referent field, remove the `SoftReference` from the list of soft references,
             and optionally enqueue it to the associated `ReferenceQueue` if it has one.
-    -   (This step may expand the transitive closure if any referents are retained.)
+    -   (This step may expand the transitive closure if any referents are resurrected.)
 2.  Visit all `WeakReference`.
     -   If the referent is reachable, then
         -   forward the referent field.
@@ -254,7 +254,7 @@ Take Java as an example,  we may run `process_weak_refs` four times.
         -   forward the reference to it since it may have been moved.
     -   If the finalizable object is unreachable, then
         -   remove it from the list of finalizable objects, and enqueue it for finalization.
-    -   (This step may expand the transitive closure if any finalizable objects are retained.)
+    -   (This step may expand the transitive closure if any finalizable objects are resurrected.)
 4.  Visit all `PhantomReference`.
     -   If the referent is reachable, then
         -   forward the referent field.  (Note: `PhantomReference#get()` always returns `null`, but

@@ -297,7 +297,7 @@ pub trait Scanning<VM: VMBinding> {
     /// 4.  Request this function to be called again after transitive closure is finished again.
     ///     -   by returning `true`
     ///
-    /// The `tracer_context` parameter provides the VM binding the mechanism for retaining
+    /// The `tracer_context` parameter provides the VM binding the mechanism for resurrecting
     /// unreachable objects (i.e. keeping them alive in this GC).  The following snippet shows a
     /// typical use case of handling finalizable objects for a Java-like language.
     ///
@@ -312,7 +312,7 @@ pub trait Scanning<VM: VMBinding> {
     ///             let new_object = object.get_forwarded_object().unwrap_or(object);
     ///             new_finalizable_objects.push(new_object);
     ///         } else {
-    ///             // Object is dead.  Retain it.
+    ///             // Object is dead.  resurrect it.
     ///             let new_object = tracer.trace_object(object);
     ///             enqueue_finalizable_object_to_be_executed_later(new_object);
     ///         }
@@ -321,9 +321,9 @@ pub trait Scanning<VM: VMBinding> {
     /// ```
     ///
     /// Within the closure `|tracer| { ... }`, the VM binding can call `tracer.trace_object(object)`
-    /// to retain `object` and get its new address if moved.  After `with_tracer` returns, it will
-    /// create work packets in the `VMRefClosure` work bucket to compute the transitive closure from
-    /// the objects retained in the closure.
+    /// to resurrect `object` and get its new address if moved.  After `with_tracer` returns, it
+    /// will create work packets in the `VMRefClosure` work bucket to compute the transitive closure
+    /// from the objects resurrected in the closure.
     ///
     /// The `memory_manager::is_mmtk_object` function can be used in this function if
     /// -   the "is_mmtk_object" feature is enabled, and
@@ -331,21 +331,21 @@ pub trait Scanning<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `worker`: The current GC worker.
-    /// * `tracer_context`: Use this to get access an `ObjectTracer` and use it to retain and
+    /// * `tracer_context`: Use this to get access an `ObjectTracer` and use it to resurrect and
     ///   update weak references.
     ///
     /// If `process_weak_refs` returns `true`, then `process_weak_refs` will be called again after
     /// all work packets in the `VMRefClosure` work bucket has been executed, by which time all
-    /// objects reachable from the objects retained in this function will have been reached.
+    /// objects reachable from the objects resurrected in this function will have been reached.
     ///
     /// # Performance notes
     ///
-    /// **Retain as many objects as needed in one invocation of `tracer_context.with_tracer`, and
+    /// **Resurrect as many objects as needed in one invocation of `tracer_context.with_tracer`, and
     /// avoid calling `with_tracer` again and again** for each object.  The `tracer` provided by
-    /// `ObjectTracerFactory::with_tracer` enqueues retained objects in an internal list specific to
-    /// this invocation of `with_tracer`, and will create reasonably sized work packets to compute
-    /// the transitive closure.  This means the invocation of `with_tracer` has a non-trivial
-    /// overhead, but each invocation of `tracer.trace_object` is cheap.
+    /// `ObjectTracerFactory::with_tracer` enqueues resurrected objects in an internal list specific
+    /// to this invocation of `with_tracer`, and will create reasonably sized work packets to
+    /// compute the transitive closure.  This means the invocation of `with_tracer` has a
+    /// non-trivial overhead, but each invocation of `tracer.trace_object` is cheap.
     ///
     /// *Don't do this*:
     ///
@@ -358,7 +358,7 @@ pub trait Scanning<VM: VMBinding> {
     /// ```
     ///
     /// **Use `ObjectReference::get_forwarded_object()` to get the forwarded address of reachable
-    /// objects.  Only use `tracer.trace_object` for retaining unreachable objects.** If
+    /// objects.  Only use `tracer.trace_object` for resurrecting unreachable objects.** If
     /// `trace_object` is called on an already reached object, it will also return its new address
     /// if moved. However, `tracer_context.with_tracer` has a cost, and the VM binding may
     /// accidentally resurrect unreachable objects if failed to check `object.is_reachable()` first.
