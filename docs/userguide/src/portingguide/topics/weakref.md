@@ -219,13 +219,15 @@ objects.  When using MMTk, there are two ways to implement this semantics.
 The easiest way is **treating `SoftReference` as strong references in non-emergency GCs, and
 treating them as weak references in emergency GCs**.
 
--   During non-emergency GC, we let `Scanning::scan_objects` scan the weak reference field inside a
-    `SoftReference` instance as if it were an ordinary strong reference field.  In this way, the
-    (strong) transitive closure after the `Closure` stage will also include softly reachable
-    objects, and they will be kept alive just like strongly reachable objects.
--   During emergency GC, however, skip this field in `Scanning::scan_objects`, and clear
-    `SoftReference` just like `WeakReference` in `Scanning::process_weak_refs`.  In this way, softly
-    reachable objects will be dead unless they are subject to finalization.
+-   During non-emergency GC, we let `Scanning::scan_object` and
+    `Scanning::scan_object_and_trace_edges` scan the weak reference field inside a `SoftReference`
+    instance as if it were an ordinary strong reference field.  In this way, the (strong) transitive
+    closure after the `Closure` stage will also include softly reachable objects, and they will be
+    kept alive just like strongly reachable objects.
+-   During emergency GC, however, skip this field in `Scanning::scan_object` or
+    `Scanning::scan_object_and_trace_edges` , and clear `SoftReference` just like `WeakReference` in
+    `Scanning::process_weak_refs`.  In this way, softly reachable objects will be dead unless they
+    are subject to finalization.
 
 The other way is **resurrecting referents of `SoftReference` after the strong closure**.  This
 involves supporting multiple levels of reference strengths, which will be introduced in the next
@@ -328,7 +330,43 @@ fn process_weak_ref(...) -> bool {
 
 ### Ephemerons
 
-TODO
+An [Ephemeron] has a *key* and a *value*, both of which are object references.  The key is a weak
+reference, while the value keeps the referent alive only if both the ephemeron itself and the key
+are reachable.
+
+[Ephemeron]: https://dl.acm.org/doi/10.1145/263700.263733
+
+To support ephemerons, the VM binding needs to identify ephemerons.  This includes ephemerons as
+individual objects, objects that contain ephemerons, and, equivalently, objects that contain
+key/value fields that have semantics similar to ephemerons.
+
+The following is the algorithm for processing ephemerons.  It gradually discovers ephemerons as we
+do the tracing.  We maintain a queue of ephemerons which is empty before the `Closure` stage.
+
+1.  In `Scanning::scan_object` and `Scanning::scan_object_and_trace_edges`, we enqueue ephemerons as
+    we scan them, but do not trace either the key or the value fields.
+2.  In `Scanning::process_weak_refs`, we iterate through all ephemerons in the queue.  If the key of
+    an ephemeron is reached, but its value has not yet been reached, then resurrect its value, and
+    remove the ephemeron from the queue.  Otherwise, keep the object in the queue.
+3.  If any value is resurrected, return `true` from `Scanning::process_weak_refs` so that it will be
+    called again after the transitive closure from retained values are computed.  Then go back to
+    Step 2.
+4.  If no value is resurrected, the algorithm completes.  The queue contains reachable ephemerons
+    that have unreachable keys.
+
+This algorithm can be modified if we have a list of all ephemerons before GC starts.  We no longer
+need to maintain the queue.
+
+-   In Step 1, we don't need to enqueue ephemerons.
+-   In Step 2, we iterate through all ephemerons, and we resurrect the value if both the ephemeron
+    itself and the key are reached, and the value is not reached yet.  We don't need to remove any
+    ephemeron from the list.
+-   When the algorithm completes, we can identify both reachable and unreachable ephemerons that
+    have unreachable keys.  But we need to remove unreachable (dead) ephemerons from the list
+    because they will be recycled in the `Release` stage.
+
+And we can go through ephemerons with unreachable keys and do necessary clean-up operations, either
+immediately or postponed to mutator time.
 
 
 ## Optimizations
