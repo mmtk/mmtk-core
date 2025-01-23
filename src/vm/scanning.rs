@@ -288,7 +288,7 @@ pub trait Scanning<VM: VMBinding> {
     ///
     /// MMTk core enables the VM binding to do the following in this function:
     ///
-    /// 1.  Query if an object is already reached in this transitive closure.
+    /// 1.  Query if an object is already reached.
     ///     -   by calling `ObjectReference::is_reachable()`
     /// 2.  Get the new address of an object if it is already reached.
     ///     -   by calling `ObjectReference::get_forwarded_object()`
@@ -351,7 +351,7 @@ pub trait Scanning<VM: VMBinding> {
     ///
     /// ```rust
     /// for object in objects {
-    ///     tracer_context.with_tracer(worker, |tracer| { // This is expensive! DONT DO THIS!
+    ///     tracer_context.with_tracer(worker, |tracer| { // This is expensive! DON'T DO THIS!
     ///         tracer.trace_object(object);
     ///     });
     /// }

@@ -22,26 +22,22 @@ In other words, a Java `Reference` instance has a field that holds a weak refere
 
 ## Overview
 
-During each GC, after the transitive closure is computed, MMTk calls `Scanning::process_weak_refs`
-which is implemented by the VM binding.  Inside this function, the VM binding can do several things.
+During each GC, after the transitive closure is computed (i.e. after all objects reachable from
+roots have been reached), MMTk calls `Scanning::process_weak_refs` which is implemented by the VM
+binding.  Inside this function, the VM binding can do several things.
 
--   **Query reachability**: The VM binding can query whether any given object has been reached in
-    the transitive closure.
-    -   **Query forwarded address**: If an object is already reached, the VM binding can further
-        query the new address of an object.  This is needed to support copying GC.
-    -   **Resurrect object**: If an object is not reached, the VM binding can optionally resurrect
-        the object.  It will keep that object *and all descendants* alive.
+-   **Query reachability**: The VM binding can query whether any given object has been reached.
+    +   Do this with `ObjectReference::is_reachable()`.
+-   **Query forwarded address**: If an object is already reached, the VM binding can further query
+    the new address of an object.  This is needed to support copying GC.
+    +   Do this with `ObjectReference::get_forwarded_object()`.
+-   **Resurrect objects**: If an object is not reached, the VM binding can optionally resurrect the
+    object.  It will keep that object *and all descendants* alive.
+    +   Do this with the `tracer_context` argument of `process_weak_refs`.
 -   **Request another invocation**: The VM binding can request `Scanning::process_weak_refs` to be
-    *called again* after computing the transitive closure that includes *resurrected objects and
-    their descendants*.  This helps handling multiple levels of weak reference strength.
-
-Concretely,
-
--   `ObjectReference::is_reachable()` queries reachability,
--   `ObjectReference::get_forwarded_object()` queries forwarded address, and
--   the `tracer_context` argument provided by the `Scanning::process_weak_refs` function can
-    resurrect objects.
--   Returning `true` from `Scanning::process_weak_refs` will make it called again.
+    called again after computing the transitive closure that includes *resurrected objects and their
+    descendants*.  This helps handling multiple levels of weak reference strength.
+    +   Do this by returning `true` from `process_weak_refs`.
 
 The `Scanning::process_weak_refs` function also gives the VM binding a chance to perform other
 operations, including (but not limited to)
@@ -54,55 +50,56 @@ operations, including (but not limited to)
     -   **Clear the field**: It can clear the field if the referent is unreachable.
 
 Using those primitive operations, the VM binding can support different flavours of finalizers and/or
-weak references.  We will discuss different use cases in the following sections.
+weak references.  We will discuss common use cases in the following sections.
 
 ## Supporting finalizers
 
 Different VMs define "finalizer" differently, but they all involve performing operations when an
 object is dead.  The general way to handle finalizer is visiting all **finalizable objects** (i.e.
-objects that have associated finalization operations), check if they are dead and, if dead, do
-something about them.
+objects that have associated finalization operations), check if they are unreachable and, if
+unreachable, do something about them.
 
 ### Identifying finalizable objects
 
 Some VMs determine whether an object is finalizable by its type.  In Java, for example, an object is
-finalizable if its `finalize()` method is overridden.  We can register instances of such types when
-they are constructed.
+finalizable if its `finalize()` method is overridden.  The VM binding can maintain a list of
+finalizable objects, and register instances of such types into that list when they are constructed.
 
-Some VMs can attach finalizing operations to an object after it is created.  The VM can maintain a
-list of objects with attached finalizers, or maintain a (weak) hash map that maps finalizable
-objects to its associated finalizers.
+Some VMs can dynamically attach finalizing operations to individual objects after objects are
+created.  The VM binding can maintain a list of objects with attached finalizers, or maintain a
+(weak) hash map that maps finalizable objects to its associated finalizers.
 
 ### When to run finalizers?
 
-Depending on the semantics, finalizers can be executed during GC or during mutator time after GC.
+Depending on the finalizer semantics in different VMs, finalizers can be executed during GC or
+during mutator time after GC.
 
-The VM binding can run finalizers in `Scanning::process_weak_refs` after finding a finalizable
-object dead.  But beware that MMTk is usually run with multiple GC workers.  The VM binding can
-parallelise the operations by creating work packets.  The `Scanning::process_weak_refs` function is
-executed in the `VMRefClosure` stage, so the created work packets shall be added to the same bucket.
+The VM binding can run finalizers immediately in `Scanning::process_weak_refs` when finding a
+finalizable object unreachable.  Beware that executing finalizers can be time-consuming.  The VM
+binding can creating work packets and let each work packet process a part of all finalizable
+objects.  In this way, multiple GC workers can process finalizable objects in parallel.  The
+`Scanning::process_weak_refs` function is executed in the `VMRefClosure` stage, so the created work
+packets shall be added to the same bucket.
 
-If the finalizers should be executed after GC, the VM binding should enqueue them to VM-specific
-queues so that they can be picked up after GC.
+If the finalizers should be executed after GC, the VM binding should enqueue such jobs to
+VM-specific queues so that they can be picked up by mutator threads after GC.
 
 ### Reading the body of dead object
 
 In some VMs, finalizers can read the fields in dead objects.  Such fields usually include
 information needed for cleaning up resources held by the object, such as file descriptors and
-pointers to memory or objects not managed by GC.
+pointers to memory not managed by GC.
 
-`Scanning::process_weak_refs` is executed in the `VMRefClosure` stage, which happens after the
-strong transitive closure (including all objects reachable from roots following only strong
-references) has been computed, but before any object has been released (which happens in the
-`Release` stage).  This means the body of all objects, live or dead, can still be accessed during
-this stage.
+`Scanning::process_weak_refs` is executed in the `VMRefClosure` stage, which happens after computing
+transitive closure, but before any object has been released (which happens in the `Release` stage).
+This means the body of all objects, live or dead, can still be accessed during this stage.
 
-Therefore, if the VM needs to execute finalizers during GC, the VM binding can execute them in
-`process_weak_refs`, or create work packets in the `VMRefClosure` stage.
+Therefore, there is no problem reading the object body if the VM binding executes finalizers
+immediately in `process_weak_refs`, or in created work packets in the `VMRefClosure` stage.
 
-However, if the VM needs to execute finalizers after GC, there will be a problem because the object
-will be reclaimed, and memory of the object will be overwritten by other objects.  In this case, the
-VM will need to "resurrect" the dead object.
+However, if the VM needs to execute finalizers after GC, it will be a problem because the object
+will have been reclaimed, and memory of the object will have been overwritten by other objects.  In
+this case, the VM will need to "resurrect" the dead object.
 
 ### Resurrecting dead objects
 
@@ -141,20 +138,34 @@ impl<VM: VMBinding> Scanning<VM> for VMScanning {
 }
 ```
 
-The `tracer` parameter of the closure is an `ObjectTracer`.  It provides the `trace_object` method
-which resurrects an object and returns the forwarded address.
+Within the closure `|tracer| { ... }`, the VM binding can call `tracer.trace_object(object)` to
+resurrect `object`.  It returns the new address of `object` because in a copying GC the
+`trace_object` function can also move the object.
 
-`tracer_context.with_tracer` creates a temporary `ObjectTracer` instance which the VM binding can
-use within the given closure.  Objects resurrected by `trace_object` in the closure are enqueued.
-After the closure returns, `with_tracer` will create reasonably-sized work packets for tracing the
-resurrected objects and their descendants.  Therefore, the VM binding is encouraged use one
-`with_tracer` invocation to resurrect as many objects as needed.  Do not call `with_tracer` too
-often, or it will create too many small work packets, which hurts the performance.
+Under the hood, `tracer_context.with_tracer` creates a queue and calls the closure.  The `tracer`
+implements the `ObjectTracer`  trait, and is just an interface that provides the `trace_object`
+method.  Objects resurrected by `tracer.trace_object` will be enqueued.  After the closure returns,
+`with_tracer` will split the queue into reasonably-sized work packets and add them to the
+`VMRefClosure` work bucket.  Those work packets will trace the resurrected objects and their
+descendants, effectively expanding the transitive closure to include objects reachable from the
+resurrected objects.  Because of the overhead of creating queues and work packets, the VM binding
+should **resurrect as objects as needed in one invocation of `with_tracer`, and avoid calling
+`with_tracer` again and again for each object**.
 
-Keep in mind that **`ObjectTracerContext` implements `Clone`**.  If the VM has too many finalizable
-objects, it is advisable to split the list of finalizable objects into smaller chunks.  Create one
-work packets for each chunk, and give each work packet a clone of `tracer_context` so that multiple
-work packets can process finalizable objects in parallel.
+**Don't do this**:
+
+```rust
+for object in objects {
+    tracer_context.with_tracer(worker, |tracer| { // This is expensive! DON'T DO THIS!
+        tracer.trace_object(object);
+    });
+}
+```
+
+Keep in mind that **tracer_context implements the `Clone` trait**.  As introduced in the *When to
+run finalizers* section, the VM binding can use work packets to parallelise finalizer processing.
+If finalizable objects can be resurrected, the VM binding can clone the `trace_context` and give
+each work packet a clone of `tracer_context`.
 
 
 ## Supporting weak references
@@ -223,7 +234,7 @@ section.
 
 Some VMs support multiple levels of weak reference strengths.  Java, for example, has
 `SoftReference`, `WeakReference`, `FinalizerReference` (internal) and `PhantomReference`, in the
-order of decreasing strength.  
+order of decreasing strength.
 
 This can be supported by running `Scanning::process_weak_refs` multiple times.  If
 `process_weak_refs` returns `true`, it will be called again after all pending work packets in the
@@ -264,10 +275,13 @@ Take Java as an example,  we may run `process_weak_refs` four times.
             references, and optionally enqueue it to the associated `ReferenceQueue` if it has one.
     -   (This step cannot expand the transitive closure.)
 
-As an optimization, Step 1 can be eliminated by merging it with the strong closure in non-emergency
-GC, or with `WeakReference` processing in emergency GC, as we described in the previous section.
-Step 2 can be merged with Step 3 since Step 2 never expands the transitive closure.  Therefore, we
-only need to run `process_weak_refs` twice:
+As an optimization,
+
+-   Step 1 can be eliminated by merging it with the strong closure in non-emergency GC, or with
+    `WeakReference` processing in emergency GC, as we described in the previous section.
+-   Step 2 can be merged with Step 3 since Step 2 never expands the transitive closure.
+
+Therefore, we only need to run `process_weak_refs` twice:
 
 1.  Handle `WeakReference` (and also `SoftReference` in emergency GC), and then handle finalizable
     objects.
