@@ -9,7 +9,7 @@ cleared, and associated clean-up operations will be executed.  Some VMs also sup
 weak data structures, such as weak hash tables, where keys, values, or both, can be weak references.
 
 The concrete semantics of finalizer and weak reference varies from VM to VM, but MMTk provides a
-low-level API that allows the VM bindings to implement their flavours of finalizer and weak
+low-level API that allows the VM bindings to implement their flavors of finalizer and weak
 references on top of it.
 
 **A note for Java programmers**: In Java, the term "weak reference" often refers to instances of
@@ -49,7 +49,7 @@ operations, including (but not limited to)
         copying GC.
     -   **Clear the field**: It can clear the field if the referent is unreachable.
 
-Using those primitive operations, the VM binding can support different flavours of finalizers and/or
+Using those primitive operations, the VM binding can support different flavors of finalizers and/or
 weak references.  We will discuss common use cases in the following sections.
 
 ## Supporting finalizers
@@ -163,7 +163,7 @@ for object in objects {
 ```
 
 Keep in mind that **tracer_context implements the `Clone` trait**.  As introduced in the *When to
-run finalizers* section, the VM binding can use work packets to parallelise finalizer processing.
+run finalizers* section, the VM binding can use work packets to parallelize finalizer processing.
 If finalizable objects can be resurrected, the VM binding can clone the `trace_context` and give
 each work packet a clone of `tracer_context`.
 
@@ -354,7 +354,7 @@ a minor GC,
     finalizable objects must be old and will not be considered dead.
 -   The VM binding only needs to visit **weak reference slots written since the last GC**.  Other
     slots must be pointing to old objects (if not `null`).  For weak hash tables, if existing
-    entries are immutable, it is sufficient to only visit newly added entires.
+    entries are immutable, it is sufficient to only visit newly added entries.
 
 Implementation-wise, the VM binding can split the lists or hash tables into two parts: one for old
 entries and another for young entries.
