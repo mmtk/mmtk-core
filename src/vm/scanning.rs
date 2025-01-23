@@ -282,7 +282,9 @@ pub trait Scanning<VM: VMBinding> {
 
     /// Process weak references.
     ///
-    /// This function is called after a transitive closure is completed.
+    /// This function is called in a GC after the transitive closure from roots is computed, that
+    /// is, all reachable objects from roots are reached.  This function gives the VM binding an
+    /// opportunitiy to process finalizers and weak references.
     ///
     /// MMTk core enables the VM binding to do the following in this function:
     ///
@@ -296,8 +298,8 @@ pub trait Scanning<VM: VMBinding> {
     ///     -   by returning `true`
     ///
     /// The `tracer_context` parameter provides the VM binding the mechanism for retaining
-    /// unreachable objects (i.e. keeping them alive in this GC).  The snippet shows a typical use
-    /// case of handling finalizable objects for a Java-like language.
+    /// unreachable objects (i.e. keeping them alive in this GC).  The following snippet shows a
+    /// typical use case of handling finalizable objects for a Java-like language.
     ///
     /// ```rust
     /// let finalizable_objects = ...;
