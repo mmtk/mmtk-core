@@ -187,9 +187,9 @@ values in global weak tables, are relatively straightforward.  We just need to e
 There are also fields that in heap objects that hold weak references to other heap objects.  There
 are two basic ways to identify them.
 
--   **Register on creation**: We may record objects that contain such fields in a global list when
-    such objects are created.  In `Scanning::process_weak_refs`, we just need to iterate through
-    this list, process the fields, and remove dead objects from the list.
+-   **Register on creation**: We may record objects that contain weak reference fields in a global
+    list when such objects are created.  In `Scanning::process_weak_refs`, we just need to iterate
+    through this list, process the fields, and remove dead objects from the list.
 -   **Discover objects during tracing**: While computing the transitive closure, we scan objects and
     discover objects that contain weak reference fields.  We enqueue such objects into a list, and
     iterate through the list in `Scanning::process_weak_refs` after transitive closure.  The list
@@ -207,24 +207,25 @@ will be executed after the weak reference is cleared.
 
 Such clean-up operations can be supported similar to finalizers.  While we enumerate weak references
 in `Scanning::process_weak_refs`, we clear weak references to unreachable objects.  Depending on the
-semantics, such as whether the clean-up operation can access the body of unreachable referent, we
-may choose to execute the clean-up operation immediately, or enqueue them to be executed after GC,
-and may even resurrect the unreachable referent if we need to.
+semantics, we may choose to execute the clean-up operations immediately, or enqueue them to be
+executed after GC.  We may resurrect the unreachable referent if we need to.
 
 ### Soft references
 
-Java has a special kind of weak reference: `SoftReference`.  The API allows the GC to choose whether
-to resurrect or clear references to softly reachable objects.  When using MMTk, there are two ways
-to implement it.
+Java has a special kind of weak reference: `SoftReference`.  The API allows the GC to choose between
+(1) resurrecting softly reachable referents, and (2) clearing references to softly reachable
+objects.  When using MMTk, there are two ways to implement this semantics.
 
 The easiest way is **treating `SoftReference` as strong references in non-emergency GCs, and
-treating them as weak references in emergency GCs**.  During non-emergency GC, we let
-`Scanning::scan_objects` scan the weak reference field inside a `SoftReference` instance as if it
-were an ordinary strong reference field.  In this way, the (strong) transitive closure after the
-`Closure` stage will also include softly reachable objects, and they will be resurrected.  During
-emergency GC, however, skip this field in `Scanning::scan_objects`, and clear `SoftReference` just
-like `WeakReference` in `Scanning::process_weak_refs`.  In this way, softly reachable objects will
-be dead if not subject to finalization.
+treating them as weak references in emergency GCs**.
+
+-   During non-emergency GC, we let `Scanning::scan_objects` scan the weak reference field inside a
+    `SoftReference` instance as if it were an ordinary strong reference field.  In this way, the
+    (strong) transitive closure after the `Closure` stage will also include softly reachable
+    objects, and they will be kept alive just like strongly reachable objects.
+-   During emergency GC, however, skip this field in `Scanning::scan_objects`, and clear
+    `SoftReference` just like `WeakReference` in `Scanning::process_weak_refs`.  In this way, softly
+    reachable objects will be dead unless they are subject to finalization.
 
 The other way is **resurrecting referents of `SoftReference` after the strong closure**.  This
 involves supporting multiple levels of reference strengths, which will be introduced in the next
@@ -238,21 +239,25 @@ order of decreasing strength.
 
 This can be supported by running `Scanning::process_weak_refs` multiple times.  If
 `process_weak_refs` returns `true`, it will be called again after all pending work packets in the
-`VMRefClosure` stage has been executed.  That include all work packets that compute the transitive
-closure from objects resurrected during `process_weak_refs`.  This allows the VM binding to expand
-the transitive closure multiple times, each handling weak references at different levels of
-reachability.
+`VMRefClosure` stage has been executed.  Those work packets include all work packets that compute
+the transitive closure from objects resurrected during `process_weak_refs`.  This allows the VM
+binding to expand the transitive closure multiple times, each handling weak references at different
+levels of reachability.
 
 Take Java as an example,  we may run `process_weak_refs` four times.
 
 1.  Visit all `SoftReference`.
     -   If the referent is reachable, then
         -   forward the referent field.
-    -   If the referent is unreachable, choose between one of the following:
-        -   Resurrect the referent and update the referent field.
-        -   Clear the referent field, remove the `SoftReference` from the list of soft references,
-            and optionally enqueue it to the associated `ReferenceQueue` if it has one.
-    -   (This step may expand the transitive closure if any referents are resurrected.)
+    -   If the referent is unreachable, then
+        -   if it is not emergency GC, then
+            -   resurrect the referent and update the referent field.
+        -   it it is emergency GC, then
+            -   clear the referent field, remove the `SoftReference` from the list of soft
+                references, and optionally enqueue it to the associated `ReferenceQueue` if it has
+                one.
+    -   (This step may expand the transitive closure in emergency GC if any referents are
+        resurrected.)
 2.  Visit all `WeakReference`.
     -   If the referent is reachable, then
         -   forward the referent field.
@@ -262,14 +267,15 @@ Take Java as an example,  we may run `process_weak_refs` four times.
     -   (This step cannot expand the transitive closure.)
 3.  Visit the list of finalizable objects (may be implemented as `FinalizerReference` by some JVMs).
     -   If the finalizable object is reachable, then
-        -   forward the reference to it since it may have been moved.
+        -   forward the reference to it.
     -   If the finalizable object is unreachable, then
         -   remove it from the list of finalizable objects, and enqueue it for finalization.
     -   (This step may expand the transitive closure if any finalizable objects are resurrected.)
 4.  Visit all `PhantomReference`.
     -   If the referent is reachable, then
-        -   forward the referent field.  (Note: `PhantomReference#get()` always returns `null`, but
-            the actual referent field shall hold a valid reference to the referent.)
+        -   forward the referent field.
+        -   (Note: `PhantomReference#get()` always returns `null`, but the actual referent field
+            shall hold a valid reference to the referent.)
     -   If the referent is unreachable, then
         -   clear the referent field, remove the `PhantomReference` from the list of phantom
             references, and optionally enqueue it to the associated `ReferenceQueue` if it has one.
@@ -337,7 +343,8 @@ GC) are live.
 The VM binding can query if the current GC is a nursery GC by calling
 
 ```rust
-let is_nursery_gc = mmtk.get_plan().is_some_and(|gen| gen.is_current_gc_nursery());
+let is_nursery_gc = mmtk.get_plan().generational().is_some_and(|gen|
+    gen.is_current_gc_nursery());
 ```
 
 The VM binding can make use of this information when processing finalizers and weak references.  In
@@ -347,14 +354,14 @@ a minor GC,
     finalizable objects must be old and will not be considered dead.
 -   The VM binding only needs to visit **weak reference slots written since the last GC**.  Other
     slots must be pointing to old objects (if not `null`).  For weak hash tables, if existing
-    entries are immutable, it is sufficient to visit newly added entires.
+    entries are immutable, it is sufficient to only visit newly added entires.
 
-Implementation-wise, the VM binding can split the list or hash tables into two parts: one for old
+Implementation-wise, the VM binding can split the lists or hash tables into two parts: one for old
 entries and another for young entries.
 
 ### Copying versus non-copying GC
 
-During non-copying GC, objects will not be moved.  In MMTk, `MarkSweep` never moves any objects.
+MMTk provides both copying and non-copying GC plans.  `MarkSweep` never moves any objects.
 `MarkCompact`, `SemiSpace` always moves all objects.  Immix-based plans sometimes do non-copying GC,
 and sometimes do copying GC.  Regardless of the plan, the VM binding can query if the current GC is
 a copying GC by calling
@@ -370,15 +377,17 @@ addresses as keys, and the hash code is computed directly from the address, then
 rehash the table during copying GC because changing the address may move the entry to a different
 hash bin.  But if the current GC is non-moving, the VM binding will not need to rehash the table,
 but only needs to remove entries for dead objects.  Despite of this optimization opportunity, we
-still recommend VMs to implement *address-based hashing* if possible.
+still recommend VMs to implement *address-based hashing* if possible.  In that case, we never need
+to rehash any hash tables due to object movement.
 
 ```admonish info
 When using **address-based hashing**, the hash code of an object depends on whether its hash code
 has been observed before, and whether it has been moved after its hash code has been observed.
 
 -   If never observed, the hash code of an object will be its current address.
--   When the object is moved the first time after its hash code is observed, the GC thread copy its
-    old address to a field of the new copy.  Its hash code will be read from that field.
+-   When the object is moved the first time after its hash code is observed, the GC thread copies
+    its old address to a field of the new copy.  From then on, its hash code will be read from that
+    field.
 -   When such an object is copied again, its hash code will be copied to the new copy of the object.
     The hash code of the object remains unchanged.
 
