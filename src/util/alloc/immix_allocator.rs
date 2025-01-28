@@ -298,6 +298,8 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     block.start(),
                     block.end()
                 );
+                // Bulk clear stale line mark state
+                Line::MARK_TABLE.bzero_metadata(block.start(), Block::BYTES);
                 if self.request_for_large {
                     self.large_bump_pointer.cursor = block.start();
                     self.large_bump_pointer.limit = block.end();
