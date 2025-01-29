@@ -400,7 +400,10 @@
 <a href="#399" id="399">399</a>
 <a href="#400" id="400">400</a>
 <a href="#401" id="401">401</a>
-<a href="#402" id="402">402</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span><span class="kw">super</span>::allocator::{align_allocation_no_fill, fill_alignment_gap, AllocatorContext};
 <span class="kw">use </span><span class="kw">super</span>::BumpPointer;
@@ -700,6 +703,9 @@
                     block.start(),
                     block.end()
                 );
+                <span class="comment">// Bulk clear stale line mark state
+                </span>Line::MARK_TABLE
+                    .bzero_metadata(block.start(), <span class="kw">crate</span>::policy::immix::block::Block::BYTES);
                 <span class="kw">if </span><span class="self">self</span>.request_for_large {
                     <span class="self">self</span>.large_bump_pointer.cursor = block.start();
                     <span class="self">self</span>.large_bump_pointer.limit = block.end();

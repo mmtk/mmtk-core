@@ -370,7 +370,11 @@
 <a href="#369" id="369">369</a>
 <a href="#370" id="370">370</a>
 <a href="#371" id="371">371</a>
-<a href="#372" id="372">372</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::Histogram;
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::Histogram;
 <span class="kw">use </span><span class="kw">super</span>::line::Line;
 <span class="kw">use </span><span class="kw">super</span>::ImmixSpace;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
@@ -619,7 +623,11 @@
                     <span class="kw">if </span>prev_line_is_marked {
                         holes += <span class="number">1</span>;
                     }
-
+                    <span class="comment">// We need to clear the line mark state at least twice in every 128 GC
+                    // otherwise, the line mark state of the last GC will stick around
+                    </span><span class="kw">if </span>line_mark_state &gt; Line::MAX_MARK_STATE - <span class="number">2 </span>{
+                        line.mark(<span class="number">0</span>);
+                    }
                     <span class="attr">#[cfg(feature = <span class="string">"immix_zero_on_release"</span>)]
                     </span><span class="kw">crate</span>::util::memory::zero(line.start(), Line::BYTES);
 
