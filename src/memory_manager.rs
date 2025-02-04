@@ -25,6 +25,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::slot::MemorySlice;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
+use crate::util::alloc::allocator::AllocationOptions;
 
 /// Initialize an MMTk instance. A VM should call this method after creating an [`crate::MMTK`]
 /// instance but before using any of the methods provided in MMTk (except `process()` and `process_bulk()`).
@@ -198,17 +199,19 @@ pub fn alloc<VM: VMBinding>(
 /// * `align`: Required alignment for the object.
 /// * `offset`: Offset associated with the alignment.
 /// * `semantics`: The allocation semantic required for the allocation.
-pub fn alloc_no_gc<VM: VMBinding>(
+/// * `overcommit`: if true, the allocation request will always succeed, and the heap may go beyond the specified size.
+pub fn alloc_with_options<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     size: usize,
     align: usize,
     offset: usize,
     semantics: AllocationSemantics,
+    options: crate::util::alloc::allocator::AllocationOptions,
 ) -> Address {
     #[cfg(debug_assertions)]
     crate::util::alloc::allocator::assert_allocation_args::<VM>(size, align, offset);
 
-    mutator.alloc_no_gc(size, align, offset, semantics)
+    mutator.alloc_with_options(size, align, offset, semantics, options)
 }
 
 /// Invoke the allocation slow path of [`alloc`].
@@ -251,14 +254,15 @@ pub fn alloc_slow<VM: VMBinding>(
 /// * `align`: Required alignment for the object.
 /// * `offset`: Offset associated with the alignment.
 /// * `semantics`: The allocation semantic required for the allocation.
-pub fn alloc_slow_no_gc<VM: VMBinding>(
+pub fn alloc_slow_with_options<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     size: usize,
     align: usize,
     offset: usize,
     semantics: AllocationSemantics,
+    options: AllocationOptions
 ) -> Address {
-    mutator.alloc_slow_no_gc(size, align, offset, semantics)
+    mutator.alloc_slow_with_options(size, align, offset, semantics, options)
 }
 
 /// Perform post-allocation actions, usually initializing object metadata. For many allocators none are

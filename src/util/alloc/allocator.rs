@@ -6,7 +6,7 @@ use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::options::Options;
 use crate::MMTK;
 
-use std::sync::atomic::AtomicBool;
+use atomic::Atomic;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -26,6 +26,39 @@ pub enum AllocationError {
     /// The OS is unable to mmap or acquire more memory. Critical error. MMTk expects the VM to
     /// abort if such an error is thrown.
     MmapOutOfMemory,
+}
+
+#[repr(u8)]
+#[derive(Copy, Clone, Default, PartialEq, bytemuck::NoUninit, Debug)]
+pub enum OnAllocationFail {
+    #[default]
+    RequestGC,
+    ReturnFailure,
+    OverCommit,
+}
+
+impl OnAllocationFail {
+    pub fn allow_oom_call(&self) -> bool {
+        *self == Self::RequestGC
+    }
+    pub fn allow_gc(&self) -> bool {
+        *self == Self::RequestGC
+    }
+    pub fn allow_overcommit(&self) -> bool {
+        *self == Self::OverCommit
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Default, PartialEq, bytemuck::NoUninit, Debug)]
+pub struct AllocationOptions {
+    pub on_fail: OnAllocationFail,
+}
+
+impl AllocationOptions {
+    pub(crate) fn is_default(&self) -> bool {
+        *self == AllocationOptions::default()
+    }
 }
 
 pub fn align_allocation_no_fill<VM: VMBinding>(
@@ -150,12 +183,7 @@ pub(crate) fn assert_allocation_args<VM: VMBinding>(size: usize, align: usize, o
 
 /// The context an allocator needs to access in order to perform allocation.
 pub struct AllocatorContext<VM: VMBinding> {
-    /// Whether we should avoid trigger a GC when the current allocation fails.
-    /// The default value is `false`. This value is only set to `true` when
-    /// the binding requests a 'no-gc' alloc, and will be set back to `false`
-    /// when the allocation is done (successfully or not).
-    /// As allocators are thread-local data structures, this should be fine.
-    pub no_gc_on_fail: AtomicBool,
+    pub alloc_options: Atomic<AllocationOptions>,
     pub state: Arc<GlobalState>,
     pub options: Arc<Options>,
     pub gc_trigger: Arc<GCTrigger<VM>>,
@@ -166,7 +194,7 @@ pub struct AllocatorContext<VM: VMBinding> {
 impl<VM: VMBinding> AllocatorContext<VM> {
     pub fn new(mmtk: &MMTK<VM>) -> Self {
         Self {
-            no_gc_on_fail: AtomicBool::new(false),
+            alloc_options: Atomic::new(AllocationOptions::default()),
             state: mmtk.state.clone(),
             options: mmtk.options.clone(),
             gc_trigger: mmtk.gc_trigger.clone(),
@@ -175,13 +203,16 @@ impl<VM: VMBinding> AllocatorContext<VM> {
         }
     }
 
-    pub fn set_no_gc_on_fail(&self, v: bool) {
-        trace!("set_no_gc_on_fail: {}", v);
-        self.no_gc_on_fail.store(v, Ordering::Relaxed);
+    pub fn set_alloc_options(&self, options: AllocationOptions) {
+        self.alloc_options.store(options, Ordering::Relaxed);
     }
 
-    pub fn is_no_gc_on_fail(&self) -> bool {
-        self.no_gc_on_fail.load(Ordering::Relaxed)
+    pub fn clear_alloc_options(&self) {
+        self.alloc_options.store(AllocationOptions::default(), Ordering::Relaxed);
+    }
+
+    pub fn get_alloc_options(&self) -> AllocationOptions {
+        self.alloc_options.load(Ordering::Relaxed)
     }
 }
 
@@ -239,10 +270,11 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `size`: the allocation size in bytes.
     /// * `align`: the required alignment in bytes.
     /// * `offset` the required offset in bytes.
-    fn alloc_no_gc(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        self.get_context().set_no_gc_on_fail(true);
+    /// * `overcommit`: if true, the allocation will always succeed, and the heap may go beyond the specified size.
+    fn alloc_with_options(&mut self, size: usize, align: usize, offset: usize, alloc_options: AllocationOptions) -> Address {
+        self.get_context().set_alloc_options(alloc_options);
         let ret = self.alloc(size, align, offset);
-        self.get_context().set_no_gc_on_fail(false);
+        self.get_context().clear_alloc_options();
         ret
     }
 
@@ -268,11 +300,11 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `size`: the allocation size in bytes.
     /// * `align`: the required alignment in bytes.
     /// * `offset` the required offset in bytes.
-    fn alloc_slow_no_gc(&mut self, size: usize, align: usize, offset: usize) -> Address {
+    fn alloc_slow_with_options(&mut self, size: usize, align: usize, offset: usize, alloc_options: AllocationOptions) -> Address {
         // The function is not used internally. We won't set no_gc_on_fail redundantly.
-        self.get_context().set_no_gc_on_fail(true);
+        self.get_context().set_alloc_options(alloc_options);
         let ret = self.alloc_slow(size, align, offset);
-        self.get_context().set_no_gc_on_fail(false);
+        self.get_context().clear_alloc_options();
         ret
     }
 
@@ -326,7 +358,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 return result;
             }
 
-            if result.is_zero() && self.get_context().is_no_gc_on_fail() {
+            if result.is_zero() && self.get_context().get_alloc_options().on_fail == OnAllocationFail::ReturnFailure {
                 return result;
             }
 

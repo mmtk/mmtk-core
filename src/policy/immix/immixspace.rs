@@ -28,6 +28,7 @@ use crate::{
     util::opaque_pointer::{VMThread, VMWorkerThread},
     MMTK,
 };
+use crate::util::alloc::allocator::AllocationOptions;
 use atomic::Ordering;
 use std::sync::{atomic::AtomicU8, atomic::AtomicUsize, Arc};
 
@@ -516,8 +517,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Allocate a clean block.
-    pub fn get_clean_block(&self, tls: VMThread, copy: bool, no_gc_on_fail: bool) -> Option<Block> {
-        let block_address = self.acquire(tls, Block::PAGES, no_gc_on_fail);
+    pub fn get_clean_block(&self, tls: VMThread, copy: bool, alloc_options: AllocationOptions) -> Option<Block> {
+        let block_address = self.acquire(tls, Block::PAGES, alloc_options);
         if block_address.is_zero() {
             return None;
         }

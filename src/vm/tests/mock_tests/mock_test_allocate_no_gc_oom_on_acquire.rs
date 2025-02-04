@@ -1,6 +1,7 @@
 use super::mock_test_prelude::*;
 
 use crate::AllocationSemantics;
+use crate::util::alloc::allocator::{AllocationOptions, OnAllocationFail};
 
 /// This test will allocate an object that is larger than the heap size. The call will fail.
 #[test]
@@ -13,12 +14,13 @@ pub fn allocate_no_gc_oom_on_acquire() {
             let mut fixture = MutatorFixture::create_with_heapsize(KB);
 
             // Attempt to allocate an object that is larger than the heap size.
-            let addr = memory_manager::alloc_no_gc(
+            let addr = memory_manager::alloc_with_options(
                 &mut fixture.mutator,
                 1024 * 10,
                 8,
                 0,
                 AllocationSemantics::Default,
+                AllocationOptions { on_fail: OnAllocationFail::ReturnFailure }
             );
             // We should get zero.
             assert!(addr.is_zero());

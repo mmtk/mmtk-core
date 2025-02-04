@@ -14,6 +14,7 @@ use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use crate::util::alloc::allocator::AllocationOptions;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -303,8 +304,8 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     /// Allocate an object
-    pub fn allocate_pages(&self, tls: VMThread, pages: usize, no_gc_on_fail: bool) -> Address {
-        self.acquire(tls, pages, no_gc_on_fail)
+    pub fn allocate_pages(&self, tls: VMThread, pages: usize, alloc_options: AllocationOptions) -> Address {
+        self.acquire(tls, pages, alloc_options)
     }
 
     /// Test if the object's mark bit is the same as the given value. If it is not the same,

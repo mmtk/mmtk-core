@@ -15,6 +15,7 @@ use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
 use crate::util::ObjectReference;
 use crate::vm::{ObjectModel, VMBinding};
+use crate::util::alloc::allocator::AllocationOptions;
 
 use std::sync::atomic::Ordering;
 
@@ -136,7 +137,7 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
         unreachable!()
     }
 
-    fn acquire(&self, _tls: VMThread, _pages: usize, _no_gc_on_fail: bool) -> Address {
+    fn acquire(&self, _tls: VMThread, _pages: usize, _alloc_options: AllocationOptions) -> Address {
         unreachable!()
     }
 

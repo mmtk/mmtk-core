@@ -292,7 +292,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         match self.immix_space().get_clean_block(
             self.tls,
             self.copy,
-            self.get_context().is_no_gc_on_fail(),
+            self.get_context().get_alloc_options(),
         ) {
             None => Address::ZERO,
             Some(block) => {

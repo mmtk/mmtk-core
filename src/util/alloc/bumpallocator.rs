@@ -197,7 +197,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         if self.space.handle_obvious_oom_request(
             self.tls,
             size,
-            !self.get_context().is_no_gc_on_fail(),
+            self.get_context().get_alloc_options(),
         ) {
             return Address::ZERO;
         }
@@ -206,7 +206,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         let acquired_start = self.space.acquire(
             self.tls,
             bytes_to_pages_up(block_size),
-            self.get_context().is_no_gc_on_fail(),
+            self.get_context().get_alloc_options(),
         );
         if acquired_start.is_zero() {
             trace!("Failed to acquire a new block");

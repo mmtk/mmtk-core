@@ -29,6 +29,7 @@ use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
 use crate::util::VMThread;
 use crate::vm::ObjectModel;
+use crate::util::alloc::allocator::AllocationOptions;
 use std::sync::Mutex;
 
 /// The result for `MarkSweepSpace.acquire_block()`. `MarkSweepSpace` will attempt
@@ -407,7 +408,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         tls: VMThread,
         size: usize,
         align: usize,
-        no_gc_on_fail: bool,
+        alloc_options: AllocationOptions,
     ) -> BlockAcquireResult {
         {
             let mut abandoned = self.abandoned.lock().unwrap();
@@ -430,7 +431,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             }
         }
 
-        let acquired = self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE, no_gc_on_fail);
+        let acquired = self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE, alloc_options);
         if acquired.is_zero() {
             BlockAcquireResult::Exhausted
         } else {

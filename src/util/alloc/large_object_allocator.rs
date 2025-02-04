@@ -52,7 +52,7 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
         if self.space.handle_obvious_oom_request(
             self.tls,
             size,
-            !self.get_context().is_no_gc_on_fail(),
+            self.get_context().get_alloc_options(),
         ) {
             return Address::ZERO;
         }
@@ -60,7 +60,7 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
         let maxbytes = allocator::get_maximum_aligned_size::<VM>(size, align);
         let pages = crate::util::conversions::bytes_to_pages_up(maxbytes);
         self.space
-            .allocate_pages(self.tls, pages, self.get_context().is_no_gc_on_fail())
+            .allocate_pages(self.tls, pages, self.get_context().get_alloc_options())
     }
 }
 

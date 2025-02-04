@@ -20,6 +20,7 @@ use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
+use crate::util::alloc::allocator::AllocationOptions;
 
 /// This type implements a lock free version of the immortal collection
 /// policy. This is close to the OpenJDK's epsilon GC.
@@ -135,7 +136,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         data_pages + meta_pages
     }
 
-    fn acquire(&self, _tls: VMThread, pages: usize, no_gc_on_fail: bool) -> Address {
+    fn acquire(&self, _tls: VMThread, pages: usize, alloc_options: AllocationOptions) -> Address {
         trace!("LockFreeImmortalSpace::acquire");
         let bytes = conversions::pages_to_bytes(pages);
         let start = self
@@ -145,10 +146,10 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             })
             .expect("update cursor failed");
         if start + bytes > self.limit {
-            if no_gc_on_fail {
-                return Address::ZERO;
-            } else {
+            if alloc_options.on_fail.allow_oom_call() {
                 panic!("OutOfMemory");
+            } else {
+                return Address::ZERO;
             }
         }
         if self.slow_path_zeroing {

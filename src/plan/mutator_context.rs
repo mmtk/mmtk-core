@@ -4,6 +4,7 @@ use crate::plan::barriers::Barrier;
 use crate::plan::global::Plan;
 use crate::plan::AllocationSemantics;
 use crate::policy::space::Space;
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::Allocator;
 use crate::util::{Address, ObjectReference};
@@ -118,24 +119,25 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
         };
         // The value should be default/unset at the beginning of an allocation request.
-        debug_assert!(!allocator.get_context().is_no_gc_on_fail());
+        debug_assert!(allocator.get_context().get_alloc_options().is_default());
         allocator.alloc(size, align, offset)
     }
 
-    fn alloc_no_gc(
+    fn alloc_with_options(
         &mut self,
         size: usize,
         align: usize,
         offset: usize,
         allocator: AllocationSemantics,
+        options: AllocationOptions,
     ) -> Address {
         let allocator = unsafe {
             self.allocators
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
         };
         // The value should be default/unset at the beginning of an allocation request.
-        debug_assert!(!allocator.get_context().is_no_gc_on_fail());
-        allocator.alloc_no_gc(size, align, offset)
+        debug_assert!(allocator.get_context().get_alloc_options().is_default());
+        allocator.alloc_with_options(size, align, offset, options)
     }
 
     fn alloc_slow(
@@ -150,24 +152,25 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
         };
         // The value should be default/unset at the beginning of an allocation request.
-        debug_assert!(!allocator.get_context().is_no_gc_on_fail());
+        debug_assert!(allocator.get_context().get_alloc_options().is_default());
         allocator.alloc_slow(size, align, offset)
     }
 
-    fn alloc_slow_no_gc(
+    fn alloc_slow_with_options(
         &mut self,
         size: usize,
         align: usize,
         offset: usize,
         allocator: AllocationSemantics,
+        options: AllocationOptions,
     ) -> Address {
         let allocator = unsafe {
             self.allocators
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
         };
         // The value should be default/unset at the beginning of an allocation request.
-        debug_assert!(!allocator.get_context().is_no_gc_on_fail());
-        allocator.alloc_slow_no_gc(size, align, offset)
+        debug_assert!(allocator.get_context().get_alloc_options().is_default());
+        allocator.alloc_slow_with_options(size, align, offset, options)
     }
 
     // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
@@ -321,12 +324,14 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     /// * `align`: required alignment for the object.
     /// * `offset`: offset associated with the alignment. The result plus the offset will be aligned to the given alignment.
     /// * `allocator`: the allocation semantic used for this object.
-    fn alloc_no_gc(
+    /// * `overcommit`: if true, the allocation request will always succeed, and the heap may go beyond the specified size.
+    fn alloc_with_options(
         &mut self,
         size: usize,
         align: usize,
         offset: usize,
         allocator: AllocationSemantics,
+        options: AllocationOptions,
     ) -> Address;
     /// The slow path allocation for [`MutatorContext::alloc`]. This function will trigger a GC on failed allocation.
     ///
@@ -345,12 +350,13 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     /// This is only useful when the binding
     /// implements the fast path allocation, and would like to explicitly
     /// call the slow path after the fast path allocation fails.
-    fn alloc_slow_no_gc(
+    fn alloc_slow_with_options(
         &mut self,
         size: usize,
         align: usize,
         offset: usize,
         allocator: AllocationSemantics,
+        options: AllocationOptions,
     ) -> Address;
     /// Perform post-allocation actions.  For many allocators none are
     /// required.
