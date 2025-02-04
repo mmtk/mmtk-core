@@ -1,5 +1,6 @@
 use super::mmapper::MapState;
 use super::Mmapper;
+use crate::util::memory::MmapAnnotation;
 use crate::util::Address;
 
 use crate::util::constants::*;
@@ -44,7 +45,13 @@ impl Mmapper for ByteMapMmapper {
         }
     }
 
-    fn ensure_mapped(&self, start: Address, pages: usize, strategy: MmapStrategy) -> Result<()> {
+    fn ensure_mapped(
+        &self,
+        start: Address,
+        pages: usize,
+        strategy: MmapStrategy,
+        anno: &MmapAnnotation,
+    ) -> Result<()> {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
         trace!(
@@ -62,7 +69,8 @@ impl Mmapper for ByteMapMmapper {
 
             let mmap_start = Self::mmap_chunks_to_address(chunk);
             let _guard = self.lock.lock().unwrap();
-            MapState::transition_to_mapped(&self.mapped[chunk], mmap_start, strategy).unwrap();
+            MapState::transition_to_mapped(&self.mapped[chunk], mmap_start, strategy, anno)
+                .unwrap();
         }
 
         Ok(())
@@ -73,6 +81,7 @@ impl Mmapper for ByteMapMmapper {
         start: Address,
         pages: usize,
         strategy: MmapStrategy,
+        anno: &MmapAnnotation,
     ) -> Result<()> {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
@@ -91,7 +100,8 @@ impl Mmapper for ByteMapMmapper {
 
             let mmap_start = Self::mmap_chunks_to_address(chunk);
             let _guard = self.lock.lock().unwrap();
-            MapState::transition_to_quarantined(&self.mapped[chunk], mmap_start, strategy).unwrap();
+            MapState::transition_to_quarantined(&self.mapped[chunk], mmap_start, strategy, anno)
+                .unwrap();
         }
 
         Ok(())
@@ -172,6 +182,7 @@ impl Default for ByteMapMmapper {
 #[cfg(test)]
 mod tests {
     use super::ByteMapMmapper;
+    use crate::mmap_anno_test;
     use crate::util::heap::layout::Mmapper;
     use crate::util::Address;
 
@@ -237,7 +248,7 @@ mod tests {
                 || {
                     let mmapper = ByteMapMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, mmap_anno_test!())
                         .unwrap();
 
                     for chunk in start_chunk..end_chunk {
@@ -266,7 +277,7 @@ mod tests {
                 || {
                     let mmapper = ByteMapMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, mmap_anno_test!())
                         .unwrap();
 
                     for chunk in start_chunk..end_chunk {
@@ -295,7 +306,7 @@ mod tests {
                 || {
                     let mmapper = ByteMapMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, mmap_anno_test!())
                         .unwrap();
 
                     let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
@@ -329,7 +340,12 @@ mod tests {
                     // map 2 chunks
                     let mmapper = ByteMapMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, test_memory_pages, MmapStrategy::TEST)
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            test_memory_pages,
+                            MmapStrategy::TEST,
+                            mmap_anno_test!(),
+                        )
                         .unwrap();
 
                     // protect 1 chunk
@@ -364,7 +380,12 @@ mod tests {
                     // map 2 chunks
                     let mmapper = ByteMapMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, test_memory_pages, MmapStrategy::TEST)
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            test_memory_pages,
+                            MmapStrategy::TEST,
+                            mmap_anno_test!(),
+                        )
                         .unwrap();
 
                     // protect 1 chunk
@@ -382,7 +403,12 @@ mod tests {
 
                     // ensure mapped - this will unprotect the previously protected chunk
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, protect_memory_pages_2, MmapStrategy::TEST)
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            protect_memory_pages_2,
+                            MmapStrategy::TEST,
+                            mmap_anno_test!(),
+                        )
                         .unwrap();
                     assert_eq!(
                         mmapper.mapped[chunk].load(Ordering::Relaxed),

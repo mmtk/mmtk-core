@@ -27,6 +27,8 @@ use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use crate::util::alloc::allocator::AllocationOptions;
 
+use std::collections::HashMap;
+
 /// Initialize an MMTk instance. A VM should call this method after creating an [`crate::MMTK`]
 /// instance but before using any of the methods provided in MMTk (except `process()` and `process_bulk()`).
 ///
@@ -39,7 +41,9 @@ use crate::util::alloc::allocator::AllocationOptions;
 ///    supported. Currently we assume a binding will only need one MMTk instance. Note that GC is enabled by default and the binding should
 ///    implement `VMCollection::is_collection_enabled()` if it requires that the GC should be disabled at a particular time.
 ///
-/// Note that this method will attempt to initialize a logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
+/// This method will attempt to initialize the built-in `env_logger` if the Cargo feature "builtin_env_logger" is enabled (by default).
+/// If the VM would like to use its own logger, it should disable the default feature "builtin_env_logger" in `Cargo.toml`.
+///
 /// Note that, to allow MMTk to do GC properly, `initialize_collection()` needs to be called after this call when
 /// the VM's thread system is ready to spawn GC workers.
 ///
@@ -52,12 +56,7 @@ use crate::util::alloc::allocator::AllocationOptions;
 /// Arguments:
 /// * `builder`: The reference to a MMTk builder.
 pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
-    match crate::util::logger::try_init() {
-        Ok(_) => debug!("MMTk initialized the logger."),
-        Err(_) => debug!(
-            "MMTk failed to initialize the logger. Possibly a logger has been initialized by user."
-        ),
-    }
+    crate::util::logger::try_init();
     #[cfg(all(feature = "perf_counter", target_os = "linux"))]
     {
         use std::fs::File;
@@ -602,16 +601,18 @@ pub fn free_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
     mmtk.get_plan().get_free_pages() << LOG_BYTES_IN_PAGE
 }
 
-/// Return the size of all the live objects in bytes in the last GC. MMTk usually accounts for memory in pages.
+/// Return a hash map for live bytes statistics in the last GC for each space.
+///
+/// MMTk usually accounts for memory in pages by each space.
 /// This is a special method that we count the size of every live object in a GC, and sum up the total bytes.
-/// We provide this method so users can compare with `used_bytes` (which does page accounting), and know if
-/// the heap is fragmented.
+/// We provide this method so users can use [`crate::LiveBytesStats`] to know if
+/// the space is fragmented.
 /// The value returned by this method is only updated when we finish tracing in a GC. A recommended timing
 /// to call this method is at the end of a GC (e.g. when the runtime is about to resume threads).
-#[cfg(feature = "count_live_bytes_in_gc")]
-pub fn live_bytes_in_last_gc<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
-    use std::sync::atomic::Ordering;
-    mmtk.state.live_bytes_in_last_gc.load(Ordering::SeqCst)
+pub fn live_bytes_in_last_gc<VM: VMBinding>(
+    mmtk: &MMTK<VM>,
+) -> HashMap<&'static str, crate::LiveBytesStats> {
+    mmtk.state.live_bytes_in_last_gc.borrow().clone()
 }
 
 /// Return the starting address of the heap. *Note that currently MMTk uses

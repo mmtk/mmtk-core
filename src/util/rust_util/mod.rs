@@ -14,24 +14,27 @@ pub const fn min_of_usize(a: usize, b: usize) -> usize {
     }
 }
 
-#[rustversion::nightly]
+#[cfg(feature = "nightly")]
 pub use core::intrinsics::{likely, unlikely};
 
 // likely() and unlikely() compiler hints in stable Rust
 // [1]: https://github.com/rust-lang/hashbrown/blob/a41bd76de0a53838725b997c6085e024c47a0455/src/raw/mod.rs#L48-L70
 // [2]: https://users.rust-lang.org/t/compiler-hint-for-unlikely-likely-for-if-branches/62102/3
-#[rustversion::not(nightly)]
+#[cfg(not(feature = "nightly"))]
+#[inline]
 #[cold]
 fn cold() {}
 
-#[rustversion::not(nightly)]
+#[cfg(not(feature = "nightly"))]
+#[inline]
 pub fn likely(b: bool) -> bool {
     if !b {
         cold();
     }
     b
 }
-#[rustversion::not(nightly)]
+#[cfg(not(feature = "nightly"))]
+#[inline]
 pub fn unlikely(b: bool) -> bool {
     if b {
         cold();

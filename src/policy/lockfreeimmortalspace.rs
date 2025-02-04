@@ -13,6 +13,7 @@ use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
+use crate::util::memory::MmapAnnotation;
 use crate::util::memory::MmapStrategy;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
@@ -46,7 +47,7 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
     fn is_live(&self, _object: ObjectReference) -> bool {
@@ -129,10 +130,14 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         unsafe { sft_map.eager_initialize(self.as_sft(), self.start, self.total_bytes) };
     }
 
+    fn estimate_side_meta_pages(&self, data_pages: usize) -> usize {
+        self.metadata.calculate_reserved_pages(data_pages)
+    }
+
     fn reserved_pages(&self) -> usize {
         let cursor = self.cursor.load(Ordering::Relaxed);
         let data_pages = conversions::bytes_to_pages_up(self.limit - cursor);
-        let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
+        let meta_pages = self.estimate_side_meta_pages(data_pages);
         data_pages + meta_pages
     }
 
@@ -246,15 +251,22 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             *args.options.transparent_hugepages,
             crate::util::memory::MmapProtection::ReadWrite,
         );
-        crate::util::memory::dzmmap_noreplace(start, aligned_total_bytes, strategy).unwrap();
-        if space
+        crate::util::memory::dzmmap_noreplace(
+            start,
+            aligned_total_bytes,
+            strategy,
+            &MmapAnnotation::Space {
+                name: space.get_name(),
+            },
+        )
+        .unwrap();
+        space
             .metadata
-            .try_map_metadata_space(start, aligned_total_bytes)
-            .is_err()
-        {
-            // TODO(Javad): handle meta space allocation failure
-            panic!("failed to mmap meta memory");
-        }
+            .try_map_metadata_space(start, aligned_total_bytes, space.get_name())
+            .unwrap_or_else(|e| {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory: {e}")
+            });
 
         space
     }

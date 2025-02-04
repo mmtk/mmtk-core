@@ -864,7 +864,9 @@ options! {
     gc_trigger:             GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize),
     /// Enable transparent hugepage support for MMTk spaces via madvise (only Linux is supported)
     /// This only affects the memory for MMTk spaces.
-    transparent_hugepages: bool                  [env_var: true, command_line: true]  [|v: &bool| !v || cfg!(target_os = "linux")] = false
+    transparent_hugepages: bool                  [env_var: true, command_line: true]  [|v: &bool| !v || cfg!(target_os = "linux")] = false,
+    /// Count live bytes for objects in each space during a GC.
+    count_live_bytes_in_gc: bool                 [env_var: true, command_line: true] [always_valid] = false
 }
 
 #[cfg(test)]

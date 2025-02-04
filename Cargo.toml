@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.28.0"
+version = "0.30.0"
 authors = ["The MMTk Developers <>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -28,7 +28,7 @@ crossbeam = "0.8.1"
 delegate = "0.12.0"
 downcast-rs = "1.1.1"
 enum-map = "2.4.2"
-env_logger = "0.11.3"
+env_logger = { version = "0.11.3", optional = true }
 is-terminal = "0.4.7"
 itertools = "0.12.0"
 jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
@@ -38,7 +38,7 @@ log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"]
 memoffset = "0.9"
 mimalloc-sys = { version = "0.1.6", optional = true }
 # MMTk macros - we have to specify a version here in order to publish the crate, even though we use the dependency from a local path.
-mmtk-macros = { version="0.28.0", path = "macros/" }
+mmtk-macros = { version="0.30.0", path = "macros/" }
 num_cpus = "1.8"
 num-traits = "0.2"
 pfm = { version = "0.1.1", optional = true }
@@ -66,11 +66,19 @@ name = "main"
 harness = false
 
 [features]
-default = []
+default = ["builtin_env_logger"]
+
+# Built-in env_logger.  This feature is enabled by default.
+# The user can disable this default feature to remove `env_logger` from the dependencies.
+# See `crate::util::logger` for more details.
+builtin_env_logger = ["dep:env_logger"]
+
+# Enable this feature if you want to use nightly features and compiler
+nightly = []
 
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts
-perf_counter = ["pfm"]
+perf_counter = ["dep:pfm"]
 
 # This feature is only used for tests with MockVM.
 # CI scripts run those tests with this feature.
@@ -164,12 +172,26 @@ work_packet_stats = []
 # Count the malloc'd memory into the heap size
 malloc_counted_size = []
 
-# Count the size of all live objects in GC
-count_live_bytes_in_gc = []
-
 # Workaround a problem where bpftrace scripts (see tools/tracing/timeline/capture.bt) cannot
 # capture the type names of work packets.
 bpftrace_workaround = []
+
+# Disable mmap annotations.
+# All invocations of `mmap` in mmtk-core are accompanied by calls of `prctl` with
+# `PR_SET_VMA_ANON_NAME` to annotate the mmap ranges with human-readable names.  It is enabled by
+# default and should work fine even with large heap sizes.  However, if this is causing problems,
+# users can disable such annotations by enabling this Cargo feature.
+no_mmap_annotation = []
+
+# Allow the binding to access Valid Object (VO) bit.
+# MMTk uses VO bit to identify a valid object. Thus VO bit is carefully managed by MMTk in cooperation with the binding.
+# So normally this feature is not needed, and its use should be discouraged.
+# However, in rare cases, a binding may want to directly access and manipulate VO bit. For example, a binding cannot cooperate
+# with MMTk to identify each object for setting the VO bit. This is usually due to the limitation of the VM.
+# In such cases, a binding may use this feature and manipulate the VO bit to their needs. The binding's manipulation on VO bit
+# may violate MMTk's semantics, and may result in undefined behaviors for VO bit related APIs. This feature should
+# only be used if you understand how VO bit works internally. Use at your own risk.
+vo_bit_access = []
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --
@@ -179,8 +201,8 @@ bpftrace_workaround = []
 # Group:malloc
 # only one of the following features should be enabled, or none to use the default malloc from libc
 # this does not replace the global Rust allocator, but provides these libraries for GC implementation
-malloc_mimalloc = ["mimalloc-sys"]
-malloc_jemalloc = ["jemalloc-sys"]
+malloc_mimalloc = ["dep:mimalloc-sys"]
+malloc_jemalloc = ["dep:jemalloc-sys"]
 
 # Use the native mimalloc allocator for malloc. This is not tested by me (Yi) yet, and it is only used to make sure that some code
 # is not compiled in default builds.

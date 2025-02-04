@@ -12,6 +12,7 @@ use crate::util::address::ObjectReference;
 use crate::util::analysis::AnalysisManager;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::gc_trigger::GCTrigger;
+use crate::util::heap::layout::heap_parameters::MAX_SPACES;
 use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::heap::layout::{self, Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
@@ -26,6 +27,7 @@ use crate::util::statistics::stats::Stats;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
+use std::collections::HashMap;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -525,5 +527,73 @@ impl<VM: VMBinding> MMTK<VM> {
         plan.for_each_space(&mut |space| {
             space.enumerate_objects(&mut enumerator);
         })
+    }
+
+    /// Aggregate a hash map of live bytes per space with the space stats to produce
+    /// a map of live bytes stats for the spaces.
+    pub(crate) fn aggregate_live_bytes_in_last_gc(
+        &self,
+        live_bytes_per_space: [usize; MAX_SPACES],
+    ) -> HashMap<&'static str, crate::LiveBytesStats> {
+        use crate::policy::space::Space;
+        let mut ret = HashMap::new();
+        self.get_plan().for_each_space(&mut |space: &dyn Space<VM>| {
+            let space_name = space.get_name();
+            let space_idx = space.get_descriptor().get_index();
+            let used_pages = space.reserved_pages();
+            if used_pages != 0 {
+                let used_bytes = crate::util::conversions::pages_to_bytes(used_pages);
+                let live_bytes = live_bytes_per_space[space_idx];
+                debug_assert!(
+                    live_bytes <= used_bytes,
+                    "Live bytes of objects in {} ({} bytes) is larger than used pages ({} bytes), something is wrong.",
+                    space_name, live_bytes, used_bytes
+                );
+                ret.insert(space_name, crate::LiveBytesStats {
+                    live_bytes,
+                    used_pages,
+                    used_bytes,
+                });
+            }
+        });
+        ret
+    }
+
+    /// Print VM maps.  It will print the memory ranges used by spaces as well as some attributes of
+    /// the spaces.
+    ///
+    /// -   "I": The space is immortal.  Its objects will never die.
+    /// -   "N": The space is non-movable.  Its objects will never move.
+    ///
+    /// Arguments:
+    /// *   `out`: the place to print the VM maps.
+    /// *   `space_name`: If `None`, print all spaces;
+    ///                   if `Some(n)`, only print the space whose name is `n`.
+    pub fn debug_print_vm_maps(
+        &self,
+        out: &mut impl std::fmt::Write,
+        space_name: Option<&str>,
+    ) -> Result<(), std::fmt::Error> {
+        let mut result_so_far = Ok(());
+        self.get_plan().for_each_space(&mut |space| {
+            if result_so_far.is_ok()
+                && (space_name.is_none() || space_name == Some(space.get_name()))
+            {
+                result_so_far = crate::policy::space::print_vm_map(space, out);
+            }
+        });
+        result_so_far
+    }
+
+    /// Initialize object metadata for a VM space object.
+    /// Objects in the VM space are allocated/managed by the binding. This function provides a way for
+    /// the binding to set object metadata in MMTk for an object in the space.
+    #[cfg(feature = "vm_space")]
+    pub fn initialize_vm_space_object(&self, object: crate::util::ObjectReference) {
+        use crate::policy::sft::SFT;
+        self.get_plan()
+            .base()
+            .vm_space
+            .initialize_object_metadata(object, false)
     }
 }

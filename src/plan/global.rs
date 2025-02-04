@@ -266,6 +266,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         //    the reserved pages is larger than total pages after the copying GC (the reserved pages after a GC
         //    may be larger than the reserved pages before a GC, as we may end up using more memory for thread local
         //    buffers for copy allocators).
+        // 3. the binding disabled GC, and we end up over-allocating beyond the total pages determined by the GC trigger.
         let available_pages = total_pages.saturating_sub(reserved_pages);
         trace!(
             "Total pages = {}, reserved pages = {}, available pages = {}",
@@ -289,7 +290,12 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// Get the number of pages that are NOT used. This is clearly different from available pages.
     /// Free pages are unused, but some of them may have been reserved for some reason.
     fn get_free_pages(&self) -> usize {
-        self.get_total_pages() - self.get_used_pages()
+        let total_pages = self.get_total_pages();
+        let used_pages = self.get_used_pages();
+
+        // It is possible that the used pages is larger than the total pages, so we use saturating
+        // subtraction.  See the comments in `get_available_pages`.
+        total_pages.saturating_sub(used_pages)
     }
 
     /// Return whether last GC was an exhaustive attempt to collect the heap.
@@ -390,7 +396,7 @@ pub struct CreateSpecificPlanArgs<'a, VM: VMBinding> {
     pub global_side_metadata_specs: Vec<SideMetadataSpec>,
 }
 
-impl<'a, VM: VMBinding> CreateSpecificPlanArgs<'a, VM> {
+impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
     /// Get a PlanCreateSpaceArgs that can be used to create a space
     pub fn get_space_args(
         &mut self,

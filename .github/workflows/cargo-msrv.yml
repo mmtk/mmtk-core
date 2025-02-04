@@ -32,4 +32,4 @@ jobs:
       # If the previous step fails, find MSRV
       - name: Find MSRV
         if: failure()
-        run: cargo msrv
+        run: cargo msrv find

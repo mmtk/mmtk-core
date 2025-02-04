@@ -1,3 +1,50 @@
+0.30.0 (2024-12-20)
+===
+
+## What's Changed
+
+### policy
+* Allow setting object metadata for VM space objects. Expose VO bit under a feature. by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1248
+
+### Misc
+* Fix clippy warnings for Rust 1.83 by @wks in https://github.com/mmtk/mmtk-core/pull/1242
+* Annotate mmap ranges using PR_SET_VMA by @wks in https://github.com/mmtk/mmtk-core/pull/1236
+* Fix warnings for lifetime in MmapAnnotation impl by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1244
+* Collect live bytes per space, and report by space by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1238
+* Minor changes for debugging. by @wks in https://github.com/mmtk/mmtk-core/pull/1245
+* Use macos-15 for style check by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1249
+* Check the option before aggregating live bytes data. Panic if the option is enabled on malloc space. by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1250
+
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.29.0...v0.30.0
+
+0.29.0 (2024-11-08)
+===
+
+## What's Changed
+
+### CI
+* Install cargo-msrv using stable toolchain. by @wks in https://github.com/mmtk/mmtk-core/pull/1215
+* Update CI macos image by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1216
+* Performance history canary by @wks in https://github.com/mmtk/mmtk-core/pull/1209
+* Change the default testing branch for Julia tests by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1221
+* Fix auto merge branches by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1230
+
+### Documentation
+* Document the policy about performance testing environment and epochs by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1206
+
+### Misc
+* Fix a race between forwarding bits and VO bits. by @wks in https://github.com/mmtk/mmtk-core/pull/1214
+* Remove space for nogc link by @Pat-Lafon in https://github.com/mmtk/mmtk-core/pull/1217
+* Make env_logger an optional dependency by @wks in https://github.com/mmtk/mmtk-core/pull/1226
+* Use modern syntax for optional dependencies by @wks in https://github.com/mmtk/mmtk-core/pull/1229
+* Fix nightly build and add `inline` attributes to `{un,}likely` by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1228
+
+## New Contributors
+* @Pat-Lafon made their first contribution in https://github.com/mmtk/mmtk-core/pull/1217
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.28.0...v0.29.0
+
 0.28.0 (2024-09-27)
 ===
 

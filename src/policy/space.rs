@@ -130,10 +130,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // Otherwise do GC here
             debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
+
             // Inform GC trigger about the pending allocation.
+            let meta_pages_reserved = self.estimate_side_meta_pages(pages_reserved);
+            let total_pages_reserved = pages_reserved + meta_pages_reserved;
             self.get_gc_trigger()
                 .policy
-                .on_pending_allocation(pages_reserved);
+                .on_pending_allocation(total_pages_reserved);
+
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
 
             // Return zero -- the caller will handle re-attempting allocation
@@ -167,12 +171,19 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         if let Err(mmap_error) = self
                             .common()
                             .mmapper
-                            .ensure_mapped(res.start, res.pages, self.common().mmap_strategy())
-                            .and(
-                                self.common()
-                                    .metadata
-                                    .try_map_metadata_space(res.start, bytes),
+                            .ensure_mapped(
+                                res.start,
+                                res.pages,
+                                self.common().mmap_strategy(),
+                                &memory::MmapAnnotation::Space {
+                                    name: self.get_name(),
+                                },
                             )
+                            .and(self.common().metadata.try_map_metadata_space(
+                                res.start,
+                                bytes,
+                                self.get_name(),
+                            ))
                         {
                             memory::handle_mmap_error::<VM>(mmap_error, tls, res.start, bytes);
                         }
@@ -323,24 +334,33 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// Ensure this space is marked as mapped -- used when the space is already
     /// mapped (e.g. for a vm image which is externally mmapped.)
     fn ensure_mapped(&self) {
-        if self
-            .common()
+        self.common()
             .metadata
-            .try_map_metadata_space(self.common().start, self.common().extent)
-            .is_err()
-        {
-            // TODO(Javad): handle meta space allocation failure
-            panic!("failed to mmap meta memory");
-        }
+            .try_map_metadata_space(self.common().start, self.common().extent, self.get_name())
+            .unwrap_or_else(|e| {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory: {e}");
+            });
 
         self.common()
             .mmapper
             .mark_as_mapped(self.common().start, self.common().extent);
     }
 
+    /// Estimate the amount of side metadata memory needed for a give data memory size in pages. The
+    /// result will over-estimate the amount of metadata pages needed, with at least one page per
+    /// side metadata.  This relatively accurately describes the number of side metadata pages the
+    /// space actually consumes.
+    ///
+    /// This function is used for both triggering GC (via [`Space::reserved_pages`]) and resizing
+    /// the heap (via [`crate::util::heap::GCTriggerPolicy::on_pending_allocation`]).
+    fn estimate_side_meta_pages(&self, data_pages: usize) -> usize {
+        self.common().metadata.calculate_reserved_pages(data_pages)
+    }
+
     fn reserved_pages(&self) -> usize {
         let data_pages = self.get_page_resource().reserved_pages();
-        let meta_pages = self.common().metadata.calculate_reserved_pages(data_pages);
+        let meta_pages = self.estimate_side_meta_pages(data_pages);
         data_pages + meta_pages
     }
 
@@ -351,6 +371,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
     fn get_name(&self) -> &'static str {
         self.common().name
+    }
+
+    fn get_descriptor(&self) -> SpaceDescriptor {
+        self.common().descriptor
     }
 
     fn common(&self) -> &CommonSpace<VM>;
@@ -639,14 +663,12 @@ impl<VM: VMBinding> CommonSpace<VM> {
         }
 
         // For contiguous space, we know its address range so we reserve metadata memory for its range.
-        if rtn
-            .metadata
-            .try_map_metadata_address_range(rtn.start, rtn.extent)
-            .is_err()
-        {
-            // TODO(Javad): handle meta space allocation failure
-            panic!("failed to mmap meta memory");
-        }
+        rtn.metadata
+            .try_map_metadata_address_range(rtn.start, rtn.extent, rtn.name)
+            .unwrap_or_else(|e| {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory: {e}");
+            });
 
         debug!(
             "Created space {} [{}, {}) for {} bytes",

@@ -30,6 +30,7 @@ use crate::util::linear_scan::Region;
 use crate::util::VMThread;
 use crate::vm::ObjectModel;
 use crate::util::alloc::allocator::AllocationOptions;
+use crate::vm::Scanning;
 use std::sync::Mutex;
 
 /// The result for `MarkSweepSpace.acquire_block()`. `MarkSweepSpace` will attempt
@@ -158,7 +159,7 @@ impl AbandonedBlockLists {
 }
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.common.name
     }
 
@@ -330,6 +331,58 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         }
     }
 
+    /// Mark an object non-atomically.  If multiple GC worker threads attempt to mark the same
+    /// object, more than one of them may return `true`.
+    fn attempt_mark_non_atomic(&self, object: ObjectReference) -> bool {
+        if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_marked::<VM>(object, Ordering::SeqCst) {
+            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.mark::<VM>(object, Ordering::SeqCst);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Mark an object atomically.
+    fn attempt_mark_atomic(&self, object: ObjectReference) -> bool {
+        let mark_state = 1u8;
+
+        loop {
+            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
+                object,
+                None,
+                Ordering::SeqCst,
+            );
+            if old_value == mark_state {
+                return false;
+            }
+
+            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+                .compare_exchange_metadata::<VM, u8>(
+                    object,
+                    old_value,
+                    mark_state,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
+                break;
+            }
+        }
+        true
+    }
+
+    /// Mark an object.  Return `true` if the object is newly marked.  Return `false` if the object
+    /// was already marked.
+    fn attempt_mark(&self, object: ObjectReference) -> bool {
+        if VM::VMScanning::UNIQUE_OBJECT_ENQUEUING {
+            self.attempt_mark_atomic(object)
+        } else {
+            self.attempt_mark_non_atomic(object)
+        }
+    }
+
     fn trace_object<Q: ObjectQueue>(
         &self,
         queue: &mut Q,
@@ -340,8 +393,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             "Cannot mark an object {} that was not alloced by free list allocator.",
             object,
         );
-        if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_marked::<VM>(object, Ordering::SeqCst) {
-            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.mark::<VM>(object, Ordering::SeqCst);
+        if self.attempt_mark(object) {
             let block = Block::containing(object);
             block.set_state(BlockState::Marked);
             queue.enqueue(object);
