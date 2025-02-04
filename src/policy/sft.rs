@@ -101,6 +101,19 @@ pub trait SFT {
         object: ObjectReference,
         worker: GCWorkerMutRef,
     ) -> ObjectReference;
+
+    fn debug_get_object_info(&self, object: ObjectReference) -> String {
+        crate::policy::sft::debug_get_object_global_info(object)
+    }
+}
+
+pub(crate) fn debug_get_object_global_info(object: ObjectReference) -> String {
+    let mut ret = String::new();
+    #[cfg(feature = "vo_bit")]
+    {
+        ret += &format!("vo bit = {}", crate::util::metadata::vo_bit::is_vo_bit_set(object));
+    }
+    ret
 }
 
 // Create erased VM refs for these types that will be used in `sft_trace_object()`.

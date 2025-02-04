@@ -102,6 +102,10 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
         // Depending on which trace it is, we should manually call either trace_mark or trace_forward.
         panic!("sft_trace_object() cannot be used with mark compact space")
     }
+
+    fn debug_get_object_info(&self, object: ObjectReference) -> String {
+        format!("{}: marked = {:?}, head forwarding pointer = {:?}. {}", self.name(), MarkCompactSpace::<VM>::is_marked(object), MarkCompactSpace::<VM>::get_header_forwarding_pointer(object), crate::policy::sft::debug_get_object_global_info(object))
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
