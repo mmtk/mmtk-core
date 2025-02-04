@@ -1,7 +1,7 @@
 use super::mock_test_prelude::*;
 
-use crate::AllocationSemantics;
 use crate::util::alloc::allocator::{AllocationOptions, OnAllocationFail};
+use crate::AllocationSemantics;
 
 /// This test will do alloc_no_gc in a loop, and evetually fill up the heap.
 /// As alloc_no_gc will not trigger a GC, we expect to see a return value of zero, and no GC is triggered.
@@ -25,7 +25,9 @@ pub fn allocate_no_gc_simple() {
                     8,
                     0,
                     AllocationSemantics::Default,
-                    AllocationOptions { on_fail: OnAllocationFail::ReturnFailure }
+                    AllocationOptions {
+                        on_fail: OnAllocationFail::ReturnFailure,
+                    },
                 );
                 if last_result.is_zero() {
                     read_mockvm(|mock| {

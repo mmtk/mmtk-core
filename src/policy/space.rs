@@ -22,6 +22,7 @@ use crate::mmtk::SFT_MAP;
 #[cfg(debug_assertions)]
 use crate::policy::sft::EMPTY_SFT_NAME;
 use crate::policy::sft::SFT;
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::copy::*;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
@@ -31,7 +32,6 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::memory::{self, HugePageSupport, MmapProtection, MmapStrategy};
 use crate::vm::VMBinding;
-use crate::util::alloc::allocator::AllocationOptions;
 
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -77,7 +77,12 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// Check if the requested `size` is an obvious out-of-memory case using
     /// [`Self::will_oom_on_acquire`] and, if it is, call `Collection::out_of_memory`.  Return the
     /// result of `will_oom_on_acquire`.
-    fn handle_obvious_oom_request(&self, tls: VMThread, size: usize, alloc_options: AllocationOptions) -> bool {
+    fn handle_obvious_oom_request(
+        &self,
+        tls: VMThread,
+        size: usize,
+        alloc_options: AllocationOptions,
+    ) -> bool {
         if self.will_oom_on_acquire(size) {
             if alloc_options.on_fail.allow_oom_call() {
                 VM::VMCollection::out_of_memory(
@@ -106,11 +111,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // - If tls is collector, we cannot attempt a GC.
         // - If gc is disabled, we cannot attempt a GC.
         // - If overcommit is allowed, we don't attempt a GC.
-        let should_poll =
-            VM::VMActivePlan::is_mutator(tls) && VM::VMCollection::is_collection_enabled() && !alloc_options.on_fail.allow_overcommit();
+        let should_poll = VM::VMActivePlan::is_mutator(tls)
+            && VM::VMCollection::is_collection_enabled()
+            && !alloc_options.on_fail.allow_overcommit();
         // Is a GC allowed here? If we should poll but are not allowed to poll, we will panic.
         // initialize_collection() has to be called so we know GC is initialized.
-        let allow_gc = should_poll && self.common().global_state.is_initialized() && alloc_options.on_fail.allow_gc();
+        let allow_gc = should_poll
+            && self.common().global_state.is_initialized()
+            && alloc_options.on_fail.allow_gc();
 
         trace!("Reserving pages");
         let pr = self.get_page_resource();

@@ -208,7 +208,8 @@ impl<VM: VMBinding> AllocatorContext<VM> {
     }
 
     pub fn clear_alloc_options(&self) {
-        self.alloc_options.store(AllocationOptions::default(), Ordering::Relaxed);
+        self.alloc_options
+            .store(AllocationOptions::default(), Ordering::Relaxed);
     }
 
     pub fn get_alloc_options(&self) -> AllocationOptions {
@@ -271,7 +272,13 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `align`: the required alignment in bytes.
     /// * `offset` the required offset in bytes.
     /// * `overcommit`: if true, the allocation will always succeed, and the heap may go beyond the specified size.
-    fn alloc_with_options(&mut self, size: usize, align: usize, offset: usize, alloc_options: AllocationOptions) -> Address {
+    fn alloc_with_options(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: usize,
+        alloc_options: AllocationOptions,
+    ) -> Address {
         self.get_context().set_alloc_options(alloc_options);
         let ret = self.alloc(size, align, offset);
         self.get_context().clear_alloc_options();
@@ -300,7 +307,13 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `size`: the allocation size in bytes.
     /// * `align`: the required alignment in bytes.
     /// * `offset` the required offset in bytes.
-    fn alloc_slow_with_options(&mut self, size: usize, align: usize, offset: usize, alloc_options: AllocationOptions) -> Address {
+    fn alloc_slow_with_options(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: usize,
+        alloc_options: AllocationOptions,
+    ) -> Address {
         // The function is not used internally. We won't set no_gc_on_fail redundantly.
         self.get_context().set_alloc_options(alloc_options);
         let ret = self.alloc_slow(size, align, offset);
@@ -358,7 +371,9 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 return result;
             }
 
-            if result.is_zero() && self.get_context().get_alloc_options().on_fail == OnAllocationFail::ReturnFailure {
+            if result.is_zero()
+                && self.get_context().get_alloc_options().on_fail == OnAllocationFail::ReturnFailure
+            {
                 return result;
             }
 

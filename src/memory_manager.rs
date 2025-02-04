@@ -17,6 +17,7 @@ use crate::plan::AllocationSemantics;
 use crate::plan::{Mutator, MutatorContext};
 use crate::scheduler::WorkBucketStage;
 use crate::scheduler::{GCWork, GCWorker};
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout::vm_layout;
@@ -25,7 +26,6 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::slot::MemorySlice;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
-use crate::util::alloc::allocator::AllocationOptions;
 
 use std::collections::HashMap;
 
@@ -259,7 +259,7 @@ pub fn alloc_slow_with_options<VM: VMBinding>(
     align: usize,
     offset: usize,
     semantics: AllocationSemantics,
-    options: AllocationOptions
+    options: AllocationOptions,
 ) -> Address {
     mutator.alloc_slow_with_options(size, align, offset, semantics, options)
 }

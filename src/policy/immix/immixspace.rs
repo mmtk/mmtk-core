@@ -7,6 +7,7 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::sft_map::SFTMap;
 use crate::policy::space::{CommonSpace, Space};
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::alloc::allocator::AllocatorContext;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;
@@ -28,7 +29,6 @@ use crate::{
     util::opaque_pointer::{VMThread, VMWorkerThread},
     MMTK,
 };
-use crate::util::alloc::allocator::AllocationOptions;
 use atomic::Ordering;
 use std::sync::{atomic::AtomicU8, atomic::AtomicUsize, Arc};
 
@@ -517,7 +517,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Allocate a clean block.
-    pub fn get_clean_block(&self, tls: VMThread, copy: bool, alloc_options: AllocationOptions) -> Option<Block> {
+    pub fn get_clean_block(
+        &self,
+        tls: VMThread,
+        copy: bool,
+        alloc_options: AllocationOptions,
+    ) -> Option<Block> {
         let block_address = self.acquire(tls, Block::PAGES, alloc_options);
         if block_address.is_zero() {
             return None;
