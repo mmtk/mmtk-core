@@ -4,9 +4,9 @@ use crate::util::alloc::allocator::{AllocationOptions, OnAllocationFail};
 use crate::AllocationSemantics;
 
 /// This test will do alloc_with_options in a loop, and evetually fill up the heap.
-/// As we require alloc_with_options not to trigger a GC, we expect to see a return value of zero, and no GC is triggered.
+/// As we require alloc_with_options to over commit, we expect to see valid return values, and no GC is triggered.
 #[test]
-pub fn allocate_no_gc_simple() {
+pub fn allocate_overcommit() {
     // 1MB heap
     with_mockvm(
         default_setup,
@@ -29,18 +29,17 @@ pub fn allocate_no_gc_simple() {
                         on_fail: OnAllocationFail::ReturnFailure,
                     },
                 );
-                if last_result.is_zero() {
-                    read_mockvm(|mock| {
-                        assert!(!mock.block_for_gc.is_called());
-                    });
-                    read_mockvm(|mock| {
-                        assert!(!mock.out_of_memory.is_called());
-                    });
-                }
+                assert!(!last_result.is_zero());
+                read_mockvm(|mock| {
+                    assert!(!mock.block_for_gc.is_called());
+                });
+                read_mockvm(|mock| {
+                    assert!(!mock.out_of_memory.is_called());
+                });
             }
 
-            // The allocation should consume all the heap, and the last result should be zero (failure).
-            assert!(last_result.is_zero());
+            // The allocation should consume all the heap, but we allow over commit and the last result should be not zero (failure).
+            assert!(!last_result.is_zero());
         },
         no_cleanup,
     )
