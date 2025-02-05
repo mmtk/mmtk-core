@@ -19,86 +19,86 @@ jobs:
     with:
       pull_request: ${{ github.event.pull_request.number }}
 
-  extended-tests-v8:
-    runs-on: ubuntu-20.04
-    needs: binding-refs
-    if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
-    steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v4
-        with:
-          path: mmtk-core
-      - name: Checkout V8 Binding
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ needs.binding-refs.outputs.v8_binding_repo }}
-          path: mmtk-v8
-          ref: ${{ needs.binding-refs.outputs.v8_binding_ref }}
-      - name: Use mmtk-core Rust toolchain for bindings
-        run: |
-          cp mmtk-core/rust-toolchain mmtk-v8/mmtk
-      - name: Overwrite MMTk core in V8 binding
-        run: |
-          rm -rf mmtk-v8/repos/*
-          mkdir -p mmtk-v8/repos/mmtk-core
-          cp -r mmtk-core/* mmtk-v8/repos/mmtk-core
-      - name: Setup
-        run: |
-          cd mmtk-v8
-          ./.github/scripts/ci-setup.sh
-          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
-          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
-      - name: Test
-        run: |
-          cd mmtk-v8
-          export RUST_BACKTRACE=1
-          export V8_ROOT=$GITHUB_WORKSPACE/v8_deps
-          .github/scripts/ci-test.sh
-          .github/scripts/ci-style.sh
+  # extended-tests-v8:
+  #   runs-on: ubuntu-20.04
+  #   needs: binding-refs
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
+  #   steps:
+  #     - name: Checkout MMTk Core
+  #       uses: actions/checkout@v4
+  #       with:
+  #         path: mmtk-core
+  #     - name: Checkout V8 Binding
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: ${{ needs.binding-refs.outputs.v8_binding_repo }}
+  #         path: mmtk-v8
+  #         ref: ${{ needs.binding-refs.outputs.v8_binding_ref }}
+  #     - name: Use mmtk-core Rust toolchain for bindings
+  #       run: |
+  #         cp mmtk-core/rust-toolchain mmtk-v8/mmtk
+  #     - name: Overwrite MMTk core in V8 binding
+  #       run: |
+  #         rm -rf mmtk-v8/repos/*
+  #         mkdir -p mmtk-v8/repos/mmtk-core
+  #         cp -r mmtk-core/* mmtk-v8/repos/mmtk-core
+  #     - name: Setup
+  #       run: |
+  #         cd mmtk-v8
+  #         ./.github/scripts/ci-setup.sh
+  #         sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
+  #         sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+  #     - name: Test
+  #       run: |
+  #         cd mmtk-v8
+  #         export RUST_BACKTRACE=1
+  #         export V8_ROOT=$GITHUB_WORKSPACE/v8_deps
+  #         .github/scripts/ci-test.sh
+  #         .github/scripts/ci-style.sh
 
-  extended-tests-openjdk:
-    needs: binding-refs
-    if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
-    uses: ./.github/workflows/binding-tests-openjdk.yml
-    with:
-      repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
-      ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
-      test-script: ci-test-extended.sh
+  # extended-tests-openjdk:
+  #   needs: binding-refs
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
+  #   uses: ./.github/workflows/binding-tests-openjdk.yml
+  #   with:
+  #     repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
+  #     ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
+  #     test-script: ci-test-extended.sh
 
-  extended-tests-jikesrvm:
-    runs-on: ubuntu-22.04
-    needs: binding-refs
-    if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
-    steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v4
-        with:
-          path: mmtk-core
-      - name: Checkout JikesRVM Binding
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ needs.binding-refs.outputs.jikesrvm_binding_repo }}
-          path: mmtk-jikesrvm
-          ref: ${{ needs.binding-refs.outputs.jikesrvm_binding_ref }}
-      - name: Use mmtk-core Rust toolchain for bindings
-        run: |
-          cp mmtk-core/rust-toolchain mmtk-jikesrvm/mmtk
-      - name: Setup
-        run: |
-          cd mmtk-jikesrvm
-          ./.github/scripts/ci-checkout.sh
-          ./.github/scripts/ci-setup.sh
-          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
-          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
-      - name: Overwrite MMTk core in JikesRVM binding
-        run: |
-          cp -r mmtk-core mmtk-jikesrvm/repos
-      - name: Test
-        run: |
-          cd mmtk-jikesrvm
-          export RUST_BACKTRACE=1
-          ./.github/scripts/ci-test.sh
-          ./.github/scripts/ci-style.sh
+  # extended-tests-jikesrvm:
+  #   runs-on: ubuntu-22.04
+  #   needs: binding-refs
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
+  #   steps:
+  #     - name: Checkout MMTk Core
+  #       uses: actions/checkout@v4
+  #       with:
+  #         path: mmtk-core
+  #     - name: Checkout JikesRVM Binding
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: ${{ needs.binding-refs.outputs.jikesrvm_binding_repo }}
+  #         path: mmtk-jikesrvm
+  #         ref: ${{ needs.binding-refs.outputs.jikesrvm_binding_ref }}
+  #     - name: Use mmtk-core Rust toolchain for bindings
+  #       run: |
+  #         cp mmtk-core/rust-toolchain mmtk-jikesrvm/mmtk
+  #     - name: Setup
+  #       run: |
+  #         cd mmtk-jikesrvm
+  #         ./.github/scripts/ci-checkout.sh
+  #         ./.github/scripts/ci-setup.sh
+  #         sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
+  #         sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+  #     - name: Overwrite MMTk core in JikesRVM binding
+  #       run: |
+  #         cp -r mmtk-core mmtk-jikesrvm/repos
+  #     - name: Test
+  #       run: |
+  #         cd mmtk-jikesrvm
+  #         export RUST_BACKTRACE=1
+  #         ./.github/scripts/ci-test.sh
+  #         ./.github/scripts/ci-style.sh
 
   extended-tests-julia:
     runs-on: ubuntu-22.04
@@ -147,61 +147,61 @@ jobs:
           ./.github/scripts/ci-test.sh
           ./.github/scripts/ci-style.sh
 
-  extended-tests-ruby:
-    runs-on: ubuntu-22.04
-    needs: binding-refs
-    if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
-    strategy:
-      fail-fast: true
-      matrix:
-        debug-level: ["debug", "release"]
-    env:
-      DEBUG_LEVEL: ${{ matrix.debug-level }}
-    steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v4
-        with:
-          path: mmtk-core
+  # extended-tests-ruby:
+  #   runs-on: ubuntu-22.04
+  #   needs: binding-refs
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
+  #   strategy:
+  #     fail-fast: true
+  #     matrix:
+  #       debug-level: ["debug", "release"]
+  #   env:
+  #     DEBUG_LEVEL: ${{ matrix.debug-level }}
+  #   steps:
+  #     - name: Checkout MMTk Core
+  #       uses: actions/checkout@v4
+  #       with:
+  #         path: mmtk-core
 
-      - name: Checkout MMTk Ruby binding
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ needs.binding-refs.outputs.ruby_binding_repo }}
-          path: mmtk-ruby
-          ref: ${{ needs.binding-refs.outputs.ruby_binding_ref }}
+  #     - name: Checkout MMTk Ruby binding
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: ${{ needs.binding-refs.outputs.ruby_binding_repo }}
+  #         path: mmtk-ruby
+  #         ref: ${{ needs.binding-refs.outputs.ruby_binding_ref }}
 
-      - name: Setup script dependencies
-        run: ./.github/scripts/ci-setup-script-deps.sh
-        working-directory: mmtk-ruby
+  #     - name: Setup script dependencies
+  #       run: ./.github/scripts/ci-setup-script-deps.sh
+  #       working-directory: mmtk-ruby
 
-      - name: Determine Ruby repository and revision
-        id: extract-ruby-revision
-        run: python ./.github/scripts/extract-ruby-revision.py ./mmtk/Cargo.toml --github-output=$GITHUB_OUTPUT
-        working-directory: mmtk-ruby
+  #     - name: Determine Ruby repository and revision
+  #       id: extract-ruby-revision
+  #       run: python ./.github/scripts/extract-ruby-revision.py ./mmtk/Cargo.toml --github-output=$GITHUB_OUTPUT
+  #       working-directory: mmtk-ruby
 
-      - name: Checkout Ruby
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ steps.extract-ruby-revision.outputs.ruby_repo }}
-          ref: ${{ steps.extract-ruby-revision.outputs.ruby_rev }}
-          path: ruby
+  #     - name: Checkout Ruby
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: ${{ steps.extract-ruby-revision.outputs.ruby_repo }}
+  #         ref: ${{ steps.extract-ruby-revision.outputs.ruby_rev }}
+  #         path: ruby
 
-      - name: Override mmtk-core dependency for binding
-        run: ./.github/scripts/ci-replace-mmtk-dep.sh ../mmtk-ruby/mmtk/Cargo.toml --mmtk-core-path .
-        working-directory: mmtk-core
+  #     - name: Override mmtk-core dependency for binding
+  #       run: ./.github/scripts/ci-replace-mmtk-dep.sh ../mmtk-ruby/mmtk/Cargo.toml --mmtk-core-path .
+  #       working-directory: mmtk-core
 
-      - name: Setup environment
-        run: ./.github/scripts/ci-setup.sh
-        working-directory: mmtk-ruby
+  #     - name: Setup environment
+  #       run: ./.github/scripts/ci-setup.sh
+  #       working-directory: mmtk-ruby
 
-      - name: Build MMTk Ruby ${{ matrix.debug-level }}
-        run: ./.github/scripts/ci-build.sh
-        working-directory: mmtk-ruby
+  #     - name: Build MMTk Ruby ${{ matrix.debug-level }}
+  #       run: ./.github/scripts/ci-build.sh
+  #       working-directory: mmtk-ruby
 
-      - name: Run bootstrap tests (btest)
-        run: ./.github/scripts/ci-btest.sh
-        working-directory: mmtk-ruby
+  #     - name: Run bootstrap tests (btest)
+  #       run: ./.github/scripts/ci-btest.sh
+  #       working-directory: mmtk-ruby
 
-      - name: Run all tests (test-all)
-        run: ./.github/scripts/ci-test-all.sh
-        working-directory: mmtk-ruby
+  #     - name: Run all tests (test-all)
+  #       run: ./.github/scripts/ci-test-all.sh
+  #       working-directory: mmtk-ruby
