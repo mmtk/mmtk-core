@@ -28,30 +28,38 @@ pub enum AllocationError {
     MmapOutOfMemory,
 }
 
+/// Behavior when an allocation fails, and a GC is expected.
 #[repr(u8)]
 #[derive(Copy, Clone, Default, PartialEq, bytemuck::NoUninit, Debug)]
 pub enum OnAllocationFail {
+    /// Request the GC. This is the default behavior.
     #[default]
     RequestGC,
+    /// Instead of requesting GC, the allocation request returns with a failure value.
     ReturnFailure,
+    /// Instead of requesting GC, the allocation request simply overcommits the memory,
+    /// and return a valid result at its best efforts.
     OverCommit,
 }
 
 impl OnAllocationFail {
-    pub fn allow_oom_call(&self) -> bool {
+    pub(crate) fn allow_oom_call(&self) -> bool {
         *self == Self::RequestGC
     }
-    pub fn allow_gc(&self) -> bool {
+    pub(crate) fn allow_gc(&self) -> bool {
         *self == Self::RequestGC
     }
-    pub fn allow_overcommit(&self) -> bool {
+    pub(crate) fn allow_overcommit(&self) -> bool {
         *self == Self::OverCommit
     }
 }
 
+/// Allow specifying different behaviors with [`Allocator::alloc_with_options`].
 #[repr(C)]
 #[derive(Copy, Clone, Default, PartialEq, bytemuck::NoUninit, Debug)]
 pub struct AllocationOptions {
+    /// When the allocation fails and a GC is originally expected, on_fail
+    /// allows a different behavior to avoid the GC.
     pub on_fail: OnAllocationFail,
 }
 
@@ -264,14 +272,13 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `offset` the required offset in bytes.
     fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address;
 
-    /// An allocation attempt. Mostly the same as [`Allocator::alloc`], except that MMTk will
-    /// not trigger a GC on allocation failure.
+    /// An allocation attempt. The allocation options may specify different behaviors for this allocation request.
     ///
     /// Arguments:
     /// * `size`: the allocation size in bytes.
     /// * `align`: the required alignment in bytes.
     /// * `offset` the required offset in bytes.
-    /// * `overcommit`: if true, the allocation will always succeed, and the heap may go beyond the specified size.
+    /// * `options`: the allocation options to change the default allocation behavior for this request.
     fn alloc_with_options(
         &mut self,
         size: usize,
@@ -297,11 +304,11 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         self.alloc_slow_inline(size, align, offset)
     }
 
-    /// Slowpath allocation attempt. Mostly the same as [`Allocator::alloc_slow`], except that MMTk will
-    /// not trigger a GC on allocation failure.
+    /// Slowpath allocation attempt. Mostly the same as [`Allocator::alloc_slow`], except that the allocation options
+    /// may specify different behaviors for this allocation request.
     ///
     /// This function is not used internally. It is mostly for the bindings.
-    /// [`Allocator::alloc_no_gc`] still calls the normal [`Allocator::alloc_slow`].
+    /// [`Allocator::alloc_with_options`] still calls the normal [`Allocator::alloc_slow`].
     ///
     /// Arguments:
     /// * `size`: the allocation size in bytes.

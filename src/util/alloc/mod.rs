@@ -5,6 +5,8 @@ pub(crate) mod allocator;
 pub use allocator::fill_alignment_gap;
 pub use allocator::AllocationError;
 pub use allocator::Allocator;
+pub use allocator::AllocationOptions;
+pub use allocator::OnAllocationFail;
 
 /// A list of all the allocators, embedded in Mutator
 pub(crate) mod allocators;

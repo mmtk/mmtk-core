@@ -315,14 +315,14 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
         offset: usize,
         allocator: AllocationSemantics,
     ) -> Address;
-    /// Allocate memory for an object. This function will not trigger a GC on failed allocation.
+    /// Allocate memory for an object with more options to control this allocation request, e.g. not triggering a GC on fail.
     ///
     /// Arguments:
     /// * `size`: the number of bytes required for the object.
     /// * `align`: required alignment for the object.
     /// * `offset`: offset associated with the alignment. The result plus the offset will be aligned to the given alignment.
     /// * `allocator`: the allocation semantic used for this object.
-    /// * `overcommit`: if true, the allocation request will always succeed, and the heap may go beyond the specified size.
+    /// * `options`: the allocation options to change the default allocation behavior for this request.
     fn alloc_with_options(
         &mut self,
         size: usize,
@@ -343,7 +343,7 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
         offset: usize,
         allocator: AllocationSemantics,
     ) -> Address;
-    /// The slow path allocation for [`MutatorContext::alloc_no_gc`]. This function will not trigger a GC on failed allocation.
+    /// The slow path allocation for [`MutatorContext::alloc_with_options`].
     ///
     /// This is only useful when the binding
     /// implements the fast path allocation, and would like to explicitly

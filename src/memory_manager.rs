@@ -152,7 +152,7 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
 /// the current thread that is allocating. Callers of `alloc` must be aware of this behavior.
 /// For example, JIT compilers that support
 /// precise stack scanning need to make the call site of `alloc` a GC-safe point by generating stack maps. See
-/// [`alloc_no_gc`] if it is undesirable to trigger GC at this allocation site.
+/// [`alloc_with_options`] if it is undesirable to trigger GC at this allocation site.
 ///
 /// If MMTk has attempted at least one GC, and still cannot free up enough memory, it will call
 /// [`crate::vm::Collection::out_of_memory`] to inform the binding. The VM binding
@@ -184,13 +184,11 @@ pub fn alloc<VM: VMBinding>(
 
 /// Allocate memory for an object.
 ///
-/// The semantics of this function is the same as [`alloc`], except that when MMTk fails to allocate
-/// memory, it will simply return zero. This function is guaranteed not to trigger GC and not to
-/// call [`crate::vm::Collection::block_for_gc`] or [`crate::vm::Collection::out_of_memory`].
-///
-/// Generally [`alloc`] is preferred over this function. This function should only be used
-/// when the binding does not want GCs to happen at certain allocation sites (for example, places
-/// where stack maps cannot be generated), and is able to handle allocation failure if that happens.
+/// This allocation function allows alternation to the allocation behaviors, specified by the
+/// [`crate::util::alloc::AllocationOptions`]. For example, one can allow
+/// overcommit the memory to go beyond the heap size without triggering a GC. This function can be
+/// used in certain cases where the runtime needs a different allocation behavior other than
+/// what the default [`alloc`] provides.
 ///
 /// Arguments:
 /// * `mutator`: The mutator to perform this allocation request.
@@ -198,7 +196,7 @@ pub fn alloc<VM: VMBinding>(
 /// * `align`: Required alignment for the object.
 /// * `offset`: Offset associated with the alignment.
 /// * `semantics`: The allocation semantic required for the allocation.
-/// * `overcommit`: if true, the allocation request will always succeed, and the heap may go beyond the specified size.
+/// * `options`: the allocation options to change the default allocation behavior for this request.
 pub fn alloc_with_options<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     size: usize,
@@ -238,11 +236,13 @@ pub fn alloc_slow<VM: VMBinding>(
     mutator.alloc_slow(size, align, offset, semantics)
 }
 
-/// Invoke the allocation slow path of [`alloc_no_gc`].
+/// Invoke the allocation slow path of [`alloc_with_options`].
 ///
-/// Like [`alloc_no_gc`], this function is guaranteed not to trigger GC and not to call
-/// [`crate::vm::Collection::block_for_gc`] or [`crate::vm::Collection::out_of_memory`].  It returns zero on
-/// allocation failure.
+/// Like [`alloc_with_options`], This allocation function allows alternation to the allocation behaviors, specified by the
+/// [`crate::util::alloc::AllocationOptions`]. For example, one can allow
+/// overcommit the memory to go beyond the heap size without triggering a GC. This function can be
+/// used in certain cases where the runtime needs a different allocation behavior other than
+/// what the default [`alloc`] provides.
 ///
 /// Like [`alloc_slow`], this function is also only intended for use when a binding implements the
 /// fastpath on the binding side.
