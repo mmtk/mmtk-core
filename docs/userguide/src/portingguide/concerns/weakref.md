@@ -1,16 +1,36 @@
 # Finalizers and Weak References
 
-Some VMs support **finalizers**.  In simple terms, finalizers are clean-up operations associated
-with an object, and are executed when the object is dead.
+Some VMs support *finalizers*, *weak references*, and other complex data structures that have weak
+reference semantics, such as weak tables (hash tables where the key, the value or both can be weak
+references), ephemerons, etc.  The concrete semantics of finalizer and weak reference varies from VM
+to VM, but MMTk provides a low-level API that allows the VM bindings to implement their flavors of
+finalizer and weak references on top of it.
 
-Some VMs support **weak references**.  If an object cannot be reached from roots following only
-strong references, the object will be considered dead.  Weak references to dead objects will be
-cleared, and associated clean-up operations will be executed.  Some VMs also support more complex
-weak data structures, such as weak hash tables, where keys, values, or both, can be weak references.
+## Definitions
 
-The concrete semantics of finalizer and weak reference varies from VM to VM, but MMTk provides a
-low-level API that allows the VM bindings to implement their flavors of finalizer and weak
-references on top of it.
+In this chapter, we use the following definitions.  They may be different from the definitions in
+concrete VMs.
+
+**Finalizers** are clean-up operations associated with an object, and are executed when the garbage
+collector determines the object is no longer reachable.  Depending on the VM,
+
+-   Finalizers may be executed immediately during GC, or postponed to mutator time.
+-   They may have access to the object body, or executed independently from the object.
+-   They may "resurrect" the unreachable object, or guarantee unreachable objects remain unreachable
+    after finalization.
+
+**Weak references** are special [object graph] edges distinct from ordinary "strong" references.
+
+-   An object is *strongly reachable* if there is a path from roots to the object that contains only
+    strong references.
+-   An object is *weakly reachable* if any path from the roots to the object must contain at least
+    one weak reference.
+
+The garbage collector may reclaim weakly reachable objects, clear weak reference (by, for
+example, assigning `null` to the slot that holds the weak reference), and/or performing associated
+clean-up operations.
+
+[object graph]: ../../glossary.html#object-graph
 
 **A note for Java programmers**: In Java, the term "weak reference" often refers to instances of
 `java.lang.ref.Reference` (including the concrete classes `SoftReference`, `WeakReference`,

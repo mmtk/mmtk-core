@@ -2,6 +2,8 @@
 
 [Introduction](README.md)
 
+[Glossary](glossary.md)
+
 # For GC Developers
 
 - [Tutorial: Add a new GC plan to MMTk](tutorial/prefix.md)
