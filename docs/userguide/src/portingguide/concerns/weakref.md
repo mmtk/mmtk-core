@@ -40,22 +40,23 @@ a field that contains a pointer to the referent, and the field can be cleared wh
 dies.  In this article, we use the term "weak reference" to refer to the pointer inside that field.
 In other words, a Java `Reference` instance has a field that holds a weak reference to the referent.
 
-## Overview
+## Overview of MMTk's finalizer and weak reference processing API
 
-During each GC, after the transitive closure is computed (i.e. after all objects reachable from
-roots have been reached), MMTk calls `Scanning::process_weak_refs` which is implemented by the VM
-binding.  Inside this function, the VM binding can do several things.
+During each GC, after the transitive closure is computed (i.e. after all objects strongly reachable
+from roots have been reached), MMTk calls `Scanning::process_weak_refs` which is implemented by the
+VM binding.  Inside this function, the VM binding can do several things.
 
 -   **Query reachability**: The VM binding can query whether any given object has been reached.
     +   Do this with `ObjectReference::is_reachable()`.
 -   **Query forwarded address**: If an object is already reached, the VM binding can further query
     the new address of an object.  This is needed to support copying GC.
     +   Do this with `ObjectReference::get_forwarded_object()`.
--   **Resurrect objects**: If an object is not reached, the VM binding can optionally resurrect the
-    object.  It will keep that object *and all descendants* alive.
+-   **Retain objects**: If an object is not reached at this time, the VM binding can optionally
+    retain the object.  It will make that object *and all descendants* reachable, and keep them
+    alive during this GC.
     +   Do this with the `tracer_context` argument of `process_weak_refs`.
 -   **Request another invocation**: The VM binding can request `Scanning::process_weak_refs` to be
-    called again after computing the transitive closure that includes *resurrected objects and their
+    called again after computing the transitive closure that includes *retained objects and their
     descendants*.  This helps handling multiple levels of weak reference strength.
     +   Do this by returning `true` from `process_weak_refs`.
 
