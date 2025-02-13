@@ -224,11 +224,10 @@ through all fields that contain weak references to objects.  For each field,
 
 ### Identifying weak references
 
-Weak references in *global slots*, including fields of global data structures as well as keys and/or
-values in global weak tables, are relatively straightforward.  We just need to enumerate them in
-`Scanning::process_weak_refs`.
+Weak references in fields of *global* (per-VM) data structures are relatively straightforward.  We
+just need to enumerate them in `Scanning::process_weak_refs`.
 
-There are also *fields* in heap objects that hold weak references to other heap objects.  There are
+There are also fields in *heap objects* that hold weak references to other heap objects.  There are
 two basic ways to identify them.
 
 -   **Register on creation**: We may record objects that contain weak reference fields in a global
