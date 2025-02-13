@@ -26,9 +26,8 @@ collector determines the object is no longer reachable.  Depending on the VM,
 -   An object is *weakly reachable* if any path from the roots to the object must contain at least
     one weak reference.
 
-The garbage collector may reclaim weakly reachable objects, clear weak reference (by, for
-example, assigning `null` to the slot that holds the weak reference), and/or performing associated
-clean-up operations.
+The garbage collector may reclaim weakly reachable objects, clear weak references to weakly
+reachable objects, and/or performing associated clean-up operations.
 
 [object graph]: ../../glossary.html#object-graph
 
@@ -120,15 +119,16 @@ immediately in `process_weak_refs`, or in created work packets in the `VMRefClos
 
 However, if the VM needs to execute finalizers after GC, it will be a problem because the object
 will have been reclaimed, and memory of the object will have been overwritten by other objects.  In
-this case, the VM will need to "resurrect" the dead object.
+this case, the VM will need to retain the dead object to make it accessible after the current GC.
 
-### Resurrecting dead objects
+### Retaining unreachable objects
 
-Some VMs, particularly the Java VM, executes finalizers during mutator time.  The dead finalizable
-objects must be brought back to life so that they can still be accessed after the GC.
+Some VMs, particularly the Java VM, executes finalizers during mutator time.  Any finalizable
+objects unreachable before a GC must be retained so that they can still be accessed by their
+finalizers after the GC.
 
 The `Scanning::process_weak_refs` has an parameter `tracer_context: impl ObjectTracerContext<VM>`.
-This parameter provides the necessary mechanism to resurrect objects and make them (and their
+This parameter provides the necessary mechanism to retain objects and make them (and their
 descendants) live through the current GC.  The typical use pattern is:
 
 ```rust
@@ -143,11 +143,11 @@ impl<VM: VMBinding> Scanning<VM> for VMScanning {
         tracer_context.with_tracer(worker, |tracer| {
             for object in finalizable_objects {
                 if object.is_reachable() {
-                    // Object is still alive, and may be moved if it's copying GC.
+                    // Object is still reachable, and may have been moved if it is a copying GC.
                     let new_object = object.get_forwarded_object().unwrap_or(object);
                     new_finalizable_objects.push(new_object);
                 } else {
-                    // Object is dead.  Resurrect it.
+                    // Object is unreachable.  Retain it.
                     let new_object = tracer.trace_object(object);
                     enqueue_finalizable_object_to_be_executed_later(new_object);
                 }
@@ -160,17 +160,17 @@ impl<VM: VMBinding> Scanning<VM> for VMScanning {
 ```
 
 Within the closure `|tracer| { ... }`, the VM binding can call `tracer.trace_object(object)` to
-resurrect `object`.  It returns the new address of `object` because in a copying GC the
-`trace_object` function can also move the object.
+retain `object`.  It returns the new address of `object` because in a copying GC the `trace_object`
+function can also move the object.
 
 Under the hood, `tracer_context.with_tracer` creates a queue and calls the closure.  The `tracer`
 implements the `ObjectTracer`  trait, and is just an interface that provides the `trace_object`
-method.  Objects resurrected by `tracer.trace_object` will be enqueued.  After the closure returns,
+method.  Objects retained by `tracer.trace_object` will be enqueued.  After the closure returns,
 `with_tracer` will split the queue into reasonably-sized work packets and add them to the
-`VMRefClosure` work bucket.  Those work packets will trace the resurrected objects and their
-descendants, effectively expanding the transitive closure to include objects reachable from the
-resurrected objects.  Because of the overhead of creating queues and work packets, the VM binding
-should **resurrect as objects as needed in one invocation of `with_tracer`, and avoid calling
+`VMRefClosure` work bucket.  Those work packets will trace the retained objects and their
+descendants, effectively expanding the transitive closure to include all objects reachable from the
+retained objects.  Because of the overhead of creating queues and work packets, the VM binding
+should **retain as many objects as needed in one invocation of `with_tracer`, and avoid calling
 `with_tracer` again and again for each object**.
 
 **Don't do this**:
@@ -185,8 +185,31 @@ for object in objects {
 
 Keep in mind that **tracer_context implements the `Clone` trait**.  As introduced in the *When to
 run finalizers* section, the VM binding can use work packets to parallelize finalizer processing.
-If finalizable objects can be resurrected, the VM binding can clone the `trace_context` and give
+If finalizable objects need to be retained, the VM binding can clone the `trace_context` and give
 each work packet a clone of `tracer_context`.
+
+### WARNING: object resurrection
+
+If the VM binding retains an unreachable object for finalization, and the finalizer writes a
+reference of that object into a place readable by application threads, including global or static
+variable, then the previously unreachable object will become reachable by the application again.
+This phenomenon is known as **"resurrection"**, and can be surprising to the programmers.
+
+Developers of VM bindings of existing VMs may have no choice but implementing the finalizer
+semantics strictly according to the specification of the VM, even if that would result in
+"resurrection".  JVM is a well-known example of the "resurrection" behavior, although the
+`Object.finalize()` method has been deprecated for removal, in favor for alternative clean-up
+mechanisms such as `PhantomReference` and `Cleaner` which never "resurrect" objects.
+
+Designers of new programming languages or VMs should be aware of the "resurrection" problem.  It is
+recommended not to let finalizers have access to the object body.  For finalizers that need to
+release certain resources (such as files), the VM may store relevant data (such as file descriptors)
+in a separate object and use that as the context of the finalizer.
+
+To avoid unintentionally "resurrecting" objects, if the VM binding intends to get the new address of
+a moved object, it should use `object.get_forwarded_object()` instead of
+`tracer.trace_object(object)`, although the latter also returns the new address if `object` is
+already moved.
 
 
 ## Supporting weak references
@@ -201,12 +224,12 @@ through all fields that contain weak references to objects.  For each field,
 
 ### Identifying weak references
 
-Weak references in global slots, including fields of global data structures as well as keys and/or
+Weak references in *global slots*, including fields of global data structures as well as keys and/or
 values in global weak tables, are relatively straightforward.  We just need to enumerate them in
 `Scanning::process_weak_refs`.
 
-There are also fields that in heap objects that hold weak references to other heap objects.  There
-are two basic ways to identify them.
+There are also *fields* in heap objects that hold weak references to other heap objects.  There are
+two basic ways to identify them.
 
 -   **Register on creation**: We may record objects that contain weak reference fields in a global
     list when such objects are created.  In `Scanning::process_weak_refs`, we just need to iterate
@@ -229,16 +252,16 @@ will be executed after the weak reference is cleared.
 Such clean-up operations can be supported similar to finalizers.  While we enumerate weak references
 in `Scanning::process_weak_refs`, we clear weak references to unreachable objects.  Depending on the
 semantics, we may choose to execute the clean-up operations immediately, or enqueue them to be
-executed after GC.  We may resurrect the unreachable referent if we need to.
+executed after GC.  We may retain the unreachable referent if we need to.
 
 ### Soft references
 
 Java has a special kind of weak reference: `SoftReference`.  The API allows the GC to choose between
-(1) resurrecting softly reachable referents, and (2) clearing references to softly reachable
-objects.  When using MMTk, there are two ways to implement this semantics.
+(1) retaining softly reachable referents, and (2) clearing references to softly reachable objects.
+When using MMTk, there are two ways to implement this semantics.
 
 The easiest way is **treating `SoftReference` as strong references in non-emergency GCs, and
-treating them as weak references in emergency GCs**.
+treating them like `WeakReference` in emergency GCs**.
 
 -   During non-emergency GC, we let `Scanning::scan_object` and
     `Scanning::scan_object_and_trace_edges` scan the weak reference field inside a `SoftReference`
@@ -246,13 +269,12 @@ treating them as weak references in emergency GCs**.
     closure after the `Closure` stage will also include softly reachable objects, and they will be
     kept alive just like strongly reachable objects.
 -   During emergency GC, however, skip this field in `Scanning::scan_object` or
-    `Scanning::scan_object_and_trace_edges` , and clear `SoftReference` just like `WeakReference` in
+    `Scanning::scan_object_and_trace_edges`, and clear `SoftReference` just like `WeakReference` in
     `Scanning::process_weak_refs`.  In this way, softly reachable objects will be dead unless they
     are subject to finalization.
 
-The other way is **resurrecting referents of `SoftReference` after the strong closure**.  This
-involves supporting multiple levels of reference strengths, which will be introduced in the next
-section.
+The other way is **retaining referents of `SoftReference` after the strong closure**.  This involves
+supporting multiple levels of reference strengths, which will be introduced in the next section.
 
 ### Multiple levels of reference strength
 
@@ -262,10 +284,10 @@ order of decreasing strength.
 
 This can be supported by running `Scanning::process_weak_refs` multiple times.  If
 `process_weak_refs` returns `true`, it will be called again after all pending work packets in the
-`VMRefClosure` stage has been executed.  Those work packets include all work packets that compute
-the transitive closure from objects resurrected during `process_weak_refs`.  This allows the VM
+`VMRefClosure` stage has been executed.  Those pending work packets include all work packets that
+compute the transitive closure from objects retained during `process_weak_refs`.  This allows the VM
 binding to expand the transitive closure multiple times, each handling weak references at different
-levels of reachability.
+levels of strength.
 
 Take Java as an example,  we may run `process_weak_refs` four times.
 
@@ -274,13 +296,12 @@ Take Java as an example,  we may run `process_weak_refs` four times.
         -   forward the referent field.
     -   If the referent is unreachable, then
         -   if it is not emergency GC, then
-            -   resurrect the referent and update the referent field.
+            -   retain the referent and update the referent field.
         -   it it is emergency GC, then
             -   clear the referent field, remove the `SoftReference` from the list of soft
                 references, and optionally enqueue it to the associated `ReferenceQueue` if it has
                 one.
-    -   (This step may expand the transitive closure in emergency GC if any referents are
-        resurrected.)
+    -   (This step may expand the transitive closure in emergency GC if any referents are retained.)
 2.  Visit all `WeakReference`.
     -   If the referent is reachable, then
         -   forward the referent field.
@@ -293,7 +314,7 @@ Take Java as an example,  we may run `process_weak_refs` four times.
         -   forward the reference to it.
     -   If the finalizable object is unreachable, then
         -   remove it from the list of finalizable objects, and enqueue it for finalization.
-    -   (This step may expand the transitive closure if any finalizable objects are resurrected.)
+    -   (This step may expand the transitive closure if any finalizable objects are retained.)
 4.  Visit all `PhantomReference`.
     -   If the referent is reachable, then
         -   forward the referent field.
@@ -306,8 +327,8 @@ Take Java as an example,  we may run `process_weak_refs` four times.
 
 As an optimization,
 
--   Step 1 can be eliminated by merging it with the strong closure in non-emergency GC, or with
-    `WeakReference` processing in emergency GC, as we described in the previous section.
+-   Step 1 can be, as we described in the previous section, eliminated by merging it with the strong
+    closure in non-emergency GC, or with `WeakReference` processing in emergency GC.
 -   Step 2 can be merged with Step 3 since Step 2 never expands the transitive closure.
 
 Therefore, we only need to run `process_weak_refs` twice:
@@ -345,7 +366,6 @@ fn process_weak_ref(...) -> bool {
             return false; // Proceed to the Release stage.
         }
     }
-
 }
 ```
 
@@ -367,20 +387,20 @@ do the tracing.  We maintain a queue of ephemerons which is empty before the `Cl
 1.  In `Scanning::scan_object` and `Scanning::scan_object_and_trace_edges`, we enqueue ephemerons as
     we scan them, but do not trace either the key or the value fields.
 2.  In `Scanning::process_weak_refs`, we iterate through all ephemerons in the queue.  If the key of
-    an ephemeron is reached, but its value has not yet been reached, then resurrect its value, and
+    an ephemeron is reached, but its value has not yet been reached, then retain its value, and
     remove the ephemeron from the queue.  Otherwise, keep the object in the queue.
-3.  If any value is resurrected, return `true` from `Scanning::process_weak_refs` so that it will be
+3.  If any value is retained, return `true` from `Scanning::process_weak_refs` so that it will be
     called again after the transitive closure from retained values are computed.  Then go back to
     Step 2.
-4.  If no value is resurrected, the algorithm completes.  The queue contains reachable ephemerons
-    that have unreachable keys.
+4.  If no value is retained, the algorithm completes.  The queue contains reachable ephemerons that
+    have unreachable keys.
 
 This algorithm can be modified if we have a list of all ephemerons before GC starts.  We no longer
 need to maintain the queue.
 
 -   In Step 1, we don't need to enqueue ephemerons.
--   In Step 2, we iterate through all ephemerons, and we resurrect the value if both the ephemeron
-    itself and the key are reached, and the value is not reached yet.  We don't need to remove any
+-   In Step 2, we iterate through all ephemerons.  We retain the value if both the ephemeron itself
+    and the key are reached, and the value is not reached yet.  We don't need to remove any
     ephemeron from the list.
 -   When the algorithm completes, we can identify both reachable and unreachable ephemerons that
     have unreachable keys.  But we need to remove unreachable (dead) ephemerons from the list
