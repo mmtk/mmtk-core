@@ -252,6 +252,7 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
             if !self.is_object_in_nursery(object) {
                 // Mature object
                 trace!("Immix mature object {}, skip", object);
+                debug_assert!(
                 return object;
             } else {
                 let object = if KIND == TRACE_KIND_TRANSITIVE_PIN || KIND == TRACE_KIND_FAST {

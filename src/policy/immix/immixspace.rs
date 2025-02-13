@@ -389,6 +389,16 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 unimplemented!("cyclic mark bits is not supported at the moment");
             }
 
+        	if self.common.needs_log_bit {
+        	    if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+        	        for chunk in self.chunk_map.all_chunks() {
+        	            side.bzero_metadata(chunk.start(), Chunk::BYTES);
+        	        }
+        	    } else {
+        	        unimplemented!("in header log bit is not supported");
+        	    }
+        	}
+
             // Prepare defrag info
             if super::DEFRAG {
                 self.defrag.prepare(self, plan_stats);

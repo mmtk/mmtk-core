@@ -109,16 +109,11 @@ impl<E: ProcessEdgesWork> ProcessModBuf<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         // Process and scan modbuf only if the current GC is a nursery GC
-        if mmtk
-            .get_plan()
-            .generational()
-            .unwrap()
-            .is_current_gc_nursery()
-        {
+        let gen = mmtk.get_plan().generational().unwrap();
+        if gen.is_current_gc_nursery() {
             // Flip the per-object unlogged bits to "unlogged" state.
             for obj in &self.modbuf {
-                debug_assert!((*obj).is_live(), "{} was logged but is not live", *obj);
-
+                debug_assert!(!gen.is_object_in_nursery(*obj), "{} was logged but is not mature", *obj);
                 <E::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<E::VM, u8>(
                     *obj,
                     1,
