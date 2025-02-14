@@ -297,6 +297,13 @@ impl Block {
             if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
                 .is_marked::<VM>(potential_object, Ordering::SeqCst)
             {
+                #[cfg(feature = "crabgrind")]
+                {
+                    let vo_bit = crate::util::metadata::vo_bit::is_vo_bit_set(potential_object);
+                    if vo_bit {
+                        crabgrind::memcheck::alloc::free(cell.to_mut_ptr(), 0);
+                    }
+                }
                 // clear VO bit if it is ever set. It is possible that the VO bit is never set for this cell (i.e. there was no object in this cell before this GC),
                 // we unset the bit anyway.
                 #[cfg(feature = "vo_bit")]
@@ -304,6 +311,7 @@ impl Block {
                 unsafe {
                     cell.store::<Address>(last);
                 }
+
                 last = cell;
             }
             cell += cell_size;
@@ -365,7 +373,14 @@ impl Block {
                         "{:?} Free cell: {}, last cell in freelist is {}",
                         self, cell, last
                     );
-
+                    #[cfg(feature = "crabgrind")]
+                    {
+                        let vo_bit =
+                            crate::util::metadata::vo_bit::is_vo_bit_set(potential_object_ref);
+                        if vo_bit {
+                            crabgrind::memcheck::alloc::free(cell.to_mut_ptr(), 0);
+                        }
+                    }
                     // Clear VO bit: we don't know where the object reference actually is, so we bulk zero the cell.
                     #[cfg(feature = "vo_bit")]
                     crate::util::metadata::vo_bit::bzero_vo_bit(cell, cell_size);
@@ -376,6 +391,7 @@ impl Block {
                         cell.store::<Address>(last);
                     }
                     last = cell;
+
                     cell += cell_size;
                     debug_assert_eq!(cursor, cell);
                 }

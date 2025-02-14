@@ -17,6 +17,7 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::memory;
 use crate::util::opaque_pointer::*;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
+use crate::util::track::{track_mempool, track_mempool_alloc, track_mempool_free, untrack_mempool};
 use crate::vm::*;
 use std::marker::PhantomData;
 
@@ -41,6 +42,10 @@ struct FreeListPageResourceSync {
 }
 
 impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
+    fn track(&self) {
+        track_mempool(self, 0, false);
+    }
+
     fn common(&self) -> &CommonPageResource {
         &self.common
     }
@@ -134,6 +139,9 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
                 }
             }
         };
+
+        track_mempool_alloc(self, rtn, conversions::pages_to_bytes(required_pages));
+
         Result::Ok(PRAllocResult {
             start: rtn,
             pages: required_pages,
@@ -346,6 +354,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         }
 
         self.common.accounting.release(pages as _);
+        track_mempool_free(self, first);
         let freed = sync.free_list.free(page_offset as _, true);
         sync.pages_currently_on_freelist += pages as usize;
         if !self.common.contiguous {
@@ -389,5 +398,11 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
                 }
             }
         }
+    }
+}
+
+impl<VM: VMBinding> Drop for FreeListPageResource<VM> {
+    fn drop(&mut self) {
+        untrack_mempool(self);
     }
 }
