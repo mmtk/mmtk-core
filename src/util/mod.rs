@@ -68,9 +68,9 @@ pub(crate) mod sanity;
 pub(crate) mod slot_logger;
 /// Utils for collecting statistics.
 pub(crate) mod statistics;
+pub(crate) mod track;
 /// A treadmill implementation.
 pub(crate) mod treadmill;
-pub(crate) mod track;
 
 // These modules are private. They are only used by other util modules.
 

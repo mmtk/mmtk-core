@@ -119,7 +119,6 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
             );
             track_malloc(result, size, false);
             result
-
         }
     }
 
@@ -127,7 +126,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         trace!("alloc_slow");
         let block = self.acquire_block(size, align, offset, false);
         track_malloc(block, size, false);
-        block 
+        block
     }
 
     /// Slow path for allocation if precise stress testing has been enabled.

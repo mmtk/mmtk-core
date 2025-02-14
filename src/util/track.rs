@@ -115,7 +115,6 @@ pub fn untrack_mempool<T>(pool: &T) {
 /// - `addr`: The address of the memory to associate.
 /// - `size`: The size of the memory to associate.
 pub fn track_mempool_alloc<T>(pool: &T, addr: Address, size: usize) {
-
     #[cfg(feature = "crabgrind")]
     {
         crabgrind::memcheck::mempool::alloc(

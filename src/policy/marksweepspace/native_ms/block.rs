@@ -297,7 +297,7 @@ impl Block {
             if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
                 .is_marked::<VM>(potential_object, Ordering::SeqCst)
             {
-                #[cfg(feature="crabgrind")]
+                #[cfg(feature = "crabgrind")]
                 {
                     let vo_bit = crate::util::metadata::vo_bit::is_vo_bit_set(potential_object);
                     if vo_bit {
@@ -373,9 +373,10 @@ impl Block {
                         "{:?} Free cell: {}, last cell in freelist is {}",
                         self, cell, last
                     );
-                    #[cfg(feature="crabgrind")]
+                    #[cfg(feature = "crabgrind")]
                     {
-                        let vo_bit = crate::util::metadata::vo_bit::is_vo_bit_set(potential_object_ref);
+                        let vo_bit =
+                            crate::util::metadata::vo_bit::is_vo_bit_set(potential_object_ref);
                         if vo_bit {
                             println!("free");
                             crabgrind::memcheck::alloc::free(cell.to_mut_ptr(), 0);
@@ -391,10 +392,9 @@ impl Block {
                         cell.store::<Address>(last);
                     }
                     last = cell;
-                    
+
                     cell += cell_size;
                     debug_assert_eq!(cursor, cell);
-                    
                 }
             }
         }

@@ -47,7 +47,7 @@ pub enum MonotonePageResourceConditional {
 }
 impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
     fn track(&self) {
-        track_mempool(self,0, true);
+        track_mempool(self, 0, true);
     }
 
     fn common(&self) -> &CommonPageResource {

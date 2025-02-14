@@ -34,7 +34,7 @@ impl<VM: VMBinding, B: Region> PageResource<VM> for BlockPageResource<VM, B> {
     fn track(&self) {
         track_mempool(self, 0, false);
     }
-    
+
     fn common(&self) -> &CommonPageResource {
         self.flpr.common()
     }
@@ -427,4 +427,3 @@ impl<B: Region> BlockPool<B> {
         }
     }
 }
-

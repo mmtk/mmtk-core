@@ -44,9 +44,9 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
         // We may get a null ptr from alloc due to the VM being OOM
         if !cell.is_zero() {
             let result = allocator::align_allocation::<VM>(cell, align, offset);
-            
+
             track_malloc(result, size, true);
-            result 
+            result
         } else {
             cell
         }

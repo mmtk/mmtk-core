@@ -355,7 +355,6 @@ pub fn handle_mmap_error<VM: VMBinding>(
 pub(crate) fn panic_if_unmapped(_start: Address, _size: usize, _anno: &MmapAnnotation) {
     #[cfg(feature = "crabgrind")]
     {
-     
         use crabgrind::memcheck::Error;
         let result = crabgrind::memcheck::is_defined(_start.to_mut_ptr(), _size);
         match result {
@@ -365,7 +364,7 @@ pub(crate) fn panic_if_unmapped(_start: Address, _size: usize, _anno: &MmapAnnot
                     panic!("Address {addr:x} is not addressable, start={_start}");
                 }
 
-                _ => ()
+                _ => (),
             },
         }
     }
