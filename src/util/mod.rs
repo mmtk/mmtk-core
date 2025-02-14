@@ -70,6 +70,7 @@ pub(crate) mod slot_logger;
 pub(crate) mod statistics;
 /// A treadmill implementation.
 pub(crate) mod treadmill;
+pub(crate) mod track;
 
 // These modules are private. They are only used by other util modules.
 

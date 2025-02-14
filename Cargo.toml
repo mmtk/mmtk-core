@@ -51,6 +51,8 @@ static_assertions = "1.1.0"
 strum = "0.26.2"
 strum_macros = "0.26.2"
 sysinfo = "0.30.9"
+crabgrind = { version = "0.1.12", optional = true }
+
 
 [dev-dependencies]
 paste = "1.0.8"
@@ -218,4 +220,7 @@ eager_sweeping = []
 # normal heap range, we will have to use chunk-based SFT table. Turning on this feature will use a different SFT map implementation on 64bits,
 # and will affect all the plans in the build. Please be aware of the consequence, and this is only meant to be experimental use.
 malloc_mark_sweep = []
+# Enable Valgrind support in MMTk. This will invoke Valgrind interfaces on allocation and deallocation. At the moment only MarkSweep
+# space is supported
+crabgrind = ["dep:crabgrind"]
 # Group:end

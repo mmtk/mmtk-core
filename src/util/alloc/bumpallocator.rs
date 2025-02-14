@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::util::track::track_malloc;
 use crate::util::Address;
 
 use crate::util::alloc::Allocator;
@@ -116,13 +117,17 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
                 self.bump_pointer.cursor,
                 self.bump_pointer.limit
             );
+            track_malloc(result, size, false);
             result
+
         }
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
         trace!("alloc_slow");
-        self.acquire_block(size, align, offset, false)
+        let block = self.acquire_block(size, align, offset, false);
+        track_malloc(block, size, false);
+        block 
     }
 
     /// Slow path for allocation if precise stress testing has been enabled.

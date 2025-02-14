@@ -9,6 +9,7 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::*;
 use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
+use crate::util::track::{track_mempool, track_mempool_alloc, track_mempool_free, untrack_mempool};
 use crate::vm::*;
 use atomic::Ordering;
 use spin::RwLock;
@@ -30,6 +31,10 @@ pub struct BlockPageResource<VM: VMBinding, B: Region + 'static> {
 }
 
 impl<VM: VMBinding, B: Region> PageResource<VM> for BlockPageResource<VM, B> {
+    fn track(&self) {
+        track_mempool(self, 0, false);
+    }
+    
     fn common(&self) -> &CommonPageResource {
         self.flpr.common()
     }
@@ -55,6 +60,12 @@ impl<VM: VMBinding, B: Region> PageResource<VM> for BlockPageResource<VM, B> {
     fn get_available_physical_pages(&self) -> usize {
         let _sync = self.sync.lock().unwrap();
         self.flpr.get_available_physical_pages()
+    }
+}
+
+impl<VM: VMBinding, B: Region> Drop for BlockPageResource<VM, B> {
+    fn drop(&mut self) {
+        untrack_mempool(self);
     }
 }
 
@@ -136,6 +147,7 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
         self.block_queue.add_global_array(array);
         // Finish slow-allocation
         self.commit_pages(reserved_pages, required_pages, tls);
+        track_mempool_alloc(self, first_block, required_pages * BYTES_IN_PAGE);
         Result::Ok(PRAllocResult {
             start: first_block,
             pages: required_pages,
@@ -156,6 +168,7 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
         // Fast allocate from the blocks list
         if let Some(block) = self.block_queue.pop() {
             self.commit_pages(reserved_pages, required_pages, tls);
+            track_mempool_alloc(self, block.start(), required_pages * BYTES_IN_PAGE);
             return Result::Ok(PRAllocResult {
                 start: block.start(),
                 pages: required_pages,
@@ -170,6 +183,7 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
         let pages = 1 << Self::LOG_PAGES;
         debug_assert!(pages as usize <= self.common().accounting.get_committed_pages());
         self.common().accounting.release(pages as _);
+        track_mempool_free(self, block.start());
         self.block_queue.push(block)
     }
 
@@ -413,3 +427,4 @@ impl<B: Region> BlockPool<B> {
         }
     }
 }
+

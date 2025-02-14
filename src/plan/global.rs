@@ -98,10 +98,14 @@ pub fn create_plan<VM: VMBinding>(
     let sft_map: &mut dyn crate::policy::sft_map::SFTMap =
         unsafe { crate::mmtk::SFT_MAP.get_mut() }.as_mut();
     plan.for_each_space(&mut |s| {
+        
         sft_map.notify_space_creation(s.as_sft());
         s.initialize_sft(sft_map);
+        // after SFT is initialized, we can also initialize mempool tracking
+        s.get_page_resource().track();
     });
 
+    
     plan
 }
 

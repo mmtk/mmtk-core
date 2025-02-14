@@ -4,6 +4,7 @@ use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::{allocator, Allocator};
 use crate::util::opaque_pointer::*;
+use crate::util::track::track_malloc;
 use crate::util::Address;
 use crate::vm::VMBinding;
 
@@ -42,7 +43,10 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
         let cell: Address = self.alloc_slow(size, align, offset);
         // We may get a null ptr from alloc due to the VM being OOM
         if !cell.is_zero() {
-            allocator::align_allocation::<VM>(cell, align, offset)
+            let result = allocator::align_allocation::<VM>(cell, align, offset);
+            
+            track_malloc(result, size, true);
+            result 
         } else {
             cell
         }
