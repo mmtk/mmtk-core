@@ -222,5 +222,5 @@ eager_sweeping = []
 malloc_mark_sweep = []
 # Enable Valgrind support in MMTk. This will invoke Valgrind interfaces on allocation and deallocation. At the moment only MarkSweep
 # space is supported
-crabgrind = ["dep:crabgrind"]
+crabgrind = ["dep:crabgrind", "vo_bit"]
 # Group:end

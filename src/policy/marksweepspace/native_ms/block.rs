@@ -378,7 +378,6 @@ impl Block {
                         let vo_bit =
                             crate::util::metadata::vo_bit::is_vo_bit_set(potential_object_ref);
                         if vo_bit {
-                            println!("free");
                             crabgrind::memcheck::alloc::free(cell.to_mut_ptr(), 0);
                         }
                     }
