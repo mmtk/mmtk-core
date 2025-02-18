@@ -12,7 +12,8 @@ In this chapter, we use the following definitions.  They may be different from t
 concrete VMs.
 
 **Finalizers** are clean-up operations associated with an object, and are executed when the garbage
-collector determines the object is no longer reachable.  Depending on the VM,
+collector determines the object is no longer reachable.  Depending on the VM, finalizers may have
+different properties.
 
 -   Finalizers may be executed immediately during GC, or postponed to mutator time.
 -   They may have access to the object body, or executed independently from the object.
@@ -41,17 +42,19 @@ In other words, a Java `Reference` instance has a field that holds a weak refere
 
 ## Overview of MMTk's finalizer and weak reference processing API
 
-During each GC, after the transitive closure is computed (i.e. after all objects strongly reachable
-from roots have been reached), MMTk calls `Scanning::process_weak_refs` which is implemented by the
-VM binding.  Inside this function, the VM binding can do several things.
+During each GC, MMTk core starts tracing from roots.  It will follow strong references discovered by
+`Scanning::scan_object` and `Scanning::scan_object_and_trace_edges`.  After all strongly reachable
+objects have been reached (i.e. the transitive closure including strongly reachable objects is
+computed), MMTk will call `Scanning::process_weak_refs` which is implemented by the VM binding.
+Inside this function, the VM binding can do several things.
 
 -   **Query reachability**: The VM binding can query whether any given object has been reached.
     +   Do this with `ObjectReference::is_reachable()`.
--   **Query forwarded address**: If an object is already reached, the VM binding can further query
-    the new address of an object.  This is needed to support copying GC.
+-   **Query forwarded address**: If an object has already been reached, the VM binding can further
+    query the new address of an object.  This is needed to support copying GC.
     +   Do this with `ObjectReference::get_forwarded_object()`.
--   **Retain objects**: If an object is not reached at this time, the VM binding can optionally
-    retain the object.  It will make that object *and all descendants* reachable, and keep them
+-   **Retain objects**: If an object has not been reached at this time, the VM binding can
+    optionally demand the object to be retained.  That object *and all descendants* will be kept
     alive during this GC.
     +   Do this with the `tracer_context` argument of `process_weak_refs`.
 -   **Request another invocation**: The VM binding can request `Scanning::process_weak_refs` to be
@@ -67,7 +70,8 @@ operations, including (but not limited to)
 -   **update fields** that contain weak references.
     -   **Forward the field**: It can write the forwarded address of the referent if moved by a
         copying GC.
-    -   **Clear the field**: It can clear the field if the referent is unreachable.
+    -   **Clear the field**: It can clear the field if the referent has not been reached and the
+        binding decides it is unreachable.
 
 Using those primitive operations, the VM binding can support different flavors of finalizers and/or
 weak references.  We will discuss common use cases in the following sections.
@@ -147,7 +151,7 @@ impl<VM: VMBinding> Scanning<VM> for VMScanning {
                     let new_object = object.get_forwarded_object().unwrap_or(object);
                     new_finalizable_objects.push(new_object);
                 } else {
-                    // Object is unreachable.  Retain it.
+                    // Object is unreachable.  Retain it, and enqueue for postponed execution.
                     let new_object = tracer.trace_object(object);
                     enqueue_finalizable_object_to_be_executed_later(new_object);
                 }
@@ -217,8 +221,8 @@ already moved.
 The general way to handle weak references is, after computing the transitive closure, iterate
 through all fields that contain weak references to objects.  For each field,
 
--   if the referent is already reached, write the new address of the object to the field (or do
-    nothing if the object is not moved);
+-   if the referent has already been reached, write the new address of the object to the field (or
+    do nothing if the object is not moved);
 -   otherwise, clear the field, writing `null`, `nil`, or whatever represents a cleared weak
     reference to the field.
 
@@ -264,13 +268,15 @@ treating them like `WeakReference` in emergency GCs**.
 
 -   During non-emergency GC, we let `Scanning::scan_object` and
     `Scanning::scan_object_and_trace_edges` scan the weak reference field inside a `SoftReference`
-    instance as if it were an ordinary strong reference field.  In this way, the (strong) transitive
-    closure after the `Closure` stage will also include softly reachable objects, and they will be
-    kept alive just like strongly reachable objects.
+    instance as if it were an ordinary strong reference field.  In this way, softly reachable
+    objects will be included in the (strong) transitive closure from roots.  By the first time
+    `Scanning::process_weak_refs` is called, strongly reachable objects will have already been
+    reached (i.e. `object.is_reachable()` will be true).  They will be kept alive just like strongly
+    reachable objects.
 -   During emergency GC, however, skip this field in `Scanning::scan_object` or
     `Scanning::scan_object_and_trace_edges`, and clear `SoftReference` just like `WeakReference` in
-    `Scanning::process_weak_refs`.  In this way, softly reachable objects will be dead unless they
-    are subject to finalization.
+    `Scanning::process_weak_refs`.  In this way, softly reachable objects will become unreachable
+    unless they are subject to finalization.
 
 The other way is **retaining referents of `SoftReference` after the strong closure**.  This involves
 supporting multiple levels of reference strengths, which will be introduced in the next section.
@@ -291,37 +297,41 @@ levels of strength.
 Take Java as an example,  we may run `process_weak_refs` four times.
 
 1.  Visit all `SoftReference`.
-    -   If the referent is reachable, then
+    -   If the referent has been reached, then
         -   forward the referent field.
-    -   If the referent is unreachable, then
+    -   If the referent has not been reached, yet, then
         -   if it is not emergency GC, then
             -   retain the referent and update the referent field.
         -   it it is emergency GC, then
-            -   clear the referent field, remove the `SoftReference` from the list of soft
-                references, and optionally enqueue it to the associated `ReferenceQueue` if it has
-                one.
+            -   clear the referent field,
+            -   remove the `SoftReference` from the list of soft references, and
+            -   optionally enqueue it to the associated `ReferenceQueue` if it has one.
     -   (This step may expand the transitive closure in emergency GC if any referents are retained.)
 2.  Visit all `WeakReference`.
-    -   If the referent is reachable, then
+    -   If the referent has been reached, then
         -   forward the referent field.
-    -   If the referent is unreachable, then
-        -   clear the referent field, remove the `WeakReference` from the list of weak references,
-            and optionally enqueue it to the associated `ReferenceQueue` if it has one.
+    -   If the referent has not been reached, yet, then
+        -   clear the referent field,
+        -   remove the `WeakReference` from the list of weak references, and
+        -   optionally enqueue it to the associated `ReferenceQueue` if it has one.
     -   (This step cannot expand the transitive closure.)
-3.  Visit the list of finalizable objects (may be implemented as `FinalizerReference` by some JVMs).
-    -   If the finalizable object is reachable, then
-        -   forward the reference to it.
-    -   If the finalizable object is unreachable, then
-        -   remove it from the list of finalizable objects, and enqueue it for finalization.
+3.  Visit the list of finalizable objects.
+    -   If the finalizable object has been reached, then
+        -   forward the reference in the list.
+    -   If the finalizable object has not been reached, yet, then
+        -   retain the finalizable object, and
+        -   remove it from the list of finalizable objects, and
+        -   enqueue it for finalization.
     -   (This step may expand the transitive closure if any finalizable objects are retained.)
 4.  Visit all `PhantomReference`.
-    -   If the referent is reachable, then
+    -   If the referent has been reached, then
         -   forward the referent field.
         -   (Note: `PhantomReference#get()` always returns `null`, but the actual referent field
-            shall hold a valid reference to the referent.)
-    -   If the referent is unreachable, then
-        -   clear the referent field, remove the `PhantomReference` from the list of phantom
-            references, and optionally enqueue it to the associated `ReferenceQueue` if it has one.
+            shall hold a valid reference to the referent before it is cleared.)
+    -   If the referent has not been reached, yet, then
+        -   clear the referent field,
+        -   remove the `PhantomReference` from the list of phantom references, and
+        -   optionally enqueue it to the associated `ReferenceQueue` if it has one.
     -   (This step cannot expand the transitive closure.)
 
 As an optimization,
@@ -386,8 +396,8 @@ do the tracing.  We maintain a queue of ephemerons which is empty before the `Cl
 1.  In `Scanning::scan_object` and `Scanning::scan_object_and_trace_edges`, we enqueue ephemerons as
     we scan them, but do not trace either the key or the value fields.
 2.  In `Scanning::process_weak_refs`, we iterate through all ephemerons in the queue.  If the key of
-    an ephemeron is reached, but its value has not yet been reached, then retain its value, and
-    remove the ephemeron from the queue.  Otherwise, keep the object in the queue.
+    an ephemeron has been reached, but its value has not yet been reached, then retain its value,
+    and remove the ephemeron from the queue.  Otherwise, keep the object in the queue.
 3.  If any value is retained, return `true` from `Scanning::process_weak_refs` so that it will be
     called again after the transitive closure from retained values are computed.  Then go back to
     Step 2.
@@ -399,8 +409,8 @@ need to maintain the queue.
 
 -   In Step 1, we don't need to enqueue ephemerons.
 -   In Step 2, we iterate through all ephemerons.  We retain the value if both the ephemeron itself
-    and the key are reached, and the value is not reached yet.  We don't need to remove any
-    ephemeron from the list.
+    and the key have been reached, and the value has not been reached, yet.  We don't need to remove
+    any ephemeron from the list.
 -   When the algorithm completes, we can identify both reachable and unreachable ephemerons that
     have unreachable keys.  But we need to remove unreachable (dead) ephemerons from the list
     because they will be recycled in the `Release` stage.

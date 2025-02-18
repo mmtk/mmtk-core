@@ -312,7 +312,7 @@ pub trait Scanning<VM: VMBinding> {
     ///             let new_object = object.get_forwarded_object().unwrap_or(object);
     ///             new_finalizable_objects.push(new_object);
     ///         } else {
-    ///             // Object is unreachable.  Retain it.
+    ///             // Object is unreachable.  Retain it, and enqueue for postponed execution.
     ///             let new_object = tracer.trace_object(object);
     ///             enqueue_finalizable_object_to_be_executed_later(new_object);
     ///         }
