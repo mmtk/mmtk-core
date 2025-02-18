@@ -7,10 +7,10 @@ mod raw {
 }
 
 /// MMTk crate version such as 0.14.0
-use raw::PKG_VERSION as MMTK_PKG_VERSION;
+pub use raw::PKG_VERSION as MMTK_PKG_VERSION;
 
 /// Comma separated features enabled for this build
-use raw::FEATURES_STR as MMTK_FEATURES;
+pub use raw::FEATURES_STR as MMTK_FEATURES;
 
 lazy_static! {
     /// Git version as short commit hash, such as a96e8f9, or a96e8f9-dirty, or unknown-git-version if MMTk
