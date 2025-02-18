@@ -465,7 +465,7 @@ pub(crate) fn get_system_total_memory() -> u64 {
     // `Options`.  If we only load memory-related components on start-up, it should only take <1ms
     // to initialize the `System` instance.
     let sys = System::new_with_specifics(
-        RefreshKind::new().with_memory(MemoryRefreshKind::new().with_ram()),
+        RefreshKind::nothing().with_memory(MemoryRefreshKind::nothing().with_ram()),
     );
     sys.total_memory()
 }
