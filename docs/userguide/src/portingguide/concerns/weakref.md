@@ -136,31 +136,7 @@ This parameter provides the necessary mechanism to retain objects and make them 
 descendants) live through the current GC.  The typical use pattern is:
 
 ```rust
-impl<VM: VMBinding> Scanning<VM> for VMScanning {
-    fn process_weak_refs(
-        worker: &mut GCWorker<VM>,
-        tracer_context: impl ObjectTracerContext<VM>,
-    ) -> bool {
-        let finalizable_objects = ...;
-        let mut new_finalizable_objects = vec![];
-
-        tracer_context.with_tracer(worker, |tracer| {
-            for object in finalizable_objects {
-                if object.is_reachable() {
-                    // Object is still reachable, and may have been moved if it is a copying GC.
-                    let new_object = object.get_forwarded_object().unwrap_or(object);
-                    new_finalizable_objects.push(new_object);
-                } else {
-                    // Object is unreachable.  Retain it, and enqueue for postponed execution.
-                    let new_object = tracer.trace_object(object);
-                    enqueue_finalizable_object_to_be_executed_later(new_object);
-                }
-            }
-        });
-
-        // more code ...
-    }
-}
+{{#include ../../../../../src/vm/tests/mock_tests/mock_test_doc_weakref_code_example.rs:process_weak_refs_finalization}}
 ```
 
 Within the closure `|tracer| { ... }`, the VM binding can call `tracer.trace_object(object)` to

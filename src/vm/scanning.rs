@@ -302,19 +302,21 @@ pub trait Scanning<VM: VMBinding> {
     /// typical use case of handling finalizable objects for a Java-like language.
     ///
     /// ```rust
-    /// let finalizable_objects = ...;
+    /// let finalizable_objects: Vec<ObjectReference> = my_vm::get_finalizable_object();
     /// let mut new_finalizable_objects = vec![];
     ///
     /// tracer_context.with_tracer(worker, |tracer| {
     ///     for object in finalizable_objects {
     ///         if object.is_reachable() {
-    ///             // Object is still reachable, and may have been moved if it is a copying GC.
+    ///             // `object` is still reachable.
+    ///             // It may have been moved if it is a copying GC.
     ///             let new_object = object.get_forwarded_object().unwrap_or(object);
     ///             new_finalizable_objects.push(new_object);
     ///         } else {
-    ///             // Object is unreachable.  Retain it, and enqueue for postponed execution.
+    ///             // `object` is unreachable.
+    ///             // Retain it, and enqueue it for postponed finalization.
     ///             let new_object = tracer.trace_object(object);
-    ///             enqueue_finalizable_object_to_be_executed_later(new_object);
+    ///             my_vm::enqueue_finalizable_object_to_be_executed_later(new_object);
     ///         }
     ///     }
     /// });
