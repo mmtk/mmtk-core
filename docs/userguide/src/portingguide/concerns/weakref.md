@@ -326,7 +326,7 @@ To implement this, the VM binding may need to implement some kind of *state mach
 `Scanning::process_weak_refs` function behaves differently each time it is called.  For example,
 
 ```rust
-fn process_weak_ref(...) -> bool {
+fn process_weak_refs(...) -> bool {
     let mut state = /* Get VM-specific states here. */;
 
     match *state {
