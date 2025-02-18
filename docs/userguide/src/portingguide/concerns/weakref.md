@@ -30,7 +30,7 @@ different properties.
 The garbage collector may reclaim weakly reachable objects, clear weak references to weakly
 reachable objects, and/or performing associated clean-up operations.
 
-[object graph]: ../../glossary.html#object-graph
+[object graph]: ../../glossary.md#object-graph
 
 **A note for Java programmers**: In Java, the term "weak reference" often refers to instances of
 `java.lang.ref.Reference` (including the concrete classes `SoftReference`, `WeakReference`,
