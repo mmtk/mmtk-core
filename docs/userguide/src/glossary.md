@@ -30,6 +30,22 @@ garbage, and can be reclaimed by the garbage collector.
 
 TODO
 
+## Emergency Collection
+
+Also known as: *emergency GC*
+
+In MMTk, an emergency collection happens when a normal collection cannot reclaim enough memory to
+satisfy allocation requests.  Plans may do full-heap GC, defragmentation, etc. during emergency
+collections in order to free up more memory.
+
+VM bindings can call `MMTK::is_emergency_collection` to query if the current GC is an emergency GC.
+During emergency GC, the VM binding is recommended to retain fewer objects than normal GCs, to the
+extent allowed by the specification of the VM or the language.  For example, the VM binding may
+choose not to retain objects used for caching.  Specifically, for Java virtual machines, that means
+not retaining referents of [`SoftReference`][java-soft-ref] which is primarily designed for
+implementing memory-sensitive caches.
+
+[java-soft-ref]: https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/ref/SoftReference.html
 
 <!--
 vim: tw=100 ts=4 sw=4 sts=4 et
