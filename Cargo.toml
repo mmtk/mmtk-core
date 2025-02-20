@@ -10,7 +10,7 @@ repository = "https://github.com/mmtk/mmtk-core"
 readme = "README.md"
 categories = ["memory-management"]
 keywords = ["gc", "garbage", "collection", "garbage-collection", "allocation"]
-rust-version = "1.71.1"
+rust-version = "1.74.1"
 build = "build.rs"
 
 [lib]
@@ -25,12 +25,12 @@ atomic-traits = "0.4.0"
 bytemuck = { version = "1.14.0", features = ["derive"] }
 cfg-if = "1.0"
 crossbeam = "0.8.1"
-delegate = "0.12.0"
-downcast-rs = "1.1.1"
+delegate = "0.13.2"
+downcast-rs = "2.0.1"
 enum-map = "2.4.2"
 env_logger = { version = "0.11.3", optional = true }
 is-terminal = "0.4.7"
-itertools = "0.12.0"
+itertools = "0.14.0"
 jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
 lazy_static = "1.1"
 libc = "0.2"
@@ -48,18 +48,18 @@ regex = "1.7.0"
 rustversion = "1.0"
 spin = "0.9.5"
 static_assertions = "1.1.0"
-strum = "0.26.2"
-strum_macros = "0.26.2"
-sysinfo = "0.30.9"
+strum = "0.27.1"
+strum_macros = "0.27.1"
+sysinfo = "0.33.1"
 
 [dev-dependencies]
 paste = "1.0.8"
-rand = "0.8.5"
-rand_chacha = "0.3.1"
-criterion = "0.4"
+rand = "0.9.0"
+rand_chacha = "0.9.0"
+criterion = "0.5"
 
 [build-dependencies]
-built = { version = "0.7.1", features = ["git2"] }
+built = { version = "0.7.7", features = ["git2"] }
 
 [[bench]]
 name = "main"
