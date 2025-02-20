@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="VM-specific methods for scanning roots/objects."><title>Scanning in mmtk::vm::scanning - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-b0742ba02757f159.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0 (90b35a623 2024-11-26)" data-channel="1.83.0" data-search-js="search-f0d225181b97f9a4.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc trait"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../mmtk/index.html">mmtk</a><span class="version">0.30.0-df5e0cdc4bf1d16c0773885bf2a72e819cd43732</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Scanning</a></h2><h3><a href="#provided-associated-consts">Provided Associated Constants</a></h3><ul class="block"><li><a href="#associatedconstant.UNIQUE_OBJECT_ENQUEUING" title="UNIQUE_OBJECT_ENQUEUING">UNIQUE_OBJECT_ENQUEUING</a></li></ul><h3><a href="#required-methods">Required Methods</a></h3><ul class="block"><li><a href="#tymethod.notify_initial_thread_scan_complete" title="notify_initial_thread_scan_complete">notify_initial_thread_scan_complete</a></li><li><a href="#tymethod.prepare_for_roots_re_scanning" title="prepare_for_roots_re_scanning">prepare_for_roots_re_scanning</a></li><li><a href="#tymethod.scan_object" title="scan_object">scan_object</a></li><li><a href="#tymethod.scan_roots_in_mutator_thread" title="scan_roots_in_mutator_thread">scan_roots_in_mutator_thread</a></li><li><a href="#tymethod.scan_vm_specific_roots" title="scan_vm_specific_roots">scan_vm_specific_roots</a></li><li><a href="#tymethod.supports_return_barrier" title="supports_return_barrier">supports_return_barrier</a></li></ul><h3><a href="#provided-methods">Provided Methods</a></h3><ul class="block"><li><a href="#method.forward_weak_refs" title="forward_weak_refs">forward_weak_refs</a></li><li><a href="#method.process_weak_refs" title="process_weak_refs">process_weak_refs</a></li><li><a href="#method.scan_object_and_trace_edges" title="scan_object_and_trace_edges">scan_object_and_trace_edges</a></li><li><a href="#method.support_slot_enqueuing" title="support_slot_enqueuing">support_slot_enqueuing</a></li></ul><h3><a href="#object-safety">Object Safety</a></h3><h3><a href="#implementors">Implementors</a></h3></section><div id="rustdoc-modnav"><h2><a href="index.html">In mmtk::<wbr>vm::<wbr>scanning</a></h2></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><span class="rustdoc-breadcrumbs"><a href="../../index.html">mmtk</a>::<wbr><a href="../index.html">vm</a>::<wbr><a href="index.html">scanning</a></span><h1>Trait <span class="trait">Scanning</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/mmtk/vm/scanning.rs.html#142-365">source</a> </span></div><pre class="rust item-decl"><code>pub trait Scanning&lt;VM: <a class="trait" href="../trait.VMBinding.html" title="trait mmtk::vm::VMBinding">VMBinding</a>&gt; {
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="VM-specific methods for scanning roots/objects."><title>Scanning in mmtk::vm::scanning - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-b0742ba02757f159.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0 (90b35a623 2024-11-26)" data-channel="1.83.0" data-search-js="search-f0d225181b97f9a4.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc trait"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../mmtk/index.html">mmtk</a><span class="version">0.30.0-84545cce237b4452e78cff0a31cdabff7b49dd70</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Scanning</a></h2><h3><a href="#provided-associated-consts">Provided Associated Constants</a></h3><ul class="block"><li><a href="#associatedconstant.UNIQUE_OBJECT_ENQUEUING" title="UNIQUE_OBJECT_ENQUEUING">UNIQUE_OBJECT_ENQUEUING</a></li></ul><h3><a href="#required-methods">Required Methods</a></h3><ul class="block"><li><a href="#tymethod.notify_initial_thread_scan_complete" title="notify_initial_thread_scan_complete">notify_initial_thread_scan_complete</a></li><li><a href="#tymethod.prepare_for_roots_re_scanning" title="prepare_for_roots_re_scanning">prepare_for_roots_re_scanning</a></li><li><a href="#tymethod.scan_object" title="scan_object">scan_object</a></li><li><a href="#tymethod.scan_roots_in_mutator_thread" title="scan_roots_in_mutator_thread">scan_roots_in_mutator_thread</a></li><li><a href="#tymethod.scan_vm_specific_roots" title="scan_vm_specific_roots">scan_vm_specific_roots</a></li><li><a href="#tymethod.supports_return_barrier" title="supports_return_barrier">supports_return_barrier</a></li></ul><h3><a href="#provided-methods">Provided Methods</a></h3><ul class="block"><li><a href="#method.forward_weak_refs" title="forward_weak_refs">forward_weak_refs</a></li><li><a href="#method.process_weak_refs" title="process_weak_refs">process_weak_refs</a></li><li><a href="#method.scan_object_and_trace_edges" title="scan_object_and_trace_edges">scan_object_and_trace_edges</a></li><li><a href="#method.support_slot_enqueuing" title="support_slot_enqueuing">support_slot_enqueuing</a></li></ul><h3><a href="#object-safety">Object Safety</a></h3><h3><a href="#implementors">Implementors</a></h3></section><div id="rustdoc-modnav"><h2><a href="index.html">In mmtk::<wbr>vm::<wbr>scanning</a></h2></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><span class="rustdoc-breadcrumbs"><a href="../../index.html">mmtk</a>::<wbr><a href="../index.html">vm</a>::<wbr><a href="index.html">scanning</a></span><h1>Trait <span class="trait">Scanning</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/mmtk/vm/scanning.rs.html#142-396">source</a> </span></div><pre class="rust item-decl"><code>pub trait Scanning&lt;VM: <a class="trait" href="../trait.VMBinding.html" title="trait mmtk::vm::VMBinding">VMBinding</a>&gt; {
     const <a href="#associatedconstant.UNIQUE_OBJECT_ENQUEUING" class="constant">UNIQUE_OBJECT_ENQUEUING</a>: <a class="primitive" href="https://doc.rust-lang.org/1.83.0/std/primitive.bool.html">bool</a> = false;
 
     // Required methods
@@ -169,50 +169,62 @@ field is holding a null reference, or a tagged non-reference value such as small
 <li><code>object</code>: The object to be scanned.</li>
 <li><code>object_tracer</code>: Called back for the object reference held in each field.</li>
 </ul>
-</div></details><details class="toggle method-toggle" open><summary><section id="method.process_weak_refs" class="method"><a class="src rightside" href="../../../src/mmtk/vm/scanning.rs.html#343-348">source</a><h4 class="code-header">fn <a href="#method.process_weak_refs" class="fn">process_weak_refs</a>(
+</div></details><details class="toggle method-toggle" open><summary><section id="method.process_weak_refs" class="method"><a class="src rightside" href="../../../src/mmtk/vm/scanning.rs.html#374-379">source</a><h4 class="code-header">fn <a href="#method.process_weak_refs" class="fn">process_weak_refs</a>(
     _worker: &amp;mut <a class="struct" href="../../scheduler/worker/struct.GCWorker.html" title="struct mmtk::scheduler::worker::GCWorker">GCWorker</a>&lt;VM&gt;,
     _tracer_context: impl <a class="trait" href="trait.ObjectTracerContext.html" title="trait mmtk::vm::scanning::ObjectTracerContext">ObjectTracerContext</a>&lt;VM&gt;,
 ) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.83.0/std/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>Process weak references.</p>
-<p>This function is called after a transitive closure is completed.</p>
+<p>This function is called in a GC after the transitive closure from roots is computed, that
+is, all reachable objects from roots are reached.  This function gives the VM binding an
+opportunitiy to process finalizers and weak references.</p>
 <p>MMTk core enables the VM binding to do the following in this function:</p>
 <ol>
-<li>Query if an object is already reached in this transitive closure.</li>
-<li>Get the new address of an object if it is already reached.</li>
-<li>Keep an object and its descendents alive if not yet reached.</li>
-<li>Request this function to be called again after transitive closure is finished again.</li>
+<li>Query if an object is already reached.
+<ul>
+<li>by calling <code>ObjectReference::is_reachable()</code></li>
+</ul>
+</li>
+<li>Get the new address of an object if it is already reached.
+<ul>
+<li>by calling <code>ObjectReference::get_forwarded_object()</code></li>
+</ul>
+</li>
+<li>Keep an object and its descendents alive if not yet reached.
+<ul>
+<li>using <code>tracer_context</code></li>
+</ul>
+</li>
+<li>Request this function to be called again after transitive closure is finished again.
+<ul>
+<li>by returning <code>true</code></li>
+</ul>
+</li>
 </ol>
-<p>The VM binding can query if an object is currently reached by calling
-<code>ObjectReference::is_reachable()</code>.</p>
-<p>If an object is already reached, the VM binding can get its new address by calling
-<code>ObjectReference::get_forwarded_object()</code> as the object may have been moved.</p>
-<p>If an object is not yet reached, the VM binding can keep that object and its descendents
-alive.  To do this, the VM binding should use <code>tracer_context.with_tracer</code> to get access to
-an <code>ObjectTracer</code>, and then call its <code>trace_object(object)</code> method.  The <code>trace_object</code>
-method will return the new address of the <code>object</code> if it moved the object, or its original
-address if not moved.  Implementation-wise, the <code>ObjectTracer</code> may contain an internal
-queue for newly traced objects, and will flush the queue when <code>tracer_context.with_tracer</code>
-returns. Therefore, it is recommended to reuse the <code>ObjectTracer</code> instance to trace
-multiple objects.</p>
-<p><em>Note that if <code>trace_object</code> is called on an already reached object, the behavior will be
-equivalent to <code>ObjectReference::get_forwarded_object()</code>.  It will return the new address if
-the GC already moved the object when tracing that object, or the original address if the GC
-did not move the object when tracing it.  In theory, the VM binding can use <code>trace_object</code>
-wherever <code>ObjectReference::get_forwarded_object()</code> is needed.  However, if a VM never
-resurrects objects, it should completely avoid touching <code>tracer_context</code>, and exclusively
-use <code>ObjectReference::get_forwarded_object()</code> to get new addresses of objects.  By doing
-so, the VM binding can avoid accidentally resurrecting objects.</em></p>
-<p>The VM binding can return <code>true</code> from <code>process_weak_refs</code> to request <code>process_weak_refs</code>
-to be called again after the MMTk core finishes transitive closure again from the objects
-newly visited by <code>ObjectTracer::trace_object</code>.  This is useful if a VM supports multiple
-levels of reachabilities (such as Java) or ephemerons.</p>
-<p>Implementation-wise, this function is called as the “sentinel” of the <code>VMRefClosure</code> work
-bucket, which means it is called when all work packets in that bucket have finished.  The
-<code>tracer_context</code> expands the transitive closure by adding more work packets in the same
-bucket.  This means if <code>process_weak_refs</code> returns true, those work packets will have
-finished (completing the transitive closure) by the time <code>process_weak_refs</code> is called
-again.  The VM binding can make use of this by adding custom work packets into the
-<code>VMRefClosure</code> bucket.  The bucket will be <code>VMRefForwarding</code>, instead, when forwarding.
-See below.</p>
+<p>The <code>tracer_context</code> parameter provides the VM binding the mechanism for retaining
+unreachable objects (i.e. keeping them alive in this GC).  The following snippet shows a
+typical use case of handling finalizable objects for a Java-like language.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>finalizable_objects: Vec&lt;ObjectReference&gt; = my_vm::get_finalizable_object();
+<span class="kw">let </span><span class="kw-2">mut </span>new_finalizable_objects = <span class="macro">vec!</span>[];
+
+tracer_context.with_tracer(worker, |tracer| {
+    <span class="kw">for </span>object <span class="kw">in </span>finalizable_objects {
+        <span class="kw">if </span>object.is_reachable() {
+            <span class="comment">// `object` is still reachable.
+            // It may have been moved if it is a copying GC.
+            </span><span class="kw">let </span>new_object = object.get_forwarded_object().unwrap_or(object);
+            new_finalizable_objects.push(new_object);
+        } <span class="kw">else </span>{
+            <span class="comment">// `object` is unreachable.
+            // Retain it, and enqueue it for postponed finalization.
+            </span><span class="kw">let </span>new_object = tracer.trace_object(object);
+            my_vm::enqueue_finalizable_object_to_be_executed_later(new_object);
+        }
+    }
+});</code></pre></div>
+<p>Within the closure <code>|tracer| { ... }</code>, the VM binding can call <code>tracer.trace_object(object)</code>
+to retain <code>object</code> and get its new address if moved.  After <code>with_tracer</code> returns, it will
+create work packets in the <code>VMRefClosure</code> work bucket to compute the transitive closure from
+the objects retained in the closure.</p>
 <p>The <code>memory_manager::is_mmtk_object</code> function can be used in this function if</p>
 <ul>
 <li>the “is_mmtk_object” feature is enabled, and</li>
@@ -221,12 +233,38 @@ See below.</p>
 <p>Arguments:</p>
 <ul>
 <li><code>worker</code>: The current GC worker.</li>
-<li><code>tracer_context</code>: Use this to get access an <code>ObjectTracer</code> and use it to retain and
-update weak references.</li>
+<li><code>tracer_context</code>: Use this to get access an <code>ObjectTracer</code> and use it to retain and update
+weak references.</li>
 </ul>
-<p>This function shall return true if this function needs to be called again after the GC
-finishes expanding the transitive closure from the objects kept alive.</p>
-</div></details><details class="toggle method-toggle" open><summary><section id="method.forward_weak_refs" class="method"><a class="src rightside" href="../../../src/mmtk/vm/scanning.rs.html#360-364">source</a><h4 class="code-header">fn <a href="#method.forward_weak_refs" class="fn">forward_weak_refs</a>(
+<p>If <code>process_weak_refs</code> returns <code>true</code>, then <code>process_weak_refs</code> will be called again after
+all work packets in the <code>VMRefClosure</code> work bucket has been executed, by which time all
+objects reachable from the objects retained in this function will have been reached.</p>
+<h5 id="performance-notes"><a class="doc-anchor" href="#performance-notes">§</a>Performance notes</h5>
+<p><strong>Retain as many objects as needed in one invocation of <code>tracer_context.with_tracer</code>, and
+avoid calling <code>with_tracer</code> again and again</strong> for each object.  The <code>tracer</code> provided by
+<code>ObjectTracerFactory::with_tracer</code> enqueues retained objects in an internal list specific to
+this invocation of <code>with_tracer</code>, and will create reasonably sized work packets to compute
+the transitive closure.  This means the invocation of <code>with_tracer</code> has a non-trivial
+overhead, but each invocation of <code>tracer.trace_object</code> is cheap.</p>
+<p><em>Don’t do this</em>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">for </span>object <span class="kw">in </span>objects {
+    tracer_context.with_tracer(worker, |tracer| { <span class="comment">// This is expensive! DON'T DO THIS!
+        </span>tracer.trace_object(object);
+    });
+}</code></pre></div>
+<p><strong>Use <code>ObjectReference::get_forwarded_object()</code> to get the forwarded address of reachable
+objects.  Only use <code>tracer.trace_object</code> for retaining unreachable objects.</strong> If
+<code>trace_object</code> is called on an already reached object, it will also return its new address
+if moved. However, <code>tracer_context.with_tracer</code> has a cost, and the VM binding may
+accidentally “resurrect” dead objects if failed to check <code>object.is_reachable()</code> first. If
+the VM binding does not intend to retain any objects, it should completely avoid touching
+<code>tracer_context</code>.</p>
+<p><strong>Clone the <code>tracer_context</code> for parallelism.</strong>  The <code>ObjectTracerContext</code> has <code>Clone</code> as
+its supertrait.  The VM binding can clone it and distribute each clone into a work packet.
+By doing so, the VM binding can parallelize the processing of finalizers and weak references
+by creating multiple work packets.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.forward_weak_refs" class="method"><a class="src rightside" href="../../../src/mmtk/vm/scanning.rs.html#391-395">source</a><h4 class="code-header">fn <a href="#method.forward_weak_refs" class="fn">forward_weak_refs</a>(
     _worker: &amp;mut <a class="struct" href="../../scheduler/worker/struct.GCWorker.html" title="struct mmtk::scheduler::worker::GCWorker">GCWorker</a>&lt;VM&gt;,
     _tracer_context: impl <a class="trait" href="trait.ObjectTracerContext.html" title="trait mmtk::vm::scanning::ObjectTracerContext">ObjectTracerContext</a>&lt;VM&gt;,
 )</h4></section></summary><div class="docblock"><p>Forward weak references.</p>

@@ -162,7 +162,40 @@
 <p>MMTk is a memory management toolkit providing language implementers with a powerful memory management framework
 and researchers with a multi-runtime platform for memory management research. It is a complete re-write of the original MMTk,
 which was written in Java as part of Jikes RVM.</p>
-<iframe width="800" height="600" src="https://www.youtube.com/embed/0mldpiYW1X4" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe><div style="break-before: page; page-break-before: always;"></div><h1 id="mmtk-tutorial"><a class="header" href="#mmtk-tutorial">MMTk Tutorial</a></h1>
+<iframe width="800" height="600" src="https://www.youtube.com/embed/0mldpiYW1X4" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe><div style="break-before: page; page-break-before: always;"></div><h1 id="glossary"><a class="header" href="#glossary">Glossary</a></h1>
+<p>This document explains basic concepts of garbage collection.  MMTk uses those terms as described in
+this document.  Different VMs may define some terms differently.  Should there be any confusion,
+this document will help disambiguating them.  We use the book <a href="https://gchandbook.org/"><em>The Garbage Collection Handbook: The
+Art of Automatic Memory Management</em></a> as the primary reference.</p>
+<h2 id="object-graph"><a class="header" href="#object-graph">Object graph</a></h2>
+<p>Object graph is a graph-theory view of the garbage-collected heap.  An <strong>object graph</strong> is a
+directed graph that contains <em>nodes</em> and <em>edges</em>.  An edge always points to a node.  But unlike
+conventional graphs, an edge may originate from either another node or a <em>root</em>.</p>
+<p>Each <em>node</em> represents an object in the heap.</p>
+<p>Each <em>edge</em> represents an object reference from an object or a root.  A <em>root</em> is a reference held
+in a slot directly accessible from <a href="glossary.html#mutator">mutators</a>, including local variables, global variables,
+thread-local variables, and so on.  A object can have many fields, and some fields may hold
+references to objects, while others hold non-reference values.</p>
+<p>An object is <em>reachable</em> if there is a path in the object graph from any root to the node of the
+object.  Unreachable objects cannot be accessed by <a href="glossary.html#mutator">mutators</a>.  They are considered
+garbage, and can be reclaimed by the garbage collector.</p>
+<h2 id="mutator"><a class="header" href="#mutator">Mutator</a></h2>
+<p>TODO</p>
+<h2 id="emergency-collection"><a class="header" href="#emergency-collection">Emergency Collection</a></h2>
+<p>Also known as: <em>emergency GC</em></p>
+<p>In MMTk, an emergency collection happens when a normal collection cannot reclaim enough memory to
+satisfy allocation requests.  Plans may do full-heap GC, defragmentation, etc. during emergency
+collections in order to free up more memory.</p>
+<p>VM bindings can call <code>MMTK::is_emergency_collection</code> to query if the current GC is an emergency GC.
+During emergency GC, the VM binding is recommended to retain fewer objects than normal GCs, to the
+extent allowed by the specification of the VM or the language.  For example, the VM binding may
+choose not to retain objects used for caching.  Specifically, for Java virtual machines, that means
+not retaining referents of <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/ref/SoftReference.html"><code>SoftReference</code></a> which is primarily designed for
+implementing memory-sensitive caches.</p>
+<!--
+vim: tw=100 ts=4 sw=4 sts=4 et
+-->
+<div style="break-before: page; page-break-before: always;"></div><h1 id="mmtk-tutorial"><a class="header" href="#mmtk-tutorial">MMTk Tutorial</a></h1>
 <p>In this tutorial, you will build multiple garbage collectors from
 scratch using MMTk.
 You will start with an incredibly simple 'collector' called NoGC,
@@ -209,7 +242,7 @@ of the MMTk. It is deliberately kept separate as a simpler stable
 version. Make sure to refer to the
 <a href="https://github.com/mmtk/mmtk-core/tree/master/docs/userguide/src/tutorial/code">provided tutorial code</a>
 and not the main collector code during the tutorial.</p>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="glossary"><a class="header" href="#glossary">Glossary</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="glossary-1"><a class="header" href="#glossary-1">Glossary</a></h1>
 <p><em>allocator</em>: Code that allocates new objects into memory.</p>
 <p><em>collector</em>: Finds and frees memory occupied by 'dead' objects.</p>
 <p><em>dead</em>: An object that is not live.</p>
@@ -2095,6 +2128,515 @@ JIT time. The actual implementation highly depends on the compiler implementatio
 <li><a href="https://github.com/mmtk/mmtk-jikesrvm/blob/fbfb91adafd9e9b3f45bd6a4b32c845a5d48d20b/jikesrvm/rvm/src/org/jikesrvm/mm/mminterface/MMTkMutatorContext.java#L377">JikesRVM</a></li>
 <li><a href="https://github.com/mmtk/julia/blob/5c406d9bb20d76e2298a6101f171cfac491f651c/src/llvm-final-gc-lowering.cpp#L267">Julia</a></li>
 </ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="vm-specific-concerns"><a class="header" href="#vm-specific-concerns">VM-specific Concerns</a></h1>
+<p>Every VM is special in some way.  Because of this, some VM bindings may use MMTk features not
+usually used by most VMs, and may even deviate from the usual steps of integrating MMTk into the VM.
+Here we provide special guides to cover such cases.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="finalizers-and-weak-references"><a class="header" href="#finalizers-and-weak-references">Finalizers and Weak References</a></h1>
+<p>Some VMs support <em>finalizers</em>, <em>weak references</em>, and other complex data structures that have weak
+reference semantics, such as weak tables (hash tables where the key, the value or both can be weak
+references), ephemerons, etc.  The concrete semantics of finalizer and weak reference varies from VM
+to VM, but MMTk provides a low-level API that allows the VM bindings to implement their flavors of
+finalizer and weak references on top of it.</p>
+<h2 id="definitions"><a class="header" href="#definitions">Definitions</a></h2>
+<p>In this chapter, we use the following definitions.  They may be different from the definitions in
+concrete VMs.</p>
+<p><strong>Finalizers</strong> are clean-up operations associated with an object, and are executed when the garbage
+collector determines the object is no longer reachable.  Depending on the VM, finalizers may have
+different properties.</p>
+<ul>
+<li>Finalizers may be executed immediately during GC, or postponed to mutator time.</li>
+<li>They may have access to the object body, or executed independently from the object.</li>
+<li>They may "resurrect" the unreachable object, or guarantee unreachable objects remain unreachable
+after finalization.</li>
+</ul>
+<p><strong>Weak references</strong> are special <a href="portingguide/concerns/../../glossary.html#object-graph">object graph</a> edges distinct from ordinary "strong" references.</p>
+<ul>
+<li>An object is <em>strongly reachable</em> if there is a path from roots to the object that contains only
+strong references.</li>
+<li>An object is <em>weakly reachable</em> if any path from the roots to the object must contain at least
+one weak reference.</li>
+</ul>
+<p>The garbage collector may reclaim weakly reachable objects, clear weak references to weakly
+reachable objects, and/or performing associated clean-up operations.</p>
+<p><strong>A note for Java programmers</strong>: In Java, the term "weak reference" often refers to instances of
+<code>java.lang.ref.Reference</code> (including the concrete classes <code>SoftReference</code>, <code>WeakReference</code>,
+<code>PhantomReference</code> and the hidden <code>FinalizerReference</code> class used by some JVM implementations to
+implement finalizers).  Instances of <code>Reference</code> are proper Java heap objects, but each instance has
+a field that contains a pointer to the referent, and the field can be cleared when the referent
+dies.  In this article, we use the term "weak reference" to refer to the pointer inside that field.
+In other words, a Java <code>Reference</code> instance has a field that holds a weak reference to the referent.</p>
+<h2 id="overview-of-mmtks-finalizer-and-weak-reference-processing-api"><a class="header" href="#overview-of-mmtks-finalizer-and-weak-reference-processing-api">Overview of MMTk's finalizer and weak reference processing API</a></h2>
+<p>During each GC, MMTk core starts tracing from roots.  It will follow strong references discovered by
+<code>Scanning::scan_object</code> and <code>Scanning::scan_object_and_trace_edges</code>.  After all strongly reachable
+objects have been reached (i.e. the transitive closure including strongly reachable objects is
+computed), MMTk will call <code>Scanning::process_weak_refs</code> which is implemented by the VM binding.
+Inside this function, the VM binding can do several things.</p>
+<ul>
+<li><strong>Query reachability</strong>: The VM binding can query whether any given object has been reached.
+<ul>
+<li>Do this with <code>ObjectReference::is_reachable()</code>.</li>
+</ul>
+</li>
+<li><strong>Query forwarded address</strong>: If an object has already been reached, the VM binding can further
+query the new address of an object.  This is needed to support copying GC.
+<ul>
+<li>Do this with <code>ObjectReference::get_forwarded_object()</code>.</li>
+</ul>
+</li>
+<li><strong>Retain objects</strong>: If an object has not been reached at this time, the VM binding can
+optionally demand the object to be retained.  That object <em>and all descendants</em> will be kept
+alive during this GC.
+<ul>
+<li>Do this with the <code>tracer_context</code> argument of <code>process_weak_refs</code>.</li>
+</ul>
+</li>
+<li><strong>Request another invocation</strong>: The VM binding can request <code>Scanning::process_weak_refs</code> to be
+called again after computing the transitive closure that includes <em>retained objects and their
+descendants</em>.  This helps handling multiple levels of weak reference strength.
+<ul>
+<li>Do this by returning <code>true</code> from <code>process_weak_refs</code>.</li>
+</ul>
+</li>
+</ul>
+<p>The <code>Scanning::process_weak_refs</code> function also gives the VM binding a chance to perform other
+operations, including (but not limited to)</p>
+<ul>
+<li><strong>Do clean-up operations</strong>: The VM binding can perform clean-up operations, or queue them to be
+executed after GC.</li>
+<li><strong>Update fields</strong> that contain weak references.
+<ul>
+<li><strong>Forward the field</strong>: It can write the forwarded address of the referent if moved by a
+copying GC.</li>
+<li><strong>Clear the field</strong>: It can clear the field if the referent has not been reached and the
+binding decides it is unreachable.</li>
+</ul>
+</li>
+</ul>
+<p>Using those primitive operations, the VM binding can support different flavors of finalizers and/or
+weak references.  We will discuss common use cases in the following sections.</p>
+<h2 id="supporting-finalizers"><a class="header" href="#supporting-finalizers">Supporting finalizers</a></h2>
+<p>Different languages and VMs define "finalizer" differently, but they all involve performing
+operations when an object is dead.  The general way to handle finalizer is visiting all
+<strong>finalizable objects</strong> (i.e.  objects that have associated finalization operations), check if they
+are unreachable and, if unreachable, do something about them.</p>
+<h3 id="identifying-finalizable-objects"><a class="header" href="#identifying-finalizable-objects">Identifying finalizable objects</a></h3>
+<p>Some VMs determine whether an object is finalizable by its type.  In Java, for example, an object is
+finalizable if its <code>finalize()</code> method is overridden.  The VM binding can maintain a list of
+finalizable objects, and register instances of such types into that list when they are constructed.</p>
+<p>Some VMs can dynamically attach finalizing operations to individual objects after objects are
+created.  The VM binding can maintain a list of objects with attached finalizers, or maintain a
+(weak) hash map that maps finalizable objects to its associated finalizers.</p>
+<h3 id="when-to-run-finalizers"><a class="header" href="#when-to-run-finalizers">When to run finalizers?</a></h3>
+<p>Depending on the finalizer semantics in different VMs, finalizers can be executed during GC or
+during mutator time after GC.</p>
+<p>The VM binding can run finalizers immediately in <code>Scanning::process_weak_refs</code> when finding a
+finalizable object unreachable.  Beware that executing finalizers can be time-consuming.  The VM
+binding can creating work packets and let each work packet process a part of all finalizable
+objects.  In this way, multiple GC workers can process finalizable objects in parallel.  The
+<code>Scanning::process_weak_refs</code> function is executed in the <code>VMRefClosure</code> stage, so the created work
+packets shall be added to the same bucket.</p>
+<p>If the finalizers should be executed after GC, the VM binding should enqueue such jobs to
+VM-specific queues so that they can be picked up by mutator threads after GC.</p>
+<h3 id="reading-the-body-of-dead-object"><a class="header" href="#reading-the-body-of-dead-object">Reading the body of dead object</a></h3>
+<p>In some VMs, finalizers can read the fields in dead objects.  Such fields usually include
+information needed for cleaning up resources held by the object, such as file descriptors and
+pointers to memory not managed by GC.</p>
+<p><code>Scanning::process_weak_refs</code> is executed in the <code>VMRefClosure</code> stage, which happens after computing
+transitive closure, but before any object has been released (which happens in the <code>Release</code> stage).
+This means the body of all objects, live or dead, can still be accessed during this stage.</p>
+<p>Therefore, there is no problem reading the object body if the VM binding executes finalizers
+immediately in <code>process_weak_refs</code>, or in created work packets in the <code>VMRefClosure</code> stage.</p>
+<p>However, if the VM needs to execute finalizers after GC, it will be a problem because the object
+will have been reclaimed, and memory of the object will have been overwritten by other objects.  In
+this case, the VM will need to retain the dead object to make it accessible after the current GC.</p>
+<h3 id="retaining-unreachable-objects"><a class="header" href="#retaining-unreachable-objects">Retaining unreachable objects</a></h3>
+<p>Some VMs, particularly the Java VM, executes finalizers during mutator time.  Any finalizable
+objects unreachable before a GC must be retained so that they can still be accessed by their
+finalizers after the GC.</p>
+<p>The <code>Scanning::process_weak_refs</code> has an parameter <code>tracer_context: impl ObjectTracerContext&lt;VM&gt;</code>.
+This parameter provides the necessary mechanism to retain objects and make them (and their
+descendants) live through the current GC.  The typical use pattern is:</p>
+<pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl Scanning&lt;MyVM&gt; for VMScanning {
+    fn process_weak_refs(
+        worker: &amp;mut GCWorker&lt;MyVM&gt;,
+        tracer_context: impl ObjectTracerContext&lt;MyVM&gt;,
+    ) -&gt; bool {
+        let finalizable_objects: Vec&lt;ObjectReference&gt; = my_vm::get_finalizable_object();
+        let mut new_finalizable_objects = vec![];
+
+        tracer_context.with_tracer(worker, |tracer| {
+            for object in finalizable_objects {
+                if object.is_reachable() {
+                    // `object` is still reachable.
+                    // It may have been moved if it is a copying GC.
+                    let new_object = object.get_forwarded_object().unwrap_or(object);
+                    new_finalizable_objects.push(new_object);
+                } else {
+                    // `object` is unreachable.
+                    // Retain it, and enqueue it for postponed finalization.
+                    let new_object = tracer.trace_object(object);
+                    my_vm::enqueue_finalizable_object_to_be_executed_later(new_object);
+                }
+            }
+        });
+
+        my_vm::set_new_finalizable_objects(new_finalizable_objects);
+
+        false
+    }
+
+    // ...
+<span class="boring">}</span></code></pre></pre>
+<p>Within the closure <code>|tracer| { ... }</code>, the VM binding can call <code>tracer.trace_object(object)</code> to
+retain <code>object</code>.  It returns the new address of <code>object</code> because in a copying GC the <code>trace_object</code>
+function can also move the object.</p>
+<p>Under the hood, <code>tracer_context.with_tracer</code> creates a queue and calls the closure.  The <code>tracer</code>
+implements the <code>ObjectTracer</code>  trait, and is just an interface that provides the <code>trace_object</code>
+method.  Objects retained by <code>tracer.trace_object</code> will be enqueued.  After the closure returns,
+<code>with_tracer</code> will split the queue into reasonably-sized work packets and add them to the
+<code>VMRefClosure</code> work bucket.  Those work packets will trace the retained objects and their
+descendants, effectively expanding the transitive closure to include all objects reachable from the
+retained objects.  Because of the overhead of creating queues and work packets, the VM binding
+should <strong>retain as many objects as needed in one invocation of <code>with_tracer</code>, and avoid calling
+<code>with_tracer</code> again and again for each object</strong>.</p>
+<p><strong>Don't do this</strong>:</p>
+<pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>for object in objects {
+    tracer_context.with_tracer(worker, |tracer| { // This is expensive! DON'T DO THIS!
+        tracer.trace_object(object);
+    });
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Keep in mind that <strong>tracer_context implements the <code>Clone</code> trait</strong>.  As introduced in the <a href="portingguide/concerns/weakref.html#when-to-run-finalizers"><em>When to
+run finalizers</em></a> section, the VM binding can use work packets to
+parallelize finalizer processing.  If finalizable objects need to be retained, the VM binding can
+clone the <code>trace_context</code> and give each work packet a clone of <code>tracer_context</code>.</p>
+<h3 id="warning-object-resurrection"><a class="header" href="#warning-object-resurrection">WARNING: object resurrection</a></h3>
+<p>If the VM binding retains an unreachable object for finalization, and the finalizer writes a
+reference of that object into a place readable by application threads, including global or static
+variable, then the previously unreachable object will become reachable by the application again.
+This phenomenon is known as <strong>"resurrection"</strong>, and can be surprising to the programmers.</p>
+<p>Developers of VM bindings of existing VMs may have no choice but to implement the finalizer
+semantics strictly according to the specification of the VM, even if that would result in
+"resurrection".  JVM is a well-known example of the "resurrection" behavior, although the
+<code>Object.finalize()</code> method has been deprecated for removal, in favor for alternative clean-up
+mechanisms such as <code>PhantomReference</code> and <code>Cleaner</code> which never "resurrect" objects.</p>
+<p>Designers of new programming languages or VMs should be aware of the "resurrection" problem.  It is
+recommended not to let finalizers have access to the object body.  For finalizers that need to
+release certain resources (such as files), the VM may store relevant data (such as file descriptors)
+in a separate object and use that as the context of the finalizer.</p>
+<p>To avoid unintentionally "resurrecting" objects, if the VM binding intends to get the new address of
+a moved object, it should use <code>object.get_forwarded_object()</code> instead of
+<code>tracer.trace_object(object)</code>, although the latter also returns the new address if <code>object</code> is
+already moved.</p>
+<h2 id="supporting-weak-references"><a class="header" href="#supporting-weak-references">Supporting weak references</a></h2>
+<p>The general way to handle weak references is, after computing the transitive closure, iterate
+through all fields that contain weak references to objects.  For each field,</p>
+<ul>
+<li>if the referent has already been reached, write the new address of the object to the field (or
+do nothing if the object is not moved);</li>
+<li>otherwise, clear the field, writing <code>null</code>, <code>nil</code>, or whatever represents a cleared weak
+reference to the field.</li>
+</ul>
+<h3 id="identifying-weak-references"><a class="header" href="#identifying-weak-references">Identifying weak references</a></h3>
+<p>Weak references in fields of <em>global</em> (per-VM) data structures are relatively straightforward.  We
+just need to enumerate them in <code>Scanning::process_weak_refs</code>.</p>
+<p>There are also fields in <em>heap objects</em> that hold weak references to other heap objects.  There are
+two basic ways to identify them.</p>
+<ul>
+<li><strong>Register on creation</strong>: We may record objects that contain weak reference fields in a global
+list when such objects are created.  In <code>Scanning::process_weak_refs</code>, we just need to iterate
+through this list, process the fields, and remove dead objects from the list.</li>
+<li><strong>Discover objects during tracing</strong>: While computing the transitive closure, we scan objects and
+discover objects that contain weak reference fields.  We enqueue such objects into a list, and
+iterate through the list in <code>Scanning::process_weak_refs</code> after transitive closure.  The list
+needs to be reconstructed in each GC.</li>
+</ul>
+<p>Both methods work, but each has its advantages and disadvantages.  Registering on creation does not
+need to reconstruct the list in every GC, while discovering during tracing can avoid visiting dead
+objects.  Depending on the nature of your VM, one method may be easier to implement than the other,
+especially if your VM's existing GC has already implemented weak reference processing in some way.</p>
+<h3 id="associated-clean-up-operations"><a class="header" href="#associated-clean-up-operations">Associated clean-up operations</a></h3>
+<p>Some languages and VMs allow certain clean-up operations to be associated with weak references, and
+will be executed after the weak reference is cleared.</p>
+<p>Such clean-up operations can be supported similar to finalizers.  While we enumerate weak references
+in <code>Scanning::process_weak_refs</code>, we clear weak references to unreachable objects.  Depending on the
+semantics, we may choose to execute the clean-up operations immediately, or enqueue them to be
+executed after GC.  We may retain the unreachable referent if we need to.</p>
+<h3 id="soft-references"><a class="header" href="#soft-references">Soft references</a></h3>
+<p>Java has a special kind of weak reference: <code>SoftReference</code>.  The API allows the GC to choose between
+(1) retaining softly reachable referents, and (2) clearing references to softly reachable objects.
+When using MMTk, there are two ways to implement this semantics.</p>
+<p>The easiest way is <strong>treating <code>SoftReference</code> as strong references in non-emergency GCs, and
+treating them like <code>WeakReference</code> in <a href="portingguide/concerns/../../glossary.html#emergency-collection">emergency GCs</a></strong>.</p>
+<ul>
+<li>During non-emergency GC, we let <code>Scanning::scan_object</code> and
+<code>Scanning::scan_object_and_trace_edges</code> scan the weak reference field inside a <code>SoftReference</code>
+instance as if it were an ordinary strong reference field.  In this way, softly reachable
+objects will be included in the (strong) transitive closure from roots.  By the first time
+<code>Scanning::process_weak_refs</code> is called, strongly reachable objects will have already been
+reached (i.e. <code>object.is_reachable()</code> will be true).  They will be kept alive just like strongly
+reachable objects.</li>
+<li>During emergency GC, however, skip this field in <code>Scanning::scan_object</code> or
+<code>Scanning::scan_object_and_trace_edges</code>, and clear <code>SoftReference</code> just like <code>WeakReference</code> in
+<code>Scanning::process_weak_refs</code>.  In this way, softly reachable objects will become unreachable
+unless they are subject to finalization.</li>
+</ul>
+<p>The other way is <strong>retaining referents of <code>SoftReference</code> after the strong closure</strong>.  This involves
+supporting multiple levels of reference strength, which will be introduced in the <a href="portingguide/concerns/weakref.html#multiple-levels-of-reference-strength">next
+section</a>.</p>
+<h3 id="multiple-levels-of-reference-strength"><a class="header" href="#multiple-levels-of-reference-strength">Multiple levels of reference strength</a></h3>
+<p>Some VMs support multiple levels of weak reference strengths.  Java, for example, has
+<code>SoftReference</code>, <code>WeakReference</code>, <code>FinalizerReference</code> (internal) and <code>PhantomReference</code>, in the
+order of decreasing strength.</p>
+<p>This can be supported by running <code>Scanning::process_weak_refs</code> multiple times.  If
+<code>process_weak_refs</code> returns <code>true</code>, it will be called again after all pending work packets in the
+<code>VMRefClosure</code> stage has been executed.  Those pending work packets include all work packets that
+compute the transitive closure from objects retained during <code>process_weak_refs</code>.  This allows the VM
+binding to expand the transitive closure multiple times, each handling weak references at different
+levels of strength.</p>
+<p>Take Java as an example,  we may run <code>process_weak_refs</code> four times.</p>
+<ol>
+<li>Visit all <code>SoftReference</code>.
+<ul>
+<li>If the referent has been reached, then
+<ul>
+<li>forward the referent field.</li>
+</ul>
+</li>
+<li>If the referent has not been reached, yet, then
+<ul>
+<li>if it is not an emergency GC, then
+<ul>
+<li>retain the referent and update the referent field.</li>
+</ul>
+</li>
+<li>it it is an emergency GC, then
+<ul>
+<li>clear the referent field,</li>
+<li>remove the <code>SoftReference</code> from the list of soft references, and</li>
+<li>optionally enqueue it to the associated <code>ReferenceQueue</code> if it has one.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>(This step may expand the transitive closure in emergency GCs if any referents are
+retained.)</li>
+</ul>
+</li>
+<li>Visit all <code>WeakReference</code>.
+<ul>
+<li>If the referent has been reached, then
+<ul>
+<li>forward the referent field.</li>
+</ul>
+</li>
+<li>If the referent has not been reached, yet, then
+<ul>
+<li>clear the referent field,</li>
+<li>remove the <code>WeakReference</code> from the list of weak references, and</li>
+<li>optionally enqueue it to the associated <code>ReferenceQueue</code> if it has one.</li>
+</ul>
+</li>
+<li>(This step cannot expand the transitive closure.)</li>
+</ul>
+</li>
+<li>Visit the list of finalizable objects.
+<ul>
+<li>If the finalizable object has been reached, then
+<ul>
+<li>forward the reference in the list.</li>
+</ul>
+</li>
+<li>If the finalizable object has not been reached, yet, then
+<ul>
+<li>retain the finalizable object, and</li>
+<li>remove it from the list of finalizable objects, and</li>
+<li>enqueue it for finalization.</li>
+</ul>
+</li>
+<li>(This step may expand the transitive closure if any finalizable objects are retained.)</li>
+</ul>
+</li>
+<li>Visit all <code>PhantomReference</code>.
+<ul>
+<li>If the referent has been reached, then
+<ul>
+<li>forward the referent field.</li>
+<li>(Note: <code>PhantomReference#get()</code> always returns <code>null</code>, but the actual referent field
+shall hold a valid reference to the referent before it is cleared.)</li>
+</ul>
+</li>
+<li>If the referent has not been reached, yet, then
+<ul>
+<li>clear the referent field,</li>
+<li>remove the <code>PhantomReference</code> from the list of phantom references, and</li>
+<li>optionally enqueue it to the associated <code>ReferenceQueue</code> if it has one.</li>
+</ul>
+</li>
+<li>(This step cannot expand the transitive closure.)</li>
+</ul>
+</li>
+</ol>
+<p>As an optimization,</p>
+<ul>
+<li>Step 1 can be, as we described in the <a href="portingguide/concerns/weakref.html#soft-references">previous section</a>, eliminated by
+merging it with the strong closure in non-emergency GC, or with <code>WeakReference</code> processing in
+emergency GCs.</li>
+<li>Step 2 can be merged with Step 3 since Step 2 never expands the transitive closure.</li>
+</ul>
+<p>Therefore, we only need to run <code>process_weak_refs</code> twice:</p>
+<ol>
+<li>Handle <code>WeakReference</code> (and also <code>SoftReference</code> in emergency GCs), and then handle finalizable
+objects.</li>
+<li>Handle <code>PhandomReference</code>.</li>
+</ol>
+<p>To implement this, the VM binding may need to implement some kind of <em>state machine</em> so that the
+<code>Scanning::process_weak_refs</code> function behaves differently each time it is called.  For example,</p>
+<pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn process_weak_refs(...) -&gt; bool {
+    let mut state = /* Get VM-specific states here. */;
+
+    match *state {
+        State::ProcessSoftReference =&gt; {
+            process_soft_references(...);
+            *state = State::ProcessWeakReference;
+            return true; // Run this function again.
+        }
+        State::ProcessWeakReference =&gt; {
+            process_weak_references(...);
+            *state = State::ProcessFinalizableObjects;
+            return true; // Run this function again.
+        }
+        State::ProcessFinalizableObjects =&gt; {
+            process_finalizable_objects(...);
+            *state = State::ProcessPhantomReferences;
+            return true; // Run this function again.
+        }
+        State::ProcessPhantomReferences =&gt; {
+            process_phantom_references(...);
+            *state = State::ProcessSoftReference
+            return false; // Proceed to the Release stage.
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="ephemerons"><a class="header" href="#ephemerons">Ephemerons</a></h3>
+<p>An <a href="https://dl.acm.org/doi/10.1145/263700.263733">Ephemeron</a> has a <em>key</em> and a <em>value</em>, both of which are object references.  The key is a weak
+reference, while the value keeps the referent alive only if both the ephemeron itself and the key
+are reachable.</p>
+<p>To support ephemerons, the VM binding needs to identify ephemerons.  This includes ephemerons as
+individual objects, objects that contain ephemerons, and, equivalently, objects that contain
+key/value fields that have semantics similar to ephemerons.</p>
+<p>The following is the algorithm for processing ephemerons.  It gradually discovers ephemerons as we
+do the tracing.  We maintain a queue of ephemerons which is empty before the <code>Closure</code> stage.</p>
+<ol>
+<li>In <code>Scanning::scan_object</code> and <code>Scanning::scan_object_and_trace_edges</code>, we enqueue ephemerons
+(into the queue of ephemerons we created before) as we scan them, but do not trace either the
+key or the value fields.</li>
+<li>In <code>Scanning::process_weak_refs</code>, we iterate through all ephemerons in the queue.  If the key of
+an ephemeron has been reached, but its value has not yet been reached, then retain its value,
+and remove the ephemeron from the queue.  Otherwise, keep the object in the queue.</li>
+<li>If any value is retained, return <code>true</code> from <code>Scanning::process_weak_refs</code> so that it will be
+called again after the transitive closure from retained values are computed.  Then go back to
+Step 2.</li>
+<li>If no value is retained, the algorithm completes.  The queue contains reachable ephemerons that
+have unreachable keys.</li>
+</ol>
+<p>This algorithm can be modified if we have a list of all ephemerons before GC starts.  We no longer
+need to maintain the queue.</p>
+<ul>
+<li>In Step 1, we don't need to enqueue ephemerons.</li>
+<li>In Step 2, we iterate through all ephemerons.  We retain the value if both the ephemeron itself
+and the key have been reached, and the value has not been reached, yet.  We don't need to remove
+any ephemeron from the list.</li>
+<li>When the algorithm completes, we can identify both reachable and unreachable ephemerons that
+have unreachable keys.  But we need to remove unreachable (dead) ephemerons from the list
+because they will be recycled in the <code>Release</code> stage.</li>
+</ul>
+<p>And we can go through ephemerons with unreachable keys and do necessary clean-up operations, either
+immediately or postponed to mutator time.</p>
+<h2 id="optimizations"><a class="header" href="#optimizations">Optimizations</a></h2>
+<h3 id="generational-gc"><a class="header" href="#generational-gc">Generational GC</a></h3>
+<p>MMTk provides generational GC plans.  Currently, there are <code>GenCopy</code>, <code>GenImmix</code> and <code>StickyImmix</code>.
+In a minor GC, a generational plan only consider <em>young objects</em> (i.e. objects allocated since the
+last GC) as candidates of garbage, and will assume all <em>old objects</em> (i.e. objects survived the last
+GC) are live.</p>
+<p>The VM binding can query if the current GC is a nursery GC by calling</p>
+<pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let is_nursery_gc = mmtk.get_plan().generational().is_some_and(|gen|
+    gen.is_current_gc_nursery());
+<span class="boring">}</span></code></pre></pre>
+<p>The VM binding can make use of this information when processing finalizers and weak references.  In
+a minor GC,</p>
+<ul>
+<li>The VM binding only needs to visit <strong>finalizable objects allocated since the last GC</strong>.  Other
+finalizable objects must be old and will not be considered dead.</li>
+<li>The VM binding only needs to visit <strong>weak reference slots written since the last GC</strong>.  Other
+slots must be pointing to old objects (if not <code>null</code>).  For weak hash tables, if existing
+entries are immutable, it is sufficient to only visit newly added entries.</li>
+</ul>
+<p>Implementation-wise, the VM binding can split the lists or hash tables into two parts: one for old
+entries and another for young entries.</p>
+<h3 id="copying-versus-non-copying-gc"><a class="header" href="#copying-versus-non-copying-gc">Copying versus non-copying GC</a></h3>
+<p>MMTk provides both copying and non-copying GC plans.  <code>MarkSweep</code> never moves any objects.
+<code>MarkCompact</code>, <code>SemiSpace</code> always moves all objects (except objects in the large object space,
+immortal space, VM space, etc.).  Immix-based plans sometimes do non-copying GC, and sometimes do
+copying GC.  Regardless of the plan, the VM binding can query if the current GC is a copying GC by
+calling</p>
+<pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let may_move_object = mmtk.get_plan().current_gc_may_move_object();
+<span class="boring">}</span></code></pre></pre>
+<p>If it returns <code>false</code>, the current GC will not move any object.</p>
+<p>The VM binding can make use of this information.  For example, if a weak hash table uses object
+addresses as keys, and the hash code is computed directly from the address, then the VM will need to
+rehash the table during copying GC because changing the address may move the entry to a different
+hash bin.  But if the current GC is non-moving, the VM binding will not need to rehash the table,
+but only needs to remove entries for dead objects.  Despite of this optimization opportunity, we
+still recommend VMs to implement <em>address-based hashing</em> if possible.  In that case, we never need
+to rehash any hash tables due to object movement.</p>
+<div id="admonition-info" class="admonition admonish-info" role="note" aria-labelledby="admonition-info-title">
+<div class="admonition-title">
+<div id="admonition-info-title">
+<p>Info</p>
+</div>
+<a class="admonition-anchor-link" href="portingguide/concerns/weakref.html#admonition-info"></a>
+</div>
+<div>
+<p>When using <strong>address-based hashing</strong>, the hash code of an object depends on whether its hash code
+has been observed before, and whether it has been moved after its hash code has been observed.</p>
+<ul>
+<li>If never observed, the hash code of an object will be its current address.</li>
+<li>When the object is moved the first time after its hash code is observed, the GC thread copies
+its old address to a field of the new copy.  From then on, its hash code will be read from that
+field.</li>
+<li>When such an object is copied again, its hash code will be copied to the new copy of the object.
+The hash code of the object remains unchanged.</li>
+</ul>
+<p>The VM binding needs to implement this in <code>ObjectModel::copy</code>.</p>
+</div>
+</div>
+<h2 id="deprecated-reference-and-finalizable-processors"><a class="header" href="#deprecated-reference-and-finalizable-processors">Deprecated reference and finalizable processors</a></h2>
+<p>When porting MMTk from JikesRVM to a dedicated Rust library, we also ported the <code>ReferenceProcessor</code>
+and the <code>FinalizableProcessor</code> from JikesRVM.  They are implemented in mmtk-core, and provide the
+mechanisms for handling Java-style soft/weak/phantom references and finalizable objects.  The VM
+binding can use those utilities by implementing the <code>mmtk::vm::ReferenceGlue</code> and the
+<code>mmtk::vm::Finalizable</code> traits, and calling the
+<code>mmtk::memory_manager::add_{soft,weak,phantom}_candidate</code> and the
+<code>mmtk::memory_manager::add_finalizer</code> functions.</p>
+<p>However, those mechanisms are too specific to Java, and are not applicable to most other VMs.  <strong>New
+VM bindings should use the <code>Scanning::process_weak_refs</code> API</strong>, and we are porting existing VM
+bindings away from the built-in reference/finalizable processors.</p>
+<!--
+vim: tw=100 ts=4 sw=4 sts=4 et
+-->
 <div style="break-before: page; page-break-before: always;"></div><h1 id="api-migration-guide"><a class="header" href="#api-migration-guide">API Migration Guide</a></h1>
 <p>This document lists changes to the MMTk-VM API that require changes to be made by the VM bindings.
 VM binding developers can use this document as a guide to update their code to maintain
