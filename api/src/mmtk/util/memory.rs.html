@@ -1137,7 +1137,7 @@
     // `Options`.  If we only load memory-related components on start-up, it should only take &lt;1ms
     // to initialize the `System` instance.
     </span><span class="kw">let </span>sys = System::new_with_specifics(
-        RefreshKind::new().with_memory(MemoryRefreshKind::new().with_ram()),
+        RefreshKind::nothing().with_memory(MemoryRefreshKind::nothing().with_ram()),
     );
     sys.total_memory()
 }

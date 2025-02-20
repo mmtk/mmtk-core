@@ -679,7 +679,7 @@
 /// i.e. byte size == `wsize*sizeof(void*)`
 /// adapted from _mi_wsize_from_size in mimalloc
 </span><span class="kw">fn </span>mi_wsize_from_size(size: usize) -&gt; usize {
-    (size + MI_INTPTR_SIZE - <span class="number">1</span>) / MI_INTPTR_SIZE
+    size.div_ceil(MI_INTPTR_SIZE)
 }
 
 <span class="kw">pub fn </span>mi_bin&lt;VM: VMBinding&gt;(size: usize, align: usize) -&gt; usize {
