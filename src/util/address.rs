@@ -650,7 +650,7 @@ impl ObjectReference {
     /// When called at other times, particularly during mutator time, the behavior is specific to
     /// the implementation of the plan and policy due to their strategies of metadata clean-up.  If
     /// the VM needs to know if any given reference is still valid, it should instead use the valid
-    /// object bit (VO bit) metadata which is enabled by the Cargo feature "vo_bit".
+    /// object bit (VO-bit) metadata which is enabled by the Cargo feature "vo_bit".
     ///
     /// # Return value
     ///

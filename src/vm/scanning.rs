@@ -367,10 +367,10 @@ pub trait Scanning<VM: VMBinding> {
     /// the VM binding does not intend to retain any objects, it should completely avoid touching
     /// `tracer_context`.
     ///
-    /// **Clone the `tracer_context` for paralelism.**  The `ObjectTracerContext` has `Clone` as its
-    /// supertrait.  The VM binding can clone it and distribute each clone into a work packet.  By
-    /// doing so, the VM binding can parallelize the processing of finalizers and weak references by
-    /// creating multiple work packets.
+    /// **Clone the `tracer_context` for parallelism.**  The `ObjectTracerContext` has `Clone` as
+    /// its supertrait.  The VM binding can clone it and distribute each clone into a work packet.
+    /// By doing so, the VM binding can parallelize the processing of finalizers and weak references
+    /// by creating multiple work packets.
     fn process_weak_refs(
         _worker: &mut GCWorker<VM>,
         _tracer_context: impl ObjectTracerContext<VM>,

@@ -67,7 +67,7 @@ operations, including (but not limited to)
 
 -   **Do clean-up operations**: The VM binding can perform clean-up operations, or queue them to be
     executed after GC.
--   **update fields** that contain weak references.
+-   **Update fields** that contain weak references.
     -   **Forward the field**: It can write the forwarded address of the referent if moved by a
         copying GC.
     -   **Clear the field**: It can clear the field if the referent has not been reached and the
@@ -78,10 +78,10 @@ weak references.  We will discuss common use cases in the following sections.
 
 ## Supporting finalizers
 
-Different VMs define "finalizer" differently, but they all involve performing operations when an
-object is dead.  The general way to handle finalizer is visiting all **finalizable objects** (i.e.
-objects that have associated finalization operations), check if they are unreachable and, if
-unreachable, do something about them.
+Different languages and VMs define "finalizer" differently, but they all involve performing
+operations when an object is dead.  The general way to handle finalizer is visiting all
+**finalizable objects** (i.e.  objects that have associated finalization operations), check if they
+are unreachable and, if unreachable, do something about them.
 
 ### Identifying finalizable objects
 
@@ -163,10 +163,10 @@ for object in objects {
 }
 ```
 
-Keep in mind that **tracer_context implements the `Clone` trait**.  As introduced in the *When to
-run finalizers* section, the VM binding can use work packets to parallelize finalizer processing.
-If finalizable objects need to be retained, the VM binding can clone the `trace_context` and give
-each work packet a clone of `tracer_context`.
+Keep in mind that **tracer_context implements the `Clone` trait**.  As introduced in the [*When to
+run finalizers*](#when-to-run-finalizers) section, the VM binding can use work packets to
+parallelize finalizer processing.  If finalizable objects need to be retained, the VM binding can
+clone the `trace_context` and give each work packet a clone of `tracer_context`.
 
 ### WARNING: object resurrection
 
@@ -175,7 +175,7 @@ reference of that object into a place readable by application threads, including
 variable, then the previously unreachable object will become reachable by the application again.
 This phenomenon is known as **"resurrection"**, and can be surprising to the programmers.
 
-Developers of VM bindings of existing VMs may have no choice but implementing the finalizer
+Developers of VM bindings of existing VMs may have no choice but to implement the finalizer
 semantics strictly according to the specification of the VM, even if that would result in
 "resurrection".  JVM is a well-known example of the "resurrection" behavior, although the
 `Object.finalize()` method has been deprecated for removal, in favor for alternative clean-up
@@ -240,7 +240,7 @@ Java has a special kind of weak reference: `SoftReference`.  The API allows the 
 When using MMTk, there are two ways to implement this semantics.
 
 The easiest way is **treating `SoftReference` as strong references in non-emergency GCs, and
-treating them like `WeakReference` in emergency GCs**.
+treating them like `WeakReference` in [emergency GCs][emergency-gc]**.
 
 -   During non-emergency GC, we let `Scanning::scan_object` and
     `Scanning::scan_object_and_trace_edges` scan the weak reference field inside a `SoftReference`
@@ -253,6 +253,8 @@ treating them like `WeakReference` in emergency GCs**.
     `Scanning::scan_object_and_trace_edges`, and clear `SoftReference` just like `WeakReference` in
     `Scanning::process_weak_refs`.  In this way, softly reachable objects will become unreachable
     unless they are subject to finalization.
+
+[emergency-gc]: ../../glossary.md#emergency-collection
 
 The other way is **retaining referents of `SoftReference` after the strong closure**.  This involves
 supporting multiple levels of reference strengths, which will be introduced in the next section.
@@ -276,13 +278,14 @@ Take Java as an example,  we may run `process_weak_refs` four times.
     -   If the referent has been reached, then
         -   forward the referent field.
     -   If the referent has not been reached, yet, then
-        -   if it is not emergency GC, then
+        -   if it is not an emergency GC, then
             -   retain the referent and update the referent field.
-        -   it it is emergency GC, then
+        -   it it is an emergency GC, then
             -   clear the referent field,
             -   remove the `SoftReference` from the list of soft references, and
             -   optionally enqueue it to the associated `ReferenceQueue` if it has one.
-    -   (This step may expand the transitive closure in emergency GC if any referents are retained.)
+    -   (This step may expand the transitive closure in emergency GCs if any referents are
+        retained.)
 2.  Visit all `WeakReference`.
     -   If the referent has been reached, then
         -   forward the referent field.
@@ -313,12 +316,12 @@ Take Java as an example,  we may run `process_weak_refs` four times.
 As an optimization,
 
 -   Step 1 can be, as we described in the previous section, eliminated by merging it with the strong
-    closure in non-emergency GC, or with `WeakReference` processing in emergency GC.
+    closure in non-emergency GC, or with `WeakReference` processing in emergency GCs.
 -   Step 2 can be merged with Step 3 since Step 2 never expands the transitive closure.
 
 Therefore, we only need to run `process_weak_refs` twice:
 
-1.  Handle `WeakReference` (and also `SoftReference` in emergency GC), and then handle finalizable
+1.  Handle `WeakReference` (and also `SoftReference` in emergency GCs), and then handle finalizable
     objects.
 2.  Handle `PhandomReference`.
 
@@ -369,8 +372,9 @@ key/value fields that have semantics similar to ephemerons.
 The following is the algorithm for processing ephemerons.  It gradually discovers ephemerons as we
 do the tracing.  We maintain a queue of ephemerons which is empty before the `Closure` stage.
 
-1.  In `Scanning::scan_object` and `Scanning::scan_object_and_trace_edges`, we enqueue ephemerons as
-    we scan them, but do not trace either the key or the value fields.
+1.  In `Scanning::scan_object` and `Scanning::scan_object_and_trace_edges`, we enqueue ephemerons
+    (into the queue of ephemerons we created before) as we scan them, but do not trace either the
+    key or the value fields.
 2.  In `Scanning::process_weak_refs`, we iterate through all ephemerons in the queue.  If the key of
     an ephemeron has been reached, but its value has not yet been reached, then retain its value,
     and remove the ephemeron from the queue.  Otherwise, keep the object in the queue.
@@ -426,9 +430,10 @@ entries and another for young entries.
 ### Copying versus non-copying GC
 
 MMTk provides both copying and non-copying GC plans.  `MarkSweep` never moves any objects.
-`MarkCompact`, `SemiSpace` always moves all objects.  Immix-based plans sometimes do non-copying GC,
-and sometimes do copying GC.  Regardless of the plan, the VM binding can query if the current GC is
-a copying GC by calling
+`MarkCompact`, `SemiSpace` always moves all objects (except objects in the large object space,
+immortal space, VM space, etc.).  Immix-based plans sometimes do non-copying GC, and sometimes do
+copying GC.  Regardless of the plan, the VM binding can query if the current GC is a copying GC by
+calling
 
 ```rust
 let may_move_object = mmtk.get_plan().current_gc_may_move_object();
