@@ -257,7 +257,8 @@ treating them like `WeakReference` in [emergency GCs][emergency-gc]**.
 [emergency-gc]: ../../glossary.md#emergency-collection
 
 The other way is **retaining referents of `SoftReference` after the strong closure**.  This involves
-supporting multiple levels of reference strengths, which will be introduced in the next section.
+supporting multiple levels of reference strength, which will be introduced in the [next
+section](#multiple-levels-of-reference-strength).
 
 ### Multiple levels of reference strength
 
@@ -315,8 +316,9 @@ Take Java as an example,  we may run `process_weak_refs` four times.
 
 As an optimization,
 
--   Step 1 can be, as we described in the previous section, eliminated by merging it with the strong
-    closure in non-emergency GC, or with `WeakReference` processing in emergency GCs.
+-   Step 1 can be, as we described in the [previous section](#soft-references), eliminated by
+    merging it with the strong closure in non-emergency GC, or with `WeakReference` processing in
+    emergency GCs.
 -   Step 2 can be merged with Step 3 since Step 2 never expands the transitive closure.
 
 Therefore, we only need to run `process_weak_refs` twice:
