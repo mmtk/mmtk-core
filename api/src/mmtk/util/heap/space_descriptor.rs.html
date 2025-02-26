@@ -208,9 +208,7 @@
 <a href="#207" id="207">207</a>
 <a href="#208" id="208">208</a>
 <a href="#209" id="209">209</a>
-<a href="#210" id="210">210</a>
-<a href="#211" id="211">211</a>
-<a href="#212" id="212">212</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
+<a href="#210" id="210">210</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::{<span class="self">self</span>, vm_layout};
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>std::sync::atomic::{AtomicUsize, Ordering};
@@ -251,14 +249,12 @@
             } <span class="kw">else </span>{
                 start &gt;&gt; vm_layout().space_shift_64()
             };
-            <span class="kw">return </span>SpaceDescriptor(
-                space_index &lt;&lt; INDEX_SHIFT
-                    | (<span class="kw">if </span>top {
-                        TYPE_CONTIGUOUS_HI
-                    } <span class="kw">else </span>{
-                        TYPE_CONTIGUOUS
-                    }),
-            );
+            <span class="kw">let </span>flags = <span class="kw">if </span>top {
+                TYPE_CONTIGUOUS_HI
+            } <span class="kw">else </span>{
+                TYPE_CONTIGUOUS
+            };
+            <span class="kw">return </span>SpaceDescriptor((space_index &lt;&lt; INDEX_SHIFT) | flags);
         }
         <span class="kw">let </span>chunks = (end - start) &gt;&gt; vm_layout::LOG_BYTES_IN_CHUNK;
         <span class="macro">debug_assert!</span>(!start.is_zero() &amp;&amp; chunks &gt; <span class="number">0 </span>&amp;&amp; chunks &lt; (<span class="number">1 </span>&lt;&lt; SIZE_BITS));
