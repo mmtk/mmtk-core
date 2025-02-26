@@ -1230,7 +1230,9 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
                 worker,
             )
         } else {
-            self.plan.common.trace_object(queue, object, worker)
+            use crate::plan::PlanTraceObject;
+            use crate::policy::gc_work::DEFAULT_TRACE;
+            self.plan.common.trace_object::&lt;_, DEFAULT_TRACE&gt;(queue, object, worker)
         }
     }
 
