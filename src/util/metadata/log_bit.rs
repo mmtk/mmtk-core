@@ -6,6 +6,11 @@ use std::sync::atomic::Ordering;
 use super::MetadataSpec;
 
 impl VMGlobalLogBitSpec {
+    /// Clear the unlog bit to log object (0 means logged)
+    pub fn clear<VM: VMBinding>(&self, object: ObjectReference, order: Ordering) {
+        self.store_atomic::<VM, u8>(object, 0, None, order)
+    }
+
     /// Mark the log bit as unlogged (1 means unlogged)
     pub fn mark_as_unlogged<VM: VMBinding>(&self, object: ObjectReference, order: Ordering) {
         self.store_atomic::<VM, u8>(object, 1, None, order)
