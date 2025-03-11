@@ -52,7 +52,7 @@ be implemented in OpenJDK ([the Lilliput project][lilliput-ihash]).
 
 ## The Address-based Hashing Algorithm
 
-Each object is in one of the three states:
+Each object is in one of the three **hash code states**:
 
 -   `Unhashed`
 -   `Hashed`
@@ -91,11 +91,67 @@ no state transition happens.
 
 ## Implementing Address-based Hashing with MMTk
 
-Since there are three states, each object needs two bits of metadata to represent that state.  The
-two bits are usually held in the object header, but it is also possible to use side metadata albeit
-slightly higher memory overhead.
+### Object Layout
 
-When getting (i.e. observing) the identity hash code of an object, it n
+The VM needs to design the object layout to hold the state and the hash field.
+
+Since there are three states, each object needs two bits of metadata to represent that state.  The
+two bits are usually held in the object header.  For example, in [in JikesRVM][jikesrvm-hash], the
+two hash code state bits are placed after the thin lock bits.
+
+```
+      TTTT TTTT TTTT TTTT TTTT TTHH AAAA AAAA
+ T = thin lock bits
+ H = hash code state bits
+ A = available for use by GCHeader and/or MiscHeader.
+```
+
+The VM also needs to decide the location of the extra hash field.  It is usually placed at the
+beginning or at the end of an object, as shown in the diagram below.  Regardless of the position of
+the hash field, the `ObjectReference` of an object usually points at the usual object header.  In
+this way, ordinary fields can be accessed at the same offset from the `ObjectReference` regardless
+of whether or where the hash field has been added.  The start of the object, however, may no longer
+be the same as he `ObjectReference` in some layout designs.
+
+```
+                                   │ObjectReference                                      
+                                   │start of object                                      
+                                   ▼                                                     
+                                   ┌────────────┬──────────────────────────┐             
+No hash field                      │   Header   │ ordinary fields...       │             
+                                   └────────────┴──────────────────────────┘             
+                                                                                         
+                      │start of    │                                                     
+                      │object      │ObjectReference                                      
+                      ▼            ▼                                                     
+                      ┌────────────┬────────────┬──────────────────────────┐             
+Hash at the beginning │    Hash    │   Header   │ ordinary fields...       │             
+                      └────────────┴────────────┴──────────────────────────┘             
+                                                                                         
+                                   │ObjectReference                                      
+                                   │start of object                                      
+                                   ▼                                                     
+                                   ┌────────────┬──────────────────────────┬────────────┐
+Hash at the end                    │   Header   │ ordinary fields...       │    Hash    │
+                                   └────────────┴──────────────────────────┴────────────┘
+```
+
+### Copying Objects
+
+When using a copying GC plan except MarkCompact, the MMTk core will call `ObjectModel::copy` to copy
+objects.  The VM binding shall handle the addition of the hash field in this method.  The VM binding
+first needs to work out the size of the new copy.  It is usually the same as the old copy.  But when
+the old copy is in the `Hashed` state, the new copy will be one word larger than the old copy
+
+When using MarkCompact, the MMTk core will call `ObjectModel::get_size_when_copied` a
+
+-   For `Unhashed` objects, the new size shall be the same as the old size.  
+-   For `Hashed` objects, the new size 
+
+Evacuating GC plans (that is, all copying GC except MarkCompact) use `ObjectModel::copy` to copy
+objects.  The VM binding should work out the size of the new copy.
+
+When getting (i.e. observing) the identity hash code of an object, it 
 
 
 <!--
