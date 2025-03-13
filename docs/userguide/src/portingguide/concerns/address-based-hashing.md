@@ -91,13 +91,17 @@ no state transition happens.
 
 ## Implementing Address-based Hashing with MMTk
 
+Here we use the implementation strategy from JikesRVM as an example of how to implement
+address-based hashing when using MMTk.  For the best performance, we recommend holding the hash code
+state in the object header, and putting the added hash field in the beginning or the end of the
+object.  We also introduce alternative strategies in [the next
+section](#alternative-implementation-strategies).
+
 ### Object Layout
 
-The VM needs to design the object layout to hold the state and the hash field.
-
 Since there are three states, each object needs two bits of metadata to represent that state.  The
-two bits are usually held in the object header.  For example, in [in JikesRVM][jikesrvm-hash], the
-two hash code state bits are placed after the thin lock bits.
+two bits are usually held in the object header.  For example, [in JikesRVM][jikesrvm-hash], the two
+hash code state bits are placed after the thin lock bits, as shown below.
 
 ```
       TTTT TTTT TTTT TTTT TTTT TTHH AAAA AAAA
@@ -108,10 +112,12 @@ two hash code state bits are placed after the thin lock bits.
 
 The VM also needs to decide the location of the extra hash field.  It is usually placed at the
 beginning or at the end of an object, as shown in the diagram below.  Regardless of the position of
-the hash field, the `ObjectReference` of an object usually points at the usual object header.  In
-this way, ordinary fields can be accessed at the same offset from the `ObjectReference` regardless
-of whether or where the hash field has been added.  The start of the object, however, may no longer
-be the same as he `ObjectReference` in some layout designs.
+the hash field, the `ObjectReference` of an object usually points at the object header.  In this
+way, the header and ordinary fields can be accessed at the same offsets from the `ObjectReference`
+regardless of whether or where the hash field has been added.  The starting address of the object,
+however, may no longer be the same as he `ObjectReference` in some layout designs.  Therefore, the
+VM binding needs to **implement `ObjectModel::ref_to_object_start` and handle the added hash field
+correctly**.
 
 ```
                                    │ObjectReference                                      
@@ -138,20 +144,59 @@ Hash at the end                    │   Header   │ ordinary fields...       �
 
 ### Copying Objects
 
-When using a copying GC plan except MarkCompact, the MMTk core will call `ObjectModel::copy` to copy
-objects.  The VM binding shall handle the addition of the hash field in this method.  The VM binding
-first needs to work out the size of the new copy.  It is usually the same as the old copy.  But when
-the old copy is in the `Hashed` state, the new copy will be one word larger than the old copy
+MMTk calls the following trait methods implemented by the VM binding during copying GC.
 
-When using MarkCompact, the MMTk core will call `ObjectModel::get_size_when_copied` a
+-   For non-delayed-copy collectors (all moving plans except MarkCompact) 
+    -   `ObjectModel::copy`
+-   For delayed-copy collectors (MarkCompact)
+    -   `ObjectModel::copy_to`
+    -   `ObjectModel::get_reference_when_copied_to`
+    -   `ObjectModel::get_size_when_copied`
+    -   `ObjectModel::get_align_when_copied`
+    -   `ObjectModel::get_align_offset_when_copied`
 
--   For `Unhashed` objects, the new size shall be the same as the old size.  
--   For `Hashed` objects, the new size 
+When using a non-delayed-copy collector, MMTk calls `ObjectgModel::copy` which is defined as:
 
-Evacuating GC plans (that is, all copying GC except MarkCompact) use `ObjectModel::copy` to copy
-objects.  The VM binding should work out the size of the new copy.
+```rust
+{{#include ../../../../../src/vm/object_model.rs:copy}}
+```
 
-When getting (i.e. observing) the identity hash code of an object, it 
+The `copy` method should
+
+1.  **Find the state of the `from` object.**  This is done in VM-specific ways, such as inspecting
+    header bits.  If it was `Hashed`, it should transition to the `HashedAndMoved` state in the new
+    copy.
+2.  **Find the size of the `from` object, including the hash field.**  If the `from` object is
+    already in the `HashedAndMoved` state, the VM binding must have already inserted a hash field in
+    step 3 below.  Make sure the hash field is counted in the object size.
+3.  **Allocate the new copy, with a larger size if needed.**  It should call
+    `copy_context.alloc_copy(from, new_size, new_align, new_offset, semantics)` to allocate the new
+    copy of the object.  When transitioning from `Hashed` to `HashedAndMoved`, the `new_size` should
+    be *larger* than the old size in order to accommodate the added hash field.  Otherwise the new
+    size should be the same as the old size.
+4.  **Adjust the `ObjectReference` if needed.**  If the hash field is inserted in the beginning, the
+    offset from the start of the object to the `ObjectReference` may be greater in the new copy.
+    Make sure the `ObjectReference` of the new copy is pointing at the right place.  See the
+    diagrams in the [Object Layout](#object-layout) section.
+5.  **Copy header and ordinary fields.**  Make sure the data is copied to the right offset if the
+    hash field is inserted at the beginning.
+6.  **Fix the state of the new copy if needed.**  If the old copy is `Hashed`, the new copy shall be
+    in the `HashedAndMoved` state.  Set the new copy to the right state by, for example, modifying
+    its header bits.
+7.  **Write or copy the hash field if needed.**  When transitioning from `Hashed` to
+    `HashedAndMoved`, write the old address of the object to the hash field; if the old copy is
+    already in the `HashedAndMoved` state, copy the content of the hash field.
+
+When using a delayed-copy collector, the VM binding shall (1) determine the size of the new copy in
+`get_size_when_copied`, (2) determine the address of `ObjectReference` in the new copy in
+`get_reference_when_copied_to`, and (3) do the actual copying and write the right values to the
+header bits and the hash field in `copy_to`.  The reference to the old copy is passed to all of the
+three methods as a parameter so that the VM binding can look up the state of the old copy, and
+determine the state of the new copy.
+
+## Alternative Implementation Strategies
+
+
 
 
 <!--
