@@ -282,52 +282,50 @@ pub trait Scanning<VM: VMBinding> {
 
     /// Process weak references.
     ///
-    /// This function is called after a transitive closure is completed.
+    /// This function is called in a GC after the transitive closure from roots is computed, that
+    /// is, all reachable objects from roots are reached.  This function gives the VM binding an
+    /// opportunitiy to process finalizers and weak references.
     ///
     /// MMTk core enables the VM binding to do the following in this function:
     ///
-    /// 1.  Query if an object is already reached in this transitive closure.
+    /// 1.  Query if an object is already reached.
+    ///     -   by calling `ObjectReference::is_reachable()`
     /// 2.  Get the new address of an object if it is already reached.
+    ///     -   by calling `ObjectReference::get_forwarded_object()`
     /// 3.  Keep an object and its descendents alive if not yet reached.
+    ///     -   using `tracer_context`
     /// 4.  Request this function to be called again after transitive closure is finished again.
+    ///     -   by returning `true`
     ///
-    /// The VM binding can query if an object is currently reached by calling
-    /// `ObjectReference::is_reachable()`.
+    /// The `tracer_context` parameter provides the VM binding the mechanism for retaining
+    /// unreachable objects (i.e. keeping them alive in this GC).  The following snippet shows a
+    /// typical use case of handling finalizable objects for a Java-like language.
     ///
-    /// If an object is already reached, the VM binding can get its new address by calling
-    /// `ObjectReference::get_forwarded_object()` as the object may have been moved.
+    /// ```rust
+    /// let finalizable_objects: Vec<ObjectReference> = my_vm::get_finalizable_object();
+    /// let mut new_finalizable_objects = vec![];
     ///
-    /// If an object is not yet reached, the VM binding can keep that object and its descendents
-    /// alive.  To do this, the VM binding should use `tracer_context.with_tracer` to get access to
-    /// an `ObjectTracer`, and then call its `trace_object(object)` method.  The `trace_object`
-    /// method will return the new address of the `object` if it moved the object, or its original
-    /// address if not moved.  Implementation-wise, the `ObjectTracer` may contain an internal
-    /// queue for newly traced objects, and will flush the queue when `tracer_context.with_tracer`
-    /// returns. Therefore, it is recommended to reuse the `ObjectTracer` instance to trace
-    /// multiple objects.
+    /// tracer_context.with_tracer(worker, |tracer| {
+    ///     for object in finalizable_objects {
+    ///         if object.is_reachable() {
+    ///             // `object` is still reachable.
+    ///             // It may have been moved if it is a copying GC.
+    ///             let new_object = object.get_forwarded_object().unwrap_or(object);
+    ///             new_finalizable_objects.push(new_object);
+    ///         } else {
+    ///             // `object` is unreachable.
+    ///             // Retain it, and enqueue it for postponed finalization.
+    ///             let new_object = tracer.trace_object(object);
+    ///             my_vm::enqueue_finalizable_object_to_be_executed_later(new_object);
+    ///         }
+    ///     }
+    /// });
+    /// ```
     ///
-    /// *Note that if `trace_object` is called on an already reached object, the behavior will be
-    /// equivalent to `ObjectReference::get_forwarded_object()`.  It will return the new address if
-    /// the GC already moved the object when tracing that object, or the original address if the GC
-    /// did not move the object when tracing it.  In theory, the VM binding can use `trace_object`
-    /// wherever `ObjectReference::get_forwarded_object()` is needed.  However, if a VM never
-    /// resurrects objects, it should completely avoid touching `tracer_context`, and exclusively
-    /// use `ObjectReference::get_forwarded_object()` to get new addresses of objects.  By doing
-    /// so, the VM binding can avoid accidentally resurrecting objects.*
-    ///
-    /// The VM binding can return `true` from `process_weak_refs` to request `process_weak_refs`
-    /// to be called again after the MMTk core finishes transitive closure again from the objects
-    /// newly visited by `ObjectTracer::trace_object`.  This is useful if a VM supports multiple
-    /// levels of reachabilities (such as Java) or ephemerons.
-    ///
-    /// Implementation-wise, this function is called as the "sentinel" of the `VMRefClosure` work
-    /// bucket, which means it is called when all work packets in that bucket have finished.  The
-    /// `tracer_context` expands the transitive closure by adding more work packets in the same
-    /// bucket.  This means if `process_weak_refs` returns true, those work packets will have
-    /// finished (completing the transitive closure) by the time `process_weak_refs` is called
-    /// again.  The VM binding can make use of this by adding custom work packets into the
-    /// `VMRefClosure` bucket.  The bucket will be `VMRefForwarding`, instead, when forwarding.
-    /// See below.
+    /// Within the closure `|tracer| { ... }`, the VM binding can call `tracer.trace_object(object)`
+    /// to retain `object` and get its new address if moved.  After `with_tracer` returns, it will
+    /// create work packets in the `VMRefClosure` work bucket to compute the transitive closure from
+    /// the objects retained in the closure.
     ///
     /// The `memory_manager::is_mmtk_object` function can be used in this function if
     /// -   the "is_mmtk_object" feature is enabled, and
@@ -335,11 +333,44 @@ pub trait Scanning<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `worker`: The current GC worker.
-    /// * `tracer_context`: Use this to get access an `ObjectTracer` and use it to retain and
-    ///   update weak references.
+    /// * `tracer_context`: Use this to get access an `ObjectTracer` and use it to retain and update
+    ///   weak references.
     ///
-    /// This function shall return true if this function needs to be called again after the GC
-    /// finishes expanding the transitive closure from the objects kept alive.
+    /// If `process_weak_refs` returns `true`, then `process_weak_refs` will be called again after
+    /// all work packets in the `VMRefClosure` work bucket has been executed, by which time all
+    /// objects reachable from the objects retained in this function will have been reached.
+    ///
+    /// # Performance notes
+    ///
+    /// **Retain as many objects as needed in one invocation of `tracer_context.with_tracer`, and
+    /// avoid calling `with_tracer` again and again** for each object.  The `tracer` provided by
+    /// `ObjectTracerFactory::with_tracer` enqueues retained objects in an internal list specific to
+    /// this invocation of `with_tracer`, and will create reasonably sized work packets to compute
+    /// the transitive closure.  This means the invocation of `with_tracer` has a non-trivial
+    /// overhead, but each invocation of `tracer.trace_object` is cheap.
+    ///
+    /// *Don't do this*:
+    ///
+    /// ```rust
+    /// for object in objects {
+    ///     tracer_context.with_tracer(worker, |tracer| { // This is expensive! DON'T DO THIS!
+    ///         tracer.trace_object(object);
+    ///     });
+    /// }
+    /// ```
+    ///
+    /// **Use `ObjectReference::get_forwarded_object()` to get the forwarded address of reachable
+    /// objects.  Only use `tracer.trace_object` for retaining unreachable objects.** If
+    /// `trace_object` is called on an already reached object, it will also return its new address
+    /// if moved. However, `tracer_context.with_tracer` has a cost, and the VM binding may
+    /// accidentally "resurrect" dead objects if failed to check `object.is_reachable()` first. If
+    /// the VM binding does not intend to retain any objects, it should completely avoid touching
+    /// `tracer_context`.
+    ///
+    /// **Clone the `tracer_context` for parallelism.**  The `ObjectTracerContext` has `Clone` as
+    /// its supertrait.  The VM binding can clone it and distribute each clone into a work packet.
+    /// By doing so, the VM binding can parallelize the processing of finalizers and weak references
+    /// by creating multiple work packets.
     fn process_weak_refs(
         _worker: &mut GCWorker<VM>,
         _tracer_context: impl ObjectTracerContext<VM>,
