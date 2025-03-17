@@ -60,6 +60,14 @@ criterion = "0.5"
 
 [build-dependencies]
 built = { version = "0.7.7", features = ["git2"] }
+# Note:
+# Some components in ICU4X started to require Rust 1.81 since some versions, such as `litemap` v0.7.5.
+# The `built` crate depends on ICU4X via the dependency chain:
+#     built -> git2 -> url -> idna -> idna_adapter --(default)--------> crates from the ICU4X projects
+#                                                  --(alternatively)--> `unicode-rs`
+# But we don't need ICU4X (or even `url`) because we only use `git2` to get the Git commit hash.
+# We move away from ICU4X completely following the instruction in https://docs.rs/crate/idna_adapter/1.2.0
+idna_adapter = "=1.1.0"
 
 [[bench]]
 name = "main"
