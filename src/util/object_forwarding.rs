@@ -160,12 +160,7 @@ pub fn get_forwarding_status<VM: VMBinding>(object: ObjectReference) -> u8 {
             Ordering::SeqCst,
         )
     } else {
-        unsafe {
-            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.load::<VM, u8>(
-                object,
-                None,
-            )
-        }
+        unsafe { VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.load::<VM, u8>(object, None) }
     }
 }
 
@@ -229,10 +224,8 @@ pub fn read_forwarding_pointer<VM: VMBinding>(object: ObjectReference) -> Object
             // We use "unchecked" convertion becasue we guarantee the forwarding pointer we stored
             // previously is from a valid `ObjectReference` which is never zero.
             ObjectReference::from_raw_address_unchecked(crate::util::Address::from_usize(
-                VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.load::<VM, usize>(
-                    object,
-                    Some(FORWARDING_POINTER_MASK),
-                ),
+                VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC
+                    .load::<VM, usize>(object, Some(FORWARDING_POINTER_MASK)),
             ))
         }
     }
