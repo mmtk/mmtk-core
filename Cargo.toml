@@ -57,13 +57,13 @@ paste = "1.0.8"
 rand = "0.9.0"
 rand_chacha = "0.9.0"
 criterion = "0.5"
-# Note: `half` v2.5.0 started to require Rust 1.8.1.
+# Note: `half` v2.5.0 started to require Rust 1.81.
 # `criterion` transitively depends on `half` via the dependency chain:
 #     criterion -> ciborium -> ciborium_ll -> half
 # The MSRV of `ciborium` v0.2.2 is declared as 1.58, and is declared to depend on `half` v2.2.
-# The Ciborium project should either bump its MSRV or select a version of `half` that satisfies its current MSRV.
+# Ciborium should either bump its MSRV or select a version of `half` that satisfies its current MSRV.
 # We lock the version of `half` to 2.4.1 to workaround this.
-# TODO: When we bump MSRV to 1.84 or above, we can rely on Cargo's MSRV-aware dependency resolver and remove this workaround.
+# TODO: When we bump MSRV to 1.84 or above, we can rely on Cargo's MSRV-aware dependency resolver and remove such workarounds.
 half = "=2.4.1"
 
 [build-dependencies]
