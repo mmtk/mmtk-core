@@ -156,8 +156,7 @@ analysis = []
 nogc_lock_free = []
 # Use lock free with no zeroing NoGC
 nogc_no_zeroing = ["nogc_lock_free"]
-# For using a single GC thread
-# Q: Why do we need this as a compile time flat? We can always set the number of GC threads through options.
+# For using a single GC thread. We optimize for single thread at certain places such as object forwarding
 single_worker = []
 
 # To run expensive comprehensive runtime checks, such as checking duplicate edges
