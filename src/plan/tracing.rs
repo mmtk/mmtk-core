@@ -3,7 +3,7 @@
 
 use crate::scheduler::gc_work::{ProcessEdgesWork, SlotOf};
 use crate::scheduler::{GCWorker, WorkBucketStage};
-use crate::util::ObjectReference;
+use crate::util::{self, ObjectReference};
 use crate::vm::SlotVisitor;
 
 /// This trait represents an object queue to enqueue objects during tracing.
@@ -25,7 +25,7 @@ pub struct VectorQueue<T> {
 
 impl<T> VectorQueue<T> {
     /// Reserve a capacity of this on first enqueue to avoid frequent resizing.
-    const CAPACITY: usize = 4096;
+    const CAPACITY: usize = util::constants::BUFFER_SIZE;
 
     /// Create an empty `VectorObjectQueue`.
     pub fn new() -> Self {

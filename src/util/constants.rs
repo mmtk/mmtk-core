@@ -22,6 +22,9 @@ pub const LOG_BYTES_IN_KBYTE: u8 = 10;
 /// The number of bytes in a kilobyte
 pub const BYTES_IN_KBYTE: usize = 1 << LOG_BYTES_IN_KBYTE;
 
+/// Work packet buffer size
+pub const BUFFER_SIZE: usize = 4096;
+
 /// Some card scanning constants ported from Java MMTK.
 /// As we haven't implemented card scanning, these are not used at the moment.
 mod card_scanning {
