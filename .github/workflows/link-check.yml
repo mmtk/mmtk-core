@@ -21,7 +21,19 @@ jobs:
         with:
           fail: true
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --base docs --accept '200,201,202,203,204,429,500' --no-progress --cache --max-cache-age 1d './docs/**/*.md' --exclude https://users.cecs.anu.edu.au/~steveb/pubs/papers/**
+          # Notes:
+          # - Do not use `--base`.  All relative URLs in Markdown are based on the file itself.
+          # - Verbosity level 2 enables debug logs and shows redirections. \
+          # - Exclude dl.acm.org because it responses 403. \
+          args: |
+            --accept '200..=204,429,500' \
+            --verbose --verbose \
+            --no-progress \
+            --cache \
+            --max-cache-age 1d \
+            --exclude 'https://users.cecs.anu.edu.au/~steveb/pubs/papers/**' \
+            --exclude 'https://dl.acm.org/**' \
+            './docs/**/*.md'
       - name: Save lychee cache
         uses: actions/cache/save@v4
         if: always()
