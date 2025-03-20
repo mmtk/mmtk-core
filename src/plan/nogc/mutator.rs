@@ -1,4 +1,3 @@
-use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::unreachable_prepare_func;
 use crate::plan::mutator_context::unreachable_release_func;
 use crate::plan::mutator_context::Mutator;

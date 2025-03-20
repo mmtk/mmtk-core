@@ -1,4 +1,3 @@
-use crate::plan::barriers::NoBarrier;
 use crate::plan::marksweep::MarkSweep;
 use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::Mutator;

@@ -9,9 +9,9 @@ use crate::plan::mutator_context::{
 };
 use crate::plan::AllocationSemantics;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::opaque_pointer::VMMutatorThread;
 use crate::vm::VMBinding;
 use crate::MMTK;
-use crate::{plan::barriers::NoBarrier, util::opaque_pointer::VMMutatorThread};
 use enum_map::EnumMap;
 
 const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {

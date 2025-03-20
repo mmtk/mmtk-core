@@ -1,5 +1,4 @@
 use super::MarkCompact;
-use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::create_space_mapping;
 use crate::plan::mutator_context::unreachable_prepare_func;
