@@ -4,6 +4,7 @@ use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::create_space_mapping;
 use crate::plan::mutator_context::unreachable_prepare_func;
 use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::ReservedAllocators;
 use crate::plan::AllocationSemantics;
@@ -42,14 +43,13 @@ pub fn create_markcompact_mutator<VM: VMBinding>(
         prepare_func: &unreachable_prepare_func,
         release_func: &markcompact_mutator_release,
     };
-
-    Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        barrier: Box::new(NoBarrier),
+    let builder = MutatorBuilder::new(
+        Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
         mutator_tls,
+        markcompact,
         config,
-        plan: markcompact,
-    }
+    );
+    builder.build()
 }
 
 pub fn markcompact_mutator_release<VM: VMBinding>(

@@ -2,6 +2,7 @@ use super::SemiSpace;
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::unreachable_prepare_func;
 use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::{
     create_allocator_mapping, create_space_mapping, ReservedAllocators,
@@ -61,11 +62,11 @@ pub fn create_ss_mutator<VM: VMBinding>(
         release_func: &ss_mutator_release,
     };
 
-    Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        barrier: Box::new(NoBarrier),
+    let builder = MutatorBuilder::new(
+        Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
         mutator_tls,
+        ss,
         config,
-        plan: ss,
-    }
+    );
+    builder.build()
 }

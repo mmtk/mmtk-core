@@ -1,7 +1,9 @@
 use crate::plan::barriers::ObjectBarrier;
 use crate::plan::generational::barrier::GenObjectBarrierSemantics;
 use crate::plan::immix;
-use crate::plan::mutator_context::{create_space_mapping, unreachable_prepare_func, MutatorConfig};
+use crate::plan::mutator_context::{
+    create_space_mapping, unreachable_prepare_func, MutatorBuilder, MutatorConfig,
+};
 use crate::plan::sticky::immix::global::StickyImmix;
 use crate::util::alloc::allocators::Allocators;
 use crate::util::alloc::AllocatorSelector;
@@ -33,14 +35,15 @@ pub fn create_stickyimmix_mutator<VM: VMBinding>(
         release_func: &stickyimmix_mutator_release,
     };
 
-    Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        barrier: Box::new(ObjectBarrier::new(GenObjectBarrierSemantics::new(
-            mmtk,
-            stickyimmix,
-        ))),
+    let builder = MutatorBuilder::new(
+        Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
         mutator_tls,
+        stickyimmix,
         config,
-        plan: mmtk.get_plan(),
-    }
+    );
+    builder
+        .barrier(Box::new(ObjectBarrier::new(
+            GenObjectBarrierSemantics::new(mmtk, stickyimmix),
+        )))
+        .build()
 }

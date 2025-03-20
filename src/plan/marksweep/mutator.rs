@@ -2,6 +2,7 @@ use crate::plan::barriers::NoBarrier;
 use crate::plan::marksweep::MarkSweep;
 use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::ReservedAllocators;
 use crate::plan::mutator_context::SpaceMapping;
@@ -121,11 +122,11 @@ pub fn create_ms_mutator<VM: VMBinding>(
         release_func: &ms_mutator_release,
     };
 
-    Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        barrier: Box::new(NoBarrier),
+    let builder = MutatorBuilder::new(
+        Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
         mutator_tls,
+        mmtk.get_plan(),
         config,
-        plan: mmtk.get_plan(),
-    }
+    );
+    builder.build()
 }

@@ -12,6 +12,8 @@ use crate::vm::VMBinding;
 
 use enum_map::EnumMap;
 
+use super::barriers::NoBarrier;
+
 pub(crate) type SpaceMapping<VM> = Vec<(AllocatorSelector, &'static dyn Space<VM>)>;
 
 /// A place-holder implementation for `MutatorConfig::prepare_func` that should not be called.
@@ -75,6 +77,48 @@ impl<VM: VMBinding> std::fmt::Debug for MutatorConfig<VM> {
             f.write_fmt(format_args!("- {:?} = {:?}\n", selector, space.name()))?;
         }
         Ok(())
+    }
+}
+
+/// Used to build a mutator struct
+pub struct MutatorBuilder<VM: VMBinding> {
+    allocators: Allocators<VM>,
+    barrier: Box<dyn Barrier<VM>>,
+    /// The mutator thread that is bound with this Mutator struct.
+    mutator_tls: VMMutatorThread,
+    plan: &'static dyn Plan<VM = VM>,
+    config: MutatorConfig<VM>,
+}
+
+impl<VM: VMBinding> MutatorBuilder<VM> {
+    pub fn new(
+        allocators: Allocators<VM>,
+        mutator_tls: VMMutatorThread,
+        plan: &'static dyn Plan<VM = VM>,
+        config: MutatorConfig<VM>,
+    ) -> Self {
+        MutatorBuilder {
+            allocators,
+            barrier: Box::new(NoBarrier),
+            mutator_tls,
+            plan,
+            config,
+        }
+    }
+
+    pub fn barrier(mut self, barrier: Box<dyn Barrier<VM>>) -> Self {
+        self.barrier = barrier;
+        self
+    }
+
+    pub fn build(self) -> Mutator<VM> {
+        Mutator {
+            allocators: self.allocators,
+            barrier: self.barrier,
+            mutator_tls: self.mutator_tls,
+            plan: self.plan,
+            config: self.config,
+        }
     }
 }
 

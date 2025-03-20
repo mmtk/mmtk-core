@@ -3,6 +3,7 @@ use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::create_space_mapping;
 use crate::plan::mutator_context::unreachable_prepare_func;
 use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::ReservedAllocators;
 use crate::plan::AllocationSemantics;
@@ -56,11 +57,11 @@ pub fn create_immix_mutator<VM: VMBinding>(
         release_func: &immix_mutator_release,
     };
 
-    Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        barrier: Box::new(NoBarrier),
+    let builder = MutatorBuilder::new(
+        Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
         mutator_tls,
+        immix,
         config,
-        plan: immix,
-    }
+    );
+    builder.build()
 }

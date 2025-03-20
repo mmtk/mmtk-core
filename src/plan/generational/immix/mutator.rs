@@ -5,6 +5,7 @@ use crate::plan::generational::create_gen_space_mapping;
 use crate::plan::generational::immix::GenImmix;
 use crate::plan::mutator_context::unreachable_prepare_func;
 use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics;
 use crate::util::alloc::allocators::Allocators;
@@ -40,13 +41,15 @@ pub fn create_genimmix_mutator<VM: VMBinding>(
         release_func: &genimmix_mutator_release,
     };
 
-    Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        barrier: Box::new(ObjectBarrier::new(GenObjectBarrierSemantics::new(
-            mmtk, genimmix,
-        ))),
+    let builder = MutatorBuilder::new(
+        Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
         mutator_tls,
+        genimmix,
         config,
-        plan: genimmix,
-    }
+    );
+    builder
+        .barrier(Box::new(ObjectBarrier::new(
+            GenObjectBarrierSemantics::new(mmtk, genimmix),
+        )))
+        .build()
 }
