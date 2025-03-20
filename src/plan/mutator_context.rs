@@ -9,6 +9,7 @@ use crate::util::alloc::Allocator;
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
+use crate::MMTK;
 
 use enum_map::EnumMap;
 
@@ -82,26 +83,23 @@ impl<VM: VMBinding> std::fmt::Debug for MutatorConfig<VM> {
 
 /// Used to build a mutator struct
 pub struct MutatorBuilder<VM: VMBinding> {
-    allocators: Allocators<VM>,
     barrier: Box<dyn Barrier<VM>>,
     /// The mutator thread that is bound with this Mutator struct.
     mutator_tls: VMMutatorThread,
-    plan: &'static dyn Plan<VM = VM>,
+    mmtk: &'static MMTK<VM>,
     config: MutatorConfig<VM>,
 }
 
 impl<VM: VMBinding> MutatorBuilder<VM> {
     pub fn new(
-        allocators: Allocators<VM>,
         mutator_tls: VMMutatorThread,
-        plan: &'static dyn Plan<VM = VM>,
+        mmtk: &'static MMTK<VM>,
         config: MutatorConfig<VM>,
     ) -> Self {
         MutatorBuilder {
-            allocators,
             barrier: Box::new(NoBarrier),
             mutator_tls,
-            plan,
+            mmtk,
             config,
         }
     }
@@ -113,10 +111,14 @@ impl<VM: VMBinding> MutatorBuilder<VM> {
 
     pub fn build(self) -> Mutator<VM> {
         Mutator {
-            allocators: self.allocators,
+            allocators: Allocators::<VM>::new(
+                self.mutator_tls,
+                self.mmtk,
+                &self.config.space_mapping,
+            ),
             barrier: self.barrier,
             mutator_tls: self.mutator_tls,
-            plan: self.plan,
+            plan: self.mmtk.get_plan(),
             config: self.config,
         }
     }
