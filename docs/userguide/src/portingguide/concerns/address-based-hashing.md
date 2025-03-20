@@ -194,6 +194,26 @@ header bits and the hash field in `copy_to`.  The reference to the old copy is p
 three methods as a parameter so that the VM binding can look up the state of the old copy, and
 determine the state of the new copy.
 
+### Observing the Identity Hash Code
+
+Mutators should get the identity hash code of an object by first finding the state of the object.
+
+If the object is in the `Unhashed` or `Hashed` state, the hash code shall be the address of the
+object.  Specifically, if the object is in the `Unhashed` state, it should change its state to
+`Hashed`.  This should be done *atomically* because other mutators may be observing the identity
+hash code of the same object concurrently.  If `Unhashed` is encoded as 00 and `Hashed` is encoded
+as 01 in binary, this can be done with an atomic bit-set or fetch-or operation.
+
+If the object is in the `HashedAndMoved` state, the hash code shall be read from the added hash
+field.
+
+Note that the operation for the mutator to observe the identity hash code must be *atomic with
+respect to the GC*.  One way to ensure this in stop-the-world GC is not having [GC-safe points] in
+the function that computes the identity hash code.  Currently, all plans in the `master` branch of
+`mmtk-core` are stop-the-world.
+
+[GC-safe points]: ../../glossary.md#gc-safe-point
+
 ## Alternative Implementation Strategies
 
 
