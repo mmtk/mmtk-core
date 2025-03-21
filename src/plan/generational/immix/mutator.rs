@@ -41,12 +41,7 @@ pub fn create_genimmix_mutator<VM: VMBinding>(
         release_func: &genimmix_mutator_release,
     };
 
-    let builder = MutatorBuilder::new(
-        Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        mutator_tls,
-        genimmix,
-        config,
-    );
+    let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
     builder
         .barrier(Box::new(ObjectBarrier::new(
             GenObjectBarrierSemantics::new(mmtk, genimmix),

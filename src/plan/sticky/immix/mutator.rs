@@ -35,12 +35,7 @@ pub fn create_stickyimmix_mutator<VM: VMBinding>(
         release_func: &stickyimmix_mutator_release,
     };
 
-    let builder = MutatorBuilder::new(
-        Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        mutator_tls,
-        stickyimmix,
-        config,
-    );
+    let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
     builder
         .barrier(Box::new(ObjectBarrier::new(
             GenObjectBarrierSemantics::new(mmtk, stickyimmix),

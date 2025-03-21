@@ -54,11 +54,6 @@ pub fn create_immix_mutator<VM: VMBinding>(
         release_func: &immix_mutator_release,
     };
 
-    let builder = MutatorBuilder::new(
-        Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        mutator_tls,
-        immix,
-        config,
-    );
+    let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
     builder.build()
 }

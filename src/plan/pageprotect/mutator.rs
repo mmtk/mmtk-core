@@ -45,11 +45,6 @@ pub fn create_pp_mutator<VM: VMBinding>(
         release_func: &no_op_release_func,
     };
 
-    let builder = MutatorBuilder::new(
-        Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        mutator_tls,
-        page,
-        config,
-    );
+    let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
     builder.build()
 }

@@ -61,11 +61,6 @@ pub fn create_ss_mutator<VM: VMBinding>(
         release_func: &ss_mutator_release,
     };
 
-    let builder = MutatorBuilder::new(
-        Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        mutator_tls,
-        ss,
-        config,
-    );
+    let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
     builder.build()
 }

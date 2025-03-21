@@ -56,11 +56,6 @@ pub fn create_nogc_mutator<VM: VMBinding>(
         release_func: &unreachable_release_func,
     };
 
-    let builder = MutatorBuilder::new(
-        Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        mutator_tls,
-        plan,
-        config,
-    );
+    let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
     builder.build()
 }

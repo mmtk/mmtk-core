@@ -121,11 +121,6 @@ pub fn create_ms_mutator<VM: VMBinding>(
         release_func: &ms_mutator_release,
     };
 
-    let builder = MutatorBuilder::new(
-        Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        mutator_tls,
-        mmtk.get_plan(),
-        config,
-    );
+    let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
     builder.build()
 }

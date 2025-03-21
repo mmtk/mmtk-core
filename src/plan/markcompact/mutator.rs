@@ -42,12 +42,7 @@ pub fn create_markcompact_mutator<VM: VMBinding>(
         prepare_func: &unreachable_prepare_func,
         release_func: &markcompact_mutator_release,
     };
-    let builder = MutatorBuilder::new(
-        Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        mutator_tls,
-        markcompact,
-        config,
-    );
+    let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
     builder.build()
 }
 
