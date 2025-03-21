@@ -8,7 +8,7 @@ use crate::plan::mutator_context::{
 };
 use crate::plan::nogc::NoGC;
 use crate::plan::AllocationSemantics;
-use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
 use crate::MMTK;

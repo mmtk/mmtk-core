@@ -7,7 +7,7 @@ use crate::plan::mutator_context::ReservedAllocators;
 use crate::plan::mutator_context::SpaceMapping;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
-use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use crate::MMTK;

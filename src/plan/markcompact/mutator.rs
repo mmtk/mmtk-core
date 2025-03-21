@@ -7,7 +7,7 @@ use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::ReservedAllocators;
 use crate::plan::AllocationSemantics;
-use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::alloc::MarkCompactAllocator;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
