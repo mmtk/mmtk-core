@@ -23,6 +23,7 @@ atomic = "0.6.0"
 atomic_refcell = "0.1.7"
 atomic-traits = "0.4.0"
 bytemuck = { version = "1.14.0", features = ["derive"] }
+bytemuck_derive = "=1.8.1" # We can remove this dependency when we use MSRV 1.84+
 cfg-if = "1.0"
 crossbeam = "0.8.1"
 delegate = "0.13.2"
