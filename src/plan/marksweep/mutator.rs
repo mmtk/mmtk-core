@@ -1,13 +1,13 @@
-use crate::plan::barriers::NoBarrier;
 use crate::plan::marksweep::MarkSweep;
 use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::ReservedAllocators;
 use crate::plan::mutator_context::SpaceMapping;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
-use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use crate::MMTK;
@@ -121,11 +121,6 @@ pub fn create_ms_mutator<VM: VMBinding>(
         release_func: &ms_mutator_release,
     };
 
-    Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        barrier: Box::new(NoBarrier),
-        mutator_tls,
-        config,
-        plan: mmtk.get_plan(),
-    }
+    let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
+    builder.build()
 }

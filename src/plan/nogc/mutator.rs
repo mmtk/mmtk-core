@@ -1,14 +1,14 @@
-use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::unreachable_prepare_func;
 use crate::plan::mutator_context::unreachable_release_func;
 use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::{
     create_allocator_mapping, create_space_mapping, ReservedAllocators,
 };
 use crate::plan::nogc::NoGC;
 use crate::plan::AllocationSemantics;
-use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
 use crate::MMTK;
@@ -56,11 +56,6 @@ pub fn create_nogc_mutator<VM: VMBinding>(
         release_func: &unreachable_release_func,
     };
 
-    Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        barrier: Box::new(NoBarrier),
-        mutator_tls,
-        config,
-        plan,
-    }
+    let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
+    builder.build()
 }

@@ -9,8 +9,11 @@ use crate::util::alloc::Allocator;
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
+use crate::MMTK;
 
 use enum_map::EnumMap;
+
+use super::barriers::NoBarrier;
 
 pub(crate) type SpaceMapping<VM> = Vec<(AllocatorSelector, &'static dyn Space<VM>)>;
 
@@ -75,6 +78,49 @@ impl<VM: VMBinding> std::fmt::Debug for MutatorConfig<VM> {
             f.write_fmt(format_args!("- {:?} = {:?}\n", selector, space.name()))?;
         }
         Ok(())
+    }
+}
+
+/// Used to build a mutator struct
+pub struct MutatorBuilder<VM: VMBinding> {
+    barrier: Box<dyn Barrier<VM>>,
+    /// The mutator thread that is bound with this Mutator struct.
+    mutator_tls: VMMutatorThread,
+    mmtk: &'static MMTK<VM>,
+    config: MutatorConfig<VM>,
+}
+
+impl<VM: VMBinding> MutatorBuilder<VM> {
+    pub fn new(
+        mutator_tls: VMMutatorThread,
+        mmtk: &'static MMTK<VM>,
+        config: MutatorConfig<VM>,
+    ) -> Self {
+        MutatorBuilder {
+            barrier: Box::new(NoBarrier),
+            mutator_tls,
+            mmtk,
+            config,
+        }
+    }
+
+    pub fn barrier(mut self, barrier: Box<dyn Barrier<VM>>) -> Self {
+        self.barrier = barrier;
+        self
+    }
+
+    pub fn build(self) -> Mutator<VM> {
+        Mutator {
+            allocators: Allocators::<VM>::new(
+                self.mutator_tls,
+                self.mmtk,
+                &self.config.space_mapping,
+            ),
+            barrier: self.barrier,
+            mutator_tls: self.mutator_tls,
+            plan: self.mmtk.get_plan(),
+            config: self.config,
+        }
     }
 }
 
