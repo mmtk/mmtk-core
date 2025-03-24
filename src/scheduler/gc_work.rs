@@ -10,10 +10,12 @@ use crate::*;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
-/// Buffer size for [`ProcessEdgesWork`] work packets. This constant is exposed to users so that
-/// they can use this value for places in their binding that interface with the work packet system,
-/// specifically the transitive closure via `ProcessEdgesWork` work packets such as roots gathering
-/// code or weak reference processing.
+/// Buffer size for [`ProcessEdgesWork`] work packets. This constant is exposed to binding
+/// developers so that they can use this value for places in their binding that interface with the
+/// work packet system, specifically the transitive closure via `ProcessEdgesWork` work packets
+/// such as roots gathering code or weak reference processing. In order to have better load
+/// balancing, it is recommended that binding developers use this constant to split work up into
+/// different work packets.
 pub const EDGES_WORK_BUFFER_SIZE: usize = 4096;
 
 pub struct ScheduleCollection;
