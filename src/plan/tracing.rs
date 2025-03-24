@@ -1,7 +1,7 @@
 //! This module contains code useful for tracing,
 //! i.e. visiting the reachable objects by traversing all or part of an object graph.
 
-use crate::scheduler::gc_work::{EDGES_WORK_BUFFER_SIZE, ProcessEdgesWork, SlotOf};
+use crate::scheduler::gc_work::{ProcessEdgesWork, SlotOf, EDGES_WORK_BUFFER_SIZE};
 use crate::scheduler::{GCWorker, WorkBucketStage};
 use crate::util::ObjectReference;
 use crate::vm::SlotVisitor;
