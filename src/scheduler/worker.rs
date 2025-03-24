@@ -69,17 +69,20 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
 
         // The live bytes of the object
         let bytes = VM::VMObjectModel::get_current_size(object);
-        // Get the space index from descriptor
-        let space_descriptor = VM_MAP.get_descriptor_for_address(object.to_raw_address());
-        let space_index = space_descriptor.get_index();
-        debug_assert!(
-            space_index < MAX_SPACES,
-            "Space index {} is not in the range of [0, {})",
-            space_index,
-            MAX_SPACES
-        );
-        // Accumulate the live bytes for the index
-        live_bytes_per_space[space_index] += bytes;
+        // Check if the object is in our heap. If it is not in our heap (e.g. in the VM space), we cannot use VM map to get its descriptor.
+        if crate::util::heap::vm_layout::vm_layout().in_available_range(object.to_raw_address()) {
+            // Get the space index from descriptor
+            let space_descriptor = VM_MAP.get_descriptor_for_address(object.to_raw_address());
+            let space_index = space_descriptor.get_index();
+            debug_assert!(
+                space_index < MAX_SPACES,
+                "Space index {} is not in the range of [0, {})",
+                space_index,
+                MAX_SPACES
+            );
+            // Accumulate the live bytes for the index
+            live_bytes_per_space[space_index] += bytes;
+        }
     }
 }
 
