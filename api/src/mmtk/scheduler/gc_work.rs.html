@@ -1196,7 +1196,15 @@
 <a href="#1195" id="1195">1195</a>
 <a href="#1196" id="1196">1196</a>
 <a href="#1197" id="1197">1197</a>
-<a href="#1198" id="1198">1198</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
+<a href="#1198" id="1198">1198</a>
+<a href="#1199" id="1199">1199</a>
+<a href="#1200" id="1200">1200</a>
+<a href="#1201" id="1201">1201</a>
+<a href="#1202" id="1202">1202</a>
+<a href="#1203" id="1203">1203</a>
+<a href="#1204" id="1204">1204</a>
+<a href="#1205" id="1205">1205</a>
+<a href="#1206" id="1206">1206</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::global_state::GcStatus;
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectsClosure;
@@ -1207,6 +1215,14 @@
 <span class="kw">use crate</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span>std::marker::PhantomData;
 <span class="kw">use </span>std::ops::{Deref, DerefMut};
+
+<span class="doccomment">/// Buffer size for [`ProcessEdgesWork`] work packets. This constant is exposed to binding
+/// developers so that they can use this value for places in their binding that interface with the
+/// work packet system, specifically the transitive closure via `ProcessEdgesWork` work packets
+/// such as roots gathering code or weak reference processing. In order to have better load
+/// balancing, it is recommended that binding developers use this constant to split work up into
+/// different work packets.
+</span><span class="kw">pub const </span>EDGES_WORK_BUFFER_SIZE: usize = <span class="number">4096</span>;
 
 <span class="kw">pub struct </span>ScheduleCollection;
 
@@ -1754,7 +1770,7 @@
     /// Higher capacity means the packet will take longer to finish, and may lead to
     /// bad load balancing. On the other hand, lower capacity would lead to higher cost
     /// on scheduling many small work packets. It is important to find a proper capacity.
-    </span><span class="kw">const </span>CAPACITY: usize = <span class="number">4096</span>;
+    </span><span class="kw">const </span>CAPACITY: usize = EDGES_WORK_BUFFER_SIZE;
     <span class="doccomment">/// Do we update object reference? This has to be true for a moving GC.
     </span><span class="kw">const </span>OVERWRITE_REFERENCE: bool = <span class="bool-val">true</span>;
     <span class="doccomment">/// If true, we do object scanning in this work packet with the same worker without scheduling overhead.
