@@ -71,11 +71,12 @@ Each object is in one of the three **hash code states**:
 The state-transition graph is shown below:
 
 ```
-   move           hash          move or hash  
-   ┌──┐           ┌──┐              ┌──┐      
-┌──▼──┴──┐ hash ┌─▼──┴─┐ move ┌─────▼──┴─────┐
-│Unhashed├─────►│Hashed├─────►│HashedAndMoved│
-└────────┘      └──────┘      └──────────────┘
+       move                        hash                    move or hash   
+     ┌──────┐                    ┌──────┐                    ┌──────┐     
+     │      │                    │      │                    │      │     
+┌────▼──────┴────┐   hash   ┌────▼──────┴────┐   move   ┌────▼──────┴────┐
+│    Unhashed    ├─────────►│     Hashed     ├─────────►│ HashedAndMoved │
+└────────────────┘          └────────────────┘          └────────────────┘
 ```
 
 States are transitioned upon events labelled on the edges:
