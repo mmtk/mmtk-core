@@ -556,7 +556,7 @@ pub trait ProcessEdgesWork:
     /// Higher capacity means the packet will take longer to finish, and may lead to
     /// bad load balancing. On the other hand, lower capacity would lead to higher cost
     /// on scheduling many small work packets. It is important to find a proper capacity.
-    const CAPACITY: usize = 4096;
+    const CAPACITY: usize = EDGES_WORK_BUFFER_SIZE;
     /// Do we update object reference? This has to be true for a moving GC.
     const OVERWRITE_REFERENCE: bool = true;
     /// If true, we do object scanning in this work packet with the same worker without scheduling overhead.
