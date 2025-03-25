@@ -554,7 +554,15 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         probe!(mmtk, gc_end);
 
         if *mmtk.get_options().count_live_bytes_in_gc {
-            for (space_name, &stats) in mmtk.state.live_bytes_in_last_gc.borrow().iter() {
+            // Aggregate the live bytes
+            let live_bytes = mmtk
+                .scheduler
+                .worker_group
+                .get_and_clear_worker_live_bytes();
+            let mut stats = mmtk.state.live_bytes_in_last_gc.borrow_mut();
+            *stats = mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
+            // Logging
+            for (space_name, &stats) in stats.iter() {
                 info!(
                     "{} = {} pages ({:.1}% live)",
                     space_name,
