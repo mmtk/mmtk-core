@@ -3,17 +3,15 @@ use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::create_space_mapping;
 use crate::plan::mutator_context::unreachable_prepare_func;
 use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::ReservedAllocators;
 use crate::plan::AllocationSemantics;
-use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::alloc::ImmixAllocator;
+use crate::util::opaque_pointer::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use crate::MMTK;
-use crate::{
-    plan::barriers::NoBarrier,
-    util::opaque_pointer::{VMMutatorThread, VMWorkerThread},
-};
 use enum_map::EnumMap;
 
 pub fn immix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
@@ -56,11 +54,6 @@ pub fn create_immix_mutator<VM: VMBinding>(
         release_func: &immix_mutator_release,
     };
 
-    Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        barrier: Box::new(NoBarrier),
-        mutator_tls,
-        config,
-        plan: immix,
-    }
+    let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
+    builder.build()
 }
