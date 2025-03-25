@@ -124,21 +124,16 @@
 <a href="#123" id="123">123</a>
 <a href="#124" id="124">124</a>
 <a href="#125" id="125">125</a>
-<a href="#126" id="126">126</a>
-<a href="#127" id="127">127</a>
-<a href="#128" id="128">128</a>
-<a href="#129" id="129">129</a>
-<a href="#130" id="130">130</a>
-<a href="#131" id="131">131</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::NoBarrier;
-<span class="kw">use </span><span class="kw">crate</span>::plan::marksweep::MarkSweep;
+<a href="#126" id="126">126</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::marksweep::MarkSweep;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::create_allocator_mapping;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::Mutator;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::MutatorBuilder;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::MutatorConfig;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::ReservedAllocators;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::SpaceMapping;
 <span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
-<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::{AllocatorSelector, Allocators};
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
 <span class="kw">use </span><span class="kw">crate</span>::util::{VMMutatorThread, VMWorkerThread};
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span><span class="kw">crate</span>::MMTK;
@@ -252,12 +247,7 @@
         release_func: <span class="kw-2">&amp;</span>ms_mutator_release,
     };
 
-    Mutator {
-        allocators: Allocators::&lt;VM&gt;::new(mutator_tls, mmtk, <span class="kw-2">&amp;</span>config.space_mapping),
-        barrier: Box::new(NoBarrier),
-        mutator_tls,
-        config,
-        plan: mmtk.get_plan(),
-    }
+    <span class="kw">let </span>builder = MutatorBuilder::new(mutator_tls, mmtk, config);
+    builder.build()
 }
 </code></pre></div></section></main></body></html>

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["create_allocator_mapping","create_space_mapping","no_op_release_func","unreachable_prepare_func","unreachable_release_func"],"struct":["Mutator","MutatorConfig","ReservedAllocators"],"trait":["MutatorContext"],"type":["SpaceMapping"]};
+window.SIDEBAR_ITEMS = {"fn":["create_allocator_mapping","create_space_mapping","no_op_release_func","unreachable_prepare_func","unreachable_release_func"],"struct":["Mutator","MutatorBuilder","MutatorConfig","ReservedAllocators"],"trait":["MutatorContext"],"type":["SpaceMapping"]};

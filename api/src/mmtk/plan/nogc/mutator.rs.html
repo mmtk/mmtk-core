@@ -59,22 +59,17 @@
 <a href="#58" id="58">58</a>
 <a href="#59" id="59">59</a>
 <a href="#60" id="60">60</a>
-<a href="#61" id="61">61</a>
-<a href="#62" id="62">62</a>
-<a href="#63" id="63">63</a>
-<a href="#64" id="64">64</a>
-<a href="#65" id="65">65</a>
-<a href="#66" id="66">66</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::NoBarrier;
-<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::unreachable_prepare_func;
+<a href="#61" id="61">61</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::unreachable_prepare_func;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::unreachable_release_func;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::Mutator;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::MutatorBuilder;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::MutatorConfig;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::{
     create_allocator_mapping, create_space_mapping, ReservedAllocators,
 };
 <span class="kw">use </span><span class="kw">crate</span>::plan::nogc::NoGC;
 <span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
-<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::{AllocatorSelector, Allocators};
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
 <span class="kw">use </span><span class="kw">crate</span>::util::VMMutatorThread;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span><span class="kw">crate</span>::MMTK;
@@ -122,12 +117,7 @@
         release_func: <span class="kw-2">&amp;</span>unreachable_release_func,
     };
 
-    Mutator {
-        allocators: Allocators::&lt;VM&gt;::new(mutator_tls, mmtk, <span class="kw-2">&amp;</span>config.space_mapping),
-        barrier: Box::new(NoBarrier),
-        mutator_tls,
-        config,
-        plan,
-    }
+    <span class="kw">let </span>builder = MutatorBuilder::new(mutator_tls, mmtk, config);
+    builder.build()
 }
 </code></pre></div></section></main></body></html>

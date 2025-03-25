@@ -41,15 +41,13 @@
 <a href="#40" id="40">40</a>
 <a href="#41" id="41">41</a>
 <a href="#42" id="42">42</a>
-<a href="#43" id="43">43</a>
-<a href="#44" id="44">44</a>
-<a href="#45" id="45">45</a>
-<a href="#46" id="46">46</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::ObjectBarrier;
+<a href="#43" id="43">43</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::ObjectBarrier;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::barrier::GenObjectBarrierSemantics;
 <span class="kw">use </span><span class="kw">crate</span>::plan::immix;
-<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::{create_space_mapping, unreachable_prepare_func, MutatorConfig};
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::{
+    create_space_mapping, unreachable_prepare_func, MutatorBuilder, MutatorConfig,
+};
 <span class="kw">use </span><span class="kw">crate</span>::plan::sticky::immix::global::StickyImmix;
-<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::Allocators;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocatorSelector;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::VMWorkerThread;
 <span class="kw">use </span><span class="kw">crate</span>::util::VMMutatorThread;
@@ -79,15 +77,11 @@
         release_func: <span class="kw-2">&amp;</span>stickyimmix_mutator_release,
     };
 
-    Mutator {
-        allocators: Allocators::&lt;VM&gt;::new(mutator_tls, mmtk, <span class="kw-2">&amp;</span>config.space_mapping),
-        barrier: Box::new(ObjectBarrier::new(GenObjectBarrierSemantics::new(
-            mmtk,
-            stickyimmix,
-        ))),
-        mutator_tls,
-        config,
-        plan: mmtk.get_plan(),
-    }
+    <span class="kw">let </span>builder = MutatorBuilder::new(mutator_tls, mmtk, config);
+    builder
+        .barrier(Box::new(ObjectBarrier::new(
+            GenObjectBarrierSemantics::new(mmtk, stickyimmix),
+        )))
+        .build()
 }
 </code></pre></div></section></main></body></html>
