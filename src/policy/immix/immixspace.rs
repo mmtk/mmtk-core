@@ -321,7 +321,12 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
 
         // increase the number of objects scanned
         #[cfg(feature = "dump_memory_stats")]
-        self.immix_stats.increase_traced_objects(1);
+        {
+            if self.is_pinned(object) {
+                self.immix_stats.increase_pinned_objects(1);
+            }
+            self.immix_stats.increase_traced_objects(1);
+        }
     }
 
     fn may_move_objects<const KIND: TraceKind>() -> bool {
@@ -837,10 +842,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             object_forwarding::clear_forwarding_bits::<VM>(object);
             object
         } else {
-            #[cfg(feature = "dump_memory_stats")]
-            if self.is_pinned(object) {
-                self.immix_stats.increase_pinned_objects(1);
-            }
             // We won the forwarding race; actually forward and copy the object if it is not pinned
             // and we have sufficient space in our copy allocator
             let new_object = if self.is_pinned(object)
