@@ -153,7 +153,7 @@ Hash at the end                    │   Header   │ ordinary fields...       �
                                    └────────────┴──────────────────────────┴────────────┘
 ```
 
-### Copying Objects
+### GC: Copying Objects
 
 MMTk calls the following trait methods implemented by the VM binding during copying GC.
 
@@ -198,31 +198,38 @@ The `copy` method should
     `HashedAndMoved`, write the old address of the object to the hash field; if the old copy is
     already in the `HashedAndMoved` state, copy the content of the hash field.
 
-When using a delayed-copy collector, the VM binding shall (1) determine the size of the new copy in
+When using a delayed-copy collector, the VM binding should do the same things as above, but in
+different methods in a slightly different order.  It shall (1) determine the size of the new copy in
 `get_size_when_copied`, (2) determine the address of `ObjectReference` in the new copy in
 `get_reference_when_copied_to`, and (3) do the actual copying and write the right values to the
 header bits and the hash field in `copy_to`.  The reference to the old copy is passed to all of the
 three methods as a parameter so that the VM binding can look up the state of the old copy, and
 determine the state of the new copy.
 
-### Observing the Identity Hash Code
+### Mutator: Observing the Identity Hash Code
 
 Mutators should get the identity hash code of an object by first finding the state of the object.
 
-If the object is in the `Unhashed` or `Hashed` state, the hash code shall be the address of the
-object.  Specifically, if the object is in the `Unhashed` state, it should change its state to
-`Hashed`.  This should be done *atomically* because other mutators may be observing the identity
-hash code of the same object concurrently.  If `Unhashed` is encoded as 00 and `Hashed` is encoded
-as 01 in binary, this can be done with an atomic bit-set or fetch-or operation.
+-   If `Unhashed`, it should set its state to `Hashed` and use its address as the hash code.
+-   If `Hashed`, it should simply use its address as the hash code.
+-   If `HashedAndMoved`, it should read the hash code from the added hash field.
 
-If the object is in the `HashedAndMoved` state, the hash code shall be read from the added hash
-field.
+Note that the operation of getting the identity hash code may happen concurrently with other mutator
+threads and GC worker threads.
 
-Note that the operation for the mutator to observe the identity hash code must be *atomic with
-respect to the GC*.  One way to ensure this in stop-the-world GC is not having [GC-safe points] in
-the function that computes the identity hash code.  Currently, all plans in the `master` branch of
-`mmtk-core` are stop-the-world.
+Because other mutators can be accessing the header bits of the same object concurrently, the
+operation of transitioning the state from `Unhashed` to `Hashed` it should be done *atomically*.
+If, as in JikesRVM, the `Unhashed` state is encoded as `00` and the `Hashed` state is encoded as
+`01`, this state transition can be done with a single atomic bit-set or fetch-or operation.
 
+There is also a risk if GC can happen concurrently, moving the object and changing its state.  If
+copying only happens during stop-the-world (that includes all stop-the-world GC algorithms and
+mostly-concurrent GC algorithms that only copy objects during stop-the-world, such as [LXR]), we can
+make the computing of identity hash code *atomic with respect to copying GC* by not inserting
+[GC-safe points] in the middle of computing identity hash code.  MMTk currently does not have
+concurrent copying GC.
+
+[LXR]: https://dl.acm.org/doi/10.1145/3519939.3523440
 [GC-safe points]: ../../glossary.md#gc-safe-point
 
 ## Alternative Implementation Strategies
