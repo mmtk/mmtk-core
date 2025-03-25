@@ -234,7 +234,27 @@ concurrent copying GC.
 
 ## Alternative Implementation Strategies
 
+Some VMs cannot implement address-based hashing in the same way as JikesRVM due to implementation
+details.
 
+If the VM cannot spare two bits in the object header for the hash code state, it can use on-the-side
+metadata (bitmap), instead.  It will add a space overhead of two bits per object alignment.  If all
+objects are aligned to 8 bytes, it will be a 1/32 (about 3%) space overhead.
+
+If the VM cannot add a hash field to an object when moved, an alternative is using a global table
+that maps the address of each object in the `HashedAndMoved` state to its hash code.  This will
+require a table lookup every time the VM observes the hash code of an object in the `HashedAndMoved`
+state.  This table also needs to be updated when copying GC happens because object may be moved or
+dead.  Because the addresses of objects are used as keys, the table may need to be rehashed or
+reconstructed if it is implemented as a hash table or a search tree.
+
+Whether the space and time overhead is acceptable depends on the VM implementation as well as the
+workload.  For example, if a VM has many hash tables that naively use object addresses as the hash
+code, it will need to rehash all such tables when copying GC happens.  Even though maintaining a
+global table that maps addresses to hash codes is expensive, implementing address-based hashing this
+way can still eliminate the need to rehash all other hash tables at the expense of having to rehash
+one global table.  And if very few objects are in the `HashedAndMoved` state, the *average* cost of
+computing the identity hash code can still be low.
 
 
 <!--
