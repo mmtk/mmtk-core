@@ -137,8 +137,8 @@
 <a href="#136" id="136">136</a></pre></div><pre class="rust"><code><span class="doccomment">//! This module contains code useful for tracing,
 //! i.e. visiting the reachable objects by traversing all or part of an object graph.
 
-</span><span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::{ProcessEdgesWork, SlotOf, EDGES_WORK_BUFFER_SIZE};
-<span class="kw">use </span><span class="kw">crate</span>::scheduler::{GCWorker, WorkBucketStage};
+</span><span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::{ProcessEdgesWork, SlotOf};
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::{GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::vm::SlotVisitor;
 
