@@ -8,41 +8,51 @@ object address as identity hash code.
 
 ## Concepts
 
-An **identity hash code** of an object is a hash code that never changes during the lifetime of the
-object, i.e. since it is allocated, until it is reclaimed by the GC.
+An **identity hash code** of an object is a hash code that *never changes* during the lifetime of
+the object, i.e. since it is allocated, until it is reclaimed by the GC.
 
--   It is unrelated to the *value* the object represents.  This means modifying the fields of an
-    object does not modify its identity hash code.
--   Copying GC does *not* change object identities.  If an object is moved by a copying GC, its
-    identity hash code remains the same.
--   It is not required to be *unique*.  Two different objects are allowed to have the same hash
-    code.
+-   It is not required to be *unique*.
+    -   Two different objects are allowed to have the same identity hash code.  Like any hashing
+        algorithm, collision is allowed.  But a good hash code should be *relatively unique* in
+        order to reduce collision.
+    -   On the contrary, some programming languages (such as [Python][python-id] and
+        [Ruby][ruby-id]) have the notion of *object ID* which is required to be unique.
+-   It is unrelated to the *value* the object represents.
+    -   For example, modifying a mutable string object does not change its identity hash code.
+    -   On the contrary, two string objects that are equal character-wise may (but does not have to)
+        have different identity hash code.
+-   Copying GC does *not* change object identities.
+    -   If an object is moved by a copying GC, its identity hash code remains the same.
+    -   On the contrary, when moved by a copying GC, the *address* of the object is changed.
 
-For non-copying GC algorithms, the *address* of an object never changes, and is therefore an ideal
-identity hash code.
+[python-id]: https://docs.python.org/3/library/functions.html#id
+[ruby-id]: https://docs.ruby-lang.org/en/master/Object.html#method-i-object_id
+
+For non-copying GC algorithms, the *address* of an object never changes, and all objects have
+distinct addresses.  Therefore it is an ideal identity hash code.
 
 For copying GC algorithms, however, we cannot simply use the address of an object because it will be
 changed when the GC moves the object.  A naive solution is adding an extra field to every object to
 hold its hash code, and the field is copied when the GC moves the object.  Although this approach
-works (and it is used by real-world VMs such as OpenJDK), it has obvious drawbacks.  It
-unconditionally adds a field to every object.  However,
+works (and it is used by real-world VMs such as OpenJDK), it unconditionally adds a field to every
+object.  However,
 
 -   **Objects are rarely moved** in advanced GC algorithms such as Immix.
 -   **Few objects ever have identity hash code _observed_** (e.g.  by calling
     `System.identityHashCode(object)` in Java) in real-world applications.  According to [the
-    Lilliput project of the OpenJDK][openjdk-lilliput], with most workloads, only relatively few
-    (<1%) Java objects are ever assigned an identity hash.
+    Lilliput project][openjdk-lilliput] of OpenJDK, with most workloads, only relatively few (<1%)
+    Java objects are ever assigned an identity hash.
 
 [openjdk-lilliput]: https://wiki.openjdk.org/display/lilliput
 
-**Address-based hashing** solves the problem by not adding the extra hash field until both of the
+**Address-based hashing** solves these problems by not adding the extra hash field until both of the
 following conditions are true:
 
 1.  The identity hash code of the object has been observed, and
 2.  the object is moved by the GC *after* its identity hash code has been observed.
 
-Under the *weak generational hypothesis*, i.e. most objects die young, most objects won't live long
-enough until the extra hash field becomes necessary.
+Under the *weak generational hypothesis* (i.e. most objects die young), most objects will die before
+the two conditions become true, and will never need the extra hash field during its lifetime.
 
 The address-based hashing algorithm is implemented [in JikesRVM][jikesrvm-hash], and is planned to
 be implemented in OpenJDK ([the Lilliput project][lilliput-ihash]).
