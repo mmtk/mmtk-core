@@ -564,6 +564,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             }
         }
 
+        #[cfg(feature = "dump_memory_stats")]
+        mmtk.get_plan().dump_memory_stats();
+
         #[cfg(feature = "extreme_assertions")]
         if crate::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {
             // reset the logging info at the end of each GC
