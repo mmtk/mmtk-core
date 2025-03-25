@@ -85,7 +85,7 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
             sync.cursor, sync.sentinel, sync.current_chunk
         );
 
-        if cfg!(debug = "true") {
+        if cfg!(debug_assertions) {
             /*
              * Cursor should always be zero, or somewhere in the current chunk.  If we have just
              * allocated exactly enough pages to exhaust the current chunk, then cursor can point
@@ -113,9 +113,9 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         if !self.common().contiguous && tmp > sync.sentinel {
             /* we're out of virtual memory within our discontiguous region, so ask for more */
             let required_chunks = required_chunks(required_pages);
-            sync.current_chunk = self
-                .common
-                .grow_discontiguous_space(space_descriptor, required_chunks); // Returns zero on failure
+            sync.current_chunk =
+                self.common
+                    .grow_discontiguous_space(space_descriptor, required_chunks, None); // Returns zero on failure
             sync.cursor = sync.current_chunk;
             sync.sentinel = sync.cursor
                 + if sync.current_chunk.is_zero() {
@@ -350,7 +350,13 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
                 } else {
                     let start = self.discontiguous_start;
                     self.discontiguous_start = self.pr.vm_map().get_next_contiguous_region(start);
-                    let size = self.pr.vm_map().get_contiguous_region_size(start);
+                    // If the current cursor is within the current discontiguous region (i.e. chunk),
+                    // then return the size till the cursor
+                    let size = if self.pr.cursor().chunk_index() == start.chunk_index() {
+                        self.pr.cursor() - start
+                    } else {
+                        self.pr.vm_map().get_contiguous_region_size(start)
+                    };
                     Some((start, size))
                 }
             }

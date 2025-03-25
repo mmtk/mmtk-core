@@ -20,7 +20,7 @@ jobs:
     outputs:
       rust: ${{ steps.rust.outputs.array }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       # Get rust version
       - id: rust
         run: |
@@ -36,21 +36,36 @@ jobs:
         target:
           - { os: ubuntu-22.04, triple: x86_64-unknown-linux-gnu }
           - { os: ubuntu-22.04, triple: i686-unknown-linux-gnu }
-          - { os: macos-12, triple: x86_64-apple-darwin }
+          - { os: macos-15, triple: x86_64-apple-darwin }
         rust: ${{ fromJson(needs.setup-test-matrix.outputs.rust )}}
 
     name: minimal-tests-core/${{ matrix.target.triple }}/${{ matrix.rust }}
     runs-on: ${{ matrix.target.os }}
 
+    env:
+      # This determines the default target which cargo-build, cargo-test, etc. use.
+      CARGO_BUILD_TARGET: "${{ matrix.target.triple }}"
+
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}-${{ matrix.target.triple }}
-          components: rustfmt, clippy
-          # This overwrites the default toolchain with the toolchain specified above.
-          override: true
+        run: |
+          # "rustup toolchain install" should always install the host toolchain,
+          # so we don't specify the triple.
+          rustup toolchain install ${{ matrix.rust }}
+          rustup override set ${{ matrix.rust }}
+
+          # Ensure we install the target support for the target we are testing for.
+          # This is especially important for i686-unknown-linux-gnu
+          # because it's different from the host.
+          rustup target add ${{ matrix.target.triple }}
+
+          rustup component add rustfmt clippy
+
+      # Show the Rust toolchain and target we are actually using
+      - run: rustup show
+      - run: cargo --version
+      - run: cargo rustc -- --print cfg
 
       # Setup Environments
       - name: Setup Environments
@@ -63,6 +78,49 @@ jobs:
       # Test
       - name: Test
         run: ./.github/scripts/ci-test.sh
+
+  style-check:
+    needs: setup-test-matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { os: ubuntu-22.04, triple: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-22.04, triple: i686-unknown-linux-gnu }
+          - { os: macos-15, triple: x86_64-apple-darwin }
+        rust: ${{ fromJson(needs.setup-test-matrix.outputs.rust )}}
+
+    name: style-check/${{ matrix.target.triple }}/${{ matrix.rust }}
+    runs-on: ${{ matrix.target.os }}
+
+    env:
+      # This determines the default target which cargo-build, cargo-test, etc. use.
+      CARGO_BUILD_TARGET: "${{ matrix.target.triple }}"
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        run: |
+          # "rustup toolchain install" should always install the host toolchain,
+          # so we don't specify the triple.
+          rustup toolchain install ${{ matrix.rust }}
+          rustup override set ${{ matrix.rust }}
+
+          # Ensure we install the target support for the target we are testing for.
+          # This is especially important for i686-unknown-linux-gnu
+          # because it's different from the host.
+          rustup target add ${{ matrix.target.triple }}
+
+          rustup component add rustfmt clippy
+
+      # Show the Rust toolchain and target we are actually using
+      - run: rustup show
+      - run: cargo --version
+      - run: cargo rustc -- --print cfg
+
+      # Setup Environments
+      - name: Setup Environments
+        run: ./.github/scripts/ci-setup-${{ matrix.target.triple }}.sh
 
       # Style checks
       - name: Style checks

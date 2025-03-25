@@ -62,6 +62,10 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         self.base().collection_required(self, space_full)
     }
 
+    fn current_gc_may_move_object(&self) -> bool {
+        false
+    }
+
     fn get_used_pages(&self) -> usize {
         self.space.reserved_pages() + self.common.get_used_pages()
     }
@@ -101,7 +105,7 @@ impl<VM: VMBinding> PageProtect<VM> {
 
         let ret = PageProtect {
             space: LargeObjectSpace::new(
-                plan_args.get_space_args("pageprotect", true, VMRequest::discontiguous()),
+                plan_args.get_space_args("pageprotect", true, false, VMRequest::discontiguous()),
                 true,
             ),
             common: CommonPlan::new(plan_args),

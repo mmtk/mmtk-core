@@ -4,8 +4,9 @@ use crate::global_state::GlobalState;
 use crate::plan::gc_requester::GCRequester;
 use crate::plan::Plan;
 use crate::policy::space::Space;
+use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions;
-use crate::util::options::{GCTriggerSelector, Options};
+use crate::util::options::{GCTriggerSelector, Options, DEFAULT_MAX_NURSERY, DEFAULT_MIN_NURSERY};
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::mem::MaybeUninit;
@@ -39,10 +40,19 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 GCTriggerSelector::FixedHeapSize(size) => Box::new(FixedHeapSizeTrigger {
                     total_pages: conversions::bytes_to_pages_up(size),
                 }),
-                GCTriggerSelector::DynamicHeapSize(min, max) => Box::new(MemBalancerTrigger::new(
-                    conversions::bytes_to_pages_up(min),
-                    conversions::bytes_to_pages_up(max),
-                )),
+                GCTriggerSelector::DynamicHeapSize(min, max) => 'dynamic_heap_size: {
+                    let min_pages = conversions::bytes_to_pages_up(min);
+                    let max_pages = conversions::bytes_to_pages_up(max);
+
+                    if *options.plan == crate::util::options::PlanSelector::NoGC {
+                        warn!("Cannot use dynamic heap size with NoGC.  Using fixed heap size trigger instead.");
+                        break 'dynamic_heap_size Box::new(FixedHeapSizeTrigger {
+                            total_pages: max_pages,
+                        });
+                    }
+
+                    Box::new(MemBalancerTrigger::new(min_pages, max_pages))
+                }
                 GCTriggerSelector::Delegated => {
                     <VM::VMCollection as crate::vm::Collection<VM>>::create_gc_trigger()
                 }
@@ -56,6 +66,10 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// Set the plan. This is called in `create_plan()` after we created a boxed plan.
     pub fn set_plan(&mut self, plan: &'static dyn Plan<VM = VM>) {
         self.plan.write(plan);
+    }
+
+    fn plan(&self) -> &dyn Plan<VM = VM> {
+        unsafe { self.plan.assume_init() }
     }
 
     /// This method is called periodically by the allocation subsystem
@@ -101,8 +115,62 @@ impl<VM: VMBinding> GCTrigger<VM> {
 
     /// Check if the heap is full
     pub fn is_heap_full(&self) -> bool {
-        let plan = unsafe { self.plan.assume_init() };
-        self.policy.is_heap_full(plan)
+        self.policy.is_heap_full(self.plan())
+    }
+
+    /// Return upper bound of the nursery size (in number of bytes)
+    pub fn get_max_nursery_bytes(&self) -> usize {
+        use crate::util::options::NurserySize;
+        debug_assert!(self.plan().generational().is_some());
+        match *self.options.nursery {
+            NurserySize::Bounded { min: _, max } => max,
+            NurserySize::ProportionalBounded { min: _, max } => {
+                let heap_size_bytes =
+                    conversions::pages_to_bytes(self.policy.get_current_heap_size_in_pages());
+                let max_bytes = heap_size_bytes as f64 * max;
+                let max_bytes = conversions::raw_align_up(max_bytes as usize, BYTES_IN_PAGE);
+                if max_bytes > DEFAULT_MAX_NURSERY {
+                    warn!("Proportional nursery with max size {} ({}) is larger than DEFAULT_MAX_NURSERY ({}). Use DEFAULT_MAX_NURSERY instead.", max, max_bytes, DEFAULT_MAX_NURSERY);
+                    DEFAULT_MAX_NURSERY
+                } else {
+                    max_bytes
+                }
+            }
+            NurserySize::Fixed(sz) => sz,
+        }
+    }
+
+    /// Return lower bound of the nursery size (in number of bytes)
+    pub fn get_min_nursery_bytes(&self) -> usize {
+        use crate::util::options::NurserySize;
+        debug_assert!(self.plan().generational().is_some());
+        match *self.options.nursery {
+            NurserySize::Bounded { min, max: _ } => min,
+            NurserySize::ProportionalBounded { min, max: _ } => {
+                let min_bytes =
+                    conversions::pages_to_bytes(self.policy.get_current_heap_size_in_pages())
+                        as f64
+                        * min;
+                let min_bytes = conversions::raw_align_up(min_bytes as usize, BYTES_IN_PAGE);
+                if min_bytes < DEFAULT_MIN_NURSERY {
+                    warn!("Proportional nursery with min size {} ({}) is smaller than DEFAULT_MIN_NURSERY ({}). Use DEFAULT_MIN_NURSERY instead.", min, min_bytes, DEFAULT_MIN_NURSERY);
+                    DEFAULT_MIN_NURSERY
+                } else {
+                    min_bytes
+                }
+            }
+            NurserySize::Fixed(sz) => sz,
+        }
+    }
+
+    /// Return upper bound of the nursery size (in number of pages)
+    pub fn get_max_nursery_pages(&self) -> usize {
+        crate::util::conversions::bytes_to_pages_up(self.get_max_nursery_bytes())
+    }
+
+    /// Return lower bound of the nursery size (in number of pages)
+    pub fn get_min_nursery_pages(&self) -> usize {
+        crate::util::conversions::bytes_to_pages_up(self.get_min_nursery_bytes())
     }
 }
 
@@ -433,7 +501,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
                         // We reserve an extra of min nursery. This ensures that we will not trigger
                         // a full heap GC in the next GC (if available pages is smaller than min nursery, we will force a full heap GC)
                         mmtk.get_plan().get_collection_reserved_pages()
-                            + mmtk.options.get_min_nursery_pages(),
+                            + mmtk.gc_trigger.get_min_nursery_pages(),
                         stats,
                     );
                 }

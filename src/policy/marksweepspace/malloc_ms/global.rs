@@ -15,6 +15,7 @@ use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
 use crate::util::metadata::MetadataSpec;
+use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -63,7 +64,7 @@ pub struct MallocSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for MallocSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
 
@@ -97,21 +98,33 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     // For malloc space, we need to further check the VO bit.
     fn is_in_space(&self, object: ObjectReference) -> bool {
-        is_alloced_by_malloc::<VM>(object)
+        is_alloced_by_malloc(object)
     }
 
     /// For malloc space, we just use the side metadata.
     #[cfg(feature = "is_mmtk_object")]
-    fn is_mmtk_object(&self, addr: Address) -> bool {
+    fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
         debug_assert!(!addr.is_zero());
         // `addr` cannot be mapped by us. It should be mapped by the malloc library.
         debug_assert!(!addr.is_mapped());
-        has_object_alloced_by_malloc::<VM>(addr).is_some()
+        has_object_alloced_by_malloc(addr)
+    }
+
+    #[cfg(feature = "is_mmtk_object")]
+    fn find_object_from_internal_pointer(
+        &self,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -> Option<ObjectReference> {
+        crate::util::metadata::vo_bit::find_object_from_internal_pointer::<VM>(
+            ptr,
+            max_search_bytes,
+        )
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         trace!("initialize_object_metadata for object {}", object);
-        set_vo_bit::<VM>(object);
+        set_vo_bit(object);
     }
 
     fn sft_trace_object(
@@ -137,6 +150,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         unreachable!()
     }
 
+    fn maybe_get_page_resource_mut(&mut self) -> Option<&mut dyn PageResource<VM>> {
+        None
+    }
+
     fn common(&self) -> &CommonSpace<VM> {
         unreachable!()
     }
@@ -156,7 +173,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     // We have assertions in a debug build. We allow this pattern for the release build.
     #[allow(clippy::let_and_return)]
     fn in_space(&self, object: ObjectReference) -> bool {
-        let ret = is_alloced_by_malloc::<VM>(object);
+        let ret = is_alloced_by_malloc(object);
 
         #[cfg(debug_assertions)]
         if ASSERT_ALLOCATION {
@@ -198,6 +215,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         "MallocSpace"
     }
 
+    fn estimate_side_meta_pages(&self, data_pages: usize) -> usize {
+        self.metadata.calculate_reserved_pages(data_pages)
+    }
+
     #[allow(clippy::assertions_on_constants)]
     fn reserved_pages(&self) -> usize {
         use crate::util::constants::LOG_BYTES_IN_PAGE;
@@ -205,13 +226,17 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         debug_assert!(LOG_BYTES_IN_MALLOC_PAGE >= LOG_BYTES_IN_PAGE);
         let data_pages = self.active_pages.load(Ordering::SeqCst)
             << (LOG_BYTES_IN_MALLOC_PAGE - LOG_BYTES_IN_PAGE);
-        let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
+        let meta_pages = self.estimate_side_meta_pages(data_pages);
         data_pages + meta_pages
     }
 
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
+    }
+
+    fn enumerate_objects(&self, _enumerator: &mut dyn ObjectEnumerator) {
+        unimplemented!()
     }
 }
 
@@ -253,6 +278,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
     }
 
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+        if *args.options.count_live_bytes_in_gc {
+            // The implementation of counting live bytes needs a SpaceDescriptor which we do not have for MallocSpace.
+            // Besides we cannot meaningfully measure the live bytes vs total pages for MallocSpace.
+            panic!("count_live_bytes_in_gc is not supported by MallocSpace");
+        }
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
@@ -400,8 +430,6 @@ impl<VM: VMBinding> MallocSpace<VM> {
         queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
-        debug_assert!(!object.is_null());
-
         assert!(
             self.in_space(object),
             "Cannot mark an object {} that was not alloced by malloc.",
@@ -420,7 +448,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     fn map_metadata_and_update_bound(&self, addr: Address, size: usize) {
         // Map the metadata space for the range [addr, addr + size)
-        map_meta_space(&self.metadata, addr, size);
+        map_meta_space(&self.metadata, addr, size, self.get_name());
 
         // Update the bounds of the max and min chunk addresses seen -- this is used later in the sweep
         // Lockless compare-and-swap loops perform better than a locking variant
@@ -492,6 +520,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
         self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
     }
 
+    pub fn end_of_gc(&mut self) {}
+
     pub fn sweep_chunk(&self, chunk_start: Address) {
         // Call the relevant sweep function depending on the location of the mark bits
         match *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
@@ -535,7 +565,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             // Free object
             self.free_internal(obj_start, bytes, offset_malloc);
             trace!("free object {}", object);
-            unsafe { unset_vo_bit_unsafe::<VM>(object) };
+            unsafe { unset_vo_bit_unsafe(object) };
 
             true
         } else {

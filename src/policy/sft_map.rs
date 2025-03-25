@@ -103,8 +103,12 @@ pub(crate) type SFTRawPointer = *const (dyn SFT + Sync + 'static);
 /// see if 128 bits atomic instructions are available.
 #[cfg(target_pointer_width = "64")]
 type AtomicDoubleWord = portable_atomic::AtomicU128;
+#[cfg(target_pointer_width = "64")]
+type DoubleWord = u128;
 #[cfg(target_pointer_width = "32")]
 type AtomicDoubleWord = portable_atomic::AtomicU64;
+#[cfg(target_pointer_width = "32")]
+type DoubleWord = u64;
 
 /// The type we store SFT raw pointer as. It basically just double word sized atomic integer.
 /// This type provides an abstraction so we can access SFT easily.
@@ -128,7 +132,7 @@ impl SFTRefStorage {
     }
 
     pub fn new(sft: SFTRawPointer) -> Self {
-        let val = unsafe { std::mem::transmute(sft) };
+        let val: DoubleWord = unsafe { std::mem::transmute(sft) };
         Self(AtomicDoubleWord::new(val))
     }
 
@@ -140,7 +144,7 @@ impl SFTRefStorage {
 
     // Store a raw SFT pointer with the release ordering.
     pub fn store(&self, sft: SFTRawPointer) {
-        let val = unsafe { std::mem::transmute(sft) };
+        let val: DoubleWord = unsafe { std::mem::transmute(sft) };
         self.0.store(val, Ordering::Release)
     }
 }
@@ -361,7 +365,7 @@ mod dense_chunk_map {
 
             let space_name = unsafe { &*space }.name().to_string();
             // We shouldn't have this space in our map yet. Otherwise, this method is called multiple times for the same space.
-            assert!(self.index_map.get(&space_name).is_none());
+            assert!(!self.index_map.contains_key(&space_name));
             // Index for the space
             let index = self.sft.len();
             // Insert to hashmap and vec
@@ -374,9 +378,11 @@ mod dense_chunk_map {
                 global: vec![SFT_DENSE_CHUNK_MAP_INDEX],
                 local: vec![],
             };
-            if context.try_map_metadata_space(start, bytes).is_err() {
-                panic!("failed to mmap metadata memory");
-            }
+            context
+                .try_map_metadata_space(start, bytes, "SFTDenseChunkMap")
+                .unwrap_or_else(|e| {
+                    panic!("failed to mmap metadata memory: {e}");
+                });
 
             self.update(space, start, bytes);
         }

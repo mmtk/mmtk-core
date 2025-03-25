@@ -8,9 +8,6 @@ use std::io::Result;
 
 /// Generic mmap and protection functionality
 pub trait Mmapper: Sync {
-    /// Set mmap strategy
-    fn set_mmap_strategy(&self, strategy: MmapStrategy);
-
     /// Given an address array describing the regions of virtual memory to be used
     /// by MMTk, demand zero map all of them if they are not already mapped.
     ///
@@ -35,7 +32,16 @@ pub trait Mmapper: Sync {
     /// Arguments:
     /// * `start`: Address of the first page to be quarantined
     /// * `bytes`: Number of bytes to quarantine from the start
-    fn quarantine_address_range(&self, start: Address, pages: usize) -> Result<()>;
+    /// * `strategy`: The mmap strategy.  The `prot` field is ignored because we always use
+    ///   `PROT_NONE`.
+    /// * `anno`: Human-readable annotation to apply to newly mapped memory ranges.
+    fn quarantine_address_range(
+        &self,
+        start: Address,
+        pages: usize,
+        strategy: MmapStrategy,
+        anno: &MmapAnnotation,
+    ) -> Result<()>;
 
     /// Ensure that a range of pages is mmapped (or equivalent).  If the
     /// pages are not yet mapped, demand-zero map them. Note that mapping
@@ -44,10 +50,18 @@ pub trait Mmapper: Sync {
     /// Arguments:
     /// * `start`: The start of the range to be mapped.
     /// * `pages`: The size of the range to be mapped, in pages
+    /// * `strategy`: The mmap strategy.
+    /// * `anno`: Human-readable annotation to apply to newly mapped memory ranges.
     // NOTE: There is a monotonicity assumption so that only updates require lock
     // acquisition.
     // TODO: Fix the above to support unmapping.
-    fn ensure_mapped(&self, start: Address, pages: usize) -> Result<()>;
+    fn ensure_mapped(
+        &self,
+        start: Address,
+        pages: usize,
+        strategy: MmapStrategy,
+        anno: &MmapAnnotation,
+    ) -> Result<()>;
 
     /// Is the page pointed to by this address mapped? Returns true if
     /// the page at the given address is mapped.
@@ -86,6 +100,7 @@ impl MapState {
         state: &Atomic<MapState>,
         mmap_start: Address,
         strategy: MmapStrategy,
+        anno: &MmapAnnotation,
     ) -> Result<()> {
         trace!(
             "Trying to map {} - {}",
@@ -93,9 +108,11 @@ impl MapState {
             mmap_start + MMAP_CHUNK_BYTES
         );
         let res = match state.load(Ordering::Relaxed) {
-            MapState::Unmapped => dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES, strategy),
-            MapState::Protected => munprotect(mmap_start, MMAP_CHUNK_BYTES),
-            MapState::Quarantined => unsafe { dzmmap(mmap_start, MMAP_CHUNK_BYTES, strategy) },
+            MapState::Unmapped => dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES, strategy, anno),
+            MapState::Protected => munprotect(mmap_start, MMAP_CHUNK_BYTES, strategy.prot),
+            MapState::Quarantined => unsafe {
+                dzmmap(mmap_start, MMAP_CHUNK_BYTES, strategy, anno)
+            },
             // might have become MapState::Mapped here
             MapState::Mapped => Ok(()),
         };
@@ -111,6 +128,7 @@ impl MapState {
         state: &Atomic<MapState>,
         mmap_start: Address,
         strategy: MmapStrategy,
+        anno: &MmapAnnotation,
     ) -> Result<()> {
         trace!(
             "Trying to quarantine {} - {}",
@@ -118,14 +136,14 @@ impl MapState {
             mmap_start + MMAP_CHUNK_BYTES
         );
         let res = match state.load(Ordering::Relaxed) {
-            MapState::Unmapped => mmap_noreserve(mmap_start, MMAP_CHUNK_BYTES, strategy),
+            MapState::Unmapped => mmap_noreserve(mmap_start, MMAP_CHUNK_BYTES, strategy, anno),
             MapState::Quarantined => Ok(()),
             MapState::Mapped => {
-                // If a chunk is mapped by us and we try to quanrantine it, we simply don't do anything.
+                // If a chunk is mapped by us and we try to quarantine it, we simply don't do anything.
                 // We allow this as it is possible to have a situation like this:
-                // we have global side metdata S, and space A and B. We quanrantine memory X for S for A, then map
-                // X for A, and then we quanrantine memory Y for S for B. It is possible that X and Y is the same chunk,
-                // so the chunk is already mapped for A, and we try quanrantine it for B. We simply allow this transition.
+                // we have global side metadata S, and space A and B. We quarantine memory X for S for A, then map
+                // X for A, and then we quarantine memory Y for S for B. It is possible that X and Y is the same chunk,
+                // so the chunk is already mapped for A, and we try quarantine it for B. We simply allow this transition.
                 return Ok(());
             }
             MapState::Protected => panic!("Cannot quarantine protected memory"),
@@ -151,10 +169,13 @@ impl MapState {
     ///
     /// * `state_slices`: A slice of slices. Each inner slice is a part of a `Slab`.
     /// * `mmap_start`: The start of the region to transition.
+    /// * `strategy`: The mmap strategy.
+    /// * `anno`: Human-readable annotation to apply to newly mapped memory ranges.
     pub(super) fn bulk_transition_to_quarantined(
         state_slices: &[&[Atomic<MapState>]],
         mmap_start: Address,
         strategy: MmapStrategy,
+        anno: &MmapAnnotation,
     ) -> Result<()> {
         trace!(
             "Trying to bulk-quarantine {} - {}",
@@ -177,7 +198,7 @@ impl MapState {
             match group.key {
                 MapState::Unmapped => {
                     trace!("Trying to quarantine {} - {}", start_addr, end_addr);
-                    mmap_noreserve(start_addr, end_addr - start_addr, strategy)?;
+                    mmap_noreserve(start_addr, end_addr - start_addr, strategy, anno)?;
 
                     for state in group {
                         state.store(MapState::Quarantined, Ordering::Relaxed);

@@ -112,9 +112,9 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             scheduler.work_buckets[WorkBucketStage::SoftRefClosure]
                 .add(SoftRefProcessing::<MarkingProcessEdges<VM>>::new());
             scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
-                .add(WeakRefProcessing::<MarkingProcessEdges<VM>>::new());
+                .add(WeakRefProcessing::<VM>::new());
             scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
-                .add(PhantomRefProcessing::<MarkingProcessEdges<VM>>::new());
+                .add(PhantomRefProcessing::<VM>::new());
 
             use crate::util::reference_processor::RefForwarding;
             scheduler.work_buckets[WorkBucketStage::RefForwarding]
@@ -171,6 +171,10 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     fn get_collection_reserved_pages(&self) -> usize {
         0
     }
+
+    fn current_gc_may_move_object(&self) -> bool {
+        true
+    }
 }
 
 impl<VM: VMBinding> MarkCompact<VM> {
@@ -191,8 +195,12 @@ impl<VM: VMBinding> MarkCompact<VM> {
             global_side_metadata_specs,
         };
 
-        let mc_space =
-            MarkCompactSpace::new(plan_args.get_space_args("mc", true, VMRequest::discontiguous()));
+        let mc_space = MarkCompactSpace::new(plan_args.get_space_args(
+            "mc",
+            true,
+            false,
+            VMRequest::discontiguous(),
+        ));
 
         let res = MarkCompact {
             mc_space,

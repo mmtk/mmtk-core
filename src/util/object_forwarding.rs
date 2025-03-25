@@ -74,12 +74,30 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
     }
 }
 
+/// Copy an object and set the forwarding state.
+///
+/// The caller can use `on_after_forwarding` to set extra metadata (including VO bits, mark bits,
+/// etc.) after the object is copied, but before the forwarding state is changed to `FORWARDED`. The
+/// atomic memory operation that sets the forwarding bits to `FORWARDED` has the `SeqCst` order.  It
+/// will guarantee that if another GC worker thread that attempts to forward the same object sees
+/// the forwarding bits being `FORWARDED`, it is guaranteed to see those extra metadata set.
+///
+/// Arguments:
+///
+/// *   `object`: The object to copy.
+/// *   `semantics`: The copy semantics.
+/// *   `copy_context`: A reference ot the `CopyContext` instance of the current GC worker.
+/// *   `on_after_forwarding`: A callback function that is called after `object` is copied, but
+///     before the forwarding bits are set.  Its argument is a reference to the new copy of
+///     `object`.
 pub fn forward_object<VM: VMBinding>(
     object: ObjectReference,
     semantics: CopySemantics,
     copy_context: &mut GCWorkerCopyContext<VM>,
+    on_after_forwarding: impl FnOnce(ObjectReference),
 ) -> ObjectReference {
     let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
+    on_after_forwarding(new_object);
     if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {
         VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
             object,
@@ -150,7 +168,9 @@ pub fn read_forwarding_pointer<VM: VMBinding>(object: ObjectReference) -> Object
 
     // We write the forwarding poiner. We know it is an object reference.
     unsafe {
-        ObjectReference::from_raw_address(crate::util::Address::from_usize(
+        // We use "unchecked" convertion becasue we guarantee the forwarding pointer we stored
+        // previously is from a valid `ObjectReference` which is never zero.
+        ObjectReference::from_raw_address_unchecked(crate::util::Address::from_usize(
             VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.load_atomic::<VM, usize>(
                 object,
                 Some(FORWARDING_POINTER_MASK),

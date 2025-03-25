@@ -1,5 +1,8 @@
+use atomic_refcell::AtomicRefCell;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::time::Instant;
 
 /// This stores some global states for an MMTK instance.
 /// Some MMTK components like plans and allocators may keep an reference to the struct, and can access it.
@@ -15,6 +18,8 @@ pub struct GlobalState {
     pub(crate) initialized: AtomicBool,
     /// The current GC status.
     pub(crate) gc_status: Mutex<GcStatus>,
+    /// When did the last GC start? Only accessed by the last parked worker.
+    pub(crate) gc_start_time: AtomicRefCell<Option<Instant>>,
     /// Is the current GC an emergency collection? Emergency means we may run out of memory soon, and we should
     /// attempt to collect as much as we can.
     pub(crate) emergency_collection: AtomicBool,
@@ -40,9 +45,8 @@ pub struct GlobalState {
     /// A counteer that keeps tracks of the number of bytes allocated by malloc
     #[cfg(feature = "malloc_counted_size")]
     pub(crate) malloc_bytes: AtomicUsize,
-    /// This stores the size in bytes for all the live objects in last GC. This counter is only updated in the GC release phase.
-    #[cfg(feature = "count_live_bytes_in_gc")]
-    pub(crate) live_bytes_in_last_gc: AtomicUsize,
+    /// This stores the live bytes and the used bytes (by pages) for each space in last GC. This counter is only updated in the GC release phase.
+    pub(crate) live_bytes_in_last_gc: AtomicRefCell<HashMap<&'static str, LiveBytesStats>>,
 }
 
 impl GlobalState {
@@ -178,16 +182,6 @@ impl GlobalState {
     pub(crate) fn decrease_malloc_bytes_by(&self, size: usize) {
         self.malloc_bytes.fetch_sub(size, Ordering::SeqCst);
     }
-
-    #[cfg(feature = "count_live_bytes_in_gc")]
-    pub fn get_live_bytes_in_last_gc(&self) -> usize {
-        self.live_bytes_in_last_gc.load(Ordering::SeqCst)
-    }
-
-    #[cfg(feature = "count_live_bytes_in_gc")]
-    pub fn set_live_bytes_in_last_gc(&self, size: usize) {
-        self.live_bytes_in_last_gc.store(size, Ordering::SeqCst);
-    }
 }
 
 impl Default for GlobalState {
@@ -195,6 +189,7 @@ impl Default for GlobalState {
         Self {
             initialized: AtomicBool::new(false),
             gc_status: Mutex::new(GcStatus::NotInGC),
+            gc_start_time: AtomicRefCell::new(None),
             stacks_prepared: AtomicBool::new(false),
             emergency_collection: AtomicBool::new(false),
             user_triggered_collection: AtomicBool::new(false),
@@ -207,8 +202,7 @@ impl Default for GlobalState {
             allocation_bytes: AtomicUsize::new(0),
             #[cfg(feature = "malloc_counted_size")]
             malloc_bytes: AtomicUsize::new(0),
-            #[cfg(feature = "count_live_bytes_in_gc")]
-            live_bytes_in_last_gc: AtomicUsize::new(0),
+            live_bytes_in_last_gc: AtomicRefCell::new(HashMap::new()),
         }
     }
 }
@@ -218,4 +212,16 @@ pub enum GcStatus {
     NotInGC,
     GcPrepare,
     GcProper,
+}
+
+/// Statistics for the live bytes in the last GC. The statistics is per space.
+#[derive(Copy, Clone, Debug)]
+pub struct LiveBytesStats {
+    /// Total accumulated bytes of live objects in the space.
+    pub live_bytes: usize,
+    /// Total pages used by the space.
+    pub used_pages: usize,
+    /// Total bytes used by the space, computed from `used_pages`.
+    /// The ratio of live_bytes and used_bytes reflects the utilization of the memory in the space.
+    pub used_bytes: usize,
 }

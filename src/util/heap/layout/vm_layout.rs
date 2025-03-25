@@ -1,5 +1,6 @@
 //! The module defines virutal memory layout parameters.
 
+use std::ptr::addr_of;
 use std::sync::atomic::AtomicBool;
 
 use atomic::Ordering;
@@ -192,5 +193,5 @@ pub fn vm_layout() -> &'static VMLayout {
     if cfg!(debug_assertions) {
         VM_LAYOUT_FETCHED.store(true, Ordering::SeqCst);
     }
-    unsafe { &VM_LAYOUT }
+    unsafe { &*addr_of!(VM_LAYOUT) }
 }

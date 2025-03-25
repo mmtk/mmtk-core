@@ -2,7 +2,8 @@ use super::SideMetadataSpec;
 use crate::util::{
     constants::{self, LOG_BITS_IN_BYTE},
     heap::layout::vm_layout::{BYTES_IN_CHUNK, CHUNK_MASK, LOG_BYTES_IN_CHUNK},
-    memory, Address,
+    memory::{self, MmapAnnotation},
+    Address,
 };
 use std::io::Result;
 
@@ -111,6 +112,7 @@ pub(super) fn try_map_per_chunk_metadata_space(
     size: usize,
     local_per_chunk: usize,
     no_reserve: bool,
+    anno: &MmapAnnotation,
 ) -> Result<usize> {
     let mut aligned_start = start.align_down(BYTES_IN_CHUNK);
     let aligned_end = (start + size).align_up(BYTES_IN_CHUNK);
@@ -121,7 +123,7 @@ pub(super) fn try_map_per_chunk_metadata_space(
     let mut total_mapped = 0;
 
     while aligned_start < aligned_end {
-        let res = try_mmap_metadata_chunk(aligned_start, local_per_chunk, no_reserve);
+        let res = try_mmap_metadata_chunk(aligned_start, local_per_chunk, no_reserve, anno);
         if res.is_err() {
             if munmap_first_chunk.is_some() {
                 let mut munmap_start = if munmap_first_chunk.unwrap() {
@@ -174,6 +176,7 @@ pub(super) fn try_mmap_metadata_chunk(
     start: Address,
     local_per_chunk: usize,
     no_reserve: bool,
+    anno: &MmapAnnotation,
 ) -> Result<()> {
     debug_assert!(start.is_aligned_to(BYTES_IN_CHUNK));
 
@@ -181,8 +184,18 @@ pub(super) fn try_mmap_metadata_chunk(
     let pages = crate::util::conversions::bytes_to_pages_up(local_per_chunk);
     if !no_reserve {
         // We have reserved the memory
-        MMAPPER.ensure_mapped(policy_meta_start, pages)
+        MMAPPER.ensure_mapped(
+            policy_meta_start,
+            pages,
+            memory::MmapStrategy::SIDE_METADATA,
+            anno,
+        )
     } else {
-        MMAPPER.quarantine_address_range(policy_meta_start, pages)
+        MMAPPER.quarantine_address_range(
+            policy_meta_start,
+            pages,
+            memory::MmapStrategy::SIDE_METADATA,
+            anno,
+        )
     }
 }

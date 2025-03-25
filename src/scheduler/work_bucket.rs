@@ -1,4 +1,4 @@
-use super::worker::WorkerMonitor;
+use super::worker_monitor::WorkerMonitor;
 use super::*;
 use crate::vm::VMBinding;
 use crossbeam::deque::{Injector, Steal, Worker};
@@ -139,6 +139,19 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.notify_one_worker();
     }
 
+    /// Add a work packet to this bucket, but do not notify any workers.
+    /// This is useful when the current thread is holding the mutex of `WorkerMonitor` which is
+    /// used for notifying workers.  This usually happens if the current thread is the last worker
+    /// parked.
+    pub(crate) fn add_no_notify<W: GCWork<VM>>(&self, work: W) {
+        self.queue.push(Box::new(work));
+    }
+
+    /// Like [`WorkBucket::add_no_notify`], but the work is boxed.
+    pub(crate) fn add_boxed_no_notify(&self, work: Box<dyn GCWork<VM>>) {
+        self.queue.push(work);
+    }
+
     /// Add multiple packets with a higher priority.
     /// Panic if this bucket cannot receive prioritized packets.
     pub fn bulk_add_prioritized(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
@@ -210,11 +223,10 @@ impl<VM: VMBinding> WorkBucket<VM> {
             sentinel.take()
         };
         if let Some(work) = maybe_sentinel {
-            // We don't need to call `self.add` because this function is called by the coordinator
-            // when workers are stopped.  We don't need to notify the workers because the
-            // coordinator will do that later.
-            // We can just "sneak" the sentinel work packet into the current bucket.
-            self.queue.push(work);
+            // We don't need to notify other workers because this function is called by the last
+            // parked worker.  After this function returns, the caller will notify workers because
+            // more work packets become available.
+            self.add_boxed_no_notify(work);
             true
         } else {
             false

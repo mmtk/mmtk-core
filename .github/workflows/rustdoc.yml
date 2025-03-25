@@ -10,18 +10,19 @@ jobs:
   publish-rustdoc-as-ghpages:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
-      - name: Install nightly
-        uses: actions-rs/toolchain@v1
-        with:
-          components: rustfmt, clippy
-          target: i686-unknown-linux-gnu
-          # This overwrites the default toolchain with the toolchain specified above.
-          override: true
+      - uses: actions/checkout@v4
+
+      # Show the Rust toolchain we are actually using
+      - run: rustup show
+      - run: cargo --version
+
       - name: Append sha to crate version
         run: |
           sed -i 's/^version = "[0-9]\+.[0-9]\+.[0-9]\+/&-'${GITHUB_SHA}'/' Cargo.toml
       - name: Generate rustdoc
+        env:
+          # Override preprocessor.hide.hide in book.toml to hide some chapters.
+          MDBOOK_preprocessor__hide__hide: "true"
         run: ./.github/scripts/ci-doc.sh
       - name: Copy docs
         # docs.mmtk.io is the root for github pages.
@@ -30,7 +31,7 @@ jobs:
           cp -r docs/userguide/book to_publish
           cp -r target/doc to_publish/api
       - name: Deploy to Github Page
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
           publish_dir: to_publish

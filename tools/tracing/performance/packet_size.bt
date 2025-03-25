@@ -1,8 +1,8 @@
-usdt:$MMTK:mmtk:process_edges {
+usdt:$MMTK:mmtk:process_slots {
     if (@stats_enabled) {
-        @process_edges_packet_size = hist(arg0);
+        @process_edges_work_packet_size = hist(arg0);
         if (arg1) {
-            @process_edges_root_packet_size = hist(arg0);
+            @process_edges_work_root_packet_size = hist(arg0);
         }
     }
 }

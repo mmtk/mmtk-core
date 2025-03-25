@@ -10,8 +10,8 @@ pub struct MyGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MyGC<VM>;
-    type ProcessEdgesWorkType = SFTProcessEdges<Self::VM>;
-    type TPProcessEdges = UnsupportedProcessEdges<Self::VM>;
+    type DefaultProcessEdges = SFTProcessEdges<Self::VM>;
+    type PinningProcessEdges = UnsupportedProcessEdges<Self::VM>;
 }
 // ANCHOR_END: workcontext_sft
 
@@ -22,8 +22,8 @@ pub struct MyGCWorkContext2<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext2<VM> {
     type VM = VM;
     type PlanType = MyGC<VM>;
-    type ProcessEdgesWorkType = PlanProcessEdges<Self::VM, MyGC<VM>, DEFAULT_TRACE>;
-    type TPProcessEdges = UnsupportedProcessEdges<Self::VM>;
+    type DefaultProcessEdges = PlanProcessEdges<Self::VM, MyGC<VM>, DEFAULT_TRACE>;
+    type PinningProcessEdges = UnsupportedProcessEdges<Self::VM>;
 }
 // ANCHOR_END: workcontext_plan
 
@@ -45,18 +45,17 @@ impl<VM: VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
     type ScanObjectsWorkType = ScanObjects<Self>;
 
     fn new(
-        edges: Vec<EdgeOf<Self>>,
+        slots: Vec<SlotOf<Self>>,
         roots: bool,
         mmtk: &'static MMTK<VM>,
         bucket: WorkBucketStage,
     ) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk, bucket);
+        let base = ProcessEdgesBase::new(slots, roots, mmtk, bucket);
         let plan = base.plan().downcast_ref::<MyGC<VM>>().unwrap();
         Self { base, plan }
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        debug_assert!(!object.is_null());
         let worker = self.worker();
         let queue = &mut self.base.nodes;
         if self.plan.tospace().in_space(object) {
@@ -74,7 +73,9 @@ impl<VM: VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
                 worker,
             )
         } else {
-            self.plan.common.trace_object(queue, object, worker)
+            use crate::plan::PlanTraceObject;
+            use crate::policy::gc_work::DEFAULT_TRACE;
+            self.plan.common.trace_object::<_, DEFAULT_TRACE>(queue, object, worker)
         }
     }
 
@@ -104,7 +105,7 @@ pub struct MyGCWorkContext3<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext3<VM> {
     type VM = VM;
     type PlanType = MyGC<VM>;
-    type ProcessEdgesWorkType = MyGCProcessEdges<Self::VM>;
-    type TPProcessEdges = UnsupportedProcessEdges<Self::VM>;
+    type DefaultProcessEdges = MyGCProcessEdges<Self::VM>;
+    type PinningProcessEdges = UnsupportedProcessEdges<Self::VM>;
 }
 // ANCHOR: workcontext_mygc

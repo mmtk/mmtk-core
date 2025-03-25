@@ -35,18 +35,16 @@ impl SpaceDescriptor {
         let top = end == vm_layout().heap_end;
         if vm_layout().force_use_contiguous_spaces {
             let space_index = if start > vm_layout().heap_end {
-                ::std::usize::MAX
+                usize::MAX
             } else {
                 start >> vm_layout().space_shift_64()
             };
-            return SpaceDescriptor(
-                space_index << INDEX_SHIFT
-                    | (if top {
-                        TYPE_CONTIGUOUS_HI
-                    } else {
-                        TYPE_CONTIGUOUS
-                    }),
-            );
+            let flags = if top {
+                TYPE_CONTIGUOUS_HI
+            } else {
+                TYPE_CONTIGUOUS
+            };
+            return SpaceDescriptor((space_index << INDEX_SHIFT) | flags);
         }
         let chunks = (end - start) >> vm_layout::LOG_BYTES_IN_CHUNK;
         debug_assert!(!start.is_zero() && chunks > 0 && chunks < (1 << SIZE_BITS));

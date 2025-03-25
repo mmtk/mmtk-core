@@ -29,6 +29,13 @@ space here.
 {{#include ../../code/mygc_semispace/global.rs:create_copy_config}}
 ```
 
+Because the semispace GC copies objects in every single GC, we modify the method
+`current_gc_may_move_object()` in `MyGC` so that it always returns `true`.
+
+```rust
+{{#include ../../code/mygc_semispace/global.rs:current_gc_may_move_object}}
+```
+
 ## Introduce collection to MyGC plan
 
 Add a new method to `Plan for MyGC`, `schedule_collection()`. This function 
@@ -202,7 +209,7 @@ With the derive macro, your `MyGC` struct should look like this:
 {{#include ../../code/mygc_semispace/global.rs:plan_def}}
 ```
 
-Once this is done, you can specify `PlanProcessEdges` as the `ProcessEdgesWorkType` in your GC work context:
+Once this is done, you can specify `PlanProcessEdges` as the `DefaultProcessEdges` in your GC work context:
 ```rust
 {{#include ../../code/mygc_semispace/gc_work.rs:workcontext_plan}}
 ```
@@ -238,7 +245,7 @@ dereferenced as `ProcessEdgesBase`.
 {{#include ../../code/mygc_semispace/gc_work.rs:mygc_process_edges_deref}}
 ```
 
-In the end, use `MyGCProcessEdges` as `ProcessEdgesWorkType` in the `GCWorkContext`:
+In the end, use `MyGCProcessEdges` as `DefaultProcessEdges` in the `GCWorkContext`:
 ```rust
 {{#include ../../code/mygc_semispace/gc_work.rs:workcontext_mygc}}
 ```

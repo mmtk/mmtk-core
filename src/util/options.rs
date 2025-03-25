@@ -6,11 +6,9 @@ use std::fmt::Debug;
 use std::str::FromStr;
 use strum_macros::EnumString;
 
-use super::heap::vm_layout::vm_layout;
-
 /// The default stress factor. This is set to the max usize,
 /// which means we will never trigger a stress GC for the default value.
-pub const DEFAULT_STRESS_FACTOR: usize = usize::max_value();
+pub const DEFAULT_STRESS_FACTOR: usize = usize::MAX;
 
 /// The zeroing approach to use for new object allocations.
 /// Affects each plan differently.
@@ -27,7 +25,7 @@ pub enum NurseryZeroingOptions {
 }
 
 /// Select a GC plan for MMTk.
-#[derive(Copy, Clone, EnumString, Debug)]
+#[derive(Copy, Clone, EnumString, Debug, PartialEq, Eq)]
 pub enum PlanSelector {
     /// Allocation only without a collector. This is usually used for debugging.
     /// Similar to OpenJDK epsilon (<https://openjdk.org/jeps/318>).
@@ -97,9 +95,6 @@ impl FromStr for PerfEventOptions {
     }
 }
 
-/// The default nursery space size.
-#[cfg(target_pointer_width = "64")]
-pub const NURSERY_SIZE: usize = (1 << 20) << LOG_BYTES_IN_MBYTE;
 /// The default min nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
 #[cfg(target_pointer_width = "64")]
@@ -109,18 +104,21 @@ pub const DEFAULT_MIN_NURSERY: usize = 2 << LOG_BYTES_IN_MBYTE;
 #[cfg(target_pointer_width = "64")]
 pub const DEFAULT_MAX_NURSERY: usize = (1 << 20) << LOG_BYTES_IN_MBYTE;
 
-/// The default nursery space size.
-#[cfg(target_pointer_width = "32")]
-pub const NURSERY_SIZE: usize = 32 << LOG_BYTES_IN_MBYTE;
 /// The default min nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
 #[cfg(target_pointer_width = "32")]
 pub const DEFAULT_MIN_NURSERY: usize = 2 << LOG_BYTES_IN_MBYTE;
-const DEFAULT_MAX_NURSERY_32: usize = 32 << LOG_BYTES_IN_MBYTE;
+/// The default max nursery size for 32 bits.
+pub const DEFAULT_MAX_NURSERY_32: usize = 32 << LOG_BYTES_IN_MBYTE;
 /// The default max nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
 #[cfg(target_pointer_width = "32")]
 pub const DEFAULT_MAX_NURSERY: usize = DEFAULT_MAX_NURSERY_32;
+
+/// The default min nursery size proportional to the current heap size
+pub const DEFAULT_PROPORTIONAL_MIN_NURSERY: f64 = 0.25;
+/// The default max nursery size proportional to the current heap size
+pub const DEFAULT_PROPORTIONAL_MAX_NURSERY: f64 = 1.0;
 
 fn always_valid<T>(_: &T) -> bool {
     true
@@ -224,7 +222,7 @@ macro_rules! options {
             ///
             /// Arguments:
             /// * `options`: a string that is key value pairs separated by white spaces or commas, e.g. `threads=1 stress_factor=4096`,
-            /// or `threads=1,stress_factor=4096`
+            ///   or `threads=1,stress_factor=4096`
             pub fn set_bulk_from_command_line(&mut self, options: &str) -> bool {
                 for opt in options.replace(",", " ").split_ascii_whitespace() {
                     let kv_pair: Vec<&str> = opt.split('=').collect();
@@ -293,6 +291,15 @@ macro_rules! options {
             }
         }
     ]
+}
+
+impl Options {
+    /// Check if the options are set for stress GC. If either stress_factor or analysis_factor is set,
+    /// we should do stress GC.
+    pub fn is_stress_test_gc_enabled(&self) -> bool {
+        *self.stress_factor != DEFAULT_STRESS_FACTOR
+            || *self.analysis_factor != DEFAULT_STRESS_FACTOR
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -389,62 +396,41 @@ impl FromStr for AffinityKind {
     }
 }
 
-#[derive(Copy, Clone, EnumString, Debug)]
-/// Different nursery types.
-pub enum NurseryKind {
-    /// A Bounded nursery has different upper and lower bounds. The size only controls the upper
-    /// bound. Hence, it is considered to be a "variable size" nursery. By default, a Bounded
-    /// nursery has a lower bound of 2 MB and an upper bound of 32 MB for 32-bit systems and 1 TB
-    /// for 64-bit systems.
-    Bounded,
-    /// A Fixed nursery has the same upper and lower bounds. The size controls both the upper and
-    /// lower bounds. Note that this is considered less performant than a Bounded nursery since a
-    /// Fixed nursery size can be too restrictive and cause more GCs.
-    Fixed,
-}
-
 #[derive(Copy, Clone, Debug)]
 /// An option that provides a min/max interface to MMTk and a Bounded/Fixed interface to the
 /// user/VM.
-pub struct NurserySize {
-    /// The nursery type
-    pub kind: NurseryKind,
-    /// Minimum nursery size (in bytes)
-    pub min: usize,
-    /// Maximum nursery size (in bytes)
-    max: Option<usize>,
+pub enum NurserySize {
+    /// A Bounded nursery has different upper and lower bounds. The size only controls the upper
+    /// bound. Hence, it is considered to be a "variable size" nursery.
+    Bounded {
+        /// The lower bound of the nursery size in bytes. Default to [`DEFAULT_MIN_NURSERY`].
+        min: usize,
+        /// The upper bound of the nursery size in bytes. Default to [`DEFAULT_MAX_NURSERY`].
+        max: usize,
+    },
+    /// A bounded nursery that is porportional to the current heap size.
+    ProportionalBounded {
+        /// The lower bound of the nursery size as a proportion of the current heap size. Default to [`DEFAULT_PROPORTIONAL_MIN_NURSERY`].
+        min: f64,
+        /// The upper bound of the nursery size as a proportion of the current heap size. Default to [`DEFAULT_PROPORTIONAL_MAX_NURSERY`].
+        max: f64,
+    },
+    /// A Fixed nursery has the same upper and lower bounds. The size controls both the upper and
+    /// lower bounds. Note that this is considered less performant than a Bounded nursery since a
+    /// Fixed nursery size can be too restrictive and cause more GCs.
+    Fixed(usize),
 }
 
 impl NurserySize {
-    /// Create a NurserySize with the given kind. The value argument specifies the nursery size
-    /// for a fixed nursery, or specifies the max size for a bounded nursery.
-    pub fn new(kind: NurseryKind, value: Option<usize>) -> Self {
-        match kind {
-            NurseryKind::Bounded => NurserySize {
-                kind,
-                min: DEFAULT_MIN_NURSERY,
-                max: value,
-            },
-            NurseryKind::Fixed => NurserySize {
-                kind,
-                min: value.unwrap(),
-                max: value,
-            },
+    /// Return true if the values are valid.
+    fn validate(&self) -> bool {
+        match *self {
+            NurserySize::Bounded { min, max } => min <= max,
+            NurserySize::ProportionalBounded { min, max } => {
+                0.0f64 < min && min <= max && max <= 1.0f64
+            }
+            NurserySize::Fixed(_) => true,
         }
-    }
-
-    /// Returns a [`NurserySize`] or [`String`] containing error. Expects nursery size to be formatted as
-    /// `<NurseryKind>:<size in bytes>`. For example, `Fixed:8192` creates a [`NurseryKind::Fixed`] nursery of size
-    /// 8192 bytes.
-    pub fn parse(s: &str) -> Result<NurserySize, String> {
-        let ns: Vec<&str> = s.split(':').collect();
-        let kind = ns[0].parse::<NurseryKind>().map_err(|_| {
-            String::from("Please specify one of \"Bounded\" or \"Fixed\" nursery type")
-        })?;
-        let value = ns[1]
-            .parse()
-            .map_err(|_| String::from("Failed to parse size"))?;
-        Ok(NurserySize::new(kind, Some(value)))
     }
 }
 
@@ -452,42 +438,139 @@ impl FromStr for NurserySize {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        NurserySize::parse(s)
+        let parts: Vec<&str> = s.split(':').collect();
+        if parts.len() != 2 {
+            return Err("Invalid format".to_string());
+        }
+
+        let variant = parts[0];
+        let values: Vec<&str> = parts[1].split(',').collect();
+
+        fn default_or_parse<T: FromStr>(val: &str, default_value: T) -> Result<T, String> {
+            if val == "_" {
+                Ok(default_value)
+            } else {
+                val.parse::<T>()
+                    .map_err(|_| format!("Failed to parse {:?}", std::any::type_name::<T>()))
+            }
+        }
+
+        match variant {
+            "Bounded" => {
+                if values.len() == 2 {
+                    let min = default_or_parse(values[0], DEFAULT_MIN_NURSERY)?;
+                    let max = default_or_parse(values[1], DEFAULT_MAX_NURSERY)?;
+                    Ok(NurserySize::Bounded { min, max })
+                } else {
+                    Err("Bounded requires two values".to_string())
+                }
+            }
+            "ProportionalBounded" => {
+                if values.len() == 2 {
+                    let min = default_or_parse(values[0], DEFAULT_PROPORTIONAL_MIN_NURSERY)?;
+                    let max = default_or_parse(values[1], DEFAULT_PROPORTIONAL_MAX_NURSERY)?;
+                    Ok(NurserySize::ProportionalBounded { min, max })
+                } else {
+                    Err("ProportionalBounded requires two values".to_string())
+                }
+            }
+            "Fixed" => {
+                if values.len() == 1 {
+                    let size = values[0]
+                        .parse::<usize>()
+                        .map_err(|_| "Invalid size value".to_string())?;
+                    Ok(NurserySize::Fixed(size))
+                } else {
+                    Err("Fixed requires one value".to_string())
+                }
+            }
+            _ => Err("Unknown variant".to_string()),
+        }
     }
 }
 
-impl Options {
-    /// Return upper bound of the nursery size (in number of bytes)
-    pub fn get_max_nursery_bytes(&self) -> usize {
-        self.nursery.max.unwrap_or_else(|| {
-            if !vm_layout().force_use_contiguous_spaces {
-                DEFAULT_MAX_NURSERY_32
-            } else {
-                DEFAULT_MAX_NURSERY
-            }
-        })
+#[cfg(test)]
+mod nursery_size_parsing_tests {
+    use super::*;
+
+    #[test]
+    fn test_bounded() {
+        // Simple case
+        let result = "Bounded:1,2".parse::<NurserySize>().unwrap();
+        if let NurserySize::Bounded { min, max } = result {
+            assert_eq!(min, 1);
+            assert_eq!(max, 2);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
+
+        // Default min
+        let result = "Bounded:_,2".parse::<NurserySize>().unwrap();
+        if let NurserySize::Bounded { min, max } = result {
+            assert_eq!(min, DEFAULT_MIN_NURSERY);
+            assert_eq!(max, 2);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
+
+        // Default max
+        let result = "Bounded:1,_".parse::<NurserySize>().unwrap();
+        if let NurserySize::Bounded { min, max } = result {
+            assert_eq!(min, 1);
+            assert_eq!(max, DEFAULT_MAX_NURSERY);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
+
+        // Default both
+        let result = "Bounded:_,_".parse::<NurserySize>().unwrap();
+        if let NurserySize::Bounded { min, max } = result {
+            assert_eq!(min, DEFAULT_MIN_NURSERY);
+            assert_eq!(max, DEFAULT_MAX_NURSERY);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
     }
 
-    /// Return upper bound of the nursery size (in number of pages)
-    pub fn get_max_nursery_pages(&self) -> usize {
-        crate::util::conversions::bytes_to_pages_up(self.get_max_nursery_bytes())
-    }
+    #[test]
+    fn test_proportional() {
+        // Simple case
+        let result = "ProportionalBounded:0.1,0.8"
+            .parse::<NurserySize>()
+            .unwrap();
+        if let NurserySize::ProportionalBounded { min, max } = result {
+            assert_eq!(min, 0.1);
+            assert_eq!(max, 0.8);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
 
-    /// Return lower bound of the nursery size (in number of bytes)
-    pub fn get_min_nursery_bytes(&self) -> usize {
-        self.nursery.min
-    }
+        // Default min
+        let result = "ProportionalBounded:_,0.8".parse::<NurserySize>().unwrap();
+        if let NurserySize::ProportionalBounded { min, max } = result {
+            assert_eq!(min, DEFAULT_PROPORTIONAL_MIN_NURSERY);
+            assert_eq!(max, 0.8);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
 
-    /// Return lower bound of the nursery size (in number of pages)
-    pub fn get_min_nursery_pages(&self) -> usize {
-        crate::util::conversions::bytes_to_pages_up(self.nursery.min)
-    }
+        // Default max
+        let result = "ProportionalBounded:0.1,_".parse::<NurserySize>().unwrap();
+        if let NurserySize::ProportionalBounded { min, max } = result {
+            assert_eq!(min, 0.1);
+            assert_eq!(max, DEFAULT_PROPORTIONAL_MAX_NURSERY);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
 
-    /// Check if the options are set for stress GC. If either stress_factor or analysis_factor is set,
-    /// we should do stress GC.
-    pub fn is_stress_test_gc_enabled(&self) -> bool {
-        *self.stress_factor != DEFAULT_STRESS_FACTOR
-            || *self.analysis_factor != DEFAULT_STRESS_FACTOR
+        // Default both
+        let result = "ProportionalBounded:_,_".parse::<NurserySize>().unwrap();
+        if let NurserySize::ProportionalBounded { min, max } = result {
+            assert_eq!(min, DEFAULT_PROPORTIONAL_MIN_NURSERY);
+            assert_eq!(max, DEFAULT_PROPORTIONAL_MAX_NURSERY);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
     }
 }
 
@@ -705,10 +788,7 @@ mod gc_trigger_tests {
 options! {
     /// The GC plan to use.
     plan:                  PlanSelector         [env_var: true, command_line: true] [always_valid] = PlanSelector::GenImmix,
-    /// Number of GC worker threads. (There is always one GC controller thread besides the GC workers)
-    // FIXME: Currently we create GCWorkScheduler when MMTK is created, which is usually static.
-    // To allow this as a command-line option, we need to refactor the creation fo the `MMTK` instance.
-    // See: https://github.com/mmtk/mmtk-core/issues/532
+    /// Number of GC worker threads.
     threads:               usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = num_cpus::get(),
     /// Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans: bool                 [env_var: true, command_line: true]  [always_valid] = false,
@@ -718,13 +798,14 @@ options! {
     eager_complete_sweep:  bool                 [env_var: true, command_line: true]  [always_valid] = false,
     /// Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
     ignore_system_gc:      bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    /// The nursery size for generational plans. It can be one of Bounded or Fixed. The size for a
-    /// Bounded nursery only controls the upper bound, whereas the size for a Fixed nursery controls
-    /// both the upper and lower bounds. The nursery size can be set like 'Fixed:8192', for example,
-    /// to have a Fixed nursery size of 8192 bytes
-    // FIXME: This is not a good way to have conflicting options -- we should refactor this
-    nursery:               NurserySize          [env_var: true, command_line: true]  [|v: &NurserySize| v.min > 0 && v.max.map(|max| max > 0 && max >= v.min).unwrap_or(true)]
-        = NurserySize { kind: NurseryKind::Bounded, min: DEFAULT_MIN_NURSERY, max: None },
+    /// The nursery size for generational plans. It can be one of Bounded, ProportionalBounded or Fixed.
+    /// The nursery size can be set like 'Fixed:8192', for example,
+    /// to have a Fixed nursery size of 8192 bytes, or 'ProportionalBounded:0.2,1.0' to have a nursery size
+    /// between 20% and 100% of the heap size. You can omit lower bound and upper bound to use the default
+    /// value for bounded nursery by using '_'. For example, 'ProportionalBounded:0.1,_' sets the min nursery
+    /// to 10% of the heap size while using the default value for max nursery.
+    nursery:               NurserySize          [env_var: true, command_line: true]  [|v: &NurserySize| v.validate()]
+        = NurserySize::ProportionalBounded { min: DEFAULT_PROPORTIONAL_MIN_NURSERY, max: DEFAULT_PROPORTIONAL_MAX_NURSERY },
     /// Should a major GC be performed when a system GC is required?
     full_heap_system_gc:   bool                 [env_var: true, command_line: true]  [always_valid] = false,
     /// Should finalization be disabled?
@@ -781,8 +862,11 @@ options! {
     /// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
     /// Default to a fixed heap size of 0.5x physical memory.
     gc_trigger:             GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize),
-    /// Enable transparent hugepage support via madvise (only Linux is supported)
-    transparent_hugepages: bool                  [env_var: true, command_line: true]  [|v: &bool| !v || cfg!(target_os = "linux")] = false
+    /// Enable transparent hugepage support for MMTk spaces via madvise (only Linux is supported)
+    /// This only affects the memory for MMTk spaces.
+    transparent_hugepages: bool                  [env_var: true, command_line: true]  [|v: &bool| !v || cfg!(target_os = "linux")] = false,
+    /// Count live bytes for objects in each space during a GC.
+    count_live_bytes_in_gc: bool                 [env_var: true, command_line: true] [always_valid] = false
 }
 
 #[cfg(test)]

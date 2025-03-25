@@ -3,13 +3,12 @@ use super::Mmapper;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout::*;
-use crate::util::memory::MmapStrategy;
+use crate::util::memory::{MmapAnnotation, MmapStrategy};
 use crate::util::Address;
 use atomic::{Atomic, Ordering};
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::io::Result;
-use std::mem::transmute;
 use std::sync::Mutex;
 
 const MMAP_NUM_CHUNKS: usize = 1 << (33 - LOG_MMAP_CHUNK_BYTES);
@@ -58,7 +57,6 @@ struct InnerFragmentedMapper {
     free_slabs: Vec<Option<Box<Slab>>>,
     slab_table: Vec<Option<Box<Slab>>>,
     slab_map: Vec<Address>,
-    strategy: Atomic<MmapStrategy>,
 }
 
 impl fmt::Debug for FragmentedMapper {
@@ -68,10 +66,6 @@ impl fmt::Debug for FragmentedMapper {
 }
 
 impl Mmapper for FragmentedMapper {
-    fn set_mmap_strategy(&self, strategy: MmapStrategy) {
-        self.inner().strategy.store(strategy, Ordering::Relaxed);
-    }
-
     fn eagerly_mmap_all_spaces(&self, _space_map: &[Address]) {}
 
     fn mark_as_mapped(&self, mut start: Address, bytes: usize) {
@@ -95,7 +89,13 @@ impl Mmapper for FragmentedMapper {
         }
     }
 
-    fn quarantine_address_range(&self, mut start: Address, pages: usize) -> Result<()> {
+    fn quarantine_address_range(
+        &self,
+        mut start: Address,
+        pages: usize,
+        strategy: MmapStrategy,
+        anno: &MmapAnnotation,
+    ) -> Result<()> {
         debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
 
         let end = start + conversions::pages_to_bytes(pages);
@@ -140,14 +140,21 @@ impl Mmapper for FragmentedMapper {
             MapState::bulk_transition_to_quarantined(
                 state_slices.as_slice(),
                 mmap_start,
-                self.inner().strategy.load(Ordering::Relaxed),
+                strategy,
+                anno,
             )?;
         }
 
         Ok(())
     }
 
-    fn ensure_mapped(&self, mut start: Address, pages: usize) -> Result<()> {
+    fn ensure_mapped(
+        &self,
+        mut start: Address,
+        pages: usize,
+        strategy: MmapStrategy,
+        anno: &MmapAnnotation,
+    ) -> Result<()> {
         let end = start + conversions::pages_to_bytes(pages);
         // Iterate over the slabs covered
         while start < end {
@@ -172,11 +179,7 @@ impl Mmapper for FragmentedMapper {
 
                 let mmap_start = Self::chunk_index_to_address(base, chunk);
                 let _guard = self.lock.lock().unwrap();
-                MapState::transition_to_mapped(
-                    entry,
-                    mmap_start,
-                    self.inner().strategy.load(Ordering::Relaxed),
-                )?;
+                MapState::transition_to_mapped(entry, mmap_start, strategy, anno)?;
             }
             start = high;
         }
@@ -236,14 +239,25 @@ impl FragmentedMapper {
                 free_slabs: (0..MAX_SLABS).map(|_| Some(Self::new_slab())).collect(),
                 slab_table: (0..SLAB_TABLE_SIZE).map(|_| None).collect(),
                 slab_map: vec![SENTINEL; SLAB_TABLE_SIZE],
-                strategy: Atomic::new(MmapStrategy::Normal),
             }),
         }
     }
 
     fn new_slab() -> Box<Slab> {
-        let mapped: Box<Slab> =
-            Box::new(unsafe { transmute([MapState::Unmapped; MMAP_NUM_CHUNKS]) });
+        // Because AtomicU8 does not implement Copy, it is a compilation error to usen the
+        // expression `[Atomic::new(MapState::Unmapped); MMAP_NUM_CHUNKS]` because that involves
+        // copying.  We must define a constant for it.
+        //
+        // TODO: Use the inline const expression `const { Atomic::new(MapState::Unmapped) }` after
+        // we bump MSRV to 1.79.
+
+        // If we declare a const Atomic, Clippy will warn about const items being interior mutable.
+        // Using inline const expression will eliminate this warning, but that is experimental until
+        // 1.79.  Fix it after we bump MSRV.
+        #[allow(clippy::declare_interior_mutable_const)]
+        const INITIAL_ENTRY: Atomic<MapState> = Atomic::new(MapState::Unmapped);
+
+        let mapped: Box<Slab> = Box::new([INITIAL_ENTRY; MMAP_NUM_CHUNKS]);
         mapped
     }
 
@@ -382,6 +396,7 @@ impl Default for FragmentedMapper {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mmap_anno_test;
     use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::heap::layout::vm_layout::MMAP_CHUNK_BYTES;
     use crate::util::memory;
@@ -434,7 +449,9 @@ mod tests {
             with_cleanup(
                 || {
                     let mmapper = FragmentedMapper::new();
-                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
+                    mmapper
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, mmap_anno_test!())
+                        .unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
                     for i in 0..chunks {
@@ -460,7 +477,9 @@ mod tests {
             with_cleanup(
                 || {
                     let mmapper = FragmentedMapper::new();
-                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
+                    mmapper
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, mmap_anno_test!())
+                        .unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
                     for i in 0..chunks {
@@ -487,7 +506,9 @@ mod tests {
             with_cleanup(
                 || {
                     let mmapper = FragmentedMapper::new();
-                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
+                    mmapper
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, mmap_anno_test!())
+                        .unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
                     for i in 0..chunks {
@@ -516,7 +537,12 @@ mod tests {
                     let mmapper = FragmentedMapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2)
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            pages_per_chunk * 2,
+                            MmapStrategy::TEST,
+                            mmap_anno_test!(),
+                        )
                         .unwrap();
 
                     // protect 1 chunk
@@ -547,7 +573,12 @@ mod tests {
                     let mmapper = FragmentedMapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2)
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            pages_per_chunk * 2,
+                            MmapStrategy::TEST,
+                            mmap_anno_test!(),
+                        )
                         .unwrap();
 
                     // protect 1 chunk
@@ -564,7 +595,12 @@ mod tests {
 
                     // ensure mapped - this will unprotect the previously protected chunk
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2)
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            pages_per_chunk * 2,
+                            MmapStrategy::TEST,
+                            mmap_anno_test!(),
+                        )
                         .unwrap();
                     assert_eq!(
                         get_chunk_map_state(&mmapper, FIXED_ADDRESS),

@@ -18,11 +18,11 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
         - name: Checkout MMTk Core
-          uses: actions/checkout@v2
+          uses: actions/checkout@v4
           with:
             path: mmtk-core
         - name: Checkout OpenJDK Binding
-          uses: actions/checkout@v2
+          uses: actions/checkout@v4
           with:
             repository: ${{ inputs.repo }}
             path: mmtk-openjdk

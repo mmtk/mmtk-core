@@ -4,7 +4,11 @@ use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::immix;
 use crate::plan::PlanConstraints;
+use crate::policy::gc_work::TraceKind;
+use crate::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
 use crate::policy::immix::ImmixSpace;
+use crate::policy::immix::PREFER_COPY_ON_NURSERY_GC;
+use crate::policy::immix::TRACE_KIND_FAST;
 use crate::policy::sft::SFT;
 use crate::policy::space::Space;
 use crate::util::copy::CopyConfig;
@@ -89,6 +93,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     fn schedule_collection(&'static self, scheduler: &crate::scheduler::GCWorkScheduler<Self::VM>) {
         let is_full_heap = self.requires_full_heap_collection();
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
+        probe!(mmtk, gen_full_heap, is_full_heap);
 
         if !is_full_heap {
             info!("Nursery GC");
@@ -97,7 +102,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         } else {
             info!("Full heap GC");
             use crate::plan::immix::Immix;
-            use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
+            use crate::policy::immix::TRACE_KIND_DEFRAG;
             Immix::schedule_immix_full_heap_collection::<
                 StickyImmix<VM>,
                 StickyImmixMatureGCWorkContext<VM, TRACE_KIND_FAST>,
@@ -129,9 +134,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
 
     fn release(&mut self, tls: crate::util::VMWorkerThread) {
         if self.is_current_gc_nursery() {
-            let was_defrag = self.immix.immix_space.release(false);
-            self.immix
-                .set_last_gc_was_defrag(was_defrag, Ordering::Relaxed);
+            self.immix.immix_space.release(false);
             self.immix.common.los.release(false);
         } else {
             self.immix.release(tls);
@@ -143,11 +146,15 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             crate::plan::generational::global::CommonGenPlan::should_next_gc_be_full_heap(self);
         self.next_gc_full_heap
             .store(next_gc_full_heap, Ordering::Relaxed);
+
+        let was_defrag = self.immix.immix_space.end_of_gc();
+        self.immix
+            .set_last_gc_was_defrag(was_defrag, Ordering::Relaxed);
     }
 
     fn collection_required(&self, space_full: bool, space: Option<SpaceStats<Self::VM>>) -> bool {
-        let nursery_full =
-            self.immix.immix_space.get_pages_allocated() > self.options().get_max_nursery_pages();
+        let nursery_full = self.immix.immix_space.get_pages_allocated()
+            > self.base().gc_trigger.get_max_nursery_pages();
         if space_full
             && space.is_some()
             && space.as_ref().unwrap().0.name() != self.immix.immix_space.name()
@@ -159,6 +166,14 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
 
     fn last_collection_was_exhaustive(&self) -> bool {
         self.gc_full_heap.load(Ordering::Relaxed) && self.immix.last_collection_was_exhaustive()
+    }
+
+    fn current_gc_may_move_object(&self) -> bool {
+        if self.is_current_gc_nursery() {
+            PREFER_COPY_ON_NURSERY_GC
+        } else {
+            self.get_immix_space().in_defrag()
+        }
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
@@ -233,7 +248,7 @@ impl<VM: VMBinding> GenerationalPlan for StickyImmix<VM> {
 }
 
 impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> for StickyImmix<VM> {
-    fn trace_object_nursery<Q: crate::ObjectQueue>(
+    fn trace_object_nursery<Q: crate::ObjectQueue, const KIND: TraceKind>(
         &self,
         queue: &mut Q,
         object: crate::util::ObjectReference,
@@ -245,7 +260,17 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                 trace!("Immix mature object {}, skip", object);
                 return object;
             } else {
-                let object = if crate::policy::immix::PREFER_COPY_ON_NURSERY_GC {
+                let object = if KIND == TRACE_KIND_TRANSITIVE_PIN || KIND == TRACE_KIND_FAST {
+                    trace!(
+                        "Immix nursery object {} is being traced without moving",
+                        object
+                    );
+                    self.immix.immix_space.trace_object_without_moving(
+                        queue,
+                        object,
+                        KIND == TRACE_KIND_TRANSITIVE_PIN,
+                    )
+                } else if crate::policy::immix::PREFER_COPY_ON_NURSERY_GC {
                     let ret = self.immix.immix_space.trace_object_with_opportunistic_copy(
                         queue,
                         object,
@@ -261,7 +286,7 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                         if ret == object {
                             "".to_string()
                         } else {
-                            format!(" -> new object {}", ret)
+                            format!("-> new object {}", ret)
                         }
                     );
                     ret
@@ -313,6 +338,7 @@ impl<VM: VMBinding> StickyImmix<VM> {
                 // Along with the option above, we unlog them again during tracing.
                 reset_log_bit_in_major_gc: true,
                 // In StickyImmix, both young and old objects are allocated in the ImmixSpace.
+                #[cfg(feature = "vo_bit")]
                 mixed_age: true,
             },
         );
@@ -327,7 +353,11 @@ impl<VM: VMBinding> StickyImmix<VM> {
     fn requires_full_heap_collection(&self) -> bool {
         // Separate each condition so the code is clear
         #[allow(clippy::if_same_then_else, clippy::needless_bool)]
-        if self
+        if crate::plan::generational::FULL_NURSERY_GC {
+            trace!("full heap: forced full heap");
+            // For barrier overhead measurements, we always do full gc in nursery collections.
+            true
+        } else if self
             .immix
             .common
             .base

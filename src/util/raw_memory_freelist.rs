@@ -3,6 +3,7 @@ use super::memory::MmapStrategy;
 use crate::util::address::Address;
 use crate::util::constants::*;
 use crate::util::conversions;
+use crate::util::memory::MmapAnnotation;
 
 /** log2 of the number of bits used by a free list entry (two entries per unit) */
 const LOG_ENTRY_BITS: usize = LOG_BITS_IN_INT as _;
@@ -198,7 +199,14 @@ impl RawMemoryFreeList {
     }
 
     fn mmap(&self, start: Address, bytes: usize) {
-        let res = super::memory::dzmmap_noreplace(start, bytes, self.strategy);
+        let res = super::memory::dzmmap_noreplace(
+            start,
+            bytes,
+            self.strategy,
+            &MmapAnnotation::Misc {
+                name: "RawMemoryFreeList",
+            },
+        );
         assert!(res.is_ok(), "Can't get more space with mmap()");
     }
     pub fn get_limit(&self) -> Address {
@@ -273,7 +281,7 @@ mod tests {
             list_size as _,
             grain,
             1,
-            MmapStrategy::Normal,
+            MmapStrategy::TEST,
         );
         // Grow the free-list to do the actual memory-mapping.
         l.grow_freelist(list_size as _);

@@ -36,8 +36,9 @@ jobs:
     needs: [get-merged-pr, binding-refs]
     with:
       repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
-      base_repo: mmtk/mmtk-openjdk
+      base_repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo_default }}
       ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
+      base_ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref_default }}
       core_commit: ${{ needs.get-merged-pr.outputs.commit }}
       update_lockfile: cargo build
     secrets: inherit
@@ -47,8 +48,9 @@ jobs:
     needs: [get-merged-pr, binding-refs]
     with:
       repo: ${{ needs.binding-refs.outputs.jikesrvm_binding_repo }}
-      base_repo: mmtk/mmtk-jikesrvm
+      base_repo: ${{ needs.binding-refs.outputs.jikesrvm_binding_repo_default }}
       ref: ${{ needs.binding-refs.outputs.jikesrvm_binding_ref }}
+      base_ref: ${{ needs.binding-refs.outputs.jikesrvm_binding_ref_default }}
       core_commit: ${{ needs.get-merged-pr.outputs.commit }}
       # `cargo generate-lockfile` will update other dependencies. We avoid using it for the bindings.
       # But we do not have a good option for JikesRVM. The Rust project in JikesRVM needs some source files
@@ -62,8 +64,9 @@ jobs:
     needs: [get-merged-pr, binding-refs]
     with:
       repo: ${{ needs.binding-refs.outputs.v8_binding_repo }}
-      base_repo: mmtk/mmtk-v8
+      base_repo: ${{ needs.binding-refs.outputs.v8_binding_repo_default }}
       ref: ${{ needs.binding-refs.outputs.v8_binding_ref }}
+      base_ref: ${{ needs.binding-refs.outputs.v8_binding_ref_default }}
       core_commit: ${{ needs.get-merged-pr.outputs.commit }}
       update_lockfile: cargo build --features nogc
     secrets: inherit
@@ -73,10 +76,14 @@ jobs:
     needs: [get-merged-pr, binding-refs]
     with:
       repo: ${{ needs.binding-refs.outputs.julia_binding_repo }}
-      base_repo: mmtk/mmtk-julia
+      base_repo: ${{ needs.binding-refs.outputs.julia_binding_repo_default }}
       ref: ${{ needs.binding-refs.outputs.julia_binding_ref }}
+      base_ref: ${{ needs.binding-refs.outputs.julia_binding_ref_default }}
       core_commit: ${{ needs.get-merged-pr.outputs.commit }}
-      update_lockfile: cargo build --features immix
+      # `cargo generate-lockfile` will update other dependencies. We avoid using it for the bindings.
+      # mmtk-julia uses bindgen during building and requires the Julia repo. This is a similar situation
+      # as mmtk-jikesrvm. To make thigns simpler, we just use `cargo generate-lockfile`.
+      update_lockfile: cargo generate-lockfile
     secrets: inherit
 
   check-merge-ruby-pr:
@@ -84,8 +91,9 @@ jobs:
     needs: [get-merged-pr, binding-refs]
     with:
       repo: ${{ needs.binding-refs.outputs.ruby_binding_repo }}
-      base_repo: mmtk/mmtk-ruby
+      base_repo: ${{ needs.binding-refs.outputs.ruby_binding_repo_default }}
       ref: ${{ needs.binding-refs.outputs.ruby_binding_ref }}
+      base_ref: ${{ needs.binding-refs.outputs.ruby_binding_ref_default }}
       core_commit: ${{ needs.get-merged-pr.outputs.commit }}
       update_lockfile: cargo build
     secrets: inherit

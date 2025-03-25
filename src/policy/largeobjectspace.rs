@@ -10,6 +10,7 @@ use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::{FreeListPageResource, PageResource};
 use crate::util::metadata;
+use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
@@ -38,7 +39,7 @@ pub struct LargeObjectSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
     fn is_live(&self, object: ObjectReference) -> bool {
@@ -86,12 +87,61 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         }
 
         #[cfg(feature = "vo_bit")]
-        crate::util::metadata::vo_bit::set_vo_bit::<VM>(object);
+        crate::util::metadata::vo_bit::set_vo_bit(object);
+        #[cfg(all(feature = "is_mmtk_object", debug_assertions))]
+        {
+            use crate::util::constants::LOG_BYTES_IN_PAGE;
+            let vo_addr = object.to_raw_address();
+            let offset_from_page_start = vo_addr & ((1 << LOG_BYTES_IN_PAGE) - 1) as usize;
+            debug_assert!(
+                offset_from_page_start < crate::util::metadata::vo_bit::VO_BIT_WORD_TO_REGION,
+                "The raw address of ObjectReference is not in the first 512 bytes of a page. The internal pointer searching for LOS won't work."
+            );
+        }
+
         self.treadmill.add_to_treadmill(object, alloc);
     }
     #[cfg(feature = "is_mmtk_object")]
-    fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
+    fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
+    }
+    #[cfg(feature = "is_mmtk_object")]
+    fn find_object_from_internal_pointer(
+        &self,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -> Option<ObjectReference> {
+        use crate::util::metadata::vo_bit;
+        // For large object space, it is a bit special. We only need to check VO bit for each page.
+        let mut cur_page = ptr.align_down(BYTES_IN_PAGE);
+        let low_page = ptr
+            .saturating_sub(max_search_bytes)
+            .align_down(BYTES_IN_PAGE);
+        while cur_page >= low_page {
+            // If the page start is not mapped, there can't be an object in it.
+            if !cur_page.is_mapped() {
+                return None;
+            }
+            // For performance, we only check the first word which maps to the first 512 bytes in the page.
+            // In almost all the cases, it should be sufficient.
+            // However, if the raw address of ObjectReference is not in the first 512 bytes, this won't work.
+            // We assert this when we set VO bit for LOS.
+            if vo_bit::get_raw_vo_bit_word(cur_page) != 0 {
+                // Find the exact address that has vo bit set
+                for offset in 0..vo_bit::VO_BIT_WORD_TO_REGION {
+                    let addr = cur_page + offset;
+                    if unsafe { vo_bit::is_vo_addr(addr) } {
+                        return vo_bit::is_internal_ptr_from_vo_bit::<VM>(addr, ptr);
+                    }
+                }
+                unreachable!(
+                    "We found vo bit in the raw word, but we cannot find the exact address"
+                );
+            }
+
+            cur_page -= BYTES_IN_PAGE;
+        }
+        None
     }
     fn sft_trace_object(
         &self,
@@ -113,6 +163,9 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
+    fn maybe_get_page_resource_mut(&mut self) -> Option<&mut dyn PageResource<VM>> {
+        Some(&mut self.pr)
+    }
 
     fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
         self.common().initialize_sft(self.as_sft(), sft_map)
@@ -124,6 +177,10 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 
     fn release_multiple_pages(&mut self, start: Address) {
         self.pr.release_pages(start);
+    }
+
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
+        self.treadmill.enumerate_objects(enumerator);
     }
 }
 
@@ -162,7 +219,11 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         } else {
             FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
         };
-        pr.protect_memory_on_release = protect_memory_on_release;
+        pr.protect_memory_on_release = if protect_memory_on_release {
+            Some(common.mmap_strategy().prot)
+        } else {
+            None
+        };
         LargeObjectSpace {
             pr,
             common,
@@ -200,10 +261,9 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
-        debug_assert!(!object.is_null());
         #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
+            crate::util::metadata::vo_bit::is_vo_bit_set(object),
             "{:x}: VO bit not set",
             object
         );
@@ -238,7 +298,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     fn sweep_large_pages(&mut self, sweep_nursery: bool) {
         let sweep = |object: ObjectReference| {
             #[cfg(feature = "vo_bit")]
-            crate::util::metadata::vo_bit::unset_vo_bit::<VM>(object);
+            crate::util::metadata::vo_bit::unset_vo_bit(object);
             self.pr
                 .release_pages(get_super_page(object.to_object_start::<VM>()));
         };

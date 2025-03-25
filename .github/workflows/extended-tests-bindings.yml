@@ -25,11 +25,11 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout V8 Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: ${{ needs.binding-refs.outputs.v8_binding_repo }}
           path: mmtk-v8
@@ -71,11 +71,11 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout JikesRVM Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: ${{ needs.binding-refs.outputs.jikesrvm_binding_repo }}
           path: mmtk-jikesrvm
@@ -106,11 +106,11 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout Julia Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: ${{ needs.binding-refs.outputs.julia_binding_repo }}
           path: mmtk-julia
@@ -121,10 +121,15 @@ jobs:
       - name: Setup
         run: |
           cd mmtk-julia
-          ./.github/scripts/ci-checkout.sh
+          ./.github/scripts/ci-checkout.sh ${{ needs.binding-refs.outputs.julia_vm_repo }} ${{ needs.binding-refs.outputs.julia_vm_ref }}
           ./.github/scripts/ci-setup.sh
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+      # removing these two LLVM installations as they cause a conflict within bindgen
+      - name: Hack to make bindgen work for Github images
+        run: |
+          sudo rm -rf /usr/lib/llvm-14
+          sudo rm -rf /usr/lib/llvm-13
       - name: Overwrite MMTk core in Julia binding
         run: |
           mkdir -p mmtk-julia/repos/mmtk-core
@@ -154,12 +159,12 @@ jobs:
       DEBUG_LEVEL: ${{ matrix.debug-level }}
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
 
       - name: Checkout MMTk Ruby binding
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ needs.binding-refs.outputs.ruby_binding_repo }}
           path: mmtk-ruby
@@ -175,7 +180,7 @@ jobs:
         working-directory: mmtk-ruby
 
       - name: Checkout Ruby
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ steps.extract-ruby-revision.outputs.ruby_repo }}
           ref: ${{ steps.extract-ruby-revision.outputs.ruby_rev }}

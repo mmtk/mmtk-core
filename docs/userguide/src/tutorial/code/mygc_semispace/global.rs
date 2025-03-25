@@ -72,6 +72,13 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     // ANCHOR_END: create_copy_config
 
     // Modify
+    // ANCHOR: current_gc_may_move_object
+    fn current_gc_may_move_object(&self) -> bool {
+        true
+    }
+    // ANCHOR_END: current_gc_may_move_object
+
+    // Modify
     // ANCHOR: schedule_collection
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         scheduler.schedule_common_work::<MyGCWorkContext<VM>>(self);
@@ -168,9 +175,9 @@ impl<VM: VMBinding> MyGC<VM> {
         let res = MyGC {
             hi: AtomicBool::new(false),
             // ANCHOR: copyspace_new
-            copyspace0: CopySpace::new(plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()), false),
+            copyspace0: CopySpace::new(plan_args.get_space_args("copyspace0", true, false, VMRequest::discontiguous()), false),
             // ANCHOR_END: copyspace_new
-            copyspace1: CopySpace::new(plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()), true),
+            copyspace1: CopySpace::new(plan_args.get_space_args("copyspace1", true, false, VMRequest::discontiguous()), true),
             common: CommonPlan::new(plan_args),
         };
 

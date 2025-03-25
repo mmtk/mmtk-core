@@ -81,7 +81,6 @@ impl<VM: VMBinding> std::fmt::Debug for MutatorConfig<VM> {
 /// A mutator is a per-thread data structure that manages allocations and barriers. It is usually highly coupled with the language VM.
 /// It is recommended for MMTk users 1) to have a mutator struct of the same layout in the thread local storage that can be accessed efficiently,
 /// and 2) to implement fastpath allocation and barriers for the mutator in the VM side.
-
 // We are trying to make this struct fixed-sized so that VM bindings can easily define a type to have the exact same layout as this struct.
 // Currently Mutator is fixed sized, and we should try keep this invariant:
 // - Allocators are fixed-length arrays of allocators.
@@ -151,13 +150,6 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
 
     fn get_tls(&self) -> VMMutatorThread {
         self.mutator_tls
-    }
-
-    /// Used by specialized barrier slow-path calls to avoid dynamic dispatches.
-    unsafe fn barrier_impl<B: Barrier<VM>>(&mut self) -> &mut B {
-        debug_assert!(self.barrier().is::<B>());
-        let (payload, _vptr) = std::mem::transmute::<_, (*mut B, *mut ())>(self.barrier());
-        &mut *payload
     }
 
     fn barrier(&mut self) -> &mut dyn Barrier<VM> {
@@ -263,7 +255,6 @@ impl<VM: VMBinding> Mutator<VM> {
 
 /// Each GC plan should provide their implementation of a MutatorContext. *Note that this trait is no longer needed as we removed
 /// per-plan mutator implementation and we will remove this trait as well in the future.*
-
 // TODO: We should be able to remove this trait, as we removed per-plan mutator implementation, and there is no other type that implements this trait.
 // The Mutator struct above is the only type that implements this trait. We should be able to merge them.
 pub trait MutatorContext<VM: VMBinding>: Send + 'static {
@@ -316,11 +307,6 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     fn get_tls(&self) -> VMMutatorThread;
     /// Get active barrier trait object
     fn barrier(&mut self) -> &mut dyn Barrier<VM>;
-    /// Force cast the barrier trait object to a concrete implementation.
-    ///
-    /// # Safety
-    /// The safety of this function is ensured by a down-cast check.
-    unsafe fn barrier_impl<B: Barrier<VM>>(&mut self) -> &mut B;
 }
 
 /// This is used for plans to indicate the number of allocators reserved for the plan.

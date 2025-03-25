@@ -6,12 +6,13 @@ use crate::plan::Plan;
 use crate::policy::sft_map::{create_sft_map, SFTMap};
 use crate::scheduler::GCWorkScheduler;
 
+#[cfg(feature = "vo_bit")]
+use crate::util::address::ObjectReference;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
-#[cfg(feature = "extreme_assertions")]
-use crate::util::edge_logger::EdgeLogger;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::gc_trigger::GCTrigger;
+use crate::util::heap::layout::heap_parameters::MAX_SPACES;
 use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::heap::layout::{self, Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
@@ -20,10 +21,13 @@ use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
+#[cfg(feature = "extreme_assertions")]
+use crate::util::slot_logger::SlotLogger;
 use crate::util::statistics::stats::Stats;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
+use std::collections::HashMap;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -113,9 +117,9 @@ pub struct MMTK<VM: VMBinding> {
         Mutex<FinalizableProcessor<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType>>,
     pub(crate) scheduler: Arc<GCWorkScheduler<VM>>,
     #[cfg(feature = "sanity")]
-    pub(crate) sanity_checker: Mutex<SanityChecker<VM::VMEdge>>,
+    pub(crate) sanity_checker: Mutex<SanityChecker<VM::VMSlot>>,
     #[cfg(feature = "extreme_assertions")]
-    pub(crate) edge_logger: EdgeLogger<VM::VMEdge>,
+    pub(crate) slot_logger: SlotLogger<VM::VMSlot>,
     pub(crate) gc_trigger: Arc<GCTrigger<VM>>,
     pub(crate) gc_requester: Arc<GCRequester<VM>>,
     pub(crate) stats: Arc<Stats>,
@@ -148,7 +152,7 @@ impl<VM: VMBinding> MMTK<VM> {
 
         let state = Arc::new(GlobalState::default());
 
-        let gc_requester = Arc::new(GCRequester::new());
+        let gc_requester = Arc::new(GCRequester::new(scheduler.clone()));
 
         let gc_trigger = Arc::new(GCTrigger::new(
             options.clone(),
@@ -162,7 +166,7 @@ impl<VM: VMBinding> MMTK<VM> {
         // So we do not save it in MMTK. This may change in the future.
         let mut heap = HeapMeta::new();
 
-        let plan = crate::plan::create_plan(
+        let mut plan = crate::plan::create_plan(
             *options.plan,
             CreateGeneralPlanArgs {
                 vm_map: VM_MAP.as_ref(),
@@ -188,13 +192,20 @@ impl<VM: VMBinding> MMTK<VM> {
         }
 
         // TODO: This probably does not work if we have multiple MMTk instances.
-        VM_MAP.boot();
         // This needs to be called after we create Plan. It needs to use HeapMeta, which is gradually built when we create spaces.
-        VM_MAP.finalize_static_space_map(heap.get_discontig_start(), heap.get_discontig_end());
-
-        if *options.transparent_hugepages {
-            MMAPPER.set_mmap_strategy(crate::util::memory::MmapStrategy::TransparentHugePages);
-        }
+        VM_MAP.finalize_static_space_map(
+            heap.get_discontig_start(),
+            heap.get_discontig_end(),
+            &mut |start_address| {
+                plan.for_each_space_mut(&mut |space| {
+                    // If the `VMMap` has a discontiguous memory range, we notify all discontiguous
+                    // space that the starting address has been determined.
+                    if let Some(pr) = space.maybe_get_page_resource_mut() {
+                        pr.update_discontiguous_start(start_address);
+                    }
+                })
+            },
+        );
 
         MMTK {
             options,
@@ -211,13 +222,100 @@ impl<VM: VMBinding> MMTK<VM> {
             inside_sanity: AtomicBool::new(false),
             inside_harness: AtomicBool::new(false),
             #[cfg(feature = "extreme_assertions")]
-            edge_logger: EdgeLogger::new(),
+            slot_logger: SlotLogger::new(),
             #[cfg(feature = "analysis")]
             analysis_manager: Arc::new(AnalysisManager::new(stats.clone())),
             gc_trigger,
             gc_requester,
             stats,
         }
+    }
+
+    /// Initialize the GC worker threads that are required for doing garbage collections.
+    /// This is a mandatory call for a VM during its boot process once its thread system
+    /// is ready.
+    ///
+    /// Internally, this function will invoke [`Collection::spawn_gc_thread()`] to spawn GC worker
+    /// threads.
+    ///
+    /// # Arguments
+    ///
+    /// *   `tls`: The thread that wants to enable the collection. This value will be passed back
+    ///     to the VM in [`Collection::spawn_gc_thread()`] so that the VM knows the context.
+    ///
+    /// [`Collection::spawn_gc_thread()`]: crate::vm::Collection::spawn_gc_thread()
+    pub fn initialize_collection(&'static self, tls: VMThread) {
+        assert!(
+            !self.state.is_initialized(),
+            "MMTk collection has been initialized (was initialize_collection() already called before?)"
+        );
+        self.scheduler.spawn_gc_threads(self, tls);
+        self.state.initialized.store(true, Ordering::SeqCst);
+        probe!(mmtk, collection_initialized);
+    }
+
+    /// Prepare an MMTk instance for calling the `fork()` system call.
+    ///
+    /// The `fork()` system call is available on Linux and some UNIX variants, and may be emulated
+    /// on other platforms by libraries such as Cygwin.  The properties of the `fork()` system call
+    /// requires the users to do some preparation before calling it.
+    ///
+    /// -   **Multi-threading**:  If `fork()` is called when the process has multiple threads, it
+    ///     will only duplicate the current thread into the child process, and the child process can
+    ///     only call async-signal-safe functions, notably `exec()`.  For VMs that that use
+    ///     multi-process concurrency, it is imperative that when calling `fork()`, only one thread may
+    ///     exist in the process.
+    ///
+    /// -   **File descriptors**: The child process inherits copies of the parent's set of open
+    ///     file descriptors.  This may or may not be desired depending on use cases.
+    ///
+    /// This function helps VMs that use `fork()` for multi-process concurrency.  It instructs all
+    /// GC threads to save their contexts and return from their entry-point functions.  Currently,
+    /// such threads only include GC workers, and the entry point is
+    /// [`crate::memory_manager::start_worker`].  A subsequent call to `MMTK::after_fork()` will
+    /// re-spawn the threads using their saved contexts.  The VM must not allocate objects in the
+    /// MMTk heap before calling `MMTK::after_fork()`.
+    ///
+    /// TODO: Currently, the MMTk core does not keep any files open for a long time.  In the
+    /// future, this function and the `after_fork` function may be used for handling open file
+    /// descriptors across invocations of `fork()`.  One possible use case is logging GC activities
+    /// and statistics to files, such as performing heap dumps across multiple GCs.
+    ///
+    /// If a VM intends to execute another program by calling `fork()` and immediately calling
+    /// `exec`, it may skip this function because the state of the MMTk instance will be irrelevant
+    /// in that case.
+    ///
+    /// # Caution!
+    ///
+    /// This function sends an asynchronous message to GC threads and returns immediately, but it
+    /// is only safe for the VM to call `fork()` after the underlying **native threads** of the GC
+    /// threads have exited.  After calling this function, the VM should wait for their underlying
+    /// native threads to exit in VM-specific manner before calling `fork()`.
+    pub fn prepare_to_fork(&'static self) {
+        assert!(
+            self.state.is_initialized(),
+            "MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
+        );
+        probe!(mmtk, prepare_to_fork);
+        self.scheduler.stop_gc_threads_for_forking();
+    }
+
+    /// Call this function after the VM called the `fork()` system call.
+    ///
+    /// This function will re-spawn MMTk threads from saved contexts.
+    ///
+    /// # Arguments
+    ///
+    /// *   `tls`: The thread that wants to respawn MMTk threads after forking. This value will be
+    ///     passed back to the VM in `Collection::spawn_gc_thread()` so that the VM knows the
+    ///     context.
+    pub fn after_fork(&'static self, tls: VMThread) {
+        assert!(
+            self.state.is_initialized(),
+            "MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
+        );
+        probe!(mmtk, after_fork);
+        self.scheduler.respawn_gc_threads_after_forking(tls);
     }
 
     /// Generic hook to allow benchmarks to be harnessed. MMTk will trigger a GC
@@ -284,13 +382,13 @@ impl<VM: VMBinding> MMTK<VM> {
     /// Return true if the current GC is an emergency GC.
     ///
     /// An emergency GC happens when a normal GC cannot reclaim enough memory to satisfy allocation
-    /// requests.  Plans may do full-heap GC, defragmentation, etc. during emergency in order to
+    /// requests.  Plans may do full-heap GC, defragmentation, etc. during emergency GCs in order to
     /// free up more memory.
     ///
     /// VM bindings can call this function during GC to check if the current GC is an emergency GC.
     /// If it is, the VM binding is recommended to retain fewer objects than normal GCs, to the
-    /// extent allowed by the specification of the VM or langauge.  For example, the VM binding may
-    /// choose not to retain objects used for caching.  Specifically, for Java virtual machines,
+    /// extent allowed by the specification of the VM or the language.  For example, the VM binding
+    /// may choose not to retain objects used for caching.  Specifically, for Java virtual machines,
     /// that means not retaining referents of [`SoftReference`][java-soft-ref] which is primarily
     /// designed for implementing memory-sensitive caches.
     ///
@@ -307,6 +405,10 @@ impl<VM: VMBinding> MMTK<VM> {
     /// The application code has requested a collection. This is just a GC hint, and
     /// we may ignore it.
     ///
+    /// Returns whether a GC was ran or not. If MMTk triggers a GC, this method will block the
+    /// calling thread and return true when the GC finishes. Otherwise, this method returns
+    /// false immediately.
+    ///
     /// # Arguments
     /// * `tls`: The mutator thread that requests the GC
     /// * `force`: The request cannot be ignored (except for NoGC)
@@ -316,11 +418,11 @@ impl<VM: VMBinding> MMTK<VM> {
         tls: VMMutatorThread,
         force: bool,
         exhaustive: bool,
-    ) {
+    ) -> bool {
         use crate::vm::Collection;
         if !self.get_plan().constraints().collects_garbage {
             warn!("User attempted a collection request, but the plan can not do GC. The request is ignored.");
-            return;
+            return false;
         }
 
         if force || !*self.options.ignore_system_gc && VM::VMCollection::is_collection_enabled() {
@@ -336,7 +438,10 @@ impl<VM: VMBinding> MMTK<VM> {
                 .store(true, Ordering::Relaxed);
             self.gc_requester.request();
             VM::VMCollection::block_for_gc(tls);
+            return true;
         }
+
+        false
     }
 
     /// MMTK has requested stop-the-world activity (e.g., stw within a concurrent gc).
@@ -349,6 +454,8 @@ impl<VM: VMBinding> MMTK<VM> {
         self.state
             .internal_triggered_collection
             .store(true, Ordering::Relaxed);
+        // TODO: The current `GCRequester::request()` is probably incorrect for internally triggered GC.
+        // Consider removing functions related to "internal triggered collection".
         self.gc_requester.request();
     }
 
@@ -370,5 +477,123 @@ impl<VM: VMBinding> MMTK<VM> {
     /// Get the run time options.
     pub fn get_options(&self) -> &Options {
         &self.options
+    }
+
+    /// Enumerate objects in all spaces in this MMTK instance.
+    ///
+    /// The call-back function `f` is called for every object that has the valid object bit (VO
+    /// bit), i.e. objects that are allocated in the heap of this MMTK instance, but has not been
+    /// reclaimed, yet.
+    ///
+    /// # Notes about object initialization and finalization
+    ///
+    /// When this function visits an object, it only guarantees that its VO bit must have been set.
+    /// It is not guaranteed if the object has been "fully initialized" in the sense of the
+    /// programming language the VM is implementing.  For example, the object header and the type
+    /// information may not have been written.
+    ///
+    /// It will also visit objects that have been "finalized" in the sense of the programming
+    /// langauge the VM is implementing, as long as the object has not been reclaimed by the GC,
+    /// yet.  Be careful.  If the object header is destroyed, it may not be safe to access such
+    /// objects in the high-level language.
+    ///
+    /// # Interaction with allocation and GC
+    ///
+    /// This function does not mutate the heap.  It is safe if multiple threads execute this
+    /// function concurrently during mutator time.
+    ///
+    /// It has *undefined behavior* if allocation or GC happens while this function is being
+    /// executed.  The VM binding must ensure no threads are allocating and GC does not start while
+    /// executing this function.  One way to do this is stopping all mutators before calling this
+    /// function.
+    ///
+    /// Some high-level languages may provide an API that allows the user to allocate objects and
+    /// trigger GC while enumerating objects.  One example is [`ObjectSpace::each_object`][os_eo] in
+    /// Ruby.  The VM binding may use the callback of this function to save all visited object
+    /// references and let the user visit those references after this function returns.  Make sure
+    /// those saved references are in the root set or in an object that will live through GCs before
+    /// the high-level language finishes visiting the saved object references.
+    ///
+    /// [os_eo]: https://docs.ruby-lang.org/en/master/ObjectSpace.html#method-c-each_object
+    #[cfg(feature = "vo_bit")]
+    pub fn enumerate_objects<F>(&self, f: F)
+    where
+        F: FnMut(ObjectReference),
+    {
+        use crate::util::object_enum;
+
+        let mut enumerator = object_enum::ClosureObjectEnumerator::<_, VM>::new(f);
+        let plan = self.get_plan();
+        plan.for_each_space(&mut |space| {
+            space.enumerate_objects(&mut enumerator);
+        })
+    }
+
+    /// Aggregate a hash map of live bytes per space with the space stats to produce
+    /// a map of live bytes stats for the spaces.
+    pub(crate) fn aggregate_live_bytes_in_last_gc(
+        &self,
+        live_bytes_per_space: [usize; MAX_SPACES],
+    ) -> HashMap<&'static str, crate::LiveBytesStats> {
+        use crate::policy::space::Space;
+        let mut ret = HashMap::new();
+        self.get_plan().for_each_space(&mut |space: &dyn Space<VM>| {
+            let space_name = space.get_name();
+            let space_idx = space.get_descriptor().get_index();
+            let used_pages = space.reserved_pages();
+            if used_pages != 0 {
+                let used_bytes = crate::util::conversions::pages_to_bytes(used_pages);
+                let live_bytes = live_bytes_per_space[space_idx];
+                debug_assert!(
+                    live_bytes <= used_bytes,
+                    "Live bytes of objects in {} ({} bytes) is larger than used pages ({} bytes), something is wrong.",
+                    space_name, live_bytes, used_bytes
+                );
+                ret.insert(space_name, crate::LiveBytesStats {
+                    live_bytes,
+                    used_pages,
+                    used_bytes,
+                });
+            }
+        });
+        ret
+    }
+
+    /// Print VM maps.  It will print the memory ranges used by spaces as well as some attributes of
+    /// the spaces.
+    ///
+    /// -   "I": The space is immortal.  Its objects will never die.
+    /// -   "N": The space is non-movable.  Its objects will never move.
+    ///
+    /// Arguments:
+    /// *   `out`: the place to print the VM maps.
+    /// *   `space_name`: If `None`, print all spaces;
+    ///                   if `Some(n)`, only print the space whose name is `n`.
+    pub fn debug_print_vm_maps(
+        &self,
+        out: &mut impl std::fmt::Write,
+        space_name: Option<&str>,
+    ) -> Result<(), std::fmt::Error> {
+        let mut result_so_far = Ok(());
+        self.get_plan().for_each_space(&mut |space| {
+            if result_so_far.is_ok()
+                && (space_name.is_none() || space_name == Some(space.get_name()))
+            {
+                result_so_far = crate::policy::space::print_vm_map(space, out);
+            }
+        });
+        result_so_far
+    }
+
+    /// Initialize object metadata for a VM space object.
+    /// Objects in the VM space are allocated/managed by the binding. This function provides a way for
+    /// the binding to set object metadata in MMTk for an object in the space.
+    #[cfg(feature = "vm_space")]
+    pub fn initialize_vm_space_object(&self, object: crate::util::ObjectReference) {
+        use crate::policy::sft::SFT;
+        self.get_plan()
+            .base()
+            .vm_space
+            .initialize_object_metadata(object, false)
     }
 }

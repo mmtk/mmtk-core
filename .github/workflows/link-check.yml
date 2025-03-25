@@ -9,7 +9,7 @@ jobs:
   check-broken-links-in-docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Restore lychee cache
         uses: actions/cache@v3
         with:
@@ -17,13 +17,28 @@ jobs:
             key: cache-lychee-${{ github.sha }}
             restore-keys: cache-lychee-
       - name: Check links in docs/*.md
-        uses: lycheeverse/lychee-action@v1.9.0
+        uses: lycheeverse/lychee-action@v2
         with:
           fail: true
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --base docs --accept '200,201,202,203,204,429,500' --no-progress --cache --max-cache-age 1d './docs/**/*.md' --exclude https://users.cecs.anu.edu.au/~steveb/pubs/papers/**
+          args:
+            # Notes:
+            # - Do not use `--base`.  All relative URLs in Markdown are based on the file itself.
+            # - Verbosity level 2 enables debug logs and shows redirections.
+            # - Exclude dl.acm.org because it responses 403.
+            # According to the YAML syntax,
+            # the following lines will be concatenated into one single YAML string,
+            # which is intended because the `args:` argument of the lychee-action takes one single string.
+            --accept '200..=204,429,500'
+            --verbose --verbose
+            --no-progress
+            --cache
+            --max-cache-age 1d
+            --exclude 'https://users.cecs.anu.edu.au/~steveb/pubs/papers/**'
+            --exclude 'https://dl.acm.org/**'
+            './docs/**/*.md'
       - name: Save lychee cache
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         if: always()
         with:
             path: .lycheecache

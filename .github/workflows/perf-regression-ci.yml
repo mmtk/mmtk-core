@@ -28,11 +28,11 @@ jobs:
     timeout-minutes: 1440
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout JikesRVM Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-jikesrvm
           path: mmtk-jikesrvm
@@ -42,10 +42,10 @@ jobs:
           ./.github/scripts/ci-checkout.sh
       # checkout perf-kit
       - name: Checkout Perf Kit
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.7.4"
+          ref: "0.8.2"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
@@ -73,7 +73,7 @@ jobs:
       # deploy
       - name: Deploy to Github Page
         if: ${{ env.DEPLOY == 'true' }}
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
           external_repository: mmtk/ci-perf-result
@@ -81,13 +81,13 @@ jobs:
           publish_branch: gh-pages
           keep_files: true
       - name: Upload build as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jikesrvm-regression-build
           path: ${{ env.CI_PERF_KIT_BUILD }}
           if-no-files-found: error
       - name: Upload logs as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jikesrvm-regression-logs
           path: ${{ env.CI_PERF_KIT_LOG }}
@@ -97,45 +97,81 @@ jobs:
   openjdk-perf-regression:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     timeout-minutes: 1440
+    env:
+      # This version will be used as the canary version, and will be used to checkout both
+      # `mmtk-core` and `mmtk-openjdk`.
+      #
+      # A "canary" is a chosen version that is tested alongside each merged pull request.  The
+      # performance of the canary should not change unless
+      #
+      # 1.  There is an environment change, such as changes of the operating system, the hardware,
+      #     the firmware, or the methodology we use for testing, or
+      # 2.  There are non-deterministic factors (i.e. noises) affecting each execution.
+      #
+      # Running the canary alongside regular regression tests help us identify unnoticed environment
+      # changes and the level of noise.
+      #
+      # Currently, we choose one release version as the canary, and will use it until we can no
+      # longer run it for any reason, such as the toolchain for compiling that version is no longer
+      # available.  Then we may change to another release version and mark the change of canary on
+      # the timeline, or introduce a mechanism to dynamically choose the canary version.
+      CANARY_VERSION: "v0.28.0"
     steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+      # checkout latest versions
+      - name: Checkout MMTk Core (latest)
+        uses: actions/checkout@v4
         with:
-          path: mmtk-core
-      - name: Checkout OpenJDK Binding
-        uses: actions/checkout@v2
+          path: latest/mmtk-core
+      - name: Checkout OpenJDK Binding (latest)
+        uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
-          path: mmtk-openjdk
-      - name: Checkout OpenJDK
-        working-directory: mmtk-openjdk
+          path: latest/mmtk-openjdk
+      - name: Checkout OpenJDK (latest)
+        working-directory: latest/mmtk-openjdk
         run: |
           ./.github/scripts/ci-checkout.sh
       # checkout perf-kit
       - name: Checkout Perf Kit
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.7.4"
+          ref: "0.8.2"
           path: ci-perf-kit
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
+      # checkout canary versions.
+      - name: Checkout MMTk Core (canary)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CANARY_VERSION }}
+          path: canary/mmtk-core
+      - name: Checkout OpenJDK Binding (canary)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CANARY_VERSION }}
+          repository: mmtk/mmtk-openjdk
+          path: canary/mmtk-openjdk
+      - name: Checkout OpenJDK (canary)
+        working-directory: canary/mmtk-openjdk
+        run: |
+          ./.github/scripts/ci-checkout.sh
       # setup
-      - name: Overwrite MMTk core in openjdk binding
-        run: cp -r mmtk-core mmtk-openjdk/repos/
-      - name: Setup Rust Toolchain
-        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
-      # cleanup previosu build
-      - name: Cleanup previous build
+      - name: Setup directory structures
         run: |
-          rm -rf mmtk-openjdk/repos/openjdk/scratch
-          rm -rf mmtk-openjdk/repos/openjdk/build
-      - name: Setup
-        run: |
-          ./ci-perf-kit/scripts/history-run-setup.sh
-          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
-          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
-      - id: branch
+          for BASE_DIR in ./latest ./canary; do
+            pushd $BASE_DIR
+              # replace dependency
+              # Note that ci-replace-mmtk-dep.sh will apply `realpath()` to the `--mmtk-core-path` option.
+              # so we specify the relative path from the PWD to the mmtk-core repo.
+              ./mmtk-core/.github/scripts/ci-replace-mmtk-dep.sh mmtk-openjdk/mmtk/Cargo.toml \
+                --mmtk-core-path mmtk-core
+              # cleanup previous build
+              rm -rf mmtk-openjdk/repos/openjdk/scratch
+              rm -rf mmtk-openjdk/repos/openjdk/build
+            popd
+          done
+      - name: Setup branch name
+        id: branch
         # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
         run: echo "branch_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_OUTPUT
       # run
@@ -145,11 +181,14 @@ jobs:
           export RESULT_REPO_BRANCH=${{ env.RESULT_REPO_BRANCH }}
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
-          ./ci-perf-kit/scripts/openjdk-history-run.sh ./mmtk-openjdk ./reports/${{ steps.branch.outputs.branch_name }}
+          ./ci-perf-kit/scripts/openjdk-history-run.sh \
+            ./latest/mmtk-openjdk \
+            ./canary/mmtk-openjdk \
+            ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
       - name: Deploy to Github Page
         if: ${{ env.DEPLOY == 'true' }}
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
           external_repository: mmtk/ci-perf-result
@@ -157,13 +196,13 @@ jobs:
           publish_branch: gh-pages
           keep_files: true
       - name: Upload build as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: openjdk-regression-build
           path: ${{ env.CI_PERF_KIT_BUILD }}
           if-no-files-found: error
       - name: Upload logs as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: openjdk-regression-logs
           path: ${{ env.CI_PERF_KIT_LOG }}
@@ -174,11 +213,11 @@ jobs:
     timeout-minutes: 1440
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout OpenJDK Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
           path: mmtk-openjdk
@@ -188,10 +227,10 @@ jobs:
           ./.github/scripts/ci-checkout.sh
       # checkout perf-kit
       - name: Checkout Perf Kit
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.7.4"
+          ref: "0.8.2"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
@@ -225,7 +264,7 @@ jobs:
       # deploy
       - name: Deploy to Github Page
         if: ${{ env.DEPLOY == 'true' }}
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
           external_repository: mmtk/ci-perf-result
@@ -233,13 +272,13 @@ jobs:
           publish_branch: gh-pages
           keep_files: true
       - name: Upload build as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mutator-regression-build
           path: ${{ env.CI_PERF_KIT_BUILD }}
           if-no-files-found: error
       - name: Upload logs as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mutator-regression-logs
           path: ${{ env.CI_PERF_KIT_LOG }}

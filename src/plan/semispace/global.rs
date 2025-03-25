@@ -100,6 +100,10 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.base().collection_required(self, space_full)
     }
 
+    fn current_gc_may_move_object(&self) -> bool {
+        true
+    }
+
     fn get_collection_reserved_pages(&self) -> usize {
         self.tospace().reserved_pages()
     }
@@ -139,11 +143,11 @@ impl<VM: VMBinding> SemiSpace<VM> {
         let res = SemiSpace {
             hi: AtomicBool::new(false),
             copyspace0: CopySpace::new(
-                plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()),
+                plan_args.get_space_args("copyspace0", true, false, VMRequest::discontiguous()),
                 false,
             ),
             copyspace1: CopySpace::new(
-                plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()),
+                plan_args.get_space_args("copyspace1", true, false, VMRequest::discontiguous()),
                 true,
             ),
             common: CommonPlan::new(plan_args),

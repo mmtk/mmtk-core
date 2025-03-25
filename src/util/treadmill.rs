@@ -4,6 +4,8 @@ use std::sync::Mutex;
 
 use crate::util::ObjectReference;
 
+use super::object_enum::ObjectEnumerator;
+
 pub struct TreadMill {
     from_space: Mutex<HashSet<ObjectReference>>,
     to_space: Mutex<HashSet<ObjectReference>>,
@@ -34,10 +36,10 @@ impl TreadMill {
 
     pub fn add_to_treadmill(&self, object: ObjectReference, nursery: bool) {
         if nursery {
-            // println!("+ an {}", cell);
+            trace!("Adding {} to nursery", object);
             self.alloc_nursery.lock().unwrap().insert(object);
         } else {
-            // println!("+ ts {}", cell);
+            trace!("Adding {} to to_space", object);
             self.to_space.lock().unwrap().insert(object);
         }
     }
@@ -93,11 +95,22 @@ impl TreadMill {
 
     pub fn flip(&mut self, full_heap: bool) {
         swap(&mut self.alloc_nursery, &mut self.collect_nursery);
-        // println!("an <-> cn");
+        trace!("Flipped alloc_nursery and collect_nursery");
         if full_heap {
             swap(&mut self.from_space, &mut self.to_space);
-            // println!("fs <-> ts");
+            trace!("Flipped from_space and to_space");
         }
+    }
+
+    pub(crate) fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
+        let mut visit_objects = |set: &Mutex<HashSet<ObjectReference>>| {
+            let set = set.lock().unwrap();
+            for object in set.iter() {
+                enumerator.visit_object(*object);
+            }
+        };
+        visit_objects(&self.alloc_nursery);
+        visit_objects(&self.to_space);
     }
 }
 

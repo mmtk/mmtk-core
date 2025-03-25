@@ -12,11 +12,11 @@ use crate::util::heap::gc_trigger::GCTriggerPolicy;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::object_model::specs::*;
-use crate::vm::EdgeVisitor;
 use crate::vm::GCThreadContext;
 use crate::vm::ObjectTracer;
 use crate::vm::ObjectTracerContext;
 use crate::vm::RootsWorkFactory;
+use crate::vm::SlotVisitor;
 use crate::vm::VMBinding;
 use crate::Mutator;
 
@@ -28,7 +28,7 @@ use std::sync::Mutex;
 
 /// The offset between object reference and the allocation address if we use
 /// the default mock VM.
-pub const DEFAULT_OBJECT_REF_OFFSET: usize = 4;
+pub const DEFAULT_OBJECT_REF_OFFSET: usize = crate::util::constants::BYTES_IN_ADDRESS;
 
 // To mock static methods, we have to create a static instance of `MockVM`.
 lazy_static! {
@@ -44,7 +44,12 @@ lazy_static! {
 // we do not store them for access after the mock method returns.
 macro_rules! lifetime {
     ($e: expr) => {
-        unsafe { std::mem::transmute($e) }
+        unsafe {
+            // The dynamic nature of this lifetime-removal macro makes it impossible to reason
+            // about the source and destination types of the `transmute`.
+            #[allow(clippy::missing_transmute_annotations)]
+            std::mem::transmute($e)
+        }
     };
 }
 
@@ -82,7 +87,7 @@ where
     func(&mut lock)
 }
 
-/// A test that uses `MockVM`` should use this method to wrap the entire test
+/// A test that uses `MockVM` should use this method to wrap the entire test
 /// that may use `MockVM`.
 ///
 /// # Arguents
@@ -175,7 +180,6 @@ pub fn no_cleanup() {}
 ///
 /// These are not supported at the moment. As those will change the `MockVM` type, we will have
 /// to use macros to generate a new `MockVM` type when we custimize constants or associated types.
-
 // The current implementation is not perfect, but at least it works, and it is easy enough to debug with.
 // I have tried different third-party libraries for mocking, and each has its own limitation. And
 // none of the libraries I tried can mock `VMBinding` and the associated traits out of box. Even after I attempted
@@ -226,22 +230,19 @@ pub struct MockVM {
         MockMethod<(ObjectReference, Address), ObjectReference>,
     pub ref_to_object_start: MockMethod<ObjectReference, Address>,
     pub ref_to_header: MockMethod<ObjectReference, Address>,
-    pub ref_to_address: MockMethod<ObjectReference, Address>,
-    pub address_to_ref: MockMethod<Address, ObjectReference>,
     pub dump_object: MockMethod<ObjectReference, ()>,
     // reference glue
     pub weakref_clear_referent: MockMethod<ObjectReference, ()>,
     pub weakref_set_referent: MockMethod<(ObjectReference, ObjectReference), ()>,
-    pub weakref_get_referent: MockMethod<ObjectReference, ObjectReference>,
-    pub weakref_is_referent_cleared: MockMethod<ObjectReference, bool>,
+    pub weakref_get_referent: MockMethod<ObjectReference, Option<ObjectReference>>,
     pub weakref_enqueue_references: MockMethod<(&'static [ObjectReference], VMWorkerThread), ()>,
     // scanning
-    pub support_edge_enqueuing: MockMethod<(VMWorkerThread, ObjectReference), bool>,
+    pub support_slot_enqueuing: MockMethod<(VMWorkerThread, ObjectReference), bool>,
     pub scan_object: MockMethod<
         (
             VMWorkerThread,
             ObjectReference,
-            &'static mut dyn EdgeVisitor<<MockVM as VMBinding>::VMEdge>,
+            &'static mut dyn SlotVisitor<<MockVM as VMBinding>::VMSlot>,
         ),
         (),
     >,
@@ -300,21 +301,14 @@ impl Default for MockVM {
                 object.to_raw_address().sub(DEFAULT_OBJECT_REF_OFFSET)
             })),
             ref_to_header: MockMethod::new_fixed(Box::new(|object| object.to_raw_address())),
-            ref_to_address: MockMethod::new_fixed(Box::new(|object| {
-                object.to_raw_address().sub(DEFAULT_OBJECT_REF_OFFSET)
-            })),
-            address_to_ref: MockMethod::new_fixed(Box::new(|addr| {
-                ObjectReference::from_raw_address(addr.add(DEFAULT_OBJECT_REF_OFFSET))
-            })),
             dump_object: MockMethod::new_unimplemented(),
 
             weakref_clear_referent: MockMethod::new_unimplemented(),
             weakref_get_referent: MockMethod::new_unimplemented(),
             weakref_set_referent: MockMethod::new_unimplemented(),
-            weakref_is_referent_cleared: MockMethod::new_fixed(Box::new(|r| r.is_null())),
             weakref_enqueue_references: MockMethod::new_unimplemented(),
 
-            support_edge_enqueuing: MockMethod::new_fixed(Box::new(|_| true)),
+            support_slot_enqueuing: MockMethod::new_fixed(Box::new(|_| true)),
             scan_object: MockMethod::new_unimplemented(),
             scan_object_and_trace_edges: MockMethod::new_unimplemented(),
             // We instantiate a `MockMethod` with the arguments as ProcessEdgesWorkRootsWorkFactory<..., SFTProcessEdges<MockVM>, ...>,
@@ -376,7 +370,7 @@ unsafe impl Sync for MockVM {}
 unsafe impl Send for MockVM {}
 
 impl VMBinding for MockVM {
-    type VMEdge = Address;
+    type VMSlot = Address;
     type VMMemorySlice = Range<Address>;
 
     type VMActivePlan = MockVM;
@@ -478,6 +472,9 @@ impl crate::vm::ObjectModel<MockVM> for MockVM {
     const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec =
         VMLocalLOSMarkNurserySpec::in_header(0);
 
+    #[cfg(feature = "object_pinning")]
+    const LOCAL_PINNING_BIT_SPEC: VMLocalPinningBitSpec = VMLocalPinningBitSpec::in_header(0);
+
     const OBJECT_REF_OFFSET_LOWER_BOUND: isize = DEFAULT_OBJECT_REF_OFFSET as isize;
 
     fn copy(
@@ -525,14 +522,6 @@ impl crate::vm::ObjectModel<MockVM> for MockVM {
         mock!(ref_to_header(object))
     }
 
-    fn ref_to_address(object: ObjectReference) -> Address {
-        mock!(ref_to_address(object))
-    }
-
-    fn address_to_ref(addr: Address) -> ObjectReference {
-        mock!(address_to_ref(addr))
-    }
-
     fn dump_object(object: ObjectReference) {
         mock!(dump_object(object))
     }
@@ -548,11 +537,8 @@ impl crate::vm::ReferenceGlue<MockVM> for MockVM {
     fn set_referent(reference: ObjectReference, referent: ObjectReference) {
         mock!(weakref_set_referent(reference, referent))
     }
-    fn get_referent(object: ObjectReference) -> ObjectReference {
+    fn get_referent(object: ObjectReference) -> Option<ObjectReference> {
         mock!(weakref_get_referent(object))
-    }
-    fn is_referent_cleared(referent: ObjectReference) -> bool {
-        mock!(weakref_is_referent_cleared(referent))
     }
     fn enqueue_references(references: &[ObjectReference], tls: VMWorkerThread) {
         mock!(weakref_enqueue_references(lifetime!(references), tls))
@@ -560,18 +546,18 @@ impl crate::vm::ReferenceGlue<MockVM> for MockVM {
 }
 
 impl crate::vm::Scanning<MockVM> for MockVM {
-    fn support_edge_enqueuing(tls: VMWorkerThread, object: ObjectReference) -> bool {
-        mock!(support_edge_enqueuing(tls, object))
+    fn support_slot_enqueuing(tls: VMWorkerThread, object: ObjectReference) -> bool {
+        mock!(support_slot_enqueuing(tls, object))
     }
-    fn scan_object<EV: EdgeVisitor<<MockVM as VMBinding>::VMEdge>>(
+    fn scan_object<SV: SlotVisitor<<MockVM as VMBinding>::VMSlot>>(
         tls: VMWorkerThread,
         object: ObjectReference,
-        edge_visitor: &mut EV,
+        slot_visitor: &mut SV,
     ) {
         mock!(scan_object(
             tls,
             object,
-            lifetime!(edge_visitor as &mut dyn EdgeVisitor<<MockVM as VMBinding>::VMEdge>)
+            lifetime!(slot_visitor as &mut dyn SlotVisitor<<MockVM as VMBinding>::VMSlot>)
         ))
     }
     fn scan_object_and_trace_edges<OT: ObjectTracer>(
@@ -588,7 +574,7 @@ impl crate::vm::Scanning<MockVM> for MockVM {
     fn scan_roots_in_mutator_thread(
         tls: VMWorkerThread,
         mutator: &'static mut Mutator<Self>,
-        factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMEdge>,
+        factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
     ) {
         mock_any!(scan_roots_in_mutator_thread(
             tls,
@@ -598,7 +584,7 @@ impl crate::vm::Scanning<MockVM> for MockVM {
     }
     fn scan_vm_specific_roots(
         tls: VMWorkerThread,
-        factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMEdge>,
+        factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
     ) {
         mock_any!(scan_vm_specific_roots(tls, Box::new(factory)))
     }
@@ -624,5 +610,11 @@ impl crate::vm::Scanning<MockVM> for MockVM {
     ) {
         let worker: &'static mut GCWorker<Self> = lifetime!(worker);
         mock_any!(forward_weak_refs(worker, tracer_context))
+    }
+}
+
+impl MockVM {
+    pub fn object_start_to_ref(start: Address) -> ObjectReference {
+        ObjectReference::from_raw_address(start + DEFAULT_OBJECT_REF_OFFSET).unwrap()
     }
 }

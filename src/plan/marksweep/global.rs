@@ -65,8 +65,16 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         self.common.release(tls, true);
     }
 
+    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
+        self.ms.end_of_gc();
+    }
+
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
         self.base().collection_required(self, space_full)
+    }
+
+    fn current_gc_may_move_object(&self) -> bool {
+        false
     }
 
     fn get_used_pages(&self) -> usize {
@@ -105,6 +113,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
             ms: MarkSweepSpace::new(plan_args.get_space_args(
                 "ms",
                 true,
+                false,
                 VMRequest::discontiguous(),
             )),
             common: CommonPlan::new(plan_args),

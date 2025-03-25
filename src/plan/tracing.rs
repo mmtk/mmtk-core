@@ -1,10 +1,10 @@
 //! This module contains code useful for tracing,
 //! i.e. visiting the reachable objects by traversing all or part of an object graph.
 
-use crate::scheduler::gc_work::{EdgeOf, ProcessEdgesWork};
+use crate::scheduler::gc_work::{ProcessEdgesWork, SlotOf, EDGES_WORK_BUFFER_SIZE};
 use crate::scheduler::{GCWorker, WorkBucketStage};
 use crate::util::ObjectReference;
-use crate::vm::EdgeVisitor;
+use crate::vm::SlotVisitor;
 
 /// This trait represents an object queue to enqueue objects during tracing.
 pub trait ObjectQueue {
@@ -25,7 +25,7 @@ pub struct VectorQueue<T> {
 
 impl<T> VectorQueue<T> {
     /// Reserve a capacity of this on first enqueue to avoid frequent resizing.
-    const CAPACITY: usize = 4096;
+    const CAPACITY: usize = EDGES_WORK_BUFFER_SIZE;
 
     /// Create an empty `VectorObjectQueue`.
     pub fn new() -> Self {
@@ -77,11 +77,11 @@ impl ObjectQueue for VectorQueue<ObjectReference> {
     }
 }
 
-/// A transitive closure visitor to collect the edges from objects.
-/// It maintains a buffer for the edges, and flushes edges to a new work packet
+/// A transitive closure visitor to collect the slots from objects.
+/// It maintains a buffer for the slots, and flushes slots to a new work packet
 /// if the buffer is full or if the type gets dropped.
 pub struct ObjectsClosure<'a, E: ProcessEdgesWork> {
-    buffer: VectorQueue<EdgeOf<E>>,
+    buffer: VectorQueue<SlotOf<E>>,
     pub(crate) worker: &'a mut GCWorker<E::VM>,
     bucket: WorkBucketStage,
 }
@@ -111,13 +111,13 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
     }
 }
 
-impl<'a, E: ProcessEdgesWork> EdgeVisitor<EdgeOf<E>> for ObjectsClosure<'a, E> {
-    fn visit_edge(&mut self, slot: EdgeOf<E>) {
+impl<E: ProcessEdgesWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'_, E> {
+    fn visit_slot(&mut self, slot: SlotOf<E>) {
         #[cfg(debug_assertions)]
         {
-            use crate::vm::edge_shape::Edge;
+            use crate::vm::slot::Slot;
             trace!(
-                "(ObjectsClosure) Visit edge {:?} (pointing to {})",
+                "(ObjectsClosure) Visit slot {:?} (pointing to {:?})",
                 slot,
                 slot.load()
             );
@@ -129,7 +129,7 @@ impl<'a, E: ProcessEdgesWork> EdgeVisitor<EdgeOf<E>> for ObjectsClosure<'a, E> {
     }
 }
 
-impl<'a, E: ProcessEdgesWork> Drop for ObjectsClosure<'a, E> {
+impl<E: ProcessEdgesWork> Drop for ObjectsClosure<'_, E> {
     fn drop(&mut self) {
         self.flush();
     }

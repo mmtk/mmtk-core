@@ -15,16 +15,18 @@ pub const fn min_of_usize(a: usize, b: usize) -> usize {
 }
 
 #[cfg(feature = "nightly")]
-use core::intrinsics::{likely, unlikely};
+pub use core::intrinsics::{likely, unlikely};
 
 // likely() and unlikely() compiler hints in stable Rust
 // [1]: https://github.com/rust-lang/hashbrown/blob/a41bd76de0a53838725b997c6085e024c47a0455/src/raw/mod.rs#L48-L70
 // [2]: https://users.rust-lang.org/t/compiler-hint-for-unlikely-likely-for-if-branches/62102/3
 #[cfg(not(feature = "nightly"))]
+#[inline]
 #[cold]
 fn cold() {}
 
 #[cfg(not(feature = "nightly"))]
+#[inline]
 pub fn likely(b: bool) -> bool {
     if !b {
         cold();
@@ -32,6 +34,7 @@ pub fn likely(b: bool) -> bool {
     b
 }
 #[cfg(not(feature = "nightly"))]
+#[inline]
 pub fn unlikely(b: bool) -> bool {
     if b {
         cold();
@@ -123,6 +126,23 @@ where
         }
     }
     unsafe { result_array.assume_init() }
+}
+
+/// Create a formatted string that makes the best effort idenfying the current process and thread.
+pub fn debug_process_thread_id() -> String {
+    let pid = unsafe { libc::getpid() };
+    #[cfg(target_os = "linux")]
+    {
+        // `gettid()` is Linux-specific.
+        let tid = unsafe { libc::gettid() };
+        format!("PID: {}, TID: {}", pid, tid)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        // TODO: When we support other platforms, use platform-specific methods to get thread
+        // identifiers.
+        format!("PID: {}", pid)
+    }
 }
 
 #[cfg(test)]

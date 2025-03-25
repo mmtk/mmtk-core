@@ -13,9 +13,11 @@ use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
+use crate::util::memory::MmapAnnotation;
 use crate::util::memory::MmapStrategy;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
+use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
@@ -44,7 +46,7 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
     fn is_live(&self, _object: ObjectReference) -> bool {
@@ -71,11 +73,22 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     }
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
         #[cfg(feature = "vo_bit")]
-        crate::util::metadata::vo_bit::set_vo_bit::<VM>(_object);
+        crate::util::metadata::vo_bit::set_vo_bit(_object);
     }
     #[cfg(feature = "is_mmtk_object")]
-    fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
+    fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
+    }
+    #[cfg(feature = "is_mmtk_object")]
+    fn find_object_from_internal_pointer(
+        &self,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -> Option<ObjectReference> {
+        crate::util::metadata::vo_bit::find_object_from_internal_pointer::<VM>(
+            ptr,
+            max_search_bytes,
+        )
     }
     fn sft_trace_object(
         &self,
@@ -97,6 +110,9 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         unimplemented!()
     }
+    fn maybe_get_page_resource_mut(&mut self) -> Option<&mut dyn PageResource<VM>> {
+        None
+    }
     fn common(&self) -> &CommonSpace<VM> {
         unimplemented!()
     }
@@ -113,10 +129,14 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         unsafe { sft_map.eager_initialize(self.as_sft(), self.start, self.total_bytes) };
     }
 
+    fn estimate_side_meta_pages(&self, data_pages: usize) -> usize {
+        self.metadata.calculate_reserved_pages(data_pages)
+    }
+
     fn reserved_pages(&self) -> usize {
         let cursor = self.cursor.load(Ordering::Relaxed);
         let data_pages = conversions::bytes_to_pages_up(self.limit - cursor);
-        let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
+        let meta_pages = self.estimate_side_meta_pages(data_pages);
         data_pages + meta_pages
     }
 
@@ -151,6 +171,10 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
+    }
+
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
+        enumerator.visit_address_range(self.start, self.start + self.total_bytes);
     }
 }
 
@@ -198,7 +222,9 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         // Create a VM request of fixed size
         let vmrequest = VMRequest::fixed_size(aligned_total_bytes);
         // Reserve the space
-        let VMRequest::Extent{ extent, top } = vmrequest else { unreachable!() };
+        let VMRequest::Extent { extent, top } = vmrequest else {
+            unreachable!()
+        };
         let start = args.heap.reserve(extent, top);
 
         let space = Self {
@@ -216,20 +242,26 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         };
 
         // Eagerly memory map the entire heap (also zero all the memory)
-        let strategy = if *args.options.transparent_hugepages {
-            MmapStrategy::TransparentHugePages
-        } else {
-            MmapStrategy::Normal
-        };
-        crate::util::memory::dzmmap_noreplace(start, aligned_total_bytes, strategy).unwrap();
-        if space
+        let strategy = MmapStrategy::new(
+            *args.options.transparent_hugepages,
+            crate::util::memory::MmapProtection::ReadWrite,
+        );
+        crate::util::memory::dzmmap_noreplace(
+            start,
+            aligned_total_bytes,
+            strategy,
+            &MmapAnnotation::Space {
+                name: space.get_name(),
+            },
+        )
+        .unwrap();
+        space
             .metadata
-            .try_map_metadata_space(start, aligned_total_bytes)
-            .is_err()
-        {
-            // TODO(Javad): handle meta space allocation failure
-            panic!("failed to mmap meta memory");
-        }
+            .try_map_metadata_space(start, aligned_total_bytes, space.get_name())
+            .unwrap_or_else(|e| {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory: {e}")
+            });
 
         space
     }

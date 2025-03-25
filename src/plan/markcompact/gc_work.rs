@@ -48,10 +48,9 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
         plan_mut.common.release(worker.tls, true);
         plan_mut.common.prepare(worker.tls, true);
         #[cfg(feature = "extreme_assertions")]
-        mmtk.edge_logger.reset();
+        mmtk.slot_logger.reset();
 
         // We do two passes of transitive closures. We clear the live bytes from the first pass.
-        #[cfg(feature = "count_live_bytes_in_gc")]
         mmtk.scheduler
             .worker_group
             .get_and_clear_worker_live_bytes();
@@ -102,14 +101,14 @@ pub struct MarkCompactGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>)
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MarkCompact<VM>;
-    type ProcessEdgesWorkType = MarkingProcessEdges<VM>;
-    type TPProcessEdges = UnsupportedProcessEdges<VM>;
+    type DefaultProcessEdges = MarkingProcessEdges<VM>;
+    type PinningProcessEdges = UnsupportedProcessEdges<VM>;
 }
 
 pub struct MarkCompactForwardingGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactForwardingGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MarkCompact<VM>;
-    type ProcessEdgesWorkType = ForwardingProcessEdges<VM>;
-    type TPProcessEdges = UnsupportedProcessEdges<VM>;
+    type DefaultProcessEdges = ForwardingProcessEdges<VM>;
+    type PinningProcessEdges = UnsupportedProcessEdges<VM>;
 }

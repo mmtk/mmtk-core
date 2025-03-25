@@ -58,7 +58,7 @@ pub fn realloc_grow() {
             MMTK.with_fixture(|fixture| {
                 let bytes_before = memory_manager::get_malloc_bytes(fixture.get_mmtk());
 
-                let res1 = memory_manager::counted_malloc(&fixture.get_mmtk(), 8);
+                let res1 = memory_manager::counted_malloc(fixture.get_mmtk(), 8);
                 assert!(!res1.is_zero());
                 let bytes_after_alloc = memory_manager::get_malloc_bytes(fixture.get_mmtk());
                 assert_eq!(bytes_before + 8, bytes_after_alloc);
@@ -69,7 +69,7 @@ pub fn realloc_grow() {
                 let bytes_after_realloc = memory_manager::get_malloc_bytes(fixture.get_mmtk());
                 assert_eq!(bytes_before + 16, bytes_after_realloc);
 
-                memory_manager::free_with_size(&fixture.get_mmtk(), res2, 16);
+                memory_manager::free_with_size(fixture.get_mmtk(), res2, 16);
                 let bytes_after_free = memory_manager::get_malloc_bytes(fixture.get_mmtk());
                 assert_eq!(bytes_before, bytes_after_free);
             });

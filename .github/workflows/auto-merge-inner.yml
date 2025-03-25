@@ -15,6 +15,10 @@ on:
       ref:
         required: true
         type: string
+      # The upstream branch where the binding PR is targeting, such as master, dev
+      base_ref:
+        required: true
+        type: string
       # The core commit hash that the binding should be using.
       core_commit:
         required: true
@@ -35,7 +39,7 @@ jobs:
       - name: Check input conditions
         id: check-input
         run: |
-          if [[ "${{ inputs.repo }}" == ${{ inputs.base_repo }} ]] && [[ "${{ inputs.ref }}" == "master" ]]; then
+          if [[ "${{ inputs.repo }}" == ${{ inputs.base_repo }} ]] && [[ "${{ inputs.ref }}" == "${{ inputs.base_ref }}" ]]; then
             echo "Conditions not met"
             echo "skip=true" >> $GITHUB_OUTPUT
           else
@@ -44,13 +48,13 @@ jobs:
         shell: bash
 
       - name: Checkout MMTk Core
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         if: steps.check-input.outputs.skip == 'false'
         with:
           path: ${{ env.MMTK_CORE_WORK_DIR }}
       - name: Checkout repository
         if: steps.check-input.outputs.skip == 'false'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repo }}
           path: ${{ env.BINDING_WORK_DIR }}

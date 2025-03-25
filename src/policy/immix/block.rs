@@ -8,6 +8,9 @@ use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpec};
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
+#[cfg(feature = "object_pinning")]
+use crate::util::metadata::MetadataSpec;
+use crate::util::object_enum::BlockMayHaveObjects;
 use crate::util::Address;
 use crate::vm::*;
 use std::sync::atomic::Ordering;
@@ -81,6 +84,12 @@ impl Region for Block {
 
     fn start(&self) -> Address {
         self.0
+    }
+}
+
+impl BlockMayHaveObjects for Block {
+    fn may_have_objects(&self) -> bool {
+        self.get_state() != BlockState::Unallocated
     }
 }
 
@@ -201,6 +210,15 @@ impl Block {
                     #[cfg(feature = "vo_bit")]
                     vo_bit::helper::on_region_swept::<VM, _>(self, false);
 
+                    // If the pin bit is not on the side, we cannot bulk zero.
+                    // We shouldn't need to clear it here in that case, since the pin bit
+                    // should be overwritten at each object allocation. The same applies below
+                    // when we are sweeping on a line granularity.
+                    #[cfg(feature = "object_pinning")]
+                    if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC {
+                        side.bzero_metadata(self.start(), Block::BYTES);
+                    }
+
                     // Release the block if it is allocated but not marked by the current GC.
                     space.release_block(*self);
                     true
@@ -229,9 +247,19 @@ impl Block {
                     if prev_line_is_marked {
                         holes += 1;
                     }
-
+                    // We need to clear the line mark state at least twice in every 128 GC
+                    // otherwise, the line mark state of the last GC will stick around
+                    if line_mark_state > Line::MAX_MARK_STATE - 2 {
+                        line.mark(0);
+                    }
                     #[cfg(feature = "immix_zero_on_release")]
                     crate::util::memory::zero(line.start(), Line::BYTES);
+
+                    // We need to clear the pin bit if it is on the side, as this line can be reused
+                    #[cfg(feature = "object_pinning")]
+                    if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC {
+                        side.bzero_metadata(line.start(), Line::BYTES);
+                    }
 
                     prev_line_is_marked = false;
                 }

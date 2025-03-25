@@ -24,7 +24,7 @@ use std::marker::PhantomData;
 /// table of SFT rather than Space.
 pub trait SFT {
     /// The space name
-    fn name(&self) -> &str;
+    fn name(&self) -> &'static str;
 
     /// Get forwarding pointer if the object is forwarded.
     fn get_forwarded_object(&self, _object: ObjectReference) -> Option<ObjectReference> {
@@ -76,7 +76,14 @@ pub trait SFT {
     /// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.
     /// Such spaces needs to override this method.
     #[cfg(feature = "is_mmtk_object")]
-    fn is_mmtk_object(&self, addr: Address) -> bool;
+    fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference>;
+
+    #[cfg(feature = "is_mmtk_object")]
+    fn find_object_from_internal_pointer(
+        &self,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -> Option<ObjectReference>;
 
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
@@ -113,7 +120,7 @@ pub const EMPTY_SFT_NAME: &str = "empty";
 pub const EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 
 impl SFT for EmptySpaceSFT {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         EMPTY_SFT_NAME
     }
     fn is_live(&self, object: ObjectReference) -> bool {
@@ -154,8 +161,16 @@ impl SFT for EmptySpaceSFT {
         false
     }
     #[cfg(feature = "is_mmtk_object")]
-    fn is_mmtk_object(&self, _addr: Address) -> bool {
-        false
+    fn is_mmtk_object(&self, _addr: Address) -> Option<ObjectReference> {
+        None
+    }
+    #[cfg(feature = "is_mmtk_object")]
+    fn find_object_from_internal_pointer(
+        &self,
+        _ptr: Address,
+        _max_search_bytes: usize,
+    ) -> Option<ObjectReference> {
+        None
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {

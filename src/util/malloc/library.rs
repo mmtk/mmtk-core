@@ -1,14 +1,8 @@
 // Export one of the malloc libraries.
 
-#[cfg(feature = "malloc_hoard")]
-pub use self::hoard::*;
 #[cfg(feature = "malloc_jemalloc")]
 pub use self::jemalloc::*;
-#[cfg(not(any(
-    feature = "malloc_jemalloc",
-    feature = "malloc_mimalloc",
-    feature = "malloc_hoard",
-)))]
+#[cfg(not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc",)))]
 pub use self::libc_malloc::*;
 #[cfg(feature = "malloc_mimalloc")]
 pub use self::mimalloc::*;
@@ -48,24 +42,8 @@ mod mimalloc {
     pub use mimalloc_sys::mi_malloc_usable_size as malloc_usable_size;
 }
 
-#[cfg(feature = "malloc_hoard")]
-mod hoard {
-    // Normal 4K page
-    pub const LOG_BYTES_IN_MALLOC_PAGE: u8 = crate::util::constants::LOG_BYTES_IN_PAGE;
-    // ANSI C
-    pub use hoard_sys::{calloc, free, malloc, realloc};
-    // Posix
-    pub use hoard_sys::posix_memalign;
-    // GNU
-    pub use hoard_sys::malloc_usable_size;
-}
-
 /// If no malloc lib is specified, use the libc implementation
-#[cfg(not(any(
-    feature = "malloc_jemalloc",
-    feature = "malloc_mimalloc",
-    feature = "malloc_hoard",
-)))]
+#[cfg(not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc",)))]
 mod libc_malloc {
     // Normal 4K page
     pub const LOG_BYTES_IN_MALLOC_PAGE: u8 = crate::util::constants::LOG_BYTES_IN_PAGE;

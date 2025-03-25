@@ -19,32 +19,43 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout mmtk-core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           # Full git history needed
           fetch-depth: 0
 
-      # cargo-public-api can be built with the latest stable toolchain.
-      - name: Install stable Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          # make it the active toolchain
-          override: true
-
       # cargo-public-api needs a nightly toolchain installed in order to work.
       # It does not have to be the active toolchain.
       - name: Install nightly Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
+        run: rustup toolchain install nightly
 
+      # Show the Rust toolchain we are actually using
+      - run: rustup show
       - run: cargo --version
       - run: cargo +nightly --version
 
       - name: Install cargo-public-api
-        run: cargo install cargo-public-api
+        run: cargo +nightly install cargo-public-api
       - name: API Diff
-        run: cargo public-api diff origin/${GITHUB_BASE_REF}..${{ github.event.pull_request.head.sha }} --deny=all
+        run: cargo +nightly public-api diff origin/${GITHUB_BASE_REF}..${{ github.event.pull_request.head.sha }} --deny=all
+
+  check-api-migration-update:
+    needs: check-public-api-changes
+    runs-on: ubuntu-latest
+    if: ${{ always() && needs.check-public-api-changes.result == 'failure'}}
+    env:
+      MIGRATION_GUIDE_PATH: 'docs/userguide/src/migration/**'
+    steps:
+      # Check if migration guide is updated.
+      - name: Get the update status for the migration guide.
+        uses: tj-actions/changed-files@v44
+        id: migration-guide-status
+        with:
+          files: ${{ env.MIGRATION_GUIDE_PATH }}
+      # If the api check failed but the migration is not updated, we fail here
+      - name: Report if the migration guide is not updated.
+        if: ${{ steps.migration-guide-status.outputs.any_changed == 'false' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.setFailed('Public API is changed, but the migration guide (${{ env.MIGRATION_GUIDE_PATH }}) is not updated. If the bindings need to be updated for the API change, the migration guide needs to be updated as well.')

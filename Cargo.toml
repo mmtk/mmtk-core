@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.23.0"
+version = "0.30.0"
 authors = ["The MMTk Developers <>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -10,7 +10,7 @@ repository = "https://github.com/mmtk/mmtk-core"
 readme = "README.md"
 categories = ["memory-management"]
 keywords = ["gc", "garbage", "collection", "garbage-collection", "allocation"]
-rust-version = "1.70.0"
+rust-version = "1.74.1"
 build = "build.rs"
 
 [lib]
@@ -21,16 +21,17 @@ doctest = false
 [dependencies]
 atomic = "0.6.0"
 atomic_refcell = "0.1.7"
-atomic-traits = "0.3.0"
+atomic-traits = "0.4.0"
 bytemuck = { version = "1.14.0", features = ["derive"] }
+bytemuck_derive = "=1.8.1" # We can remove this dependency when we use MSRV 1.84+
 cfg-if = "1.0"
 crossbeam = "0.8.1"
-delegate = "0.10.0"
-downcast-rs = "1.1.1"
+delegate = "0.13.2"
+downcast-rs = "2.0.1"
 enum-map = "2.4.2"
-env_logger = "0.10.0"
+env_logger = { version = "0.11.3", optional = true }
 is-terminal = "0.4.7"
-itertools = "0.12.0"
+itertools = "0.14.0"
 jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
 lazy_static = "1.1"
 libc = "0.2"
@@ -38,41 +39,69 @@ log = { version = "0.4", features = ["max_level_trace", "release_max_level_trace
 memoffset = "0.9"
 mimalloc-sys = { version = "0.1.6", optional = true }
 # MMTk macros - we have to specify a version here in order to publish the crate, even though we use the dependency from a local path.
-mmtk-macros = { version="0.23.0", path = "macros/" }
+mmtk-macros = { version="0.30.0", path = "macros/" }
 num_cpus = "1.8"
 num-traits = "0.2"
 pfm = { version = "0.1.1", optional = true }
 portable-atomic = "1.4.3"
 probe = "0.5"
 regex = "1.7.0"
+rustversion = "1.0"
 spin = "0.9.5"
 static_assertions = "1.1.0"
-strum = "0.25"
-strum_macros = "0.25"
-sysinfo = "0.29"
+strum = "0.27.1"
+strum_macros = "0.27.1"
+sysinfo = "0.33.1"
 
 [dev-dependencies]
 paste = "1.0.8"
-rand = "0.8.5"
-criterion = "0.4"
+rand = "0.9.0"
+rand_chacha = "0.9.0"
+criterion = "0.5"
+# Note: `half` v2.5.0 started to require Rust 1.81.
+# `criterion` transitively depends on `half` via the dependency chain:
+#     criterion -> ciborium -> ciborium_ll -> half
+# The MSRV of `ciborium` v0.2.2 is declared as 1.58, and is declared to depend on `half` v2.2.
+# Ciborium should either bump its MSRV or select a version of `half` that satisfies its current MSRV.
+# We lock the version of `half` to 2.4.1 to workaround this.
+# TODO: When we bump MSRV to 1.84 or above, we can rely on Cargo's MSRV-aware dependency resolver and remove such workarounds.
+half = "=2.4.1"
 
 [build-dependencies]
-built = { version = "0.7.1", features = ["git2"] }
+built = { version = "0.7.7", features = ["git2"] }
+# Note: Some components in ICU4X started to require Rust 1.81 since some versions, such as `litemap` v0.7.5.
+# The `built` crate depends on ICU4X via the dependency chain:
+#     built -> git2 -> url -> idna -> idna_adapter --(default)--------> crates from the ICU4X projects
+#                                                  --(alternatively)--> `unicode-rs`
+# But we don't need ICU4X (or even `url`) because we only use `git2` to get the Git commit hash.
+# We move away from ICU4X completely following the instruction in https://docs.rs/crate/idna_adapter/1.2.0
+idna_adapter = "=1.1.0"
 
 [[bench]]
 name = "main"
 harness = false
 
 [features]
-default = []
+default = ["builtin_env_logger"]
+
+# Built-in env_logger.  This feature is enabled by default.
+# The user can disable this default feature to remove `env_logger` from the dependencies.
+# See `crate::util::logger` for more details.
+builtin_env_logger = ["dep:env_logger"]
+
+# Enable this feature if you want to use nightly features and compiler
+nightly = []
 
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts
-perf_counter = ["pfm"]
+perf_counter = ["dep:pfm"]
 
 # This feature is only used for tests with MockVM.
 # CI scripts run those tests with this feature.
-mock_test = []
+mock_test = ["test_private"]
+
+# This feature will expose some private functions for testings or benchmarking.
+test_private = []
 
 # .github/scripts/ci-common.sh extracts features from the following part (including from comments).
 # So be careful when editing or adding stuff to the section below.
@@ -88,12 +117,21 @@ mock_test = []
 # If a binding would need to trace/scan objects that is allocated and managed by the VM, `ActivePlan::vm_trace_object()` is an alternative.
 vm_space = []
 
+# Bulk set unlog bits for all objects inside the VM space. A binding can use
+# this in case they do not have a way to iterate through objects in the
+# bootimage to set the unlog bit. Note that this will set the unlog bit for
+# addresses that may not correspond to valid objects.
+set_unlog_bits_vm_space = []
+
 # A readonly space.
 # TODO: This is not properly implemented yet. We currently use an immortal space instead, and do not guarantee read-only semantics.
 ro_space = []
 # A code space with execution permission.
-# TODO: This is not properly implemented yet. We currently use an immortal space instead, and all our spaces have execution permission at the moment.
 code_space  = []
+
+# By default, we only allow execution permission for code spaces. With this feature, all the spaces have execution permission.
+# Use with care.
+exec_permission_on_all_spaces = []
 
 # Global valid object (VO) bit metadata.
 # The VO bit is set when an object is allocated, and cleared when the GC determines it is dead.
@@ -119,7 +157,8 @@ immix_non_moving = []
 # if `immix_non_moving` is in use.
 sticky_immix_non_moving_nursery = []
 
-
+# Turn on stress copying for Immix. This is a debug feature to test copying for Immix plans.
+immix_stress_copying = []
 # Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
 immix_smaller_block = []
 # Zero the unmarked lines after a GC cycle in immix. This helps debug untraced objects.
@@ -149,15 +188,29 @@ work_packet_stats = []
 # Count the malloc'd memory into the heap size
 malloc_counted_size = []
 
-# Count the size of all live objects in GC
-count_live_bytes_in_gc = []
-
 # Dump memory stats about the plan (live bytes, live lines, live blocks, and used pages)
 dump_memory_stats = []
 
 # Workaround a problem where bpftrace scripts (see tools/tracing/timeline/capture.bt) cannot
 # capture the type names of work packets.
 bpftrace_workaround = []
+
+# Disable mmap annotations.
+# All invocations of `mmap` in mmtk-core are accompanied by calls of `prctl` with
+# `PR_SET_VMA_ANON_NAME` to annotate the mmap ranges with human-readable names.  It is enabled by
+# default and should work fine even with large heap sizes.  However, if this is causing problems,
+# users can disable such annotations by enabling this Cargo feature.
+no_mmap_annotation = []
+
+# Allow the binding to access Valid Object (VO) bit.
+# MMTk uses VO bit to identify a valid object. Thus VO bit is carefully managed by MMTk in cooperation with the binding.
+# So normally this feature is not needed, and its use should be discouraged.
+# However, in rare cases, a binding may want to directly access and manipulate VO bit. For example, a binding cannot cooperate
+# with MMTk to identify each object for setting the VO bit. This is usually due to the limitation of the VM.
+# In such cases, a binding may use this feature and manipulate the VO bit to their needs. The binding's manipulation on VO bit
+# may violate MMTk's semantics, and may result in undefined behaviors for VO bit related APIs. This feature should
+# only be used if you understand how VO bit works internally. Use at your own risk.
+vo_bit_access = []
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --
@@ -167,8 +220,8 @@ bpftrace_workaround = []
 # Group:malloc
 # only one of the following features should be enabled, or none to use the default malloc from libc
 # this does not replace the global Rust allocator, but provides these libraries for GC implementation
-malloc_mimalloc = ["mimalloc-sys"]
-malloc_jemalloc = ["jemalloc-sys"]
+malloc_mimalloc = ["dep:mimalloc-sys"]
+malloc_jemalloc = ["dep:jemalloc-sys"]
 
 # Use the native mimalloc allocator for malloc. This is not tested by me (Yi) yet, and it is only used to make sure that some code
 # is not compiled in default builds.

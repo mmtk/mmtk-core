@@ -78,7 +78,8 @@ impl Defrag {
                 || !exhausted_reusable_space
                 || super::STRESS_DEFRAG
                 || (collect_whole_heap && user_triggered && full_heap_system_gc));
-        // println!("Defrag: {}", in_defrag);
+        info!("Defrag: {}", in_defrag);
+        probe!(mmtk, immix_defrag, in_defrag);
         self.in_defrag_collection
             .store(in_defrag, Ordering::Release)
     }
@@ -205,9 +206,9 @@ impl Defrag {
             .store(threshold, Ordering::Release);
     }
 
-    /// Release work. Should be called in ImmixSpace::release.
+    /// Reset the in-defrag state.
     #[allow(clippy::assertions_on_constants)]
-    pub fn release<VM: VMBinding>(&self, _space: &ImmixSpace<VM>) {
+    pub fn reset_in_defrag(&self) {
         debug_assert!(super::DEFRAG);
         self.in_defrag_collection.store(false, Ordering::Release);
     }

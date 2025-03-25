@@ -73,9 +73,47 @@ usdt:$MMTK:mmtk:work {
     }
 }
 
-usdt:$MMTK:mmtk:process_edges {
+usdt:$MMTK:mmtk:gen_full_heap {
+    printf("gen_full_heap,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+}
+
+usdt:$MMTK:mmtk:immix_defrag {
+    printf("immix_defrag,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+}
+
+usdt:$MMTK:mmtk:roots {
     if (@enable_print) {
-        printf("process_edges,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+        printf("roots,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+    }
+}
+
+usdt:$MMTK:mmtk:process_slots {
+    if (@enable_print) {
+        printf("process_slots,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+    }
+}
+
+usdt:$MMTK:mmtk:scan_objects {
+    if (@enable_print) {
+        printf("scan_objects,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+    }
+}
+
+usdt:$MMTK:mmtk:plan_end_of_gc_begin {
+    if (@enable_print) {
+        printf("plan_end_of_gc,B,%d,%lu\n", tid, nsecs);
+    }
+}
+
+usdt:$MMTK:mmtk:plan_end_of_gc_end {
+    if (@enable_print) {
+        printf("plan_end_of_gc,E,%d,%lu\n", tid, nsecs);
+    }
+}
+
+usdt:$MMTK:mmtk:sweep_chunk {
+    if (@enable_print) {
+        printf("sweep_chunk,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
     }
 }
 

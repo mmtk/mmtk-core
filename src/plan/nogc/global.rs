@@ -74,6 +74,10 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         unreachable!("GC triggered in nogc")
     }
 
+    fn current_gc_may_move_object(&self) -> bool {
+        false
+    }
+
     fn get_used_pages(&self) -> usize {
         self.nogc_space.reserved_pages()
             + self.immortal.reserved_pages()
@@ -94,16 +98,19 @@ impl<VM: VMBinding> NoGC<VM> {
             nogc_space: NoGCImmortalSpace::new(plan_args.get_space_args(
                 "nogc_space",
                 cfg!(not(feature = "nogc_no_zeroing")),
+                false,
                 VMRequest::discontiguous(),
             )),
             immortal: ImmortalSpace::new(plan_args.get_space_args(
                 "immortal",
                 true,
+                false,
                 VMRequest::discontiguous(),
             )),
             los: ImmortalSpace::new(plan_args.get_space_args(
                 "los",
                 true,
+                false,
                 VMRequest::discontiguous(),
             )),
             base: BasePlan::new(plan_args),

@@ -11,6 +11,7 @@ use crate::util::constants::LOG_BYTES_IN_WORD;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::{extract_side_metadata, vo_bit};
+use crate::util::object_enum::{self, ObjectEnumerator};
 use crate::util::{Address, ObjectReference};
 use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
@@ -32,17 +33,12 @@ pub const GC_EXTRA_HEADER_WORD: usize = 1;
 const GC_EXTRA_HEADER_BYTES: usize = GC_EXTRA_HEADER_WORD << LOG_BYTES_IN_WORD;
 
 impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
 
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
-        let forwarding_pointer = Self::get_header_forwarding_pointer(object);
-        if forwarding_pointer.is_null() {
-            None
-        } else {
-            Some(forwarding_pointer)
-        }
+        Self::get_header_forwarding_pointer(object)
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
@@ -71,7 +67,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        crate::util::metadata::vo_bit::set_vo_bit::<VM>(object);
+        crate::util::metadata::vo_bit::set_vo_bit(object);
     }
 
     #[cfg(feature = "sanity")]
@@ -80,8 +76,20 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     #[cfg(feature = "is_mmtk_object")]
-    fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
+    fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
+    }
+
+    #[cfg(feature = "is_mmtk_object")]
+    fn find_object_from_internal_pointer(
+        &self,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -> Option<ObjectReference> {
+        crate::util::metadata::vo_bit::find_object_from_internal_pointer::<VM>(
+            ptr,
+            max_search_bytes,
+        )
     }
 
     fn sft_trace_object(
@@ -109,6 +117,10 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
         &self.pr
     }
 
+    fn maybe_get_page_resource_mut(&mut self) -> Option<&mut dyn PageResource<VM>> {
+        Some(&mut self.pr)
+    }
+
     fn common(&self) -> &CommonSpace<VM> {
         &self.common
     }
@@ -120,6 +132,10 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("markcompactspace only releases pages enmasse")
     }
+
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
+        object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, &self.pr);
+    }
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompactSpace<VM> {
@@ -130,7 +146,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompac
         _copy: Option<CopySemantics>,
         _worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        debug_assert!(!object.is_null());
         debug_assert!(
             KIND != TRACE_KIND_TRANSITIVE_PIN,
             "MarkCompact does not support transitive pin trace."
@@ -177,8 +192,9 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     }
 
     /// Get header forwarding pointer for an object
-    fn get_header_forwarding_pointer(object: ObjectReference) -> ObjectReference {
-        unsafe { Self::header_forwarding_pointer_address(object).load::<ObjectReference>() }
+    fn get_header_forwarding_pointer(object: ObjectReference) -> Option<ObjectReference> {
+        let addr = unsafe { Self::header_forwarding_pointer_address(object).load::<Address>() };
+        ObjectReference::from_raw_address(addr)
     }
 
     /// Store header forwarding pointer for an object
@@ -225,7 +241,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(
-            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
+            crate::util::metadata::vo_bit::is_vo_bit_set(object),
             "{:x}: VO bit not set",
             object
         );
@@ -241,7 +257,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(
-            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
+            crate::util::metadata::vo_bit::is_vo_bit_set(object),
             "{:x}: VO bit not set",
             object
         );
@@ -252,6 +268,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         }
 
         Self::get_header_forwarding_pointer(object)
+            .unwrap_or_else(|| panic!("Object {object} does not have a forwarding pointer"))
     }
 
     pub fn test_and_mark(object: ObjectReference) -> bool {
@@ -386,12 +403,11 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             for obj in self.linear_scan_objects(from_start..from_end) {
                 let copied_size = VM::VMObjectModel::get_size_when_copied(obj);
                 // clear the VO bit
-                vo_bit::unset_vo_bit::<VM>(obj);
+                vo_bit::unset_vo_bit(obj);
 
-                let forwarding_pointer = Self::get_header_forwarding_pointer(obj);
-
-                trace!("Compact {} to {}", obj, forwarding_pointer);
-                if !forwarding_pointer.is_null() {
+                let maybe_forwarding_pointer = Self::get_header_forwarding_pointer(obj);
+                if let Some(forwarding_pointer) = maybe_forwarding_pointer {
+                    trace!("Compact {} to {}", obj, forwarding_pointer);
                     let new_object = forwarding_pointer;
                     Self::clear_header_forwarding_pointer(new_object);
 
@@ -400,9 +416,11 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                     let end_of_new_object =
                         VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
                     // update VO bit,
-                    vo_bit::set_vo_bit::<VM>(new_object);
+                    vo_bit::set_vo_bit(new_object);
                     to = new_object.to_object_start::<VM>() + copied_size;
                     debug_assert_eq!(end_of_new_object, to);
+                } else {
+                    trace!("Skipping dead object {}", obj);
                 }
             }
         }

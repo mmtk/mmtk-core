@@ -1,10 +1,11 @@
 # MMTk GC visualization
 
-This directory contains tools for visualizing the execution time of each work packet on a timeline. 
+This directory contains tools for visualizing the execution time of each work packet on a timeline.
 
 ## Before Running
 
-Before running, you should make sure the [bpftrace] command line utility is installed.
+Before running, you should make sure the [bpftrace] command line utility is installed.  You also
+need Python 3.10 or later.
 
 [bpftrace]: https://github.com/iovisor/bpftrace
 
@@ -128,6 +129,12 @@ in your browser and show a timeline.  Zoom in to one GC, and you should see the 
 like this:
 
 ![Perfetto UI timeline](./perfetto-example.png)
+
+## Extending the timeline tool
+
+VM binding developers can insert USDT trace points, too, and our scripts `capture.py` and
+`visualize.py` provides mechanisms for extension.  Read [EXTENSION.md](EXTENSION.md) for more
+details.
 
 ## Known issues
 
