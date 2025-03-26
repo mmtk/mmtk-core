@@ -40,6 +40,7 @@
         - [Optimizing Allocation](portingguide/perf_tuning/alloc.md)
     - [VM-specific Concerns](portingguide/concerns/prefix.md)
         - [Finalizers and Weak References](portingguide/concerns/weakref.md)
+        - [Address-based Hashing](portingguide/concerns/address-based-hashing.md)
 - [API Migration Guide](migration/prefix.md)
     - [Template (for mmtk-core developers)](migration/template.md)
 
