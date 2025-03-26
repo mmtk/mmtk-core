@@ -223,11 +223,11 @@ If, as in JikesRVM, the `Unhashed` state is encoded as `00` and the `Hashed` sta
 `01`, this state transition can be done with a single atomic bit-set or fetch-or operation.
 
 There is also a risk if GC can happen concurrently, moving the object and changing its state.  If
-copying only happens during stop-the-world (that includes all stop-the-world GC algorithms and
-mostly-concurrent GC algorithms that only copy objects during stop-the-world, such as [LXR]), we can
-make the computing of identity hash code *atomic with respect to copying GC* by not inserting
-[GC-safe points] in the middle of computing identity hash code.  MMTk currently does not have
-concurrent copying GC.
+copying only happens during stop-the-world (that includes all stop-the-world GC algorithms and some
+concurrent GC algorithms that only copy objects during stop-the-world, such as [LXR]), we can make
+the computing of identity hash code *atomic with respect to copying GC* by not inserting [GC-safe
+points] in the middle of computing identity hash code.  MMTk currently does not have concurrent
+copying GC.
 
 [LXR]: https://dl.acm.org/doi/10.1145/3519939.3523440
 [GC-safe points]: ../../glossary.md#gc-safe-point
