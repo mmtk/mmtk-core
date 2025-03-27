@@ -81,6 +81,8 @@ pub trait VMMap: Sync {
 
     fn is_finalized(&self) -> bool;
 
+    /// Get the space descriptor for the given address. Return SpaceDescriptor::UNINITIALIZED if the
+    /// address is not within the MMTk heap range, or not within MMTk spaces.
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor;
 
     fn add_to_cumulative_committed_pages(&self, pages: usize);
