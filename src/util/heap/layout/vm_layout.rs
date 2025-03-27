@@ -63,10 +63,6 @@ impl VMLayout {
     pub const fn available_end(&self) -> Address {
         self.heap_end
     }
-    /// Is the given address within the address space between available start and available end?
-    pub fn in_available_range(&self, addr: Address) -> bool {
-        addr >= self.available_start() && addr < self.available_end()
-    }
     /// Size of the address space available to the MMTk heap.
     pub const fn available_bytes(&self) -> usize {
         self.available_end().get_extent(self.available_start())
