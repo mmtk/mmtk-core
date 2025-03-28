@@ -559,10 +559,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 .scheduler
                 .worker_group
                 .get_and_clear_worker_live_bytes();
-            let mut stats = mmtk.state.live_bytes_in_last_gc.borrow_mut();
-            *stats = mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
+            let mut live_bytes_in_last_gc = mmtk.state.live_bytes_in_last_gc.borrow_mut();
+            *live_bytes_in_last_gc = mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
             // Logging
-            for (space_name, &stats) in stats.iter() {
+            for (space_name, &stats) in live_bytes_in_last_gc.iter() {
                 info!(
                     "{} = {} pages ({:.1}% live)",
                     space_name,
