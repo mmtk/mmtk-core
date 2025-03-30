@@ -609,7 +609,15 @@
 <a href="#608" id="608">608</a>
 <a href="#609" id="609">609</a>
 <a href="#610" id="610">610</a>
-<a href="#611" id="611">611</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="self">self</span>::worker::PollResult;
+<a href="#611" id="611">611</a>
+<a href="#612" id="612">612</a>
+<a href="#613" id="613">613</a>
+<a href="#614" id="614">614</a>
+<a href="#615" id="615">615</a>
+<a href="#616" id="616">616</a>
+<a href="#617" id="617">617</a>
+<a href="#618" id="618">618</a>
+<a href="#619" id="619">619</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="self">self</span>::worker::PollResult;
 
 <span class="kw">use </span><span class="kw">super</span>::gc_work::ScheduleCollection;
 <span class="kw">use </span><span class="kw">super</span>::stat::SchedulerStat;
@@ -1165,7 +1173,15 @@
         </span><span class="macro">probe!</span>(mmtk, gc_end);
 
         <span class="kw">if </span><span class="kw-2">*</span>mmtk.get_options().count_live_bytes_in_gc {
-            <span class="kw">for </span>(space_name, <span class="kw-2">&amp;</span>stats) <span class="kw">in </span>mmtk.state.live_bytes_in_last_gc.borrow().iter() {
+            <span class="comment">// Aggregate the live bytes
+            </span><span class="kw">let </span>live_bytes = mmtk
+                .scheduler
+                .worker_group
+                .get_and_clear_worker_live_bytes();
+            <span class="kw">let </span><span class="kw-2">mut </span>live_bytes_in_last_gc = mmtk.state.live_bytes_in_last_gc.borrow_mut();
+            <span class="kw-2">*</span>live_bytes_in_last_gc = mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
+            <span class="comment">// Logging
+            </span><span class="kw">for </span>(space_name, <span class="kw-2">&amp;</span>stats) <span class="kw">in </span>live_bytes_in_last_gc.iter() {
                 <span class="macro">info!</span>(
                     <span class="string">"{} = {} pages ({:.1}% live)"</span>,
                     space_name,

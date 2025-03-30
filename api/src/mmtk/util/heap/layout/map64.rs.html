@@ -249,7 +249,10 @@
 <a href="#248" id="248">248</a>
 <a href="#249" id="249">249</a>
 <a href="#250" id="250">250</a>
-<a href="#251" id="251">251</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::CreateFreeListResult;
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::CreateFreeListResult;
 <span class="kw">use </span><span class="kw">super</span>::map::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
@@ -457,8 +460,11 @@
     }
 
     <span class="kw">fn </span>get_descriptor_for_address(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; SpaceDescriptor {
-        <span class="kw">let </span>index = <span class="self">Self</span>::space_index(address).unwrap();
-        <span class="self">self</span>.inner().descriptor_map[index]
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(index) = <span class="self">Self</span>::space_index(address) {
+            <span class="self">self</span>.inner().descriptor_map[index]
+        } <span class="kw">else </span>{
+            SpaceDescriptor::UNINITIALIZED
+        }
     }
 
     <span class="kw">fn </span>add_to_cumulative_committed_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, pages: usize) {

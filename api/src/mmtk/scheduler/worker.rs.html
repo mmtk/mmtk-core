@@ -453,7 +453,9 @@
 <a href="#452" id="452">452</a>
 <a href="#453" id="453">453</a>
 <a href="#454" id="454">454</a>
-<a href="#455" id="455">455</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::WorkerLocalStat;
+<a href="#455" id="455">455</a>
+<a href="#456" id="456">456</a>
+<a href="#457" id="457">457</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::WorkerLocalStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::MMTK;
@@ -526,15 +528,17 @@
         </span><span class="kw">let </span>bytes = VM::VMObjectModel::get_current_size(object);
         <span class="comment">// Get the space index from descriptor
         </span><span class="kw">let </span>space_descriptor = VM_MAP.get_descriptor_for_address(object.to_raw_address());
-        <span class="kw">let </span>space_index = space_descriptor.get_index();
-        <span class="macro">debug_assert!</span>(
-            space_index &lt; MAX_SPACES,
-            <span class="string">"Space index {} is not in the range of [0, {})"</span>,
-            space_index,
-            MAX_SPACES
-        );
-        <span class="comment">// Accumulate the live bytes for the index
-        </span>live_bytes_per_space[space_index] += bytes;
+        <span class="kw">if </span>space_descriptor != <span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor::UNINITIALIZED {
+            <span class="kw">let </span>space_index = space_descriptor.get_index();
+            <span class="macro">debug_assert!</span>(
+                space_index &lt; MAX_SPACES,
+                <span class="string">"Space index {} is not in the range of [0, {})"</span>,
+                space_index,
+                MAX_SPACES
+            );
+            <span class="comment">// Accumulate the live bytes for the index
+            </span>live_bytes_per_space[space_index] += bytes;
+        }
     }
 }
 

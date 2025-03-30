@@ -1187,16 +1187,7 @@
 <a href="#1186" id="1186">1186</a>
 <a href="#1187" id="1187">1187</a>
 <a href="#1188" id="1188">1188</a>
-<a href="#1189" id="1189">1189</a>
-<a href="#1190" id="1190">1190</a>
-<a href="#1191" id="1191">1191</a>
-<a href="#1192" id="1192">1192</a>
-<a href="#1193" id="1193">1193</a>
-<a href="#1194" id="1194">1194</a>
-<a href="#1195" id="1195">1195</a>
-<a href="#1196" id="1196">1196</a>
-<a href="#1197" id="1197">1197</a>
-<a href="#1198" id="1198">1198</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
+<a href="#1189" id="1189">1189</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::global_state::GcStatus;
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectsClosure;
@@ -1350,15 +1341,6 @@
         <span class="kw">for </span>w <span class="kw">in </span><span class="kw-2">&amp;</span>mmtk.scheduler.worker_group.workers_shared {
             <span class="kw">let </span>result = w.designated_work.push(Box::new(ReleaseCollector));
             <span class="macro">debug_assert!</span>(result.is_ok());
-        }
-
-        <span class="kw">if </span><span class="kw-2">*</span>mmtk.get_options().count_live_bytes_in_gc {
-            <span class="kw">let </span>live_bytes = mmtk
-                .scheduler
-                .worker_group
-                .get_and_clear_worker_live_bytes();
-            <span class="kw-2">*</span>mmtk.state.live_bytes_in_last_gc.borrow_mut() =
-                mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
         }
     }
 }

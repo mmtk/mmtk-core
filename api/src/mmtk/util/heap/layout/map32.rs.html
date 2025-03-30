@@ -318,7 +318,10 @@
 <a href="#317" id="317">317</a>
 <a href="#318" id="318">318</a>
 <a href="#319" id="319">319</a>
-<a href="#320" id="320">320</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::CreateFreeListResult;
+<a href="#320" id="320">320</a>
+<a href="#321" id="321">321</a>
+<a href="#322" id="322">322</a>
+<a href="#323" id="323">323</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::CreateFreeListResult;
 <span class="kw">use </span><span class="kw">super</span>::map::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
@@ -575,7 +578,10 @@
 
     <span class="kw">fn </span>get_descriptor_for_address(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; SpaceDescriptor {
         <span class="kw">let </span>index = address.chunk_index();
-        <span class="self">self</span>.descriptor_map[index]
+        <span class="self">self</span>.descriptor_map
+            .get(index)
+            .copied()
+            .unwrap_or(SpaceDescriptor::UNINITIALIZED)
     }
 
     <span class="kw">fn </span>add_to_cumulative_committed_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, pages: usize) {
