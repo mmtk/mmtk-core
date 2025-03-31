@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["MAX_COUNTERS","MAX_PHASES"],"struct":["SharedStats","Stats"]};
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_NUM_PHASES","MAX_COUNTERS"],"struct":["SharedStats","Stats"]};

@@ -154,8 +154,10 @@
 <a href="#153" id="153">153</a>
 <a href="#154" id="154">154</a>
 <a href="#155" id="155">155</a>
-<a href="#156" id="156">156</a></pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">crate</span>::util::statistics::stats::{SharedStats, MAX_PHASES};
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a></pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::statistics::stats::{SharedStats, DEFAULT_NUM_PHASES};
 <span class="kw">use </span>std::fmt;
 <span class="kw">use </span>std::sync::Arc;
 
@@ -163,8 +165,8 @@
     name: String,
     <span class="kw">pub </span>implicitly_start: bool,
     merge_phases: bool,
-    count: Box&lt;[u64; MAX_PHASES]&gt;, <span class="comment">// FIXME make this resizable
-    </span>diffable: T,
+    count: Vec&lt;u64&gt;,
+    diffable: T,
     start_value: <span class="prelude-ty">Option</span>&lt;T::Val&gt;,
     total_count: u64,
     running: bool,
@@ -197,7 +199,8 @@
         <span class="self">self</span>.diffable.stop();
         <span class="kw">let </span>current_value = <span class="self">self</span>.diffable.current_value();
         <span class="kw">let </span>delta = T::diff(<span class="kw-2">&amp;</span>current_value, <span class="self">self</span>.start_value.as_ref().unwrap());
-        <span class="self">self</span>.count[<span class="self">self</span>.stats.get_phase()] += delta;
+        <span class="self">self</span>.count.push(delta);
+        <span class="macro">debug_assert_eq!</span>(<span class="self">self</span>.count[<span class="self">self</span>.stats.get_phase()], delta);
         <span class="self">self</span>.total_count += delta;
     }
 
@@ -205,7 +208,8 @@
         <span class="kw">if </span><span class="self">self</span>.running {
             <span class="kw">let </span>now = <span class="self">self</span>.diffable.current_value();
             <span class="kw">let </span>delta = T::diff(<span class="kw-2">&amp;</span>now, <span class="self">self</span>.start_value.as_ref().unwrap());
-            <span class="self">self</span>.count[old_phase] += delta;
+            <span class="self">self</span>.count.push(delta);
+            <span class="macro">debug_assert_eq!</span>(<span class="self">self</span>.count[old_phase], delta);
             <span class="self">self</span>.total_count += delta;
             <span class="self">self</span>.start_value = <span class="prelude-val">Some</span>(now);
         }
@@ -295,7 +299,7 @@
             name,
             implicitly_start,
             merge_phases,
-            count: Box::new([<span class="number">0</span>; MAX_PHASES]),
+            count: Vec::with_capacity(DEFAULT_NUM_PHASES),
             diffable,
             start_value: <span class="prelude-val">None</span>,
             total_count: <span class="number">0</span>,
