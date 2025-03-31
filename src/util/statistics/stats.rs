@@ -11,9 +11,8 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 
-// TODO: Increasing this number would cause JikesRVM die at boot time. I don't really know why.
-// E.g. using 1 << 14 will cause JikesRVM segfault at boot time.
-pub const MAX_PHASES: usize = 1 << 12;
+/// The default number of phases for statistics.
+pub const DEFAULT_NUM_PHASES: usize = 1 << 12;
 pub const MAX_COUNTERS: usize = 100;
 
 /// GC stats shared among counters
@@ -51,10 +50,8 @@ pub struct Stats {
     // Initialization of libpfm4 is required before we can use `PerfEvent` types
     #[cfg(feature = "perf_counter")]
     perfmon: Perfmon,
-
     pub shared: Arc<SharedStats>,
     counters: Mutex<Vec<Arc<Mutex<dyn Counter + Send>>>>,
-    exceeded_phase_limit: AtomicBool,
 }
 
 impl Stats {
@@ -99,10 +96,8 @@ impl Stats {
             total_time: t,
             #[cfg(feature = "perf_counter")]
             perfmon,
-
             shared,
             counters: Mutex::new(counters),
-            exceeded_phase_limit: AtomicBool::new(false),
         }
     }
 
@@ -157,32 +152,22 @@ impl Stats {
         if !self.get_gathering_stats() {
             return;
         }
-        if self.get_phase() < MAX_PHASES - 1 {
-            let counters = self.counters.lock().unwrap();
-            for counter in &(*counters) {
-                counter.lock().unwrap().phase_change(self.get_phase());
-            }
-            self.shared.increment_phase();
-        } else if !self.exceeded_phase_limit.load(Ordering::SeqCst) {
-            eprintln!("Warning: number of GC phases exceeds MAX_PHASES");
-            self.exceeded_phase_limit.store(true, Ordering::SeqCst);
+        let counters = self.counters.lock().unwrap();
+        for counter in &(*counters) {
+            counter.lock().unwrap().phase_change(self.get_phase());
         }
+        self.shared.increment_phase();
     }
 
     pub fn end_gc(&self) {
         if !self.get_gathering_stats() {
             return;
         }
-        if self.get_phase() < MAX_PHASES - 1 {
-            let counters = self.counters.lock().unwrap();
-            for counter in &(*counters) {
-                counter.lock().unwrap().phase_change(self.get_phase());
-            }
-            self.shared.increment_phase();
-        } else if !self.exceeded_phase_limit.load(Ordering::SeqCst) {
-            eprintln!("Warning: number of GC phases exceeds MAX_PHASES");
-            self.exceeded_phase_limit.store(true, Ordering::SeqCst);
+        let counters = self.counters.lock().unwrap();
+        for counter in &(*counters) {
+            counter.lock().unwrap().phase_change(self.get_phase());
         }
+        self.shared.increment_phase();
     }
 
     pub fn print_stats<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>) {
