@@ -121,7 +121,7 @@ jobs:
       - name: Setup
         run: |
           cd mmtk-julia
-          ./.github/scripts/ci-checkout.sh
+          ./.github/scripts/ci-checkout.sh ${{ needs.binding-refs.outputs.julia_vm_repo }} ${{ needs.binding-refs.outputs.julia_vm_ref }}
           ./.github/scripts/ci-setup.sh
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml

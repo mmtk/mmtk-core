@@ -382,13 +382,13 @@ impl<VM: VMBinding> MMTK<VM> {
     /// Return true if the current GC is an emergency GC.
     ///
     /// An emergency GC happens when a normal GC cannot reclaim enough memory to satisfy allocation
-    /// requests.  Plans may do full-heap GC, defragmentation, etc. during emergency in order to
+    /// requests.  Plans may do full-heap GC, defragmentation, etc. during emergency GCs in order to
     /// free up more memory.
     ///
     /// VM bindings can call this function during GC to check if the current GC is an emergency GC.
     /// If it is, the VM binding is recommended to retain fewer objects than normal GCs, to the
-    /// extent allowed by the specification of the VM or langauge.  For example, the VM binding may
-    /// choose not to retain objects used for caching.  Specifically, for Java virtual machines,
+    /// extent allowed by the specification of the VM or the language.  For example, the VM binding
+    /// may choose not to retain objects used for caching.  Specifically, for Java virtual machines,
     /// that means not retaining referents of [`SoftReference`][java-soft-ref] which is primarily
     /// designed for implementing memory-sensitive caches.
     ///

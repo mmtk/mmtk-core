@@ -109,9 +109,12 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
             // Clear the request, and inform GC trigger about the pending allocation.
             pr.clear_request(pages_reserved);
+
+            let meta_pages_reserved = self.estimate_side_meta_pages(pages_reserved);
+            let total_pages_reserved = pages_reserved + meta_pages_reserved;
             self.get_gc_trigger()
                 .policy
-                .on_pending_allocation(pages_reserved);
+                .on_pending_allocation(total_pages_reserved);
 
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
@@ -313,9 +316,20 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             .mark_as_mapped(self.common().start, self.common().extent);
     }
 
+    /// Estimate the amount of side metadata memory needed for a give data memory size in pages. The
+    /// result will over-estimate the amount of metadata pages needed, with at least one page per
+    /// side metadata.  This relatively accurately describes the number of side metadata pages the
+    /// space actually consumes.
+    ///
+    /// This function is used for both triggering GC (via [`Space::reserved_pages`]) and resizing
+    /// the heap (via [`crate::util::heap::GCTriggerPolicy::on_pending_allocation`]).
+    fn estimate_side_meta_pages(&self, data_pages: usize) -> usize {
+        self.common().metadata.calculate_reserved_pages(data_pages)
+    }
+
     fn reserved_pages(&self) -> usize {
         let data_pages = self.get_page_resource().reserved_pages();
-        let meta_pages = self.common().metadata.calculate_reserved_pages(data_pages);
+        let meta_pages = self.estimate_side_meta_pages(data_pages);
         data_pages + meta_pages
     }
 

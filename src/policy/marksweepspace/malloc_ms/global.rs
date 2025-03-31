@@ -215,6 +215,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         "MallocSpace"
     }
 
+    fn estimate_side_meta_pages(&self, data_pages: usize) -> usize {
+        self.metadata.calculate_reserved_pages(data_pages)
+    }
+
     #[allow(clippy::assertions_on_constants)]
     fn reserved_pages(&self) -> usize {
         use crate::util::constants::LOG_BYTES_IN_PAGE;
@@ -222,7 +226,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         debug_assert!(LOG_BYTES_IN_MALLOC_PAGE >= LOG_BYTES_IN_PAGE);
         let data_pages = self.active_pages.load(Ordering::SeqCst)
             << (LOG_BYTES_IN_MALLOC_PAGE - LOG_BYTES_IN_PAGE);
-        let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
+        let meta_pages = self.estimate_side_meta_pages(data_pages);
         data_pages + meta_pages
     }
 
