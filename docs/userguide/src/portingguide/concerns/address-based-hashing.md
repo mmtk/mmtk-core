@@ -157,7 +157,7 @@ Hash at the end                    │   Header   │ ordinary fields...       �
 
 MMTk calls the following trait methods implemented by the VM binding during copying GC.
 
--   For non-delayed-copy collectors (all moving plans except MarkCompact) 
+-   For non-delayed-copy collectors (all moving plans except MarkCompact)
     -   `ObjectModel::copy`
 -   For delayed-copy collectors (MarkCompact)
     -   `ObjectModel::copy_to`
