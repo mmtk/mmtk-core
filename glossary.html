@@ -33,10 +33,11 @@
         <link rel="stylesheet" href="assets/css/mdbook-admonish.css">
 
 
-        <!-- Provide site root to javascript -->
+        <!-- Provide site root and default themes to javascript -->
         <script>
-            var path_to_root = "";
-            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc.js"></script>
@@ -46,8 +47,8 @@
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script>
             try {
-                var theme = localStorage.getItem('mdbook-theme');
-                var sidebar = localStorage.getItem('mdbook-sidebar');
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
 
                 if (theme.startsWith('"') && theme.endsWith('"')) {
                     localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
@@ -61,7 +62,8 @@
 
         <!-- Set the theme before any content is loaded, prevents flash -->
         <script>
-            var theme;
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
@@ -74,8 +76,8 @@
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
-            var sidebar = null;
-            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
@@ -111,6 +113,7 @@
                             <i class="fa fa-paint-brush"></i>
                         </button>
                         <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
@@ -190,6 +193,89 @@ extent allowed by the specification of the VM or the language.  For example, the
 choose not to retain objects used for caching.  Specifically, for Java virtual machines, that means
 not retaining referents of <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/ref/SoftReference.html"><code>SoftReference</code></a> which is primarily designed for
 implementing memory-sensitive caches.</p>
+<h2 id="gc-safe-point"><a class="header" href="#gc-safe-point">GC-safe Point</a></h2>
+<p>Also known as: <em>GC-point</em></p>
+<p>A <em>GC-safe point</em> is a place in the code executed by mutators where (stop-the-world) garbage
+collection is allowed to happen.  Concurrent GC can run concurrently with mutators, but still needs
+to synchronize with mutators at GC-safe points.  Regardless, the following statements must be true
+when a mutator is at a GC-safe point.</p>
+<ul>
+<li>References held by a mutator can be identified.  That include references in local variables,
+thread-local variables, and so on.  For compiled code, that include those in stack slots and
+machine registers.</li>
+<li>The mutator cannot be in the middle of operations that must be <em>atomic with respect to GC</em>.
+That includes <a href="#write-barrier">write barriers</a>, <a href="#address-based-hashing">address-based hashing</a>, etc.</li>
+</ul>
+<h3 id="code-with-gc-semantics"><a class="header" href="#code-with-gc-semantics">Code With GC Semantics</a></h3>
+<p>Compilers (including ahead-of-time and just-in-time compilers) for programs with garbage collection
+semantics (such as Java source code or bytecode) usually understand GC semantics, too, and can
+generate <a href="#yieldpoint">yieldpoints</a> and <a href="#stack-map">stack maps</a> to assist GC.</p>
+<p>In practice, such compilers only make certain places in a function GC-safe and only generate <a href="#stack-map">stack
+maps</a> at those places, including but not limited to:</p>
+<ul>
+<li><a href="#yieldpoint">yieldpoints</a></li>
+<li>object allocation sites (may trigger GC)</li>
+<li>call sites to other functions where GC is allowed to happen inside</li>
+</ul>
+<p>If we allow GC to happen at arbitrary PC, it will either force the compiler to generate <a href="#stack-map">stack maps</a>
+at all PCs, or force the VM to use <a href="#shadow-stack">shadow stacks</a> or <a href="#conservative-stack-scanning">conservative stack scanning</a>, instead.  It
+will also break operations that must be <em>atomic with respect to GC</em>, such as <a href="#write-barrier">write barrier</a> and
+<a href="#address-based-hashing">address-based hashing</a>.</p>
+<h3 id="code-without-gc-semantics"><a class="header" href="#code-without-gc-semantics">Code Without GC Semantics</a></h3>
+<p>In contrast, for programs without GC semantics (e.g. programs written in C, C++, Rust, etc.), their
+compilers (GCC, clang, rustc, ...) are agnostic to GC.  But many VMs (such as OpenJDK, CRuby, Julia,
+etc.) are implemented in such languages.  We don't usually use the term "GC-safe point" for
+functions written in C, C++, Rust, etc., but each VM has its own rules to determine whether GC can
+happen within functions written in those languages.</p>
+<p>Interpreters usually maintain local variables in dedicated stacks or frames data structures.
+References in such structures are identified by traversing those stacks or frames, and GC is usually
+allowed between bytecode instructions.</p>
+<p>Some runtime functions implement operations tightly related to GC, and must be <em>atomic w.r.t. GC</em>.
+For example, if a function initializes the type information in the header of an object, GC cannot
+happen in the middle.  Otherwise the GC will read a corrupted header and crash.  Other examples
+include functions that implement the write barrier <a href="#fast-path-and-slow-path">slow path</a> and <a href="#address-based-hashing">address-based hashing</a>.  Such
+functions cannot allocate objects, and cannot call any function that may trigger GC.</p>
+<p>Some functions do not access the GC heap, or only access the heap in controlled ways (e.g. utilizing
+<a href="#object-pinning">object pinning</a>, or via safe APIs such as <a href="https://docs.oracle.com/en/java/javase/21/docs/specs/jni/index.html">JNI</a>).  Some of such functions (such as wrappers for
+blocking system calls including <code>read</code> and <code>write</code>) are long-running.  GC is usually safe when some
+mutators are executing such functions.  Compilers for languages with GC semantics usually make <em>call
+sites</em> to such functions <a href="#gc-safe-point">GC-safe points</a>, and generate <a href="#stack-map">stack maps</a> at those call sites.  The
+runtime usually transitions the state of the current mutator thread so that the GC knows it is in
+such a function when requesting all mutators to stop at their next GC-safe points.</p>
+<h2 id="stack-map"><a class="header" href="#stack-map">Stack Map</a></h2>
+<p>A <em>stack map</em> is a data structure that identifies stack slots and registers that may contain
+references.  Stack maps are essential for supporting <a href="#precise-stack-scanning">precise stack scanning</a>.</p>
+<h2 id="yieldpoint"><a class="header" href="#yieldpoint">Yieldpoint</a></h2>
+<p>Also known as: <em>GC-check point</em></p>
+<p>A <em>yieldpoint</em> is a point in a program where a mutator thread checks if it should yield from normal
+execution in order to handle certain events, such as garbage collection, profiling, biased lock
+revocation, etc.</p>
+<p>Compilers of programs with GC semantics (e.g. Java source code and byte code) insert yieldpoints in
+various places, such as function epilogues and loop back-edges.  In this way, when GC is triggered
+asynchronously by other threads, the current mutator can reach the next yieldpoint quickly and yield
+for GC promptly.  Compilers also generate <a href="#stack-map">stack maps</a> at yieldpoints to make them <a href="#gc-safe-point">GC-safe points</a>.</p>
+<p>Because some operations (such as <a href="#write-barrier">write barrier</a>) must be <em>atomic w.r.t. GC</em>, <a href="#yieldpoint">yieldpoints</a> must not
+be inserted in the middle of such operations.</p>
+<p>Read the paper <a href="https://dl.acm.org/doi/10.1145/2754169.2754187"><em>Stop and go: Understanding yieldpoint behavior</em></a> by Lin et al. for more
+details.</p>
+<h2 id="address-based-hashing"><a class="header" href="#address-based-hashing">Address-based Hashing</a></h2>
+<p><em>Address-based hashing</em> is a GC-assisted space-efficient high-performance method for implementing
+identity hash code in copying GC.</p>
+<p>Read the <a href="portingguide/concerns/address-based-hashing.html">Address-based Hashing</a> chapter for more
+details.</p>
+<h2 id="precise-stack-scanning"><a class="header" href="#precise-stack-scanning">Precise Stack Scanning</a></h2>
+<p>Also known as: <em>exact stack scanning</em></p>
+<p>TODO</p>
+<h2 id="conservative-stack-scanning"><a class="header" href="#conservative-stack-scanning">Conservative Stack Scanning</a></h2>
+<p>TODO</p>
+<h2 id="shadow-stack"><a class="header" href="#shadow-stack">Shadow Stack</a></h2>
+<p>TODO</p>
+<h2 id="write-barrier"><a class="header" href="#write-barrier">Write Barrier</a></h2>
+<p>TODO</p>
+<h2 id="fast-path-and-slow-path"><a class="header" href="#fast-path-and-slow-path">Fast Path and Slow Path</a></h2>
+<p>TODO</p>
+<h2 id="object-pinning"><a class="header" href="#object-pinning">Object Pinning</a></h2>
+<p>TODO</p>
 <!--
 vim: tw=100 ts=4 sw=4 sts=4 et
 -->

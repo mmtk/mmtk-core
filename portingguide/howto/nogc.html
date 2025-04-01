@@ -33,10 +33,11 @@
         <link rel="stylesheet" href="../../assets/css/mdbook-admonish.css">
 
 
-        <!-- Provide site root to javascript -->
+        <!-- Provide site root and default themes to javascript -->
         <script>
-            var path_to_root = "../../";
-            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+            const path_to_root = "../../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../toc.js"></script>
@@ -46,8 +47,8 @@
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script>
             try {
-                var theme = localStorage.getItem('mdbook-theme');
-                var sidebar = localStorage.getItem('mdbook-sidebar');
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
 
                 if (theme.startsWith('"') && theme.endsWith('"')) {
                     localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
@@ -61,7 +62,8 @@
 
         <!-- Set the theme before any content is loaded, prevents flash -->
         <script>
-            var theme;
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
@@ -74,8 +76,8 @@
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
-            var sidebar = null;
-            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
@@ -111,6 +113,7 @@
                             <i class="fa fa-paint-brush"></i>
                         </button>
                         <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
@@ -167,10 +170,7 @@ In the case of V8, the refactoring within V8 required to get a simple NoGC plan 
 <p>At a high level, in order to implement NoGC, we need to handle MMTk initialization, mutator initialization, and memory allocation.</p>
 <p>If you're ever stuck at any point, feel free to send a message in the <code>#Porting</code> channel of our <a href="https://mmtk.zulipchat.com/">Zulip</a>!</p>
 <h2 id="set-up"><a class="header" href="#set-up">Set up</a></h2>
-<p>You want to set up the binding repository/directory structure before starting the port. For the sake of the tutorial guide we assume you have a directory structure similar to the one below. Note that such a directory structure is not a requirement<sup class="footnote-reference"><a href="#1">1</a></sup> but a recommendation. We assume you are using some form of version control system (such as <code>git</code> or <code>mercurial</code>) in this guide.</p>
-<div class="footnote-definition" id="1"><sup class="footnote-definition-label">1</sup>
-<p>In fact some bindings may not be able to have such a directory structure due to the build tools used by the runtime.</p>
-</div>
+<p>You want to set up the binding repository/directory structure before starting the port. For the sake of the tutorial guide we assume you have a directory structure similar to the one below. Note that such a directory structure is not a requirement<sup class="footnote-reference" id="fr-1-1"><a href="#footnote-1">1</a></sup> but a recommendation. We assume you are using some form of version control system (such as <code>git</code> or <code>mercurial</code>) in this guide.</p>
 <ul>
 <li><code>mmtk-X/mmtk</code>: The MMTk side of the binding. This includes the implementation of <a href="https://docs.mmtk.io/api/mmtk/vm/trait.VMBinding.html">the <code>VMBinding</code> trait</a>,
 and any necessary Rust code to integrate MMTk with the VM code (e.g. exposing MMTk functions to native, allowing up-calls from the MMTk binding to the runtime, etc).
@@ -198,11 +198,8 @@ You can also take a look at one of our officially maintained language bindings a
 <ol>
 <li><code>cd mmtk-X/mmtk</code></li>
 <li><code>cargo build</code> to build in debug mode or add <code>--release</code> for release mode</li>
-<li>Copy the shared or static<sup class="footnote-reference"><a href="#2">2</a></sup> library from <code>target/debug</code> or <code>target/release</code> to your desired location</li>
+<li>Copy the shared or static<sup class="footnote-reference" id="fr-2-1"><a href="#footnote-2">2</a></sup> library from <code>target/debug</code> or <code>target/release</code> to your desired location</li>
 </ol>
-<div class="footnote-definition" id="2"><sup class="footnote-definition-label">2</sup>
-<p>You would have to change the <code>crate-type</code> in <code>mmtk-X/mmtk/Cargo.toml</code> from <code>cdylib</code> to <code>staticlib</code> to build a static library.</p>
-</div>
 <p>Later, you can edit the runtime build process to build MMTk at the same time automatically.</p>
 <p><strong>Note:</strong> If the runtime you are targeting already links some Rust FFI libraries, then you may notice "multiple definition" linker errors for Rust stdlib functions. Unfortunately this is a current limitation of Rust FFI wherein all symbols are bundled together in the final C lib which will cause multiple definitions errors when two or more Rust FFI libraries are linked together. There is ongoing work to stabilize the Rust package format that would hopefully make it easier in the future. A current workaround would be to use the <code>-Wl,--allow-multiple-definition</code> linker flag, but this unfortunately isn't ideal as it increases code sizes. See <a href="https://internals.rust-lang.org/t/pre-rfc-stabilize-a-version-of-the-rlib-format/17558">here</a> and <a href="https://github.com/rust-lang/rust/issues/73632">here</a> for more details.</p>
 <p><strong>Note:</strong> It is <em>highly</em> recommended to also check-in the generated <code>Cargo.lock</code> file into your version control. This improves the reproducibility of the build and ensures the same package versions are used when building in the future in order to prevent random breakages.</p>
@@ -414,7 +411,14 @@ binding developer, you can ignore the details for now.</p>
 <p>Often it is the case that the above changes are not enough to allow a runtime to work with MMTk. For example, for the ART binding, the runtime required that all inflated locks be deflated prior to writing the boot image. In order to fix this, we had to implement a heap visitor that visited each allocated object and checked if it had inflated locks, deflating them if they were.</p>
 <p>Unfortunately there is no real magic bullet here. If you come across a runtime-specific idiosyncrasy (and you almost certainly will), you will have to understand what the underlying bug is and either fix or work around it.</p>
 <p>If you have any confusions or questions, please free to reach us on our <a href="https://mmtk.zulipchat.com/">Zulip</a>! We would be glad to help.</p>
-
+<hr>
+<ol class="footnote-definition"><li id="footnote-1">
+<p>In fact some bindings may not be able to have such a directory structure due to the build tools used by the runtime. <a href="#fr-1-1">↩</a></p>
+</li>
+<li id="footnote-2">
+<p>You would have to change the <code>crate-type</code> in <code>mmtk-X/mmtk/Cargo.toml</code> from <code>cdylib</code> to <code>staticlib</code> to build a static library. <a href="#fr-2-1">↩</a></p>
+</li>
+</ol>
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">

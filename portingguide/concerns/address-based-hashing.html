@@ -1,0 +1,451 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Address-based Hashing - MMTk User Guide</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="The guide describes the usage of MMTk for GC and language runtime developers.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../../favicon.svg">
+        <link rel="shortcut icon" href="../../favicon.png">
+        <link rel="stylesheet" href="../../css/variables.css">
+        <link rel="stylesheet" href="../../css/general.css">
+        <link rel="stylesheet" href="../../css/chrome.css">
+        <link rel="stylesheet" href="../../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../../assets/css/api-migration-details.css">
+        <link rel="stylesheet" href="../../assets/css/mdbook-admonish.css">
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../../toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">MMTk User Guide</h1>
+
+                    <div class="right-buttons">
+                        <a href="../../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/mmtk/mmtk-core/tree/master/docs/userguide" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/mmtk/mmtk-core/edit/master/docs/userguide/src/portingguide/concerns/address-based-hashing.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="address-based-hashing"><a class="header" href="#address-based-hashing">Address-based Hashing</a></h1>
+<p>Address-based hashing is a GC-assisted method for implementing identity hash code in copying GC.  It
+has the advantage of high performance and not requiring a dedicated hash field for most objects.</p>
+<p>This chapter is especially useful for VMs that previously used non-moving GC and naively used the
+object address as identity hash code.</p>
+<h2 id="concepts"><a class="header" href="#concepts">Concepts</a></h2>
+<p>An <strong>identity hash code</strong> of an object is a hash code that <em>never changes</em> during the lifetime of
+the object, i.e. since it is allocated, until it is reclaimed by the GC.</p>
+<ul>
+<li>It is not required to be <em>unique</em>.
+<ul>
+<li>Two different objects are allowed to have the same identity hash code.  Like any hashing
+algorithm, collision is allowed.  But a good hash code should be <em>relatively unique</em> in
+order to reduce collision.</li>
+<li>On the contrary, some programming languages (such as <a href="https://docs.python.org/3/library/functions.html#id">Python</a> and
+<a href="https://docs.ruby-lang.org/en/master/Object.html#method-i-object_id">Ruby</a>) have the notion of <em>object ID</em> which is required to be unique.</li>
+</ul>
+</li>
+<li>It is unrelated to the <em>value</em> the object represents.
+<ul>
+<li>For example, modifying a mutable string object does not change its identity hash code.</li>
+<li>On the contrary, two string objects that are equal character-wise may (but does not have to)
+have different identity hash code.</li>
+</ul>
+</li>
+<li>Copying GC does <em>not</em> change object identities.
+<ul>
+<li>If an object is moved by a copying GC, its identity hash code remains the same.</li>
+<li>On the contrary, when moved by a copying GC, the <em>address</em> of the object is changed.</li>
+</ul>
+</li>
+</ul>
+<p>For non-copying GC algorithms, the <em>address</em> of an object never changes, and all objects have
+distinct addresses.  Therefore it is an ideal identity hash code.</p>
+<p>For copying GC algorithms, however, we cannot simply use the address of an object because it will be
+changed when the GC moves the object.  A naive solution is adding an extra field to every object to
+hold its hash code, and the field is copied when the GC moves the object.  Although this approach
+works (and it is used by real-world VMs such as OpenJDK), it unconditionally adds a field to every
+object.  However,</p>
+<ul>
+<li><strong>Objects are rarely moved</strong> in advanced GC algorithms such as Immix.</li>
+<li><strong>Few objects ever have identity hash code <em>observed</em></strong> (e.g.  by calling
+<code>System.identityHashCode(object)</code> in Java) in real-world applications.  According to <a href="https://wiki.openjdk.org/display/lilliput">the
+Lilliput project</a> of OpenJDK, with most workloads, only relatively few (&lt;1%)
+Java objects are ever assigned an identity hash.</li>
+</ul>
+<p><strong>Address-based hashing</strong> solves these problems by not adding the extra hash field until both of the
+following conditions are true:</p>
+<ol>
+<li>The identity hash code of the object has been observed, and</li>
+<li>the object is moved by the GC <em>after</em> its identity hash code has been observed.</li>
+</ol>
+<p>Under the <em>weak generational hypothesis</em> (i.e. most objects die young), most objects will die before
+the two conditions become true, and will never need the extra hash field during its lifetime.</p>
+<p>The address-based hashing algorithm is implemented <a href="https://www.jikesrvm.org/JavaDoc/org/jikesrvm/objectmodel/JavaHeader.html">in JikesRVM</a>, and is planned to
+be implemented in OpenJDK (<a href="https://wiki.openjdk.org/display/lilliput/Compact+Identity+Hashcode">the Lilliput project</a>).</p>
+<h2 id="the-address-based-hashing-algorithm"><a class="header" href="#the-address-based-hashing-algorithm">The Address-based Hashing Algorithm</a></h2>
+<p>Each object is in one of the three <strong>hash code states</strong>:</p>
+<ul>
+<li><code>Unhashed</code></li>
+<li><code>Hashed</code></li>
+<li><code>HashedAndMoved</code></li>
+</ul>
+<p>The state-transition graph is shown below:</p>
+<pre><code>       move                        hash                    move or hash   
+     ┌──────┐                    ┌──────┐                    ┌──────┐     
+     │      │                    │      │                    │      │     
+┌────▼──────┴────┐   hash   ┌────▼──────┴────┐   move   ┌────▼──────┴────┐
+│    Unhashed    ├─────────►│     Hashed     ├─────────►│ HashedAndMoved │
+└────────────────┘          └────────────────┘          └────────────────┘
+</code></pre>
+<p>States are transitioned upon events labelled on the edges:</p>
+<ul>
+<li><code>hash</code>: The mutator observes the identity hash code of an object.</li>
+<li><code>move</code>: The GC moves the object.</li>
+</ul>
+<p>An object starts in the <code>Unhashed</code> state when allocated.  The GC is free to move it any times, and
+its state remains <code>Unhashed</code>, as long as its identity hash code is not observed.</p>
+<p>When the identity hash code is observed for the first time, its state is changed to <code>Hashed</code>.  <strong>In
+the <code>Hashed</code> state, the identity hash code of an object is its address.</strong>  The object will continue
+to use its address as its identity hash code until the object is moved.</p>
+<p>When a <code>Hashed</code> object is moved, the GC adds a hash field (distinct from high-level language fields
+defined by the application) to the new copy of the object, and writes its old address into that
+field.  The state of the object is transitioned to <code>HashedAndMoved</code>.  <strong>In the <code>HashedAndMoved</code>
+state, the identity hash code of an object is the value in its added hash field</strong>, and it will keep
+using the value in the field as the identity hash code from then on.</p>
+<p>When a <code>HashedAndMoved</code> object is moved again, the GC copies the hash field to the newer copy, but
+no state transition happens.</p>
+<h2 id="implementing-address-based-hashing-with-mmtk"><a class="header" href="#implementing-address-based-hashing-with-mmtk">Implementing Address-based Hashing with MMTk</a></h2>
+<p>Here we use the implementation strategy from JikesRVM as an example of how to implement
+address-based hashing when using MMTk.  For the best performance, we recommend holding the hash code
+state in the object header, and putting the added hash field in the beginning or the end of the
+object.  We also introduce alternative strategies in <a href="#alternative-implementation-strategies">the next
+section</a>.</p>
+<h3 id="object-layout"><a class="header" href="#object-layout">Object Layout</a></h3>
+<p>Since there are three states, each object needs two bits of metadata to represent that state.  The
+two bits are usually held in the object header.  For example, <a href="https://www.jikesrvm.org/JavaDoc/org/jikesrvm/objectmodel/JavaHeader.html">in JikesRVM</a>, the two
+hash code state bits are placed after the thin lock bits, as shown below.</p>
+<pre><code>      TTTT TTTT TTTT TTTT TTTT TTHH AAAA AAAA
+ T = thin lock bits
+ H = hash code state bits
+ A = available for use by GCHeader and/or MiscHeader.
+</code></pre>
+<p>The VM also needs to decide the location of the extra hash field.  It is usually placed at the
+beginning or at the end of an object, as shown in the diagram below.  Regardless of the position of
+the hash field, the <code>ObjectReference</code> of an object usually points at the object header.  In this
+way, the header and ordinary fields can be accessed at the same offsets from the <code>ObjectReference</code>
+regardless of whether or where the hash field has been added.  The starting address of the object,
+however, may no longer be the same as he <code>ObjectReference</code> in some layout designs.  Therefore, the
+VM binding needs to <strong>implement <code>ObjectModel::ref_to_object_start</code> and handle the added hash field
+correctly</strong>.</p>
+<pre><code>                                   │ObjectReference                                      
+                                   │start of object                                      
+                                   ▼                                                     
+                                   ┌────────────┬──────────────────────────┐             
+No hash field                      │   Header   │ ordinary fields...       │             
+                                   └────────────┴──────────────────────────┘             
+                                                                                         
+                      │start of    │                                                     
+                      │object      │ObjectReference                                      
+                      ▼            ▼                                                     
+                      ┌────────────┬────────────┬──────────────────────────┐             
+Hash at the beginning │    Hash    │   Header   │ ordinary fields...       │             
+                      └────────────┴────────────┴──────────────────────────┘             
+                                                                                         
+                                   │ObjectReference                                      
+                                   │start of object                                      
+                                   ▼                                                     
+                                   ┌────────────┬──────────────────────────┬────────────┐
+Hash at the end                    │   Header   │ ordinary fields...       │    Hash    │
+                                   └────────────┴──────────────────────────┴────────────┘
+</code></pre>
+<h3 id="gc-copying-objects"><a class="header" href="#gc-copying-objects">GC: Copying Objects</a></h3>
+<p>MMTk calls the following trait methods implemented by the VM binding during copying GC.</p>
+<ul>
+<li>For non-delayed-copy collectors (all moving plans except MarkCompact)
+<ul>
+<li><code>ObjectModel::copy</code></li>
+</ul>
+</li>
+<li>For delayed-copy collectors (MarkCompact)
+<ul>
+<li><code>ObjectModel::copy_to</code></li>
+<li><code>ObjectModel::get_reference_when_copied_to</code></li>
+<li><code>ObjectModel::get_size_when_copied</code></li>
+<li><code>ObjectModel::get_align_when_copied</code></li>
+<li><code>ObjectModel::get_align_offset_when_copied</code></li>
+</ul>
+</li>
+</ul>
+<p>When using a non-delayed-copy collector, MMTk calls <code>ObjectModel::copy</code> which is defined as:</p>
+<pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn copy(
+        from: ObjectReference,
+        semantics: CopySemantics,
+        copy_context: &amp;mut GCWorkerCopyContext&lt;VM&gt;,
+    ) -&gt; ObjectReference;
+<span class="boring">}</span></code></pre></pre>
+<p>The <code>copy</code> method should</p>
+<ol>
+<li><strong>Find the state of the <code>from</code> object.</strong>  This is done in VM-specific ways, such as inspecting
+header bits.  If it was <code>Hashed</code>, it should transition to the <code>HashedAndMoved</code> state in the new
+copy.</li>
+<li><strong>Find the size of the <code>from</code> object, including the hash field.</strong>  If the <code>from</code> object is
+already in the <code>HashedAndMoved</code> state, the VM binding must have already inserted a hash field in
+step 3 below.  Make sure the hash field is counted in the object size.</li>
+<li><strong>Allocate the new copy, with a larger size if needed.</strong>  It should call
+<code>copy_context.alloc_copy(from, new_size, new_align, new_offset, semantics)</code> to allocate the new
+copy of the object.  When transitioning from <code>Hashed</code> to <code>HashedAndMoved</code>, the <code>new_size</code> should
+be <em>larger</em> than the old size in order to accommodate the added hash field.  Otherwise the new
+size should be the same as the old size.</li>
+<li><strong>Adjust the <code>ObjectReference</code> if needed.</strong>  If the hash field is inserted in the beginning, the
+offset from the start of the object to the <code>ObjectReference</code> may be greater in the new copy.
+Make sure the <code>ObjectReference</code> of the new copy is pointing at the right place.  See the
+diagrams in the <a href="#object-layout">Object Layout</a> section.</li>
+<li><strong>Copy header and ordinary fields.</strong>  Make sure the data is copied to the right offset if the
+hash field is inserted at the beginning.</li>
+<li><strong>Fix the state of the new copy if needed.</strong>  If the old copy is <code>Hashed</code>, the new copy shall be
+in the <code>HashedAndMoved</code> state.  Set the new copy to the right state by, for example, modifying
+its header bits.</li>
+<li><strong>Write or copy the hash field if needed.</strong>  When transitioning from <code>Hashed</code> to
+<code>HashedAndMoved</code>, write the old address of the object to the hash field; if the old copy is
+already in the <code>HashedAndMoved</code> state, copy the content of the hash field.</li>
+</ol>
+<p>When using a delayed-copy collector, the VM binding should do the same things as above, but in
+different methods in a slightly different order.  It shall (1) determine the size of the new copy in
+<code>get_size_when_copied</code>, (2) determine the address of <code>ObjectReference</code> in the new copy in
+<code>get_reference_when_copied_to</code>, and (3) do the actual copying and write the right values to the
+header bits and the hash field in <code>copy_to</code>.  The reference to the old copy is passed to all of the
+three methods as a parameter so that the VM binding can look up the state of the old copy, and
+determine the state of the new copy.</p>
+<h3 id="mutator-observing-the-identity-hash-code"><a class="header" href="#mutator-observing-the-identity-hash-code">Mutator: Observing the Identity Hash Code</a></h3>
+<p>Mutators should get the identity hash code of an object by first finding the state of the object.</p>
+<ul>
+<li>If <code>Unhashed</code>, it should set its state to <code>Hashed</code> and use its address as the hash code.</li>
+<li>If <code>Hashed</code>, it should simply use its address as the hash code.</li>
+<li>If <code>HashedAndMoved</code>, it should read the hash code from the added hash field.</li>
+</ul>
+<p>Note that the operation of getting the identity hash code may happen concurrently with other mutator
+threads and GC worker threads.</p>
+<p>Because other mutators can be accessing the header bits of the same object concurrently, the
+operation of transitioning the state from <code>Unhashed</code> to <code>Hashed</code> it should be done <em>atomically</em>.
+If, as in JikesRVM, the <code>Unhashed</code> state is encoded as <code>00</code> and the <code>Hashed</code> state is encoded as
+<code>01</code>, this state transition can be done with a single atomic bit-set or fetch-or operation.</p>
+<p>There is also a risk if GC can happen concurrently, moving the object and changing its state.  If
+copying only happens during stop-the-world (that includes all stop-the-world GC algorithms and some
+concurrent GC algorithms that only copy objects during stop-the-world, such as <a href="https://dl.acm.org/doi/10.1145/3519939.3523440">LXR</a>), we can make
+the computing of identity hash code <em>atomic with respect to copying GC</em> by not inserting <a href="../../glossary.html#gc-safe-point">GC-safe
+points</a> in the middle of computing identity hash code.  MMTk currently does not have concurrent
+copying GC.</p>
+<h2 id="alternative-implementation-strategies"><a class="header" href="#alternative-implementation-strategies">Alternative Implementation Strategies</a></h2>
+<p>Some VMs cannot implement address-based hashing in the same way as JikesRVM due to implementation
+details.</p>
+<p>If the VM cannot spare two bits in the object header for the hash code state, it can use on-the-side
+metadata (bitmap), instead.  It will add a space overhead of two bits per object alignment.  If all
+objects are aligned to 8 bytes, it will be a 1/32 (about 3%) space overhead.</p>
+<p>If the VM cannot add a hash field to an object when moved, an alternative is using a global table
+that maps the address of each object in the <code>HashedAndMoved</code> state to its hash code.  This will
+require a table lookup every time the VM observes the hash code of an object in the <code>HashedAndMoved</code>
+state.  This table also needs to be updated when copying GC happens because object may be moved or
+dead.  Because the addresses of objects are used as keys, the table may need to be rehashed or
+reconstructed if it is implemented as a hash table or a search tree.</p>
+<p>Whether the space and time overhead is acceptable depends on the VM implementation as well as the
+workload.  For example, if a VM has many hash tables that naively use object addresses as the hash
+code, it will need to rehash all such tables when copying GC happens.  Even though maintaining a
+global table that maps addresses to hash codes is expensive, implementing address-based hashing this
+way can still eliminate the need to rehash all other hash tables at the expense of having to rehash
+one global table.  And if very few objects are in the <code>HashedAndMoved</code> state, the <em>average</em> cost of
+computing the identity hash code can still be low.</p>
+<!--
+vim: tw=100 ts=4 sw=4 sts=4 et
+-->
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../../portingguide/concerns/weakref.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../../migration/prefix.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../../portingguide/concerns/weakref.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../../migration/prefix.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../../elasticlunr.min.js"></script>
+        <script src="../../mark.min.js"></script>
+        <script src="../../searcher.js"></script>
+
+        <script src="../../clipboard.min.js"></script>
+        <script src="../../highlight.js"></script>
+        <script src="../../book.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../../assets/js/api-migration-details.js"></script>
+
+
+    </div>
+    </body>
+</html>

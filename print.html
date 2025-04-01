@@ -34,10 +34,11 @@
         <link rel="stylesheet" href="assets/css/mdbook-admonish.css">
 
 
-        <!-- Provide site root to javascript -->
+        <!-- Provide site root and default themes to javascript -->
         <script>
-            var path_to_root = "";
-            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc.js"></script>
@@ -47,8 +48,8 @@
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script>
             try {
-                var theme = localStorage.getItem('mdbook-theme');
-                var sidebar = localStorage.getItem('mdbook-sidebar');
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
 
                 if (theme.startsWith('"') && theme.endsWith('"')) {
                     localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
@@ -62,7 +63,8 @@
 
         <!-- Set the theme before any content is loaded, prevents flash -->
         <script>
-            var theme;
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
@@ -75,8 +77,8 @@
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
-            var sidebar = null;
-            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
@@ -112,6 +114,7 @@
                             <i class="fa fa-paint-brush"></i>
                         </button>
                         <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
@@ -192,6 +195,89 @@ extent allowed by the specification of the VM or the language.  For example, the
 choose not to retain objects used for caching.  Specifically, for Java virtual machines, that means
 not retaining referents of <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/ref/SoftReference.html"><code>SoftReference</code></a> which is primarily designed for
 implementing memory-sensitive caches.</p>
+<h2 id="gc-safe-point"><a class="header" href="#gc-safe-point">GC-safe Point</a></h2>
+<p>Also known as: <em>GC-point</em></p>
+<p>A <em>GC-safe point</em> is a place in the code executed by mutators where (stop-the-world) garbage
+collection is allowed to happen.  Concurrent GC can run concurrently with mutators, but still needs
+to synchronize with mutators at GC-safe points.  Regardless, the following statements must be true
+when a mutator is at a GC-safe point.</p>
+<ul>
+<li>References held by a mutator can be identified.  That include references in local variables,
+thread-local variables, and so on.  For compiled code, that include those in stack slots and
+machine registers.</li>
+<li>The mutator cannot be in the middle of operations that must be <em>atomic with respect to GC</em>.
+That includes <a href="glossary.html#write-barrier">write barriers</a>, <a href="glossary.html#address-based-hashing">address-based hashing</a>, etc.</li>
+</ul>
+<h3 id="code-with-gc-semantics"><a class="header" href="#code-with-gc-semantics">Code With GC Semantics</a></h3>
+<p>Compilers (including ahead-of-time and just-in-time compilers) for programs with garbage collection
+semantics (such as Java source code or bytecode) usually understand GC semantics, too, and can
+generate <a href="glossary.html#yieldpoint">yieldpoints</a> and <a href="glossary.html#stack-map">stack maps</a> to assist GC.</p>
+<p>In practice, such compilers only make certain places in a function GC-safe and only generate <a href="glossary.html#stack-map">stack
+maps</a> at those places, including but not limited to:</p>
+<ul>
+<li><a href="glossary.html#yieldpoint">yieldpoints</a></li>
+<li>object allocation sites (may trigger GC)</li>
+<li>call sites to other functions where GC is allowed to happen inside</li>
+</ul>
+<p>If we allow GC to happen at arbitrary PC, it will either force the compiler to generate <a href="glossary.html#stack-map">stack maps</a>
+at all PCs, or force the VM to use <a href="glossary.html#shadow-stack">shadow stacks</a> or <a href="glossary.html#conservative-stack-scanning">conservative stack scanning</a>, instead.  It
+will also break operations that must be <em>atomic with respect to GC</em>, such as <a href="glossary.html#write-barrier">write barrier</a> and
+<a href="glossary.html#address-based-hashing">address-based hashing</a>.</p>
+<h3 id="code-without-gc-semantics"><a class="header" href="#code-without-gc-semantics">Code Without GC Semantics</a></h3>
+<p>In contrast, for programs without GC semantics (e.g. programs written in C, C++, Rust, etc.), their
+compilers (GCC, clang, rustc, ...) are agnostic to GC.  But many VMs (such as OpenJDK, CRuby, Julia,
+etc.) are implemented in such languages.  We don't usually use the term "GC-safe point" for
+functions written in C, C++, Rust, etc., but each VM has its own rules to determine whether GC can
+happen within functions written in those languages.</p>
+<p>Interpreters usually maintain local variables in dedicated stacks or frames data structures.
+References in such structures are identified by traversing those stacks or frames, and GC is usually
+allowed between bytecode instructions.</p>
+<p>Some runtime functions implement operations tightly related to GC, and must be <em>atomic w.r.t. GC</em>.
+For example, if a function initializes the type information in the header of an object, GC cannot
+happen in the middle.  Otherwise the GC will read a corrupted header and crash.  Other examples
+include functions that implement the write barrier <a href="glossary.html#fast-path-and-slow-path">slow path</a> and <a href="glossary.html#address-based-hashing">address-based hashing</a>.  Such
+functions cannot allocate objects, and cannot call any function that may trigger GC.</p>
+<p>Some functions do not access the GC heap, or only access the heap in controlled ways (e.g. utilizing
+<a href="glossary.html#object-pinning">object pinning</a>, or via safe APIs such as <a href="https://docs.oracle.com/en/java/javase/21/docs/specs/jni/index.html">JNI</a>).  Some of such functions (such as wrappers for
+blocking system calls including <code>read</code> and <code>write</code>) are long-running.  GC is usually safe when some
+mutators are executing such functions.  Compilers for languages with GC semantics usually make <em>call
+sites</em> to such functions <a href="glossary.html#gc-safe-point">GC-safe points</a>, and generate <a href="glossary.html#stack-map">stack maps</a> at those call sites.  The
+runtime usually transitions the state of the current mutator thread so that the GC knows it is in
+such a function when requesting all mutators to stop at their next GC-safe points.</p>
+<h2 id="stack-map"><a class="header" href="#stack-map">Stack Map</a></h2>
+<p>A <em>stack map</em> is a data structure that identifies stack slots and registers that may contain
+references.  Stack maps are essential for supporting <a href="glossary.html#precise-stack-scanning">precise stack scanning</a>.</p>
+<h2 id="yieldpoint"><a class="header" href="#yieldpoint">Yieldpoint</a></h2>
+<p>Also known as: <em>GC-check point</em></p>
+<p>A <em>yieldpoint</em> is a point in a program where a mutator thread checks if it should yield from normal
+execution in order to handle certain events, such as garbage collection, profiling, biased lock
+revocation, etc.</p>
+<p>Compilers of programs with GC semantics (e.g. Java source code and byte code) insert yieldpoints in
+various places, such as function epilogues and loop back-edges.  In this way, when GC is triggered
+asynchronously by other threads, the current mutator can reach the next yieldpoint quickly and yield
+for GC promptly.  Compilers also generate <a href="glossary.html#stack-map">stack maps</a> at yieldpoints to make them <a href="glossary.html#gc-safe-point">GC-safe points</a>.</p>
+<p>Because some operations (such as <a href="glossary.html#write-barrier">write barrier</a>) must be <em>atomic w.r.t. GC</em>, <a href="glossary.html#yieldpoint">yieldpoints</a> must not
+be inserted in the middle of such operations.</p>
+<p>Read the paper <a href="https://dl.acm.org/doi/10.1145/2754169.2754187"><em>Stop and go: Understanding yieldpoint behavior</em></a> by Lin et al. for more
+details.</p>
+<h2 id="address-based-hashing"><a class="header" href="#address-based-hashing">Address-based Hashing</a></h2>
+<p><em>Address-based hashing</em> is a GC-assisted space-efficient high-performance method for implementing
+identity hash code in copying GC.</p>
+<p>Read the <a href="portingguide/concerns/address-based-hashing.html">Address-based Hashing</a> chapter for more
+details.</p>
+<h2 id="precise-stack-scanning"><a class="header" href="#precise-stack-scanning">Precise Stack Scanning</a></h2>
+<p>Also known as: <em>exact stack scanning</em></p>
+<p>TODO</p>
+<h2 id="conservative-stack-scanning"><a class="header" href="#conservative-stack-scanning">Conservative Stack Scanning</a></h2>
+<p>TODO</p>
+<h2 id="shadow-stack"><a class="header" href="#shadow-stack">Shadow Stack</a></h2>
+<p>TODO</p>
+<h2 id="write-barrier"><a class="header" href="#write-barrier">Write Barrier</a></h2>
+<p>TODO</p>
+<h2 id="fast-path-and-slow-path"><a class="header" href="#fast-path-and-slow-path">Fast Path and Slow Path</a></h2>
+<p>TODO</p>
+<h2 id="object-pinning"><a class="header" href="#object-pinning">Object Pinning</a></h2>
+<p>TODO</p>
 <!--
 vim: tw=100 ts=4 sw=4 sts=4 et
 -->
@@ -1603,10 +1689,7 @@ In the case of V8, the refactoring within V8 required to get a simple NoGC plan 
 <p>At a high level, in order to implement NoGC, we need to handle MMTk initialization, mutator initialization, and memory allocation.</p>
 <p>If you're ever stuck at any point, feel free to send a message in the <code>#Porting</code> channel of our <a href="https://mmtk.zulipchat.com/">Zulip</a>!</p>
 <h2 id="set-up"><a class="header" href="#set-up">Set up</a></h2>
-<p>You want to set up the binding repository/directory structure before starting the port. For the sake of the tutorial guide we assume you have a directory structure similar to the one below. Note that such a directory structure is not a requirement<sup class="footnote-reference"><a href="#1">1</a></sup> but a recommendation. We assume you are using some form of version control system (such as <code>git</code> or <code>mercurial</code>) in this guide.</p>
-<div class="footnote-definition" id="1"><sup class="footnote-definition-label">1</sup>
-<p>In fact some bindings may not be able to have such a directory structure due to the build tools used by the runtime.</p>
-</div>
+<p>You want to set up the binding repository/directory structure before starting the port. For the sake of the tutorial guide we assume you have a directory structure similar to the one below. Note that such a directory structure is not a requirement<sup class="footnote-reference" id="fr-1-1"><a href="#footnote-1">1</a></sup> but a recommendation. We assume you are using some form of version control system (such as <code>git</code> or <code>mercurial</code>) in this guide.</p>
 <ul>
 <li><code>mmtk-X/mmtk</code>: The MMTk side of the binding. This includes the implementation of <a href="https://docs.mmtk.io/api/mmtk/vm/trait.VMBinding.html">the <code>VMBinding</code> trait</a>,
 and any necessary Rust code to integrate MMTk with the VM code (e.g. exposing MMTk functions to native, allowing up-calls from the MMTk binding to the runtime, etc).
@@ -1634,11 +1717,8 @@ You can also take a look at one of our officially maintained language bindings a
 <ol>
 <li><code>cd mmtk-X/mmtk</code></li>
 <li><code>cargo build</code> to build in debug mode or add <code>--release</code> for release mode</li>
-<li>Copy the shared or static<sup class="footnote-reference"><a href="#2">2</a></sup> library from <code>target/debug</code> or <code>target/release</code> to your desired location</li>
+<li>Copy the shared or static<sup class="footnote-reference" id="fr-2-1"><a href="#footnote-2">2</a></sup> library from <code>target/debug</code> or <code>target/release</code> to your desired location</li>
 </ol>
-<div class="footnote-definition" id="2"><sup class="footnote-definition-label">2</sup>
-<p>You would have to change the <code>crate-type</code> in <code>mmtk-X/mmtk/Cargo.toml</code> from <code>cdylib</code> to <code>staticlib</code> to build a static library.</p>
-</div>
 <p>Later, you can edit the runtime build process to build MMTk at the same time automatically.</p>
 <p><strong>Note:</strong> If the runtime you are targeting already links some Rust FFI libraries, then you may notice "multiple definition" linker errors for Rust stdlib functions. Unfortunately this is a current limitation of Rust FFI wherein all symbols are bundled together in the final C lib which will cause multiple definitions errors when two or more Rust FFI libraries are linked together. There is ongoing work to stabilize the Rust package format that would hopefully make it easier in the future. A current workaround would be to use the <code>-Wl,--allow-multiple-definition</code> linker flag, but this unfortunately isn't ideal as it increases code sizes. See <a href="https://internals.rust-lang.org/t/pre-rfc-stabilize-a-version-of-the-rlib-format/17558">here</a> and <a href="https://github.com/rust-lang/rust/issues/73632">here</a> for more details.</p>
 <p><strong>Note:</strong> It is <em>highly</em> recommended to also check-in the generated <code>Cargo.lock</code> file into your version control. This improves the reproducibility of the build and ensures the same package versions are used when building in the future in order to prevent random breakages.</p>
@@ -1850,7 +1930,14 @@ binding developer, you can ignore the details for now.</p>
 <p>Often it is the case that the above changes are not enough to allow a runtime to work with MMTk. For example, for the ART binding, the runtime required that all inflated locks be deflated prior to writing the boot image. In order to fix this, we had to implement a heap visitor that visited each allocated object and checked if it had inflated locks, deflating them if they were.</p>
 <p>Unfortunately there is no real magic bullet here. If you come across a runtime-specific idiosyncrasy (and you almost certainly will), you will have to understand what the underlying bug is and either fix or work around it.</p>
 <p>If you have any confusions or questions, please free to reach us on our <a href="https://mmtk.zulipchat.com/">Zulip</a>! We would be glad to help.</p>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h1>
+<hr>
+<ol class="footnote-definition"><li id="footnote-1">
+<p>In fact some bindings may not be able to have such a directory structure due to the build tools used by the runtime. <a href="#fr-1-1">↩</a></p>
+</li>
+<li id="footnote-2">
+<p>You would have to change the <code>crate-type</code> in <code>mmtk-X/mmtk/Cargo.toml</code> from <code>cdylib</code> to <code>staticlib</code> to build a static library. <a href="#fr-2-1">↩</a></p>
+</li>
+</ol><div style="break-before: page; page-break-before: always;"></div><h1 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h1>
 <p>Your choice of the next GC plan to implement depends on your situation.
 If you’re developing a new VM from scratch, or if you are intimately familiar with the internals of your target VM, then implementing a SemiSpace collector is probably the best course of action.
 Although the GC itself is rather simplistic, it stresses many of the key components of the MMTk &lt;-&gt; VM binding that will be required for later (and more powerful) GCs.
@@ -2636,6 +2723,239 @@ binding can use those utilities by implementing the <code>mmtk::vm::ReferenceGlu
 <p>However, those mechanisms are too specific to Java, and are not applicable to most other VMs.  <strong>New
 VM bindings should use the <code>Scanning::process_weak_refs</code> API</strong>, and we are porting existing VM
 bindings away from the built-in reference/finalizable processors.</p>
+<!--
+vim: tw=100 ts=4 sw=4 sts=4 et
+-->
+<div style="break-before: page; page-break-before: always;"></div><h1 id="address-based-hashing-1"><a class="header" href="#address-based-hashing-1">Address-based Hashing</a></h1>
+<p>Address-based hashing is a GC-assisted method for implementing identity hash code in copying GC.  It
+has the advantage of high performance and not requiring a dedicated hash field for most objects.</p>
+<p>This chapter is especially useful for VMs that previously used non-moving GC and naively used the
+object address as identity hash code.</p>
+<h2 id="concepts"><a class="header" href="#concepts">Concepts</a></h2>
+<p>An <strong>identity hash code</strong> of an object is a hash code that <em>never changes</em> during the lifetime of
+the object, i.e. since it is allocated, until it is reclaimed by the GC.</p>
+<ul>
+<li>It is not required to be <em>unique</em>.
+<ul>
+<li>Two different objects are allowed to have the same identity hash code.  Like any hashing
+algorithm, collision is allowed.  But a good hash code should be <em>relatively unique</em> in
+order to reduce collision.</li>
+<li>On the contrary, some programming languages (such as <a href="https://docs.python.org/3/library/functions.html#id">Python</a> and
+<a href="https://docs.ruby-lang.org/en/master/Object.html#method-i-object_id">Ruby</a>) have the notion of <em>object ID</em> which is required to be unique.</li>
+</ul>
+</li>
+<li>It is unrelated to the <em>value</em> the object represents.
+<ul>
+<li>For example, modifying a mutable string object does not change its identity hash code.</li>
+<li>On the contrary, two string objects that are equal character-wise may (but does not have to)
+have different identity hash code.</li>
+</ul>
+</li>
+<li>Copying GC does <em>not</em> change object identities.
+<ul>
+<li>If an object is moved by a copying GC, its identity hash code remains the same.</li>
+<li>On the contrary, when moved by a copying GC, the <em>address</em> of the object is changed.</li>
+</ul>
+</li>
+</ul>
+<p>For non-copying GC algorithms, the <em>address</em> of an object never changes, and all objects have
+distinct addresses.  Therefore it is an ideal identity hash code.</p>
+<p>For copying GC algorithms, however, we cannot simply use the address of an object because it will be
+changed when the GC moves the object.  A naive solution is adding an extra field to every object to
+hold its hash code, and the field is copied when the GC moves the object.  Although this approach
+works (and it is used by real-world VMs such as OpenJDK), it unconditionally adds a field to every
+object.  However,</p>
+<ul>
+<li><strong>Objects are rarely moved</strong> in advanced GC algorithms such as Immix.</li>
+<li><strong>Few objects ever have identity hash code <em>observed</em></strong> (e.g.  by calling
+<code>System.identityHashCode(object)</code> in Java) in real-world applications.  According to <a href="https://wiki.openjdk.org/display/lilliput">the
+Lilliput project</a> of OpenJDK, with most workloads, only relatively few (&lt;1%)
+Java objects are ever assigned an identity hash.</li>
+</ul>
+<p><strong>Address-based hashing</strong> solves these problems by not adding the extra hash field until both of the
+following conditions are true:</p>
+<ol>
+<li>The identity hash code of the object has been observed, and</li>
+<li>the object is moved by the GC <em>after</em> its identity hash code has been observed.</li>
+</ol>
+<p>Under the <em>weak generational hypothesis</em> (i.e. most objects die young), most objects will die before
+the two conditions become true, and will never need the extra hash field during its lifetime.</p>
+<p>The address-based hashing algorithm is implemented <a href="https://www.jikesrvm.org/JavaDoc/org/jikesrvm/objectmodel/JavaHeader.html">in JikesRVM</a>, and is planned to
+be implemented in OpenJDK (<a href="https://wiki.openjdk.org/display/lilliput/Compact+Identity+Hashcode">the Lilliput project</a>).</p>
+<h2 id="the-address-based-hashing-algorithm"><a class="header" href="#the-address-based-hashing-algorithm">The Address-based Hashing Algorithm</a></h2>
+<p>Each object is in one of the three <strong>hash code states</strong>:</p>
+<ul>
+<li><code>Unhashed</code></li>
+<li><code>Hashed</code></li>
+<li><code>HashedAndMoved</code></li>
+</ul>
+<p>The state-transition graph is shown below:</p>
+<pre><code>       move                        hash                    move or hash   
+     ┌──────┐                    ┌──────┐                    ┌──────┐     
+     │      │                    │      │                    │      │     
+┌────▼──────┴────┐   hash   ┌────▼──────┴────┐   move   ┌────▼──────┴────┐
+│    Unhashed    ├─────────►│     Hashed     ├─────────►│ HashedAndMoved │
+└────────────────┘          └────────────────┘          └────────────────┘
+</code></pre>
+<p>States are transitioned upon events labelled on the edges:</p>
+<ul>
+<li><code>hash</code>: The mutator observes the identity hash code of an object.</li>
+<li><code>move</code>: The GC moves the object.</li>
+</ul>
+<p>An object starts in the <code>Unhashed</code> state when allocated.  The GC is free to move it any times, and
+its state remains <code>Unhashed</code>, as long as its identity hash code is not observed.</p>
+<p>When the identity hash code is observed for the first time, its state is changed to <code>Hashed</code>.  <strong>In
+the <code>Hashed</code> state, the identity hash code of an object is its address.</strong>  The object will continue
+to use its address as its identity hash code until the object is moved.</p>
+<p>When a <code>Hashed</code> object is moved, the GC adds a hash field (distinct from high-level language fields
+defined by the application) to the new copy of the object, and writes its old address into that
+field.  The state of the object is transitioned to <code>HashedAndMoved</code>.  <strong>In the <code>HashedAndMoved</code>
+state, the identity hash code of an object is the value in its added hash field</strong>, and it will keep
+using the value in the field as the identity hash code from then on.</p>
+<p>When a <code>HashedAndMoved</code> object is moved again, the GC copies the hash field to the newer copy, but
+no state transition happens.</p>
+<h2 id="implementing-address-based-hashing-with-mmtk"><a class="header" href="#implementing-address-based-hashing-with-mmtk">Implementing Address-based Hashing with MMTk</a></h2>
+<p>Here we use the implementation strategy from JikesRVM as an example of how to implement
+address-based hashing when using MMTk.  For the best performance, we recommend holding the hash code
+state in the object header, and putting the added hash field in the beginning or the end of the
+object.  We also introduce alternative strategies in <a href="portingguide/concerns/address-based-hashing.html#alternative-implementation-strategies">the next
+section</a>.</p>
+<h3 id="object-layout"><a class="header" href="#object-layout">Object Layout</a></h3>
+<p>Since there are three states, each object needs two bits of metadata to represent that state.  The
+two bits are usually held in the object header.  For example, <a href="https://www.jikesrvm.org/JavaDoc/org/jikesrvm/objectmodel/JavaHeader.html">in JikesRVM</a>, the two
+hash code state bits are placed after the thin lock bits, as shown below.</p>
+<pre><code>      TTTT TTTT TTTT TTTT TTTT TTHH AAAA AAAA
+ T = thin lock bits
+ H = hash code state bits
+ A = available for use by GCHeader and/or MiscHeader.
+</code></pre>
+<p>The VM also needs to decide the location of the extra hash field.  It is usually placed at the
+beginning or at the end of an object, as shown in the diagram below.  Regardless of the position of
+the hash field, the <code>ObjectReference</code> of an object usually points at the object header.  In this
+way, the header and ordinary fields can be accessed at the same offsets from the <code>ObjectReference</code>
+regardless of whether or where the hash field has been added.  The starting address of the object,
+however, may no longer be the same as he <code>ObjectReference</code> in some layout designs.  Therefore, the
+VM binding needs to <strong>implement <code>ObjectModel::ref_to_object_start</code> and handle the added hash field
+correctly</strong>.</p>
+<pre><code>                                   │ObjectReference                                      
+                                   │start of object                                      
+                                   ▼                                                     
+                                   ┌────────────┬──────────────────────────┐             
+No hash field                      │   Header   │ ordinary fields...       │             
+                                   └────────────┴──────────────────────────┘             
+                                                                                         
+                      │start of    │                                                     
+                      │object      │ObjectReference                                      
+                      ▼            ▼                                                     
+                      ┌────────────┬────────────┬──────────────────────────┐             
+Hash at the beginning │    Hash    │   Header   │ ordinary fields...       │             
+                      └────────────┴────────────┴──────────────────────────┘             
+                                                                                         
+                                   │ObjectReference                                      
+                                   │start of object                                      
+                                   ▼                                                     
+                                   ┌────────────┬──────────────────────────┬────────────┐
+Hash at the end                    │   Header   │ ordinary fields...       │    Hash    │
+                                   └────────────┴──────────────────────────┴────────────┘
+</code></pre>
+<h3 id="gc-copying-objects"><a class="header" href="#gc-copying-objects">GC: Copying Objects</a></h3>
+<p>MMTk calls the following trait methods implemented by the VM binding during copying GC.</p>
+<ul>
+<li>For non-delayed-copy collectors (all moving plans except MarkCompact)
+<ul>
+<li><code>ObjectModel::copy</code></li>
+</ul>
+</li>
+<li>For delayed-copy collectors (MarkCompact)
+<ul>
+<li><code>ObjectModel::copy_to</code></li>
+<li><code>ObjectModel::get_reference_when_copied_to</code></li>
+<li><code>ObjectModel::get_size_when_copied</code></li>
+<li><code>ObjectModel::get_align_when_copied</code></li>
+<li><code>ObjectModel::get_align_offset_when_copied</code></li>
+</ul>
+</li>
+</ul>
+<p>When using a non-delayed-copy collector, MMTk calls <code>ObjectModel::copy</code> which is defined as:</p>
+<pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn copy(
+        from: ObjectReference,
+        semantics: CopySemantics,
+        copy_context: &amp;mut GCWorkerCopyContext&lt;VM&gt;,
+    ) -&gt; ObjectReference;
+<span class="boring">}</span></code></pre></pre>
+<p>The <code>copy</code> method should</p>
+<ol>
+<li><strong>Find the state of the <code>from</code> object.</strong>  This is done in VM-specific ways, such as inspecting
+header bits.  If it was <code>Hashed</code>, it should transition to the <code>HashedAndMoved</code> state in the new
+copy.</li>
+<li><strong>Find the size of the <code>from</code> object, including the hash field.</strong>  If the <code>from</code> object is
+already in the <code>HashedAndMoved</code> state, the VM binding must have already inserted a hash field in
+step 3 below.  Make sure the hash field is counted in the object size.</li>
+<li><strong>Allocate the new copy, with a larger size if needed.</strong>  It should call
+<code>copy_context.alloc_copy(from, new_size, new_align, new_offset, semantics)</code> to allocate the new
+copy of the object.  When transitioning from <code>Hashed</code> to <code>HashedAndMoved</code>, the <code>new_size</code> should
+be <em>larger</em> than the old size in order to accommodate the added hash field.  Otherwise the new
+size should be the same as the old size.</li>
+<li><strong>Adjust the <code>ObjectReference</code> if needed.</strong>  If the hash field is inserted in the beginning, the
+offset from the start of the object to the <code>ObjectReference</code> may be greater in the new copy.
+Make sure the <code>ObjectReference</code> of the new copy is pointing at the right place.  See the
+diagrams in the <a href="portingguide/concerns/address-based-hashing.html#object-layout">Object Layout</a> section.</li>
+<li><strong>Copy header and ordinary fields.</strong>  Make sure the data is copied to the right offset if the
+hash field is inserted at the beginning.</li>
+<li><strong>Fix the state of the new copy if needed.</strong>  If the old copy is <code>Hashed</code>, the new copy shall be
+in the <code>HashedAndMoved</code> state.  Set the new copy to the right state by, for example, modifying
+its header bits.</li>
+<li><strong>Write or copy the hash field if needed.</strong>  When transitioning from <code>Hashed</code> to
+<code>HashedAndMoved</code>, write the old address of the object to the hash field; if the old copy is
+already in the <code>HashedAndMoved</code> state, copy the content of the hash field.</li>
+</ol>
+<p>When using a delayed-copy collector, the VM binding should do the same things as above, but in
+different methods in a slightly different order.  It shall (1) determine the size of the new copy in
+<code>get_size_when_copied</code>, (2) determine the address of <code>ObjectReference</code> in the new copy in
+<code>get_reference_when_copied_to</code>, and (3) do the actual copying and write the right values to the
+header bits and the hash field in <code>copy_to</code>.  The reference to the old copy is passed to all of the
+three methods as a parameter so that the VM binding can look up the state of the old copy, and
+determine the state of the new copy.</p>
+<h3 id="mutator-observing-the-identity-hash-code"><a class="header" href="#mutator-observing-the-identity-hash-code">Mutator: Observing the Identity Hash Code</a></h3>
+<p>Mutators should get the identity hash code of an object by first finding the state of the object.</p>
+<ul>
+<li>If <code>Unhashed</code>, it should set its state to <code>Hashed</code> and use its address as the hash code.</li>
+<li>If <code>Hashed</code>, it should simply use its address as the hash code.</li>
+<li>If <code>HashedAndMoved</code>, it should read the hash code from the added hash field.</li>
+</ul>
+<p>Note that the operation of getting the identity hash code may happen concurrently with other mutator
+threads and GC worker threads.</p>
+<p>Because other mutators can be accessing the header bits of the same object concurrently, the
+operation of transitioning the state from <code>Unhashed</code> to <code>Hashed</code> it should be done <em>atomically</em>.
+If, as in JikesRVM, the <code>Unhashed</code> state is encoded as <code>00</code> and the <code>Hashed</code> state is encoded as
+<code>01</code>, this state transition can be done with a single atomic bit-set or fetch-or operation.</p>
+<p>There is also a risk if GC can happen concurrently, moving the object and changing its state.  If
+copying only happens during stop-the-world (that includes all stop-the-world GC algorithms and some
+concurrent GC algorithms that only copy objects during stop-the-world, such as <a href="https://dl.acm.org/doi/10.1145/3519939.3523440">LXR</a>), we can make
+the computing of identity hash code <em>atomic with respect to copying GC</em> by not inserting <a href="portingguide/concerns/../../glossary.html#gc-safe-point">GC-safe
+points</a> in the middle of computing identity hash code.  MMTk currently does not have concurrent
+copying GC.</p>
+<h2 id="alternative-implementation-strategies"><a class="header" href="#alternative-implementation-strategies">Alternative Implementation Strategies</a></h2>
+<p>Some VMs cannot implement address-based hashing in the same way as JikesRVM due to implementation
+details.</p>
+<p>If the VM cannot spare two bits in the object header for the hash code state, it can use on-the-side
+metadata (bitmap), instead.  It will add a space overhead of two bits per object alignment.  If all
+objects are aligned to 8 bytes, it will be a 1/32 (about 3%) space overhead.</p>
+<p>If the VM cannot add a hash field to an object when moved, an alternative is using a global table
+that maps the address of each object in the <code>HashedAndMoved</code> state to its hash code.  This will
+require a table lookup every time the VM observes the hash code of an object in the <code>HashedAndMoved</code>
+state.  This table also needs to be updated when copying GC happens because object may be moved or
+dead.  Because the addresses of objects are used as keys, the table may need to be rehashed or
+reconstructed if it is implemented as a hash table or a search tree.</p>
+<p>Whether the space and time overhead is acceptable depends on the VM implementation as well as the
+workload.  For example, if a VM has many hash tables that naively use object addresses as the hash
+code, it will need to rehash all such tables when copying GC happens.  Even though maintaining a
+global table that maps addresses to hash codes is expensive, implementing address-based hashing this
+way can still eliminate the need to rehash all other hash tables at the expense of having to rehash
+one global table.  And if very few objects are in the <code>HashedAndMoved</code> state, the <em>average</em> cost of
+computing the identity hash code can still be low.</p>
 <!--
 vim: tw=100 ts=4 sw=4 sts=4 et
 -->
