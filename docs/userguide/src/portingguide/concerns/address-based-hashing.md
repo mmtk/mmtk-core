@@ -166,7 +166,7 @@ MMTk calls the following trait methods implemented by the VM binding during copy
     -   `ObjectModel::get_align_when_copied`
     -   `ObjectModel::get_align_offset_when_copied`
 
-When using a non-delayed-copy collector, MMTk calls `ObjectgModel::copy` which is defined as:
+When using a non-delayed-copy collector, MMTk calls `ObjectModel::copy` which is defined as:
 
 ```rust
 {{#include ../../../../../src/vm/object_model.rs:copy}}
