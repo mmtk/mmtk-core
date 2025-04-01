@@ -169,7 +169,11 @@ MMTk calls the following trait methods implemented by the VM binding during copy
 When using a non-delayed-copy collector, MMTk calls `ObjectModel::copy` which is defined as:
 
 ```rust
-{{#include ../../../../../src/vm/object_model.rs:copy}}
+    fn copy(
+        from: ObjectReference,
+        semantics: CopySemantics,
+        copy_context: &mut GCWorkerCopyContext<VM>,
+    ) -> ObjectReference;
 ```
 
 The `copy` method should

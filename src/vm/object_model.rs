@@ -360,13 +360,11 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `from`: The address of the object to be copied.
     /// * `semantics`: The copy semantic to use.
     /// * `copy_context`: The `GCWorkerCopyContext` for the GC thread.
-    // ANCHOR: copy
     fn copy(
         from: ObjectReference,
         semantics: CopySemantics,
         copy_context: &mut GCWorkerCopyContext<VM>,
     ) -> ObjectReference;
-    // ANCHOR_END: copy
 
     /// Copy an object. This is required
     /// for delayed-copy collectors such as compacting collectors. During the
