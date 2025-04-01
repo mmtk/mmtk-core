@@ -255,7 +255,10 @@ impl VMMap for Map32 {
 
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
         let index = address.chunk_index();
-        self.descriptor_map[index]
+        self.descriptor_map
+            .get(index)
+            .copied()
+            .unwrap_or(SpaceDescriptor::UNINITIALIZED)
     }
 
     fn add_to_cumulative_committed_pages(&self, pages: usize) {
