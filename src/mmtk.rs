@@ -568,7 +568,7 @@ impl<VM: VMBinding> MMTK<VM> {
     /// Arguments:
     /// *   `out`: the place to print the VM maps.
     /// *   `space_name`: If `None`, print all spaces;
-    ///                   if `Some(n)`, only print the space whose name is `n`.
+    ///     if `Some(n)`, only print the space whose name is `n`.
     pub fn debug_print_vm_maps(
         &self,
         out: &mut impl std::fmt::Write,
