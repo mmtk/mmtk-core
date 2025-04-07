@@ -210,14 +210,27 @@ impl<VM: VMBinding> BumpAllocator<VM> {
                 acquired_start
             );
             if !stress_test {
-                self.set_limit(acquired_start, acquired_start + block_size);
+                // If the new block is contiguous to the previous one, we can let the
+                // allocation span multiple blocks. This reduces wasted space, specially in the
+                // single-threaded GC case.
+                let start = if self.bump_pointer.limit == acquired_start {
+                    self.bump_pointer.cursor
+                } else {
+                    acquired_start
+                };
+                self.set_limit(start, acquired_start + block_size);
                 self.alloc(size, align, offset)
             } else {
                 // For a stress test, we artificially make the fastpath fail by
                 // manipulating the limit as below.
                 // The assumption here is that we use an address range such that
                 // cursor > block_size always.
-                self.set_limit(acquired_start, unsafe { Address::from_usize(block_size) });
+                let start = if self.bump_pointer.limit == acquired_start {
+                    self.bump_pointer.cursor
+                } else {
+                    acquired_start
+                };
+                self.set_limit(start, unsafe { Address::from_usize(block_size) });
                 // Note that we have just acquired a new block so we know that we don't have to go
                 // through the entire allocation sequence again, we can directly call the slow path
                 // allocation.
