@@ -81,7 +81,7 @@
 
 <span class="kw">impl </span>VMRequest {
     <span class="kw">pub fn </span>is_discontiguous(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="macro">matches!</span>(<span class="self">self</span>, VMRequest::Discontiguous { .. })
+        <span class="macro">matches!</span>(<span class="self">self</span>, VMRequest::Discontiguous)
     }
 
     <span class="kw">pub fn </span>common64bit(top: bool) -&gt; <span class="self">Self </span>{
