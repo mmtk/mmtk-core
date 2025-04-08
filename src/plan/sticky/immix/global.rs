@@ -252,17 +252,13 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
             if !self.is_object_in_nursery(object) {
                 // Mature object
                 trace!("Immix mature object {}, skip", object);
-                debug_assert!(VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(
-                    object,
-                    Ordering::SeqCst
-                ));
+                debug_assert!(VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                    .is_unlogged::<VM>(object, Ordering::SeqCst));
                 return object;
             } else {
                 // Nursery object
-                debug_assert!(!VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(
-                    object,
-                    Ordering::SeqCst
-                ));
+                debug_assert!(!VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                    .is_unlogged::<VM>(object, Ordering::SeqCst));
                 let object = if KIND == TRACE_KIND_TRANSITIVE_PIN || KIND == TRACE_KIND_FAST {
                     trace!(
                         "Immix nursery object {} is being traced without moving",

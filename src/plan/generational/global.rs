@@ -216,10 +216,9 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
 
         // Evacuate nursery objects
         if self.nursery.in_space(object) {
-            debug_assert!(VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(
-                object,
-                Ordering::SeqCst
-            ));
+            debug_assert!(
+                !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::SeqCst)
+            );
             return self.nursery.trace_object::<Q>(
                 queue,
                 object,
@@ -233,10 +232,9 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         }
 
         // Otherwise it is a mature object
-        debug_assert!(VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(
-            object,
-            Ordering::SeqCst
-        ));
+        debug_assert!(
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::SeqCst)
+        );
 
         object
     }
