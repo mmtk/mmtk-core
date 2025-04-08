@@ -225,7 +225,9 @@ impl<VM: VMBinding> BumpAllocator<VM> {
                 // manipulating the limit as below.
                 // The assumption here is that we use an address range such that
                 // cursor > block_size always.
-                let start = if self.bump_pointer.limit == acquired_start {
+                let start = if self.bump_pointer.cursor + self.bump_pointer.limit.as_usize()
+                    == acquired_start
+                {
                     self.bump_pointer.cursor
                 } else {
                     acquired_start
