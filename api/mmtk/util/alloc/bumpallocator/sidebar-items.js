@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["BLOCK_MASK","BLOCK_SIZE","BYTES_IN_PAGE"],"struct":["BumpAllocator","BumpPointer"]};
+window.SIDEBAR_ITEMS = {"constant":["BLOCK_MASK","BLOCK_SIZE"],"struct":["BumpAllocator","BumpPointer"]};

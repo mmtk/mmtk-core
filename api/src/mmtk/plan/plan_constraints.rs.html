@@ -133,7 +133,7 @@
             max_non_los_default_alloc_bytes: MAX_INT,
             max_non_los_copy_bytes: MAX_INT,
             <span class="comment">// As `LAZY_SWEEP` is true, needs_linear_scan is true for all the plans. This is strange.
-            // https://github.com/mmtk/mmtk-core/issues/1027 trackes the issue.
+            // https://github.com/mmtk/mmtk-core/issues/1027 tracks the issue.
             </span>needs_linear_scan: <span class="kw">crate</span>::util::constants::SUPPORT_CARD_SCANNING
                 || <span class="kw">crate</span>::util::constants::LAZY_SWEEP,
             needs_concurrent_workers: <span class="bool-val">false</span>,
@@ -146,10 +146,10 @@
     }
 }
 
-<span class="doccomment">/// The default plan constraints. Each plan should define their own plan contraints.
+<span class="doccomment">/// The default plan constraints. Each plan should define their own plan constraints.
 /// They can start from the default constraints and explicitly set some of the fields.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>DEFAULT_PLAN_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
 
-<span class="comment">// Use 16 pages as the size limit for non-LOS objects to avoid copying large objects
-</span><span class="kw">pub const </span>MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN: usize = <span class="number">16 </span>&lt;&lt; LOG_BYTES_IN_PAGE;
+<span class="comment">// Use two pages as the size limit for non-LOS objects to avoid copying large objects
+</span><span class="kw">pub const </span>MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN: usize = <span class="number">2 </span>&lt;&lt; LOG_BYTES_IN_PAGE;
 </code></pre></div></section></main></body></html>
