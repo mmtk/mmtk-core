@@ -411,8 +411,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 for chunk in self.chunk_map.all_chunks() {
                     side.bzero_metadata(chunk.start(), Chunk::BYTES);
                 }
-            } else {
-                unimplemented!("in header log bit is not supported");
             }
         }
 
