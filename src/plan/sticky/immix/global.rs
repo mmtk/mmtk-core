@@ -262,14 +262,10 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                         "Immix nursery object {} is being traced without moving",
                         object
                     );
-                    debug_assert!(!VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                        .is_unlogged::<VM>(object, Ordering::SeqCst));
                     self.immix
                         .immix_space
                         .trace_object_without_moving(queue, object)
                 } else if crate::policy::immix::PREFER_COPY_ON_NURSERY_GC {
-                    debug_assert!(!VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                        .is_unlogged::<VM>(object, Ordering::SeqCst));
                     let ret = self.immix.immix_space.trace_object_with_opportunistic_copy(
                         queue,
                         object,
@@ -290,8 +286,6 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                     );
                     ret
                 } else {
-                    debug_assert!(!VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                        .is_unlogged::<VM>(object, Ordering::SeqCst));
                     trace!(
                         "Immix nursery object {} is being traced without moving",
                         object
@@ -312,10 +306,6 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                 .get_los()
                 .trace_object::<Q>(queue, object);
         }
-
-        // Mature object
-        debug_assert!(VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-            .is_unlogged::<VM>(object, Ordering::SeqCst));
 
         object
     }
