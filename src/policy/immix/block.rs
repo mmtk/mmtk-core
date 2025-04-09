@@ -10,8 +10,6 @@ use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpe
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
 use crate::util::metadata::MetadataSpec;
-#[cfg(feature = "object_pinning")]
-use crate::util::metadata::MetadataSpec;
 use crate::util::object_enum::BlockMayHaveObjects;
 use crate::util::Address;
 use crate::vm::*;
