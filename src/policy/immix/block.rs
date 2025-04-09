@@ -1,6 +1,7 @@
 use super::defrag::Histogram;
 use super::line::Line;
 use super::ImmixSpace;
+use crate::policy::space::Space;
 use crate::util::constants::*;
 use crate::util::heap::blockpageresource::BlockPool;
 use crate::util::heap::chunk_map::Chunk;
