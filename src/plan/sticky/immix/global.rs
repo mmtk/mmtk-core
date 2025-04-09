@@ -252,8 +252,6 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
             if !self.is_object_in_nursery(object) {
                 // Mature object
                 trace!("Immix mature object {}, skip", object);
-                debug_assert!(VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                    .is_unlogged::<VM>(object, Ordering::SeqCst));
                 return object;
             } else {
                 // Nursery object
