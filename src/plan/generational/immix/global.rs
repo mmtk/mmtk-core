@@ -249,10 +249,8 @@ impl<VM: VMBinding> GenImmix<VM> {
         let immix_space = ImmixSpace::new(
             plan_args.get_space_args("immix_mature", true, false, VMRequest::discontiguous()),
             ImmixSpaceArgs {
-                reset_log_bit_in_major_gc: false,
-                // We don't need to unlog objects at tracing. Instead, we unlog objects at copying.
-                // Any object is moved into the mature space, or is copied inside the mature space. We will unlog it.
-                unlog_object_when_traced: false,
+                // We need to unlog objects at tracing time since we currently clear all log bits during a major GC
+                unlog_object_when_traced: true,
                 // In GenImmix, young objects are not allocated in ImmixSpace directly.
                 #[cfg(feature = "vo_bit")]
                 mixed_age: false,
