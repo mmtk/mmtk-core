@@ -838,6 +838,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 /// A work packet to prepare each block for a major GC.
 /// Performs the action on a range of chunks.
 pub struct PrepareBlockState<VM: VMBinding> {
+    #[allow(dead_code)]
     pub space: &'static ImmixSpace<VM>,
     pub chunk: Chunk,
     pub defrag_threshold: Option<usize>,
