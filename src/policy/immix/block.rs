@@ -9,6 +9,7 @@ use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpec};
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
+#[cfg(feature = "object_pinning")]
 use crate::util::metadata::MetadataSpec;
 use crate::util::object_enum::BlockMayHaveObjects;
 use crate::util::Address;
@@ -259,14 +260,6 @@ impl Block {
                     #[cfg(feature = "object_pinning")]
                     if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC {
                         side.bzero_metadata(line.start(), Line::BYTES);
-                    }
-
-                    // We need to clear the log bit if it is on the side, as this line can be reused
-                    if space.common().needs_log_bit {
-                        if let MetadataSpec::OnSide(spec) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                        {
-                            spec.bzero_metadata(line.start(), Line::BYTES);
-                        }
                     }
 
                     prev_line_is_marked = false;
