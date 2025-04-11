@@ -171,13 +171,13 @@ impl<S: BarrierSemantics> ObjectBarrier<S> {
         Self { semantics }
     }
 
-    /// Attepmt to atomically log an object.
+    /// Attempt to atomically log an object.
     /// Returns true if the object is not logged previously.
     fn object_is_unlogged(&self, object: ObjectReference) -> bool {
         unsafe { S::UNLOG_BIT_SPEC.load::<S::VM, u8>(object, None) != 0 }
     }
 
-    /// Attepmt to atomically log an object.
+    /// Attempt to atomically log an object.
     /// Returns true if the object is not logged previously.
     fn log_object(&self, object: ObjectReference) -> bool {
         #[cfg(all(feature = "vo_bit", feature = "extreme_assertions"))]

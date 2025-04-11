@@ -227,6 +227,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         if self.common.get_los().in_space(object) {
             return self.common.get_los().trace_object::<Q>(queue, object);
         }
+
         object
     }
 

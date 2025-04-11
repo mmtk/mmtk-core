@@ -65,14 +65,6 @@ pub struct ImmixSpaceArgs {
     /// (no matter we copy an object or not). So we have to use `PromoteToMature`, and instead
     /// just set the log bit in the space when an object is traced.
     pub unlog_object_when_traced: bool,
-    /// Reset log bit at the start of a major GC.
-    /// Normally we do not need to do this. When immix is used as the mature space,
-    /// any object should be set as unlogged, and that bit does not need to be cleared
-    /// even if the object is dead. But in sticky Immix, the mature object and
-    /// the nursery object are in the same space, we will have to use the
-    /// bit to differentiate them. So we reset all the log bits in major GCs,
-    /// and unlogged the objects when they are traced (alive).
-    pub reset_log_bit_in_major_gc: bool,
     /// Whether this ImmixSpace instance contains both young and old objects.
     /// This affects the updating of valid-object bits.  If some lines or blocks of this ImmixSpace
     /// instance contain young objects, their VO bits need to be updated during this GC.  Currently
@@ -293,7 +285,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             Block::LOG_BYTES
         );
 
-        if space_args.unlog_object_when_traced || space_args.reset_log_bit_in_major_gc {
+        if space_args.unlog_object_when_traced {
             assert!(
                 args.constraints.needs_log_bit,
                 "Invalid args when the plan does not use log bit"
@@ -387,6 +379,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             } else {
                 // For header metadata, we use cyclic mark bits.
                 unimplemented!("cyclic mark bits is not supported at the moment");
+            }
+
+            if self.common.needs_log_bit {
+                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+                    for chunk in self.chunk_map.all_chunks() {
+                        side.bzero_metadata(chunk.start(), Chunk::BYTES);
+                    }
+                }
             }
 
             // Prepare defrag info
@@ -838,6 +838,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 /// A work packet to prepare each block for a major GC.
 /// Performs the action on a range of chunks.
 pub struct PrepareBlockState<VM: VMBinding> {
+    #[allow(dead_code)]
     pub space: &'static ImmixSpace<VM>,
     pub chunk: Chunk,
     pub defrag_threshold: Option<usize>,
@@ -850,17 +851,6 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
         // See `ImmixSpace::prepare`.
         if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
             side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
-        }
-        if self.space.space_args.reset_log_bit_in_major_gc {
-            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                // We zero all the log bits in major GC, and for every object we trace, we will mark the log bit again.
-                side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
-            } else {
-                // If the log bit is not in side metadata, we cannot bulk zero. We can either
-                // clear the bit for dead objects in major GC, or clear the log bit for new
-                // objects. In either cases, we do not need to set log bit at tracing.
-                unimplemented!("We cannot bulk zero unlogged bit.")
-            }
         }
     }
 }

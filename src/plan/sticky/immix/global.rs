@@ -254,6 +254,7 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                 trace!("Immix mature object {}, skip", object);
                 return object;
             } else {
+                // Nursery object
                 let object = if KIND == TRACE_KIND_TRANSITIVE_PIN || KIND == TRACE_KIND_FAST {
                     trace!(
                         "Immix nursery object {} is being traced without moving",
@@ -326,9 +327,6 @@ impl<VM: VMBinding> StickyImmix<VM> {
                 // Every object we trace in full heap GC is a mature object. Thus in both cases,
                 // they should be unlogged.
                 unlog_object_when_traced: true,
-                // In full heap GC, mature objects may die, and their unlogged bit needs to be reset.
-                // Along with the option above, we unlog them again during tracing.
-                reset_log_bit_in_major_gc: true,
                 // In StickyImmix, both young and old objects are allocated in the ImmixSpace.
                 #[cfg(feature = "vo_bit")]
                 mixed_age: true,
