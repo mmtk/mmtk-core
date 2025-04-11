@@ -405,7 +405,13 @@
 <a href="#404" id="404">404</a>
 <a href="#405" id="405">405</a>
 <a href="#406" id="406">406</a>
-<a href="#407" id="407">407</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::layout::vm_layout::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
+<a href="#410" id="410">410</a>
+<a href="#411" id="411">411</a>
+<a href="#412" id="412">412</a>
+<a href="#413" id="413">413</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::layout::vm_layout::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::required_chunks;
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE;
@@ -757,12 +763,18 @@
                 </span>} <span class="kw">else </span>{
                     <span class="kw">let </span>start = <span class="self">self</span>.discontiguous_start;
                     <span class="self">self</span>.discontiguous_start = <span class="self">self</span>.pr.vm_map().get_next_contiguous_region(start);
-                    <span class="comment">// If the current cursor is within the current discontiguous region (i.e. chunk),
-                    // then return the size till the cursor
-                    </span><span class="kw">let </span>size = <span class="kw">if </span><span class="self">self</span>.pr.cursor().chunk_index() == start.chunk_index() {
-                        <span class="self">self</span>.pr.cursor() - start
+
+                    <span class="kw">let </span>contiguous_region_size = <span class="self">self</span>.pr.vm_map().get_contiguous_region_size(start);
+                    <span class="kw">let </span>cursor = <span class="self">self</span>.pr.cursor();
+                    <span class="kw">let </span>size = <span class="kw">if </span>start &lt; cursor &amp;&amp; cursor &lt; start + contiguous_region_size {
+                        <span class="comment">// If the current cursor is within the current discontiguous region,
+                        // then return the size till the cursor.
+                        // This is sufficient for sweeping the memory and clearing side metadata.
+                        // Note that if cursor == start,
+                        // it means the cursor is at the end of the previous chunk.
+                        </span>cursor - start
                     } <span class="kw">else </span>{
-                        <span class="self">self</span>.pr.vm_map().get_contiguous_region_size(start)
+                        contiguous_region_size
                     };
                     <span class="prelude-val">Some</span>((start, size))
                 }
