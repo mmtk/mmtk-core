@@ -108,22 +108,24 @@ impl<E: ProcessEdgesWork> ProcessModBuf<E> {
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        // Flip the per-object unlogged bits to "unlogged" state.
-        for obj in &self.modbuf {
-            <E::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<E::VM, u8>(
-                *obj,
-                1,
-                None,
-                Ordering::SeqCst,
-            );
-        }
-        // scan modbuf only if the current GC is a nursery GC
-        if mmtk
-            .get_plan()
-            .generational()
-            .unwrap()
-            .is_current_gc_nursery()
-        {
+        // Process and scan modbuf only if the current GC is a nursery GC
+        let gen = mmtk.get_plan().generational().unwrap();
+        if gen.is_current_gc_nursery() {
+            // Flip the per-object unlogged bits to "unlogged" state.
+            for obj in &self.modbuf {
+                debug_assert!(
+                    !gen.is_object_in_nursery(*obj),
+                    "{} was logged but is not mature. Dumping process memory maps:\n{}",
+                    *obj,
+                    crate::util::memory::get_process_memory_maps(),
+                );
+                <E::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<E::VM, u8>(
+                    *obj,
+                    1,
+                    None,
+                    Ordering::SeqCst,
+                );
+            }
             // Scan objects in the modbuf and forward pointers
             let modbuf = std::mem::take(&mut self.modbuf);
             GCWork::do_work(
