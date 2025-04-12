@@ -368,7 +368,13 @@
 <a href="#367" id="367">367</a>
 <a href="#368" id="368">368</a>
 <a href="#369" id="369">369</a>
-<a href="#370" id="370">370</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
@@ -639,7 +645,9 @@
                 <span class="macro">trace!</span>(<span class="string">"LOS object {} is being marked now"</span>, object);
                 <span class="self">self</span>.treadmill.copy(object, nursery_object);
                 <span class="comment">// We just moved the object out of the logical nursery, mark it as unlogged.
-                </span><span class="kw">if </span>nursery_object &amp;&amp; <span class="self">self</span>.common.needs_log_bit {
+                // We also unlog mature objects as their unlog bit may have been unset before the
+                // full-heap GC
+                </span><span class="kw">if </span><span class="self">self</span>.common.needs_log_bit {
                     VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
                         .mark_as_unlogged::&lt;VM&gt;(object, Ordering::SeqCst);
                 }
@@ -658,6 +666,10 @@
         <span class="kw">let </span>sweep = |object: ObjectReference| {
             <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
             </span><span class="kw">crate</span>::util::metadata::vo_bit::unset_vo_bit(object);
+            <span class="comment">// Clear log bits for dead objects to prevent a new nursery object having the unlog bit set
+            </span><span class="kw">if </span><span class="self">self</span>.common.needs_log_bit {
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::&lt;VM&gt;(object, Ordering::SeqCst);
+            }
             <span class="self">self</span>.pr
                 .release_pages(get_super_page(object.to_object_start::&lt;VM&gt;()));
         };

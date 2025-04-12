@@ -288,7 +288,18 @@
 <a href="#287" id="287">287</a>
 <a href="#288" id="288">288</a>
 <a href="#289" id="289">289</a>
-<a href="#290" id="290">290</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
 <span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
@@ -573,6 +584,17 @@
         );
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.in_space(object));
         <span class="kw">if </span><span class="self">self</span>.mark_state.test_and_mark::&lt;VM&gt;(object) {
+            <span class="comment">// Flip the per-object unlogged bits to "unlogged" state for objects inside the
+            // bootimage
+            </span><span class="attr">#[cfg(feature = <span class="string">"set_unlog_bits_vm_space"</span>)]
+            </span><span class="kw">if </span><span class="self">self</span>.common.needs_log_bit {
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::&lt;VM, u8&gt;(
+                    object,
+                    <span class="number">1</span>,
+                    <span class="prelude-val">None</span>,
+                    Ordering::SeqCst,
+                );
+            }
             queue.enqueue(object);
         }
         object

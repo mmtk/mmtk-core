@@ -273,9 +273,7 @@
 <a href="#272" id="272">272</a>
 <a href="#273" id="273">273</a>
 <a href="#274" id="274">274</a>
-<a href="#275" id="275">275</a>
-<a href="#276" id="276">276</a>
-<a href="#277" id="277">277</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext;
+<a href="#275" id="275">275</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixNurseryGCWorkContext;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::CommonGenPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
@@ -526,10 +524,8 @@
         <span class="kw">let </span>immix_space = ImmixSpace::new(
             plan_args.get_space_args(<span class="string">"immix_mature"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
             ImmixSpaceArgs {
-                reset_log_bit_in_major_gc: <span class="bool-val">false</span>,
-                <span class="comment">// We don't need to unlog objects at tracing. Instead, we unlog objects at copying.
-                // Any object is moved into the mature space, or is copied inside the mature space. We will unlog it.
-                </span>unlog_object_when_traced: <span class="bool-val">false</span>,
+                <span class="comment">// We need to unlog objects at tracing time since we currently clear all log bits during a major GC
+                </span>unlog_object_when_traced: <span class="bool-val">true</span>,
                 <span class="comment">// In GenImmix, young objects are not allocated in ImmixSpace directly.
                 </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
                 </span>mixed_age: <span class="bool-val">false</span>,

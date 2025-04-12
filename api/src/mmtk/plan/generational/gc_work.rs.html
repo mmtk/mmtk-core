@@ -178,7 +178,9 @@
 <a href="#177" id="177">177</a>
 <a href="#178" id="178">178</a>
 <a href="#179" id="179">179</a>
-<a href="#180" id="180">180</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanTraceObject;
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
@@ -288,22 +290,24 @@
 
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>ProcessModBuf&lt;E&gt; {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
-        <span class="comment">// Flip the per-object unlogged bits to "unlogged" state.
-        </span><span class="kw">for </span>obj <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.modbuf {
-            &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::&lt;E::VM, u8&gt;(
-                <span class="kw-2">*</span>obj,
-                <span class="number">1</span>,
-                <span class="prelude-val">None</span>,
-                Ordering::SeqCst,
-            );
-        }
-        <span class="comment">// scan modbuf only if the current GC is a nursery GC
-        </span><span class="kw">if </span>mmtk
-            .get_plan()
-            .generational()
-            .unwrap()
-            .is_current_gc_nursery()
-        {
+        <span class="comment">// Process and scan modbuf only if the current GC is a nursery GC
+        </span><span class="kw">let </span>gen = mmtk.get_plan().generational().unwrap();
+        <span class="kw">if </span>gen.is_current_gc_nursery() {
+            <span class="comment">// Flip the per-object unlogged bits to "unlogged" state.
+            </span><span class="kw">for </span>obj <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.modbuf {
+                <span class="macro">debug_assert!</span>(
+                    !gen.is_object_in_nursery(<span class="kw-2">*</span>obj),
+                    <span class="string">"{} was logged but is not mature. Dumping process memory maps:\n{}"</span>,
+                    <span class="kw-2">*</span>obj,
+                    <span class="kw">crate</span>::util::memory::get_process_memory_maps(),
+                );
+                &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::&lt;E::VM, u8&gt;(
+                    <span class="kw-2">*</span>obj,
+                    <span class="number">1</span>,
+                    <span class="prelude-val">None</span>,
+                    Ordering::SeqCst,
+                );
+            }
             <span class="comment">// Scan objects in the modbuf and forward pointers
             </span><span class="kw">let </span>modbuf = std::mem::take(<span class="kw-2">&amp;mut </span><span class="self">self</span>.modbuf);
             GCWork::do_work(

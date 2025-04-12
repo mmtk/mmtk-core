@@ -323,7 +323,8 @@
 <a href="#322" id="322">322</a>
 <a href="#323" id="323">323</a>
 <a href="#324" id="324">324</a>
-<a href="#325" id="325">325</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
+<a href="#325" id="325">325</a>
+<a href="#326" id="326">326</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
@@ -552,6 +553,7 @@
         </span><span class="kw">if </span><span class="self">self</span>.common.get_los().in_space(object) {
             <span class="kw">return </span><span class="self">self</span>.common.get_los().trace_object::&lt;Q&gt;(queue, object);
         }
+
         object
     }
 

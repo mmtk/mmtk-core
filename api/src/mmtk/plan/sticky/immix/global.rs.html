@@ -379,9 +379,7 @@
 <a href="#378" id="378">378</a>
 <a href="#379" id="379">379</a>
 <a href="#380" id="380">380</a>
-<a href="#381" id="381">381</a>
-<a href="#382" id="382">382</a>
-<a href="#383" id="383">383</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
+<a href="#381" id="381">381</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
@@ -637,7 +635,8 @@
                 </span><span class="macro">trace!</span>(<span class="string">"Immix mature object {}, skip"</span>, object);
                 <span class="kw">return </span>object;
             } <span class="kw">else </span>{
-                <span class="kw">let </span>object = <span class="kw">if </span>KIND == TRACE_KIND_TRANSITIVE_PIN || KIND == TRACE_KIND_FAST {
+                <span class="comment">// Nursery object
+                </span><span class="kw">let </span>object = <span class="kw">if </span>KIND == TRACE_KIND_TRANSITIVE_PIN || KIND == TRACE_KIND_FAST {
                     <span class="macro">trace!</span>(
                         <span class="string">"Immix nursery object {} is being traced without moving"</span>,
                         object
@@ -709,9 +708,6 @@
                 // Every object we trace in full heap GC is a mature object. Thus in both cases,
                 // they should be unlogged.
                 </span>unlog_object_when_traced: <span class="bool-val">true</span>,
-                <span class="comment">// In full heap GC, mature objects may die, and their unlogged bit needs to be reset.
-                // Along with the option above, we unlog them again during tracing.
-                </span>reset_log_bit_in_major_gc: <span class="bool-val">true</span>,
                 <span class="comment">// In StickyImmix, both young and old objects are allocated in the ImmixSpace.
                 </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
                 </span>mixed_age: <span class="bool-val">true</span>,

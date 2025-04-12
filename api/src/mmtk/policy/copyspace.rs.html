@@ -345,7 +345,13 @@
 <a href="#344" id="344">344</a>
 <a href="#345" id="345">345</a>
 <a href="#346" id="346">346</a>
-<a href="#347" id="347">347</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
+<a href="#347" id="347">347</a>
+<a href="#348" id="348">348</a>
+<a href="#349" id="349">349</a>
+<a href="#350" id="350">350</a>
+<a href="#351" id="351">351</a>
+<a href="#352" id="352">352</a>
+<a href="#353" id="353">353</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
@@ -541,6 +547,12 @@
                 <span class="kw-2">*</span>&lt;VM::VMObjectModel <span class="kw">as </span>ObjectModel&lt;VM&gt;&gt;::LOCAL_FORWARDING_BITS_SPEC
             {
                 side_forwarding_status_table.bzero_metadata(start, size);
+            }
+
+            <span class="kw">if </span><span class="self">self</span>.common.needs_log_bit {
+                <span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+                    side.bzero_metadata(start, size);
+                }
             }
 
             <span class="comment">// Clear VO bits because all objects in the space are dead.
