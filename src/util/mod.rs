@@ -83,4 +83,5 @@ mod raw_memory_freelist;
 
 pub use self::address::Address;
 pub use self::address::ObjectReference;
+pub use self::object_enum::EnumeratedObject;
 pub use self::opaque_pointer::*;

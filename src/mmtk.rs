@@ -6,8 +6,6 @@ use crate::plan::Plan;
 use crate::policy::sft_map::{create_sft_map, SFTMap};
 use crate::scheduler::GCWorkScheduler;
 
-#[cfg(feature = "vo_bit")]
-use crate::util::address::ObjectReference;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::finalizable_processor::FinalizableProcessor;
@@ -24,6 +22,8 @@ use crate::util::sanity::sanity_checker::SanityChecker;
 #[cfg(feature = "extreme_assertions")]
 use crate::util::slot_logger::SlotLogger;
 use crate::util::statistics::stats::Stats;
+#[cfg(feature = "vo_bit")]
+use crate::util::EnumeratedObject;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
@@ -516,15 +516,16 @@ impl<VM: VMBinding> MMTK<VM> {
     ///
     /// [os_eo]: https://docs.ruby-lang.org/en/master/ObjectSpace.html#method-c-each_object
     #[cfg(feature = "vo_bit")]
-    pub fn enumerate_objects<F>(&self, f: F)
+    pub fn enumerate_objects<F>(&self, mut f: F)
     where
-        F: FnMut(ObjectReference),
+        F: FnMut(EnumeratedObject),
     {
         use crate::util::object_enum;
 
-        let mut enumerator = object_enum::ClosureObjectEnumerator::<_, VM>::new(f);
         let plan = self.get_plan();
         plan.for_each_space(&mut |space| {
+            let mut enumerator =
+                object_enum::ClosureObjectEnumerator::<_, VM>::new(space.get_name(), &mut f);
             space.enumerate_objects(&mut enumerator);
         })
     }

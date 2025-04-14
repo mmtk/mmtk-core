@@ -21,8 +21,11 @@ lazy_static! {
 
 pub fn get_all_objects(mmtk: &'static MMTK<MockVM>) -> HashSet<ObjectReference> {
     let mut result = HashSet::new();
-    mmtk.enumerate_objects(|object| {
-        result.insert(object);
+    mmtk.enumerate_objects(|object: EnumeratedObject| {
+        result.insert(match object {
+            EnumeratedObject::Single { reference, .. } => reference,
+            EnumeratedObject::InBlock { reference, .. } => reference,
+        });
     });
     result
 }
