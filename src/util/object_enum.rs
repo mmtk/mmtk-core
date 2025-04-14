@@ -14,6 +14,29 @@ use super::{
     Address, ObjectReference,
 };
 
+/// The object that gets enumerated.
+#[derive(PartialEq, Eq, Hash, Copy, Clone)]
+pub enum EnumeratedObject<'a> {
+    /// A single object
+    Single {
+        /// The name of the space where the object is located
+        space_name: &'a str,
+        /// The reference to the object
+        reference: ObjectReference,
+    },
+    /// An object in a block. Blocks are memory regions with fixed sizes.
+    InBlock {
+        /// The name of the space where the object is located
+        space_name: &'a str,
+        /// The reference to the object
+        reference: ObjectReference,
+        /// The start address of the block
+        block_start: Address,
+        /// The size of the block in bytes
+        block_size: usize,
+    },
+}
+
 /// A trait for enumerating objects in spaces, used by [`Space::enumerate_objects`].
 ///
 /// [`Space::enumerate_objects`]: crate::policy::space::Space::enumerate_objects
@@ -22,44 +45,66 @@ pub trait ObjectEnumerator {
     fn visit_object(&mut self, object: ObjectReference);
     /// Visit an address range that may contain objects.
     fn visit_address_range(&mut self, start: Address, end: Address);
+    /// Visit a block of memory that may contain objects. Blocks are address ranges with a fixed size.
+    fn visit_block(&mut self, block_start: Address, block_size: usize);
 }
 
 /// An implementation of `ObjectEnumerator` that wraps a callback.
-pub struct ClosureObjectEnumerator<F, VM>
+pub struct ClosureObjectEnumerator<'a, F, VM>
 where
-    F: FnMut(ObjectReference),
+    F: FnMut(EnumeratedObject),
     VM: VMBinding,
 {
-    object_callback: F,
+    space_name: &'a str,
+    object_callback: &'a mut F,
     phantom_data: PhantomData<VM>,
 }
 
-impl<F, VM> ClosureObjectEnumerator<F, VM>
+impl<'a, F, VM> ClosureObjectEnumerator<'a, F, VM>
 where
-    F: FnMut(ObjectReference),
+    F: FnMut(EnumeratedObject),
     VM: VMBinding,
 {
-    pub fn new(object_callback: F) -> Self {
+    pub fn new(space_name: &'a str, object_callback: &'a mut F) -> Self {
         Self {
+            space_name,
             object_callback,
             phantom_data: PhantomData,
         }
     }
 }
 
-impl<F, VM> ObjectEnumerator for ClosureObjectEnumerator<F, VM>
+impl<F, VM> ObjectEnumerator for ClosureObjectEnumerator<'_, F, VM>
 where
-    F: FnMut(ObjectReference),
+    F: FnMut(EnumeratedObject),
     VM: VMBinding,
 {
     fn visit_object(&mut self, object: ObjectReference) {
-        (self.object_callback)(object);
+        (self.object_callback)(EnumeratedObject::Single {
+            space_name: self.space_name,
+            reference: object,
+        });
     }
 
     fn visit_address_range(&mut self, start: Address, end: Address) {
         VO_BIT.scan_non_zero_values::<u8>(start, end, &mut |address| {
             let object = vo_bit::get_object_ref_for_vo_addr(address);
-            (self.object_callback)(object);
+            (self.object_callback)(EnumeratedObject::Single {
+                space_name: self.space_name,
+                reference: object,
+            });
+        })
+    }
+
+    fn visit_block(&mut self, block_start: Address, block_size: usize) {
+        VO_BIT.scan_non_zero_values::<u8>(block_start, block_start + block_size, &mut |address| {
+            let object = vo_bit::get_object_ref_for_vo_addr(address);
+            (self.object_callback)(EnumeratedObject::InBlock {
+                space_name: self.space_name,
+                reference: object,
+                block_start,
+                block_size,
+            });
         })
     }
 }
@@ -88,7 +133,7 @@ pub(crate) fn enumerate_blocks_from_chunk_map<B>(
         if chunk_map.get(chunk) == ChunkState::Allocated {
             for block in chunk.iter_region::<B>() {
                 if block.may_have_objects() {
-                    enumerator.visit_address_range(block.start(), block.end());
+                    enumerator.visit_block(block.start(), B::BYTES);
                 }
             }
         }

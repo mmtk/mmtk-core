@@ -1,4 +1,5 @@
-// GITHUB-CI: MMTK_PLAN=NoGC,SemiSpace,Immix,GenImmix,StickyImmix
+// GITHUB-CI: MMTK_PLAN=NoGC,SemiSpace,GenImmix
+// The test assumes the default allocator is a bump pointer allocator, thus only works for plans that use BumpAlloator (not ImmixAllocator).
 
 use super::mock_test_prelude::*;
 
