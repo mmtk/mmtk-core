@@ -24,6 +24,7 @@ use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
@@ -462,7 +463,13 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         crate::util::metadata::vo_bit::bzero_vo_bit(block.start(), Block::BYTES);
     }
 
-    pub fn acquire_block(&self, tls: VMThread, size: usize, align: usize) -> BlockAcquireResult {
+    pub fn acquire_block(
+        &self,
+        tls: VMThread,
+        size: usize,
+        align: usize,
+        alloc_options: AllocationOptions,
+    ) -> BlockAcquireResult {
         {
             let mut abandoned = self.abandoned.lock().unwrap();
             let bin = mi_bin::<VM>(size, align);
@@ -484,7 +491,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             }
         }
 
-        let acquired = self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE);
+        let acquired = self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE, alloc_options);
         if acquired.is_zero() {
             BlockAcquireResult::Exhausted
         } else {

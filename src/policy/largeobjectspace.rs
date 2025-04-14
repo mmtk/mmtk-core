@@ -5,6 +5,7 @@ use crate::plan::VectorObjectQueue;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::{FreeListPageResource, PageResource};
 use crate::util::metadata;
@@ -309,8 +310,13 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     /// Allocate an object
-    pub fn allocate_pages(&self, tls: VMThread, pages: usize) -> Address {
-        self.acquire(tls, pages)
+    pub fn allocate_pages(
+        &self,
+        tls: VMThread,
+        pages: usize,
+        alloc_options: AllocationOptions,
+    ) -> Address {
+        self.acquire(tls, pages, alloc_options)
     }
 
     /// Test if the object's mark bit is the same as the given value. If it is not the same,

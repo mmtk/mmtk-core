@@ -194,12 +194,20 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         offset: usize,
         stress_test: bool,
     ) -> Address {
-        if self.space.will_oom_on_acquire(self.tls, size) {
+        if self.space.handle_obvious_oom_request(
+            self.tls,
+            size,
+            self.get_context().get_alloc_options(),
+        ) {
             return Address::ZERO;
         }
 
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-        let acquired_start = self.space.acquire(self.tls, bytes_to_pages_up(block_size));
+        let acquired_start = self.space.acquire(
+            self.tls,
+            bytes_to_pages_up(block_size),
+            self.get_context().get_alloc_options(),
+        );
         if acquired_start.is_zero() {
             trace!("Failed to acquire a new block");
             acquired_start
