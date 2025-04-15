@@ -524,7 +524,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.defrag.notify_new_clean_block(copy);
         let block = Block::from_aligned_address(block_address);
         block.init(copy);
-        self.chunk_map.set(block.chunk(), ChunkState::Allocated);
+        self.chunk_map.set(block.chunk(), ChunkState::allocated(self.common().descriptor.get_index()));
         self.lines_consumed
             .fetch_add(Block::LINES, Ordering::SeqCst);
         Some(block)
@@ -899,7 +899,7 @@ struct SweepChunk<VM: VMBinding> {
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        assert_eq!(self.space.chunk_map.get(self.chunk), ChunkState::Allocated);
+        assert!(self.space.chunk_map.get(self.chunk).is_allocated());
 
         let mut histogram = self.space.defrag.new_histogram();
         let line_mark_state = if super::BLOCK_ONLY {
@@ -950,7 +950,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
         probe!(mmtk, sweep_chunk, allocated_blocks);
         // Set this chunk as free if there is not live blocks.
         if allocated_blocks == 0 {
-            self.space.chunk_map.set(self.chunk, ChunkState::Free)
+            self.space.chunk_map.set(self.chunk, ChunkState::free())
         }
         self.space.defrag.add_completed_mark_histogram(histogram);
         self.epilogue.finish_one_work_packet();

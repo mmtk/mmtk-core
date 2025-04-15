@@ -45,13 +45,44 @@ impl Chunk {
 }
 
 /// Chunk allocation state
-#[repr(u8)]
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum ChunkState {
-    /// The chunk is not allocated.
-    Free = 0,
-    /// The chunk is allocated.
-    Allocated = 1,
+/// Highest bit: 0 = free, 1 = allocated
+/// Lower 4 bits: Space index (0-15)
+#[repr(transparent)]
+#[derive(PartialEq, Clone, Copy)]
+pub struct ChunkState(u8);
+
+impl ChunkState {
+    pub fn allocated(space_index: usize) -> ChunkState {
+        debug_assert!(space_index < crate::util::heap::layout::heap_parameters::MAX_SPACES);
+        let mut encode = space_index as u8;
+        encode |= 0x80;
+        ChunkState(encode)
+    }
+    pub fn free() -> ChunkState {
+        ChunkState(0)
+    }
+    pub fn is_free(&self) -> bool {
+        self.0 & 0x80 == 0
+    }
+    pub fn is_allocated(&self) -> bool {
+        !self.is_free()
+    }
+    pub fn get_space_index(&self) -> usize {
+        debug_assert!(self.is_allocated());
+        let index = (self.0 & 0x0F) as usize;
+        debug_assert!(index < crate::util::heap::layout::heap_parameters::MAX_SPACES);
+        index
+    }
+}
+
+impl std::fmt::Debug for ChunkState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_free() {
+            write!(f, "Free")
+        } else {
+            write!(f, "Allocated in space {}", self.get_space_index())
+        }
+    }
 }
 
 /// A byte-map to record all the allocated chunks.
@@ -78,10 +109,17 @@ impl ChunkMap {
         if self.get(chunk) == state {
             return;
         }
+        #[cfg(debug_assertions)]
+        {
+            let old_state = self.get(chunk);
+            if state.is_allocated() {
+                assert!(old_state.is_free() || old_state.get_space_index() == state.get_space_index(), "Chunk {:?}: old state {:?}, new state {:?}. Cannot set to new state.", chunk, old_state, state);
+            }
+        }
         // Update alloc byte
-        unsafe { Self::ALLOC_TABLE.store::<u8>(chunk.start(), state as u8) };
+        unsafe { Self::ALLOC_TABLE.store::<u8>(chunk.start(), state.0) };
         // If this is a newly allcoated chunk, then expand the chunk range.
-        if state == ChunkState::Allocated {
+        if state.is_allocated() {
             debug_assert!(!chunk.start().is_zero());
             let mut range = self.chunk_range.lock();
             if range.start == Chunk::ZERO {
@@ -99,11 +137,7 @@ impl ChunkMap {
     /// Get chunk state
     pub fn get(&self, chunk: Chunk) -> ChunkState {
         let byte = unsafe { Self::ALLOC_TABLE.load::<u8>(chunk.start()) };
-        match byte {
-            0 => ChunkState::Free,
-            1 => ChunkState::Allocated,
-            _ => unreachable!(),
-        }
+        ChunkState(byte)
     }
 
     /// A range of all chunks in the heap.
@@ -120,7 +154,7 @@ impl ChunkMap {
         let mut work_packets: Vec<Box<dyn GCWork<VM>>> = vec![];
         for chunk in self
             .all_chunks()
-            .filter(|c| self.get(*c) == ChunkState::Allocated)
+            .filter(|c| self.get(*c).is_allocated())
         {
             work_packets.push(func(chunk));
         }

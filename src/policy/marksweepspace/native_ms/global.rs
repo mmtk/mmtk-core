@@ -402,7 +402,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     pub fn record_new_block(&self, block: Block) {
         block.init();
-        self.chunk_map.set(block.chunk(), ChunkState::Allocated);
+        self.chunk_map.set(block.chunk(), ChunkState::allocated(self.common.descriptor.get_index()));
     }
 
     pub fn prepare(&mut self, full_heap: bool) {
@@ -567,7 +567,7 @@ struct PrepareChunkMap<VM: VMBinding> {
 
 impl<VM: VMBinding> GCWork<VM> for PrepareChunkMap<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        debug_assert!(self.space.chunk_map.get(self.chunk) == ChunkState::Allocated);
+        debug_assert!(self.space.chunk_map.get(self.chunk).is_allocated());
         // number of allocated blocks.
         let mut n_occupied_blocks = 0;
         self.chunk
@@ -581,7 +581,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareChunkMap<VM> {
             });
         if n_occupied_blocks == 0 {
             // Set this chunk as free if there is no live blocks.
-            self.space.chunk_map.set(self.chunk, ChunkState::Free)
+            self.space.chunk_map.set(self.chunk, ChunkState::free())
         } else {
             // Otherwise this chunk is occupied, and we reset the mark bit if it is on the side.
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
@@ -617,7 +617,7 @@ struct SweepChunk<VM: VMBinding> {
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        assert_eq!(self.space.chunk_map.get(self.chunk), ChunkState::Allocated);
+        assert!(self.space.chunk_map.get(self.chunk).is_allocated());
 
         // number of allocated blocks.
         let mut allocated_blocks = 0;
@@ -636,7 +636,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
         probe!(mmtk, sweep_chunk, allocated_blocks);
         // Set this chunk as free if there is not live blocks.
         if allocated_blocks == 0 {
-            self.space.chunk_map.set(self.chunk, ChunkState::Free)
+            self.space.chunk_map.set(self.chunk, ChunkState::free());
         }
         self.epilogue.finish_one_work_packet();
     }
