@@ -89,12 +89,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         o: ObjectReference,
         f: impl FnMut(u8) -> Option<u8>,
     ) -> Result<u8, u8> {
-        RC_TABLE.fetch_update_atomic(
-            o.to_address::<VM>(),
-            Ordering::Relaxed,
-            Ordering::Relaxed,
-            f,
-        )
+        RC_TABLE.fetch_update_atomic(o.to_raw_address(), Ordering::Relaxed, Ordering::Relaxed, f)
     }
 
     pub fn is_stuck(&self, o: ObjectReference) -> bool {
@@ -137,27 +132,27 @@ impl<VM: VMBinding> RefCountHelper<VM> {
     }
 
     pub fn set(&self, o: ObjectReference, count: u8) {
-        RC_TABLE.store_atomic(o.to_address::<VM>(), count, Ordering::Relaxed)
+        RC_TABLE.store_atomic(o.to_raw_address(), count, Ordering::Relaxed)
     }
 
     pub fn set_relaxed(&self, o: ObjectReference, count: u8) {
-        unsafe { RC_TABLE.store(o.to_address::<VM>(), count) }
+        unsafe { RC_TABLE.store(o.to_raw_address(), count) }
     }
 
     pub fn count(&self, o: ObjectReference) -> u8 {
-        RC_TABLE.load_atomic(o.to_address::<VM>(), Ordering::Relaxed)
+        RC_TABLE.load_atomic(o.to_raw_address(), Ordering::Relaxed)
     }
 
     pub fn prefetch_read(&self, o: ObjectReference) {
-        RC_TABLE.prefetch_read(o.to_address::<VM>())
+        RC_TABLE.prefetch_read(o.to_raw_address())
     }
 
     pub fn prefetch_write(&self, o: ObjectReference) {
-        RC_TABLE.prefetch_write(o.to_address::<VM>())
+        RC_TABLE.prefetch_write(o.to_raw_address())
     }
 
     pub fn object_or_line_is_dead(&self, o: ObjectReference) -> bool {
-        RC_TABLE.load_byte(o.to_address::<VM>()) == 0
+        RC_TABLE.load_byte(o.to_raw_address()) == 0
     }
 
     pub fn rc_table_range<UInt: Sized>(&self, b: Block) -> &'static [UInt] {
@@ -175,12 +170,12 @@ impl<VM: VMBinding> RefCountHelper<VM> {
 
     #[allow(unused)]
     pub fn is_dead(&self, o: ObjectReference) -> bool {
-        let v: u8 = RC_TABLE.load_atomic(o.to_address::<VM>(), Ordering::Relaxed);
+        let v: u8 = RC_TABLE.load_atomic(o.to_raw_address(), Ordering::Relaxed);
         v == 0
     }
 
     pub fn is_dead_or_stuck(&self, o: ObjectReference) -> bool {
-        let v: u8 = RC_TABLE.load_atomic(o.to_address::<VM>(), Ordering::Relaxed);
+        let v: u8 = RC_TABLE.load_atomic(o.to_raw_address(), Ordering::Relaxed);
         v == 0 || v == MAX_REF_COUNT
     }
 
@@ -198,7 +193,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         debug_assert!(!crate::args::BLOCK_ONLY);
         debug_assert!(size > Line::BYTES);
         let start_line = Line::containing::<VM>(o).next();
-        let end_line = Line::from(Line::align(o.to_address::<VM>() + size));
+        let end_line = Line::from(Line::align(o.to_raw_address() + size));
         let mut line = start_line;
         while line != end_line {
             unsafe { RC_STRADDLE_LINES.store(line.start(), 1u8) };
@@ -218,7 +213,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         let size = VM::VMObjectModel::get_current_size(o);
         if size > Line::BYTES {
             let start_line = Line::containing::<VM>(o).next();
-            let end_line = Line::from(Line::align(o.to_address::<VM>() + size));
+            let end_line = Line::from(Line::align(o.to_raw_address() + size));
             let mut line = start_line;
             while line != end_line {
                 self.set_relaxed(line.start().to_object_reference::<VM>(), 0);
@@ -233,7 +228,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
     pub fn assert_zero_ref_count(&self, o: ObjectReference) {
         let size = VM::VMObjectModel::get_current_size(o);
         for i in (0..size).step_by(MIN_OBJECT_SIZE) {
-            let a = o.to_address::<VM>() + i;
+            let a = o.to_raw_address() + i;
             assert_eq!(0, self.count(a.to_object_reference::<VM>()));
         }
     }

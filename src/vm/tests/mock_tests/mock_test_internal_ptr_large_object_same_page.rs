@@ -1,5 +1,7 @@
-// GITHUB-CI: MMTK_PLAN=all
+// GITHUB-CI: MMTK_PLAN=Immix,GenImmix,StickyImmix,MarkSweep,MarkCompact
 // GITHUB-CI: FEATURES=is_mmtk_object
+
+// Only test this with plans that use LOS. NoGC does not use large object space.
 
 use super::mock_test_prelude::*;
 
@@ -32,11 +34,10 @@ pub fn interior_pointer_in_large_object_same_page() {
 
             let obj = MockVM::object_start_to_ref(addr);
             println!(
-                "start = {}, end = {}, obj = {}, in-obj addr = {}",
+                "start = {}, end = {}, obj = {}",
                 addr,
                 addr + OBJECT_SIZE,
                 obj,
-                obj.to_address::<MockVM>()
             );
 
             memory_manager::post_alloc(
@@ -47,27 +48,21 @@ pub fn interior_pointer_in_large_object_same_page() {
             );
 
             let ptr = obj.to_raw_address();
-            let base_ref = crate::memory_manager::find_object_from_internal_pointer::<MockVM>(
-                ptr,
-                OBJECT_SIZE,
-            );
+            let base_ref =
+                crate::memory_manager::find_object_from_internal_pointer(ptr, OBJECT_SIZE);
             println!("{:?}", base_ref);
             assert!(base_ref.is_some());
             assert_eq!(base_ref.unwrap(), obj);
 
             let ptr = obj.to_raw_address() + OBJECT_SIZE / 2;
-            let base_ref = crate::memory_manager::find_object_from_internal_pointer::<MockVM>(
-                ptr,
-                OBJECT_SIZE,
-            );
+            let base_ref =
+                crate::memory_manager::find_object_from_internal_pointer(ptr, OBJECT_SIZE);
             assert!(base_ref.is_some());
             assert_eq!(base_ref.unwrap(), obj);
 
             let ptr = obj.to_raw_address() + OBJECT_SIZE;
-            let base_ref = crate::memory_manager::find_object_from_internal_pointer::<MockVM>(
-                ptr,
-                OBJECT_SIZE,
-            );
+            let base_ref =
+                crate::memory_manager::find_object_from_internal_pointer(ptr, OBJECT_SIZE);
             assert!(base_ref.is_none());
         },
         no_cleanup,

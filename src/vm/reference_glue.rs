@@ -28,7 +28,7 @@ pub trait ReferenceGlue<VM: VMBinding> {
     /// Get the referent from a weak reference object.
     ///
     /// Arguments:
-    /// * `object`: Reference to the referent.  `None`` if the object currently does not point to a
+    /// * `object`: Reference to the referent.  `None` if the object currently does not point to a
     ///   referent.  This may happen if the reference has been cleared.
     fn get_referent(object: ObjectReference) -> Option<ObjectReference>;
 

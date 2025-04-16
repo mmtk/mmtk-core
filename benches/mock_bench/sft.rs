@@ -12,6 +12,6 @@ pub fn bench(c: &mut Criterion) {
     let obj = MockVM::object_start_to_ref(addr);
 
     c.bench_function("sft read", |b| {
-        b.iter(|| memory_manager::is_in_mmtk_spaces::<MockVM>(black_box(obj)))
+        b.iter(|| memory_manager::is_in_mmtk_spaces(black_box(obj)))
     });
 }

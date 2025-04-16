@@ -523,9 +523,6 @@ impl crate::vm::ObjectModel<MockVM> for MockVM {
         mock!(ref_to_header(object))
     }
 
-    // TODO: This is not mocked. We need a way to deal with it.
-    const IN_OBJECT_ADDRESS_OFFSET: isize = -(DEFAULT_OBJECT_REF_OFFSET as isize);
-
     fn dump_object(object: ObjectReference) {
         mock!(dump_object(object))
     }

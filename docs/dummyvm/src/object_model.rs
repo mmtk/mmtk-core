@@ -6,14 +6,9 @@ use mmtk::vm::*;
 pub struct VMObjectModel {}
 
 /// This is the offset from the allocation result to the object reference for the object.
-/// For bindings that this offset is not a constant, you can implement the calculation in the method `ref_to_object_start``, and
+/// For bindings that this offset is not a constant, you can implement the calculation in the method `ref_to_object_start`, and
 /// remove this constant.
 pub const OBJECT_REF_OFFSET: usize = 0;
-
-/// This is the offset from the object reference to an in-object address. The binding needs
-/// to guarantee the in-object address is inside the storage associated with the object.
-/// It has to be a constant offset. See `ObjectModel::IN_OBJECT_ADDRESS_OFFSET`.
-pub const IN_OBJECT_ADDRESS_OFFSET: isize = 0;
 
 // This is the offset from the object reference to the object header.
 // This value is used in `ref_to_header` where MMTk loads header metadata from.
@@ -85,8 +80,6 @@ impl ObjectModel<DummyVM> for VMObjectModel {
     fn ref_to_header(object: ObjectReference) -> Address {
         object.to_raw_address().sub(OBJECT_HEADER_OFFSET)
     }
-
-    const IN_OBJECT_ADDRESS_OFFSET: isize = IN_OBJECT_ADDRESS_OFFSET;
 
     fn dump_object(_object: ObjectReference) {
         unimplemented!()

@@ -283,7 +283,7 @@ impl<VM: VMBinding> ObjectQueue for LXRConcurrentTraceObjects<VM> {
     fn enqueue(&mut self, object: ObjectReference) {
         if cfg!(feature = "sanity") {
             assert!(
-                object.to_address::<VM>().is_mapped(),
+                object.to_raw_address().is_mapped(),
                 "Invalid obj {:?}: address is not mapped",
                 object
             );
@@ -450,7 +450,7 @@ impl<VM: VMBinding> GCWork<VM> for ProcessModBufSATB {
             if cfg!(any(feature = "sanity", debug_assertions)) {
                 for o in &nodes {
                     assert!(
-                        o.to_address::<VM>().is_mapped(),
+                        o.to_raw_address().is_mapped(),
                         "Invalid object {:?}: address is not mapped",
                         o
                     );
@@ -464,7 +464,7 @@ impl<VM: VMBinding> GCWork<VM> for ProcessModBufSATB {
             if cfg!(any(feature = "sanity", debug_assertions)) {
                 for o in &*nodes {
                     assert!(
-                        o.to_address::<VM>().is_mapped(),
+                        o.to_raw_address().is_mapped(),
                         "Invalid object {:?}: address is not mapped",
                         o
                     );
@@ -621,10 +621,10 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(FULL_GC);
-        debug_assert!(object.is_in_any_space::<VM>());
-        debug_assert!(object.to_address::<VM>().is_aligned_to(8));
+        debug_assert!(object.is_in_any_space());
+        debug_assert!(object.to_raw_address().is_aligned_to(8));
         // debug_assert!(object.class_is_valid::<VM>());
-        if WEAK_ROOT && !Block::containing::<VM>(object).is_defrag_source() {
+        if WEAK_ROOT && !Block::containing(object).is_defrag_source() {
             return object;
         }
         let x = if self.lxr.immix_space.in_space(object) {
@@ -664,31 +664,29 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
         debug_assert!(!FULL_GC);
         // The memory (lines) of these slots can be reused at any time during mature evacuation.
         // Filter out invalid target objects.
-        if REMSET
-            && (!object.is_in_any_space::<VM>() || !object.to_address::<VM>().is_aligned_to(8))
-        {
+        if REMSET && (!object.is_in_any_space() || !object.to_raw_address().is_aligned_to(8)) {
             return object;
         }
         if self.lxr.rc.count(object) == 0 {
             return object;
         }
-        if WEAK_ROOT && !Block::containing::<VM>(object).is_defrag_source() {
+        if WEAK_ROOT && !Block::containing(object).is_defrag_source() {
             return object;
         }
-        debug_assert!(object.is_in_any_space::<VM>(), "Invalid {:?}", object);
+        debug_assert!(object.is_in_any_space(), "Invalid {:?}", object);
         debug_assert!(
-            object.to_address::<VM>().is_aligned_to(8),
+            object.to_raw_address().is_aligned_to(8),
             "Invalid {:?} remset={}",
             object,
             self.remset_recorded_slots
         );
         debug_assert!(object.class_is_valid::<VM>());
-        let object = object.get_forwarded_object::<VM>().unwrap_or(object);
+        let object = object.get_forwarded_object().unwrap_or(object);
         let new_object = if self.lxr.immix_space.in_space(object) {
             if self
                 .lxr
                 .rc
-                .address_is_in_straddle_line(object.to_address::<VM>())
+                .address_is_in_straddle_line(object.to_raw_address())
             {
                 return object;
             }

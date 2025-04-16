@@ -294,7 +294,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
         }
         if self.attempt_mark(object) {
             // FIXME steveb consider VM-specific integrity check on reference.
-            assert!(object.is_sane::<VM>(), "Invalid reference {:?}", object);
+            assert!(object.is_sane(), "Invalid reference {:?}", object);
 
             // Let plan check object
             assert!(
@@ -315,7 +315,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
                 .downcast_ref::<crate::plan::lxr::LXR<VM>>()
             {
                 assert!(
-                    unsafe { object.to_address::<VM>().load::<usize>() } != 0xdead,
+                    unsafe { object.to_raw_address().load::<usize>() } != 0xdead,
                     "{:?} -> {:?} is killed by decs",
                     self.edge,
                     object
@@ -334,7 +334,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
                 );
                 if lxr.immix_space.in_space(object) {
                     assert_ne!(
-                        Block::containing::<VM>(object).get_state(),
+                        Block::containing(object).get_state(),
                         BlockState::Unallocated,
                         "{:?}->{:?} block is released",
                         self.edge,
@@ -363,7 +363,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
         // If the valid object (VO) bit metadata is enabled, all live objects should have the VO
         // bit set when sanity GC starts.
         #[cfg(feature = "vo_bit")]
-        if !crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object) {
+        if !crate::util::metadata::vo_bit::is_vo_bit_set(object) {
             panic!("VO bit is not set: {}", object);
         }
 

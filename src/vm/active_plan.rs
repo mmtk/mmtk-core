@@ -44,6 +44,8 @@ pub trait ActivePlan<VM: VMBinding> {
     ///
     /// The method should return the new object reference if the method moves the object, otherwise return the original object reference.
     ///
+    /// Note: **This is an experimental feature**, and may not interact well with other parts of MMTk.  Use with caution.
+    ///
     /// Arguments:
     /// * `queue`: The object queue. If an object is encountered for the first time in this GC, we expect the implementation to call `queue.enqueue()`
     ///            for the object. If the object is moved during the tracing, the new object reference (after copying) should be enqueued instead.

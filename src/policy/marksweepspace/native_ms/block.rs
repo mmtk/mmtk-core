@@ -300,7 +300,7 @@ impl Block {
                 // clear VO bit if it is ever set. It is possible that the VO bit is never set for this cell (i.e. there was no object in this cell before this GC),
                 // we unset the bit anyway.
                 #[cfg(feature = "vo_bit")]
-                crate::util::metadata::vo_bit::unset_vo_bit_nocheck::<VM>(potential_object);
+                crate::util::metadata::vo_bit::unset_vo_bit_nocheck(potential_object);
                 unsafe {
                     cell.store::<Address>(last);
                 }

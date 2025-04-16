@@ -230,7 +230,7 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
         });
         if ObjectReference::STRICT_VERIFICATION {
             unsafe {
-                o.to_address::<VM>().store(0xdeadusize);
+                o.to_raw_address().store(0xdeadusize);
             }
         }
         if !crate::args::BLOCK_ONLY {
@@ -248,8 +248,8 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
             cursor = cursor + rc::MIN_OBJECT_SIZE;
             let c = self.rc.count(o);
             if c != 0 && !immix_space.is_marked(o) {
-                if !crate::args::BLOCK_ONLY && Line::is_aligned(o.to_address::<VM>()) {
-                    if c == 1 && self.rc.is_straddle_line(Line::from(o.to_address::<VM>())) {
+                if !crate::args::BLOCK_ONLY && Line::is_aligned(o.to_raw_address()) {
+                    if c == 1 && self.rc.is_straddle_line(Line::from(o.to_raw_address())) {
                         continue;
                     } else {
                         std::sync::atomic::fence(Ordering::SeqCst);

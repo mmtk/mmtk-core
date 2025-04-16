@@ -601,32 +601,106 @@ mod tests {
     }
 }
 
-/// ObjectReference represents address for an object. Compared with Address,
-/// operations allowed on ObjectReference are very limited. No address arithmetics
-/// are allowed for ObjectReference. The idea is from the paper
-/// High-level Low-level Programming (VEE09) and JikesRVM.
+/// `ObjectReference` represents address for an object. Compared with `Address`, operations allowed
+/// on `ObjectReference` are very limited. No address arithmetics are allowed for `ObjectReference`.
+/// The idea is from the paper [Demystifying Magic: High-level Low-level Programming (VEE09)][FBC09]
+/// and [JikesRVM].
 ///
-/// A runtime may define its "object references" differently. It may define an object reference as
-/// the address of an object, a handle that points to an indirection table entry where a pointer to
-/// the object is held, or anything else. Regardless, MMTk expects each object reference to have a
-/// pointer to the object (an address) in each object reference, and that address should be used
-/// for this `ObjectReference` type.
+/// In MMTk, `ObjectReference` holds a non-zero address, i.e. its **raw address**.  It must satisfy
+/// the following requirements.
 ///
-/// We currently do not allow an opaque `ObjectReference` type for which a binding can define
-/// their layout. We now only allow a binding to define their semantics through a set of
-/// methods in [`crate::vm::ObjectModel`]. Major refactoring is needed in MMTk to allow
-/// the opaque `ObjectReference` type, and we haven't seen a use case for now.
+/// -   It uniquely references an MMTk object.
+/// -   The address must be within the address range of the object it refers to.
+/// -   The address must be word-aligned.
+/// -   It must be efficient to access object metadata from an `ObjectReference`.
 ///
-/// Note that [`ObjectReference`] cannot be null.  For the cases where a non-null object reference
-/// may or may not exist, (such as the result of [`crate::vm::slot::Slot::load`])
-/// `Option<ObjectReference>` should be used.  [`ObjectReference`] is backed by `NonZeroUsize`
-/// which cannot be zero, and it has the `#[repr(transparent)]` attribute.  Thanks to [null pointer
-/// optimization (NPO)][NPO], `Option<ObjectReference>` has the same size as `NonZeroUsize` and
-/// `usize`.  For the convenience of passing `Option<ObjectReference>` to and from native (C/C++)
-/// programs, mmtk-core provides [`crate::util::api_util::NullableObjectReference`].
+/// Each `ObjectReference` uniquely identifies exactly one MMTk object.  There is no "null
+/// reference" (see below for details).
 ///
-/// Note that [`ObjectReference`] has to be word aligned.
+/// Conversely, each object has a unique (raw) address used for `ObjectReference`.  That address is
+/// nominated by the VM binding right after an object is allocated in the MMTk heap (i.e. the
+/// argument of [`crate::memory_manager::post_alloc`]).  The same address is used by all
+/// `ObjectReference` instances that refer to that object until the object is moved, at which time
+/// the VM binding shall choose another address to use as the `ObjectReference` of the new copy (in
+/// [`crate::vm::ObjectModel::copy`] or [`crate::vm::ObjectModel::get_reference_when_copied_to`])
+/// until the object is moved again.
 ///
+/// In addition to the raw address, there are also two addresses related to each object allocated in
+/// MMTk heap, namely **starting address** and **header address**.  See the
+/// [`crate::vm::ObjectModel`] trait for their precise definition.
+///
+/// The VM binding may, in theory, pick any aligned address within the object, and it doesn't have
+/// to be the starting address.  However, during tracing, MMTk will need to access object metadata
+/// from a `ObjectReference`.  Particularly, it needs to identify reference fields, and query
+/// information about the object, such as object size.  Such information is usually accessed from
+/// object headers.  The choice of `ObjectReference` must make such accesses efficient.
+///
+/// Because the raw address is within the object, MMTk will also use the raw address to identify the
+/// space or region (chunk, block, line, etc.) that contains the object, and to access side metadata
+/// and the SFTMap.  If a VM binding needs to access side metadata directly (particularly, setting
+/// the "valid-object (VO) bit" in allocation fast paths), it shall use the raw address to compute
+/// the byte and bit address of the metadata bits.
+///
+/// # Notes
+///
+/// ## About VMs own concepts of "object references"
+///
+/// A runtime may define its own concept of "object references" differently from MMTk's
+/// `ObjectReference` type.  It may define its object reference as
+///
+/// -   the starting address of an object,
+/// -   an address inside an object,
+/// -   an address at a certain offset outside an object,
+/// -   a handle that points to an indirection table entry where a pointer to the object is held, or
+/// -   anything else that refers to an object.
+///
+/// Regardless, when passing an `ObjectReference` value to MMTk through the API, MMTk expectes its
+/// value to satisfy MMTk's definition.  This means MMTk's `ObjectReference` may not be the value
+/// held in an object field.  Some VM bindings may need to do conversions when passing object
+/// references to MMTk.  For example, adding an offset to the VM-level object reference so that the
+/// resulting address is within the object.  When using handles, the VM binding may use the *pointer
+/// stored in the entry* of the indirection table instead of the *pointer to the entry* itself as
+/// MMTk-level `ObjectReference`.
+///
+/// ## About null references
+///
+/// An [`ObjectReference`] always refers to an object.  Some VMs have special values (such as `null`
+/// in Java) that do not refer to any object.  Those values cannot be represented by
+/// `ObjectReference`.  When scanning roots and object fields, the VM binding should ignore slots
+/// that do not hold a reference to an object.  Specifically, [`crate::vm::slot::Slot::load`]
+/// returns `Option<ObjectReference>`.  It can return `None` so that MMTk skips that slot.
+///
+/// `Option<ObjectReference>` should be used for the cases where a non-null object reference may or
+/// may not exist,  That includes several API functions, including [`crate::vm::slot::Slot::load`].
+/// [`ObjectReference`] is backed by `NonZeroUsize` which cannot be zero, and it has the
+/// `#[repr(transparent)]` attribute. Thanks to [null pointer optimization (NPO)][NPO],
+/// `Option<ObjectReference>` has the same size as `NonZeroUsize` and `usize`.
+///
+/// For the convenience of passing `Option<ObjectReference>` to and from native (C/C++) programs,
+/// mmtk-core provides [`crate::util::api_util::NullableObjectReference`].
+///
+/// ## About the `VMSpace`
+///
+/// The `VMSpace` is managed by the VM binding.  The VM binding declare ranges of memory as part of
+/// the `VMSpace`, but MMTk never allocates into it.  The VM binding allocates objects into the
+/// `VMSpace` (usually by mapping boot-images), and refers to objects in the `VMSpace` using
+/// `ObjectReference`s whose raw addresses point inside those objects (and must be word-aligned,
+/// too).  MMTk will access metadata using methods of [`ObjectModel`] like other objects.  MMTk also
+/// has side metadata available for objects in the `VMSpace`.
+///
+/// ## About `ObjectReference` pointing outside MMTk spaces
+///
+/// If a VM binding implements [`crate::vm::ActivePlan::vm_trace_object`], `ObjectReference` is
+/// allowed to point to locations outside any MMTk spaces.  When tracing objects, such
+/// `ObjectReference` values will be processed by `ActivePlan::vm_trace_object` so that the VM
+/// binding can trace its own allocated objects during GC.  However, **this is an experimental
+/// feature**, and may not interact well with other parts of MMTk.  Notably, MMTk will not allocate
+/// side metadata for such `ObjectReference`, and attempts to access side metadata with a non-MMTk
+/// `ObjectReference` will result in crash. Use with caution.
+///
+/// [FBC09]: https://dl.acm.org/doi/10.1145/1508293.1508305
+/// [JikesRVM]: https://www.jikesrvm.org/
+/// [`ObjectModel`]: crate::vm::ObjectModel
 /// [NPO]: https://doc.rust-lang.org/std/option/index.html#representation
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq, NoUninit)]
@@ -641,26 +715,18 @@ impl ObjectReference {
     /// you will see an assertion failure in the debug build when constructing an object reference instance.
     pub const ALIGNMENT: usize = crate::util::constants::BYTES_IN_ADDRESS;
 
-    /// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.
-    ///
-    /// MMTk should not make any assumption on the actual location of the address with the object reference.
-    /// MMTk should not assume the address returned by this method is in our allocation. For the purposes of
-    /// setting object metadata, MMTk should use [`crate::util::ObjectReference::to_address`] or [`crate::util::ObjectReference::to_header`].
+    /// Cast the object reference to its raw address.
     pub fn to_raw_address(self) -> Address {
         Address(self.0.get())
     }
 
-    /// Cast a raw address to an object reference. This method is mostly for the convinience of a binding.
-    /// This is how a binding creates `ObjectReference` instances.
+    /// Cast a raw address to an object reference.
     ///
     /// If `addr` is 0, the result is `None`.
-    ///
-    /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::util::ObjectReference::from_address`]
-    /// to turn addresses that are from [`crate::util::ObjectReference::to_address`] back to object.
     pub fn from_raw_address(addr: Address) -> Option<ObjectReference> {
         debug_assert!(
             addr.is_aligned_to(Self::ALIGNMENT),
-            "ObjectReference is required to be word aligned"
+            "ObjectReference is required to be word aligned.  addr: {addr}"
         );
         NonZeroUsize::new(addr.0).map(ObjectReference)
     }
@@ -677,18 +743,9 @@ impl ObjectReference {
         debug_assert!(!addr.is_zero());
         debug_assert!(
             addr.is_aligned_to(Self::ALIGNMENT),
-            "ObjectReference is required to be word aligned"
+            "ObjectReference is required to be word aligned.  addr: {addr}"
         );
         ObjectReference(NonZeroUsize::new_unchecked(addr.0))
-    }
-
-    /// Get the in-heap address from an object reference. This method is used by MMTk to get an in-heap address
-    /// for an object reference.
-    pub fn to_address<VM: VMBinding>(self) -> Address {
-        use crate::vm::ObjectModel;
-        let to_address = Address(self.0.get()).offset(VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET);
-        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || to_address == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, in-object addr is {}", self, to_address);
-        to_address
     }
 
     /// Get the header base address from an object reference. This method is used by MMTk to get a base address for the
@@ -704,34 +761,27 @@ impl ObjectReference {
     pub fn to_object_start<VM: VMBinding>(self) -> Address {
         let object_start = VM::VMObjectModel::ref_to_object_start(self);
         debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_object_start() returns {}", self, object_start);
-        object_start
-    }
-
-    /// Get the object reference from an address that is returned from [`crate::util::address::ObjectReference::to_address`].
-    pub fn from_address<VM: VMBinding>(addr: Address) -> ObjectReference {
-        use crate::vm::ObjectModel;
-        let obj = unsafe {
-            ObjectReference::from_raw_address_unchecked(
-                addr.offset(-VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET),
-            )
-        };
-        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || addr == obj.to_raw_address(), "The binding claims unified object reference address, but for address {}, the object reference is {}", addr, obj);
         debug_assert!(
-            obj.to_raw_address().is_aligned_to(Self::ALIGNMENT),
-            "ObjectReference is required to be word aligned"
+            self.to_raw_address()
+                >= object_start + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
+            "The invariant `object_ref >= object_start + OBJECT_REF_OFFSET_LOWER_BOUND` is violated. \
+            object_ref: {}, object_start: {}, OBJECT_REF_OFFSET_LOWER_BOUND: {}",
+            self.to_raw_address(),
+            object_start,
+            VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
         );
-        obj
+        object_start
     }
 
     /// Is the object reachable, determined by the policy?
     /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
-    pub fn is_reachable<VM: VMBinding>(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_reachable(self)
+    pub fn is_reachable(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_reachable(self)
     }
 
     /// Is the object live, determined by the policy?
-    pub fn is_live<VM: VMBinding>(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_live(self)
+    pub fn is_live(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_live(self)
     }
 
     pub fn is_live2(self) -> bool {
@@ -739,17 +789,17 @@ impl ObjectReference {
     }
 
     /// Can the object be moved?
-    pub fn is_movable<VM: VMBinding>(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_movable()
+    pub fn is_movable(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_movable()
     }
 
     /// Get forwarding pointer if the object is forwarded.
-    pub fn get_forwarded_object<VM: VMBinding>(self) -> Option<Self> {
+    pub fn get_forwarded_object(self) -> Option<Self> {
         debug_assert!({
             let addr = self.to_raw_address();
             addr >= vm_layout().heap_start && addr < vm_layout().heap_end
         });
-        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.get_forwarded_object(self)
+        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.get_forwarded_object(self)
     }
 
     pub fn get_forwarded_object2(self) -> Option<Self> {
@@ -761,22 +811,22 @@ impl ObjectReference {
     }
 
     /// Is the object in any MMTk spaces?
-    pub fn is_in_any_space<VM: VMBinding>(self) -> bool {
+    pub fn is_in_any_space(self) -> bool {
         let addr = self.to_raw_address();
         if addr < vm_layout().heap_start || addr >= vm_layout().heap_end {
             return false;
         }
-        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_in_space(self)
+        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_in_space(self)
     }
 
     /// Is the object sane?
     #[cfg(feature = "sanity")]
-    pub fn is_sane<VM: VMBinding>(self) -> bool {
+    pub fn is_sane(self) -> bool {
         let addr = self.to_raw_address();
         if addr < vm_layout().heap_start || addr >= vm_layout().heap_end {
             return false;
         }
-        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_sane()
+        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_sane()
     }
 
     pub fn get_size<VM: VMBinding>(self) -> usize {
@@ -828,17 +878,17 @@ impl ObjectReference {
     pub fn verify<VM: VMBinding>(self) {
         if cfg!(debug_assertions) || Self::STRICT_VERIFICATION {
             assert!(
-                self.to_address::<VM>().is_mapped(),
+                self.to_raw_address().is_mapped(),
                 "unmapped object {:?}",
                 self
             );
             assert!(
-                self.is_in_any_space::<VM>(),
+                self.is_in_any_space(),
                 "object {:?} is not in any space",
                 self
             );
             assert_ne!(
-                unsafe { self.to_address::<VM>().load::<usize>() },
+                unsafe { self.to_raw_address().load::<usize>() },
                 0xdead,
                 "object {:?} is dead",
                 self

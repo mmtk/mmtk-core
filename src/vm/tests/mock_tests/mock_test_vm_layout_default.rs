@@ -24,7 +24,7 @@ pub fn test_with_vm_layout(layout: Option<VMLayout>) {
     let addr = memory_manager::alloc(&mut fixture.mutator, 8, 8, 0, AllocationSemantics::Default);
     let obj = MockVM::object_start_to_ref(addr);
     // Test SFT
-    assert!(memory_manager::is_in_mmtk_spaces::<MockVM>(obj));
+    assert!(memory_manager::is_in_mmtk_spaces(obj));
     // Test mmapper
     assert!(memory_manager::is_mapped_address(addr));
 }

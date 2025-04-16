@@ -1,6 +1,3 @@
-extern crate libc;
-extern crate mmtk;
-
 use std::sync::OnceLock;
 
 use mmtk::vm::VMBinding;

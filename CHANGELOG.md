@@ -1,3 +1,29 @@
+0.28.0 (2024-09-27)
+===
+
+## What's Changed
+
+### API
+* Require ObjectReference to point inside object by @wks in https://github.com/mmtk/mmtk-core/pull/1195
+* Return if a GC ran or not for `handle_user_collection_request` by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1205
+
+### CI
+* Update ci-perf-kit to 0.7.6 by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1199
+* Update ci-perf-kit to plot epoch by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1208
+
+### Misc
+* Skip iterating through unallocated memory for `MonotonePageResource` by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1189
+* Fix find_last_non_zero_bit, and align metadata address before converting to data address. by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1188
+* Panic message and outdated comments by @wks in https://github.com/mmtk/mmtk-core/pull/1191
+* Filter the result for find_prev_non_zero_value_fast to make sure it is in the search range by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1192
+* Assert OBJECT_REF_OFFSET_LOWER_BOUND invariant by @wks in https://github.com/mmtk/mmtk-core/pull/1194
+* Minor fixes by @wks in https://github.com/mmtk/mmtk-core/pull/1196
+* Add a feature immix_stress_copying by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1202
+* Update migration guide for #1205 by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1211
+
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.27.0...v0.28.0
+
 0.27.0 (2024-08-09)
 ===
 

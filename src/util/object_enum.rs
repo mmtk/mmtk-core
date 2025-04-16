@@ -58,7 +58,7 @@ where
 
     fn visit_address_range(&mut self, start: Address, end: Address) {
         VO_BIT.scan_non_zero_values::<u8>(start, end, &mut |address| {
-            let object = vo_bit::get_object_ref_for_vo_addr::<VM>(address);
+            let object = vo_bit::get_object_ref_for_vo_addr(address);
             (self.object_callback)(object);
         })
     }

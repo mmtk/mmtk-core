@@ -209,8 +209,8 @@ impl Block {
 
     /// Get the block containing the given address.
     /// The input address does not need to be aligned.
-    pub fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        Self(VM::VMObjectModel::ref_to_object_start(object).align_down(Self::BYTES))
+    pub fn containing(object: ObjectReference) -> Self {
+        Self(object.to_raw_address().align_down(Self::BYTES))
     }
 
     /// Get block start address

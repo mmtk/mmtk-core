@@ -142,23 +142,23 @@ pub extern "C" fn mmtk_total_bytes() -> usize {
 
 #[no_mangle]
 pub extern "C" fn mmtk_is_live_object(object: ObjectReference) -> bool {
-    memory_manager::is_live_object::<DummyVM>(object)
+    memory_manager::is_live_object(object)
 }
 
 #[no_mangle]
 pub extern "C" fn mmtk_will_never_move(object: ObjectReference) -> bool {
-    !object.is_movable::<DummyVM>()
+    !object.is_movable()
 }
 
 #[cfg(feature = "is_mmtk_object")]
 #[no_mangle]
 pub extern "C" fn mmtk_is_mmtk_object(addr: Address) -> bool {
-    memory_manager::is_mmtk_object(addr)
+    memory_manager::is_mmtk_object(addr).is_some()
 }
 
 #[no_mangle]
 pub extern "C" fn mmtk_is_in_mmtk_spaces(object: ObjectReference) -> bool {
-    memory_manager::is_in_mmtk_spaces::<DummyVM>(object)
+    memory_manager::is_in_mmtk_spaces(object)
 }
 
 #[no_mangle]

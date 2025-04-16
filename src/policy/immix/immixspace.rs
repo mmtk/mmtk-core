@@ -128,7 +128,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         if self.rc_enabled {
             if self.is_end_of_satb_or_full_gc {
                 if self.is_marked(object) {
-                    let block = Block::containing::<VM>(object);
+                    let block = Block::containing(object);
                     if block.is_defrag_source() {
                         if object_forwarding::is_forwarded::<VM>(object) {
                             let forwarded =
@@ -158,7 +158,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
             return true;
         }
         if self.cm_enabled {
-            if Block::containing::<VM>(object).is_nursery() {
+            if Block::containing(object).is_nursery() {
                 return true;
             }
         }
@@ -211,11 +211,11 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn initialize_object_metadata(&self, _object: ObjectReference, _bytes: usize, _alloc: bool) {
         self.copy_alloc_bytes.store(0, Ordering::SeqCst);
         #[cfg(feature = "vo_bit")]
-        crate::util::metadata::vo_bit::set_vo_bit::<VM>(_object);
+        crate::util::metadata::vo_bit::set_vo_bit(_object);
     }
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
-        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr)
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
     }
     #[cfg(feature = "is_mmtk_object")]
     fn find_object_from_internal_pointer(
@@ -285,7 +285,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         if KIND == TRACE_KIND_TRANSITIVE_PIN {
             self.trace_object_without_moving(queue, object)
         } else if KIND == TRACE_KIND_DEFRAG {
-            if Block::containing::<VM>(object).is_defrag_source() {
+            if Block::containing(object).is_defrag_source() {
                 debug_assert!(self.in_defrag());
                 debug_assert!(
                     !crate::plan::is_nursery_gc(worker.mmtk.get_plan()),
@@ -860,8 +860,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     cursor = cursor + crate::util::rc::MIN_OBJECT_SIZE;
                     let c = self.rc.count(o);
                     if c != 0 {
-                        if Line::is_aligned(o.to_address::<VM>())
-                            && self.rc.is_straddle_line(Line::from(o.to_address::<VM>()))
+                        if Line::is_aligned(o.to_raw_address())
+                            && self.rc.is_straddle_line(Line::from(o.to_raw_address()))
                         {
                             continue;
                         }
@@ -1080,17 +1080,17 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         if self.attempt_mark(object) {
-            let addr = object.to_address::<VM>().as_usize();
+            let addr = object.to_raw_address().as_usize();
             let straddle = if (addr & 0b11110000) == 0 {
                 self.rc
-                    .is_straddle_line(Line::from(Line::align(object.to_address::<VM>())))
+                    .is_straddle_line(Line::from(Line::align(object.to_raw_address())))
             } else {
                 false
             };
 
             // let straddle = self
             //     .rc
-            //     .is_straddle_line(Line::from(Line::align(object.to_address::<VM>())));
+            //     .is_straddle_line(Line::from(Line::align(object.to_raw_address())));
             if !straddle {
                 // Visit node
                 queue.enqueue(object);
@@ -1112,7 +1112,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             if self.rc_enabled {
                 let straddle = self
                     .rc
-                    .is_straddle_line(Line::from(Line::align(object.to_address::<VM>())));
+                    .is_straddle_line(Line::from(Line::align(object.to_raw_address())));
                 if straddle {
                     return object;
                 }
@@ -1123,7 +1123,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                         self.mark_lines(object);
                     }
                 } else {
-                    let block = Block::containing::<VM>(object);
+                    let block = Block::containing(object);
                     let state = block.get_state();
                     if state != BlockState::Marked {
                         debug_assert_ne!(state, BlockState::Unallocated);
@@ -1180,9 +1180,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 } else {
                     // new_object != object
                     debug_assert!(
-                        !Block::containing::<VM>(new_object).is_defrag_source(),
+                        !Block::containing(new_object).is_defrag_source(),
                         "Block {:?} containing forwarded object {} should not be a defragmentation source",
-                        Block::containing::<VM>(new_object),
+                        Block::containing(new_object),
                         new_object,
                     );
                 }
@@ -1202,7 +1202,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             {
                 self.attempt_mark(object);
                 object_forwarding::clear_forwarding_bits::<VM>(object);
-                Block::containing::<VM>(object).set_state(BlockState::Marked);
+                Block::containing(object).set_state(BlockState::Marked);
 
                 #[cfg(feature = "vo_bit")]
                 vo_bit::helper::on_object_marked::<VM>(object);
@@ -1226,12 +1226,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
                 new_object
             };
-            debug_assert!({
-                let state = Block::containing::<VM>(new_object).get_state();
-                state == BlockState::Marked
-            });
+            debug_assert_eq!(
+                Block::containing(new_object).get_state(),
+                BlockState::Marked
+            );
+
             queue.enqueue(new_object);
-            debug_assert!(new_object.is_live::<VM>());
+            debug_assert!(new_object.is_live());
             self.unlog_object_if_needed(new_object);
             new_object
         }
@@ -1247,7 +1248,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         debug_assert!(self.rc_enabled);
-        if crate::args::RC_MATURE_EVACUATION && Block::containing::<VM>(object).is_defrag_source() {
+        if crate::args::RC_MATURE_EVACUATION && Block::containing(object).is_defrag_source() {
             self.trace_forward_rc_mature_object(queue, object, semantics, pause, worker)
         } else if crate::args::RC_MATURE_EVACUATION {
             self.trace_mark_rc_mature_object(queue, object, pause, mark)

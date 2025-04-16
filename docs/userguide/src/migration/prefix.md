@@ -30,9 +30,78 @@ Notes for the mmtk-core developers:
 
 <!-- Insert new versions here -->
 
+## 0.28.0
+
+### `handle_user_collection_request` returns `bool`
+
+```admonish tldr
+`memory_manager::handle_user_collection_request` now returns a boolean value to indicate whether a GC
+is triggered by the method or not. Bindings may use the return value to do some post-gc cleanup, or
+simply ignore the return value.
+```
+
+API changes:
+
+-   module `memory_manager`
+    +   `handle_user_collection_request` now returns `bool` to indicate if a GC is triggered by the method.
+        Bindings may use the value, or simply ignore it.
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/issues/1205>
+-   Examples:
+    + https://github.com/mmtk/mmtk-julia/pull/177: Ignore return value.
+
+
+### `ObjectReference` must point inside an object
+
+```admonish tldr
+`ObjectReference` is now required to be an address within an object.  The concept of "in-object
+address" and related methods are removed.  Some methods which used to depend on the "in-object
+address" no longer need the `<VM>` type argument.
+```
+
+API changes:
+
+-   struct `ObjectReference`
+    +   Its "raw address" must be within an object now.
+    +   The following methods which were used to access the in-object address are removed.
+        *   `from_address`
+        *   `to_address`
+        *   When accessing side metadata, the "raw address" should be used, instead.
+    +   The following methods no longer have the `<VM>` type argument.
+        *   `get_forwarded_object`
+        *   `is_in_any_space`
+        *   `is_live`
+        *   `is_movable`
+        *   `is_reachable`
+-   module `memory_manager`
+    +   `is_mmtk_object`: It now requires the address parameter to be non-zero and word-aligned.
+        *   Otherwise it will not be a legal `ObjectReference` in the first place.  The user should
+            filter out such illegal values.
+    +   The following functions no longer have the `<VM>` type argument.
+        *   `find_object_from_internal_pointer`
+        *   `is_in_mmtk_space`
+        *   `is_live_object`
+        *   `is_pinned`
+        *   `pin_object`
+        *   `unpin_object`
+-   struct `Region`
+    +   The following methods no longer have the `<VM>` type argument.
+        *   `containing`
+-   trait `ObjectModel`
+    +   `IN_OBJECT_ADDRESS_OFFSET`: removed because it is no longer needed.
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/issues/1170>
+-   Examples:
+    +   https://github.com/mmtk/mmtk-openjdk/pull/286: a simple case
+    +   https://github.com/mmtk/mmtk-jikesrvm/issues/178: a VM that needs much change for this
+
 ## 0.27.0
 
-### `is_mmtk_object` returns `Option<ObjectReference>
+### `is_mmtk_object` returns `Option<ObjectReference>`
 
 ```admonish tldr
 `memory_manager::is_mmtk_object` now returns `Option<ObjectReference>` instead of `bool`.

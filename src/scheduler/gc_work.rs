@@ -819,7 +819,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
         let worker = GCWorkerMutRef::new(self.worker());
 
         // Invoke trace object on sft
-        let sft = unsafe { crate::mmtk::SFT_MAP.get_unchecked(object.to_address::<VM>()) };
+        let sft = unsafe { crate::mmtk::SFT_MAP.get_unchecked(object.to_raw_address()) };
         sft.sft_trace_object(&mut self.base.nodes, object, worker)
     }
 
@@ -1235,7 +1235,7 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
     #[inline]
     fn __process_slot<const IX: bool, const WEAK_ROOT: bool>(&mut self, slot: SlotOf<Self>) {
         let Some(object) = slot.load() else { return };
-        if IX && WEAK_ROOT && !Block::containing::<VM>(object).is_defrag_source() {
+        if IX && WEAK_ROOT && !Block::containing(object).is_defrag_source() {
             return;
         }
         let new_object = self.trace_object(object);

@@ -1006,6 +1006,7 @@ impl SideMetadataSpec {
     ///
     /// This function uses non-atomic load for the side metadata. The user needs to make sure
     /// that there is no other thread that is mutating the side metadata.
+    #[allow(clippy::let_and_return)]
     pub unsafe fn find_prev_non_zero_value<T: MetadataValue>(
         &self,
         data_addr: Address,
@@ -1015,7 +1016,15 @@ impl SideMetadataSpec {
 
         if self.uses_contiguous_side_metadata() {
             // Contiguous side metadata
-            self.find_prev_non_zero_value_fast::<T>(data_addr, search_limit_bytes)
+            let result = self.find_prev_non_zero_value_fast::<T>(data_addr, search_limit_bytes);
+            #[cfg(debug_assertions)]
+            {
+                // Double check if the implementation is correct
+                let result2 =
+                    self.find_prev_non_zero_value_simple::<T>(data_addr, search_limit_bytes);
+                assert_eq!(result, result2, "find_prev_non_zero_value_fast returned a diffrent result from the naive implementation.");
+            }
+            result
         } else {
             // TODO: We should be able to optimize further for this case. However, we need to be careful that the side metadata
             // is not contiguous, and we need to skip to the next chunk's side metadata when we search to a different chunk.
@@ -1033,12 +1042,10 @@ impl SideMetadataSpec {
         let region_bytes = 1 << self.log_bytes_in_region;
         // Figure out the range that we need to search.
         let start_addr = data_addr.align_down(region_bytes);
-        let end_addr = data_addr
-            .saturating_sub(search_limit_bytes)
-            .align_down(region_bytes);
+        let end_addr = data_addr.saturating_sub(search_limit_bytes) + 1usize;
 
         let mut cursor = start_addr;
-        while cursor > end_addr {
+        while cursor >= end_addr {
             // We encounter an unmapped address. Just return None.
             if !cursor.is_mapped() {
                 return None;
@@ -1074,13 +1081,13 @@ impl SideMetadataSpec {
         let end_addr = data_addr;
 
         // Then figure out the start and end metadata address and bits.
+        // The start bit may not be accurate, as we map any address in the region to the same bit.
+        // We will filter the result at the end to make sure the found address is in the search range.
         let start_meta_addr = address_to_contiguous_meta_address(self, start_addr);
         let start_meta_shift = meta_byte_lshift(self, start_addr);
         let end_meta_addr = address_to_contiguous_meta_address(self, end_addr);
         let end_meta_shift = meta_byte_lshift(self, end_addr);
 
-        // The result will be set by one of the following closures.
-        // Use Cell so it doesn't need to be mutably borrowed by the two closures which Rust will complain.
         let mut res = None;
 
         let mut visitor = |range: BitByteRange| {
@@ -1088,6 +1095,7 @@ impl SideMetadataSpec {
                 BitByteRange::Bytes { start, end } => {
                     match helpers::find_last_non_zero_bit_in_metadata_bytes(start, end) {
                         helpers::FindMetaBitResult::Found { addr, bit } => {
+                            let (addr, bit) = align_metadata_address(self, addr, bit);
                             res = Some(contiguous_meta_address_to_address(self, addr, bit));
                             // Return true to abort the search. We found the bit.
                             true
@@ -1106,6 +1114,7 @@ impl SideMetadataSpec {
                     match helpers::find_last_non_zero_bit_in_metadata_bits(addr, bit_start, bit_end)
                     {
                         helpers::FindMetaBitResult::Found { addr, bit } => {
+                            let (addr, bit) = align_metadata_address(self, addr, bit);
                             res = Some(contiguous_meta_address_to_address(self, addr, bit));
                             // Return true to abort the search. We found the bit.
                             true
@@ -1128,7 +1137,12 @@ impl SideMetadataSpec {
             &mut visitor,
         );
 
+        // We have to filter the result. We search between [start_addr, end_addr). But we actually
+        // search with metadata bits. It is possible the metadata bit for start_addr is the same bit
+        // as an address that is before start_addr. E.g. 0x2010f026360 and 0x2010f026361 are mapped
+        // to the same bit, 0x2010f026361 is the start address and 0x2010f026360 is outside the search range.
         res.map(|addr| addr.align_down(1 << self.log_bytes_in_region))
+            .filter(|addr| *addr >= start_addr && *addr < end_addr)
     }
 
     /// Search for data addresses that have non zero values in the side metadata.  This method is

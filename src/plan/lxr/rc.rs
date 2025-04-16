@@ -159,7 +159,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         let size = o.get_size::<VM>();
 
         if !los {
-            let block = Block::containing::<VM>(o);
+            let block = Block::containing(o);
             if !copied && block.is_nursery() {
                 block.set_as_in_place_promoted(&self.lxr.immix_space);
             }
@@ -216,11 +216,11 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         if los {
             if !is_val_array {
                 let start =
-                    side_metadata::address_to_meta_address(&Self::UNLOG_BITS, o.to_address::<VM>())
+                    side_metadata::address_to_meta_address(&Self::UNLOG_BITS, o.to_raw_address())
                         .to_mut_ptr::<u8>();
                 let limit = side_metadata::address_to_meta_address(
                     &Self::UNLOG_BITS,
-                    (o.to_address::<VM>() + size).align_up(heap_bytes_per_unlog_byte),
+                    (o.to_raw_address() + size).align_up(heap_bytes_per_unlog_byte),
                 )
                 .to_mut_ptr::<u8>();
                 unsafe {
@@ -228,7 +228,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                     std::ptr::write_bytes(start, 0xffu8, bytes);
                 }
             }
-            o.to_address::<VM>().unlog_field_relaxed::<VM>();
+            o.to_raw_address().unlog_field_relaxed::<VM>();
         } else if in_place_promotion && !is_val_array {
             let header_size = if VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
                 12usize
@@ -236,9 +236,9 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 16
             };
             let step = heap_bytes_per_unlog_byte << 2;
-            let end = o.to_address::<VM>() + size;
+            let end = o.to_raw_address() + size;
             let aligned_end = end.align_up(step);
-            let cursor = o.to_address::<VM>() + header_size;
+            let cursor = o.to_raw_address() + header_size;
             let mut cursor = cursor.align_down(step);
             let mut meta = side_metadata::address_to_meta_address(&Self::UNLOG_BITS, cursor);
             while cursor < aligned_end {
@@ -274,14 +274,14 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 };
                 // println!(" -- rec inc opt {:?}.{:?} -> {:?}", o, slot, target);
                 debug_assert!(
-                    target.to_address::<VM>().is_mapped(),
+                    target.to_raw_address().is_mapped(),
                     "Unmapped obj {:?}.{:?} -> {:?}",
                     o,
                     slot,
                     target
                 );
                 debug_assert!(
-                    target.is_in_any_space::<VM>(),
+                    target.is_in_any_space(),
                     "Unmapped obj {:?}.{:?} -> {:?}",
                     o,
                     slot,
@@ -339,12 +339,12 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             return true;
         }
         // Skip recycled lines
-        let block = Block::containing::<VM>(o);
+        let block = Block::containing(o);
         if crate::args::RC_DONT_EVACUATE_NURSERY_IN_RECYCLED_LINES && !block.is_nursery() {
             return true;
         }
         if cfg!(debug_assertions) {
-            let cls = unsafe { (o.to_address::<VM>() + 8usize).load::<u32>() };
+            let cls = unsafe { (o.to_raw_address() + 8usize).load::<u32>() };
             assert!(cls != 0, "ERROR {:?} rc={}", o, self.rc.count(o));
         }
         if o.get_size::<VM>() >= crate::args().max_young_evac_size {
@@ -662,7 +662,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
                 if cfg!(any(feature = "sanity", debug_assertions)) {
                     for r in &roots {
                         assert!(
-                            r.to_address::<VM>().is_mapped(),
+                            r.to_raw_address().is_mapped(),
                             "Invalid object {:?}: address is not mapped",
                             r
                         );
@@ -937,7 +937,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
                         if self.cm_in_progress && !lxr.is_marked(x) {
                             if cfg!(any(feature = "sanity", debug_assertions)) {
                                 assert!(
-                                    x.to_address::<VM>().is_mapped(),
+                                    x.to_raw_address().is_mapped(),
                                     "Invalid object {:?}.{:?} -> {:?}: address is not mapped",
                                     o,
                                     slot,
@@ -958,7 +958,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             self.rc.unmark_straddle_object(o);
         }
         if cfg!(feature = "sanity") || ObjectReference::STRICT_VERIFICATION {
-            unsafe { o.to_address::<VM>().store(0xdeadusize) };
+            unsafe { o.to_raw_address().store(0xdeadusize) };
         }
         if in_ix_space {
             if cfg!(feature = "lxr_log_reclaim") {
@@ -966,7 +966,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
                     .rc_killed_bytes
                     .fetch_add(o.get_size::<VM>(), Ordering::Relaxed);
             }
-            let block = Block::containing::<VM>(o);
+            let block = Block::containing(o);
             lxr.immix_space
                 .add_to_possibly_dead_mature_blocks(block, false);
             false
