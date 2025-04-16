@@ -9,6 +9,9 @@ use crate::util::heap::externalpageresource::{ExternalPageResource, ExternalPage
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 use crate::util::heap::PageResource;
 use crate::util::metadata::mark_bit::MarkState;
+#[cfg(feature = "set_unlog_bits_vm_space")]
+use crate::util::metadata::MetadataSpec;
+use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
 use crate::util::ObjectReference;
 use crate::vm::{ObjectModel, VMBinding};
@@ -64,8 +67,19 @@ impl<VM: VMBinding> SFT for VMSpace<VM> {
         crate::util::metadata::vo_bit::set_vo_bit::<VM>(object);
     }
     #[cfg(feature = "is_mmtk_object")]
-    fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
+    fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr)
+    }
+    #[cfg(feature = "is_mmtk_object")]
+    fn find_object_from_internal_pointer(
+        &self,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -> Option<ObjectReference> {
+        crate::util::metadata::vo_bit::find_object_from_internal_pointer::<VM>(
+            ptr,
+            max_search_bytes,
+        )
     }
     fn sft_trace_object(
         &self,
@@ -131,6 +145,13 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
         // the address range for spaces and the VM space may break those assumptions (as the space is
         // mmapped by the runtime rather than us). So we we use SFT here.
         SFT_MAP.get_checked(start).name() == self.name()
+    }
+
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
+        let external_pages = self.pr.get_external_pages();
+        for ep in external_pages.iter() {
+            enumerator.visit_address_range(ep.start, ep.end);
+        }
     }
 }
 
@@ -224,6 +245,15 @@ impl<VM: VMBinding> VMSpace<VM> {
             start: start.align_down(BYTES_IN_PAGE),
             end: end.align_up(BYTES_IN_PAGE),
         });
+
+        #[cfg(feature = "set_unlog_bits_vm_space")]
+        if self.common.needs_log_bit {
+            // Bulk set unlog bits for all addresses in the VM space. This ensures that any
+            // modification to the bootimage is logged
+            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+                side.bset_metadata(start, size);
+            }
+        }
     }
 
     pub fn prepare(&mut self) {

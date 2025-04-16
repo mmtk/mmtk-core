@@ -2,11 +2,12 @@
 // For convenience, this module is public and the bindings may create and use side metadata for their purpose.
 
 mod constants;
-mod helpers;
+pub(crate) mod helpers;
 #[cfg(target_pointer_width = "32")]
 mod helpers_32;
 
 mod global;
+pub(crate) mod ranges;
 mod sanity;
 mod side_metadata_tests;
 pub(crate) mod spec_defs;

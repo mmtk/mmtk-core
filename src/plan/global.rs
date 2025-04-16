@@ -394,9 +394,10 @@ pub struct BasePlan<VM: VMBinding> {
     /// If VM space is present, it has some special interaction with the
     /// `memory_manager::is_mmtk_object` and the `memory_manager::is_in_mmtk_spaces` functions.
     ///
-    /// -   The `is_mmtk_object` funciton requires the valid object (VO) bit side metadata to identify objects,
-    ///     but currently we do not require the boot image to provide it, so it will not work if the
-    ///     address argument is in the VM space.
+    /// -   The functions `is_mmtk_object` and `find_object_from_internal_pointer` require
+    ///     the valid object (VO) bit side metadata to identify objects.
+    ///     If the binding maintains the VO bit for objects in VM spaces, those functions will work accordingly.
+    ///     Otherwise, calling them is undefined behavior.
     ///
     /// -   The `is_in_mmtk_spaces` currently returns `true` if the given object reference is in
     ///     the VM space.
@@ -434,11 +435,13 @@ impl<'a, VM: VMBinding> CreateSpecificPlanArgs<'a, VM> {
         &mut self,
         name: &'static str,
         zeroed: bool,
+        permission_exec: bool,
         vmrequest: VMRequest,
     ) -> PlanCreateSpaceArgs<VM> {
         PlanCreateSpaceArgs {
             name,
             zeroed,
+            permission_exec,
             vmrequest,
             global_side_metadata_specs: self.global_side_metadata_specs.clone(),
             vm_map: self.global_args.vm_map,
@@ -461,11 +464,13 @@ impl<VM: VMBinding> BasePlan<VM> {
             code_space: ImmortalSpace::new(args.get_space_args(
                 "code_space",
                 true,
+                true,
                 VMRequest::discontiguous(),
             )),
             #[cfg(feature = "code_space")]
             code_lo_space: ImmortalSpace::new(args.get_space_args(
                 "code_lo_space",
+                true,
                 true,
                 VMRequest::discontiguous(),
             )),
@@ -473,12 +478,14 @@ impl<VM: VMBinding> BasePlan<VM> {
             ro_space: ImmortalSpace::new(args.get_space_args(
                 "ro_space",
                 true,
+                false,
                 VMRequest::discontiguous(),
             )),
             #[cfg(feature = "vm_space")]
             vm_space: VMSpace::new(args.get_space_args(
                 "vm_space",
                 false,
+                false, // it doesn't matter -- we are not mmapping for VM space.
                 VMRequest::discontiguous(),
             )),
 
@@ -623,15 +630,17 @@ impl<VM: VMBinding> CommonPlan<VM> {
             immortal: ImmortalSpace::new(args.get_space_args(
                 "immortal",
                 true,
+                false,
                 VMRequest::discontiguous(),
             )),
             los: LargeObjectSpace::new(
-                args.get_space_args("los", true, VMRequest::discontiguous()),
+                args.get_space_args("los", true, false, VMRequest::discontiguous()),
                 false,
             ),
             nonmoving: ImmortalSpace::new(args.get_space_args(
                 "nonmoving",
                 true,
+                false,
                 VMRequest::discontiguous(),
             )),
             base: BasePlan::new(args),

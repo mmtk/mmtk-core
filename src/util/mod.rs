@@ -19,16 +19,27 @@ pub mod constants;
 pub mod conversions;
 /// The copy allocators for a GC worker.
 pub mod copy;
+/// Heap implementation, including page resource, mmapper, etc.
+pub mod heap;
+/// Checking if an address is an valid MMTk object.
+#[cfg(feature = "is_mmtk_object")]
+pub mod is_mmtk_object;
 /// Linear scan through a heap range
 pub mod linear_scan;
+/// Various malloc implementations (conditionally compiled by features)
+pub mod malloc;
 /// Wrapper functions for memory syscalls such as mmap, mprotect, etc.
 pub mod memory;
+/// Metadata (OnSide or InHeader) implementation.
+pub mod metadata;
 /// Opaque pointers used in MMTk, e.g. VMThread.
 pub mod opaque_pointer;
 /// MMTk command line options.
 pub mod options;
 /// Reference counting support.
 pub mod rc;
+#[cfg(feature = "test_private")]
+pub mod test_private;
 /// Test utilities. We need this module for `MockVM` in criterion benches, which does not include code with `cfg(test)`.
 #[cfg(any(test, feature = "mock_test"))]
 pub mod test_util;
@@ -37,21 +48,14 @@ pub mod test_util;
 /// An analysis framework for collecting data and profiling in GC.
 #[cfg(feature = "analysis")]
 pub(crate) mod analysis;
+pub(crate) mod epilogue;
 /// Non-generic refs to generic types of `<VM>`.
 pub(crate) mod erase_vm;
 /// Finalization implementation.
 pub(crate) mod finalizable_processor;
-/// Heap implementation, including page resource, mmapper, etc.
-pub mod heap;
-/// Checking if an address is an valid MMTk object.
-#[cfg(feature = "is_mmtk_object")]
-pub mod is_mmtk_object;
 /// Logger initialization
 pub(crate) mod logger;
-/// Various malloc implementations (conditionally compiled by features)
-pub mod malloc;
-/// Metadata (OnSide or InHeader) implementation.
-pub mod metadata;
+pub(crate) mod object_enum;
 /// Forwarding word in object copying.
 pub(crate) mod object_forwarding;
 /// Reference processing implementation.

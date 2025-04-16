@@ -16,6 +16,7 @@ use crate::util::heap::VMRequest;
 use crate::util::memory::MmapStrategy;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
+use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
@@ -74,8 +75,19 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
         crate::util::metadata::vo_bit::set_vo_bit::<VM>(_object);
     }
     #[cfg(feature = "is_mmtk_object")]
-    fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
+    fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr)
+    }
+    #[cfg(feature = "is_mmtk_object")]
+    fn find_object_from_internal_pointer(
+        &self,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -> Option<ObjectReference> {
+        crate::util::metadata::vo_bit::find_object_from_internal_pointer::<VM>(
+            ptr,
+            max_search_bytes,
+        )
     }
     fn sft_trace_object(
         &self,
@@ -155,6 +167,10 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
     }
+
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
+        enumerator.visit_address_range(self.start, self.start + self.total_bytes);
+    }
 }
 
 use crate::plan::{ObjectQueue, VectorObjectQueue};
@@ -221,11 +237,10 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         };
 
         // Eagerly memory map the entire heap (also zero all the memory)
-        let strategy = if *args.options.transparent_hugepages {
-            MmapStrategy::TransparentHugePages
-        } else {
-            MmapStrategy::Normal
-        };
+        let strategy = MmapStrategy::new(
+            *args.options.transparent_hugepages,
+            crate::util::memory::MmapProtection::ReadWrite,
+        );
         crate::util::memory::dzmmap_noreplace(start, aligned_total_bytes, strategy).unwrap();
         if space
             .metadata

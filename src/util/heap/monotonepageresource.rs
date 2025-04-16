@@ -2,6 +2,7 @@ use super::layout::vm_layout::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
 use crate::policy::space::{required_chunks, Space};
 use crate::util::address::Address;
 use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_PAGE};
+use crate::util::memory::MmapStrategy;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::{conversions::*, memory};
 use std::ops::Range;
@@ -176,6 +177,7 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
                     .ensure_mapped(
                         new_chunks_start,
                         growed_chunks << (LOG_BYTES_IN_CHUNK - LOG_BYTES_IN_PAGE as usize),
+                        MmapStrategy::INTERNAL_MEMORY,
                     )
                     .and(self.common().metadata.try_map_metadata_space(
                         new_chunks_start,

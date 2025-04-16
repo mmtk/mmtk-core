@@ -622,36 +622,16 @@ pub fn is_live_object<VM: VMBinding>(object: ObjectReference) -> bool {
 /// Concretely:
 /// 1.  Return true if `ObjectReference::from_raw_address(addr)` is a valid object reference to an
 ///     object in any space in MMTk.
-/// 2.  Also return true if there exists an `objref: ObjectReference` such that
-///     -   `objref` is a valid object reference to an object in any space in MMTk, and
-///     -   `lo <= objref.to_address() < hi`, where
-///         -   `lo = addr.align_down(VO_BIT_REGION_SIZE)` and
-///         -   `hi = lo + VO_BIT_REGION_SIZE` and
-///         -   `VO_BIT_REGION_SIZE` is [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
-///             It is the byte granularity of the valid object (VO) bit.
-/// 3.  Return false otherwise.  This function never panics.
-///
-/// Case 2 means **this function is imprecise for misaligned addresses**.
-/// This function uses the "valid object (VO) bits" side metadata, i.e. a bitmap.
-/// For space efficiency, each bit of the bitmap governs a small region of memory.
-/// The size of a region is currently defined as the [minimum object size](crate::util::constants::MIN_OBJECT_SIZE),
-/// which is currently defined as the [word size](crate::util::constants::BYTES_IN_WORD),
-/// which is 4 bytes on 32-bit systems or 8 bytes on 64-bit systems.
-/// The alignment of a region is also the region size.
-/// If a VO bit is `1`, the bitmap cannot tell which address within the 4-byte or 8-byte region
-/// is the valid object reference.
-/// Therefore, if the input `addr` is not properly aligned, but is close to a valid object
-/// reference, this function may still return true.
-///
-/// For the reason above, the VM **must check if `addr` is properly aligned** before calling this
-/// function.  For most VMs, valid object references are always aligned to the word size, so
-/// checking `addr.is_aligned_to(BYTES_IN_WORD)` should usually work.  If you are paranoid, you can
-/// always check against [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
+/// 2.  Return false otherwise.
 ///
 /// This function is useful for conservative root scanning.  The VM can iterate through all words in
 /// a stack, filter out zeros, misaligned words, obviously out-of-range words (such as addresses
 /// greater than `0x0000_7fff_ffff_ffff` on Linux on x86_64), and use this function to deside if the
 /// word is really a reference.
+///
+/// This function does not handle internal pointers. If a binding may have internal pointers on
+/// the stack, and requires identifying the base reference for an internal pointer, they should use
+/// [`find_object_from_internal_pointer`] instead.
 ///
 /// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
 /// is present.  See `crate::plan::global::BasePlan::vm_space`.
@@ -659,15 +639,46 @@ pub fn is_live_object<VM: VMBinding>(object: ObjectReference) -> bool {
 /// Argument:
 /// * `addr`: An arbitrary address.
 #[cfg(feature = "is_mmtk_object")]
-pub fn is_mmtk_object(addr: Address) -> bool {
-    use crate::mmtk::SFT_MAP;
-    SFT_MAP.get_checked(addr).is_mmtk_object(addr)
+pub fn is_mmtk_object(addr: Address) -> Option<ObjectReference> {
+    crate::util::is_mmtk_object::check_object_reference(addr)
+}
+
+/// Find if there is an object with VO bit set for the given address range.
+/// This should be used instead of [`crate::memory_manager::is_mmtk_object`] for conservative stack scanning if
+/// the binding may have internal pointers on the stack.
+///
+/// Note that, we only consider pointers that point to addresses that are equal or greater than the in-object addresss
+/// (i.e. [`crate::util::ObjectReference::to_address()`] which is the same as `object_ref.to_raw_address() + ObjectModel::IN_OBJECT_ADDRESS_OFFSET`),
+/// and within the allocation as 'internal pointers'. To be precise, for each object ref `obj_ref`, internal pointers are in the range
+/// `[obj_ref + ObjectModel::IN_OBJECT_ADDRESS_OFFSET, ObjectModel::ref_to_object_start(obj_ref) + ObjectModel::get_current_size(obj_ref))`.
+/// If a binding defines internal pointers differently, calling this method is undefined behavior.
+/// If this is the case for you, please submit an issue or engage us on Zulip to discuss more.
+///
+/// Note that, in the similar situation as [`crate::memory_manager::is_mmtk_object`], the binding should filter
+/// out obvious non-pointers (e.g. alignment check, bound check, etc) before calling this function to avoid unnecessary
+/// cost. This method is not cheap.
+///
+/// To minimize the cost, the user should also use a small `max_search_bytes`.
+///
+/// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
+/// is present.  See `crate::plan::global::BasePlan::vm_space`.
+///
+/// Argument:
+/// * `internal_ptr`: The address to start searching. We search backwards from this address (including this address) to find the base reference.
+/// * `max_search_bytes`: The maximum number of bytes we may search for an object with VO bit set. `internal_ptr - max_search_bytes` is not included.
+#[cfg(feature = "is_mmtk_object")]
+pub fn find_object_from_internal_pointer<VM: VMBinding>(
+    internal_ptr: Address,
+    max_search_bytes: usize,
+) -> Option<ObjectReference> {
+    crate::util::is_mmtk_object::check_internal_reference(internal_ptr, max_search_bytes)
 }
 
 /// Return true if the `object` lies in a region of memory where
 /// -   only MMTk can allocate into, or
 /// -   only MMTk's delegated memory allocator (such as a malloc implementation) can allocate into
 ///     for allocation requests from MMTk.
+///
 /// Return false otherwise.  This function never panics.
 ///
 /// Particularly, if this function returns true, `object` cannot be an object allocated by the VM

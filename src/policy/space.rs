@@ -5,6 +5,7 @@ use crate::util::conversions::*;
 use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
+use crate::util::object_enum::ObjectEnumerator;
 use crate::util::Address;
 use crate::util::ObjectReference;
 
@@ -28,7 +29,7 @@ use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
-use crate::util::memory;
+use crate::util::memory::{self, HugePageSupport, MmapProtection, MmapStrategy};
 use crate::vm::VMBinding;
 
 use std::marker::PhantomData;
@@ -306,6 +307,28 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             &self.get_page_resource().common().metadata,
         )
     }
+
+    /// Enumerate objects in the current space.
+    ///
+    /// Implementers can use the `enumerator` to report
+    ///
+    /// -   individual objects within the space using `enumerator.visit_object`, and
+    /// -   ranges of address that may contain objects using `enumerator.visit_address_range`. The
+    ///     caller will then enumerate objects in the range using the VO bits metadata.
+    ///
+    /// Each object in the space shall be covered by one of the two methods above.
+    ///
+    /// # Implementation considerations
+    ///
+    /// **Skipping empty ranges**: When enumerating address ranges, spaces can skip ranges (blocks,
+    /// chunks, etc.) that are guarenteed not to contain objects.
+    ///
+    /// **Dynamic dispatch**: Because `Space` is a trait object type and `enumerator` is a `dyn`
+    /// reference, invoking methods of `enumerator` involves a dynamic dispatching.  But the
+    /// overhead is OK if we call it a block at a time because scanning the VO bits will dominate
+    /// the execution time.  For LOS, it will be cheaper to enumerate individual objects than
+    /// scanning VO bits because it is sparse.
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator);
 }
 
 /// Print the VM map for a space.
@@ -379,10 +402,12 @@ pub struct CommonSpace<VM: VMBinding> {
     // the copy semantics for the space.
     pub copy: Option<CopySemantics>,
 
-    immortal: bool,
-    movable: bool,
+    pub immortal: bool,
+    pub movable: bool,
     pub contiguous: bool,
     pub zeroed: bool,
+
+    pub permission_exec: bool,
 
     pub start: Address,
     pub extent: usize,
@@ -401,6 +426,7 @@ pub struct CommonSpace<VM: VMBinding> {
 
     pub gc_trigger: Arc<GCTrigger<VM>>,
     pub global_state: Arc<GlobalState>,
+    pub options: Arc<Options>,
 
     p: PhantomData<VM>,
 }
@@ -426,6 +452,7 @@ impl<VM: VMBinding> PolicyCreateSpaceArgs<'_, VM> {
 pub struct PlanCreateSpaceArgs<'a, VM: VMBinding> {
     pub name: &'static str,
     pub zeroed: bool,
+    pub permission_exec: bool,
     pub vmrequest: VMRequest,
     pub global_side_metadata_specs: Vec<SideMetadataSpec>,
     pub vm_map: &'static dyn VMMap,
@@ -465,6 +492,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             immortal: args.immortal,
             movable: args.movable,
             contiguous: true,
+            permission_exec: args.plan_args.permission_exec,
             zeroed: args.plan_args.zeroed,
             start: unsafe { Address::zero() },
             extent: 0,
@@ -481,6 +509,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             gc_trigger: args.plan_args.gc_trigger,
             acquire_lock: Mutex::new(()),
             global_state: args.plan_args.global_state,
+            options: args.plan_args.options.clone(),
             p: PhantomData,
         };
 
@@ -594,6 +623,21 @@ impl<VM: VMBinding> CommonSpace<VM> {
     #[allow(unused)]
     pub(crate) fn get_vm_map32(&self) -> &'static crate::util::heap::layout::map32::Map32 {
         unsafe { self.vm_map_32.unwrap_unchecked() }
+    }
+
+    pub fn mmap_strategy(&self) -> MmapStrategy {
+        MmapStrategy {
+            huge_page: if *self.options.transparent_hugepages {
+                HugePageSupport::TransparentHugePages
+            } else {
+                HugePageSupport::No
+            },
+            prot: if self.permission_exec || cfg!(feature = "exec_permission_on_all_spaces") {
+                MmapProtection::ReadWriteExec
+            } else {
+                MmapProtection::ReadWrite
+            },
+        }
     }
 }
 

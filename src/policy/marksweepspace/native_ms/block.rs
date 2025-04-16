@@ -7,6 +7,7 @@ use super::MarkSweepSpace;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
+use crate::util::object_enum::BlockMayHaveObjects;
 use crate::vm::ObjectModel;
 use crate::{
     util::{
@@ -45,6 +46,12 @@ impl Region for Block {
 
     fn start(&self) -> Address {
         unsafe { Address::from_usize(self.0.get()) }
+    }
+}
+
+impl BlockMayHaveObjects for Block {
+    fn may_have_objects(&self) -> bool {
+        self.get_state() != BlockState::Unallocated
     }
 }
 

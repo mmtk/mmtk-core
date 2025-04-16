@@ -105,7 +105,7 @@ impl<VM: VMBinding> PageProtect<VM> {
 
         let ret = PageProtect {
             space: LargeObjectSpace::new(
-                plan_args.get_space_args("pageprotect", true, VMRequest::discontiguous()),
+                plan_args.get_space_args("pageprotect", true, false, VMRequest::discontiguous()),
                 true,
             ),
             common: CommonPlan::new(plan_args),

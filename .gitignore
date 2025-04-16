@@ -33,3 +33,5 @@ Cargo.lock
 
 /*.log
 /_*
+# Python script cache
+__pycache__

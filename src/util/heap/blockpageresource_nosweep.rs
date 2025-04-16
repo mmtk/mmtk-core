@@ -9,6 +9,7 @@ use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::linear_scan::Region;
+use crate::util::memory::MmapStrategy;
 use crate::util::metadata::side_metadata::spec_defs::{BLOCK_IN_USE, BLOCK_OWNER};
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
@@ -573,7 +574,7 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
             return None;
         }
         if let Err(mmap_error) = crate::mmtk::MMAPPER
-            .ensure_mapped(start, PAGES_IN_CHUNK as _)
+            .ensure_mapped(start, PAGES_IN_CHUNK as _, MmapStrategy::INTERNAL_MEMORY)
             .and(
                 self.common()
                     .metadata

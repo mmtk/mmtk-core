@@ -74,7 +74,7 @@ impl Line {
     }
 
     pub fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        Self(VM::VMObjectModel::ref_to_address(object).align_down(Self::BYTES))
+        Self(VM::VMObjectModel::ref_to_object_start(object).align_down(Self::BYTES))
     }
 
     /// Get the block containing the line.

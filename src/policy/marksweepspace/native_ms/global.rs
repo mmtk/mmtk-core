@@ -8,8 +8,10 @@ use crate::{
     scheduler::{GCWorkScheduler, GCWorker, WorkBucketStage},
     util::{
         copy::CopySemantics,
+        epilogue,
         heap::{BlockPageResource, PageResource},
         metadata::{self, side_metadata::SideMetadataSpec, MetadataSpec},
+        object_enum::{self, ObjectEnumerator},
         ObjectReference,
     },
     vm::{ActivePlan, VMBinding},
@@ -198,8 +200,19 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     }
 
     #[cfg(feature = "is_mmtk_object")]
-    fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
+    fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr)
+    }
+
+    #[cfg(feature = "is_mmtk_object")]
+    fn find_object_from_internal_pointer(
+        &self,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -> Option<ObjectReference> {
+        // We don't need to search more than the max object size in the mark sweep space.
+        let search_bytes = usize::min(MAX_OBJECT_SIZE, max_search_bytes);
+        crate::util::metadata::vo_bit::find_object_from_internal_pointer::<VM>(ptr, search_bytes)
     }
 
     fn sft_trace_object(
@@ -243,6 +256,10 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
 
     fn release_multiple_pages(&mut self, _start: crate::util::Address) {
         todo!()
+    }
+
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
+        object_enum::enumerate_blocks_from_chunk_map::<Block>(enumerator, &self.chunk_map);
     }
 }
 
@@ -373,6 +390,13 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         let space = unsafe { &*(self as *const Self) };
         let work_packet = ReleaseMarkSweepSpace { space };
         self.scheduler.work_buckets[crate::scheduler::WorkBucketStage::Release].add(work_packet);
+    }
+
+    pub fn end_of_gc(&mut self) {
+        epilogue::debug_assert_counter_zero(
+            &self.pending_release_packets,
+            "pending_release_packets",
+        );
     }
 
     /// Release a block.
@@ -583,5 +607,11 @@ impl<VM: VMBinding> RecycleBlocks<VM> {
         if 1 == self.counter.fetch_sub(1, Ordering::SeqCst) {
             self.space.recycle_blocks()
         }
+    }
+}
+
+impl<VM: VMBinding> Drop for RecycleBlocks<VM> {
+    fn drop(&mut self) {
+        epilogue::debug_assert_counter_zero(&self.counter, "RecycleBlocks::counter");
     }
 }

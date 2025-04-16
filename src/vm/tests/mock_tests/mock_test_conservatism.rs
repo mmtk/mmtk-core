@@ -33,17 +33,26 @@ fn assert_filter_fail(addr: Address) {
 }
 
 fn assert_valid_objref(addr: Address) {
+    let obj = memory_manager::is_mmtk_object(addr);
     assert!(
-        memory_manager::is_mmtk_object(addr),
-        "mmtk_is_mmtk_object({}) should return true. Got false.",
+        obj.is_some(),
+        "mmtk_is_mmtk_object({}) should return Some. Got None.",
         addr,
+    );
+    assert_eq!(
+        obj.unwrap().to_raw_address(),
+        addr,
+        "mmtk_is_mmtk_object({}) should return Some({}). Got {:?}",
+        addr,
+        addr,
+        obj
     );
 }
 
 fn assert_invalid_objref(addr: Address, real: Address) {
     assert!(
-        !memory_manager::is_mmtk_object(addr),
-        "mmtk_is_mmtk_object({}) should return false. Got true. Real object: {}",
+        memory_manager::is_mmtk_object(addr).is_none(),
+        "mmtk_is_mmtk_object({}) should return None. Got Some. Real object: {}",
         addr,
         real,
     );

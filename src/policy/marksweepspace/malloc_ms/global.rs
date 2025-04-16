@@ -15,6 +15,7 @@ use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
 use crate::util::metadata::MetadataSpec;
+use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -102,11 +103,23 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     /// For malloc space, we just use the side metadata.
     #[cfg(feature = "is_mmtk_object")]
-    fn is_mmtk_object(&self, addr: Address) -> bool {
+    fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
         debug_assert!(!addr.is_zero());
         // `addr` cannot be mapped by us. It should be mapped by the malloc library.
         debug_assert!(!addr.is_mapped());
-        has_object_alloced_by_malloc::<VM>(addr).is_some()
+        has_object_alloced_by_malloc::<VM>(addr)
+    }
+
+    #[cfg(feature = "is_mmtk_object")]
+    fn find_object_from_internal_pointer(
+        &self,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -> Option<ObjectReference> {
+        crate::util::metadata::vo_bit::find_object_from_internal_pointer::<VM>(
+            ptr,
+            max_search_bytes,
+        )
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize, _alloc: bool) {
@@ -216,6 +229,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
+    }
+
+    fn enumerate_objects(&self, _enumerator: &mut dyn ObjectEnumerator) {
+        unimplemented!()
     }
 }
 

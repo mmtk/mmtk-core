@@ -31,19 +31,31 @@ processed by the `./visualize.py` script.
                         help="Print the content of the bpftrace script")
     parser.add_argument("-e", "--every", metavar="N", type=int, default=1,
                         help="Only capture every N-th GC"),
+    parser.add_argument("-x", "--extra", metavar="S", type=str, action="append",
+                        help="Append script S after 'capture.bt'.  Use this option multiple times to append multiple scripts."),
     return parser.parse_args()
 
 
 def main():
     args = get_args()
     here = Path(__file__).parent.resolve()
-    bpftrace_script = here / "capture.bt"
     mmtk_bin = Path(args.mmtk)
 
     if not mmtk_bin.exists():
         raise f"MMTk binary {str(mmtk_bin)} not found."
 
-    template = Template(bpftrace_script.read_text())
+    script_paths = [here / "capture.bt"]
+    if args.extra is not None:
+        for extra_script in args.extra:
+            script_paths.append(Path(extra_script))
+    script_texts = []
+    for script_path in script_paths:
+        script_text = script_path.read_text()
+        script_texts.append(script_text)
+
+    merged_script = "\n".join(script_texts)
+
+    template = Template(merged_script)
     with tempfile.NamedTemporaryFile(mode="w+t") as tmp:
         content = template.safe_substitute(
             EVERY=args.every,

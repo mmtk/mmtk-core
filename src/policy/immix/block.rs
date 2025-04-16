@@ -8,6 +8,7 @@ use crate::util::metadata::side_metadata::spec_defs::{BLOCK_IN_USE, BLOCK_OWNER}
 use crate::util::metadata::side_metadata::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
+use crate::util::object_enum::BlockMayHaveObjects;
 use crate::util::{constants::*, OpaquePointer, VMThread};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -129,6 +130,12 @@ impl Region for Block {
 
 static GLOBAL_PHASE_EPOCH: AtomicU8 = AtomicU8::new(1);
 
+impl BlockMayHaveObjects for Block {
+    fn may_have_objects(&self) -> bool {
+        self.get_state() != BlockState::Unallocated
+    }
+}
+
 impl Block {
     /// Log bytes in block
     pub const LOG_BYTES: usize = <Self as Region>::LOG_BYTES;
@@ -203,7 +210,7 @@ impl Block {
     /// Get the block containing the given address.
     /// The input address does not need to be aligned.
     pub fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        Self(VM::VMObjectModel::ref_to_address(object).align_down(Self::BYTES))
+        Self(VM::VMObjectModel::ref_to_object_start(object).align_down(Self::BYTES))
     }
 
     /// Get block start address
@@ -708,6 +715,12 @@ impl Block {
 
                     #[cfg(feature = "immix_zero_on_release")]
                     crate::util::memory::zero(line.start(), Line::BYTES);
+
+                    // We need to clear the pin bit if it is on the side, as this line can be reused
+                    #[cfg(feature = "object_pinning")]
+                    if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC {
+                        side.bzero_metadata(line.start(), Line::BYTES);
+                    }
 
                     prev_line_is_marked = false;
                 }
