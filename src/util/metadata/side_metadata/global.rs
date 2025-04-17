@@ -1345,6 +1345,11 @@ impl SideMetadataContext {
             }
         }
 
+        // Any plan that uses the chunk map needs to reserve the chunk map table.
+        // As we use either the mark sweep or (non moving) immix as the non moving space,
+        // and both policies use the chunk map, we just add the chunk map table globally.
+        ret.push(crate::util::heap::chunk_map::ChunkMap::ALLOC_TABLE);
+
         ret.extend_from_slice(specs);
         ret
     }

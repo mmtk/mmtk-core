@@ -5,10 +5,7 @@ use std::marker::PhantomData;
 use crate::vm::VMBinding;
 
 use super::{
-    heap::{
-        chunk_map::{ChunkMap, ChunkState},
-        MonotonePageResource,
-    },
+    heap::{chunk_map::ChunkMap, MonotonePageResource},
     linear_scan::Region,
     metadata::{side_metadata::spec_defs::VO_BIT, vo_bit},
     Address, ObjectReference,
@@ -84,12 +81,10 @@ pub(crate) fn enumerate_blocks_from_chunk_map<B>(
 ) where
     B: BlockMayHaveObjects,
 {
-    for chunk in chunk_map.all_chunks() {
-        if chunk_map.get(chunk) == ChunkState::Allocated {
-            for block in chunk.iter_region::<B>() {
-                if block.may_have_objects() {
-                    enumerator.visit_address_range(block.start(), block.end());
-                }
+    for chunk in chunk_map.all_allocated_chunks() {
+        for block in chunk.iter_region::<B>() {
+            if block.may_have_objects() {
+                enumerator.visit_address_range(block.start(), block.end());
             }
         }
     }
