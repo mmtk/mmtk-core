@@ -125,6 +125,11 @@ jobs:
           ./.github/scripts/ci-setup.sh
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+      # removing these two LLVM installations as they cause a conflict within bindgen
+      - name: Hack to make bindgen work for Github images
+        run: |
+          sudo rm -rf /usr/lib/llvm-14
+          sudo rm -rf /usr/lib/llvm-13
       - name: Overwrite MMTk core in Julia binding
         run: |
           mkdir -p mmtk-julia/repos/mmtk-core

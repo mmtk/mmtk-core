@@ -24,11 +24,12 @@ jobs:
       - run: cargo --version
 
       - name: Install cargo-msrv
-        run: cargo install cargo-msrv
+        # The cargo-msrv tool sometimes requires a higher Rust version than our current rust-toolchain.
+        run: cargo +stable install cargo-msrv
       # Verify the MSRV defined in Cargo.toml
       - name: Verify MSRV
         run: cargo msrv verify
       # If the previous step fails, find MSRV
       - name: Find MSRV
         if: failure()
-        run: cargo msrv
+        run: cargo msrv find

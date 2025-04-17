@@ -7,6 +7,8 @@
 // to me - considering it will break our API and all the efforts for all the developers to make the change, it may
 // not worth it.
 #![allow(clippy::upper_case_acronyms)]
+// Use the `{likely, unlikely}` provided by compiler when using nightly
+#![cfg_attr(feature = "nightly", feature(core_intrinsics))]
 
 //! Memory Management ToolKit (MMTk) is a portable and high performance memory manager
 //! that includes various garbage collection algorithms and provides clean and efficient
