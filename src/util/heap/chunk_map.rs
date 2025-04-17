@@ -174,6 +174,12 @@ impl ChunkMap {
         ChunkState(byte)
     }
 
+    fn is_my_chunk(&self, chunk: Chunk) -> bool {
+        let byte = unsafe { Self::ALLOC_TABLE.load::<u8>(chunk.start()) };
+        let state = ChunkState(byte);
+        state.get_space_index() == self.space_index
+    }
+
     /// A range of all chunks in the heap.
     pub fn all_chunks(&self) -> impl Iterator<Item = Chunk> + '_ {
         let chunk_range = self.chunk_range.lock();

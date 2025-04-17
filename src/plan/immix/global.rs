@@ -87,7 +87,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         self.common.prepare(tls, true);
         self.immix_space.prepare(
             true,
-            crate::policy::immix::defrag::StatsForDefrag::new(self),
+            Some(crate::policy::immix::defrag::StatsForDefrag::new(self)),
         );
     }
 

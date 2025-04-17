@@ -5,7 +5,7 @@ use crate::plan::global::Plan;
 use crate::plan::AllocationSemantics;
 use crate::policy::space::Space;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::alloc::Allocator;
+use crate::util::alloc::{Allocator, FreeListAllocator, ImmixAllocator};
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
@@ -27,6 +27,19 @@ pub(crate) fn unreachable_prepare_func<VM: VMBinding>(
     unreachable!("`MutatorConfig::prepare_func` must not be called for the current plan.")
 }
 
+/// An mutator prepare implementation for plans that use [`crate::plan::global::CommonPlan`].
+pub(crate) fn common_prepare_func<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+    // Prepare the free list allocator used for non moving
+    // unsafe {
+    //     mutator
+    //         .allocators
+    //         .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
+    // }
+    // .downcast_mut::<FreeListAllocator<VM>>()
+    // .unwrap()
+    // .prepare();
+}
+
 /// A place-holder implementation for `MutatorConfig::release_func` that should not be called.
 /// Currently only used by `NoGC`.
 pub(crate) fn unreachable_release_func<VM: VMBinding>(
@@ -34,6 +47,27 @@ pub(crate) fn unreachable_release_func<VM: VMBinding>(
     _tls: VMWorkerThread,
 ) {
     unreachable!("`MutatorConfig::release_func` must not be called for the current plan.")
+}
+
+/// An mutator release implementation for plans that use [`crate::plan::global::CommonPlan`].
+pub(crate) fn common_release_func<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+    // // Release the free list allocator used for non moving
+    // unsafe {
+    //     mutator
+    //         .allocators
+    //         .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
+    // }
+    // .downcast_mut::<FreeListAllocator<VM>>()
+    // .unwrap()
+    // .release();
+    let immix_allocator = unsafe {
+        mutator
+            .allocators
+            .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
+    }
+    .downcast_mut::<ImmixAllocator<VM>>()
+    .unwrap();
+    immix_allocator.reset();
 }
 
 /// A place-holder implementation for `MutatorConfig::release_func` that does nothing.
@@ -455,10 +489,8 @@ pub(crate) fn create_allocator_mapping(
         map[AllocationSemantics::Los] = AllocatorSelector::LargeObject(reserved.n_large_object);
         reserved.n_large_object += 1;
 
-        // TODO: This should be freelist allocator once we use marksweep for nonmoving space.
-        map[AllocationSemantics::NonMoving] =
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
-        reserved.n_bump_pointer += 1;
+        map[AllocationSemantics::NonMoving] = AllocatorSelector::Immix(reserved.n_immix);
+        reserved.n_immix += 1;
     }
 
     reserved.validate();
@@ -522,10 +554,10 @@ pub(crate) fn create_space_mapping<VM: VMBinding>(
         reserved.n_large_object += 1;
         // TODO: This should be freelist allocator once we use marksweep for nonmoving space.
         vec.push((
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            AllocatorSelector::Immix(reserved.n_immix),
             plan.common().get_nonmoving(),
         ));
-        reserved.n_bump_pointer += 1;
+        reserved.n_immix += 1;
     }
 
     reserved.validate();

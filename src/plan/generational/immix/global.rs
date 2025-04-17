@@ -131,7 +131,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         if full_heap {
             self.immix_space.prepare(
                 full_heap,
-                crate::policy::immix::defrag::StatsForDefrag::new(self),
+                Some(crate::policy::immix::defrag::StatsForDefrag::new(self)),
             );
         }
     }

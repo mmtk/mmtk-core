@@ -385,7 +385,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self.scheduler
     }
 
-    pub fn prepare(&mut self, major_gc: bool, plan_stats: StatsForDefrag) {
+    pub fn prepare(&mut self, major_gc: bool, plan_stats: Option<StatsForDefrag>) {
         if major_gc {
             // Update mark_state
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
@@ -405,7 +405,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
             // Prepare defrag info
             if self.is_defrag_enabled() {
-                self.defrag.prepare(self, plan_stats);
+                self.defrag.prepare(self, plan_stats.unwrap());
             }
 
             // Prepare each block for GC
