@@ -1,12 +1,10 @@
 // GITHUB-CI: MMTK_PLAN=all
 
-use lazy_static::lazy_static;
-
 use super::mock_test_prelude::*;
 use crate::plan::AllocationSemantics;
 
 #[test]
-pub fn allocate_alignment() {
+pub fn allocate_nonmoving() {
     with_mockvm(
         || -> MockVM {
             MockVM {
@@ -20,13 +18,8 @@ pub fn allocate_alignment() {
             let mut fixture = MutatorFixture::create_with_heapsize(MB);
 
             // Normal alloc
-            let addr = memory_manager::alloc(
-                &mut fixture.mutator,
-                16,
-                8,
-                0,
-                AllocationSemantics::Default,
-            );
+            let addr =
+                memory_manager::alloc(&mut fixture.mutator, 16, 8, 0, AllocationSemantics::Default);
             assert!(!addr.is_zero());
 
             // Non moving alloc
