@@ -73,6 +73,8 @@ pub struct ImmixSpaceArgs {
     // Currently only used when "vo_bit" is enabled.  Using #[cfg(...)] to eliminate dead code warning.
     #[cfg(feature = "vo_bit")]
     pub mixed_age: bool,
+    /// Disable copying for this Immix space.
+    pub never_move_objects: bool,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -84,7 +86,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
 
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
         // If we never move objects, look no further.
-        if super::NEVER_MOVE_OBJECTS {
+        if !self.is_movable() {
             return None;
         }
 
@@ -102,7 +104,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         }
 
         // If we never move objects, look no further.
-        if super::NEVER_MOVE_OBJECTS {
+        if !self.is_movable() {
             return false;
         }
 
@@ -122,7 +124,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.is_object_pinned::<VM>(object)
     }
     fn is_movable(&self) -> bool {
-        !super::NEVER_MOVE_OBJECTS
+        !self.is_defrag_enabled() && !self.is_nursery_copy_enabled()
     }
 
     #[cfg(feature = "sanity")]
@@ -278,12 +280,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         args: crate::policy::space::PlanCreateSpaceArgs<VM>,
         space_args: ImmixSpaceArgs,
     ) -> Self {
-        #[cfg(feature = "immix_non_moving")]
-        info!(
-            "Creating non-moving ImmixSpace: {}. Block size: 2^{}",
-            args.name,
-            Block::LOG_BYTES
-        );
+        if space_args.never_move_objects {
+            info!(
+                "Creating non-moving ImmixSpace: {}. Block size: 2^{}",
+                args.name,
+                Block::LOG_BYTES
+            );
+        }
 
         if space_args.unlog_object_when_traced {
             assert!(
@@ -292,7 +295,18 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             );
         }
 
-        super::validate_features();
+        // validate features
+        if super::BLOCK_ONLY {
+            assert!(
+                space_args.never_move_objects,
+                "Block-only immix must not move objects"
+            );
+        }
+        assert!(
+            Block::LINES / 2 <= u8::MAX as usize - 2,
+            "Number of lines in a block should not exceed BlockState::MARK_MARKED"
+        );
+
         #[cfg(feature = "vo_bit")]
         vo_bit::helper::validate_config::<VM>();
         let vm_map = args.vm_map;
@@ -355,6 +369,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         user_triggered_collection: bool,
         full_heap_system_gc: bool,
     ) -> bool {
+        if !self.is_defrag_enabled() {
+            return false;
+        }
         self.defrag.decide_whether_to_defrag(
             emergency_collection,
             collect_whole_heap,
@@ -390,7 +407,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
 
             // Prepare defrag info
-            if super::DEFRAG {
+            if self.is_defrag_enabled() {
                 self.defrag.prepare(self, plan_stats);
             }
 
@@ -483,7 +500,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Return whether this GC was a defrag GC, as a plan may want to know this.
     pub fn end_of_gc(&mut self) -> bool {
         let did_defrag = self.defrag.in_defrag();
-        if super::DEFRAG {
+        if self.is_defrag_enabled() {
             self.defrag.reset_in_defrag();
         }
         did_defrag
@@ -806,8 +823,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         Some((start, end))
     }
 
-    pub fn is_last_gc_exhaustive(did_defrag_for_last_gc: bool) -> bool {
-        if super::DEFRAG {
+    pub fn is_last_gc_exhaustive(&self, did_defrag_for_last_gc: bool) -> bool {
+        if self.is_defrag_enabled() {
             did_defrag_for_last_gc
         } else {
             // If defrag is disabled, every GC is exhaustive.
@@ -832,6 +849,18 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if !super::MARK_LINE_AT_SCAN_TIME {
             self.mark_lines(object);
         }
+    }
+
+    pub(crate) fn prefer_copy_on_nursery_gc(&self) -> bool {
+        self.is_nursery_copy_enabled()
+    }
+
+    pub(crate) fn is_nursery_copy_enabled(&self) -> bool {
+        !self.space_args.never_move_objects
+    }
+
+    pub(crate) fn is_defrag_enabled(&self) -> bool {
+        !self.space_args.never_move_objects
     }
 }
 
@@ -867,7 +896,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
                 continue;
             }
             // Check if this block needs to be defragmented.
-            let is_defrag_source = if !super::DEFRAG {
+            let is_defrag_source = if self.space.space_args.never_move_objects {
                 // Do not set any block as defrag source if defrag is disabled.
                 false
             } else if super::DEFRAG_EVERY_BLOCK {

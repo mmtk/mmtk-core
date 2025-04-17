@@ -87,9 +87,9 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
 
     fn last_collection_was_exhaustive(&self) -> bool {
         self.last_gc_was_full_heap.load(Ordering::Relaxed)
-            && ImmixSpace::<VM>::is_last_gc_exhaustive(
-                self.last_gc_was_defrag.load(Ordering::Relaxed),
-            )
+            && self
+                .immix_space
+                .is_last_gc_exhaustive(self.last_gc_was_defrag.load(Ordering::Relaxed))
     }
 
     fn collection_required(&self, space_full: bool, space: Option<SpaceStats<Self::VM>>) -> bool
@@ -254,6 +254,7 @@ impl<VM: VMBinding> GenImmix<VM> {
                 // In GenImmix, young objects are not allocated in ImmixSpace directly.
                 #[cfg(feature = "vo_bit")]
                 mixed_age: false,
+                never_move_objects: cfg!(feature = "immix_non_moving"),
             },
         );
 
