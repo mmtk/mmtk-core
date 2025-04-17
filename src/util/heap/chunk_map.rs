@@ -52,11 +52,14 @@ impl Chunk {
 pub struct ChunkState(u8);
 
 impl ChunkState {
+    const ALLOC_BIT_MASK: u8 = 0x80;
+    const SPACE_INDEX_MASK: u8 = 0x0F;
+
     /// Create a new ChunkState that represents being allocated in the given space
     pub fn allocated(space_index: usize) -> ChunkState {
         debug_assert!(space_index < crate::util::heap::layout::heap_parameters::MAX_SPACES);
         let mut encode = space_index as u8;
-        encode |= 0x80;
+        encode |= Self::ALLOC_BIT_MASK;
         ChunkState(encode)
     }
     /// Create a new ChunkState that represents being free in the given space
@@ -66,7 +69,7 @@ impl ChunkState {
     }
     /// Is the chunk free?
     pub fn is_free(&self) -> bool {
-        self.0 & 0x80 == 0
+        self.0 & Self::ALLOC_BIT_MASK == 0
     }
     /// Is the chunk allocated?
     pub fn is_allocated(&self) -> bool {
@@ -74,8 +77,7 @@ impl ChunkState {
     }
     /// Get the space index of the chunk
     pub fn get_space_index(&self) -> usize {
-        debug_assert!(self.is_allocated());
-        let index = (self.0 & 0x0F) as usize;
+        let index = (self.0 & Self::SPACE_INDEX_MASK) as usize;
         debug_assert!(index < crate::util::heap::layout::heap_parameters::MAX_SPACES);
         index
     }

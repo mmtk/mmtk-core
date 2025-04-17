@@ -288,7 +288,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         let vm_map = args.vm_map;
         let is_discontiguous = args.vmrequest.is_discontiguous();
         let local_specs = {
-            metadata::extract_side_metadata(&vec![
+            metadata::extract_side_metadata(&[
                 MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
                 MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
                 MetadataSpec::OnSide(Block::FREE_LIST_TABLE),
