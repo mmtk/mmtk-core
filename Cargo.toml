@@ -152,11 +152,6 @@ object_pinning = []
 # Disable any object copying in Immix. This makes Immix a non-moving policy.
 immix_non_moving = []
 
-# Disable any object copying in nursery GC for Sticky Immix while allowing other kinds of copying.
-# `immix_non_moving` disables all kinds of copying in Immix, so this feature is not needed
-# if `immix_non_moving` is in use.
-sticky_immix_non_moving_nursery = []
-
 # Turn on stress copying for Immix. This is a debug feature to test copying for Immix plans.
 immix_stress_copying = []
 # Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.

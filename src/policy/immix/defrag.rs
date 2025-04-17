@@ -72,12 +72,11 @@ impl Defrag {
         exhausted_reusable_space: bool,
         full_heap_system_gc: bool,
     ) {
-        let in_defrag = super::DEFRAG
-            && (emergency_collection
-                || (collection_attempts > 1)
-                || !exhausted_reusable_space
-                || super::STRESS_DEFRAG
-                || (collect_whole_heap && user_triggered && full_heap_system_gc));
+        let in_defrag = emergency_collection
+            || (collection_attempts > 1)
+            || !exhausted_reusable_space
+            || super::STRESS_DEFRAG
+            || (collect_whole_heap && user_triggered && full_heap_system_gc);
         info!("Defrag: {}", in_defrag);
         probe!(mmtk, immix_defrag, in_defrag);
         self.in_defrag_collection
@@ -116,9 +115,8 @@ impl Defrag {
     }
 
     /// Prepare work. Should be called in ImmixSpace::prepare.
-    #[allow(clippy::assertions_on_constants)]
     pub fn prepare<VM: VMBinding>(&self, space: &ImmixSpace<VM>, plan_stats: StatsForDefrag) {
-        debug_assert!(super::DEFRAG);
+        debug_assert!(space.is_defrag_enabled());
         self.defrag_space_exhausted.store(false, Ordering::Release);
 
         // Calculate available free space for defragmentation.
@@ -207,9 +205,7 @@ impl Defrag {
     }
 
     /// Reset the in-defrag state.
-    #[allow(clippy::assertions_on_constants)]
     pub fn reset_in_defrag(&self) {
-        debug_assert!(super::DEFRAG);
         self.in_defrag_collection.store(false, Ordering::Release);
     }
 }
