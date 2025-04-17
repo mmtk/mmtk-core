@@ -300,7 +300,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
                 MetadataSpec::OnSide(Block::TLS_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
-                MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             ])
         };

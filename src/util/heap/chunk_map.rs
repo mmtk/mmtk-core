@@ -173,14 +173,14 @@ impl ChunkMap {
     }
 
     /// A range of all chunks in the heap.
-    pub fn all_chunks(&self) -> impl Iterator<Item = Chunk> + use<'_> {
+    pub fn all_chunks(&self) -> impl Iterator<Item = Chunk> + '_ {
         let chunk_range = self.chunk_range.lock();
         RegionIterator::<Chunk>::new(chunk_range.start, chunk_range.end)
             .filter(|c| self.get(*c).is_some())
     }
 
     /// A range of all chunks in the heap.
-    pub fn all_allocated_chunks(&self) -> impl Iterator<Item = Chunk> + use<'_> {
+    pub fn all_allocated_chunks(&self) -> impl Iterator<Item = Chunk> + '_ {
         let chunk_range = self.chunk_range.lock();
         RegionIterator::<Chunk>::new(chunk_range.start, chunk_range.end)
             .filter(|c| self.get(*c).is_some_and(|state| state.is_allocated()))
