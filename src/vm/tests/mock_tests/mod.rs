@@ -67,3 +67,4 @@ mod mock_test_vm_layout_log_address_space;
 
 mod mock_test_doc_avoid_resolving_allocator;
 mod mock_test_doc_mutator_storage;
+mod mock_test_doc_weakref_code_example;

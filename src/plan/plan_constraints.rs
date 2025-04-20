@@ -59,7 +59,7 @@ impl PlanConstraints {
             max_non_los_default_alloc_bytes: MAX_INT,
             max_non_los_copy_bytes: MAX_INT,
             // As `LAZY_SWEEP` is true, needs_linear_scan is true for all the plans. This is strange.
-            // https://github.com/mmtk/mmtk-core/issues/1027 trackes the issue.
+            // https://github.com/mmtk/mmtk-core/issues/1027 tracks the issue.
             needs_linear_scan: crate::util::constants::SUPPORT_CARD_SCANNING
                 || crate::util::constants::LAZY_SWEEP,
             needs_concurrent_workers: false,
@@ -74,7 +74,7 @@ impl PlanConstraints {
     }
 }
 
-/// The default plan constraints. Each plan should define their own plan contraints.
+/// The default plan constraints. Each plan should define their own plan constraints.
 /// They can start from the default constraints and explicitly set some of the fields.
 pub(crate) const DEFAULT_PLAN_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
 
@@ -82,5 +82,5 @@ pub(crate) const DEFAULT_PLAN_CONSTRAINTS: PlanConstraints = PlanConstraints::de
 pub const MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN: usize = if cfg!(feature = "ss_los_16m") {
     16 << LOG_BYTES_IN_MBYTE
 } else {
-    16 << LOG_BYTES_IN_PAGE
+    2 << LOG_BYTES_IN_PAGE
 };

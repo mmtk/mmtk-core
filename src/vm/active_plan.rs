@@ -48,7 +48,7 @@ pub trait ActivePlan<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `queue`: The object queue. If an object is encountered for the first time in this GC, we expect the implementation to call `queue.enqueue()`
-    ///            for the object. If the object is moved during the tracing, the new object reference (after copying) should be enqueued instead.
+    ///   for the object. If the object is moved during the tracing, the new object reference (after copying) should be enqueued instead.
     /// * `object`: The object to trace.
     /// * `worker`: The GC worker that is doing this tracing. This is used to copy object (see [`crate::vm::ObjectModel::copy`])
     fn vm_trace_object<Q: ObjectQueue>(

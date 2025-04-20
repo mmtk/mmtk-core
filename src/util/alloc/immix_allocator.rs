@@ -400,6 +400,11 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     block.start(),
                     block.end()
                 );
+                // Bulk clear stale line mark state
+                if !self.space.rc_enabled {
+                    Line::MARK_TABLE
+                        .bzero_metadata(block.start(), crate::policy::immix::block::Block::BYTES);
+                }
                 if self.request_for_large {
                     self.set_large_allocating_block(block);
                     self.large_bump_pointer.cursor = block.start();

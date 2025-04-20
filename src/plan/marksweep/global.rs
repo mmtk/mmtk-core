@@ -57,7 +57,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        self.ms.prepare();
+        self.ms.prepare(true);
     }
 
     fn release(&mut self, tls: VMWorkerThread) {

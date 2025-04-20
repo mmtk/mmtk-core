@@ -310,7 +310,7 @@ pub(crate) fn pages_used_by_blocklists(lists: &BlockLists) -> usize {
 /// i.e. byte size == `wsize*sizeof(void*)`
 /// adapted from _mi_wsize_from_size in mimalloc
 fn mi_wsize_from_size(size: usize) -> usize {
-    (size + MI_INTPTR_SIZE - 1) / MI_INTPTR_SIZE
+    size.div_ceil(MI_INTPTR_SIZE)
 }
 
 pub fn mi_bin<VM: VMBinding>(size: usize, align: usize) -> usize {

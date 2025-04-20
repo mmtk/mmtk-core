@@ -469,6 +469,11 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         let sweep = |object: ObjectReference| {
             #[cfg(feature = "vo_bit")]
             crate::util::metadata::vo_bit::unset_vo_bit(object);
+            // Clear log bits for dead objects to prevent a new nursery object having the unlog bit set
+            if self.common.needs_log_bit {
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
+                unreachable!()
+            }
             self.release_object(get_super_page(object.to_object_start::<VM>()));
         };
         if sweep_nursery {

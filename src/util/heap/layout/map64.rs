@@ -206,8 +206,11 @@ impl VMMap for Map64 {
     }
 
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
-        let index = Self::space_index(address).unwrap();
-        self.inner().descriptor_map[index]
+        if let Some(index) = Self::space_index(address) {
+            self.inner().descriptor_map[index]
+        } else {
+            SpaceDescriptor::UNINITIALIZED
+        }
     }
 
     fn add_to_cumulative_committed_pages(&self, pages: usize) {
