@@ -32,3 +32,15 @@ impl From<Option<ObjectReference>> for NullableObjectReference {
         Self(encoded)
     }
 }
+
+impl std::fmt::Display for NullableObjectReference {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:#x}", self.0)
+    }
+}
+
+impl std::fmt::Debug for NullableObjectReference {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}

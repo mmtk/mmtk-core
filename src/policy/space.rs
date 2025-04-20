@@ -244,16 +244,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// Ensure this space is marked as mapped -- used when the space is already
     /// mapped (e.g. for a vm image which is externally mmapped.)
     fn ensure_mapped(&self) {
-        if self
-            .get_page_resource()
+        self.get_page_resource()
             .common()
             .metadata
-            .try_map_metadata_space(self.common().start, self.common().extent)
-            .is_err()
-        {
-            // TODO(Javad): handle meta space allocation failure
-            panic!("failed to mmap meta memory");
-        }
+            .try_map_metadata_space(self.common().start, self.common().extent, self.get_name())
+            .unwrap_or_else(|e| {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory: {e}");
+            });
 
         self.common()
             .mmapper
@@ -277,6 +275,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
     fn get_name(&self) -> &'static str {
         self.common().name
+    }
+
+    fn get_descriptor(&self) -> SpaceDescriptor {
+        self.common().descriptor
     }
 
     fn common(&self) -> &CommonSpace<VM>;
@@ -606,7 +608,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             // Move this if-block from CommonSpace::new to here, to fix the mutator performance
             // issue on 32-core Zen3 machines (dacapo-evaluation-git-6e411f33, h2o, 7341M heap)
             if metadata
-                .try_map_metadata_address_range(self.start, self.extent)
+                .try_map_metadata_address_range(self.start, self.extent, &self.name)
                 .is_err()
             {
                 // TODO(Javad): handle meta space allocation failure

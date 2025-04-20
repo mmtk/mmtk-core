@@ -154,12 +154,15 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
                     rtn,
                     growed_chunks << (LOG_BYTES_IN_CHUNK - LOG_BYTES_IN_PAGE as usize),
                     MmapStrategy::INTERNAL_MEMORY,
+                    &memory::MmapAnnotation::Space {
+                        name: space.get_name(),
+                    },
                 )
-                .and(
-                    self.common()
-                        .metadata
-                        .try_map_metadata_space(rtn, growed_chunks << LOG_BYTES_IN_CHUNK),
-                )
+                .and(self.common().metadata.try_map_metadata_space(
+                    rtn,
+                    growed_chunks << LOG_BYTES_IN_CHUNK,
+                    space.get_name(),
+                ))
             {
                 memory::handle_mmap_error::<VM>(mmap_error, tls);
             }

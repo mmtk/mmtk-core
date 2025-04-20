@@ -33,7 +33,7 @@ pub const GC_EXTRA_HEADER_WORD: usize = 1;
 const GC_EXTRA_HEADER_BYTES: usize = GC_EXTRA_HEADER_WORD << LOG_BYTES_IN_WORD;
 
 impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
 

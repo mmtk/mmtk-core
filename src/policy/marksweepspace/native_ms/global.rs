@@ -157,7 +157,7 @@ impl AbandonedBlockLists {
 }
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.common.name
     }
 

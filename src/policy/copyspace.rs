@@ -25,7 +25,7 @@ pub struct CopySpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for CopySpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
 

@@ -142,7 +142,7 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
     }
 }
 
-impl<'a, E: ProcessEdgesWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'a, E> {
+impl<E: ProcessEdgesWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'_, E> {
     fn should_discover_references(&self) -> bool {
         self.should_discover_references
     }
@@ -169,7 +169,7 @@ impl<'a, E: ProcessEdgesWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'a, E> {
     }
 }
 
-impl<'a, E: ProcessEdgesWork> Drop for ObjectsClosure<'a, E> {
+impl<E: ProcessEdgesWork> Drop for ObjectsClosure<'_, E> {
     fn drop(&mut self) {
         if self.buffer.is_empty() {
             return;

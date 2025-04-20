@@ -27,7 +27,7 @@ pub struct ImmortalSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
     fn is_live(&self, _object: ObjectReference) -> bool {

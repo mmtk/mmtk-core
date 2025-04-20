@@ -29,7 +29,7 @@ pub struct VMSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for VMSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.common.name
     }
     fn is_live(&self, _object: ObjectReference) -> bool {
@@ -229,7 +229,7 @@ impl<VM: VMBinding> VMSpace<VM> {
         // Map side metadata
         self.common
             .metadata
-            .try_map_metadata_space(chunk_start, chunk_size)
+            .try_map_metadata_space(chunk_start, chunk_size, self.get_name())
             .unwrap();
         // Insert to vm map: it would be good if we can make VM map aware of the region. However, the region may be outside what we can map in our VM map implementation.
         // self.common.vm_map.insert(chunk_start, chunk_size, self.common.descriptor);

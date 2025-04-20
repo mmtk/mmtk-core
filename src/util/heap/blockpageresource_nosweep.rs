@@ -4,7 +4,6 @@ use super::{FreeListPageResource, PageResource};
 use crate::policy::immix::block::{Block, BlockState};
 use crate::policy::space::Space;
 use crate::util::address::Address;
-use crate::util::constants::*;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::pageresource::CommonPageResource;
@@ -13,6 +12,7 @@ use crate::util::memory::MmapStrategy;
 use crate::util::metadata::side_metadata::spec_defs::{BLOCK_IN_USE, BLOCK_OWNER};
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
+use crate::util::{constants::*, memory};
 use crate::vm::*;
 use atomic::Ordering;
 use std::marker::PhantomData;
@@ -574,12 +574,19 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
             return None;
         }
         if let Err(mmap_error) = crate::mmtk::MMAPPER
-            .ensure_mapped(start, PAGES_IN_CHUNK as _, MmapStrategy::INTERNAL_MEMORY)
-            .and(
-                self.common()
-                    .metadata
-                    .try_map_metadata_space(start, BYTES_IN_CHUNK),
+            .ensure_mapped(
+                start,
+                PAGES_IN_CHUNK as _,
+                MmapStrategy::INTERNAL_MEMORY,
+                &memory::MmapAnnotation::Space {
+                    name: space.get_name(),
+                },
             )
+            .and(self.common().metadata.try_map_metadata_space(
+                start,
+                BYTES_IN_CHUNK,
+                space.get_name(),
+            ))
         {
             crate::util::memory::handle_mmap_error::<VM>(mmap_error, VMThread::UNINITIALIZED);
         }

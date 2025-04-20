@@ -69,6 +69,7 @@ use spin::{Lazy, Mutex};
 type RwLock<T> = spin::rwlock::RwLock<T>;
 
 mod global_state;
+pub use crate::global_state::LiveBytesStats;
 
 #[macro_use]
 mod policy;
