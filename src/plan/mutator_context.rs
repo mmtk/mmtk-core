@@ -13,8 +13,8 @@ use crate::MMTK;
 
 use enum_map::EnumMap;
 
-use super::lxr::LXR;
 use super::barriers::NoBarrier;
+use super::lxr::LXR;
 
 pub(crate) type SpaceMapping<VM> = Vec<(AllocatorSelector, &'static dyn Space<VM>)>;
 
