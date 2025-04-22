@@ -262,7 +262,7 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                     self.immix
                         .immix_space
                         .trace_object_without_moving(queue, object)
-                } else if self.immix.immix_space.is_nursery_copy_enabled() {
+                } else if self.immix.immix_space.prefer_copy_on_nursery_gc() {
                     let ret = self.immix.immix_space.trace_object_with_opportunistic_copy(
                         queue,
                         object,

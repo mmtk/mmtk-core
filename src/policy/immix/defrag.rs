@@ -63,8 +63,10 @@ impl Defrag {
     }
 
     /// Determine whether the current GC should do defragmentation.
+    #[allow(clippy::too_many_arguments)]
     pub fn decide_whether_to_defrag(
         &self,
+        defrag_enabled: bool,
         emergency_collection: bool,
         collect_whole_heap: bool,
         collection_attempts: usize,
@@ -72,11 +74,12 @@ impl Defrag {
         exhausted_reusable_space: bool,
         full_heap_system_gc: bool,
     ) {
-        let in_defrag = emergency_collection
-            || (collection_attempts > 1)
-            || !exhausted_reusable_space
-            || super::STRESS_DEFRAG
-            || (collect_whole_heap && user_triggered && full_heap_system_gc);
+        let in_defrag = defrag_enabled
+            && (emergency_collection
+                || (collection_attempts > 1)
+                || !exhausted_reusable_space
+                || super::STRESS_DEFRAG
+                || (collect_whole_heap && user_triggered && full_heap_system_gc));
         info!("Defrag: {}", in_defrag);
         probe!(mmtk, immix_defrag, in_defrag);
         self.in_defrag_collection

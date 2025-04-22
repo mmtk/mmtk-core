@@ -124,7 +124,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.is_object_pinned::<VM>(object)
     }
     fn is_movable(&self) -> bool {
-        !self.is_defrag_enabled() && !self.is_nursery_copy_enabled()
+        !self.space_args.never_move_objects
     }
 
     #[cfg(feature = "sanity")]
@@ -369,10 +369,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         user_triggered_collection: bool,
         full_heap_system_gc: bool,
     ) -> bool {
-        if !self.is_defrag_enabled() {
-            return false;
-        }
         self.defrag.decide_whether_to_defrag(
+            self.is_defrag_enabled(),
             emergency_collection,
             collect_whole_heap,
             collection_attempts,
@@ -856,7 +854,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub(crate) fn is_nursery_copy_enabled(&self) -> bool {
-        !self.space_args.never_move_objects
+        !self.space_args.never_move_objects && !cfg!(feature = "sticky_immix_non_moving_nursery")
     }
 
     pub(crate) fn is_defrag_enabled(&self) -> bool {
@@ -896,7 +894,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
                 continue;
             }
             // Check if this block needs to be defragmented.
-            let is_defrag_source = if self.space.space_args.never_move_objects {
+            let is_defrag_source = if !self.space.is_defrag_enabled() {
                 // Do not set any block as defrag source if defrag is disabled.
                 false
             } else if super::DEFRAG_EVERY_BLOCK {
