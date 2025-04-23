@@ -409,6 +409,43 @@ impl ReservedAllocators {
             "Allocator mapping declared more free list allocators than the max allowed."
         );
     }
+
+    // We may add more allocators from common/base plan after reserved allocators.
+
+    fn add_bump_pointer_allocator(&mut self) -> AllocatorSelector {
+        let selector = AllocatorSelector::BumpPointer(self.n_bump_pointer);
+        self.n_bump_pointer += 1;
+        selector
+    }
+    fn add_large_object_allocator(&mut self) -> AllocatorSelector {
+        let selector = AllocatorSelector::LargeObject(self.n_large_object);
+        self.n_large_object += 1;
+        selector
+    }
+    #[allow(dead_code)]
+    fn add_malloc_allocator(&mut self) -> AllocatorSelector {
+        let selector = AllocatorSelector::Malloc(self.n_malloc);
+        self.n_malloc += 1;
+        selector
+    }
+    #[allow(dead_code)]
+    fn add_immix_allocator(&mut self) -> AllocatorSelector {
+        let selector = AllocatorSelector::Immix(self.n_immix);
+        self.n_immix += 1;
+        selector
+    }
+    #[allow(dead_code)]
+    fn add_mark_compact_allocator(&mut self) -> AllocatorSelector {
+        let selector = AllocatorSelector::MarkCompact(self.n_mark_compact);
+        self.n_mark_compact += 1;
+        selector
+    }
+    #[allow(dead_code)]
+    fn add_free_list_allocator(&mut self) -> AllocatorSelector {
+        let selector = AllocatorSelector::FreeList(self.n_free_list);
+        self.n_free_list += 1;
+        selector
+    }
 }
 
 /// Create an allocator mapping for spaces in Common/BasePlan for a plan. A plan should reserve its own allocators.
@@ -430,35 +467,22 @@ pub(crate) fn create_allocator_mapping(
 
     #[cfg(feature = "code_space")]
     {
-        map[AllocationSemantics::Code] = AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
-        reserved.n_bump_pointer += 1;
-
-        map[AllocationSemantics::LargeCode] =
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
-        reserved.n_bump_pointer += 1;
+        map[AllocationSemantics::Code] = reserved.add_bump_pointer_allocator();
+        map[AllocationSemantics::LargeCode] = reserved.add_bump_pointer_allocator();
     }
 
     #[cfg(feature = "ro_space")]
     {
-        map[AllocationSemantics::ReadOnly] =
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
-        reserved.n_bump_pointer += 1;
+        map[AllocationSemantics::ReadOnly] = reserved.add_bump_pointer_allocator();
     }
 
     // spaces in common plan
 
     if include_common_plan {
-        map[AllocationSemantics::Immortal] =
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
-        reserved.n_bump_pointer += 1;
-
-        map[AllocationSemantics::Los] = AllocatorSelector::LargeObject(reserved.n_large_object);
-        reserved.n_large_object += 1;
-
+        map[AllocationSemantics::Immortal] = reserved.add_bump_pointer_allocator();
+        map[AllocationSemantics::Los] = reserved.add_large_object_allocator();
         // TODO: This should be freelist allocator once we use marksweep for nonmoving space.
-        map[AllocationSemantics::NonMoving] =
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
-        reserved.n_bump_pointer += 1;
+        map[AllocationSemantics::NonMoving] = reserved.add_bump_pointer_allocator();
     }
 
     reserved.validate();
@@ -487,45 +511,34 @@ pub(crate) fn create_space_mapping<VM: VMBinding>(
     #[cfg(feature = "code_space")]
     {
         vec.push((
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            reserved.add_bump_pointer_allocator(),
             &plan.base().code_space,
         ));
-        reserved.n_bump_pointer += 1;
         vec.push((
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            reserved.add_bump_pointer_allocator(),
             &plan.base().code_lo_space,
         ));
-        reserved.n_bump_pointer += 1;
     }
 
     #[cfg(feature = "ro_space")]
-    {
-        vec.push((
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
-            &plan.base().ro_space,
-        ));
-        reserved.n_bump_pointer += 1;
-    }
+    vec.push((reserved.add_bump_pointer_allocator(), &plan.base().ro_space));
 
     // spaces in CommonPlan
 
     if include_common_plan {
         vec.push((
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            reserved.add_bump_pointer_allocator(),
             plan.common().get_immortal(),
         ));
-        reserved.n_bump_pointer += 1;
         vec.push((
-            AllocatorSelector::LargeObject(reserved.n_large_object),
+            reserved.add_large_object_allocator(),
             plan.common().get_los(),
         ));
-        reserved.n_large_object += 1;
         // TODO: This should be freelist allocator once we use marksweep for nonmoving space.
         vec.push((
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            reserved.add_bump_pointer_allocator(),
             plan.common().get_nonmoving(),
         ));
-        reserved.n_bump_pointer += 1;
     }
 
     reserved.validate();
