@@ -252,7 +252,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             vec![
                 MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
-                MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
                 *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
@@ -264,7 +263,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Line::MARK_TABLE),
                 MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
-                MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
                 *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
@@ -299,6 +297,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let scheduler = args.scheduler.clone();
         let common =
             CommonSpace::new(args.into_policy_args(true, false, Self::side_metadata_specs()));
+        let space_index = common.descriptor.get_index();
         ImmixSpace {
             pr: if common.vmrequest.is_discontiguous() {
                 BlockPageResource::new_discontiguous(
@@ -316,7 +315,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 )
             },
             common,
-            chunk_map: ChunkMap::new(),
+            chunk_map: ChunkMap::new(space_index),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
             lines_consumed: AtomicUsize::new(0),
@@ -524,7 +523,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.defrag.notify_new_clean_block(copy);
         let block = Block::from_aligned_address(block_address);
         block.init(copy);
-        self.chunk_map.set(block.chunk(), ChunkState::Allocated);
+        self.chunk_map.set_allocated(block.chunk(), true);
         self.lines_consumed
             .fetch_add(Block::LINES, Ordering::SeqCst);
         Some(block)
@@ -899,7 +898,7 @@ struct SweepChunk<VM: VMBinding> {
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        assert_eq!(self.space.chunk_map.get(self.chunk), ChunkState::Allocated);
+        assert!(self.space.chunk_map.get(self.chunk).unwrap().is_allocated());
 
         let mut histogram = self.space.defrag.new_histogram();
         let line_mark_state = if super::BLOCK_ONLY {
@@ -950,7 +949,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
         probe!(mmtk, sweep_chunk, allocated_blocks);
         // Set this chunk as free if there is not live blocks.
         if allocated_blocks == 0 {
-            self.space.chunk_map.set(self.chunk, ChunkState::Free)
+            self.space.chunk_map.set_allocated(self.chunk, false)
         }
         self.space.defrag.add_completed_mark_histogram(histogram);
         self.epilogue.finish_one_work_packet();
