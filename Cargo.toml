@@ -82,7 +82,7 @@ name = "main"
 harness = false
 
 [features]
-default = ["builtin_env_logger"]
+default = ["builtin_env_logger", "immortal_as_nonmoving"]
 
 # Built-in env_logger.  This feature is enabled by default.
 # The user can disable this default feature to remove `env_logger` from the dependencies.
@@ -224,9 +224,6 @@ malloc_jemalloc = ["dep:jemalloc-sys"]
 # is not compiled in default builds.
 malloc_native_mimalloc = []
 
-# If there are more groups, they should be inserted above this line
-# Group:end
-
 # Group:marksweepallocation
 # default is native allocator with lazy sweeping
 eager_sweeping = []
@@ -234,4 +231,11 @@ eager_sweeping = []
 # normal heap range, we will have to use chunk-based SFT table. Turning on this feature will use a different SFT map implementation on 64bits,
 # and will affect all the plans in the build. Please be aware of the consequence, and this is only meant to be experimental use.
 malloc_mark_sweep = []
+
+# Group:nonmovingspace
+immortal_as_nonmoving = []
+immix_as_nonmoving = []
+marksweep_as_nonmoving = []
+
+# If there are more groups, they should be inserted above this line
 # Group:end

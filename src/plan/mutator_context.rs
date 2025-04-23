@@ -30,14 +30,15 @@ pub(crate) fn unreachable_prepare_func<VM: VMBinding>(
 /// An mutator prepare implementation for plans that use [`crate::plan::global::CommonPlan`].
 pub(crate) fn common_prepare_func<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     // Prepare the free list allocator used for non moving
-    // unsafe {
-    //     mutator
-    //         .allocators
-    //         .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
-    // }
-    // .downcast_mut::<FreeListAllocator<VM>>()
-    // .unwrap()
-    // .prepare();
+    #[cfg(feature = "marksweep_as_nonmoving")]
+    unsafe {
+        mutator
+            .allocators
+            .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
+    }
+    .downcast_mut::<FreeListAllocator<VM>>()
+    .unwrap()
+    .prepare();
 }
 
 /// A place-holder implementation for `MutatorConfig::release_func` that should not be called.
@@ -51,23 +52,25 @@ pub(crate) fn unreachable_release_func<VM: VMBinding>(
 
 /// An mutator release implementation for plans that use [`crate::plan::global::CommonPlan`].
 pub(crate) fn common_release_func<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-    // // Release the free list allocator used for non moving
-    // unsafe {
-    //     mutator
-    //         .allocators
-    //         .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
-    // }
-    // .downcast_mut::<FreeListAllocator<VM>>()
-    // .unwrap()
-    // .release();
+    // Release the free list allocator used for non moving
+    #[cfg(feature = "marksweep_as_nonmoving")]
+    unsafe {
+        mutator
+            .allocators
+            .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
+    }
+    .downcast_mut::<FreeListAllocator<VM>>()
+    .unwrap()
+    .release();
+    #[cfg(feature = "immix_as_nonmoving")]
     let immix_allocator = unsafe {
         mutator
             .allocators
             .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
     }
     .downcast_mut::<ImmixAllocator<VM>>()
-    .unwrap();
-    immix_allocator.reset();
+    .unwrap()
+    .reset();
 }
 
 /// A place-holder implementation for `MutatorConfig::release_func` that does nothing.
@@ -489,8 +492,21 @@ pub(crate) fn create_allocator_mapping(
         map[AllocationSemantics::Los] = AllocatorSelector::LargeObject(reserved.n_large_object);
         reserved.n_large_object += 1;
 
-        map[AllocationSemantics::NonMoving] = AllocatorSelector::Immix(reserved.n_immix);
-        reserved.n_immix += 1;
+        #[cfg(feature = "immix_as_nonmoving")]
+        {
+            map[AllocationSemantics::NonMoving] = AllocatorSelector::Immix(reserved.n_immix);
+            reserved.n_immix += 1;
+        }
+        #[cfg(feature = "immortal_as_nonmoving")]
+        {
+            map[AllocationSemantics::NonMoving] = AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
+            reserved.n_bump_pointer += 1;
+        }
+        #[cfg(feature = "marksweep_as_nonmoving")]
+        {
+            map[AllocationSemantics::NonMoving] = AllocatorSelector::FreeList(reserved.n_free_list);
+            reserved.n_free_list += 1;
+        }
     }
 
     reserved.validate();
@@ -552,12 +568,30 @@ pub(crate) fn create_space_mapping<VM: VMBinding>(
             plan.common().get_los(),
         ));
         reserved.n_large_object += 1;
-        // TODO: This should be freelist allocator once we use marksweep for nonmoving space.
-        vec.push((
-            AllocatorSelector::Immix(reserved.n_immix),
-            plan.common().get_nonmoving(),
-        ));
-        reserved.n_immix += 1;
+        #[cfg(feature = "immix_as_nonmoving")]
+        {
+            vec.push((
+                AllocatorSelector::Immix(reserved.n_immix),
+                plan.common().get_nonmoving(),
+            ));
+            reserved.n_immix += 1;
+        }
+        #[cfg(feature = "marksweep_as_nonmoving")]
+        {
+            vec.push((
+                AllocatorSelector::FreeList(reserved.n_free_list),
+                plan.common().get_nonmoving(),
+            ));
+            reserved.n_free_list += 1;
+        }
+        #[cfg(feature = "immortal_as_nonmoving")]
+        {
+            vec.push((
+                AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+                plan.common().get_nonmoving(),
+            ));
+            reserved.n_bump_pointer += 1;
+        }
     }
 
     reserved.validate();
