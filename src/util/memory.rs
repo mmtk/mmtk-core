@@ -316,6 +316,10 @@ fn mmap_fixed(
         }
     }
 
+    if crate::args().transparent_hugepage && matches!(strategy.huge_page, HugePageSupport::No) {
+        let _ = unsafe { libc::madvise(start.to_mut_ptr(), size, libc::MADV_HUGEPAGE) };
+    }
+
     match strategy.huge_page {
         HugePageSupport::No => Ok(()),
         HugePageSupport::TransparentHugePages => {
