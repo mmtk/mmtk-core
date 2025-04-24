@@ -1,6 +1,4 @@
-use super::barrier::ImmixFakeFieldBarrierSemantics;
 use super::Immix;
-use crate::plan::barriers::FieldBarrier;
 use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::create_space_mapping;
 use crate::plan::mutator_context::unreachable_prepare_func;

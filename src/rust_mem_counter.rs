@@ -123,13 +123,6 @@ pub fn dump(_gc_start: bool) {
     }
 }
 
-pub fn record_mmap(bytes: usize) {
-    if cfg!(feature = "rust_mem_counter") {
-        let current_size = MMAP_SIZE.fetch_add(bytes, Ordering::SeqCst) + bytes;
-        PEAK_MMAP_SIZE.fetch_max(current_size, Ordering::SeqCst);
-    }
-}
-
 pub fn record_munmap(bytes: usize) {
     if cfg!(feature = "rust_mem_counter") {
         MMAP_SIZE.fetch_sub(bytes, Ordering::SeqCst);

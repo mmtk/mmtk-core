@@ -845,6 +845,7 @@ impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
 /// For USDT tracepoints for roots.
 /// Keep in sync with `tools/tracing/timeline/visualize.py`.
 #[repr(usize)]
+#[allow(dead_code)]
 enum RootsKind {
     NORMAL = 0,
     PINNING = 1,
@@ -1009,8 +1010,6 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
             }
         }
 
-        let total_objects = objects_to_scan.len();
-        let scan_and_trace = scan_later.len();
         #[cfg(feature = "tracing")]
         probe!(mmtk, scan_objects, total_objects, scan_and_trace);
 
