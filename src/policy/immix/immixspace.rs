@@ -278,21 +278,23 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     pub fn new(
         args: crate::policy::space::PlanCreateSpaceArgs<VM>,
-        space_args: ImmixSpaceArgs,
+        mut space_args: ImmixSpaceArgs,
     ) -> Self {
-        if space_args.never_move_objects {
-            info!(
-                "Creating non-moving ImmixSpace: {}. Block size: 2^{}",
-                args.name,
-                Block::LOG_BYTES
-            );
-        }
-
         if space_args.unlog_object_when_traced {
             assert!(
                 args.constraints.needs_log_bit,
                 "Invalid args when the plan does not use log bit"
             );
+        }
+
+        // Make sure we override the space args if we force non moving Immix
+        if cfg!(feature = "immix_non_moving") && !space_args.never_move_objects {
+            info!(
+                "Overriding never_moves_objects for Immix Space {}, as the immix_non_moving feature is set. Block size: 2^{}",
+                args.name,
+                Block::LOG_BYTES,
+            );
+            space_args.never_move_objects = true;
         }
 
         // validate features

@@ -254,7 +254,7 @@ impl<VM: VMBinding> GenImmix<VM> {
                 // In GenImmix, young objects are not allocated in ImmixSpace directly.
                 #[cfg(feature = "vo_bit")]
                 mixed_age: false,
-                never_move_objects: cfg!(feature = "immix_non_moving"),
+                never_move_objects: false,
             },
         );
 

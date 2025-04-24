@@ -140,7 +140,7 @@ impl<VM: VMBinding> Immix<VM> {
                 unlog_object_when_traced: false,
                 #[cfg(feature = "vo_bit")]
                 mixed_age: false,
-                never_move_objects: cfg!(feature = "immix_non_moving"),
+                never_move_objects: false,
             },
         )
     }
