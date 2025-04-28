@@ -38,7 +38,8 @@ pub struct Immix<VM: VMBinding> {
 
 /// The plan constraints for the immix plan.
 pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
-    moves_objects: true,
+    // If we disable moving in Immix, this is a non-moving plan.
+    moves_objects: !cfg!(feature = "immix_non_moving"),
     // Max immix object size is half of a block.
     max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
     needs_prepare_mutator: false,
