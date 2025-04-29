@@ -62,7 +62,7 @@ impl ChunkState {
         encode |= Self::ALLOC_BIT_MASK;
         ChunkState(encode)
     }
-    /// Create a new ChunkState that represents being free in the given space
+    /// Create a new ChunkState that represents being free
     pub fn free() -> ChunkState {
         ChunkState(0u8)
     }
@@ -174,7 +174,7 @@ impl ChunkMap {
         ChunkState(byte)
     }
 
-    /// A range of all chunks in the heap.
+    /// A range of all allocated chunks by this space in the heap.
     pub fn all_chunks(&self) -> impl Iterator<Item = Chunk> + '_ {
         let chunk_range = self.chunk_range.lock();
         RegionIterator::<Chunk>::new(chunk_range.start, chunk_range.end)
