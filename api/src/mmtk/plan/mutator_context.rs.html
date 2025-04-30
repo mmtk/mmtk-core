@@ -531,7 +531,20 @@
 <a href="#530" id="530">530</a>
 <a href="#531" id="531">531</a>
 <a href="#532" id="532">532</a>
-<a href="#533" id="533">533</a></pre></div><pre class="rust"><code><span class="doccomment">//! Mutator context for each application thread.
+<a href="#533" id="533">533</a>
+<a href="#534" id="534">534</a>
+<a href="#535" id="535">535</a>
+<a href="#536" id="536">536</a>
+<a href="#537" id="537">537</a>
+<a href="#538" id="538">538</a>
+<a href="#539" id="539">539</a>
+<a href="#540" id="540">540</a>
+<a href="#541" id="541">541</a>
+<a href="#542" id="542">542</a>
+<a href="#543" id="543">543</a>
+<a href="#544" id="544">544</a>
+<a href="#545" id="545">545</a>
+<a href="#546" id="546">546</a></pre></div><pre class="rust"><code><span class="doccomment">//! Mutator context for each application thread.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::Barrier;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::Plan;
@@ -942,6 +955,43 @@
             <span class="string">"Allocator mapping declared more free list allocators than the max allowed."
         </span>);
     }
+
+    <span class="comment">// We may add more allocators from common/base plan after reserved allocators.
+
+    </span><span class="kw">fn </span>add_bump_pointer_allocator(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; AllocatorSelector {
+        <span class="kw">let </span>selector = AllocatorSelector::BumpPointer(<span class="self">self</span>.n_bump_pointer);
+        <span class="self">self</span>.n_bump_pointer += <span class="number">1</span>;
+        selector
+    }
+    <span class="kw">fn </span>add_large_object_allocator(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; AllocatorSelector {
+        <span class="kw">let </span>selector = AllocatorSelector::LargeObject(<span class="self">self</span>.n_large_object);
+        <span class="self">self</span>.n_large_object += <span class="number">1</span>;
+        selector
+    }
+    <span class="attr">#[allow(dead_code)]
+    </span><span class="kw">fn </span>add_malloc_allocator(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; AllocatorSelector {
+        <span class="kw">let </span>selector = AllocatorSelector::Malloc(<span class="self">self</span>.n_malloc);
+        <span class="self">self</span>.n_malloc += <span class="number">1</span>;
+        selector
+    }
+    <span class="attr">#[allow(dead_code)]
+    </span><span class="kw">fn </span>add_immix_allocator(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; AllocatorSelector {
+        <span class="kw">let </span>selector = AllocatorSelector::Immix(<span class="self">self</span>.n_immix);
+        <span class="self">self</span>.n_immix += <span class="number">1</span>;
+        selector
+    }
+    <span class="attr">#[allow(dead_code)]
+    </span><span class="kw">fn </span>add_mark_compact_allocator(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; AllocatorSelector {
+        <span class="kw">let </span>selector = AllocatorSelector::MarkCompact(<span class="self">self</span>.n_mark_compact);
+        <span class="self">self</span>.n_mark_compact += <span class="number">1</span>;
+        selector
+    }
+    <span class="attr">#[allow(dead_code)]
+    </span><span class="kw">fn </span>add_free_list_allocator(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; AllocatorSelector {
+        <span class="kw">let </span>selector = AllocatorSelector::FreeList(<span class="self">self</span>.n_free_list);
+        <span class="self">self</span>.n_free_list += <span class="number">1</span>;
+        selector
+    }
 }
 
 <span class="doccomment">/// Create an allocator mapping for spaces in Common/BasePlan for a plan. A plan should reserve its own allocators.
@@ -963,35 +1013,22 @@
 
     </span><span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
     </span>{
-        map[AllocationSemantics::Code] = AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
-        reserved.n_bump_pointer += <span class="number">1</span>;
-
-        map[AllocationSemantics::LargeCode] =
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
-        reserved.n_bump_pointer += <span class="number">1</span>;
+        map[AllocationSemantics::Code] = reserved.add_bump_pointer_allocator();
+        map[AllocationSemantics::LargeCode] = reserved.add_bump_pointer_allocator();
     }
 
     <span class="attr">#[cfg(feature = <span class="string">"ro_space"</span>)]
     </span>{
-        map[AllocationSemantics::ReadOnly] =
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
-        reserved.n_bump_pointer += <span class="number">1</span>;
+        map[AllocationSemantics::ReadOnly] = reserved.add_bump_pointer_allocator();
     }
 
     <span class="comment">// spaces in common plan
 
     </span><span class="kw">if </span>include_common_plan {
-        map[AllocationSemantics::Immortal] =
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
-        reserved.n_bump_pointer += <span class="number">1</span>;
-
-        map[AllocationSemantics::Los] = AllocatorSelector::LargeObject(reserved.n_large_object);
-        reserved.n_large_object += <span class="number">1</span>;
-
+        map[AllocationSemantics::Immortal] = reserved.add_bump_pointer_allocator();
+        map[AllocationSemantics::Los] = reserved.add_large_object_allocator();
         <span class="comment">// TODO: This should be freelist allocator once we use marksweep for nonmoving space.
-        </span>map[AllocationSemantics::NonMoving] =
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
-        reserved.n_bump_pointer += <span class="number">1</span>;
+        </span>map[AllocationSemantics::NonMoving] = reserved.add_bump_pointer_allocator();
     }
 
     reserved.validate();
@@ -1020,45 +1057,34 @@
     </span><span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
     </span>{
         vec.push((
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            reserved.add_bump_pointer_allocator(),
             <span class="kw-2">&amp;</span>plan.base().code_space,
         ));
-        reserved.n_bump_pointer += <span class="number">1</span>;
         vec.push((
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            reserved.add_bump_pointer_allocator(),
             <span class="kw-2">&amp;</span>plan.base().code_lo_space,
         ));
-        reserved.n_bump_pointer += <span class="number">1</span>;
     }
 
     <span class="attr">#[cfg(feature = <span class="string">"ro_space"</span>)]
-    </span>{
-        vec.push((
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
-            <span class="kw-2">&amp;</span>plan.base().ro_space,
-        ));
-        reserved.n_bump_pointer += <span class="number">1</span>;
-    }
+    </span>vec.push((reserved.add_bump_pointer_allocator(), <span class="kw-2">&amp;</span>plan.base().ro_space));
 
     <span class="comment">// spaces in CommonPlan
 
     </span><span class="kw">if </span>include_common_plan {
         vec.push((
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            reserved.add_bump_pointer_allocator(),
             plan.common().get_immortal(),
         ));
-        reserved.n_bump_pointer += <span class="number">1</span>;
         vec.push((
-            AllocatorSelector::LargeObject(reserved.n_large_object),
+            reserved.add_large_object_allocator(),
             plan.common().get_los(),
         ));
-        reserved.n_large_object += <span class="number">1</span>;
         <span class="comment">// TODO: This should be freelist allocator once we use marksweep for nonmoving space.
         </span>vec.push((
-            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            reserved.add_bump_pointer_allocator(),
             plan.common().get_nonmoving(),
         ));
-        reserved.n_bump_pointer += <span class="number">1</span>;
     }
 
     reserved.validate();
