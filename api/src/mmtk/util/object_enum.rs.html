@@ -100,22 +100,14 @@
 <a href="#99" id="99">99</a>
 <a href="#100" id="100">100</a>
 <a href="#101" id="101">101</a>
-<a href="#102" id="102">102</a>
-<a href="#103" id="103">103</a>
-<a href="#104" id="104">104</a>
-<a href="#105" id="105">105</a>
-<a href="#106" id="106">106</a>
-<a href="#107" id="107">107</a></pre></div><pre class="rust"><code><span class="doccomment">//! Helper types for object enumeration
+<a href="#102" id="102">102</a></pre></div><pre class="rust"><code><span class="doccomment">//! Helper types for object enumeration
 
 </span><span class="kw">use </span>std::marker::PhantomData;
 
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 
 <span class="kw">use super</span>::{
-    heap::{
-        chunk_map::{ChunkMap, ChunkState},
-        MonotonePageResource,
-    },
+    heap::{chunk_map::ChunkMap, MonotonePageResource},
     linear_scan::Region,
     metadata::{side_metadata::spec_defs::VO_BIT, vo_bit},
     Address, ObjectReference,
@@ -192,11 +184,9 @@
     </span>B: BlockMayHaveObjects,
 {
     <span class="kw">for </span>chunk <span class="kw">in </span>chunk_map.all_chunks() {
-        <span class="kw">if </span>chunk_map.get(chunk) == ChunkState::Allocated {
-            <span class="kw">for </span>block <span class="kw">in </span>chunk.iter_region::&lt;B&gt;() {
-                <span class="kw">if </span>block.may_have_objects() {
-                    enumerator.visit_address_range(block.start(), block.end());
-                }
+        <span class="kw">for </span>block <span class="kw">in </span>chunk.iter_region::&lt;B&gt;() {
+            <span class="kw">if </span>block.may_have_objects() {
+                enumerator.visit_address_range(block.start(), block.end());
             }
         }
     }

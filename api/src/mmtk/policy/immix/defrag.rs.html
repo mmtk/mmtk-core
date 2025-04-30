@@ -212,8 +212,7 @@
 <a href="#211" id="211">211</a>
 <a href="#212" id="212">212</a>
 <a href="#213" id="213">213</a>
-<a href="#214" id="214">214</a>
-<a href="#215" id="215">215</a></pre></div><pre class="rust"><code><span class="kw">use super</span>::{
+<a href="#214" id="214">214</a></pre></div><pre class="rust"><code><span class="kw">use super</span>::{
     block::{Block, BlockState},
     line::Line,
     ImmixSpace,
@@ -278,8 +277,10 @@
     }
 
     <span class="doccomment">/// Determine whether the current GC should do defragmentation.
+    </span><span class="attr">#[allow(clippy::too_many_arguments)]
     </span><span class="kw">pub fn </span>decide_whether_to_defrag(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
+        defrag_enabled: bool,
         emergency_collection: bool,
         collect_whole_heap: bool,
         collection_attempts: usize,
@@ -287,7 +288,7 @@
         exhausted_reusable_space: bool,
         full_heap_system_gc: bool,
     ) {
-        <span class="kw">let </span>in_defrag = <span class="kw">super</span>::DEFRAG
+        <span class="kw">let </span>in_defrag = defrag_enabled
             &amp;&amp; (emergency_collection
                 || (collection_attempts &gt; <span class="number">1</span>)
                 || !exhausted_reusable_space
@@ -331,9 +332,8 @@
     }
 
     <span class="doccomment">/// Prepare work. Should be called in ImmixSpace::prepare.
-    </span><span class="attr">#[allow(clippy::assertions_on_constants)]
     </span><span class="kw">pub fn </span>prepare&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, space: <span class="kw-2">&amp;</span>ImmixSpace&lt;VM&gt;, plan_stats: StatsForDefrag) {
-        <span class="macro">debug_assert!</span>(<span class="kw">super</span>::DEFRAG);
+        <span class="macro">debug_assert!</span>(space.is_defrag_enabled());
         <span class="self">self</span>.defrag_space_exhausted.store(<span class="bool-val">false</span>, Ordering::Release);
 
         <span class="comment">// Calculate available free space for defragmentation.
@@ -422,9 +422,7 @@
     }
 
     <span class="doccomment">/// Reset the in-defrag state.
-    </span><span class="attr">#[allow(clippy::assertions_on_constants)]
     </span><span class="kw">pub fn </span>reset_in_defrag(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="macro">debug_assert!</span>(<span class="kw">super</span>::DEFRAG);
         <span class="self">self</span>.in_defrag_collection.store(<span class="bool-val">false</span>, Ordering::Release);
     }
 }

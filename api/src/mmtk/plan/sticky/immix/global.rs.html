@@ -379,7 +379,8 @@
 <a href="#378" id="378">378</a>
 <a href="#379" id="379">379</a>
 <a href="#380" id="380">380</a>
-<a href="#381" id="381">381</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
@@ -388,7 +389,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TraceKind;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::ImmixSpace;
-<span class="kw">use </span><span class="kw">crate</span>::policy::immix::PREFER_COPY_ON_NURSERY_GC;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::TRACE_KIND_FAST;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
@@ -422,7 +422,8 @@
 
 <span class="doccomment">/// The plan constraints for the sticky immix plan.
 </span><span class="kw">pub const </span>STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
-    moves_objects: <span class="kw">crate</span>::policy::immix::DEFRAG || <span class="kw">crate</span>::policy::immix::PREFER_COPY_ON_NURSERY_GC,
+    <span class="comment">// If we disable moving in Immix, this is a non-moving plan.
+    </span>moves_objects: !<span class="macro">cfg!</span>(feature = <span class="string">"immix_non_moving"</span>),
     needs_log_bit: <span class="bool-val">true</span>,
     barrier: <span class="kw">crate</span>::plan::BarrierSelector::ObjectBarrier,
     <span class="comment">// We may trace duplicate edges in sticky immix (or any plan that uses object remembering barrier). See https://github.com/mmtk/mmtk-core/issues/743.
@@ -545,7 +546,7 @@
 
     <span class="kw">fn </span>current_gc_may_move_object(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw">if </span><span class="self">self</span>.is_current_gc_nursery() {
-            PREFER_COPY_ON_NURSERY_GC
+            <span class="self">self</span>.get_immix_space().prefer_copy_on_nursery_gc()
         } <span class="kw">else </span>{
             <span class="self">self</span>.get_immix_space().in_defrag()
         }
@@ -644,7 +645,7 @@
                     <span class="self">self</span>.immix
                         .immix_space
                         .trace_object_without_moving(queue, object)
-                } <span class="kw">else if </span><span class="kw">crate</span>::policy::immix::PREFER_COPY_ON_NURSERY_GC {
+                } <span class="kw">else if </span><span class="self">self</span>.immix.immix_space.prefer_copy_on_nursery_gc() {
                     <span class="kw">let </span>ret = <span class="self">self</span>.immix.immix_space.trace_object_with_opportunistic_copy(
                         queue,
                         object,
@@ -711,6 +712,7 @@
                 <span class="comment">// In StickyImmix, both young and old objects are allocated in the ImmixSpace.
                 </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
                 </span>mixed_age: <span class="bool-val">true</span>,
+                never_move_objects: <span class="bool-val">false</span>,
             },
         );
         <span class="self">Self </span>{

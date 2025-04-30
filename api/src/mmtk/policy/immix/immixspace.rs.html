@@ -1136,7 +1136,35 @@
 <a href="#1135" id="1135">1135</a>
 <a href="#1136" id="1136">1136</a>
 <a href="#1137" id="1137">1137</a>
-<a href="#1138" id="1138">1138</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::StatsForDefrag;
+<a href="#1138" id="1138">1138</a>
+<a href="#1139" id="1139">1139</a>
+<a href="#1140" id="1140">1140</a>
+<a href="#1141" id="1141">1141</a>
+<a href="#1142" id="1142">1142</a>
+<a href="#1143" id="1143">1143</a>
+<a href="#1144" id="1144">1144</a>
+<a href="#1145" id="1145">1145</a>
+<a href="#1146" id="1146">1146</a>
+<a href="#1147" id="1147">1147</a>
+<a href="#1148" id="1148">1148</a>
+<a href="#1149" id="1149">1149</a>
+<a href="#1150" id="1150">1150</a>
+<a href="#1151" id="1151">1151</a>
+<a href="#1152" id="1152">1152</a>
+<a href="#1153" id="1153">1153</a>
+<a href="#1154" id="1154">1154</a>
+<a href="#1155" id="1155">1155</a>
+<a href="#1156" id="1156">1156</a>
+<a href="#1157" id="1157">1157</a>
+<a href="#1158" id="1158">1158</a>
+<a href="#1159" id="1159">1159</a>
+<a href="#1160" id="1160">1160</a>
+<a href="#1161" id="1161">1161</a>
+<a href="#1162" id="1162">1162</a>
+<a href="#1163" id="1163">1163</a>
+<a href="#1164" id="1164">1164</a>
+<a href="#1165" id="1165">1165</a>
+<a href="#1166" id="1166">1166</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::StatsForDefrag;
 <span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
@@ -1211,6 +1239,8 @@
     </span><span class="comment">// Currently only used when "vo_bit" is enabled.  Using #[cfg(...)] to eliminate dead code warning.
     </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
     </span><span class="kw">pub </span>mixed_age: bool,
+    <span class="doccomment">/// Disable copying for this Immix space.
+    </span><span class="kw">pub </span>never_move_objects: bool,
 }
 
 <span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Sync <span class="kw">for </span>ImmixSpace&lt;VM&gt; {}
@@ -1222,7 +1252,7 @@
 
     <span class="kw">fn </span>get_forwarded_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
         <span class="comment">// If we never move objects, look no further.
-        </span><span class="kw">if </span><span class="kw">super</span>::NEVER_MOVE_OBJECTS {
+        </span><span class="kw">if </span>!<span class="self">self</span>.is_movable() {
             <span class="kw">return </span><span class="prelude-val">None</span>;
         }
 
@@ -1240,7 +1270,7 @@
         }
 
         <span class="comment">// If we never move objects, look no further.
-        </span><span class="kw">if </span><span class="kw">super</span>::NEVER_MOVE_OBJECTS {
+        </span><span class="kw">if </span>!<span class="self">self</span>.is_movable() {
             <span class="kw">return </span><span class="bool-val">false</span>;
         }
 
@@ -1260,7 +1290,7 @@
         VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.is_object_pinned::&lt;VM&gt;(object)
     }
     <span class="kw">fn </span>is_movable(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        !<span class="kw">super</span>::NEVER_MOVE_OBJECTS
+        !<span class="self">self</span>.space_args.never_move_objects
     }
 
     <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
@@ -1390,7 +1420,6 @@
             <span class="macro">vec!</span>[
                 MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
-                MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
                 <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
@@ -1402,7 +1431,6 @@
                 MetadataSpec::OnSide(Line::MARK_TABLE),
                 MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
-                MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
                 <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
@@ -1414,15 +1442,8 @@
 
     <span class="kw">pub fn </span>new(
         args: <span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs&lt;VM&gt;,
-        space_args: ImmixSpaceArgs,
+        <span class="kw-2">mut </span>space_args: ImmixSpaceArgs,
     ) -&gt; <span class="self">Self </span>{
-        <span class="attr">#[cfg(feature = <span class="string">"immix_non_moving"</span>)]
-        </span><span class="macro">info!</span>(
-            <span class="string">"Creating non-moving ImmixSpace: {}. Block size: 2^{}"</span>,
-            args.name,
-            Block::LOG_BYTES
-        );
-
         <span class="kw">if </span>space_args.unlog_object_when_traced {
             <span class="macro">assert!</span>(
                 args.constraints.needs_log_bit,
@@ -1430,13 +1451,35 @@
             </span>);
         }
 
-        <span class="kw">super</span>::validate_features();
+        <span class="comment">// Make sure we override the space args if we force non moving Immix
+        </span><span class="kw">if </span><span class="macro">cfg!</span>(feature = <span class="string">"immix_non_moving"</span>) &amp;&amp; !space_args.never_move_objects {
+            <span class="macro">info!</span>(
+                <span class="string">"Overriding never_moves_objects for Immix Space {}, as the immix_non_moving feature is set. Block size: 2^{}"</span>,
+                args.name,
+                Block::LOG_BYTES,
+            );
+            space_args.never_move_objects = <span class="bool-val">true</span>;
+        }
+
+        <span class="comment">// validate features
+        </span><span class="kw">if </span><span class="kw">super</span>::BLOCK_ONLY {
+            <span class="macro">assert!</span>(
+                space_args.never_move_objects,
+                <span class="string">"Block-only immix must not move objects"
+            </span>);
+        }
+        <span class="macro">assert!</span>(
+            Block::LINES / <span class="number">2 </span>&lt;= u8::MAX <span class="kw">as </span>usize - <span class="number">2</span>,
+            <span class="string">"Number of lines in a block should not exceed BlockState::MARK_MARKED"
+        </span>);
+
         <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
         </span>vo_bit::helper::validate_config::&lt;VM&gt;();
         <span class="kw">let </span>vm_map = args.vm_map;
         <span class="kw">let </span>scheduler = args.scheduler.clone();
         <span class="kw">let </span>common =
             CommonSpace::new(args.into_policy_args(<span class="bool-val">true</span>, <span class="bool-val">false</span>, <span class="self">Self</span>::side_metadata_specs()));
+        <span class="kw">let </span>space_index = common.descriptor.get_index();
         ImmixSpace {
             pr: <span class="kw">if </span>common.vmrequest.is_discontiguous() {
                 BlockPageResource::new_discontiguous(
@@ -1454,7 +1497,7 @@
                 )
             },
             common,
-            chunk_map: ChunkMap::new(),
+            chunk_map: ChunkMap::new(space_index),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
             lines_consumed: AtomicUsize::new(<span class="number">0</span>),
@@ -1494,6 +1537,7 @@
         full_heap_system_gc: bool,
     ) -&gt; bool {
         <span class="self">self</span>.defrag.decide_whether_to_defrag(
+            <span class="self">self</span>.is_defrag_enabled(),
             emergency_collection,
             collect_whole_heap,
             collection_attempts,
@@ -1528,7 +1572,7 @@
             }
 
             <span class="comment">// Prepare defrag info
-            </span><span class="kw">if </span><span class="kw">super</span>::DEFRAG {
+            </span><span class="kw">if </span><span class="self">self</span>.is_defrag_enabled() {
                 <span class="self">self</span>.defrag.prepare(<span class="self">self</span>, plan_stats);
             }
 
@@ -1621,7 +1665,7 @@
     /// Return whether this GC was a defrag GC, as a plan may want to know this.
     </span><span class="kw">pub fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; bool {
         <span class="kw">let </span>did_defrag = <span class="self">self</span>.defrag.in_defrag();
-        <span class="kw">if </span><span class="kw">super</span>::DEFRAG {
+        <span class="kw">if </span><span class="self">self</span>.is_defrag_enabled() {
             <span class="self">self</span>.defrag.reset_in_defrag();
         }
         did_defrag
@@ -1662,7 +1706,7 @@
         <span class="self">self</span>.defrag.notify_new_clean_block(copy);
         <span class="kw">let </span>block = Block::from_aligned_address(block_address);
         block.init(copy);
-        <span class="self">self</span>.chunk_map.set(block.chunk(), ChunkState::Allocated);
+        <span class="self">self</span>.chunk_map.set_allocated(block.chunk(), <span class="bool-val">true</span>);
         <span class="self">self</span>.lines_consumed
             .fetch_add(Block::LINES, Ordering::SeqCst);
         <span class="prelude-val">Some</span>(block)
@@ -1944,8 +1988,8 @@
         <span class="prelude-val">Some</span>((start, end))
     }
 
-    <span class="kw">pub fn </span>is_last_gc_exhaustive(did_defrag_for_last_gc: bool) -&gt; bool {
-        <span class="kw">if </span><span class="kw">super</span>::DEFRAG {
+    <span class="kw">pub fn </span>is_last_gc_exhaustive(<span class="kw-2">&amp;</span><span class="self">self</span>, did_defrag_for_last_gc: bool) -&gt; bool {
+        <span class="kw">if </span><span class="self">self</span>.is_defrag_enabled() {
             did_defrag_for_last_gc
         } <span class="kw">else </span>{
             <span class="comment">// If defrag is disabled, every GC is exhaustive.
@@ -1970,6 +2014,18 @@
         </span><span class="kw">if </span>!<span class="kw">super</span>::MARK_LINE_AT_SCAN_TIME {
             <span class="self">self</span>.mark_lines(object);
         }
+    }
+
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>prefer_copy_on_nursery_gc(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.is_nursery_copy_enabled()
+    }
+
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_nursery_copy_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        !<span class="self">self</span>.space_args.never_move_objects &amp;&amp; !<span class="macro">cfg!</span>(feature = <span class="string">"sticky_immix_non_moving_nursery"</span>)
+    }
+
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_defrag_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        !<span class="self">self</span>.space_args.never_move_objects
     }
 }
 
@@ -2005,7 +2061,7 @@
                 <span class="kw">continue</span>;
             }
             <span class="comment">// Check if this block needs to be defragmented.
-            </span><span class="kw">let </span>is_defrag_source = <span class="kw">if </span>!<span class="kw">super</span>::DEFRAG {
+            </span><span class="kw">let </span>is_defrag_source = <span class="kw">if </span>!<span class="self">self</span>.space.is_defrag_enabled() {
                 <span class="comment">// Do not set any block as defrag source if defrag is disabled.
                 </span><span class="bool-val">false
             </span>} <span class="kw">else if </span><span class="kw">super</span>::DEFRAG_EVERY_BLOCK {
@@ -2037,7 +2093,7 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>SweepChunk&lt;VM&gt; {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-        <span class="macro">assert_eq!</span>(<span class="self">self</span>.space.chunk_map.get(<span class="self">self</span>.chunk), ChunkState::Allocated);
+        <span class="macro">assert!</span>(<span class="self">self</span>.space.chunk_map.get(<span class="self">self</span>.chunk).unwrap().is_allocated());
 
         <span class="kw">let </span><span class="kw-2">mut </span>histogram = <span class="self">self</span>.space.defrag.new_histogram();
         <span class="kw">let </span>line_mark_state = <span class="kw">if </span><span class="kw">super</span>::BLOCK_ONLY {
@@ -2088,7 +2144,7 @@
         <span class="macro">probe!</span>(mmtk, sweep_chunk, allocated_blocks);
         <span class="comment">// Set this chunk as free if there is not live blocks.
         </span><span class="kw">if </span>allocated_blocks == <span class="number">0 </span>{
-            <span class="self">self</span>.space.chunk_map.set(<span class="self">self</span>.chunk, ChunkState::Free)
+            <span class="self">self</span>.space.chunk_map.set_allocated(<span class="self">self</span>.chunk, <span class="bool-val">false</span>)
         }
         <span class="self">self</span>.space.defrag.add_completed_mark_histogram(histogram);
         <span class="self">self</span>.epilogue.finish_one_work_packet();

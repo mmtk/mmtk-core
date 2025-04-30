@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["ChunkState"],"struct":["Chunk","ChunkMap"]};
+window.SIDEBAR_ITEMS = {"struct":["Chunk","ChunkMap","ChunkState"]};

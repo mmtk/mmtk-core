@@ -2148,7 +2148,12 @@
 <a href="#2147" id="2147">2147</a>
 <a href="#2148" id="2148">2148</a>
 <a href="#2149" id="2149">2149</a>
-<a href="#2150" id="2150">2150</a></pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href="#2150" id="2150">2150</a>
+<a href="#2151" id="2151">2151</a>
+<a href="#2152" id="2152">2152</a>
+<a href="#2153" id="2153">2153</a>
+<a href="#2154" id="2154">2154</a>
+<a href="#2155" id="2155">2155</a></pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::raw_align_up;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
@@ -3494,6 +3499,11 @@
                 ret.push(<span class="kw-2">*</span>spec);
             }
         }
+
+        <span class="comment">// Any plan that uses the chunk map needs to reserve the chunk map table.
+        // As we use either the mark sweep or (non moving) immix as the non moving space,
+        // and both policies use the chunk map, we just add the chunk map table globally.
+        </span>ret.push(<span class="kw">crate</span>::util::heap::chunk_map::ChunkMap::ALLOC_TABLE);
 
         ret.extend_from_slice(specs);
         ret

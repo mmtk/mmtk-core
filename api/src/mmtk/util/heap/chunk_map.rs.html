@@ -133,7 +133,67 @@
 <a href="#132" id="132">132</a>
 <a href="#133" id="133">133</a>
 <a href="#134" id="134">134</a>
-<a href="#135" id="135">135</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWork;
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
+<a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWork;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::RegionIterator;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
@@ -179,21 +239,69 @@
     }
 }
 
-<span class="doccomment">/// Chunk allocation state
-</span><span class="attr">#[repr(u8)]
-#[derive(Debug, PartialEq, Clone, Copy)]
-</span><span class="kw">pub enum </span>ChunkState {
-    <span class="doccomment">/// The chunk is not allocated.
-    </span>Free = <span class="number">0</span>,
-    <span class="doccomment">/// The chunk is allocated.
-    </span>Allocated = <span class="number">1</span>,
+<span class="doccomment">/// The allocation state for a chunk in the chunk map. It includes whether each chunk is allocated or free, and the space the chunk belongs to.
+/// Highest bit: 0 = free, 1 = allocated
+/// Lower 4 bits: Space index (0-15) if the chunk is allocated.
+</span><span class="attr">#[repr(transparent)]
+#[derive(PartialEq, Clone, Copy)]
+</span><span class="kw">pub struct </span>ChunkState(u8);
+
+<span class="kw">impl </span>ChunkState {
+    <span class="kw">const </span>ALLOC_BIT_MASK: u8 = <span class="number">0x80</span>;
+    <span class="kw">const </span>SPACE_INDEX_MASK: u8 = <span class="number">0x0F</span>;
+
+    <span class="doccomment">/// Create a new ChunkState that represents being allocated in the given space
+    </span><span class="kw">pub fn </span>allocated(space_index: usize) -&gt; ChunkState {
+        <span class="macro">debug_assert!</span>(space_index &lt; <span class="kw">crate</span>::util::heap::layout::heap_parameters::MAX_SPACES);
+        <span class="kw">let </span><span class="kw-2">mut </span>encode = space_index <span class="kw">as </span>u8;
+        encode |= <span class="self">Self</span>::ALLOC_BIT_MASK;
+        ChunkState(encode)
+    }
+    <span class="doccomment">/// Create a new ChunkState that represents being free
+    </span><span class="kw">pub fn </span>free() -&gt; ChunkState {
+        ChunkState(<span class="number">0u8</span>)
+    }
+    <span class="doccomment">/// Is the chunk free?
+    </span><span class="kw">pub fn </span>is_free(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.<span class="number">0 </span>== <span class="number">0
+    </span>}
+    <span class="doccomment">/// Is the chunk allocated?
+    </span><span class="kw">pub fn </span>is_allocated(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        !<span class="self">self</span>.is_free()
+    }
+    <span class="doccomment">/// Get the space index of the chunk
+    </span><span class="kw">pub fn </span>get_space_index(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.is_allocated());
+        <span class="kw">let </span>index = (<span class="self">self</span>.<span class="number">0 </span>&amp; <span class="self">Self</span>::SPACE_INDEX_MASK) <span class="kw">as </span>usize;
+        <span class="macro">debug_assert!</span>(index &lt; <span class="kw">crate</span>::util::heap::layout::heap_parameters::MAX_SPACES);
+        index
+    }
+}
+
+<span class="kw">impl </span>std::fmt::Debug <span class="kw">for </span>ChunkState {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">'_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="kw">if </span><span class="self">self</span>.is_free() {
+            <span class="macro">write!</span>(f, <span class="string">"Free"</span>)
+        } <span class="kw">else </span>{
+            <span class="macro">write!</span>(f, <span class="string">"Allocated({})"</span>, <span class="self">self</span>.get_space_index())
+        }
+    }
 }
 
 <span class="doccomment">/// A byte-map to record all the allocated chunks.
 /// A plan can use this to maintain records for the chunks that they used, and the states of the chunks.
-/// Any plan that uses the chunk map should include the `ALLOC_TABLE` spec in their local sidemetadata specs
+/// Any plan that uses the chunk map should include the `ALLOC_TABLE` spec in their global sidemetadata specs.
+///
+/// A chunk map is created for a space (identified by the space index), and will only update or list chunks for that space.
 </span><span class="kw">pub struct </span>ChunkMap {
-    chunk_range: Mutex&lt;Range&lt;Chunk&gt;&gt;,
+    <span class="doccomment">/// The space that uses this chunk map.
+    </span>space_index: usize,
+    <span class="doccomment">/// The range of chunks that are used by the space. The range only records the lowest chunk and the highest chunk.
+    /// All the chunks that are used for the space are within the range, but not necessarily that all the chunks in the range
+    /// are used for the space. Spaces may be discontiguous, thus the range may include chunks that do not belong to the space.
+    /// We need to use the space index in the chunk map and the space index encoded with the chunk state to know if
+    /// the chunk belongs to the current space.
+    </span>chunk_range: Mutex&lt;Range&lt;Chunk&gt;&gt;,
 }
 
 <span class="kw">impl </span>ChunkMap {
@@ -201,22 +309,40 @@
     </span><span class="kw">pub const </span>ALLOC_TABLE: SideMetadataSpec =
         <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::CHUNK_MARK;
 
-    <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new(space_index: usize) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
+            space_index,
             chunk_range: Mutex::new(Chunk::ZERO..Chunk::ZERO),
         }
     }
 
-    <span class="doccomment">/// Set chunk state
-    </span><span class="kw">pub fn </span>set(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk: Chunk, state: ChunkState) {
+    <span class="doccomment">/// Set a chunk as allocated, or as free.
+    </span><span class="kw">pub fn </span>set_allocated(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk: Chunk, allocated: bool) {
+        <span class="kw">let </span>state = <span class="kw">if </span>allocated {
+            ChunkState::allocated(<span class="self">self</span>.space_index)
+        } <span class="kw">else </span>{
+            ChunkState::free()
+        };
         <span class="comment">// Do nothing if the chunk is already in the expected state.
-        </span><span class="kw">if </span><span class="self">self</span>.get(chunk) == state {
+        </span><span class="kw">if </span><span class="self">self</span>.get_internal(chunk) == state {
             <span class="kw">return</span>;
         }
+        <span class="attr">#[cfg(debug_assertions)]
+        </span>{
+            <span class="kw">let </span>old_state = <span class="self">self</span>.get_internal(chunk);
+            <span class="comment">// If a chunk is free, any space may use it. If a chunk is not free, only the current space may update its state.
+            </span><span class="macro">assert!</span>(
+                old_state.is_free() || old_state.get_space_index() == <span class="self">self</span>.space_index,
+                <span class="string">"Chunk {:?}: old state {:?}, new state {:?}. Cannot set to new state."</span>,
+                chunk,
+                old_state,
+                state
+            );
+        }
         <span class="comment">// Update alloc byte
-        </span><span class="kw">unsafe </span>{ <span class="self">Self</span>::ALLOC_TABLE.store::&lt;u8&gt;(chunk.start(), state <span class="kw">as </span>u8) };
+        </span><span class="kw">unsafe </span>{ <span class="self">Self</span>::ALLOC_TABLE.store::&lt;u8&gt;(chunk.start(), state.<span class="number">0</span>) };
         <span class="comment">// If this is a newly allcoated chunk, then expand the chunk range.
-        </span><span class="kw">if </span>state == ChunkState::Allocated {
+        </span><span class="kw">if </span>allocated {
             <span class="macro">debug_assert!</span>(!chunk.start().is_zero());
             <span class="kw">let </span><span class="kw-2">mut </span>range = <span class="self">self</span>.chunk_range.lock();
             <span class="kw">if </span>range.start == Chunk::ZERO {
@@ -231,20 +357,23 @@
         }
     }
 
-    <span class="doccomment">/// Get chunk state
-    </span><span class="kw">pub fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk: Chunk) -&gt; ChunkState {
-        <span class="kw">let </span>byte = <span class="kw">unsafe </span>{ <span class="self">Self</span>::ALLOC_TABLE.load::&lt;u8&gt;(chunk.start()) };
-        <span class="kw">match </span>byte {
-            <span class="number">0 </span>=&gt; ChunkState::Free,
-            <span class="number">1 </span>=&gt; ChunkState::Allocated,
-            <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(),
-        }
+    <span class="doccomment">/// Get chunk state. Return None if the chunk does not belong to the space.
+    </span><span class="kw">pub fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk: Chunk) -&gt; <span class="prelude-ty">Option</span>&lt;ChunkState&gt; {
+        <span class="kw">let </span>state = <span class="self">self</span>.get_internal(chunk);
+        (state.is_allocated() &amp;&amp; state.get_space_index() == <span class="self">self</span>.space_index).then_some(state)
     }
 
-    <span class="doccomment">/// A range of all chunks in the heap.
-    </span><span class="kw">pub fn </span>all_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; RegionIterator&lt;Chunk&gt; {
+    <span class="doccomment">/// Get chunk state, regardless of the space. This should always be private.
+    </span><span class="kw">fn </span>get_internal(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk: Chunk) -&gt; ChunkState {
+        <span class="kw">let </span>byte = <span class="kw">unsafe </span>{ <span class="self">Self</span>::ALLOC_TABLE.load::&lt;u8&gt;(chunk.start()) };
+        ChunkState(byte)
+    }
+
+    <span class="doccomment">/// A range of all allocated chunks by this space in the heap.
+    </span><span class="kw">pub fn </span>all_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = Chunk&gt; + <span class="lifetime">'_ </span>{
         <span class="kw">let </span>chunk_range = <span class="self">self</span>.chunk_range.lock();
         RegionIterator::&lt;Chunk&gt;::new(chunk_range.start, chunk_range.end)
+            .filter(|c| <span class="self">self</span>.get(<span class="kw-2">*</span>c).is_some())
     }
 
     <span class="doccomment">/// Helper function to create per-chunk processing work packets for each allocated chunks.
@@ -253,19 +382,10 @@
         func: <span class="kw">impl </span>Fn(Chunk) -&gt; Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;,
     ) -&gt; Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>work_packets: Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; = <span class="macro">vec!</span>[];
-        <span class="kw">for </span>chunk <span class="kw">in </span><span class="self">self
-            </span>.all_chunks()
-            .filter(|c| <span class="self">self</span>.get(<span class="kw-2">*</span>c) == ChunkState::Allocated)
-        {
+        <span class="kw">for </span>chunk <span class="kw">in </span><span class="self">self</span>.all_chunks() {
             work_packets.push(func(chunk));
         }
         work_packets
-    }
-}
-
-<span class="kw">impl </span>Default <span class="kw">for </span>ChunkMap {
-    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
-        <span class="self">Self</span>::new()
     }
 }
 </code></pre></div></section></main></body></html>
