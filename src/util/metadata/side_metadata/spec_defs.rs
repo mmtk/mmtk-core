@@ -60,6 +60,8 @@ define_side_metadata_specs!(
     MS_ACTIVE_CHUNK = (global: true, log_num_of_bits: 3, log_bytes_in_region: LOG_BYTES_IN_CHUNK),
     // Track the index in SFT map for a chunk (only used for SFT sparse chunk map)
     SFT_DENSE_CHUNK_MAP_INDEX   = (global: true, log_num_of_bits: 3, log_bytes_in_region: LOG_BYTES_IN_CHUNK),
+    // Mark chunks (any plan that uses the chunk map should include this spec in their global sidemetadata specs)
+    CHUNK_MARK   = (global: true, log_num_of_bits: 3, log_bytes_in_region: crate::util::heap::chunk_map::Chunk::LOG_BYTES),
 );
 
 // This defines all LOCAL side metadata used by mmtk-core.
@@ -75,8 +77,6 @@ define_side_metadata_specs!(
     IX_BLOCK_DEFRAG = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
     // Mark blocks by immix
     IX_BLOCK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
-    // Mark chunks (any plan that uses the chunk map should include this spec in their local sidemetadata specs)
-    CHUNK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::util::heap::chunk_map::Chunk::LOG_BYTES),
     // Mark blocks by (native mimalloc) marksweep
     MS_BLOCK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::marksweepspace::native_ms::Block::LOG_BYTES),
     // Next block in list for native mimalloc
