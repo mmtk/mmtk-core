@@ -7,7 +7,6 @@ use crate::plan::tracing::ObjectQueue;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
-use crate::policy::immix::ImmixSpace;
 use crate::policy::space::{PlanCreateSpaceArgs, Space};
 #[cfg(feature = "vm_space")]
 use crate::policy::vmspace::VMSpace;

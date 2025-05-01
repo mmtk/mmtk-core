@@ -46,7 +46,7 @@ impl Chunk {
 
 /// The allocation state for a chunk in the chunk map. It includes whether each chunk is allocated or free, and the space the chunk belongs to.
 /// Highest bit: 0 = free, 1 = allocated
-/// Lower 4 bits: Space index (0-15)
+/// Lower 4 bits: Space index (0-15) if the chunk is allocated.
 #[repr(transparent)]
 #[derive(PartialEq, Clone, Copy)]
 pub struct ChunkState(u8);
@@ -62,14 +62,13 @@ impl ChunkState {
         encode |= Self::ALLOC_BIT_MASK;
         ChunkState(encode)
     }
-    /// Create a new ChunkState that represents being free in the given space
-    pub fn free(space_index: usize) -> ChunkState {
-        debug_assert!(space_index < crate::util::heap::layout::heap_parameters::MAX_SPACES);
-        ChunkState(space_index as u8)
+    /// Create a new ChunkState that represents being free
+    pub fn free() -> ChunkState {
+        ChunkState(0u8)
     }
     /// Is the chunk free?
     pub fn is_free(&self) -> bool {
-        self.0 & Self::ALLOC_BIT_MASK == 0
+        self.0 == 0
     }
     /// Is the chunk allocated?
     pub fn is_allocated(&self) -> bool {
@@ -77,6 +76,7 @@ impl ChunkState {
     }
     /// Get the space index of the chunk
     pub fn get_space_index(&self) -> usize {
+        debug_assert!(self.is_allocated());
         let index = (self.0 & Self::SPACE_INDEX_MASK) as usize;
         debug_assert!(index < crate::util::heap::layout::heap_parameters::MAX_SPACES);
         index
@@ -86,7 +86,7 @@ impl ChunkState {
 impl std::fmt::Debug for ChunkState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.is_free() {
-            write!(f, "Free({})", self.get_space_index())
+            write!(f, "Free")
         } else {
             write!(f, "Allocated({})", self.get_space_index())
         }
@@ -95,7 +95,7 @@ impl std::fmt::Debug for ChunkState {
 
 /// A byte-map to record all the allocated chunks.
 /// A plan can use this to maintain records for the chunks that they used, and the states of the chunks.
-/// Any plan that uses the chunk map should include the `ALLOC_TABLE` spec in their local sidemetadata specs.
+/// Any plan that uses the chunk map should include the `ALLOC_TABLE` spec in their global sidemetadata specs.
 ///
 /// A chunk map is created for a space (identified by the space index), and will only update or list chunks for that space.
 pub struct ChunkMap {
@@ -126,18 +126,18 @@ impl ChunkMap {
         let state = if allocated {
             ChunkState::allocated(self.space_index)
         } else {
-            ChunkState::free(self.space_index)
+            ChunkState::free()
         };
         // Do nothing if the chunk is already in the expected state.
-        if self.get_any(chunk) == state {
+        if self.get_internal(chunk) == state {
             return;
         }
         #[cfg(debug_assertions)]
         {
-            let old_state = self.get_any(chunk);
+            let old_state = self.get_internal(chunk);
             // If a chunk is free, any space may use it. If a chunk is not free, only the current space may update its state.
             assert!(
-                old_state.is_free() || old_state.get_space_index() == state.get_space_index(),
+                old_state.is_free() || old_state.get_space_index() == self.space_index,
                 "Chunk {:?}: old state {:?}, new state {:?}. Cannot set to new state.",
                 chunk,
                 old_state,
@@ -147,7 +147,7 @@ impl ChunkMap {
         // Update alloc byte
         unsafe { Self::ALLOC_TABLE.store::<u8>(chunk.start(), state.0) };
         // If this is a newly allcoated chunk, then expand the chunk range.
-        if state.is_allocated() {
+        if allocated {
             debug_assert!(!chunk.start().is_zero());
             let mut range = self.chunk_range.lock();
             if range.start == Chunk::ZERO {
@@ -164,34 +164,21 @@ impl ChunkMap {
 
     /// Get chunk state. Return None if the chunk does not belong to the space.
     pub fn get(&self, chunk: Chunk) -> Option<ChunkState> {
-        let state = self.get_any(chunk);
-        (state.get_space_index() == self.space_index).then_some(state)
+        let state = self.get_internal(chunk);
+        (state.is_allocated() && state.get_space_index() == self.space_index).then_some(state)
     }
 
     /// Get chunk state, regardless of the space. This should always be private.
-    fn get_any(&self, chunk: Chunk) -> ChunkState {
+    fn get_internal(&self, chunk: Chunk) -> ChunkState {
         let byte = unsafe { Self::ALLOC_TABLE.load::<u8>(chunk.start()) };
         ChunkState(byte)
     }
 
-    fn is_my_chunk(&self, chunk: Chunk) -> bool {
-        let byte = unsafe { Self::ALLOC_TABLE.load::<u8>(chunk.start()) };
-        let state = ChunkState(byte);
-        state.get_space_index() == self.space_index
-    }
-
-    /// A range of all chunks in the heap.
+    /// A range of all allocated chunks by this space in the heap.
     pub fn all_chunks(&self) -> impl Iterator<Item = Chunk> + '_ {
         let chunk_range = self.chunk_range.lock();
         RegionIterator::<Chunk>::new(chunk_range.start, chunk_range.end)
             .filter(|c| self.get(*c).is_some())
-    }
-
-    /// A range of all chunks in the heap.
-    pub fn all_allocated_chunks(&self) -> impl Iterator<Item = Chunk> + '_ {
-        let chunk_range = self.chunk_range.lock();
-        RegionIterator::<Chunk>::new(chunk_range.start, chunk_range.end)
-            .filter(|c| self.get(*c).is_some_and(|state| state.is_allocated()))
     }
 
     /// Helper function to create per-chunk processing work packets for each allocated chunks.
@@ -200,7 +187,7 @@ impl ChunkMap {
         func: impl Fn(Chunk) -> Box<dyn GCWork<VM>>,
     ) -> Vec<Box<dyn GCWork<VM>>> {
         let mut work_packets: Vec<Box<dyn GCWork<VM>>> = vec![];
-        for chunk in self.all_allocated_chunks() {
+        for chunk in self.all_chunks() {
             work_packets.push(func(chunk));
         }
         work_packets

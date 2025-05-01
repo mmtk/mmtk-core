@@ -40,7 +40,8 @@ pub struct StickyImmix<VM: VMBinding> {
 
 /// The plan constraints for the sticky immix plan.
 pub const STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
-    moves_objects: true,
+    // If we disable moving in Immix, this is a non-moving plan.
+    moves_objects: !cfg!(feature = "immix_non_moving"),
     needs_log_bit: true,
     barrier: crate::plan::BarrierSelector::ObjectBarrier,
     // We may trace duplicate edges in sticky immix (or any plan that uses object remembering barrier). See https://github.com/mmtk/mmtk-core/issues/743.
@@ -329,7 +330,7 @@ impl<VM: VMBinding> StickyImmix<VM> {
                 // In StickyImmix, both young and old objects are allocated in the ImmixSpace.
                 #[cfg(feature = "vo_bit")]
                 mixed_age: true,
-                never_move_objects: cfg!(feature = "immix_non_moving"),
+                never_move_objects: false,
             },
         );
         Self {
