@@ -208,9 +208,7 @@
 <a href="#207" id="207">207</a>
 <a href="#208" id="208">208</a>
 <a href="#209" id="209">209</a>
-<a href="#210" id="210">210</a>
-<a href="#211" id="211">211</a>
-<a href="#212" id="212">212</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
+<a href="#210" id="210">210</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::constants::{
@@ -268,8 +266,6 @@
     last_spec_as LAST_GLOBAL_SIDE_METADATA_SPEC,
     <span class="comment">// Mark the start of an object
     </span>VO_BIT       = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">0</span>, log_bytes_in_region: LOG_MIN_OBJECT_SIZE <span class="kw">as </span>usize),
-    <span class="comment">// Track chunks used by (malloc) marksweep
-    </span>MS_ACTIVE_CHUNK = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">3</span>, log_bytes_in_region: LOG_BYTES_IN_CHUNK),
     <span class="comment">// Track the index in SFT map for a chunk (only used for SFT sparse chunk map)
     </span>SFT_DENSE_CHUNK_MAP_INDEX   = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">3</span>, log_bytes_in_region: LOG_BYTES_IN_CHUNK),
     <span class="comment">// Mark chunks (any plan that uses the chunk map should include this spec in their global sidemetadata specs)
