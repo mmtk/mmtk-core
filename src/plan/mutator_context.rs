@@ -70,10 +70,10 @@ pub(crate) fn common_release_func<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls
         .unwrap()
         .release();
     }
-    #[cfg(feature = "immix_as_nonmoving")]
+    #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
     {
         use crate::util::alloc::ImmixAllocator;
-        let immix_allocator = unsafe {
+        unsafe {
             mutator
                 .allocators
                 .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
@@ -85,6 +85,7 @@ pub(crate) fn common_release_func<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls
 }
 
 /// A place-holder implementation for `MutatorConfig::release_func` that does nothing.
+#[allow(dead_code)]
 pub(crate) fn no_op_release_func<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
 
 // This struct is part of the Mutator struct.
@@ -529,7 +530,10 @@ pub(crate) fn create_allocator_mapping(
     if include_common_plan {
         map[AllocationSemantics::Immortal] = reserved.add_bump_pointer_allocator();
         map[AllocationSemantics::Los] = reserved.add_large_object_allocator();
-        map[AllocationSemantics::NonMoving] = if cfg!(feature = "immix_as_nonmoving") {
+        map[AllocationSemantics::NonMoving] = if cfg!(not(any(
+            feature = "immortal_as_nonmoving",
+            feature = "marksweep_as_nonmoving"
+        ))) {
             reserved.add_immix_allocator()
         } else if cfg!(feature = "marksweep_as_nonmoving") {
             reserved.add_free_list_allocator()
@@ -592,7 +596,10 @@ pub(crate) fn create_space_mapping<VM: VMBinding>(
         vec.push((
             if cfg!(feature = "marksweep_as_nonmoving") {
                 reserved.add_free_list_allocator()
-            } else if cfg!(feature = "immix_as_nonmoving") {
+            } else if cfg!(not(any(
+                feature = "immortal_as_nonmoving",
+                feature = "marksweep_as_nonmoving"
+            ))) {
                 reserved.add_immix_allocator()
             } else if cfg!(feature = "immortal_as_nonmoving") {
                 reserved.add_bump_pointer_allocator()
