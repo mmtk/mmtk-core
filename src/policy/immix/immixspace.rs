@@ -237,7 +237,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
             true
         } else if KIND == TRACE_KIND_FAST || KIND == TRACE_KIND_TRANSITIVE_PIN {
             false
-        } else if KIND == DEFAULT_TRACE{
+        } else if KIND == DEFAULT_TRACE {
             // FIXME: This is quite hacky.
             // 1. When we use immix as a non moving space, we will check this method to see
             //    if the non moving space may move objects or not. The answer should always be false.
