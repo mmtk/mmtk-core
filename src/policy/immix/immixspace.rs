@@ -2,7 +2,7 @@ use super::defrag::StatsForDefrag;
 use super::line::*;
 use super::{block::*, defrag::Defrag};
 use crate::plan::VectorObjectQueue;
-use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
+use crate::policy::gc_work::{TraceKind, DEFAULT_TRACE, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::sft_map::SFTMap;
@@ -236,6 +236,16 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         if KIND == TRACE_KIND_DEFRAG {
             true
         } else if KIND == TRACE_KIND_FAST || KIND == TRACE_KIND_TRANSITIVE_PIN {
+            false
+        } else if KIND == DEFAULT_TRACE{
+            // FIXME: This is quite hacky.
+            // 1. When we use immix as a non moving space, we will check this method to see
+            //    if the non moving space may move objects or not. The answer should always be false.
+            //    It doesn't matter what trace it is.
+            // 2. For StickyImmix, we use DEFAULT_TRACE for nursery GC. We may move objects. Luckily,
+            //    this function is only used in PlanProcessEdges, and sticky immix nursery GC does not
+            //    use PlanProcessEdges.
+            // I should fix this before merging.
             false
         } else {
             unreachable!()
