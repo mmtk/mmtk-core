@@ -10,14 +10,6 @@ use crate::*;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
-/// Buffer size for [`ProcessEdgesWork`] work packets. This constant is exposed to binding
-/// developers so that they can use this value for places in their binding that interface with the
-/// work packet system, specifically the transitive closure via `ProcessEdgesWork` work packets
-/// such as roots gathering code or weak reference processing. In order to have better load
-/// balancing, it is recommended that binding developers use this constant to split work up into
-/// different work packets.
-pub const EDGES_WORK_BUFFER_SIZE: usize = 4096;
-
 pub struct ScheduleCollection;
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
@@ -160,15 +152,6 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
         for w in &mmtk.scheduler.worker_group.workers_shared {
             let result = w.designated_work.push(Box::new(ReleaseCollector));
             debug_assert!(result.is_ok());
-        }
-
-        if *mmtk.get_options().count_live_bytes_in_gc {
-            let live_bytes = mmtk
-                .scheduler
-                .worker_group
-                .get_and_clear_worker_live_bytes();
-            *mmtk.state.live_bytes_in_last_gc.borrow_mut() =
-                mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
         }
     }
 }
