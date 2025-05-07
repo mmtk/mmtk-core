@@ -564,8 +564,11 @@ pub struct CommonPlan<VM: VMBinding> {
     pub immortal: ImmortalSpace<VM>,
     #[space]
     pub los: LargeObjectSpace<VM>,
-    // TODO: We should use a marksweep space for nonmoving.
     #[space]
+    #[cfg_attr(
+        not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")),
+        post_scan
+    )] // Immix space needs post_scan
     pub nonmoving: NonMovingSpace<VM>,
     #[parent]
     pub base: BasePlan<VM>,

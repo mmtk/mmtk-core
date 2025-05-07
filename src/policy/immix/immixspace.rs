@@ -232,6 +232,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         }
     }
 
+    #[allow(clippy::if_same_then_else)] // DEFAULT_TRACE needs a workaround which is documented below.
     fn may_move_objects<const KIND: TraceKind>() -> bool {
         if KIND == TRACE_KIND_DEFRAG {
             true
