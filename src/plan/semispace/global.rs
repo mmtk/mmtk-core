@@ -40,6 +40,7 @@ pub const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     max_non_los_default_alloc_bytes:
         crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
+    needs_prepare_mutator: false || PlanConstraints::default().needs_prepare_mutator,
     ..PlanConstraints::default()
 };
 

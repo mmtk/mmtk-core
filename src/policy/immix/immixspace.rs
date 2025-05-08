@@ -239,14 +239,11 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         } else if KIND == TRACE_KIND_FAST || KIND == TRACE_KIND_TRANSITIVE_PIN {
             false
         } else if KIND == DEFAULT_TRACE {
-            // FIXME: This is quite hacky.
-            // 1. When we use immix as a non moving space, we will check this method to see
-            //    if the non moving space may move objects or not. The answer should always be false.
-            //    It doesn't matter what trace it is.
-            // 2. For StickyImmix, we use DEFAULT_TRACE for nursery GC. We may move objects. Luckily,
-            //    this function is only used in PlanProcessEdges, and sticky immix nursery GC does not
-            //    use PlanProcessEdges.
-            // I should fix this before merging.
+            // FIXME: This is hacky. When we do a default trace, this should be a nonmoving space.
+            // The only exception is the nursery GC for sticky immix, for which, we use default trace.
+            // This function is only used for PlanProcessEdges, and for sticky immix nursery GC, we use
+            // GenNurseryProcessEdges. So it still works. But this is quite hacky anyway.
+            // See https://github.com/mmtk/mmtk-core/issues/1314 for details.
             false
         } else {
             unreachable!()

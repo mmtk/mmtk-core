@@ -65,8 +65,8 @@ impl PlanConstraints {
             needs_forward_after_liveness: false,
             needs_log_bit: false,
             barrier: BarrierSelector::NoBarrier,
-            // FIXME: To make things easy, we just require prepare mutator. This should be fixed before reviewing.
-            needs_prepare_mutator: true,
+            // If we use mark sweep as non moving space, we need to prepare mutator. See [`common_prepare_func`].
+            needs_prepare_mutator: cfg!(feature = "marksweep_as_nonmoving"),
         }
     }
 }
