@@ -27,6 +27,24 @@ pub(crate) fn unreachable_prepare_func<VM: VMBinding>(
     unreachable!("`MutatorConfig::prepare_func` must not be called for the current plan.")
 }
 
+/// An mutator prepare implementation for plans that use [`crate::plan::global::CommonPlan`].
+#[allow(unused_variables)]
+pub(crate) fn common_prepare_func<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+    // Prepare the free list allocator used for non moving
+    #[cfg(feature = "marksweep_as_nonmoving")]
+    {
+        use crate::util::alloc::FreeListAllocator;
+        unsafe {
+            mutator
+                .allocators
+                .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
+        }
+        .downcast_mut::<FreeListAllocator<VM>>()
+        .unwrap()
+        .prepare();
+    }
+}
+
 /// A place-holder implementation for `MutatorConfig::release_func` that should not be called.
 /// Currently only used by `NoGC`.
 pub(crate) fn unreachable_release_func<VM: VMBinding>(
@@ -36,7 +54,38 @@ pub(crate) fn unreachable_release_func<VM: VMBinding>(
     unreachable!("`MutatorConfig::release_func` must not be called for the current plan.")
 }
 
+/// An mutator release implementation for plans that use [`crate::plan::global::CommonPlan`].
+#[allow(unused_variables)]
+pub(crate) fn common_release_func<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+    // Release the free list allocator used for non moving
+    #[cfg(feature = "marksweep_as_nonmoving")]
+    {
+        use crate::util::alloc::FreeListAllocator;
+        unsafe {
+            mutator
+                .allocators
+                .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
+        }
+        .downcast_mut::<FreeListAllocator<VM>>()
+        .unwrap()
+        .release();
+    }
+    #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
+    {
+        use crate::util::alloc::ImmixAllocator;
+        unsafe {
+            mutator
+                .allocators
+                .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
+        }
+        .downcast_mut::<ImmixAllocator<VM>>()
+        .unwrap()
+        .reset();
+    }
+}
+
 /// A place-holder implementation for `MutatorConfig::release_func` that does nothing.
+#[allow(dead_code)]
 pub(crate) fn no_op_release_func<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
 
 // This struct is part of the Mutator struct.
@@ -481,8 +530,18 @@ pub(crate) fn create_allocator_mapping(
     if include_common_plan {
         map[AllocationSemantics::Immortal] = reserved.add_bump_pointer_allocator();
         map[AllocationSemantics::Los] = reserved.add_large_object_allocator();
-        // TODO: This should be freelist allocator once we use marksweep for nonmoving space.
-        map[AllocationSemantics::NonMoving] = reserved.add_bump_pointer_allocator();
+        map[AllocationSemantics::NonMoving] = if cfg!(not(any(
+            feature = "immortal_as_nonmoving",
+            feature = "marksweep_as_nonmoving"
+        ))) {
+            reserved.add_immix_allocator()
+        } else if cfg!(feature = "marksweep_as_nonmoving") {
+            reserved.add_free_list_allocator()
+        } else if cfg!(feature = "immortal_as_nonmoving") {
+            reserved.add_bump_pointer_allocator()
+        } else {
+            panic!("No policy selected for nonmoving space")
+        };
     }
 
     reserved.validate();
@@ -534,9 +593,19 @@ pub(crate) fn create_space_mapping<VM: VMBinding>(
             reserved.add_large_object_allocator(),
             plan.common().get_los(),
         ));
-        // TODO: This should be freelist allocator once we use marksweep for nonmoving space.
         vec.push((
-            reserved.add_bump_pointer_allocator(),
+            if cfg!(feature = "marksweep_as_nonmoving") {
+                reserved.add_free_list_allocator()
+            } else if cfg!(not(any(
+                feature = "immortal_as_nonmoving",
+                feature = "marksweep_as_nonmoving"
+            ))) {
+                reserved.add_immix_allocator()
+            } else if cfg!(feature = "immortal_as_nonmoving") {
+                reserved.add_bump_pointer_allocator()
+            } else {
+                panic!("No policy selected for nonmoving space")
+            },
             plan.common().get_nonmoving(),
         ));
     }

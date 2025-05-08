@@ -66,6 +66,10 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         unreachable!()
     }
 
+    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
+        unreachable!()
+    }
+
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
         &ALLOCATOR_MAPPING
     }

@@ -197,7 +197,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
 
     /// Inform the plan about the end of a GC. It is guaranteed that there is no further work for this GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
-    fn end_of_gc(&mut self, _tls: VMWorkerThread) {}
+    fn end_of_gc(&mut self, _tls: VMWorkerThread);
 
     /// Notify the plan that an emergency collection will happen. The plan should try to free as much memory as possible.
     /// The default implementation will force a full heap collection for generational plans.
@@ -515,6 +515,10 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.vm_space.release();
     }
 
+    pub fn end_of_gc(&mut self, _tls: VMWorkerThread) {
+        // Do nothing here. None of the spaces needs end_of_gc.
+    }
+
     pub(crate) fn collection_required<P: Plan>(&self, plan: &P, space_full: bool) -> bool {
         let stress_force_gc =
             crate::util::heap::gc_trigger::GCTrigger::<VM>::should_do_stress_gc_inner(
@@ -546,6 +550,15 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 }
 
+#[cfg(feature = "immortal_as_nonmoving")]
+pub type NonMovingSpace<VM> = crate::policy::immortalspace::ImmortalSpace<VM>;
+
+#[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
+pub type NonMovingSpace<VM> = crate::policy::immix::ImmixSpace<VM>;
+
+#[cfg(feature = "marksweep_as_nonmoving")]
+pub type NonMovingSpace<VM> = crate::policy::marksweepspace::native_ms::MarkSweepSpace<VM>;
+
 /**
 CommonPlan is for representing state and features used by _many_ plans, but that are not fundamental to _all_ plans.  Examples include the Large Object Space and an Immortal space.  Features that are fundamental to _all_ plans must be included in BasePlan.
 */
@@ -555,9 +568,12 @@ pub struct CommonPlan<VM: VMBinding> {
     pub immortal: ImmortalSpace<VM>,
     #[space]
     pub los: LargeObjectSpace<VM>,
-    // TODO: We should use a marksweep space for nonmoving.
     #[space]
-    pub nonmoving: ImmortalSpace<VM>,
+    #[cfg_attr(
+        not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")),
+        post_scan
+    )] // Immix space needs post_scan
+    pub nonmoving: NonMovingSpace<VM>,
     #[parent]
     pub base: BasePlan<VM>,
 }
@@ -575,12 +591,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 args.get_space_args("los", true, false, VMRequest::discontiguous()),
                 false,
             ),
-            nonmoving: ImmortalSpace::new(args.get_space_args(
-                "nonmoving",
-                true,
-                false,
-                VMRequest::discontiguous(),
-            )),
+            nonmoving: Self::new_nonmoving_space(&mut args),
             base: BasePlan::new(args),
         }
     }
@@ -595,15 +606,20 @@ impl<VM: VMBinding> CommonPlan<VM> {
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.prepare();
         self.los.prepare(full_heap);
-        self.nonmoving.prepare();
+        self.prepare_nonmoving_space(full_heap);
         self.base.prepare(tls, full_heap)
     }
 
     pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.release();
         self.los.release(full_heap);
-        self.nonmoving.release();
+        self.release_nonmoving_space(full_heap);
         self.base.release(tls, full_heap)
+    }
+
+    pub fn end_of_gc(&mut self, tls: VMWorkerThread) {
+        self.end_of_gc_nonmoving_space();
+        self.base.end_of_gc(tls);
     }
 
     pub fn get_immortal(&self) -> &ImmortalSpace<VM> {
@@ -614,8 +630,50 @@ impl<VM: VMBinding> CommonPlan<VM> {
         &self.los
     }
 
-    pub fn get_nonmoving(&self) -> &ImmortalSpace<VM> {
+    pub fn get_nonmoving(&self) -> &NonMovingSpace<VM> {
         &self.nonmoving
+    }
+
+    fn new_nonmoving_space(args: &mut CreateSpecificPlanArgs<VM>) -> NonMovingSpace<VM> {
+        let space_args = args.get_space_args("nonmoving", true, false, VMRequest::discontiguous());
+        #[cfg(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving"))]
+        return NonMovingSpace::new(space_args);
+        #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
+        return NonMovingSpace::new(
+            space_args,
+            crate::policy::immix::ImmixSpaceArgs {
+                unlog_object_when_traced: false,
+                #[cfg(feature = "vo_bit")]
+                mixed_age: false,
+                never_move_objects: true,
+            },
+        );
+    }
+
+    fn prepare_nonmoving_space(&mut self, _full_heap: bool) {
+        #[cfg(feature = "immortal_as_nonmoving")]
+        self.nonmoving.prepare();
+        #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
+        self.nonmoving.prepare(_full_heap, None);
+        #[cfg(feature = "marksweep_as_nonmoving")]
+        self.nonmoving.prepare(_full_heap);
+    }
+
+    fn release_nonmoving_space(&mut self, _full_heap: bool) {
+        #[cfg(feature = "immortal_as_nonmoving")]
+        self.nonmoving.release();
+        #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
+        self.nonmoving.release(_full_heap);
+        #[cfg(feature = "marksweep_as_nonmoving")]
+        self.nonmoving.release();
+    }
+
+    fn end_of_gc_nonmoving_space(&mut self) {
+        // Only mark sweep and immix need end of GC.
+        #[cfg(feature = "marksweep_as_nonmoving")]
+        self.nonmoving.end_of_gc();
+        #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
+        self.nonmoving.end_of_gc();
     }
 }
 

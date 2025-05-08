@@ -78,6 +78,11 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         self.nursery.release();
     }
 
+    pub fn end_of_gc(&mut self, tls: VMWorkerThread, next_gc_full_heap: bool) {
+        self.set_next_gc_full_heap(next_gc_full_heap);
+        self.common.end_of_gc(tls);
+    }
+
     /// Independent of how many pages remain in the page budget (a function of heap size), we must
     /// ensure we never exhaust virtual memory. Therefore we must never let the nursery grow to the
     /// extent that it can't be copied into the mature space.
