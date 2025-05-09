@@ -1,5 +1,5 @@
 use super::*;
-use crate::util::statistics::stats::{SharedStats, MAX_PHASES};
+use crate::util::statistics::stats::{SharedStats, DEFAULT_NUM_PHASES};
 use std::sync::Arc;
 
 /**
@@ -10,7 +10,7 @@ pub struct EventCounter {
     name: String,
     pub implicitly_start: bool,
     merge_phases: bool,
-    count: Box<[u64; MAX_PHASES]>,
+    count: Vec<u64>,
     current_count: u64,
     running: bool,
     stats: Arc<SharedStats>,
@@ -27,7 +27,7 @@ impl EventCounter {
             name,
             implicitly_start,
             merge_phases,
-            count: Box::new([0; MAX_PHASES]),
+            count: Vec::with_capacity(DEFAULT_NUM_PHASES),
             current_count: 0,
             running: false,
             stats,
@@ -76,13 +76,15 @@ impl Counter for EventCounter {
             return;
         }
         debug_assert!(self.running);
-        self.count[self.stats.get_phase()] = self.current_count;
+        self.count.push(self.current_count);
+        debug_assert_eq!(self.count[self.stats.get_phase()], self.current_count);
         self.running = false;
     }
 
     fn phase_change(&mut self, old_phase: usize) {
         if self.running {
-            self.count[old_phase] = self.current_count;
+            self.count.push(self.current_count);
+            debug_assert_eq!(self.count[old_phase], self.current_count);
             self.current_count = 0;
         }
     }

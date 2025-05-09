@@ -489,39 +489,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         pages
     }
 
-    pub fn trace_object<Q: ObjectQueue>(
-        &self,
-        queue: &mut Q,
-        object: ObjectReference,
-        worker: &mut GCWorker<VM>,
-    ) -> ObjectReference {
-        #[cfg(feature = "code_space")]
-        if self.code_space.in_space(object) {
-            trace!("trace_object: object in code space");
-            return self.code_space.trace_object::<Q>(queue, object);
-        }
-
-        #[cfg(feature = "code_space")]
-        if self.code_lo_space.in_space(object) {
-            trace!("trace_object: object in large code space");
-            return self.code_lo_space.trace_object::<Q>(queue, object);
-        }
-
-        #[cfg(feature = "ro_space")]
-        if self.ro_space.in_space(object) {
-            trace!("trace_object: object in ro_space space");
-            return self.ro_space.trace_object(queue, object);
-        }
-
-        #[cfg(feature = "vm_space")]
-        if self.vm_space.in_space(object) {
-            trace!("trace_object: object in boot space");
-            return self.vm_space.trace_object(queue, object);
-        }
-
-        VM::VMActivePlan::vm_trace_object::<Q>(queue, object, worker)
-    }
-
     pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
         self.code_space.prepare();
@@ -619,27 +586,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
             + self.los.reserved_pages()
             + self.nonmoving.reserved_pages()
             + self.base.get_used_pages()
-    }
-
-    pub fn trace_object<Q: ObjectQueue>(
-        &self,
-        queue: &mut Q,
-        object: ObjectReference,
-        worker: &mut GCWorker<VM>,
-    ) -> ObjectReference {
-        if self.immortal.in_space(object) {
-            trace!("trace_object: object in immortal space");
-            return self.immortal.trace_object(queue, object);
-        }
-        if self.los.in_space(object) {
-            trace!("trace_object: object in los");
-            return self.los.trace_object(queue, object);
-        }
-        if self.nonmoving.in_space(object) {
-            trace!("trace_object: object in nonmoving space");
-            return self.nonmoving.trace_object(queue, object);
-        }
-        self.base.trace_object::<Q>(queue, object, worker)
     }
 
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {

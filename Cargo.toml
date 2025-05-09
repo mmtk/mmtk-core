@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.30.0"
+version = "0.31.0"
 authors = ["The MMTk Developers <>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -10,7 +10,7 @@ repository = "https://github.com/mmtk/mmtk-core"
 readme = "README.md"
 categories = ["memory-management"]
 keywords = ["gc", "garbage", "collection", "garbage-collection", "allocation"]
-rust-version = "1.71.1"
+rust-version = "1.74.1"
 build = "build.rs"
 
 [lib]
@@ -23,14 +23,15 @@ atomic = "0.6.0"
 atomic_refcell = "0.1.7"
 atomic-traits = "0.4.0"
 bytemuck = { version = "1.14.0", features = ["derive"] }
+bytemuck_derive = "=1.8.1" # We can remove this dependency when we use MSRV 1.84+
 cfg-if = "1.0"
 crossbeam = "0.8.1"
-delegate = "0.12.0"
-downcast-rs = "1.1.1"
+delegate = "0.13.2"
+downcast-rs = "2.0.1"
 enum-map = "2.4.2"
 env_logger = { version = "0.11.3", optional = true }
 is-terminal = "0.4.7"
-itertools = "0.12.0"
+itertools = "0.14.0"
 jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
 lazy_static = "1.1"
 libc = "0.2"
@@ -38,7 +39,7 @@ log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"]
 memoffset = "0.9"
 mimalloc-sys = { version = "0.1.6", optional = true }
 # MMTk macros - we have to specify a version here in order to publish the crate, even though we use the dependency from a local path.
-mmtk-macros = { version="0.30.0", path = "macros/" }
+mmtk-macros = { version="0.31.0", path = "macros/" }
 num_cpus = "1.8"
 num-traits = "0.2"
 pfm = { version = "0.1.1", optional = true }
@@ -48,18 +49,33 @@ regex = "1.7.0"
 rustversion = "1.0"
 spin = "0.9.5"
 static_assertions = "1.1.0"
-strum = "0.26.2"
-strum_macros = "0.26.2"
-sysinfo = "0.30.9"
+strum = "0.27.1"
+strum_macros = "0.27.1"
+sysinfo = "0.33.1"
 
 [dev-dependencies]
 paste = "1.0.8"
-rand = "0.8.5"
-rand_chacha = "0.3.1"
-criterion = "0.4"
+rand = "0.9.0"
+rand_chacha = "0.9.0"
+criterion = "0.5"
+# Note: `half` v2.5.0 started to require Rust 1.81.
+# `criterion` transitively depends on `half` via the dependency chain:
+#     criterion -> ciborium -> ciborium_ll -> half
+# The MSRV of `ciborium` v0.2.2 is declared as 1.58, and is declared to depend on `half` v2.2.
+# Ciborium should either bump its MSRV or select a version of `half` that satisfies its current MSRV.
+# We lock the version of `half` to 2.4.1 to workaround this.
+# TODO: When we bump MSRV to 1.84 or above, we can rely on Cargo's MSRV-aware dependency resolver and remove such workarounds.
+half = "=2.4.1"
 
 [build-dependencies]
-built = { version = "0.7.1", features = ["git2"] }
+built = { version = "0.7.7", features = ["git2"] }
+# Note: Some components in ICU4X started to require Rust 1.81 since some versions, such as `litemap` v0.7.5.
+# The `built` crate depends on ICU4X via the dependency chain:
+#     built -> git2 -> url -> idna -> idna_adapter --(default)--------> crates from the ICU4X projects
+#                                                  --(alternatively)--> `unicode-rs`
+# But we don't need ICU4X (or even `url`) because we only use `git2` to get the Git commit hash.
+# We move away from ICU4X completely following the instruction in https://docs.rs/crate/idna_adapter/1.2.0
+idna_adapter = "=1.1.0"
 
 [[bench]]
 name = "main"

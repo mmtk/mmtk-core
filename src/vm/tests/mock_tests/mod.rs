@@ -26,6 +26,7 @@ pub(crate) mod mock_test_prelude {
 mod mock_test_allocate_align_offset;
 mod mock_test_allocate_no_gc_oom_on_acquire;
 mod mock_test_allocate_no_gc_simple;
+mod mock_test_allocate_nonmoving;
 mod mock_test_allocate_with_disable_collection;
 mod mock_test_allocate_with_initialize_collection;
 mod mock_test_allocate_with_re_enable_collection;
@@ -69,3 +70,4 @@ mod mock_test_vm_layout_log_address_space;
 
 mod mock_test_doc_avoid_resolving_allocator;
 mod mock_test_doc_mutator_storage;
+mod mock_test_doc_weakref_code_example;

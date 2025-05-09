@@ -284,6 +284,17 @@ impl<VM: VMBinding> VMSpace<VM> {
         );
         debug_assert!(self.in_space(object));
         if self.mark_state.test_and_mark::<VM>(object) {
+            // Flip the per-object unlogged bits to "unlogged" state for objects inside the
+            // bootimage
+            #[cfg(feature = "set_unlog_bits_vm_space")]
+            if self.common.needs_log_bit {
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
+                    object,
+                    1,
+                    None,
+                    Ordering::SeqCst,
+                );
+            }
             queue.enqueue(object);
         }
         object

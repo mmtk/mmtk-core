@@ -71,15 +71,17 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
         let bytes = VM::VMObjectModel::get_current_size(object);
         // Get the space index from descriptor
         let space_descriptor = VM_MAP.get_descriptor_for_address(object.to_raw_address());
-        let space_index = space_descriptor.get_index();
-        debug_assert!(
-            space_index < MAX_SPACES,
-            "Space index {} is not in the range of [0, {})",
-            space_index,
-            MAX_SPACES
-        );
-        // Accumulate the live bytes for the index
-        live_bytes_per_space[space_index] += bytes;
+        if space_descriptor != crate::util::heap::space_descriptor::SpaceDescriptor::UNINITIALIZED {
+            let space_index = space_descriptor.get_index();
+            debug_assert!(
+                space_index < MAX_SPACES,
+                "Space index {} is not in the range of [0, {})",
+                space_index,
+                MAX_SPACES
+            );
+            // Accumulate the live bytes for the index
+            live_bytes_per_space[space_index] += bytes;
+        }
     }
 }
 
