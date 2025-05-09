@@ -114,9 +114,9 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         }
     }
 
-    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
-        self.gen
-            .set_next_gc_full_heap(CommonGenPlan::should_next_gc_be_full_heap(self));
+    fn end_of_gc(&mut self, tls: VMWorkerThread) {
+        let next_gc_full_heap = CommonGenPlan::should_next_gc_be_full_heap(self);
+        self.gen.end_of_gc(tls, next_gc_full_heap);
     }
 
     fn get_collection_reserved_pages(&self) -> usize {

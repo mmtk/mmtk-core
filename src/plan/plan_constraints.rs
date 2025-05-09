@@ -60,11 +60,13 @@ impl PlanConstraints {
             needs_linear_scan: crate::util::constants::SUPPORT_CARD_SCANNING
                 || crate::util::constants::LAZY_SWEEP,
             needs_concurrent_workers: false,
-            may_trace_duplicate_edges: false,
+            // We may trace duplicate edges in mark sweep. If we use mark sweep as the non moving policy, it will be included in every
+            may_trace_duplicate_edges: cfg!(feature = "marksweep_as_nonmoving"),
             needs_forward_after_liveness: false,
             needs_log_bit: false,
             barrier: BarrierSelector::NoBarrier,
-            needs_prepare_mutator: true,
+            // If we use mark sweep as non moving space, we need to prepare mutator. See [`common_prepare_func`].
+            needs_prepare_mutator: cfg!(feature = "marksweep_as_nonmoving"),
         }
     }
 }

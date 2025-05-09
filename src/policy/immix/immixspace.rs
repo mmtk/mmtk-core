@@ -2,7 +2,7 @@ use super::defrag::StatsForDefrag;
 use super::line::*;
 use super::{block::*, defrag::Defrag};
 use crate::plan::VectorObjectQueue;
-use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
+use crate::policy::gc_work::{TraceKind, DEFAULT_TRACE, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::sft_map::SFTMap;
@@ -233,10 +233,18 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         }
     }
 
+    #[allow(clippy::if_same_then_else)] // DEFAULT_TRACE needs a workaround which is documented below.
     fn may_move_objects<const KIND: TraceKind>() -> bool {
         if KIND == TRACE_KIND_DEFRAG {
             true
         } else if KIND == TRACE_KIND_FAST || KIND == TRACE_KIND_TRANSITIVE_PIN {
+            false
+        } else if KIND == DEFAULT_TRACE {
+            // FIXME: This is hacky. When we do a default trace, this should be a nonmoving space.
+            // The only exception is the nursery GC for sticky immix, for which, we use default trace.
+            // This function is only used for PlanProcessEdges, and for sticky immix nursery GC, we use
+            // GenNurseryProcessEdges. So it still works. But this is quite hacky anyway.
+            // See https://github.com/mmtk/mmtk-core/issues/1314 for details.
             false
         } else {
             unreachable!()
@@ -388,7 +396,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self.scheduler
     }
 
-    pub fn prepare(&mut self, major_gc: bool, plan_stats: StatsForDefrag) {
+    pub fn prepare(&mut self, major_gc: bool, plan_stats: Option<StatsForDefrag>) {
         if major_gc {
             // Update mark_state
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
@@ -408,7 +416,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
             // Prepare defrag info
             if self.is_defrag_enabled() {
-                self.defrag.prepare(self, plan_stats);
+                self.defrag.prepare(self, plan_stats.unwrap());
             }
 
             // Prepare each block for GC
