@@ -660,7 +660,14 @@
 <a href="#659" id="659">659</a>
 <a href="#660" id="660">660</a>
 <a href="#661" id="661">661</a>
-<a href="#662" id="662">662</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::{
+<a href="#662" id="662">662</a>
+<a href="#663" id="663">663</a>
+<a href="#664" id="664">664</a>
+<a href="#665" id="665">665</a>
+<a href="#666" id="666">666</a>
+<a href="#667" id="667">667</a>
+<a href="#668" id="668">668</a>
+<a href="#669" id="669">669</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
@@ -686,6 +693,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{CommonSpace, Space};
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator::AllocationOptions;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::chunk_map::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
@@ -1124,7 +1132,13 @@
         </span><span class="kw">crate</span>::util::metadata::vo_bit::bzero_vo_bit(block.start(), Block::BYTES);
     }
 
-    <span class="kw">pub fn </span>acquire_block(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread, size: usize, align: usize) -&gt; BlockAcquireResult {
+    <span class="kw">pub fn </span>acquire_block(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        tls: VMThread,
+        size: usize,
+        align: usize,
+        alloc_options: AllocationOptions,
+    ) -&gt; BlockAcquireResult {
         {
             <span class="kw">let </span><span class="kw-2">mut </span>abandoned = <span class="self">self</span>.abandoned.lock().unwrap();
             <span class="kw">let </span>bin = mi_bin::&lt;VM&gt;(size, align);
@@ -1146,7 +1160,7 @@
             }
         }
 
-        <span class="kw">let </span>acquired = <span class="self">self</span>.acquire(tls, Block::BYTES &gt;&gt; LOG_BYTES_IN_PAGE);
+        <span class="kw">let </span>acquired = <span class="self">self</span>.acquire(tls, Block::BYTES &gt;&gt; LOG_BYTES_IN_PAGE, alloc_options);
         <span class="kw">if </span>acquired.is_zero() {
             BlockAcquireResult::Exhausted
         } <span class="kw">else </span>{

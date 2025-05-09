@@ -299,12 +299,14 @@
 <a href="#298" id="298">298</a>
 <a href="#299" id="299">299</a>
 <a href="#300" id="300">300</a>
-<a href="#301" id="301">301</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
 <span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{CommonSpace, Space};
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator::AllocationOptions;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::externalpageresource::{ExternalPageResource, ExternalPages};
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
@@ -437,7 +439,7 @@
         <span class="macro">unreachable!</span>()
     }
 
-    <span class="kw">fn </span>acquire(<span class="kw-2">&amp;</span><span class="self">self</span>, _tls: VMThread, _pages: usize) -&gt; Address {
+    <span class="kw">fn </span>acquire(<span class="kw-2">&amp;</span><span class="self">self</span>, _tls: VMThread, _pages: usize, _alloc_options: AllocationOptions) -&gt; Address {
         <span class="macro">unreachable!</span>()
     }
 

@@ -374,13 +374,20 @@
 <a href="#373" id="373">373</a>
 <a href="#374" id="374">374</a>
 <a href="#375" id="375">375</a>
-<a href="#376" id="376">376</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{CommonSpace, Space};
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator::AllocationOptions;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::{FreeListPageResource, PageResource};
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata;
@@ -685,8 +692,13 @@
     }
 
     <span class="doccomment">/// Allocate an object
-    </span><span class="kw">pub fn </span>allocate_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread, pages: usize) -&gt; Address {
-        <span class="self">self</span>.acquire(tls, pages)
+    </span><span class="kw">pub fn </span>allocate_pages(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        tls: VMThread,
+        pages: usize,
+        alloc_options: AllocationOptions,
+    ) -&gt; Address {
+        <span class="self">self</span>.acquire(tls, pages, alloc_options)
     }
 
     <span class="doccomment">/// Test if the object's mark bit is the same as the given value. If it is not the same,

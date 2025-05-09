@@ -266,7 +266,12 @@
 <a href="#265" id="265">265</a>
 <a href="#266" id="266">266</a>
 <a href="#267" id="267">267</a>
-<a href="#268" id="268">268</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
 
 <span class="kw">use </span>std::sync::atomic::Ordering;
 <span class="kw">use </span>std::sync::Arc;
@@ -276,6 +281,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{CommonSpace, Space};
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator::AllocationOptions;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::GCTrigger;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::vm_layout;
@@ -408,7 +414,7 @@
         data_pages + meta_pages
     }
 
-    <span class="kw">fn </span>acquire(<span class="kw-2">&amp;</span><span class="self">self</span>, _tls: VMThread, pages: usize) -&gt; Address {
+    <span class="kw">fn </span>acquire(<span class="kw-2">&amp;</span><span class="self">self</span>, _tls: VMThread, pages: usize, alloc_options: AllocationOptions) -&gt; Address {
         <span class="macro">trace!</span>(<span class="string">"LockFreeImmortalSpace::acquire"</span>);
         <span class="kw">let </span>bytes = conversions::pages_to_bytes(pages);
         <span class="kw">let </span>start = <span class="self">self
@@ -418,7 +424,11 @@
             })
             .expect(<span class="string">"update cursor failed"</span>);
         <span class="kw">if </span>start + bytes &gt; <span class="self">self</span>.limit {
-            <span class="macro">panic!</span>(<span class="string">"OutOfMemory"</span>)
+            <span class="kw">if </span>alloc_options.on_fail.allow_oom_call() {
+                <span class="macro">panic!</span>(<span class="string">"OutOfMemory"</span>);
+            } <span class="kw">else </span>{
+                <span class="kw">return </span>Address::ZERO;
+            }
         }
         <span class="kw">if </span><span class="self">self</span>.slow_path_zeroing {
             <span class="kw">crate</span>::util::memory::zero(start, bytes);

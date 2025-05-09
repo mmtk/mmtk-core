@@ -403,7 +403,11 @@
 <a href="#402" id="402">402</a>
 <a href="#403" id="403">403</a>
 <a href="#404" id="404">404</a>
-<a href="#405" id="405">405</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span><span class="kw">super</span>::allocator::{align_allocation_no_fill, fill_alignment_gap, AllocatorContext};
 <span class="kw">use </span><span class="kw">super</span>::BumpPointer;
@@ -694,7 +698,11 @@
 
     <span class="comment">// Get a clean block from ImmixSpace.
     </span><span class="kw">fn </span>acquire_clean_block(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
-        <span class="kw">match </span><span class="self">self</span>.immix_space().get_clean_block(<span class="self">self</span>.tls, <span class="self">self</span>.copy) {
+        <span class="kw">match </span><span class="self">self</span>.immix_space().get_clean_block(
+            <span class="self">self</span>.tls,
+            <span class="self">self</span>.copy,
+            <span class="self">self</span>.get_context().get_alloc_options(),
+        ) {
             <span class="prelude-val">None </span>=&gt; Address::ZERO,
             <span class="prelude-val">Some</span>(block) =&gt; {
                 <span class="macro">trace!</span>(

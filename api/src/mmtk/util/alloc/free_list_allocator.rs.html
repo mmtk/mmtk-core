@@ -774,7 +774,7 @@
     ) -&gt; <span class="prelude-ty">Option</span>&lt;Block&gt; {
         <span class="kw">let </span>bin = mi_bin::&lt;VM&gt;(size, align);
         <span class="kw">loop </span>{
-            <span class="kw">match </span><span class="self">self</span>.space.acquire_block(<span class="self">self</span>.tls, size, align) {
+            <span class="kw">match </span><span class="self">self</span>.space.acquire_block(<span class="self">self</span>.tls, size, align, <span class="self">self</span>.get_context().get_alloc_options()) {
                 <span class="kw">crate</span>::policy::marksweepspace::native_ms::BlockAcquireResult::Exhausted =&gt; {
                     <span class="macro">debug!</span>(<span class="string">"Acquire global block: None"</span>);
                     <span class="comment">// GC

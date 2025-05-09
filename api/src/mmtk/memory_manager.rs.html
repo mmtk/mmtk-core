@@ -912,7 +912,75 @@
 <a href="#911" id="911">911</a>
 <a href="#912" id="912">912</a>
 <a href="#913" id="913">913</a>
-<a href="#914" id="914">914</a></pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
+<a href="#914" id="914">914</a>
+<a href="#915" id="915">915</a>
+<a href="#916" id="916">916</a>
+<a href="#917" id="917">917</a>
+<a href="#918" id="918">918</a>
+<a href="#919" id="919">919</a>
+<a href="#920" id="920">920</a>
+<a href="#921" id="921">921</a>
+<a href="#922" id="922">922</a>
+<a href="#923" id="923">923</a>
+<a href="#924" id="924">924</a>
+<a href="#925" id="925">925</a>
+<a href="#926" id="926">926</a>
+<a href="#927" id="927">927</a>
+<a href="#928" id="928">928</a>
+<a href="#929" id="929">929</a>
+<a href="#930" id="930">930</a>
+<a href="#931" id="931">931</a>
+<a href="#932" id="932">932</a>
+<a href="#933" id="933">933</a>
+<a href="#934" id="934">934</a>
+<a href="#935" id="935">935</a>
+<a href="#936" id="936">936</a>
+<a href="#937" id="937">937</a>
+<a href="#938" id="938">938</a>
+<a href="#939" id="939">939</a>
+<a href="#940" id="940">940</a>
+<a href="#941" id="941">941</a>
+<a href="#942" id="942">942</a>
+<a href="#943" id="943">943</a>
+<a href="#944" id="944">944</a>
+<a href="#945" id="945">945</a>
+<a href="#946" id="946">946</a>
+<a href="#947" id="947">947</a>
+<a href="#948" id="948">948</a>
+<a href="#949" id="949">949</a>
+<a href="#950" id="950">950</a>
+<a href="#951" id="951">951</a>
+<a href="#952" id="952">952</a>
+<a href="#953" id="953">953</a>
+<a href="#954" id="954">954</a>
+<a href="#955" id="955">955</a>
+<a href="#956" id="956">956</a>
+<a href="#957" id="957">957</a>
+<a href="#958" id="958">958</a>
+<a href="#959" id="959">959</a>
+<a href="#960" id="960">960</a>
+<a href="#961" id="961">961</a>
+<a href="#962" id="962">962</a>
+<a href="#963" id="963">963</a>
+<a href="#964" id="964">964</a>
+<a href="#965" id="965">965</a>
+<a href="#966" id="966">966</a>
+<a href="#967" id="967">967</a>
+<a href="#968" id="968">968</a>
+<a href="#969" id="969">969</a>
+<a href="#970" id="970">970</a>
+<a href="#971" id="971">971</a>
+<a href="#972" id="972">972</a>
+<a href="#973" id="973">973</a>
+<a href="#974" id="974">974</a>
+<a href="#975" id="975">975</a>
+<a href="#976" id="976">976</a>
+<a href="#977" id="977">977</a>
+<a href="#978" id="978">978</a>
+<a href="#979" id="979">979</a>
+<a href="#980" id="980">980</a>
+<a href="#981" id="981">981</a>
+<a href="#982" id="982">982</a></pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
 //! We expect the VM binding to inherit and extend this API by:
@@ -931,8 +999,9 @@
 <span class="kw">use </span><span class="kw">crate</span>::plan::{Mutator, MutatorContext};
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::WorkBucketStage;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::{GCWork, GCWorker};
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator::AllocationOptions;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
-<span class="kw">use </span><span class="kw">crate</span>::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
+<span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::vm_layout;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
@@ -1053,11 +1122,28 @@
     mutator.flush()
 }
 
-<span class="doccomment">/// Allocate memory for an object. For performance reasons, a VM should
-/// implement the allocation fast-path on their side rather than just calling this function.
+<span class="doccomment">/// Allocate memory for an object.
 ///
-/// If the VM provides a non-zero `offset` parameter, then the returned address will be
-/// such that the `RETURNED_ADDRESS + offset` is aligned to the `align` parameter.
+/// When the allocation is successful, it returns the starting address of the new object.  The
+/// memory range for the new object is `size` bytes starting from the returned address, and
+/// `RETURNED_ADDRESS + offset` is guaranteed to be aligned to the `align` parameter.  The returned
+/// address of a successful allocation will never be zero.
+///
+/// If MMTk fails to allocate memory, it will attempt a GC to free up some memory and retry the
+/// allocation.  After triggering GC, it will call [`crate::vm::Collection::block_for_gc`] to suspend
+/// the current thread that is allocating. Callers of `alloc` must be aware of this behavior.
+/// For example, JIT compilers that support
+/// precise stack scanning need to make the call site of `alloc` a GC-safe point by generating stack maps. See
+/// [`alloc_with_options`] if it is undesirable to trigger GC at this allocation site.
+///
+/// If MMTk has attempted at least one GC, and still cannot free up enough memory, it will call
+/// [`crate::vm::Collection::out_of_memory`] to inform the binding. The VM binding
+/// can implement that method to handle the out-of-memory event in a VM-specific way, including but
+/// not limited to throwing exceptions or errors. If [`crate::vm::Collection::out_of_memory`] returns
+/// normally without panicking or throwing exceptions, this function will return zero.
+///
+/// For performance reasons, a VM should implement the allocation fast-path on their side rather
+/// than just calling this function.
 ///
 /// Arguments:
 /// * `mutator`: The mutator to perform this allocation request.
@@ -1072,24 +1158,46 @@
     offset: usize,
     semantics: AllocationSemantics,
 ) -&gt; Address {
-    <span class="comment">// MMTk has assumptions about minimal object size.
-    // We need to make sure that all allocations comply with the min object size.
-    // Ideally, we check the allocation size, and if it is smaller, we transparently allocate the min
-    // object size (the VM does not need to know this). However, for the VM bindings we support at the moment,
-    // their object sizes are all larger than MMTk's min object size, so we simply put an assertion here.
-    // If you plan to use MMTk with a VM with its object size smaller than MMTk's min object size, you should
-    // meet the min object size in the fastpath.
-    </span><span class="macro">debug_assert!</span>(size &gt;= MIN_OBJECT_SIZE);
-    <span class="comment">// Assert alignment
-    </span><span class="macro">debug_assert!</span>(align &gt;= VM::MIN_ALIGNMENT);
-    <span class="macro">debug_assert!</span>(align &lt;= VM::MAX_ALIGNMENT);
-    <span class="comment">// Assert offset
-    </span><span class="macro">debug_assert!</span>(VM::USE_ALLOCATION_OFFSET || offset == <span class="number">0</span>);
+    <span class="attr">#[cfg(debug_assertions)]
+    </span><span class="kw">crate</span>::util::alloc::allocator::assert_allocation_args::&lt;VM&gt;(size, align, offset);
 
     mutator.alloc(size, align, offset, semantics)
 }
 
-<span class="doccomment">/// Invoke the allocation slow path. This is only intended for use when a binding implements the fastpath on
+<span class="doccomment">/// Allocate memory for an object.
+///
+/// This allocation function allows alternation to the allocation behaviors, specified by the
+/// [`crate::util::alloc::AllocationOptions`]. For example, one can allow
+/// overcommit the memory to go beyond the heap size without triggering a GC. This function can be
+/// used in certain cases where the runtime needs a different allocation behavior other than
+/// what the default [`alloc`] provides.
+///
+/// Arguments:
+/// * `mutator`: The mutator to perform this allocation request.
+/// * `size`: The number of bytes required for the object.
+/// * `align`: Required alignment for the object.
+/// * `offset`: Offset associated with the alignment.
+/// * `semantics`: The allocation semantic required for the allocation.
+/// * `options`: the allocation options to change the default allocation behavior for this request.
+</span><span class="kw">pub fn </span>alloc_with_options&lt;VM: VMBinding&gt;(
+    mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
+    size: usize,
+    align: usize,
+    offset: usize,
+    semantics: AllocationSemantics,
+    options: <span class="kw">crate</span>::util::alloc::allocator::AllocationOptions,
+) -&gt; Address {
+    <span class="attr">#[cfg(debug_assertions)]
+    </span><span class="kw">crate</span>::util::alloc::allocator::assert_allocation_args::&lt;VM&gt;(size, align, offset);
+
+    mutator.alloc_with_options(size, align, offset, semantics, options)
+}
+
+<span class="doccomment">/// Invoke the allocation slow path of [`alloc`].
+/// Like [`alloc`], this function may trigger GC and call [`crate::vm::Collection::block_for_gc`] or
+/// [`crate::vm::Collection::out_of_memory`].  The caller needs to be aware of that.
+///
+/// *Notes*: This is only intended for use when a binding implements the fastpath on
 /// the binding side. When the binding handles fast path allocation and the fast path fails, it can use this
 /// method for slow path allocation. Calling before exhausting fast path allocaiton buffer will lead to bad
 /// performance.
@@ -1108,6 +1216,34 @@
     semantics: AllocationSemantics,
 ) -&gt; Address {
     mutator.alloc_slow(size, align, offset, semantics)
+}
+
+<span class="doccomment">/// Invoke the allocation slow path of [`alloc_with_options`].
+///
+/// Like [`alloc_with_options`], This allocation function allows alternation to the allocation behaviors, specified by the
+/// [`crate::util::alloc::AllocationOptions`]. For example, one can allow
+/// overcommit the memory to go beyond the heap size without triggering a GC. This function can be
+/// used in certain cases where the runtime needs a different allocation behavior other than
+/// what the default [`alloc`] provides.
+///
+/// Like [`alloc_slow`], this function is also only intended for use when a binding implements the
+/// fastpath on the binding side.
+///
+/// Arguments:
+/// * `mutator`: The mutator to perform this allocation request.
+/// * `size`: The number of bytes required for the object.
+/// * `align`: Required alignment for the object.
+/// * `offset`: Offset associated with the alignment.
+/// * `semantics`: The allocation semantic required for the allocation.
+</span><span class="kw">pub fn </span>alloc_slow_with_options&lt;VM: VMBinding&gt;(
+    mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
+    size: usize,
+    align: usize,
+    offset: usize,
+    semantics: AllocationSemantics,
+    options: AllocationOptions,
+) -&gt; Address {
+    mutator.alloc_slow_with_options(size, align, offset, semantics, options)
 }
 
 <span class="doccomment">/// Perform post-allocation actions, usually initializing object metadata. For many allocators none are

@@ -544,12 +544,83 @@
 <a href="#543" id="543">543</a>
 <a href="#544" id="544">544</a>
 <a href="#545" id="545">545</a>
-<a href="#546" id="546">546</a></pre></div><pre class="rust"><code><span class="doccomment">//! Mutator context for each application thread.
+<a href="#546" id="546">546</a>
+<a href="#547" id="547">547</a>
+<a href="#548" id="548">548</a>
+<a href="#549" id="549">549</a>
+<a href="#550" id="550">550</a>
+<a href="#551" id="551">551</a>
+<a href="#552" id="552">552</a>
+<a href="#553" id="553">553</a>
+<a href="#554" id="554">554</a>
+<a href="#555" id="555">555</a>
+<a href="#556" id="556">556</a>
+<a href="#557" id="557">557</a>
+<a href="#558" id="558">558</a>
+<a href="#559" id="559">559</a>
+<a href="#560" id="560">560</a>
+<a href="#561" id="561">561</a>
+<a href="#562" id="562">562</a>
+<a href="#563" id="563">563</a>
+<a href="#564" id="564">564</a>
+<a href="#565" id="565">565</a>
+<a href="#566" id="566">566</a>
+<a href="#567" id="567">567</a>
+<a href="#568" id="568">568</a>
+<a href="#569" id="569">569</a>
+<a href="#570" id="570">570</a>
+<a href="#571" id="571">571</a>
+<a href="#572" id="572">572</a>
+<a href="#573" id="573">573</a>
+<a href="#574" id="574">574</a>
+<a href="#575" id="575">575</a>
+<a href="#576" id="576">576</a>
+<a href="#577" id="577">577</a>
+<a href="#578" id="578">578</a>
+<a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
+<a href="#603" id="603">603</a>
+<a href="#604" id="604">604</a>
+<a href="#605" id="605">605</a>
+<a href="#606" id="606">606</a>
+<a href="#607" id="607">607</a>
+<a href="#608" id="608">608</a>
+<a href="#609" id="609">609</a>
+<a href="#610" id="610">610</a>
+<a href="#611" id="611">611</a>
+<a href="#612" id="612">612</a>
+<a href="#613" id="613">613</a>
+<a href="#614" id="614">614</a>
+<a href="#615" id="615">615</a>
+<a href="#616" id="616">616</a></pre></div><pre class="rust"><code><span class="doccomment">//! Mutator context for each application thread.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::Barrier;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator::AllocationOptions;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::{AllocatorSelector, Allocators};
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::Allocator;
 <span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
@@ -704,11 +775,30 @@
         offset: usize,
         allocator: AllocationSemantics,
     ) -&gt; Address {
-        <span class="kw">unsafe </span>{
+        <span class="kw">let </span>allocator = <span class="kw">unsafe </span>{
             <span class="self">self</span>.allocators
                 .get_allocator_mut(<span class="self">self</span>.config.allocator_mapping[allocator])
-        }
-        .alloc(size, align, offset)
+        };
+        <span class="comment">// The value should be default/unset at the beginning of an allocation request.
+        </span><span class="macro">debug_assert!</span>(allocator.get_context().get_alloc_options().is_default());
+        allocator.alloc(size, align, offset)
+    }
+
+    <span class="kw">fn </span>alloc_with_options(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        size: usize,
+        align: usize,
+        offset: usize,
+        allocator: AllocationSemantics,
+        options: AllocationOptions,
+    ) -&gt; Address {
+        <span class="kw">let </span>allocator = <span class="kw">unsafe </span>{
+            <span class="self">self</span>.allocators
+                .get_allocator_mut(<span class="self">self</span>.config.allocator_mapping[allocator])
+        };
+        <span class="comment">// The value should be default/unset at the beginning of an allocation request.
+        </span><span class="macro">debug_assert!</span>(allocator.get_context().get_alloc_options().is_default());
+        allocator.alloc_with_options(size, align, offset, options)
     }
 
     <span class="kw">fn </span>alloc_slow(
@@ -718,11 +808,30 @@
         offset: usize,
         allocator: AllocationSemantics,
     ) -&gt; Address {
-        <span class="kw">unsafe </span>{
+        <span class="kw">let </span>allocator = <span class="kw">unsafe </span>{
             <span class="self">self</span>.allocators
                 .get_allocator_mut(<span class="self">self</span>.config.allocator_mapping[allocator])
-        }
-        .alloc_slow(size, align, offset)
+        };
+        <span class="comment">// The value should be default/unset at the beginning of an allocation request.
+        </span><span class="macro">debug_assert!</span>(allocator.get_context().get_alloc_options().is_default());
+        allocator.alloc_slow(size, align, offset)
+    }
+
+    <span class="kw">fn </span>alloc_slow_with_options(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        size: usize,
+        align: usize,
+        offset: usize,
+        allocator: AllocationSemantics,
+        options: AllocationOptions,
+    ) -&gt; Address {
+        <span class="kw">let </span>allocator = <span class="kw">unsafe </span>{
+            <span class="self">self</span>.allocators
+                .get_allocator_mut(<span class="self">self</span>.config.allocator_mapping[allocator])
+        };
+        <span class="comment">// The value should be default/unset at the beginning of an allocation request.
+        </span><span class="macro">debug_assert!</span>(allocator.get_context().get_alloc_options().is_default());
+        allocator.alloc_slow_with_options(size, align, offset, options)
     }
 
     <span class="comment">// Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
@@ -854,7 +963,7 @@
     </span><span class="kw">fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread);
     <span class="doccomment">/// Do the release work for this mutator.
     </span><span class="kw">fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread);
-    <span class="doccomment">/// Allocate memory for an object.
+    <span class="doccomment">/// Allocate memory for an object. This function will trigger a GC on failed allocation.
     ///
     /// Arguments:
     /// * `size`: the number of bytes required for the object.
@@ -868,7 +977,25 @@
         offset: usize,
         allocator: AllocationSemantics,
     ) -&gt; Address;
-    <span class="doccomment">/// The slow path allocation. This is only useful when the binding
+    <span class="doccomment">/// Allocate memory for an object with more options to control this allocation request, e.g. not triggering a GC on fail.
+    ///
+    /// Arguments:
+    /// * `size`: the number of bytes required for the object.
+    /// * `align`: required alignment for the object.
+    /// * `offset`: offset associated with the alignment. The result plus the offset will be aligned to the given alignment.
+    /// * `allocator`: the allocation semantic used for this object.
+    /// * `options`: the allocation options to change the default allocation behavior for this request.
+    </span><span class="kw">fn </span>alloc_with_options(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        size: usize,
+        align: usize,
+        offset: usize,
+        allocator: AllocationSemantics,
+        options: AllocationOptions,
+    ) -&gt; Address;
+    <span class="doccomment">/// The slow path allocation for [`MutatorContext::alloc`]. This function will trigger a GC on failed allocation.
+    ///
+    ///  This is only useful when the binding
     /// implements the fast path allocation, and would like to explicitly
     /// call the slow path after the fast path allocation fails.
     </span><span class="kw">fn </span>alloc_slow(
@@ -877,6 +1004,19 @@
         align: usize,
         offset: usize,
         allocator: AllocationSemantics,
+    ) -&gt; Address;
+    <span class="doccomment">/// The slow path allocation for [`MutatorContext::alloc_with_options`].
+    ///
+    /// This is only useful when the binding
+    /// implements the fast path allocation, and would like to explicitly
+    /// call the slow path after the fast path allocation fails.
+    </span><span class="kw">fn </span>alloc_slow_with_options(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        size: usize,
+        align: usize,
+        offset: usize,
+        allocator: AllocationSemantics,
+        options: AllocationOptions,
     ) -&gt; Address;
     <span class="doccomment">/// Perform post-allocation actions.  For many allocators none are
     /// required.

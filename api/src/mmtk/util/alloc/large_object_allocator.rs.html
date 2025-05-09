@@ -72,7 +72,12 @@
 <a href="#71" id="71">71</a>
 <a href="#72" id="72">72</a>
 <a href="#73" id="73">73</a>
-<a href="#74" id="74">74</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
+<a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span><span class="kw">crate</span>::policy::largeobjectspace::LargeObjectSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
@@ -123,13 +128,18 @@
     }
 
     <span class="kw">fn </span>alloc_slow_once(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, _offset: usize) -&gt; Address {
-        <span class="kw">if </span><span class="self">self</span>.space.will_oom_on_acquire(<span class="self">self</span>.tls, size) {
+        <span class="kw">if </span><span class="self">self</span>.space.handle_obvious_oom_request(
+            <span class="self">self</span>.tls,
+            size,
+            <span class="self">self</span>.get_context().get_alloc_options(),
+        ) {
             <span class="kw">return </span>Address::ZERO;
         }
 
         <span class="kw">let </span>maxbytes = allocator::get_maximum_aligned_size::&lt;VM&gt;(size, align);
         <span class="kw">let </span>pages = <span class="kw">crate</span>::util::conversions::bytes_to_pages_up(maxbytes);
-        <span class="self">self</span>.space.allocate_pages(<span class="self">self</span>.tls, pages)
+        <span class="self">self</span>.space
+            .allocate_pages(<span class="self">self</span>.tls, pages, <span class="self">self</span>.get_context().get_alloc_options())
     }
 }
 

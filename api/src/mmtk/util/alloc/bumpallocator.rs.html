@@ -226,7 +226,15 @@
 <a href="#225" id="225">225</a>
 <a href="#226" id="226">226</a>
 <a href="#227" id="227">227</a>
-<a href="#228" id="228">228</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
+<a href="#228" id="228">228</a>
+<a href="#229" id="229">229</a>
+<a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
+<a href="#233" id="233">233</a>
+<a href="#234" id="234">234</a>
+<a href="#235" id="235">235</a>
+<a href="#236" id="236">236</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
@@ -422,12 +430,20 @@
         offset: usize,
         stress_test: bool,
     ) -&gt; Address {
-        <span class="kw">if </span><span class="self">self</span>.space.will_oom_on_acquire(<span class="self">self</span>.tls, size) {
+        <span class="kw">if </span><span class="self">self</span>.space.handle_obvious_oom_request(
+            <span class="self">self</span>.tls,
+            size,
+            <span class="self">self</span>.get_context().get_alloc_options(),
+        ) {
             <span class="kw">return </span>Address::ZERO;
         }
 
         <span class="kw">let </span>block_size = (size + BLOCK_MASK) &amp; (!BLOCK_MASK);
-        <span class="kw">let </span>acquired_start = <span class="self">self</span>.space.acquire(<span class="self">self</span>.tls, bytes_to_pages_up(block_size));
+        <span class="kw">let </span>acquired_start = <span class="self">self</span>.space.acquire(
+            <span class="self">self</span>.tls,
+            bytes_to_pages_up(block_size),
+            <span class="self">self</span>.get_context().get_alloc_options(),
+        );
         <span class="kw">if </span>acquired_start.is_zero() {
             <span class="macro">trace!</span>(<span class="string">"Failed to acquire a new block"</span>);
             acquired_start

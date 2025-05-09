@@ -703,7 +703,46 @@
 <a href="#702" id="702">702</a>
 <a href="#703" id="703">703</a>
 <a href="#704" id="704">704</a>
-<a href="#705" id="705">705</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
+<a href="#705" id="705">705</a>
+<a href="#706" id="706">706</a>
+<a href="#707" id="707">707</a>
+<a href="#708" id="708">708</a>
+<a href="#709" id="709">709</a>
+<a href="#710" id="710">710</a>
+<a href="#711" id="711">711</a>
+<a href="#712" id="712">712</a>
+<a href="#713" id="713">713</a>
+<a href="#714" id="714">714</a>
+<a href="#715" id="715">715</a>
+<a href="#716" id="716">716</a>
+<a href="#717" id="717">717</a>
+<a href="#718" id="718">718</a>
+<a href="#719" id="719">719</a>
+<a href="#720" id="720">720</a>
+<a href="#721" id="721">721</a>
+<a href="#722" id="722">722</a>
+<a href="#723" id="723">723</a>
+<a href="#724" id="724">724</a>
+<a href="#725" id="725">725</a>
+<a href="#726" id="726">726</a>
+<a href="#727" id="727">727</a>
+<a href="#728" id="728">728</a>
+<a href="#729" id="729">729</a>
+<a href="#730" id="730">730</a>
+<a href="#731" id="731">731</a>
+<a href="#732" id="732">732</a>
+<a href="#733" id="733">733</a>
+<a href="#734" id="734">734</a>
+<a href="#735" id="735">735</a>
+<a href="#736" id="736">736</a>
+<a href="#737" id="737">737</a>
+<a href="#738" id="738">738</a>
+<a href="#739" id="739">739</a>
+<a href="#740" id="740">740</a>
+<a href="#741" id="741">741</a>
+<a href="#742" id="742">742</a>
+<a href="#743" id="743">743</a>
+<a href="#744" id="744">744</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::<span class="kw-2">*</span>;
@@ -727,6 +766,7 @@
 <span class="attr">#[cfg(debug_assertions)]
 </span><span class="kw">use </span><span class="kw">crate</span>::policy::sft::EMPTY_SFT_NAME;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator::AllocationOptions;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::GCTrigger;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
@@ -772,35 +812,57 @@
     /// avoid arithmatic overflow. If we have to do computation in the allocation fastpath and
     /// overflow happens there, there is nothing we can do about it.
     /// Return a boolean to indicate if we will be out of memory, determined by the check.
-    </span><span class="kw">fn </span>will_oom_on_acquire(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread, size: usize) -&gt; bool {
+    </span><span class="kw">fn </span>will_oom_on_acquire(<span class="kw-2">&amp;</span><span class="self">self</span>, size: usize) -&gt; bool {
         <span class="kw">let </span>max_pages = <span class="self">self</span>.get_gc_trigger().policy.get_max_heap_size_in_pages();
         <span class="kw">let </span>requested_pages = size &gt;&gt; LOG_BYTES_IN_PAGE;
-        <span class="kw">if </span>requested_pages &gt; max_pages {
-            VM::VMCollection::out_of_memory(
-                tls,
-                <span class="kw">crate</span>::util::alloc::AllocationError::HeapOutOfMemory,
-            );
+        requested_pages &gt; max_pages
+    }
+
+    <span class="doccomment">/// Check if the requested `size` is an obvious out-of-memory case using
+    /// [`Self::will_oom_on_acquire`] and, if it is, call `Collection::out_of_memory`.  Return the
+    /// result of `will_oom_on_acquire`.
+    </span><span class="kw">fn </span>handle_obvious_oom_request(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        tls: VMThread,
+        size: usize,
+        alloc_options: AllocationOptions,
+    ) -&gt; bool {
+        <span class="kw">if </span><span class="self">self</span>.will_oom_on_acquire(size) {
+            <span class="kw">if </span>alloc_options.on_fail.allow_oom_call() {
+                VM::VMCollection::out_of_memory(
+                    tls,
+                    <span class="kw">crate</span>::util::alloc::AllocationError::HeapOutOfMemory,
+                );
+            }
             <span class="kw">return </span><span class="bool-val">true</span>;
         }
         <span class="bool-val">false
     </span>}
 
-    <span class="kw">fn </span>acquire(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread, pages: usize) -&gt; Address {
-        <span class="macro">trace!</span>(<span class="string">"Space.acquire, tls={:?}"</span>, tls);
+    <span class="kw">fn </span>acquire(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread, pages: usize, alloc_options: AllocationOptions) -&gt; Address {
+        <span class="macro">trace!</span>(
+            <span class="string">"Space.acquire, tls={:?}, alloc_options={:?}"</span>,
+            tls,
+            alloc_options
+        );
 
         <span class="macro">debug_assert!</span>(
-            !<span class="self">self</span>.will_oom_on_acquire(tls, pages &lt;&lt; LOG_BYTES_IN_PAGE),
+            !<span class="self">self</span>.will_oom_on_acquire(pages &lt;&lt; LOG_BYTES_IN_PAGE),
             <span class="string">"The requested pages is larger than the max heap size. Is will_go_oom_on_acquire used before acquring memory?"
         </span>);
 
         <span class="comment">// Should we poll to attempt to GC?
         // - If tls is collector, we cannot attempt a GC.
         // - If gc is disabled, we cannot attempt a GC.
-        </span><span class="kw">let </span>should_poll =
-            VM::VMActivePlan::is_mutator(tls) &amp;&amp; VM::VMCollection::is_collection_enabled();
+        // - If overcommit is allowed, we don't attempt a GC.
+        </span><span class="kw">let </span>should_poll = VM::VMActivePlan::is_mutator(tls)
+            &amp;&amp; VM::VMCollection::is_collection_enabled()
+            &amp;&amp; !alloc_options.on_fail.allow_overcommit();
         <span class="comment">// Is a GC allowed here? If we should poll but are not allowed to poll, we will panic.
         // initialize_collection() has to be called so we know GC is initialized.
-        </span><span class="kw">let </span>allow_gc = should_poll &amp;&amp; <span class="self">self</span>.common().global_state.is_initialized();
+        </span><span class="kw">let </span>allow_gc = should_poll
+            &amp;&amp; <span class="self">self</span>.common().global_state.is_initialized()
+            &amp;&amp; alloc_options.on_fail.allow_gc();
 
         <span class="macro">trace!</span>(<span class="string">"Reserving pages"</span>);
         <span class="kw">let </span>pr = <span class="self">self</span>.get_page_resource();
@@ -809,20 +871,29 @@
         <span class="macro">trace!</span>(<span class="string">"Polling .."</span>);
 
         <span class="kw">if </span>should_poll &amp;&amp; <span class="self">self</span>.get_gc_trigger().poll(<span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="self">self</span>.as_space())) {
-            <span class="macro">debug!</span>(<span class="string">"Collection required"</span>);
-            <span class="macro">assert!</span>(allow_gc, <span class="string">"GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."</span>);
-
-            <span class="comment">// Clear the request, and inform GC trigger about the pending allocation.
+            <span class="comment">// Clear the request
             </span>pr.clear_request(pages_reserved);
 
-            <span class="kw">let </span>meta_pages_reserved = <span class="self">self</span>.estimate_side_meta_pages(pages_reserved);
+            <span class="comment">// If we do not want GC on fail, just return zero.
+            </span><span class="kw">if </span>!alloc_options.on_fail.allow_gc() {
+                <span class="kw">return </span>Address::ZERO;
+            }
+
+            <span class="comment">// Otherwise do GC here
+            </span><span class="macro">debug!</span>(<span class="string">"Collection required"</span>);
+            <span class="macro">assert!</span>(allow_gc, <span class="string">"GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."</span>);
+
+            <span class="comment">// Inform GC trigger about the pending allocation.
+            </span><span class="kw">let </span>meta_pages_reserved = <span class="self">self</span>.estimate_side_meta_pages(pages_reserved);
             <span class="kw">let </span>total_pages_reserved = pages_reserved + meta_pages_reserved;
             <span class="self">self</span>.get_gc_trigger()
                 .policy
                 .on_pending_allocation(total_pages_reserved);
 
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); <span class="comment">// We have checked that this is mutator
-            </span><span class="kw">unsafe </span>{ Address::zero() }
+
+            // Return zero -- the caller will handle re-attempting allocation
+            </span>Address::ZERO
         } <span class="kw">else </span>{
             <span class="macro">debug!</span>(<span class="string">"Collection not required"</span>);
 
@@ -926,7 +997,15 @@
                 <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
                     drop(lock); <span class="comment">// drop the lock immediately
 
-                    // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
+                    // Clear the request
+                    </span>pr.clear_request(pages_reserved);
+
+                    <span class="comment">// If we do not want GC on fail, just return zero.
+                    </span><span class="kw">if </span>!alloc_options.on_fail.allow_gc() {
+                        <span class="kw">return </span>Address::ZERO;
+                    }
+
+                    <span class="comment">// We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
                     </span><span class="macro">assert!</span>(
                         allow_gc,
                         <span class="string">"Physical allocation failed when GC is not allowed!"
@@ -935,14 +1014,13 @@
                     <span class="kw">let </span>gc_performed = <span class="self">self</span>.get_gc_trigger().poll(<span class="bool-val">true</span>, <span class="prelude-val">Some</span>(<span class="self">self</span>.as_space()));
                     <span class="macro">debug_assert!</span>(gc_performed, <span class="string">"GC not performed when forced."</span>);
 
-                    <span class="comment">// Clear the request, and inform GC trigger about the pending allocation.
-                    </span>pr.clear_request(pages_reserved);
-                    <span class="self">self</span>.get_gc_trigger()
+                    <span class="comment">// Inform GC trigger about the pending allocation.
+                    </span><span class="self">self</span>.get_gc_trigger()
                         .policy
                         .on_pending_allocation(pages_reserved);
 
                     VM::VMCollection::block_for_gc(VMMutatorThread(tls)); <span class="comment">// We asserted that this is mutator.
-                    </span><span class="kw">unsafe </span>{ Address::zero() }
+                    </span>Address::ZERO
                 }
             }
         }
