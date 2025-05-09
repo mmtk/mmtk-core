@@ -100,6 +100,10 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         let worker = worker.into_mut::<VM>();
         self.trace_object(queue, object, self.common.copy, worker)
     }
+
+    fn debug_get_object_info(&self, object: ObjectReference) -> String {
+        format!("{}: {:?}, {:?}", self.name(), object_forwarding::debug_get_object_forwarding_info::<VM>(object), crate::policy::sft::debug_get_object_global_info(object))
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
