@@ -6,6 +6,7 @@ use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::options::Options;
 use crate::MMTK;
 
+use atomic::Atomic;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -25,6 +26,47 @@ pub enum AllocationError {
     /// The OS is unable to mmap or acquire more memory. Critical error. MMTk expects the VM to
     /// abort if such an error is thrown.
     MmapOutOfMemory,
+}
+
+/// Behavior when an allocation fails, and a GC is expected.
+#[repr(u8)]
+#[derive(Copy, Clone, Default, PartialEq, bytemuck::NoUninit, Debug)]
+pub enum OnAllocationFail {
+    /// Request the GC. This is the default behavior.
+    #[default]
+    RequestGC,
+    /// Instead of requesting GC, the allocation request returns with a failure value.
+    ReturnFailure,
+    /// Instead of requesting GC, the allocation request simply overcommits the memory,
+    /// and return a valid result at its best efforts.
+    OverCommit,
+}
+
+impl OnAllocationFail {
+    pub(crate) fn allow_oom_call(&self) -> bool {
+        *self == Self::RequestGC
+    }
+    pub(crate) fn allow_gc(&self) -> bool {
+        *self == Self::RequestGC
+    }
+    pub(crate) fn allow_overcommit(&self) -> bool {
+        *self == Self::OverCommit
+    }
+}
+
+/// Allow specifying different behaviors with [`Allocator::alloc_with_options`].
+#[repr(C)]
+#[derive(Copy, Clone, Default, PartialEq, bytemuck::NoUninit, Debug)]
+pub struct AllocationOptions {
+    /// When the allocation fails and a GC is originally expected, on_fail
+    /// allows a different behavior to avoid the GC.
+    pub on_fail: OnAllocationFail,
+}
+
+impl AllocationOptions {
+    pub(crate) fn is_default(&self) -> bool {
+        *self == AllocationOptions::default()
+    }
 }
 
 pub fn align_allocation_no_fill<VM: VMBinding>(
@@ -130,8 +172,26 @@ pub fn get_maximum_aligned_size_inner<VM: VMBinding>(
     }
 }
 
+#[cfg(debug_assertions)]
+pub(crate) fn assert_allocation_args<VM: VMBinding>(size: usize, align: usize, offset: usize) {
+    // MMTk has assumptions about minimal object size.
+    // We need to make sure that all allocations comply with the min object size.
+    // Ideally, we check the allocation size, and if it is smaller, we transparently allocate the min
+    // object size (the VM does not need to know this). However, for the VM bindings we support at the moment,
+    // their object sizes are all larger than MMTk's min object size, so we simply put an assertion here.
+    // If you plan to use MMTk with a VM with its object size smaller than MMTk's min object size, you should
+    // meet the min object size in the fastpath.
+    debug_assert!(size >= MIN_OBJECT_SIZE);
+    // Assert alignment
+    debug_assert!(align >= VM::MIN_ALIGNMENT);
+    debug_assert!(align <= VM::MAX_ALIGNMENT);
+    // Assert offset
+    debug_assert!(VM::USE_ALLOCATION_OFFSET || offset == 0);
+}
+
 /// The context an allocator needs to access in order to perform allocation.
 pub struct AllocatorContext<VM: VMBinding> {
+    pub alloc_options: Atomic<AllocationOptions>,
     pub state: Arc<GlobalState>,
     pub options: Arc<Options>,
     pub gc_trigger: Arc<GCTrigger<VM>>,
@@ -142,12 +202,26 @@ pub struct AllocatorContext<VM: VMBinding> {
 impl<VM: VMBinding> AllocatorContext<VM> {
     pub fn new(mmtk: &MMTK<VM>) -> Self {
         Self {
+            alloc_options: Atomic::new(AllocationOptions::default()),
             state: mmtk.state.clone(),
             options: mmtk.options.clone(),
             gc_trigger: mmtk.gc_trigger.clone(),
             #[cfg(feature = "analysis")]
             analysis_manager: mmtk.analysis_manager.clone(),
         }
+    }
+
+    pub fn set_alloc_options(&self, options: AllocationOptions) {
+        self.alloc_options.store(options, Ordering::Relaxed);
+    }
+
+    pub fn clear_alloc_options(&self) {
+        self.alloc_options
+            .store(AllocationOptions::default(), Ordering::Relaxed);
+    }
+
+    pub fn get_alloc_options(&self) -> AllocationOptions {
+        self.alloc_options.load(Ordering::Relaxed)
     }
 }
 
@@ -180,9 +254,13 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// If an allocator supports thread local allocations, then the allocation will be serviced
     /// from its TLAB, otherwise it will default to using the slowpath, i.e. [`alloc_slow`](Allocator::alloc_slow).
     ///
+    /// If the heap is full, we trigger a GC and attempt to free up
+    /// more memory, and re-attempt the allocation.
+    ///
     /// Note that in the case where the VM is out of memory, we invoke
     /// [`Collection::out_of_memory`] to inform the binding and then return a null pointer back to
     /// it. We have no assumptions on whether the VM will continue executing or abort immediately.
+    /// If the VM continues execution, the function will return a null address.
     ///
     /// An allocator needs to make sure the object reference for the returned address is in the same
     /// chunk as the returned address (so the side metadata and the SFT for an object reference is valid).
@@ -194,6 +272,26 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `offset` the required offset in bytes.
     fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address;
 
+    /// An allocation attempt. The allocation options may specify different behaviors for this allocation request.
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
+    /// * `options`: the allocation options to change the default allocation behavior for this request.
+    fn alloc_with_options(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: usize,
+        alloc_options: AllocationOptions,
+    ) -> Address {
+        self.get_context().set_alloc_options(alloc_options);
+        let ret = self.alloc(size, align, offset);
+        self.get_context().clear_alloc_options();
+        ret
+    }
+
     /// Slowpath allocation attempt. This function is explicitly not inlined for performance
     /// considerations.
     ///
@@ -204,6 +302,30 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     #[inline(never)]
     fn alloc_slow(&mut self, size: usize, align: usize, offset: usize) -> Address {
         self.alloc_slow_inline(size, align, offset)
+    }
+
+    /// Slowpath allocation attempt. Mostly the same as [`Allocator::alloc_slow`], except that the allocation options
+    /// may specify different behaviors for this allocation request.
+    ///
+    /// This function is not used internally. It is mostly for the bindings.
+    /// [`Allocator::alloc_with_options`] still calls the normal [`Allocator::alloc_slow`].
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
+    fn alloc_slow_with_options(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: usize,
+        alloc_options: AllocationOptions,
+    ) -> Address {
+        // The function is not used internally. We won't set no_gc_on_fail redundantly.
+        self.get_context().set_alloc_options(alloc_options);
+        let ret = self.alloc_slow(size, align, offset);
+        self.get_context().clear_alloc_options();
+        ret
     }
 
     /// Slowpath allocation attempt. This function executes the actual slowpath allocation.  A
@@ -253,6 +375,12 @@ pub trait Allocator<VM: VMBinding>: Downcast {
 
             if !is_mutator {
                 debug_assert!(!result.is_zero());
+                return result;
+            }
+
+            if result.is_zero()
+                && self.get_context().get_alloc_options().on_fail == OnAllocationFail::ReturnFailure
+            {
                 return result;
             }
 
