@@ -57,30 +57,32 @@ pub(crate) fn unreachable_release_func<VM: VMBinding>(
 /// An mutator release implementation for plans that use [`crate::plan::global::CommonPlan`].
 #[allow(unused_variables)]
 pub(crate) fn common_release_func<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-    // Release the free list allocator used for non moving
-    #[cfg(feature = "marksweep_as_nonmoving")]
-    {
-        use crate::util::alloc::FreeListAllocator;
-        unsafe {
-            mutator
-                .allocators
-                .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "marksweep_as_nonmoving")] {
+            // Release the free list allocator used for non moving
+            use crate::util::alloc::FreeListAllocator;
+            unsafe {
+                mutator
+                    .allocators
+                    .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
+            }
+            .downcast_mut::<FreeListAllocator<VM>>()
+            .unwrap()
+            .release();
+        } else if #[cfg(feature = "immortal_as_nonmoving")] {
+            // Do nothig for the bump pointer allocator
+        } else {
+            // Reset the Immix allocator
+            use crate::util::alloc::ImmixAllocator;
+            unsafe {
+                mutator
+                    .allocators
+                    .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
+            }
+            .downcast_mut::<ImmixAllocator<VM>>()
+            .unwrap()
+            .reset();
         }
-        .downcast_mut::<FreeListAllocator<VM>>()
-        .unwrap()
-        .release();
-    }
-    #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
-    {
-        use crate::util::alloc::ImmixAllocator;
-        unsafe {
-            mutator
-                .allocators
-                .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
-        }
-        .downcast_mut::<ImmixAllocator<VM>>()
-        .unwrap()
-        .reset();
     }
 }
 

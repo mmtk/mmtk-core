@@ -42,7 +42,6 @@ pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: !cfg!(feature = "immix_non_moving"),
     // Max immix object size is half of a block.
     max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
-    needs_prepare_mutator: false || PlanConstraints::default().needs_prepare_mutator,
     ..PlanConstraints::default()
 };
 

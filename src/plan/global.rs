@@ -653,29 +653,39 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     fn prepare_nonmoving_space(&mut self, _full_heap: bool) {
-        #[cfg(feature = "immortal_as_nonmoving")]
-        self.nonmoving.prepare();
-        #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
-        self.nonmoving.prepare(_full_heap, None);
-        #[cfg(feature = "marksweep_as_nonmoving")]
-        self.nonmoving.prepare(_full_heap);
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "immortal_as_nonmoving")] {
+                self.nonmoving.prepare();
+            } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+                self.nonmoving.prepare(_full_heap);
+            } else {
+                self.nonmoving.prepare(_full_heap, None);
+            }
+        }
     }
 
     fn release_nonmoving_space(&mut self, _full_heap: bool) {
-        #[cfg(feature = "immortal_as_nonmoving")]
-        self.nonmoving.release();
-        #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
-        self.nonmoving.release(_full_heap);
-        #[cfg(feature = "marksweep_as_nonmoving")]
-        self.nonmoving.release();
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "immortal_as_nonmoving")] {
+                self.nonmoving.release();
+            } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+                self.nonmoving.prepare(_full_heap);
+            } else {
+                self.nonmoving.release(_full_heap);
+            }
+        }
     }
 
     fn end_of_gc_nonmoving_space(&mut self) {
-        // Only mark sweep and immix need end of GC.
-        #[cfg(feature = "marksweep_as_nonmoving")]
-        self.nonmoving.end_of_gc();
-        #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
-        self.nonmoving.end_of_gc();
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "immortal_as_nonmoving")] {
+                // Nothing we need to do for immortal space.
+            } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+                self.nonmoving.end_of_gc();
+            } else {
+                self.nonmoving.end_of_gc();
+            }
+        }
     }
 }
 
