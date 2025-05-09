@@ -546,14 +546,16 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 }
 
-#[cfg(feature = "immortal_as_nonmoving")]
-pub type NonMovingSpace<VM> = crate::policy::immortalspace::ImmortalSpace<VM>;
-
-#[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
-pub type NonMovingSpace<VM> = crate::policy::immix::ImmixSpace<VM>;
-
-#[cfg(feature = "marksweep_as_nonmoving")]
-pub type NonMovingSpace<VM> = crate::policy::marksweepspace::native_ms::MarkSweepSpace<VM>;
+cfg_if::cfg_if! {
+    // Use immortal or mark sweep as the non moving space if the features are enabled. Otherwise use Immix.
+    if #[cfg(feature = "immortal_as_nonmoving")] {
+        pub type NonMovingSpace<VM> = crate::policy::immortalspace::ImmortalSpace<VM>;
+    } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+        pub type NonMovingSpace<VM> = crate::policy::marksweepspace::native_ms::MarkSweepSpace<VM>;
+    } else {
+        pub type NonMovingSpace<VM> = crate::policy::immix::ImmixSpace<VM>;
+    }
+}
 
 /**
 CommonPlan is for representing state and features used by _many_ plans, but that are not fundamental to _all_ plans.  Examples include the Large Object Space and an Immortal space.  Features that are fundamental to _all_ plans must be included in BasePlan.
@@ -632,18 +634,22 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
     fn new_nonmoving_space(args: &mut CreateSpecificPlanArgs<VM>) -> NonMovingSpace<VM> {
         let space_args = args.get_space_args("nonmoving", true, false, VMRequest::discontiguous());
-        #[cfg(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving"))]
-        return NonMovingSpace::new(space_args);
-        #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
-        return NonMovingSpace::new(
-            space_args,
-            crate::policy::immix::ImmixSpaceArgs {
-                unlog_object_when_traced: false,
-                #[cfg(feature = "vo_bit")]
-                mixed_age: false,
-                never_move_objects: true,
-            },
-        );
+        cfg_if::cfg_if! {
+            if #[cfg(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving"))] {
+                NonMovingSpace::new(space_args)
+            } else {
+                // Immix requires extra args.
+                NonMovingSpace::new(
+                    space_args,
+                    crate::policy::immix::ImmixSpaceArgs {
+                        unlog_object_when_traced: false,
+                        #[cfg(feature = "vo_bit")]
+                        mixed_age: false,
+                        never_move_objects: true,
+                    },
+                )
+            }
+        }
     }
 
     fn prepare_nonmoving_space(&mut self, _full_heap: bool) {

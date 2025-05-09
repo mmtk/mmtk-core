@@ -530,17 +530,12 @@ pub(crate) fn create_allocator_mapping(
     if include_common_plan {
         map[AllocationSemantics::Immortal] = reserved.add_bump_pointer_allocator();
         map[AllocationSemantics::Los] = reserved.add_large_object_allocator();
-        map[AllocationSemantics::NonMoving] = if cfg!(not(any(
-            feature = "immortal_as_nonmoving",
-            feature = "marksweep_as_nonmoving"
-        ))) {
-            reserved.add_immix_allocator()
-        } else if cfg!(feature = "marksweep_as_nonmoving") {
+        map[AllocationSemantics::NonMoving] = if cfg!(feature = "marksweep_as_nonmoving") {
             reserved.add_free_list_allocator()
         } else if cfg!(feature = "immortal_as_nonmoving") {
             reserved.add_bump_pointer_allocator()
         } else {
-            panic!("No policy selected for nonmoving space")
+            reserved.add_immix_allocator()
         };
     }
 
@@ -596,15 +591,10 @@ pub(crate) fn create_space_mapping<VM: VMBinding>(
         vec.push((
             if cfg!(feature = "marksweep_as_nonmoving") {
                 reserved.add_free_list_allocator()
-            } else if cfg!(not(any(
-                feature = "immortal_as_nonmoving",
-                feature = "marksweep_as_nonmoving"
-            ))) {
-                reserved.add_immix_allocator()
             } else if cfg!(feature = "immortal_as_nonmoving") {
                 reserved.add_bump_pointer_allocator()
             } else {
-                panic!("No policy selected for nonmoving space")
+                reserved.add_immix_allocator()
             },
             plan.common().get_nonmoving(),
         ));
