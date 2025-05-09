@@ -94,8 +94,8 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
                 .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
         }
         let hi = self.hi.load(Ordering::SeqCst);
-        self.copyspace0.prepare(hi);
-        self.copyspace1.prepare(!hi);
+        self.copyspace0.prepare(full_heap, Some(Box::new(hi)));
+        self.copyspace1.prepare(full_heap, Some(Box::new(!hi)));
 
         self.fromspace_mut()
             .set_copy_for_sft_trace(Some(CopySemantics::Mature));
@@ -110,7 +110,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.release(tls);
         if full_heap {
-            self.fromspace().release();
+            self.fromspace_mut().release(full_heap);
         }
     }
 
@@ -249,6 +249,7 @@ impl<VM: VMBinding> GenCopy<VM> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn fromspace(&self) -> &CopySpace<VM> {
         if self.hi.load(Ordering::SeqCst) {
             &self.copyspace0

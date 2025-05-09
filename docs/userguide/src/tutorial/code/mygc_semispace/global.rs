@@ -104,8 +104,8 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
             .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst);
         // Flips 'hi' to flip space definitions
         let hi = self.hi.load(Ordering::SeqCst);
-        self.copyspace0.prepare(hi);
-        self.copyspace1.prepare(!hi);
+        self.copyspace0.prepare(true, Some(Box::new(hi)));
+        self.copyspace1.prepare(true, Some(Box::new(!hi)));
 
         self.fromspace_mut()
             .set_copy_for_sft_trace(Some(CopySemantics::DefaultCopy));
@@ -124,7 +124,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     // ANCHOR: release
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
-        self.fromspace().release();
+        self.fromspace_mut().release(true);
     }
     // ANCHOR_END: release
 

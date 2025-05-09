@@ -117,6 +117,32 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, &self.pr);
     }
+
+    fn prepare(&mut self, _full_heap: bool, _arg: Option<Box<dyn std::any::Any>>) {
+        self.mark_state.on_global_prepare::<VM>();
+        if self.vm_space {
+            // If this is VM space, we never allocate into it, and we should reset the mark bit for the entire space.
+            self.mark_state
+                .on_block_reset::<VM>(self.common.start, self.common.extent)
+        } else {
+            // Otherwise, we reset the mark bit for the allocated regions.
+            for (addr, size) in self.pr.iterate_allocated_regions() {
+                debug!(
+                    "{:?}: reset mark bit from {} to {}",
+                    self.name(),
+                    addr,
+                    addr + size
+                );
+                self.mark_state.on_block_reset::<VM>(addr, size);
+            }
+        }
+    }
+
+    fn release(&mut self, _full_heap: bool) {
+        self.mark_state.on_global_release::<VM>();
+    }
+
+    fn end_of_gc(&mut self) {}
 }
 
 use crate::scheduler::GCWorker;
@@ -176,31 +202,6 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
             vm_space: true,
         }
     }
-
-    pub fn prepare(&mut self) {
-        self.mark_state.on_global_prepare::<VM>();
-        if self.vm_space {
-            // If this is VM space, we never allocate into it, and we should reset the mark bit for the entire space.
-            self.mark_state
-                .on_block_reset::<VM>(self.common.start, self.common.extent)
-        } else {
-            // Otherwise, we reset the mark bit for the allocated regions.
-            for (addr, size) in self.pr.iterate_allocated_regions() {
-                debug!(
-                    "{:?}: reset mark bit from {} to {}",
-                    self.name(),
-                    addr,
-                    addr + size
-                );
-                self.mark_state.on_block_reset::<VM>(addr, size);
-            }
-        }
-    }
-
-    pub fn release(&mut self) {
-        self.mark_state.on_global_release::<VM>();
-    }
-
     pub fn trace_object<Q: ObjectQueue>(
         &self,
         queue: &mut Q,

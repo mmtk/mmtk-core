@@ -79,8 +79,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
             .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
                                                                        // prepare each of the collected regions
         let hi = self.hi.load(Ordering::SeqCst);
-        self.copyspace0.prepare(hi);
-        self.copyspace1.prepare(!hi);
+        self.copyspace0.prepare(true, Some(Box::new(hi)));
+        self.copyspace1.prepare(true, Some(Box::new(!hi)));
         self.fromspace_mut()
             .set_copy_for_sft_trace(Some(CopySemantics::DefaultCopy));
         self.tospace_mut().set_copy_for_sft_trace(None);
@@ -93,7 +93,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         // release the collected region
-        self.fromspace().release();
+        self.fromspace_mut().release(true);
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
@@ -174,6 +174,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn fromspace(&self) -> &CopySpace<VM> {
         if self.hi.load(Ordering::SeqCst) {
             &self.copyspace0

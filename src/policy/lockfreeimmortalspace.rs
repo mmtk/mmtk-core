@@ -176,6 +176,10 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         enumerator.visit_address_range(self.start, self.start + self.total_bytes);
     }
+
+    fn prepare(&mut self, _full_heap: bool, _arg: Option<Box<dyn std::any::Any>>) {}
+    fn release(&mut self, _full_heap: bool) {}
+    fn end_of_gc(&mut self) {}
 }
 
 use crate::plan::{ObjectQueue, VectorObjectQueue};

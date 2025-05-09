@@ -175,6 +175,25 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         self.treadmill.enumerate_objects(enumerator);
     }
+
+    fn prepare(&mut self, full_heap: bool, _arg: Option<Box<dyn std::any::Any>>) {
+        if full_heap {
+            debug_assert!(self.treadmill.is_from_space_empty());
+            self.mark_state = MARK_BIT - self.mark_state;
+        }
+        self.treadmill.flip(full_heap);
+        self.in_nursery_gc = !full_heap;
+    }
+
+    fn release(&mut self, full_heap: bool) {
+        self.sweep_large_pages(true);
+        debug_assert!(self.treadmill.is_nursery_empty());
+        if full_heap {
+            self.sweep_large_pages(false);
+        }
+    }
+
+    fn end_of_gc(&mut self) {}
 }
 
 use crate::scheduler::GCWorker;
@@ -226,22 +245,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
-    pub fn prepare(&mut self, full_heap: bool) {
-        if full_heap {
-            debug_assert!(self.treadmill.is_from_space_empty());
-            self.mark_state = MARK_BIT - self.mark_state;
-        }
-        self.treadmill.flip(full_heap);
-        self.in_nursery_gc = !full_heap;
-    }
-
-    pub fn release(&mut self, full_heap: bool) {
-        self.sweep_large_pages(true);
-        debug_assert!(self.treadmill.is_nursery_empty());
-        if full_heap {
-            self.sweep_large_pages(false);
-        }
-    }
     // Allow nested-if for this function to make it clear that test_and_mark() is only executed
     // for the outer condition is met.
     #[allow(clippy::collapsible_if)]

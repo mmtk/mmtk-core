@@ -117,9 +117,11 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             // Prepare both large object space and immix space
             self.immix.immix_space.prepare(
                 false,
-                crate::policy::immix::defrag::StatsForDefrag::new(self),
+                Some(Box::new(crate::policy::immix::defrag::StatsForDefrag::new(
+                    self,
+                ))),
             );
-            self.immix.common.los.prepare(false);
+            self.immix.common.los.prepare(false, None);
         } else {
             self.full_heap_gc_count.lock().unwrap().inc();
             self.immix.prepare(tls);
@@ -141,9 +143,10 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         self.next_gc_full_heap
             .store(next_gc_full_heap, Ordering::Relaxed);
 
-        let was_defrag = self.immix.immix_space.end_of_gc();
+        let was_defrag = self.immix.immix_space.in_defrag();
         self.immix
             .set_last_gc_was_defrag(was_defrag, Ordering::Relaxed);
+        self.immix.immix_space.end_of_gc();
     }
 
     fn collection_required(&self, space_full: bool, space: Option<SpaceStats<Self::VM>>) -> bool {

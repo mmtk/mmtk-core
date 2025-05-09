@@ -14,6 +14,7 @@ use crate::util::{copy::*, object_enum};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
+use std::any::Any;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -138,6 +139,39 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, &self.pr);
     }
+
+    fn prepare(&mut self, _major_gc: bool, arg: Option<Box<dyn Any>>) {
+        let is_from_space = arg.unwrap().downcast::<bool>().unwrap();
+        self.from_space.store(*is_from_space, Ordering::SeqCst);
+    }
+
+    fn release(&mut self, _major_gc: bool) {
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            // Clear the forwarding bits if it is on the side.
+            if let MetadataSpec::OnSide(side_forwarding_status_table) =
+                *<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC
+            {
+                side_forwarding_status_table.bzero_metadata(start, size);
+            }
+
+            if self.common.needs_log_bit {
+                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+                    side.bzero_metadata(start, size);
+                }
+            }
+
+            // Clear VO bits because all objects in the space are dead.
+            #[cfg(feature = "vo_bit")]
+            crate::util::metadata::vo_bit::bzero_vo_bit(start, size);
+        }
+
+        unsafe {
+            self.pr.reset();
+        }
+        self.from_space.store(false, Ordering::SeqCst);
+    }
+
+    fn end_of_gc(&mut self) {}
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<VM> {
@@ -181,36 +215,6 @@ impl<VM: VMBinding> CopySpace<VM> {
             common,
             from_space: AtomicBool::new(from_space),
         }
-    }
-
-    pub fn prepare(&self, from_space: bool) {
-        self.from_space.store(from_space, Ordering::SeqCst);
-    }
-
-    pub fn release(&self) {
-        for (start, size) in self.pr.iterate_allocated_regions() {
-            // Clear the forwarding bits if it is on the side.
-            if let MetadataSpec::OnSide(side_forwarding_status_table) =
-                *<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC
-            {
-                side_forwarding_status_table.bzero_metadata(start, size);
-            }
-
-            if self.common.needs_log_bit {
-                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                    side.bzero_metadata(start, size);
-                }
-            }
-
-            // Clear VO bits because all objects in the space are dead.
-            #[cfg(feature = "vo_bit")]
-            crate::util::metadata::vo_bit::bzero_vo_bit(start, size);
-        }
-
-        unsafe {
-            self.pr.reset();
-        }
-        self.from_space.store(false, Ordering::SeqCst);
     }
 
     fn is_from_space(&self) -> bool {

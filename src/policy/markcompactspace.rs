@@ -136,6 +136,12 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, &self.pr);
     }
+
+    fn prepare(&mut self, _full_heap: bool, _arg: Option<Box<dyn std::any::Any>>) {}
+
+    fn release(&mut self, _full_heap: bool) {}
+
+    fn end_of_gc(&mut self) {}
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompactSpace<VM> {
@@ -230,10 +236,6 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             common,
         }
     }
-
-    pub fn prepare(&self) {}
-
-    pub fn release(&self) {}
 
     pub fn trace_mark_object<Q: ObjectQueue>(
         &self,

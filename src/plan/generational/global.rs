@@ -66,7 +66,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             self.full_heap_gc_count.lock().unwrap().inc();
         }
         self.common.prepare(tls, full_heap);
-        self.nursery.prepare(true);
+        self.nursery.prepare(full_heap, Some(Box::new(true)));
         self.nursery
             .set_copy_for_sft_trace(Some(CopySemantics::PromoteToMature));
     }
@@ -75,7 +75,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     pub fn release(&mut self, tls: VMWorkerThread) {
         let full_heap = !self.is_current_gc_nursery();
         self.common.release(tls, full_heap);
-        self.nursery.release();
+        self.nursery.release(full_heap);
     }
 
     /// Independent of how many pages remain in the page budget (a function of heap size), we must

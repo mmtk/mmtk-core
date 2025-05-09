@@ -32,6 +32,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::memory::{self, HugePageSupport, MmapProtection, MmapStrategy};
 use crate::vm::VMBinding;
 
+use std::any::Any;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -42,6 +43,13 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn as_space(&self) -> &dyn Space<VM>;
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
+
+    /// Prepare the space for a GC. The arg can be used to pass space-specific arguments.
+    fn prepare(&mut self, major_gc: bool, arg: Option<Box<dyn Any>>);
+    /// Release the space after a GC.
+    fn release(&mut self, major_gc: bool);
+    /// End of GC. This is called after all the GC work is done.
+    fn end_of_gc(&mut self);
 
     /// Get a mutable reference to the underlying page resource, or `None` if the space does not
     /// have a page resource.

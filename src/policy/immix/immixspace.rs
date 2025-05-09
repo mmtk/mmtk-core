@@ -188,6 +188,123 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_chunk_map::<Block>(enumerator, &self.chunk_map);
     }
+
+    fn prepare(&mut self, major_gc: bool, arg: Option<Box<dyn std::any::Any>>) {
+        if major_gc {
+            // Update mark_state
+            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
+                self.mark_state = Self::MARKED_STATE;
+            } else {
+                // For header metadata, we use cyclic mark bits.
+                unimplemented!("cyclic mark bits is not supported at the moment");
+            }
+
+            if self.common.needs_log_bit {
+                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+                    for chunk in self.chunk_map.all_chunks() {
+                        side.bzero_metadata(chunk.start(), Chunk::BYTES);
+                    }
+                }
+            }
+
+            // Prepare defrag info
+            if self.is_defrag_enabled() {
+                let plan_stats = arg.unwrap().downcast::<StatsForDefrag>().unwrap();
+                self.defrag.prepare(self, *plan_stats);
+            }
+
+            // Prepare each block for GC
+            let threshold = self.defrag.defrag_spill_threshold.load(Ordering::Acquire);
+            // # Safety: ImmixSpace reference is always valid within this collection cycle.
+            let space = unsafe { &*(self as *const Self) };
+            let work_packets = self.chunk_map.generate_tasks(|chunk| {
+                Box::new(PrepareBlockState {
+                    space,
+                    chunk,
+                    defrag_threshold: if space.in_defrag() {
+                        Some(threshold)
+                    } else {
+                        None
+                    },
+                })
+            });
+            self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
+
+            if !super::BLOCK_ONLY {
+                self.line_mark_state.fetch_add(1, Ordering::AcqRel);
+                if self.line_mark_state.load(Ordering::Acquire) > Line::MAX_MARK_STATE {
+                    self.line_mark_state
+                        .store(Line::RESET_MARK_STATE, Ordering::Release);
+                }
+            }
+        }
+
+        #[cfg(feature = "vo_bit")]
+        if vo_bit::helper::need_to_clear_vo_bits_before_tracing::<VM>() {
+            let maybe_scope = if major_gc {
+                // If it is major GC, we always clear all VO bits because we are doing full-heap
+                // tracing.
+                Some(VOBitsClearingScope::FullGC)
+            } else if self.space_args.mixed_age {
+                // StickyImmix nursery GC.
+                // Some lines (or blocks) contain only young objects,
+                // while other lines (or blocks) contain only old objects.
+                if super::BLOCK_ONLY {
+                    // Block only.  Young objects are only allocated into fully empty blocks.
+                    // Only clear unmarked blocks.
+                    Some(VOBitsClearingScope::BlockOnly)
+                } else {
+                    // Young objects are allocated into empty lines.
+                    // Only clear unmarked lines.
+                    let line_mark_state = self.line_mark_state.load(Ordering::SeqCst);
+                    Some(VOBitsClearingScope::Line {
+                        state: line_mark_state,
+                    })
+                }
+            } else {
+                // GenImmix nursery GC.  We do nothing to the ImmixSpace because the nursery is a
+                // separate CopySpace.  It'll clear its own VO bits.
+                None
+            };
+
+            if let Some(scope) = maybe_scope {
+                let work_packets = self
+                    .chunk_map
+                    .generate_tasks(|chunk| Box::new(ClearVOBitsAfterPrepare { chunk, scope }));
+                self.scheduler.work_buckets[WorkBucketStage::ClearVOBits].bulk_add(work_packets);
+            }
+        }
+    }
+
+    /// Release for the immix space.
+    fn release(&mut self, major_gc: bool) {
+        if major_gc {
+            // Update line_unavail_state for hole searching after this GC.
+            if !super::BLOCK_ONLY {
+                self.line_unavail_state.store(
+                    self.line_mark_state.load(Ordering::Acquire),
+                    Ordering::Release,
+                );
+            }
+        }
+        // Clear reusable blocks list
+        if !super::BLOCK_ONLY {
+            self.reusable_blocks.reset();
+        }
+        // Sweep chunks and blocks
+        let work_packets = self.generate_sweep_tasks();
+        self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+
+        self.lines_consumed.store(0, Ordering::Relaxed);
+    }
+
+    /// This is called when a GC finished.
+    /// Return whether this GC was a defrag GC, as a plan may want to know this.
+    fn end_of_gc(&mut self) {
+        if self.is_defrag_enabled() {
+            self.defrag.reset_in_defrag();
+        }
+    }
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace<VM> {
@@ -385,124 +502,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Get work packet scheduler
     fn scheduler(&self) -> &GCWorkScheduler<VM> {
         &self.scheduler
-    }
-
-    pub fn prepare(&mut self, major_gc: bool, plan_stats: StatsForDefrag) {
-        if major_gc {
-            // Update mark_state
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
-                self.mark_state = Self::MARKED_STATE;
-            } else {
-                // For header metadata, we use cyclic mark bits.
-                unimplemented!("cyclic mark bits is not supported at the moment");
-            }
-
-            if self.common.needs_log_bit {
-                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                    for chunk in self.chunk_map.all_chunks() {
-                        side.bzero_metadata(chunk.start(), Chunk::BYTES);
-                    }
-                }
-            }
-
-            // Prepare defrag info
-            if self.is_defrag_enabled() {
-                self.defrag.prepare(self, plan_stats);
-            }
-
-            // Prepare each block for GC
-            let threshold = self.defrag.defrag_spill_threshold.load(Ordering::Acquire);
-            // # Safety: ImmixSpace reference is always valid within this collection cycle.
-            let space = unsafe { &*(self as *const Self) };
-            let work_packets = self.chunk_map.generate_tasks(|chunk| {
-                Box::new(PrepareBlockState {
-                    space,
-                    chunk,
-                    defrag_threshold: if space.in_defrag() {
-                        Some(threshold)
-                    } else {
-                        None
-                    },
-                })
-            });
-            self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
-
-            if !super::BLOCK_ONLY {
-                self.line_mark_state.fetch_add(1, Ordering::AcqRel);
-                if self.line_mark_state.load(Ordering::Acquire) > Line::MAX_MARK_STATE {
-                    self.line_mark_state
-                        .store(Line::RESET_MARK_STATE, Ordering::Release);
-                }
-            }
-        }
-
-        #[cfg(feature = "vo_bit")]
-        if vo_bit::helper::need_to_clear_vo_bits_before_tracing::<VM>() {
-            let maybe_scope = if major_gc {
-                // If it is major GC, we always clear all VO bits because we are doing full-heap
-                // tracing.
-                Some(VOBitsClearingScope::FullGC)
-            } else if self.space_args.mixed_age {
-                // StickyImmix nursery GC.
-                // Some lines (or blocks) contain only young objects,
-                // while other lines (or blocks) contain only old objects.
-                if super::BLOCK_ONLY {
-                    // Block only.  Young objects are only allocated into fully empty blocks.
-                    // Only clear unmarked blocks.
-                    Some(VOBitsClearingScope::BlockOnly)
-                } else {
-                    // Young objects are allocated into empty lines.
-                    // Only clear unmarked lines.
-                    let line_mark_state = self.line_mark_state.load(Ordering::SeqCst);
-                    Some(VOBitsClearingScope::Line {
-                        state: line_mark_state,
-                    })
-                }
-            } else {
-                // GenImmix nursery GC.  We do nothing to the ImmixSpace because the nursery is a
-                // separate CopySpace.  It'll clear its own VO bits.
-                None
-            };
-
-            if let Some(scope) = maybe_scope {
-                let work_packets = self
-                    .chunk_map
-                    .generate_tasks(|chunk| Box::new(ClearVOBitsAfterPrepare { chunk, scope }));
-                self.scheduler.work_buckets[WorkBucketStage::ClearVOBits].bulk_add(work_packets);
-            }
-        }
-    }
-
-    /// Release for the immix space.
-    pub fn release(&mut self, major_gc: bool) {
-        if major_gc {
-            // Update line_unavail_state for hole searching after this GC.
-            if !super::BLOCK_ONLY {
-                self.line_unavail_state.store(
-                    self.line_mark_state.load(Ordering::Acquire),
-                    Ordering::Release,
-                );
-            }
-        }
-        // Clear reusable blocks list
-        if !super::BLOCK_ONLY {
-            self.reusable_blocks.reset();
-        }
-        // Sweep chunks and blocks
-        let work_packets = self.generate_sweep_tasks();
-        self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
-
-        self.lines_consumed.store(0, Ordering::Relaxed);
-    }
-
-    /// This is called when a GC finished.
-    /// Return whether this GC was a defrag GC, as a plan may want to know this.
-    pub fn end_of_gc(&mut self) -> bool {
-        let did_defrag = self.defrag.in_defrag();
-        if self.is_defrag_enabled() {
-            self.defrag.reset_in_defrag();
-        }
-        did_defrag
     }
 
     /// Generate chunk sweep tasks

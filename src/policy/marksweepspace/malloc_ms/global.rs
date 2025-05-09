@@ -241,6 +241,32 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     fn enumerate_objects(&self, _enumerator: &mut dyn ObjectEnumerator) {
         unimplemented!()
     }
+
+    fn prepare(&mut self, _full_heap: bool, _arg: Option<Box<dyn std::any::Any>>) {}
+
+    fn release(&mut self, _full_heap: bool) {
+        use crate::scheduler::WorkBucketStage;
+        let space = unsafe { &*(self as *const Self) };
+        let work_packets = self.chunk_map.generate_tasks(|chunk| {
+            Box::new(MSSweepChunk {
+                ms: space,
+                chunk: chunk.start(),
+            })
+        });
+
+        debug!("Generated {} sweep work packets", work_packets.len());
+        #[cfg(debug_assertions)]
+        {
+            self.total_work_packets
+                .store(work_packets.len() as u32, Ordering::SeqCst);
+            self.completed_work_packets.store(0, Ordering::SeqCst);
+            self.work_live_bytes.store(0, Ordering::SeqCst);
+        }
+
+        self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+    }
+
+    fn end_of_gc(&mut self) {}
 }
 
 use crate::scheduler::GCWorker;
@@ -544,32 +570,6 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
         crate::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
     }
-
-    pub fn prepare(&mut self, _full_heap: bool) {}
-
-    pub fn release(&mut self) {
-        use crate::scheduler::WorkBucketStage;
-        let space = unsafe { &*(self as *const Self) };
-        let work_packets = self.chunk_map.generate_tasks(|chunk| {
-            Box::new(MSSweepChunk {
-                ms: space,
-                chunk: chunk.start(),
-            })
-        });
-
-        debug!("Generated {} sweep work packets", work_packets.len());
-        #[cfg(debug_assertions)]
-        {
-            self.total_work_packets
-                .store(work_packets.len() as u32, Ordering::SeqCst);
-            self.completed_work_packets.store(0, Ordering::SeqCst);
-            self.work_live_bytes.store(0, Ordering::SeqCst);
-        }
-
-        self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
-    }
-
-    pub fn end_of_gc(&mut self) {}
 
     pub fn sweep_chunk(&self, chunk_start: Address) {
         // Call the relevant sweep function depending on the location of the mark bits

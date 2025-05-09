@@ -153,6 +153,22 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
             enumerator.visit_address_range(ep.start, ep.end);
         }
     }
+
+    fn prepare(&mut self, _full_heap: bool, _arg: Option<Box<dyn std::any::Any>>) {
+        self.mark_state.on_global_prepare::<VM>();
+        for external_pages in self.pr.get_external_pages().iter() {
+            self.mark_state.on_block_reset::<VM>(
+                external_pages.start,
+                external_pages.end - external_pages.start,
+            );
+        }
+    }
+
+    fn release(&mut self, _full_heap: bool) {
+        self.mark_state.on_global_release::<VM>();
+    }
+
+    fn end_of_gc(&mut self) {}
 }
 
 use crate::scheduler::GCWorker;
@@ -254,20 +270,6 @@ impl<VM: VMBinding> VMSpace<VM> {
                 side.bset_metadata(start, size);
             }
         }
-    }
-
-    pub fn prepare(&mut self) {
-        self.mark_state.on_global_prepare::<VM>();
-        for external_pages in self.pr.get_external_pages().iter() {
-            self.mark_state.on_block_reset::<VM>(
-                external_pages.start,
-                external_pages.end - external_pages.start,
-            );
-        }
-    }
-
-    pub fn release(&mut self) {
-        self.mark_state.on_global_release::<VM>();
     }
 
     pub fn trace_object<Q: ObjectQueue>(

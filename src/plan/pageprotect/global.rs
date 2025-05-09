@@ -50,7 +50,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        self.space.prepare(true);
+        self.space.prepare(true, None);
     }
 
     fn release(&mut self, tls: VMWorkerThread) {

@@ -88,7 +88,9 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         self.common.prepare(tls, true);
         self.immix_space.prepare(
             true,
-            crate::policy::immix::defrag::StatsForDefrag::new(self),
+            Some(Box::new(crate::policy::immix::defrag::StatsForDefrag::new(
+                self,
+            ))),
         );
     }
 
@@ -99,8 +101,9 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn end_of_gc(&mut self, _tls: VMWorkerThread) {
-        self.last_gc_was_defrag
-            .store(self.immix_space.end_of_gc(), Ordering::Relaxed);
+        let did_defrag = self.immix_space.in_defrag();
+        self.last_gc_was_defrag.store(did_defrag, Ordering::Relaxed);
+        self.immix_space.end_of_gc();
     }
 
     fn current_gc_may_move_object(&self) -> bool {

@@ -491,24 +491,24 @@ impl<VM: VMBinding> BasePlan<VM> {
 
     pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
-        self.code_space.prepare();
+        self.code_space.prepare(_full_heap, None);
         #[cfg(feature = "code_space")]
-        self.code_lo_space.prepare();
+        self.code_lo_space.prepare(_full_heap, None);
         #[cfg(feature = "ro_space")]
-        self.ro_space.prepare();
+        self.ro_space.prepare(_full_heap, None);
         #[cfg(feature = "vm_space")]
-        self.vm_space.prepare();
+        self.vm_space.prepare(_full_heap, None);
     }
 
     pub fn release(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
-        self.code_space.release();
+        self.code_space.release(_full_heap);
         #[cfg(feature = "code_space")]
-        self.code_lo_space.release();
+        self.code_lo_space.release(_full_heap);
         #[cfg(feature = "ro_space")]
-        self.ro_space.release();
+        self.ro_space.release(_full_heap);
         #[cfg(feature = "vm_space")]
-        self.vm_space.release();
+        self.vm_space.release(_full_heap);
     }
 
     pub(crate) fn collection_required<P: Plan>(&self, plan: &P, space_full: bool) -> bool {
@@ -589,16 +589,16 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
-        self.immortal.prepare();
-        self.los.prepare(full_heap);
-        self.nonmoving.prepare();
+        self.immortal.prepare(full_heap, None);
+        self.los.prepare(full_heap, None);
+        self.nonmoving.prepare(full_heap, None);
         self.base.prepare(tls, full_heap)
     }
 
     pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {
-        self.immortal.release();
+        self.immortal.release(full_heap);
         self.los.release(full_heap);
-        self.nonmoving.release();
+        self.nonmoving.release(full_heap);
         self.base.release(tls, full_heap)
     }
 

@@ -131,7 +131,9 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         if full_heap {
             self.immix_space.prepare(
                 full_heap,
-                crate::policy::immix::defrag::StatsForDefrag::new(self),
+                Some(Box::new(crate::policy::immix::defrag::StatsForDefrag::new(
+                    self,
+                ))),
             );
         }
     }
@@ -150,8 +152,9 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         self.gen
             .set_next_gc_full_heap(CommonGenPlan::should_next_gc_be_full_heap(self));
 
-        let did_defrag = self.immix_space.end_of_gc();
+        let did_defrag = self.immix_space.in_defrag();
         self.last_gc_was_defrag.store(did_defrag, Ordering::Relaxed);
+        self.immix_space.end_of_gc();
     }
 
     fn current_gc_may_move_object(&self) -> bool {

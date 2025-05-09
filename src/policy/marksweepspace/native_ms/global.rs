@@ -253,6 +253,47 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_chunk_map::<Block>(enumerator, &self.chunk_map);
     }
+
+    fn prepare(&mut self, full_heap: bool, _arg: Option<Box<dyn std::any::Any>>) {
+        if self.common.needs_log_bit && full_heap {
+            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+                for chunk in self.chunk_map.all_chunks() {
+                    side.bzero_metadata(chunk.start(), Chunk::BYTES);
+                }
+            }
+        }
+
+        #[cfg(debug_assertions)]
+        self.abandoned_in_gc.lock().unwrap().assert_empty();
+
+        // # Safety: MarkSweepSpace reference is always valid within this collection cycle.
+        let space = unsafe { &*(self as *const Self) };
+        let work_packets = self
+            .chunk_map
+            .generate_tasks(|chunk| Box::new(PrepareChunkMap { space, chunk }));
+        self.scheduler.work_buckets[crate::scheduler::WorkBucketStage::Prepare]
+            .bulk_add(work_packets);
+    }
+
+    fn release(&mut self, _full_heap: bool) {
+        let num_mutators = VM::VMActivePlan::number_of_mutators();
+        // all ReleaseMutator work packets plus the ReleaseMarkSweepSpace packet
+        self.pending_release_packets
+            .store(num_mutators + 1, Ordering::SeqCst);
+
+        // Do work in separate work packet in order not to slow down the `Release` work packet which
+        // blocks all `ReleaseMutator` packets.
+        let space = unsafe { &*(self as *const Self) };
+        let work_packet = ReleaseMarkSweepSpace { space };
+        self.scheduler.work_buckets[crate::scheduler::WorkBucketStage::Release].add(work_packet);
+    }
+
+    fn end_of_gc(&mut self) {
+        epilogue::debug_assert_counter_zero(
+            &self.pending_release_packets,
+            "pending_release_packets",
+        );
+    }
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepSpace<VM> {
@@ -403,47 +444,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn record_new_block(&self, block: Block) {
         block.init();
         self.chunk_map.set_allocated(block.chunk(), true);
-    }
-
-    pub fn prepare(&mut self, full_heap: bool) {
-        if self.common.needs_log_bit && full_heap {
-            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                for chunk in self.chunk_map.all_chunks() {
-                    side.bzero_metadata(chunk.start(), Chunk::BYTES);
-                }
-            }
-        }
-
-        #[cfg(debug_assertions)]
-        self.abandoned_in_gc.lock().unwrap().assert_empty();
-
-        // # Safety: MarkSweepSpace reference is always valid within this collection cycle.
-        let space = unsafe { &*(self as *const Self) };
-        let work_packets = self
-            .chunk_map
-            .generate_tasks(|chunk| Box::new(PrepareChunkMap { space, chunk }));
-        self.scheduler.work_buckets[crate::scheduler::WorkBucketStage::Prepare]
-            .bulk_add(work_packets);
-    }
-
-    pub fn release(&mut self) {
-        let num_mutators = VM::VMActivePlan::number_of_mutators();
-        // all ReleaseMutator work packets plus the ReleaseMarkSweepSpace packet
-        self.pending_release_packets
-            .store(num_mutators + 1, Ordering::SeqCst);
-
-        // Do work in separate work packet in order not to slow down the `Release` work packet which
-        // blocks all `ReleaseMutator` packets.
-        let space = unsafe { &*(self as *const Self) };
-        let work_packet = ReleaseMarkSweepSpace { space };
-        self.scheduler.work_buckets[crate::scheduler::WorkBucketStage::Release].add(work_packet);
-    }
-
-    pub fn end_of_gc(&mut self) {
-        epilogue::debug_assert_counter_zero(
-            &self.pending_release_packets,
-            "pending_release_packets",
-        );
     }
 
     /// Release a block.
