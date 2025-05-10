@@ -30,7 +30,11 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        !self.is_from_space() || object_forwarding::is_forwarded::<VM>(object)
+        if !self.is_from_space() {
+            object.to_raw_address() < self.pr.cursor()
+        } else {
+            object_forwarding::is_forwarded::<VM>(object)
+        }
     }
 
     #[cfg(feature = "object_pinning")]
