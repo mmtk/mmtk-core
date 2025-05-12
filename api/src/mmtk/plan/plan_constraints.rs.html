@@ -75,7 +75,9 @@
 <a href="#74" id="74">74</a>
 <a href="#75" id="75">75</a>
 <a href="#76" id="76">76</a>
-<a href="#77" id="77">77</a></pre></div><pre class="rust"><code><span class="doccomment">//! Plan-specific constraints.
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a></pre></div><pre class="rust"><code><span class="doccomment">//! Plan-specific constraints.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::BarrierSelector;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
@@ -137,11 +139,13 @@
             </span>needs_linear_scan: <span class="kw">crate</span>::util::constants::SUPPORT_CARD_SCANNING
                 || <span class="kw">crate</span>::util::constants::LAZY_SWEEP,
             needs_concurrent_workers: <span class="bool-val">false</span>,
-            may_trace_duplicate_edges: <span class="bool-val">false</span>,
+            <span class="comment">// We may trace duplicate edges in mark sweep. If we use mark sweep as the non moving policy, it will be included in every
+            </span>may_trace_duplicate_edges: <span class="macro">cfg!</span>(feature = <span class="string">"marksweep_as_nonmoving"</span>),
             needs_forward_after_liveness: <span class="bool-val">false</span>,
             needs_log_bit: <span class="bool-val">false</span>,
             barrier: BarrierSelector::NoBarrier,
-            needs_prepare_mutator: <span class="bool-val">true</span>,
+            <span class="comment">// If we use mark sweep as non moving space, we need to prepare mutator. See [`common_prepare_func`].
+            </span>needs_prepare_mutator: <span class="macro">cfg!</span>(feature = <span class="string">"marksweep_as_nonmoving"</span>),
         }
     }
 }

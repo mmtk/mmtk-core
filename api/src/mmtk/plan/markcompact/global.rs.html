@@ -218,7 +218,10 @@
 <a href="#217" id="217">217</a>
 <a href="#218" id="218">218</a>
 <a href="#219" id="219">219</a>
-<a href="#220" id="220">220</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::MarkCompactGCWorkContext;
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+<a href="#223" id="223">223</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::MarkCompactGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::{
     CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
     UpdateReferences,
@@ -262,7 +265,6 @@
     needs_forward_after_liveness: <span class="bool-val">true</span>,
     max_non_los_default_alloc_bytes:
         <span class="kw">crate</span>::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
-    needs_prepare_mutator: <span class="bool-val">false</span>,
     ..PlanConstraints::default()
 };
 
@@ -291,6 +293,10 @@
     <span class="kw">fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _tls: VMWorkerThread) {
         <span class="self">self</span>.common.release(_tls, <span class="bool-val">true</span>);
         <span class="self">self</span>.mc_space.release();
+    }
+
+    <span class="kw">fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
+        <span class="self">self</span>.common.end_of_gc(tls);
     }
 
     <span class="kw">fn </span>get_allocator_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>EnumMap&lt;AllocationSemantics, AllocatorSelector&gt; {

@@ -241,7 +241,6 @@
     </span>moves_objects: !<span class="macro">cfg!</span>(feature = <span class="string">"immix_non_moving"</span>),
     <span class="comment">// Max immix object size is half of a block.
     </span>max_non_los_default_alloc_bytes: <span class="kw">crate</span>::policy::immix::MAX_IMMIX_OBJECT_SIZE,
-    needs_prepare_mutator: <span class="bool-val">false</span>,
     ..PlanConstraints::default()
 };
 
@@ -287,7 +286,7 @@
         <span class="self">self</span>.common.prepare(tls, <span class="bool-val">true</span>);
         <span class="self">self</span>.immix_space.prepare(
             <span class="bool-val">true</span>,
-            <span class="kw">crate</span>::policy::immix::defrag::StatsForDefrag::new(<span class="self">self</span>),
+            <span class="prelude-val">Some</span>(<span class="kw">crate</span>::policy::immix::defrag::StatsForDefrag::new(<span class="self">self</span>)),
         );
     }
 
@@ -297,9 +296,10 @@
         </span><span class="self">self</span>.immix_space.release(<span class="bool-val">true</span>);
     }
 
-    <span class="kw">fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _tls: VMWorkerThread) {
+    <span class="kw">fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
         <span class="self">self</span>.last_gc_was_defrag
             .store(<span class="self">self</span>.immix_space.end_of_gc(), Ordering::Relaxed);
+        <span class="self">self</span>.common.end_of_gc(tls);
     }
 
     <span class="kw">fn </span>current_gc_may_move_object(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {

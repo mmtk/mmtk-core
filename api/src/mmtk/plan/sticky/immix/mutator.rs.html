@@ -41,11 +41,12 @@
 <a href="#40" id="40">40</a>
 <a href="#41" id="41">41</a>
 <a href="#42" id="42">42</a>
-<a href="#43" id="43">43</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::ObjectBarrier;
+<a href="#43" id="43">43</a>
+<a href="#44" id="44">44</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::ObjectBarrier;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::barrier::GenObjectBarrierSemantics;
 <span class="kw">use </span><span class="kw">crate</span>::plan::immix;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::{
-    create_space_mapping, unreachable_prepare_func, MutatorBuilder, MutatorConfig,
+    common_prepare_func, common_release_func, create_space_mapping, MutatorBuilder, MutatorConfig,
 };
 <span class="kw">use </span><span class="kw">crate</span>::plan::sticky::immix::global::StickyImmix;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocatorSelector;
@@ -55,7 +56,8 @@
 <span class="kw">use crate</span>::{Mutator, MMTK};
 
 <span class="kw">pub fn </span>stickyimmix_mutator_release&lt;VM: VMBinding&gt;(mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, tls: VMWorkerThread) {
-    immix::mutator::immix_mutator_release(mutator, tls)
+    immix::mutator::immix_mutator_release(mutator, tls);
+    common_release_func(mutator, tls);
 }
 
 <span class="kw">pub use </span>immix::mutator::ALLOCATOR_MAPPING;
@@ -73,7 +75,7 @@
             vec.push((AllocatorSelector::Immix(<span class="number">0</span>), stickyimmix.get_immix_space()));
             vec
         }),
-        prepare_func: <span class="kw-2">&amp;</span>unreachable_prepare_func,
+        prepare_func: <span class="kw-2">&amp;</span>common_prepare_func,
         release_func: <span class="kw-2">&amp;</span>stickyimmix_mutator_release,
     };
 

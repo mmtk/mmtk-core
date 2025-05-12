@@ -713,7 +713,81 @@
 <a href="#712" id="712">712</a>
 <a href="#713" id="713">713</a>
 <a href="#714" id="714">714</a>
-<a href="#715" id="715">715</a></pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
+<a href="#715" id="715">715</a>
+<a href="#716" id="716">716</a>
+<a href="#717" id="717">717</a>
+<a href="#718" id="718">718</a>
+<a href="#719" id="719">719</a>
+<a href="#720" id="720">720</a>
+<a href="#721" id="721">721</a>
+<a href="#722" id="722">722</a>
+<a href="#723" id="723">723</a>
+<a href="#724" id="724">724</a>
+<a href="#725" id="725">725</a>
+<a href="#726" id="726">726</a>
+<a href="#727" id="727">727</a>
+<a href="#728" id="728">728</a>
+<a href="#729" id="729">729</a>
+<a href="#730" id="730">730</a>
+<a href="#731" id="731">731</a>
+<a href="#732" id="732">732</a>
+<a href="#733" id="733">733</a>
+<a href="#734" id="734">734</a>
+<a href="#735" id="735">735</a>
+<a href="#736" id="736">736</a>
+<a href="#737" id="737">737</a>
+<a href="#738" id="738">738</a>
+<a href="#739" id="739">739</a>
+<a href="#740" id="740">740</a>
+<a href="#741" id="741">741</a>
+<a href="#742" id="742">742</a>
+<a href="#743" id="743">743</a>
+<a href="#744" id="744">744</a>
+<a href="#745" id="745">745</a>
+<a href="#746" id="746">746</a>
+<a href="#747" id="747">747</a>
+<a href="#748" id="748">748</a>
+<a href="#749" id="749">749</a>
+<a href="#750" id="750">750</a>
+<a href="#751" id="751">751</a>
+<a href="#752" id="752">752</a>
+<a href="#753" id="753">753</a>
+<a href="#754" id="754">754</a>
+<a href="#755" id="755">755</a>
+<a href="#756" id="756">756</a>
+<a href="#757" id="757">757</a>
+<a href="#758" id="758">758</a>
+<a href="#759" id="759">759</a>
+<a href="#760" id="760">760</a>
+<a href="#761" id="761">761</a>
+<a href="#762" id="762">762</a>
+<a href="#763" id="763">763</a>
+<a href="#764" id="764">764</a>
+<a href="#765" id="765">765</a>
+<a href="#766" id="766">766</a>
+<a href="#767" id="767">767</a>
+<a href="#768" id="768">768</a>
+<a href="#769" id="769">769</a>
+<a href="#770" id="770">770</a>
+<a href="#771" id="771">771</a>
+<a href="#772" id="772">772</a>
+<a href="#773" id="773">773</a>
+<a href="#774" id="774">774</a>
+<a href="#775" id="775">775</a>
+<a href="#776" id="776">776</a>
+<a href="#777" id="777">777</a>
+<a href="#778" id="778">778</a>
+<a href="#779" id="779">779</a>
+<a href="#780" id="780">780</a>
+<a href="#781" id="781">781</a>
+<a href="#782" id="782">782</a>
+<a href="#783" id="783">783</a>
+<a href="#784" id="784">784</a>
+<a href="#785" id="785">785</a>
+<a href="#786" id="786">786</a>
+<a href="#787" id="787">787</a>
+<a href="#788" id="788">788</a>
+<a href="#789" id="789">789</a></pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
@@ -912,7 +986,7 @@
 
     <span class="doccomment">/// Inform the plan about the end of a GC. It is guaranteed that there is no further work for this GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
-    </span><span class="kw">fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _tls: VMWorkerThread) {}
+    </span><span class="kw">fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _tls: VMWorkerThread);
 
     <span class="doccomment">/// Notify the plan that an emergency collection will happen. The plan should try to free as much memory as possible.
     /// The default implementation will force a full heap collection for generational plans.
@@ -1226,6 +1300,10 @@ BasePlan should contain all plan-related state and functions that are _fundament
         </span><span class="self">self</span>.vm_space.release();
     }
 
+    <span class="kw">pub fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _tls: VMWorkerThread) {
+        <span class="comment">// Do nothing here. None of the spaces needs end_of_gc.
+    </span>}
+
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>collection_required&lt;P: Plan&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span>P, space_full: bool) -&gt; bool {
         <span class="kw">let </span>stress_force_gc =
             <span class="kw">crate</span>::util::heap::gc_trigger::GCTrigger::&lt;VM&gt;::should_do_stress_gc_inner(
@@ -1257,6 +1335,17 @@ BasePlan should contain all plan-related state and functions that are _fundament
     }
 }
 
+<span class="macro">cfg_if::cfg_if!</span> {
+    <span class="comment">// Use immortal or mark sweep as the non moving space if the features are enabled. Otherwise use Immix.
+    </span><span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">"immortal_as_nonmoving"</span>)] </span>{
+        <span class="kw">pub type </span>NonMovingSpace&lt;VM&gt; = <span class="kw">crate</span>::policy::immortalspace::ImmortalSpace&lt;VM&gt;;
+    } <span class="kw">else if </span><span class="attr">#[cfg(feature = <span class="string">"marksweep_as_nonmoving"</span>)] </span>{
+        <span class="kw">pub type </span>NonMovingSpace&lt;VM&gt; = <span class="kw">crate</span>::policy::marksweepspace::native_ms::MarkSweepSpace&lt;VM&gt;;
+    } <span class="kw">else </span>{
+        <span class="kw">pub type </span>NonMovingSpace&lt;VM&gt; = <span class="kw">crate</span>::policy::immix::ImmixSpace&lt;VM&gt;;
+    }
+}
+
 <span class="doccomment">/**
 CommonPlan is for representing state and features used by _many_ plans, but that are not fundamental to _all_ plans.  Examples include the Large Object Space and an Immortal space.  Features that are fundamental to _all_ plans must be included in BasePlan.
 */
@@ -1266,9 +1355,12 @@ CommonPlan is for representing state and features used by _many_ plans, but that
     </span><span class="kw">pub </span>immortal: ImmortalSpace&lt;VM&gt;,
     <span class="attr">#[space]
     </span><span class="kw">pub </span>los: LargeObjectSpace&lt;VM&gt;,
-    <span class="comment">// TODO: We should use a marksweep space for nonmoving.
-    </span><span class="attr">#[space]
-    </span><span class="kw">pub </span>nonmoving: ImmortalSpace&lt;VM&gt;,
+    <span class="attr">#[space]
+    #[cfg_attr(
+        not(any(feature = <span class="string">"immortal_as_nonmoving"</span>, feature = <span class="string">"marksweep_as_nonmoving"</span>)),
+        post_scan
+    )] </span><span class="comment">// Immix space needs post_scan
+    </span><span class="kw">pub </span>nonmoving: NonMovingSpace&lt;VM&gt;,
     <span class="attr">#[parent]
     </span><span class="kw">pub </span>base: BasePlan&lt;VM&gt;,
 }
@@ -1286,12 +1378,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
                 args.get_space_args(<span class="string">"los"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
                 <span class="bool-val">false</span>,
             ),
-            nonmoving: ImmortalSpace::new(args.get_space_args(
-                <span class="string">"nonmoving"</span>,
-                <span class="bool-val">true</span>,
-                <span class="bool-val">false</span>,
-                VMRequest::discontiguous(),
-            )),
+            nonmoving: <span class="self">Self</span>::new_nonmoving_space(<span class="kw-2">&amp;mut </span>args),
             base: BasePlan::new(args),
         }
     }
@@ -1306,15 +1393,20 @@ CommonPlan is for representing state and features used by _many_ plans, but that
     <span class="kw">pub fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread, full_heap: bool) {
         <span class="self">self</span>.immortal.prepare();
         <span class="self">self</span>.los.prepare(full_heap);
-        <span class="self">self</span>.nonmoving.prepare();
+        <span class="self">self</span>.prepare_nonmoving_space(full_heap);
         <span class="self">self</span>.base.prepare(tls, full_heap)
     }
 
     <span class="kw">pub fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread, full_heap: bool) {
         <span class="self">self</span>.immortal.release();
         <span class="self">self</span>.los.release(full_heap);
-        <span class="self">self</span>.nonmoving.release();
+        <span class="self">self</span>.release_nonmoving_space(full_heap);
         <span class="self">self</span>.base.release(tls, full_heap)
+    }
+
+    <span class="kw">pub fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
+        <span class="self">self</span>.end_of_gc_nonmoving_space();
+        <span class="self">self</span>.base.end_of_gc(tls);
     }
 
     <span class="kw">pub fn </span>get_immortal(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>ImmortalSpace&lt;VM&gt; {
@@ -1325,8 +1417,64 @@ CommonPlan is for representing state and features used by _many_ plans, but that
         <span class="kw-2">&amp;</span><span class="self">self</span>.los
     }
 
-    <span class="kw">pub fn </span>get_nonmoving(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>ImmortalSpace&lt;VM&gt; {
+    <span class="kw">pub fn </span>get_nonmoving(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>NonMovingSpace&lt;VM&gt; {
         <span class="kw-2">&amp;</span><span class="self">self</span>.nonmoving
+    }
+
+    <span class="kw">fn </span>new_nonmoving_space(args: <span class="kw-2">&amp;mut </span>CreateSpecificPlanArgs&lt;VM&gt;) -&gt; NonMovingSpace&lt;VM&gt; {
+        <span class="kw">let </span>space_args = args.get_space_args(<span class="string">"nonmoving"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous());
+        <span class="macro">cfg_if::cfg_if!</span> {
+            <span class="kw">if </span><span class="attr">#[cfg(any(feature = <span class="string">"immortal_as_nonmoving"</span>, feature = <span class="string">"marksweep_as_nonmoving"</span>))] </span>{
+                NonMovingSpace::new(space_args)
+            } <span class="kw">else </span>{
+                <span class="comment">// Immix requires extra args.
+                </span>NonMovingSpace::new(
+                    space_args,
+                    <span class="kw">crate</span>::policy::immix::ImmixSpaceArgs {
+                        unlog_object_when_traced: <span class="bool-val">false</span>,
+                        <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+                        </span>mixed_age: <span class="bool-val">false</span>,
+                        never_move_objects: <span class="bool-val">true</span>,
+                    },
+                )
+            }
+        }
+    }
+
+    <span class="kw">fn </span>prepare_nonmoving_space(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _full_heap: bool) {
+        <span class="macro">cfg_if::cfg_if!</span> {
+            <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">"immortal_as_nonmoving"</span>)] </span>{
+                <span class="self">self</span>.nonmoving.prepare();
+            } <span class="kw">else if </span><span class="attr">#[cfg(feature = <span class="string">"marksweep_as_nonmoving"</span>)] </span>{
+                <span class="self">self</span>.nonmoving.prepare(_full_heap);
+            } <span class="kw">else </span>{
+                <span class="self">self</span>.nonmoving.prepare(_full_heap, <span class="prelude-val">None</span>);
+            }
+        }
+    }
+
+    <span class="kw">fn </span>release_nonmoving_space(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _full_heap: bool) {
+        <span class="macro">cfg_if::cfg_if!</span> {
+            <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">"immortal_as_nonmoving"</span>)] </span>{
+                <span class="self">self</span>.nonmoving.release();
+            } <span class="kw">else if </span><span class="attr">#[cfg(feature = <span class="string">"marksweep_as_nonmoving"</span>)] </span>{
+                <span class="self">self</span>.nonmoving.prepare(_full_heap);
+            } <span class="kw">else </span>{
+                <span class="self">self</span>.nonmoving.release(_full_heap);
+            }
+        }
+    }
+
+    <span class="kw">fn </span>end_of_gc_nonmoving_space(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="macro">cfg_if::cfg_if!</span> {
+            <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">"immortal_as_nonmoving"</span>)] </span>{
+                <span class="comment">// Nothing we need to do for immortal space.
+            </span>} <span class="kw">else if </span><span class="attr">#[cfg(feature = <span class="string">"marksweep_as_nonmoving"</span>)] </span>{
+                <span class="self">self</span>.nonmoving.end_of_gc();
+            } <span class="kw">else </span>{
+                <span class="self">self</span>.nonmoving.end_of_gc();
+            }
+        }
     }
 }
 

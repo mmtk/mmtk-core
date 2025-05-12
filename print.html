@@ -1192,6 +1192,14 @@ with <code>&amp;mygc_mutator_release</code>.  This function will be called at th
 (at the end of a collection) for each mutator.  It rebinds the allocator for the <code>Default</code>
 allocation semantics to the new tospace. When the mutator threads resume, any new allocations for
 <code>Default</code> will then go to the new tospace.</p>
+<h3 id="end-of-gc"><a class="header" href="#end-of-gc">End of GC</a></h3>
+<p>Find the method <code>end_of_gc()</code> in <code>mygc/global.rs</code>. Call <code>end_of_gc</code> from the common plan instead.</p>
+<pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn end_of_gc(&amp;mut self, tls: VMWorkerThread) {
+        self.common.end_of_gc(tls);
+    }
+<span class="boring">}</span></code></pre></pre>
 <h2 id="processedgeswork-for-mygc"><a class="header" href="#processedgeswork-for-mygc">ProcessEdgesWork for MyGC</a></h2>
 <p><a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html"><code>ProcessEdgesWork</code></a>
 is the key work packet for tracing objects in a GC. A <code>ProcessEdgesWork</code> implementation

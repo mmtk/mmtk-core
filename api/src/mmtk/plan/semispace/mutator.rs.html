@@ -64,8 +64,12 @@
 <a href="#63" id="63">63</a>
 <a href="#64" id="64">64</a>
 <a href="#65" id="65">65</a>
-<a href="#66" id="66">66</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::SemiSpace;
-<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::unreachable_prepare_func;
+<a href="#66" id="66">66</a>
+<a href="#67" id="67">67</a>
+<a href="#68" id="68">68</a>
+<a href="#69" id="69">69</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::SemiSpace;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::common_prepare_func;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::common_release_func;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::Mutator;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::MutatorBuilder;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::MutatorConfig;
@@ -80,7 +84,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::MMTK;
 <span class="kw">use </span>enum_map::EnumMap;
 
-<span class="kw">pub fn </span>ss_mutator_release&lt;VM: VMBinding&gt;(mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, _tls: VMWorkerThread) {
+<span class="kw">pub fn </span>ss_mutator_release&lt;VM: VMBinding&gt;(mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, tls: VMWorkerThread) {
     <span class="comment">// rebind the allocation bump pointer to the appropriate semispace
     </span><span class="kw">let </span>bump_allocator = <span class="kw">unsafe </span>{
         mutator
@@ -96,6 +100,8 @@
             .unwrap()
             .tospace(),
     );
+
+    common_release_func(mutator, tls);
 }
 
 <span class="kw">const </span>RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
@@ -123,7 +129,7 @@
             vec.push((AllocatorSelector::BumpPointer(<span class="number">0</span>), ss.tospace()));
             vec
         }),
-        prepare_func: <span class="kw-2">&amp;</span>unreachable_prepare_func,
+        prepare_func: <span class="kw-2">&amp;</span>common_prepare_func,
         release_func: <span class="kw-2">&amp;</span>ss_mutator_release,
     };
 

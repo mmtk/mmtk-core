@@ -324,7 +324,12 @@
 <a href="#323" id="323">323</a>
 <a href="#324" id="324">324</a>
 <a href="#325" id="325">325</a>
-<a href="#326" id="326">326</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
+<a href="#326" id="326">326</a>
+<a href="#327" id="327">327</a>
+<a href="#328" id="328">328</a>
+<a href="#329" id="329">329</a>
+<a href="#330" id="330">330</a>
+<a href="#331" id="331">331</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
@@ -402,6 +407,11 @@
         <span class="kw">let </span>full_heap = !<span class="self">self</span>.is_current_gc_nursery();
         <span class="self">self</span>.common.release(tls, full_heap);
         <span class="self">self</span>.nursery.release();
+    }
+
+    <span class="kw">pub fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread, next_gc_full_heap: bool) {
+        <span class="self">self</span>.set_next_gc_full_heap(next_gc_full_heap);
+        <span class="self">self</span>.common.end_of_gc(tls);
     }
 
     <span class="doccomment">/// Independent of how many pages remain in the page budget (a function of heap size), we must

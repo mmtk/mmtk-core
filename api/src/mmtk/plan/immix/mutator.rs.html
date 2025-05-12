@@ -57,10 +57,14 @@
 <a href="#56" id="56">56</a>
 <a href="#57" id="57">57</a>
 <a href="#58" id="58">58</a>
-<a href="#59" id="59">59</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::Immix;
+<a href="#59" id="59">59</a>
+<a href="#60" id="60">60</a>
+<a href="#61" id="61">61</a>
+<a href="#62" id="62">62</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::Immix;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::common_prepare_func;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::common_release_func;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::create_allocator_mapping;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::create_space_mapping;
-<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::unreachable_prepare_func;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::Mutator;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::MutatorBuilder;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::MutatorConfig;
@@ -73,7 +77,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::MMTK;
 <span class="kw">use </span>enum_map::EnumMap;
 
-<span class="kw">pub fn </span>immix_mutator_release&lt;VM: VMBinding&gt;(mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, _tls: VMWorkerThread) {
+<span class="kw">pub fn </span>immix_mutator_release&lt;VM: VMBinding&gt;(mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, tls: VMWorkerThread) {
     <span class="kw">let </span>immix_allocator = <span class="kw">unsafe </span>{
         mutator
             .allocators
@@ -82,6 +86,8 @@
     .downcast_mut::&lt;ImmixAllocator&lt;VM&gt;&gt;()
     .unwrap();
     immix_allocator.reset();
+
+    common_release_func(mutator, tls);
 }
 
 <span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plan) <span class="kw">const </span>RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
@@ -109,7 +115,7 @@
             vec.push((AllocatorSelector::Immix(<span class="number">0</span>), <span class="kw-2">&amp;</span>immix.immix_space));
             vec
         }),
-        prepare_func: <span class="kw-2">&amp;</span>unreachable_prepare_func,
+        prepare_func: <span class="kw-2">&amp;</span>common_prepare_func,
         release_func: <span class="kw-2">&amp;</span>immix_mutator_release,
     };
 

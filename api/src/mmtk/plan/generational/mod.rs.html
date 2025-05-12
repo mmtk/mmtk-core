@@ -85,8 +85,7 @@
 <a href="#84" id="84">84</a>
 <a href="#85" id="85">85</a>
 <a href="#86" id="86">86</a>
-<a href="#87" id="87">87</a>
-<a href="#88" id="88">88</a></pre></div><pre class="rust"><code><span class="doccomment">//! Generational plans
+<a href="#87" id="87">87</a></pre></div><pre class="rust"><code><span class="doccomment">//! Generational plans
 
 </span><span class="kw">use </span>enum_map::EnumMap;
 
@@ -138,7 +137,6 @@
     </span>may_trace_duplicate_edges: ACTIVE_BARRIER.equals(BarrierSelector::ObjectBarrier),
     max_non_los_default_alloc_bytes:
         <span class="kw">crate</span>::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
-    needs_prepare_mutator: <span class="bool-val">false</span>,
     ..PlanConstraints::default()
 };
 

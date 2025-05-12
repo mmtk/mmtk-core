@@ -407,7 +407,7 @@
         <span class="kw">if </span>full_heap {
             <span class="self">self</span>.immix_space.prepare(
                 full_heap,
-                <span class="kw">crate</span>::policy::immix::defrag::StatsForDefrag::new(<span class="self">self</span>),
+                <span class="prelude-val">Some</span>(<span class="kw">crate</span>::policy::immix::defrag::StatsForDefrag::new(<span class="self">self</span>)),
             );
         }
     }
@@ -422,9 +422,9 @@
             .store(full_heap, Ordering::Relaxed);
     }
 
-    <span class="kw">fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _tls: VMWorkerThread) {
-        <span class="self">self</span>.gen
-            .set_next_gc_full_heap(CommonGenPlan::should_next_gc_be_full_heap(<span class="self">self</span>));
+    <span class="kw">fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
+        <span class="kw">let </span>next_gc_full_heap = CommonGenPlan::should_next_gc_be_full_heap(<span class="self">self</span>);
+        <span class="self">self</span>.gen.end_of_gc(tls, next_gc_full_heap);
 
         <span class="kw">let </span>did_defrag = <span class="self">self</span>.immix_space.end_of_gc();
         <span class="self">self</span>.last_gc_was_defrag.store(did_defrag, Ordering::Relaxed);

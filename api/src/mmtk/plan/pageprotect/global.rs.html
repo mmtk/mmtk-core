@@ -116,7 +116,10 @@
 <a href="#115" id="115">115</a>
 <a href="#116" id="116">116</a>
 <a href="#117" id="117">117</a>
-<a href="#118" id="118">118</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::PPGCWorkContext;
+<a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::PPGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
@@ -149,7 +152,6 @@
 <span class="doccomment">/// The plan constraints for the page protect plan.
 </span><span class="kw">pub const </span>CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: <span class="bool-val">false</span>,
-    needs_prepare_mutator: <span class="bool-val">false</span>,
     ..PlanConstraints::default()
 };
 
@@ -174,6 +176,10 @@
     <span class="kw">fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
         <span class="self">self</span>.common.release(tls, <span class="bool-val">true</span>);
         <span class="self">self</span>.space.release(<span class="bool-val">true</span>);
+    }
+
+    <span class="kw">fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
+        <span class="self">self</span>.common.end_of_gc(tls);
     }
 
     <span class="kw">fn </span>collection_required(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, _space: <span class="prelude-ty">Option</span>&lt;SpaceStats&lt;<span class="self">Self</span>::VM&gt;&gt;) -&gt; bool {
