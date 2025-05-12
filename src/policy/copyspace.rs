@@ -200,6 +200,12 @@ impl<VM: VMBinding> CopySpace<VM> {
                 side_forwarding_status_table.bzero_metadata(start, size);
             }
 
+            if self.common.needs_log_bit {
+                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+                    side.bzero_metadata(start, size);
+                }
+            }
+
             // Clear VO bits because all objects in the space are dead.
             #[cfg(feature = "vo_bit")]
             crate::util::metadata::vo_bit::bzero_vo_bit(start, size);

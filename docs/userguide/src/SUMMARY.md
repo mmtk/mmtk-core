@@ -2,6 +2,8 @@
 
 [Introduction](README.md)
 
+[Glossary](glossary.md)
+
 # For GC Developers
 
 - [Tutorial: Add a new GC plan to MMTk](tutorial/prefix.md)
@@ -36,6 +38,9 @@
     - [Performance Tuning](portingguide/perf_tuning/prefix.md)
         - [Link Time Optimization](portingguide/perf_tuning/lto.md)
         - [Optimizing Allocation](portingguide/perf_tuning/alloc.md)
+    - [VM-specific Concerns](portingguide/concerns/prefix.md)
+        - [Finalizers and Weak References](portingguide/concerns/weakref.md)
+        - [Address-based Hashing](portingguide/concerns/address-based-hashing.md)
 - [API Migration Guide](migration/prefix.md)
     - [Template (for mmtk-core developers)](migration/template.md)
 

@@ -638,6 +638,37 @@ impl ObjectReference {
     }
 
     /// Is the object reachable, determined by the policy?
+    ///
+    /// # Scope
+    ///
+    /// This method is primarily used during weak reference processing.  It can check if an object
+    /// (particularly finalizable objects and objects pointed by weak references) has been reached
+    /// by following strong references or weak references of higher strength.
+    ///
+    /// This method can also be used during tracing for debug purposes.
+    ///
+    /// When called at other times, particularly during mutator time, the behavior is specific to
+    /// the implementation of the plan and policy due to their strategies of metadata clean-up.  If
+    /// the VM needs to know if any given reference is still valid, it should instead use the valid
+    /// object bit (VO-bit) metadata which is enabled by the Cargo feature "vo_bit".
+    ///
+    /// # Return value
+    ///
+    /// It returns `true` if one of the following is true:
+    ///
+    /// 1.  The object has been traced (i.e. reached) since tracing started.
+    /// 2.  The policy conservatively considers the object reachable even though it has not been
+    ///     traced.
+    ///     -   Particularly, if the plan is generational, this method will return `true` if the
+    ///         object is mature during nursery GC.
+    ///
+    /// Due to the conservativeness, if this method returns `true`, it does not necessarily mean the
+    /// object must be reachable from roots.  In generational GC, mature objects can be unreachable
+    /// from roots while the GC chooses not to reclaim their memory during nursery GC. Conversely,
+    /// all young objects reachable from the remembered set are retained even though some mature
+    /// objects in the remembered set can be unreachable in the first place.  (This is known as
+    /// *nepotism* in GC literature.)
+    ///
     /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
     pub fn is_reachable(self) -> bool {
         unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_reachable(self)

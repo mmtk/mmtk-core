@@ -9,8 +9,8 @@ use crate::util::conversions::bytes_to_pages_up;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 
-const BYTES_IN_PAGE: usize = 1 << 12;
-const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
+/// Size of a bump allocator block. Currently it is set to 32 KB.
+const BLOCK_SIZE: usize = 8 << crate::util::constants::LOG_BYTES_IN_PAGE;
 const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 
 /// A bump pointer allocator. It keeps a thread local allocation buffer,

@@ -385,7 +385,7 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `from`: The object to be copied.
-    /// * `to`: The region to be copied to.
+    /// * `to`: The start of the region to be copied to.
     fn get_reference_when_copied_to(from: ObjectReference, to: Address) -> ObjectReference;
 
     /// Return the size used by an object.

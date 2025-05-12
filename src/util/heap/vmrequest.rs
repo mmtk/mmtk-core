@@ -12,7 +12,7 @@ pub enum VMRequest {
 
 impl VMRequest {
     pub fn is_discontiguous(&self) -> bool {
-        matches!(self, VMRequest::Discontiguous { .. })
+        matches!(self, VMRequest::Discontiguous)
     }
 
     pub fn common64bit(top: bool) -> Self {

@@ -2,6 +2,7 @@ use super::ranges::BitOffset;
 use super::SideMetadataSpec;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
+use crate::util::conversions::rshift_align_up;
 use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::memory::{MmapAnnotation, MmapStrategy};
 #[cfg(target_pointer_width = "32")]
@@ -110,7 +111,7 @@ pub(crate) fn ensure_munmap_contiguous_metadata_space(
     let metadata_start = address_to_meta_address(spec, start);
     let mmap_start = metadata_start.align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
-    let metadata_size = (size + ((1 << addr_rshift(spec)) - 1)) >> addr_rshift(spec);
+    let metadata_size = data_to_meta_size_round_up(spec, size);
     let mmap_size = (metadata_start + metadata_size).align_up(BYTES_IN_PAGE) - mmap_start;
     if mmap_size > 0 {
         ensure_munmap_metadata(mmap_start, mmap_size);
@@ -135,7 +136,7 @@ pub(super) fn try_mmap_contiguous_metadata_space(
     let metadata_start = address_to_meta_address(spec, start);
     let mmap_start = metadata_start.align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
-    let metadata_size = (size + ((1 << addr_rshift(spec)) - 1)) >> addr_rshift(spec);
+    let metadata_size = data_to_meta_size_round_up(spec, size);
     let mmap_size = (metadata_start + metadata_size).align_up(BYTES_IN_PAGE) - mmap_start;
     if mmap_size > 0 {
         if !no_reserve {
@@ -185,14 +186,42 @@ pub(crate) fn address_to_meta_address(
     res
 }
 
-pub(super) const fn addr_rshift(metadata_spec: &SideMetadataSpec) -> i32 {
-    ((LOG_BITS_IN_BYTE as usize) + metadata_spec.log_bytes_in_region
-        - (metadata_spec.log_num_of_bits)) as i32
+/// Return the base-2 logarithm of the ratio of data bits and metadata bits per region.
+///
+/// Suppose a memory region has `data_bits` bits of data, and `meta_bits` bits of metadata for
+/// `metadata_spec`, and the result of `log_data_meta_ratio(metadata_spec)` is `shift`, then
+///
+/// -   `data_bits >> shift == meta_bits`
+/// -   `meta_bits << shift == data_bits`
+pub(super) const fn log_data_meta_ratio(metadata_spec: &SideMetadataSpec) -> usize {
+    let log_data_bits_in_region = (LOG_BITS_IN_BYTE as usize) + metadata_spec.log_bytes_in_region;
+    let log_meta_bits_in_region = metadata_spec.log_num_of_bits;
+
+    // TODO: In theory, it is possible to construct a side metadata that has more metadata bits than
+    // data bits per region.  But such pathological side metadata consumes way too much memory, and
+    // should never be used in any useful applications.  It should be forbidden.
+    log_data_bits_in_region - log_meta_bits_in_region
+}
+
+/// Calculate the amount of metadata needed for the give amount of data memory, round up to nearest
+/// integer. `data_size` can be in any unit, e.g. bits, bytes, pages, blocks, chunks, etc., and the
+/// result has the same unit.
+pub(super) const fn data_to_meta_size_round_up(
+    metadata_spec: &SideMetadataSpec,
+    data_size: usize,
+) -> usize {
+    rshift_align_up(data_size, log_data_meta_ratio(metadata_spec))
+}
+
+/// Calculate the amount of data governed by the give amount of metadata.  `meta_size` can be in any
+/// unit, e.g. bits, bytes, pages, blocks, chunks, etc., and the result has the same unit.
+pub(super) const fn meta_to_data_size(metadata_spec: &SideMetadataSpec, meta_size: usize) -> usize {
+    meta_size << log_data_meta_ratio(metadata_spec)
 }
 
 #[allow(dead_code)]
 pub(super) const fn metadata_address_range_size(metadata_spec: &SideMetadataSpec) -> usize {
-    1usize << (VMLayout::LOG_ARCH_ADDRESS_SPACE - addr_rshift(metadata_spec) as usize)
+    1usize << (VMLayout::LOG_ARCH_ADDRESS_SPACE - log_data_meta_ratio(metadata_spec))
 }
 
 pub(super) fn meta_byte_lshift(metadata_spec: &SideMetadataSpec, data_addr: Address) -> u8 {

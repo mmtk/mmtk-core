@@ -153,15 +153,6 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
             let result = w.designated_work.push(Box::new(ReleaseCollector));
             debug_assert!(result.is_ok());
         }
-
-        if *mmtk.get_options().count_live_bytes_in_gc {
-            let live_bytes = mmtk
-                .scheduler
-                .worker_group
-                .get_and_clear_worker_live_bytes();
-            *mmtk.state.live_bytes_in_last_gc.borrow_mut() =
-                mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
-        }
     }
 }
 
@@ -556,7 +547,7 @@ pub trait ProcessEdgesWork:
     /// Higher capacity means the packet will take longer to finish, and may lead to
     /// bad load balancing. On the other hand, lower capacity would lead to higher cost
     /// on scheduling many small work packets. It is important to find a proper capacity.
-    const CAPACITY: usize = 4096;
+    const CAPACITY: usize = EDGES_WORK_BUFFER_SIZE;
     /// Do we update object reference? This has to be true for a moving GC.
     const OVERWRITE_REFERENCE: bool = true;
     /// If true, we do object scanning in this work packet with the same worker without scheduling overhead.

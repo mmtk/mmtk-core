@@ -266,6 +266,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         //    the reserved pages is larger than total pages after the copying GC (the reserved pages after a GC
         //    may be larger than the reserved pages before a GC, as we may end up using more memory for thread local
         //    buffers for copy allocators).
+        // 3. the binding disabled GC, and we end up over-allocating beyond the total pages determined by the GC trigger.
         let available_pages = total_pages.saturating_sub(reserved_pages);
         trace!(
             "Total pages = {}, reserved pages = {}, available pages = {}",
@@ -289,7 +290,12 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// Get the number of pages that are NOT used. This is clearly different from available pages.
     /// Free pages are unused, but some of them may have been reserved for some reason.
     fn get_free_pages(&self) -> usize {
-        self.get_total_pages() - self.get_used_pages()
+        let total_pages = self.get_total_pages();
+        let used_pages = self.get_used_pages();
+
+        // It is possible that the used pages is larger than the total pages, so we use saturating
+        // subtraction.  See the comments in `get_available_pages`.
+        total_pages.saturating_sub(used_pages)
     }
 
     /// Return whether last GC was an exhaustive attempt to collect the heap.
@@ -483,39 +489,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         pages
     }
 
-    pub fn trace_object<Q: ObjectQueue>(
-        &self,
-        queue: &mut Q,
-        object: ObjectReference,
-        worker: &mut GCWorker<VM>,
-    ) -> ObjectReference {
-        #[cfg(feature = "code_space")]
-        if self.code_space.in_space(object) {
-            trace!("trace_object: object in code space");
-            return self.code_space.trace_object::<Q>(queue, object);
-        }
-
-        #[cfg(feature = "code_space")]
-        if self.code_lo_space.in_space(object) {
-            trace!("trace_object: object in large code space");
-            return self.code_lo_space.trace_object::<Q>(queue, object);
-        }
-
-        #[cfg(feature = "ro_space")]
-        if self.ro_space.in_space(object) {
-            trace!("trace_object: object in ro_space space");
-            return self.ro_space.trace_object(queue, object);
-        }
-
-        #[cfg(feature = "vm_space")]
-        if self.vm_space.in_space(object) {
-            trace!("trace_object: object in boot space");
-            return self.vm_space.trace_object(queue, object);
-        }
-
-        VM::VMActivePlan::vm_trace_object::<Q>(queue, object, worker)
-    }
-
     pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
         self.code_space.prepare();
@@ -613,27 +586,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
             + self.los.reserved_pages()
             + self.nonmoving.reserved_pages()
             + self.base.get_used_pages()
-    }
-
-    pub fn trace_object<Q: ObjectQueue>(
-        &self,
-        queue: &mut Q,
-        object: ObjectReference,
-        worker: &mut GCWorker<VM>,
-    ) -> ObjectReference {
-        if self.immortal.in_space(object) {
-            trace!("trace_object: object in immortal space");
-            return self.immortal.trace_object(queue, object);
-        }
-        if self.los.in_space(object) {
-            trace!("trace_object: object in los");
-            return self.los.trace_object(queue, object);
-        }
-        if self.nonmoving.in_space(object) {
-            trace!("trace_object: object in nonmoving space");
-            return self.nonmoving.trace_object(queue, object);
-        }
-        self.base.trace_object::<Q>(queue, object, worker)
     }
 
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {

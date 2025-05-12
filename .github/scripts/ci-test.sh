@@ -22,7 +22,7 @@ find ./src ./tests -type f -name "mock_test_*" | while read -r file; do
     # Get the required plans.
     # Some tests need to be run with multiple plans because
     # some bugs can only be reproduced in some plans but not others.
-    PLANS=$(sed -n 's/^\/\/ *GITHUB-CI: *MMTK_PLAN=//p' $file)
+    PLANS=$(sed -n 's/^\/\/ *GITHUB-CI: *MMTK_PLAN=//p' $file | tr ',' '\n')
     if [[ $PLANS == 'all' ]]; then
         PLANS=$ALL_PLANS
     elif [[ -z $PLANS ]]; then

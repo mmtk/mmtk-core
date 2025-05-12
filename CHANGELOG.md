@@ -1,3 +1,69 @@
+0.31.0 (2025-04-17)
+===
+
+## What's Changed
+
+### Plan
+* Remove dead trace_object methods. by @wks in https://github.com/mmtk/mmtk-core/pull/1277
+* implement mutator builder by @tianleq in https://github.com/mmtk/mmtk-core/pull/1287
+* Fix incongruent defaults for copying GCs by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1296
+
+### Policy
+* Clear stale line mark state by @tianleq in https://github.com/mmtk/mmtk-core/pull/1268
+* Ensure log bits are correctly maintained by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1169
+
+### Scheduler
+* Make work packet buffer size configurable from one location by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1285
+* Make `EDGES_WORK_BUFFER_SIZE` constant public to bindings by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1291
+
+### CI
+* Fix Clippy warning in 1.84.0 by @wks in https://github.com/mmtk/mmtk-core/pull/1262
+* Fix julia extended tests by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1270
+* Fix to bytemuck_derive 1.8.1 by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1288
+* Fix lychee command by @wks in https://github.com/mmtk/mmtk-core/pull/1286
+* Fix clippy warnings for Rust 1.86 by @wks in https://github.com/mmtk/mmtk-core/pull/1297
+* Properly handle multiple plans in GITHUB-CI in CI scripts by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1301
+
+### Documentation
+* Special topic chapter for finalizers and weak references by @wks in https://github.com/mmtk/mmtk-core/pull/1265
+* User Guide chapter for address-based hashing by @wks in https://github.com/mmtk/mmtk-core/pull/1294
+
+### Misc
+* Move to Rust 1.83 by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1253
+* Unique object enqueuing option by @wks in https://github.com/mmtk/mmtk-core/pull/1255
+* Fix a subtraction overflow in get_free_pages. by @wks in https://github.com/mmtk/mmtk-core/pull/1261
+* Force fixed heap size when using NoGC by @wks in https://github.com/mmtk/mmtk-core/pull/1264
+* Make GC triggering and heap resizing consistent by @wks in https://github.com/mmtk/mmtk-core/pull/1266
+* Bump MSRV to 1.74.1 by @wks in https://github.com/mmtk/mmtk-core/pull/1276
+* Fix clippy warning about operator precedence by @wks in https://github.com/mmtk/mmtk-core/pull/1280
+* Fixing MSRV-breaking dependencies by @wks in https://github.com/mmtk/mmtk-core/pull/1284
+* Check if an object is in our heap before using VM map during counting live bytes by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1289
+* Aggregate live bytes info in on_gc_finished by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1292
+* Fix broken stats gathering code if no. of GCs > `MAX_PHASES` by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1295
+* Fix contiguous chunk iterator in monotonic PR by @wks in https://github.com/mmtk/mmtk-core/pull/1299
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.30.0...v0.31.0
+
+0.30.0 (2024-12-20)
+===
+
+## What's Changed
+
+### policy
+* Allow setting object metadata for VM space objects. Expose VO bit under a feature. by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1248
+
+### Misc
+* Fix clippy warnings for Rust 1.83 by @wks in https://github.com/mmtk/mmtk-core/pull/1242
+* Annotate mmap ranges using PR_SET_VMA by @wks in https://github.com/mmtk/mmtk-core/pull/1236
+* Fix warnings for lifetime in MmapAnnotation impl by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1244
+* Collect live bytes per space, and report by space by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1238
+* Minor changes for debugging. by @wks in https://github.com/mmtk/mmtk-core/pull/1245
+* Use macos-15 for style check by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1249
+* Check the option before aggregating live bytes data. Panic if the option is enabled on malloc space. by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1250
+
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.29.0...v0.30.0
+
 0.29.0 (2024-11-08)
 ===
 
