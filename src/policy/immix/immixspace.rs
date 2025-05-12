@@ -161,7 +161,15 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn debug_get_object_info(&self, object: ObjectReference) -> String {
         let line = Line::from_unaligned_address(object.to_raw_address());
         let block = Block::from_unaligned_address(object.to_raw_address());
-        format!("{}: marked = {}, line marked = {}, block state = {:?}, {}, {}", self.name(), self.is_marked(object), line.is_marked(self.mark_state), block.get_state(), object_forwarding::debug_get_object_forwarding_info::<VM>(object), crate::policy::sft::debug_get_object_global_info(object))
+        format!(
+            "{}: marked = {}, line marked = {}, block state = {:?}, {}, {}",
+            self.name(),
+            self.is_marked(object),
+            line.is_marked(self.mark_state),
+            block.get_state(),
+            object_forwarding::debug_get_object_forwarding_info::<VM>(object),
+            crate::policy::sft::debug_get_object_global_info(object)
+        )
     }
 }
 

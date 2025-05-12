@@ -103,15 +103,23 @@ pub trait SFT {
     ) -> ObjectReference;
 
     fn debug_get_object_info(&self, object: ObjectReference) -> String {
-        crate::policy::sft::debug_get_object_global_info(object)
+        format!(
+            "{}: This policy does not implement debug_get_object_info. Global info: {}",
+            self.name(),
+            crate::policy::sft::debug_get_object_global_info(object)
+        )
     }
 }
 
-pub(crate) fn debug_get_object_global_info(object: ObjectReference) -> String {
+pub(crate) fn debug_get_object_global_info(_object: ObjectReference) -> String {
+    #[allow(unused_mut)]
     let mut ret = String::new();
     #[cfg(feature = "vo_bit")]
     {
-        ret += &format!("vo bit = {}", crate::util::metadata::vo_bit::is_vo_bit_set(object));
+        ret += &format!(
+            "vo bit = {}",
+            crate::util::metadata::vo_bit::is_vo_bit_set(_object)
+        );
     }
     ret
 }

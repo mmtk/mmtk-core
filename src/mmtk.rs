@@ -600,5 +600,10 @@ impl<VM: VMBinding> MMTK<VM> {
 
 #[no_mangle]
 pub fn mmtk_debug_print_object_info(object: crate::util::ObjectReference) {
-    println!("{}", SFT_MAP.get_checked(object.to_raw_address()).debug_get_object_info(object))
+    println!(
+        "{}",
+        SFT_MAP
+            .get_checked(object.to_raw_address())
+            .debug_get_object_info(object)
+    )
 }

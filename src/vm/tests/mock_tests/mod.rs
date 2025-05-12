@@ -33,6 +33,7 @@ mod mock_test_allocator_info;
 mod mock_test_barrier_slow_path_assertion;
 #[cfg(feature = "is_mmtk_object")]
 mod mock_test_conservatism;
+mod mock_test_debug_get_object_info;
 #[cfg(target_os = "linux")]
 mod mock_test_handle_mmap_conflict;
 mod mock_test_handle_mmap_oom;

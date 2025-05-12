@@ -104,7 +104,13 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     fn debug_get_object_info(&self, object: ObjectReference) -> String {
-        format!("{}: marked = {:?}, head forwarding pointer = {:?}. {}", self.name(), MarkCompactSpace::<VM>::is_marked(object), MarkCompactSpace::<VM>::get_header_forwarding_pointer(object), crate::policy::sft::debug_get_object_global_info(object))
+        format!(
+            "{}: marked = {:?}, head forwarding pointer = {:?}. {}",
+            self.name(),
+            MarkCompactSpace::<VM>::is_marked(object),
+            MarkCompactSpace::<VM>::get_header_forwarding_pointer(object),
+            crate::policy::sft::debug_get_object_global_info(object)
+        )
     }
 }
 
