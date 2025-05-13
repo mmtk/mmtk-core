@@ -234,9 +234,9 @@ pub(super) fn forwarding_bits_offset_in_forwarding_pointer<VM: VMBinding>() -> O
     unimplemented!()
 }
 
-pub(crate) fn debug_get_object_forwarding_info<VM: VMBinding>(object: ObjectReference) -> String {
+pub(crate) fn debug_print_object_forwarding_info<VM: VMBinding>(object: ObjectReference) {
     let forwarding_bits = get_forwarding_status::<VM>(object);
-    format!(
+    println!(
         "forwarding bits = {:?}, forwarding pointer = {:?}",
         forwarding_bits,
         if state_is_forwarded_or_being_forwarded(forwarding_bits) {

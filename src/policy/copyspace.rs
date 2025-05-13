@@ -101,13 +101,10 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         self.trace_object(queue, object, self.common.copy, worker)
     }
 
-    fn debug_get_object_info(&self, object: ObjectReference) -> String {
-        format!(
-            "{}: {:?}, {:?}",
-            self.name(),
-            object_forwarding::debug_get_object_forwarding_info::<VM>(object),
-            crate::policy::sft::debug_get_object_global_info(object)
-        )
+    fn debug_print_object_info(&self, object: ObjectReference) {
+        println!("In {}", self.name());
+        object_forwarding::debug_print_object_forwarding_info::<VM>(object);
+        crate::policy::sft::debug_print_object_global_info(object);
     }
 }
 

@@ -146,16 +146,11 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         self.trace_object(queue, object)
     }
 
-    fn debug_get_object_info(&self, object: ObjectReference) -> String {
-        let marked = self.test_mark_bit(object, self.mark_state);
-        let nursery = self.is_in_nursery(object);
-        format!(
-            "{}: marked = {}, nursery = {}, {}",
-            self.name(),
-            marked,
-            nursery,
-            crate::policy::sft::debug_get_object_global_info(object)
-        )
+    fn debug_print_object_info(&self, object: ObjectReference) {
+        println!("In {}", self.name());
+        println!("marked = {}", self.test_mark_bit(object, self.mark_state));
+        println!("nursery = {}", self.is_in_nursery(object));
+        crate::policy::sft::debug_print_object_global_info(object);
     }
 }
 
