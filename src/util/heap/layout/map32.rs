@@ -9,7 +9,6 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::int_array_freelist::IntArrayFreeList;
 use crate::util::Address;
 use std::cell::UnsafeCell;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
 pub struct Map32 {
