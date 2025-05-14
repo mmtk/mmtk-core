@@ -235,6 +235,20 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     ) -> ObjectReference {
         panic!("We do not use SFT to trace objects for Immix. sft_trace_object() cannot be used.")
     }
+
+    fn debug_print_object_info(&self, object: ObjectReference) {
+        println!("marked  = {}", self.is_marked(object));
+        println!(
+            "line marked = {}",
+            Line::from_unaligned_address(object.to_raw_address()).is_marked(self.mark_state)
+        );
+        println!(
+            "block state = {:?}",
+            Block::from_unaligned_address(object.to_raw_address()).get_state()
+        );
+        object_forwarding::debug_print_object_forwarding_info::<VM>(object);
+        self.common.debug_print_object_global_info(object);
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
