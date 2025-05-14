@@ -160,7 +160,6 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     }
 
     fn debug_print_object_info(&self, object: ObjectReference) {
-        println!("In {}", self.name());
         println!("marked  = {}", self.is_marked(object));
         println!(
             "line marked = {}",

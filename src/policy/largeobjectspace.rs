@@ -147,7 +147,6 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     }
 
     fn debug_print_object_info(&self, object: ObjectReference) {
-        println!("In {}", self.name());
         println!("marked = {}", self.test_mark_bit(object, self.mark_state));
         println!("nursery = {}", self.is_in_nursery(object));
         self.common.debug_print_object_global_info(object);

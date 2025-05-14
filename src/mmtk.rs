@@ -609,7 +609,7 @@ pub fn mmtk_debug_print_object(object: crate::util::ObjectReference) {
     }
 
     // If the address is not aligned to the object reference size, it is not an object reference.
-    if object
+    if !object
         .to_raw_address()
         .is_aligned_to(crate::util::ObjectReference::ALIGNMENT)
     {
@@ -622,7 +622,7 @@ pub fn mmtk_debug_print_object(object: crate::util::ObjectReference) {
     // Forward to the space
     let sft = SFT_MAP.get_checked(object.to_raw_address());
     // Print the space name
-    println!("In {}", sft.name());
+    println!("In {}:", sft.name());
     // Print object information
     sft.debug_print_object_info(object);
 }

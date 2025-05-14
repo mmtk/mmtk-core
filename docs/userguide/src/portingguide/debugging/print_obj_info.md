@@ -21,5 +21,10 @@ Then call `mmtk_debug_print_object` with the interested object.
 ```console
 (rr) set language c
 (rr) call mmtk_debug_print_object_info(0x200fffed9f0)
-immix: marked = false, line marked = false, block state = Unmarked, forwarding bits = 0, forwarding pointer = None, vo bit = true
+In immix:
+marked = false
+line marked = false
+block state = Unmarked
+forwarding bits = 0, forwarding pointer = None
+vo bit = true
 ```

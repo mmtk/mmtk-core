@@ -102,7 +102,6 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     }
 
     fn debug_print_object_info(&self, object: ObjectReference) {
-        println!("In {}", self.name());
         object_forwarding::debug_print_object_forwarding_info::<VM>(object);
         self.common.debug_print_object_global_info(object);
     }

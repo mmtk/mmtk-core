@@ -105,10 +105,7 @@ pub trait SFT {
     /// Print debug info for the object. The implementer should print one line at a time so in case of an unexpected error,
     /// we still print something.
     fn debug_print_object_info(&self, _object: ObjectReference) {
-        println!(
-            "{}: This policy does not implement debug_print_object_info.",
-            self.name()
-        );
+        println!("This policy does not implement debug_print_object_info.");
     }
 }
 

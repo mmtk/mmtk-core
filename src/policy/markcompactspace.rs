@@ -104,7 +104,6 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     fn debug_print_object_info(&self, object: ObjectReference) {
-        println!("In {}", self.name());
         println!("marked = {}", MarkCompactSpace::<VM>::is_marked(object));
         println!(
             "head forwarding pointer = {:?}",
