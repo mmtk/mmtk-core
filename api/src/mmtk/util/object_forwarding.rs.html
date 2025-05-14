@@ -233,7 +233,20 @@
 <a href="#232" id="232">232</a>
 <a href="#233" id="233">233</a>
 <a href="#234" id="234">234</a>
-<a href="#235" id="235">235</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
+<a href="#235" id="235">235</a>
+<a href="#236" id="236">236</a>
+<a href="#237" id="237">237</a>
+<a href="#238" id="238">238</a>
+<a href="#239" id="239">239</a>
+<a href="#240" id="240">240</a>
+<a href="#241" id="241">241</a>
+<a href="#242" id="242">242</a>
+<a href="#243" id="243">243</a>
+<a href="#244" id="244">244</a>
+<a href="#245" id="245">245</a>
+<a href="#246" id="246">246</a>
+<a href="#247" id="247">247</a>
+<a href="#248" id="248">248</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::MetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::{constants, ObjectReference};
 <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
@@ -467,5 +480,18 @@
 <span class="attr">#[cfg(target_endian = <span class="string">"big"</span>)]
 </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>forwarding_bits_offset_in_forwarding_pointer&lt;VM: VMBinding&gt;() -&gt; <span class="prelude-ty">Option</span>&lt;isize&gt; {
     <span class="macro">unimplemented!</span>()
+}
+
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>debug_print_object_forwarding_info&lt;VM: VMBinding&gt;(object: ObjectReference) {
+    <span class="kw">let </span>forwarding_bits = get_forwarding_status::&lt;VM&gt;(object);
+    <span class="macro">println!</span>(
+        <span class="string">"forwarding bits = {:?}, forwarding pointer = {:?}"</span>,
+        forwarding_bits,
+        <span class="kw">if </span>state_is_forwarded_or_being_forwarded(forwarding_bits) {
+            <span class="prelude-val">Some</span>(read_forwarding_pointer::&lt;VM&gt;(object))
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
+    )
 }
 </code></pre></div></section></main></body></html>

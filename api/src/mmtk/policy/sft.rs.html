@@ -193,7 +193,13 @@
 <a href="#192" id="192">192</a>
 <a href="#193" id="193">193</a>
 <a href="#194" id="194">194</a>
-<a href="#195" id="195">195</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
 <span class="kw">use </span><span class="kw">crate</span>::util::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -296,6 +302,12 @@
         object: ObjectReference,
         worker: GCWorkerMutRef,
     ) -&gt; ObjectReference;
+
+    <span class="doccomment">/// Print debug info for the object. The implementer should print one line at a time so in case of an unexpected error,
+    /// we still print something.
+    </span><span class="kw">fn </span>debug_print_object_info(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) {
+        <span class="macro">println!</span>(<span class="string">"This policy does not implement debug_print_object_info."</span>);
+    }
 }
 
 <span class="comment">// Create erased VM refs for these types that will be used in `sft_trace_object()`.

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"static":["SFT_MAP"],"struct":["MMAPPER","MMTK","MMTKBuilder","VM_MAP"]};
+window.SIDEBAR_ITEMS = {"fn":["mmtk_debug_print_object"],"static":["SFT_MAP"],"struct":["MMAPPER","MMTK","MMTKBuilder","VM_MAP"]};

@@ -1973,6 +1973,28 @@ optional runtime checks that can be turned on by enabling the feature <code>extr
 These usually include checks that are too expensive (even in a debug build) that we do not
 want to enable by default.</p>
 <p>You should make sure your MMTk binding can pass all the assertions (including <code>extreme_assertions</code>).</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="print-mmtk-object-information"><a class="header" href="#print-mmtk-object-information">Print MMTk Object Information</a></h1>
+<p>MMTk provides a utility function to print object information for debugging, <code>crate::mmtk::mmtk_debug_print_object</code>.
+The function is marked as <code>#[no_mangle]</code>, making it suitable to be used in a debugger.</p>
+<p>The following example shows how to use the function to print MMTk's object metadata before and after a single GC in <code>rr</code>.</p>
+<p>Set up break points before and after a GC.</p>
+<pre><code class="language-console">(rr) b stop_all_mutators
+Breakpoint 1 at 0x767cba8f74e8 (14 locations)
+(rr) b resume_mutators
+Breakpoint 2 at 0x767cba8f8908
+</code></pre>
+<p>When the program stops, call <code>mmtk_debug_print_object</code>. We might need to
+set the language context in the debugger to <code>C</code> when we stop in a Rust frame.
+Then call <code>mmtk_debug_print_object</code> with the interested object.</p>
+<pre><code class="language-console">(rr) set language c
+(rr) call mmtk_debug_print_object_info(0x200fffed9f0)
+In immix:
+marked = false
+line marked = false
+block state = Unmarked
+forwarding bits = 0, forwarding pointer = None
+vo bit = true
+</code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="performance-tuning-for-bindings"><a class="header" href="#performance-tuning-for-bindings">Performance Tuning for Bindings</a></h1>
 <p>In this section, we discuss how to achieve the best performance with MMTk in a binding implementation.
 MMTk is a high performance GC library. But there are some key points that need to be done correctly

@@ -1178,7 +1178,21 @@
 <a href="#1177" id="1177">1177</a>
 <a href="#1178" id="1178">1178</a>
 <a href="#1179" id="1179">1179</a>
-<a href="#1180" id="1180">1180</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::StatsForDefrag;
+<a href="#1180" id="1180">1180</a>
+<a href="#1181" id="1181">1181</a>
+<a href="#1182" id="1182">1182</a>
+<a href="#1183" id="1183">1183</a>
+<a href="#1184" id="1184">1184</a>
+<a href="#1185" id="1185">1185</a>
+<a href="#1186" id="1186">1186</a>
+<a href="#1187" id="1187">1187</a>
+<a href="#1188" id="1188">1188</a>
+<a href="#1189" id="1189">1189</a>
+<a href="#1190" id="1190">1190</a>
+<a href="#1191" id="1191">1191</a>
+<a href="#1192" id="1192">1192</a>
+<a href="#1193" id="1193">1193</a>
+<a href="#1194" id="1194">1194</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::StatsForDefrag;
 <span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
@@ -1337,6 +1351,20 @@
         _worker: GCWorkerMutRef,
     ) -&gt; ObjectReference {
         <span class="macro">panic!</span>(<span class="string">"We do not use SFT to trace objects for Immix. sft_trace_object() cannot be used."</span>)
+    }
+
+    <span class="kw">fn </span>debug_print_object_info(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
+        <span class="macro">println!</span>(<span class="string">"marked  = {}"</span>, <span class="self">self</span>.is_marked(object));
+        <span class="macro">println!</span>(
+            <span class="string">"line marked = {}"</span>,
+            Line::from_unaligned_address(object.to_raw_address()).is_marked(<span class="self">self</span>.mark_state)
+        );
+        <span class="macro">println!</span>(
+            <span class="string">"block state = {:?}"</span>,
+            Block::from_unaligned_address(object.to_raw_address()).get_state()
+        );
+        object_forwarding::debug_print_object_forwarding_info::&lt;VM&gt;(object);
+        <span class="self">self</span>.common.debug_print_object_global_info(object);
     }
 }
 

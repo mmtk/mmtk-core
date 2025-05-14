@@ -351,7 +351,12 @@
 <a href="#350" id="350">350</a>
 <a href="#351" id="351">351</a>
 <a href="#352" id="352">352</a>
-<a href="#353" id="353">353</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
+<a href="#353" id="353">353</a>
+<a href="#354" id="354">354</a>
+<a href="#355" id="355">355</a>
+<a href="#356" id="356">356</a>
+<a href="#357" id="357">357</a>
+<a href="#358" id="358">358</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
@@ -452,6 +457,11 @@
     ) -&gt; ObjectReference {
         <span class="kw">let </span>worker = worker.into_mut::&lt;VM&gt;();
         <span class="self">self</span>.trace_object(queue, object, <span class="self">self</span>.common.copy, worker)
+    }
+
+    <span class="kw">fn </span>debug_print_object_info(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
+        object_forwarding::debug_print_object_forwarding_info::&lt;VM&gt;(object);
+        <span class="self">self</span>.common.debug_print_object_global_info(object);
     }
 }
 

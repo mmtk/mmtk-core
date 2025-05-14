@@ -742,7 +742,23 @@
 <a href="#741" id="741">741</a>
 <a href="#742" id="742">742</a>
 <a href="#743" id="743">743</a>
-<a href="#744" id="744">744</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
+<a href="#744" id="744">744</a>
+<a href="#745" id="745">745</a>
+<a href="#746" id="746">746</a>
+<a href="#747" id="747">747</a>
+<a href="#748" id="748">748</a>
+<a href="#749" id="749">749</a>
+<a href="#750" id="750">750</a>
+<a href="#751" id="751">751</a>
+<a href="#752" id="752">752</a>
+<a href="#753" id="753">753</a>
+<a href="#754" id="754">754</a>
+<a href="#755" id="755">755</a>
+<a href="#756" id="756">756</a>
+<a href="#757" id="757">757</a>
+<a href="#758" id="758">758</a>
+<a href="#759" id="759">759</a>
+<a href="#760" id="760">760</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::<span class="kw-2">*</span>;
@@ -1465,6 +1481,22 @@
             } <span class="kw">else </span>{
                 MmapProtection::ReadWrite
             },
+        }
+    }
+
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>debug_print_object_global_info(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
+        <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+        </span><span class="macro">println!</span>(
+            <span class="string">"vo bit = {}"</span>,
+            <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set(object)
+        );
+        <span class="kw">if </span><span class="self">self</span>.needs_log_bit {
+            <span class="kw">use </span><span class="kw">crate</span>::vm::object_model::ObjectModel;
+            <span class="kw">use </span>std::sync::atomic::Ordering;
+            <span class="macro">println!</span>(
+                <span class="string">"log bit = {}"</span>,
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::&lt;VM&gt;(object, Ordering::Relaxed),
+            );
         }
     }
 }

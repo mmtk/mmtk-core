@@ -380,7 +380,13 @@
 <a href="#379" id="379">379</a>
 <a href="#380" id="380">380</a>
 <a href="#381" id="381">381</a>
-<a href="#382" id="382">382</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
+<a href="#387" id="387">387</a>
+<a href="#388" id="388">388</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
@@ -526,6 +532,12 @@
         _worker: GCWorkerMutRef,
     ) -&gt; ObjectReference {
         <span class="self">self</span>.trace_object(queue, object)
+    }
+
+    <span class="kw">fn </span>debug_print_object_info(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
+        <span class="macro">println!</span>(<span class="string">"marked = {}"</span>, <span class="self">self</span>.test_mark_bit(object, <span class="self">self</span>.mark_state));
+        <span class="macro">println!</span>(<span class="string">"nursery = {}"</span>, <span class="self">self</span>.is_in_nursery(object));
+        <span class="self">self</span>.common.debug_print_object_global_info(object);
     }
 }
 
