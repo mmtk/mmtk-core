@@ -601,13 +601,12 @@ impl<VM: VMBinding> MMTK<VM> {
 /// A non-mangled function to print object information for debugging purposes. This function can be directly
 /// called from a debugger.
 #[no_mangle]
-pub fn mmtk_debug_print_object_info(object: crate::util::ObjectReference) {
+pub fn mmtk_debug_print_object(object: crate::util::ObjectReference) {
     // If the address is unmapped, we cannot access its metadata. Just quit.
-    assert!(
-        object.to_raw_address().is_mapped(),
-        "{} is not mapped in MMTk",
-        object
-    );
+    if !object.to_raw_address().is_mapped() {
+        println!("{} is not mapped in MMTk", object);
+        return;
+    }
 
     // If the address is not aligned to the object reference size, it is not an object reference.
     if object
@@ -615,13 +614,15 @@ pub fn mmtk_debug_print_object_info(object: crate::util::ObjectReference) {
         .is_aligned_to(crate::util::ObjectReference::ALIGNMENT)
     {
         println!(
-            "{} is not properly aligned. It is not an object reference",
+            "{} is not properly aligned. It is not an object reference.",
             object
         );
     }
 
     // Forward to the space
-    SFT_MAP
-        .get_checked(object.to_raw_address())
-        .debug_print_object_info(object);
+    let sft = SFT_MAP.get_checked(object.to_raw_address());
+    // Print the space name
+    println!("In {}", sft.name());
+    // Print object information
+    sft.debug_print_object_info(object);
 }

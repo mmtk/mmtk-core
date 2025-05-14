@@ -1,6 +1,6 @@
 # Print MMTk Object Information
 
-MMTk provides a utility function to print object information for debugging, `crate::mmtk::mmtk_debug_print_object_info`.
+MMTk provides a utility function to print object information for debugging, `crate::mmtk::mmtk_debug_print_object`.
 The function is marked as `#[no_mangle]`, making it suitable to be used in a debugger.
 
 The following example shows how to use the function to print MMTk's object metadata before and after a single GC in `rr`.
@@ -14,9 +14,9 @@ Breakpoint 1 at 0x767cba8f74e8 (14 locations)
 Breakpoint 2 at 0x767cba8f8908
 ```
 
-When the program stops, call `mmtk_debug_print_object_info`. We might need to
+When the program stops, call `mmtk_debug_print_object`. We might need to
 set the language context in the debugger to `C` when we stop in a Rust frame.
-Then call `mmtk_debug_print_object_info` with the interested object.
+Then call `mmtk_debug_print_object` with the interested object.
 
 ```console
 (rr) set language c

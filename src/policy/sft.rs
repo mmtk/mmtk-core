@@ -102,23 +102,14 @@ pub trait SFT {
         worker: GCWorkerMutRef,
     ) -> ObjectReference;
 
-    /// Print debug info for the object. The implementer should try print one line at a time so in case of an unexpected error,
+    /// Print debug info for the object. The implementer should print one line at a time so in case of an unexpected error,
     /// we still print something.
-    fn debug_print_object_info(&self, object: ObjectReference) {
+    fn debug_print_object_info(&self, _object: ObjectReference) {
         println!(
             "{}: This policy does not implement debug_print_object_info.",
             self.name()
         );
-        crate::policy::sft::debug_print_object_global_info(object);
     }
-}
-
-pub(crate) fn debug_print_object_global_info(_object: ObjectReference) {
-    #[cfg(feature = "vo_bit")]
-    println!(
-        "vo bit = {}",
-        crate::util::metadata::vo_bit::is_vo_bit_set(_object)
-    );
 }
 
 // Create erased VM refs for these types that will be used in `sft_trace_object()`.

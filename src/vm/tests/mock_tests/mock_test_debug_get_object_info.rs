@@ -8,7 +8,7 @@ pub fn debug_print_object_info() {
         default_setup,
         || {
             let fixture = SingleObject::create();
-            crate::mmtk::mmtk_debug_print_object_info(fixture.objref);
+            crate::mmtk::mmtk_debug_print_object(fixture.objref);
         },
         no_cleanup,
     )

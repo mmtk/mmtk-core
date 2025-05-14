@@ -171,7 +171,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
             Block::from_unaligned_address(object.to_raw_address()).get_state()
         );
         object_forwarding::debug_print_object_forwarding_info::<VM>(object);
-        crate::policy::sft::debug_print_object_global_info(object);
+        self.common.debug_print_object_global_info(object);
     }
 }
 

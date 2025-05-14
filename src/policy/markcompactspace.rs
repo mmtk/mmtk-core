@@ -110,7 +110,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
             "head forwarding pointer = {:?}",
             MarkCompactSpace::<VM>::get_header_forwarding_pointer(object)
         );
-        crate::policy::sft::debug_print_object_global_info(object);
+        self.common.debug_print_object_global_info(object);
     }
 }
 
