@@ -145,6 +145,12 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     ) -> ObjectReference {
         self.trace_object(queue, object)
     }
+
+    fn debug_print_object_info(&self, object: ObjectReference) {
+        println!("marked = {}", self.test_mark_bit(object, self.mark_state));
+        println!("nursery = {}", self.is_in_nursery(object));
+        self.common.debug_print_object_global_info(object);
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {

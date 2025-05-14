@@ -104,6 +104,11 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         let worker = worker.into_mut::<VM>();
         self.trace_object(queue, object, self.common.copy, worker)
     }
+
+    fn debug_print_object_info(&self, object: ObjectReference) {
+        object_forwarding::debug_print_object_forwarding_info::<VM>(object);
+        self.common.debug_print_object_global_info(object);
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
