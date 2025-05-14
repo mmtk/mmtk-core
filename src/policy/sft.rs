@@ -101,6 +101,12 @@ pub trait SFT {
         object: ObjectReference,
         worker: GCWorkerMutRef,
     ) -> ObjectReference;
+
+    /// Print debug info for the object. The implementer should print one line at a time so in case of an unexpected error,
+    /// we still print something.
+    fn debug_print_object_info(&self, _object: ObjectReference) {
+        println!("This policy does not implement debug_print_object_info.");
+    }
 }
 
 // Create erased VM refs for these types that will be used in `sft_trace_object()`.

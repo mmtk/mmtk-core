@@ -35,6 +35,7 @@
         - [Next Steps](portingguide/howto/next_steps.md)
     - [Debugging Tips](portingguide/debugging/prefix.md)
         - [Enabling Debug Assertions](portingguide/debugging/assertions.md)
+        - [Print Object Info](portingguide/debugging/print_obj_info.md)
     - [Performance Tuning](portingguide/perf_tuning/prefix.md)
         - [Link Time Optimization](portingguide/perf_tuning/lto.md)
         - [Optimizing Allocation](portingguide/perf_tuning/alloc.md)

@@ -723,6 +723,22 @@ impl<VM: VMBinding> CommonSpace<VM> {
             },
         }
     }
+
+    pub(crate) fn debug_print_object_global_info(&self, object: ObjectReference) {
+        #[cfg(feature = "vo_bit")]
+        println!(
+            "vo bit = {}",
+            crate::util::metadata::vo_bit::is_vo_bit_set(object)
+        );
+        if self.needs_log_bit {
+            use crate::vm::object_model::ObjectModel;
+            use std::sync::atomic::Ordering;
+            println!(
+                "log bit = {}",
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::Relaxed),
+            );
+        }
+    }
 }
 
 fn get_frac_available(frac: f32) -> usize {
