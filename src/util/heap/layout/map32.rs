@@ -27,12 +27,6 @@ pub struct Map32Inner {
     total_available_discontiguous_chunks: usize,
     finalized: bool,
     descriptor_map: Vec<SpaceDescriptor>,
-
-    // TODO: Is this the right place for this field?
-    // This used to be a global variable. When we remove global states, this needs to be put somewhere.
-    // Currently I am putting it here, as for where this variable is used, we already have
-    // references to vm_map - so it is convenient to put it here.
-    cumulative_committed_pages: AtomicUsize,
 }
 
 unsafe impl Send for Map32 {}
@@ -51,7 +45,6 @@ impl Map32 {
                 total_available_discontiguous_chunks: 0,
                 finalized: false,
                 descriptor_map: vec![SpaceDescriptor::UNINITIALIZED; max_chunks],
-                cumulative_committed_pages: AtomicUsize::new(0),
             }),
             sync: Mutex::new(()),
         }
@@ -259,11 +252,6 @@ impl VMMap for Map32 {
             .get(index)
             .copied()
             .unwrap_or(SpaceDescriptor::UNINITIALIZED)
-    }
-
-    fn add_to_cumulative_committed_pages(&self, pages: usize) {
-        self.cumulative_committed_pages
-            .fetch_add(pages, Ordering::Relaxed);
     }
 }
 

@@ -74,10 +74,6 @@ pub trait PageResource<VM: VMBinding>: 'static {
         let delta = actual_pages - reserved_pages;
         self.common().accounting.reserve(delta);
         self.common().accounting.commit(actual_pages);
-        if VM::VMActivePlan::is_mutator(tls) {
-            self.vm_map()
-                .add_to_cumulative_committed_pages(actual_pages);
-        }
     }
 
     fn reserved_pages(&self) -> usize {

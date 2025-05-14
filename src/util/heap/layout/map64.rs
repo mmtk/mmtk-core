@@ -23,12 +23,6 @@ struct Map64Inner {
     descriptor_map: Vec<SpaceDescriptor>,
     base_address: Vec<Address>,
     high_water: Vec<Address>,
-
-    // TODO: Is this the right place for this field?
-    // This used to be a global variable. When we remove global states, this needs to be put somewhere.
-    // Currently I am putting it here, as for where this variable is used, we already have
-    // references to vm_map - so it is convenient to put it here.
-    cumulative_committed_pages: AtomicUsize,
 }
 
 unsafe impl Send for Map64 {}
@@ -53,7 +47,6 @@ impl Map64 {
                 high_water,
                 base_address,
                 finalized: false,
-                cumulative_committed_pages: AtomicUsize::new(0),
             }),
         }
     }
@@ -211,12 +204,6 @@ impl VMMap for Map64 {
         } else {
             SpaceDescriptor::UNINITIALIZED
         }
-    }
-
-    fn add_to_cumulative_committed_pages(&self, pages: usize) {
-        self.inner()
-            .cumulative_committed_pages
-            .fetch_add(pages, Ordering::Relaxed);
     }
 }
 
