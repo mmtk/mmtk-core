@@ -202,7 +202,7 @@ macro_rules! options {
 
         impl Options {
             /// Set an option and run its validator for its value.
-            fn set_by_string_inner(&mut self, s: &str, val: &str) -> Result<(), SetOptionByStringError> {
+            fn set_from_string_inner(&mut self, s: &str, val: &str) -> Result<(), SetOptionByStringError> {
                 match s {
                     // Parse the given value from str (by env vars or by calling process()) to the right type
                     $(stringify!($name) => {
@@ -260,8 +260,8 @@ impl Options {
     /// Arguments:
     /// * `s`: The name of the option, same as the field name.
     /// * `val`: The value of the option, as a string.  It will be parsed by `FromStr::from_str`.
-    pub fn set_by_string(&mut self, s: &str, val: &str) -> bool {
-        self.set_by_string_inner(s, val).is_ok()
+    pub fn set_from_string(&mut self, s: &str, val: &str) -> bool {
+        self.set_from_string_inner(s, val).is_ok()
     }
 
     /// Set options in bulk by names and values as strings.
@@ -276,7 +276,7 @@ impl Options {
     /// * `options`: a string that is key value pairs separated by white spaces or commas, e.g.
     ///   `threads=1 stress_factor=4096`, or `threads=1,stress_factor=4096`. Each key-value pair
     ///   will be set via [`Options::set_by_string`].
-    pub fn bulk_set_by_string(&mut self, options: &str) -> bool {
+    pub fn set_bulk_from_string(&mut self, options: &str) -> bool {
         for opt in options.replace(',', " ").split_ascii_whitespace() {
             let kv_pair: Vec<&str> = opt.split('=').collect();
             if kv_pair.len() != 2 {
@@ -285,7 +285,7 @@ impl Options {
 
             let key = kv_pair[0];
             let val = kv_pair[1];
-            if let Err(e) = self.set_by_string_inner(key, val) {
+            if let Err(e) = self.set_from_string_inner(key, val) {
                 match e {
                     SetOptionByStringError::InvalidKey => {
                         panic!("Invalid Options key: {}", key);
@@ -314,7 +314,7 @@ impl Options {
             // strip the prefix, and get the lower case string
             if let Some(rest_of_key) = key.strip_prefix(PREFIX) {
                 let lowercase: &str = &rest_of_key.to_lowercase();
-                if let Err(e) = self.set_by_string_inner(lowercase, &val) {
+                if let Err(e) = self.set_from_string_inner(lowercase, &val) {
                     match e {
                         SetOptionByStringError::InvalidKey => {
                             /* Silently skip unrecognized keys. */
@@ -1234,7 +1234,7 @@ mod tests {
     fn test_process_valid() {
         serial_test(|| {
             let mut options = Options::default();
-            let success = options.set_by_string("no_finalizer", "true");
+            let success = options.set_from_string("no_finalizer", "true");
             assert!(success);
             assert!(*options.no_finalizer);
         })
@@ -1245,7 +1245,7 @@ mod tests {
         serial_test(|| {
             let mut options = Options::default();
             let default_no_finalizer = *options.no_finalizer;
-            let success = options.set_by_string("no_finalizer", "100");
+            let success = options.set_from_string("no_finalizer", "100");
             assert!(!success);
             assert_eq!(*options.no_finalizer, default_no_finalizer);
         })
@@ -1255,7 +1255,7 @@ mod tests {
     fn test_process_bulk_empty() {
         serial_test(|| {
             let mut options = Options::default();
-            let success = options.bulk_set_by_string("");
+            let success = options.set_bulk_from_string("");
             assert!(success);
         })
     }
@@ -1264,7 +1264,7 @@ mod tests {
     fn test_process_bulk_valid() {
         serial_test(|| {
             let mut options = Options::default();
-            let success = options.bulk_set_by_string("no_finalizer=true stress_factor=42");
+            let success = options.set_bulk_from_string("no_finalizer=true stress_factor=42");
             assert!(success);
             assert!(*options.no_finalizer);
             assert_eq!(*options.stress_factor, 42);
@@ -1275,7 +1275,7 @@ mod tests {
     fn test_process_bulk_comma_separated_valid() {
         serial_test(|| {
             let mut options = Options::default();
-            let success = options.bulk_set_by_string("no_finalizer=true,stress_factor=42");
+            let success = options.set_bulk_from_string("no_finalizer=true,stress_factor=42");
             assert!(success);
             assert!(*options.no_finalizer);
             assert_eq!(*options.stress_factor, 42);
@@ -1286,7 +1286,7 @@ mod tests {
     fn test_process_bulk_invalid() {
         serial_test(|| {
             let mut options = Options::default();
-            let success = options.bulk_set_by_string("no_finalizer=true stress_factor=a");
+            let success = options.set_bulk_from_string("no_finalizer=true stress_factor=a");
             assert!(!success);
         })
     }
