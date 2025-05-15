@@ -87,9 +87,9 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
 
     fn last_collection_was_exhaustive(&self) -> bool {
         self.last_gc_was_full_heap.load(Ordering::Relaxed)
-            && ImmixSpace::<VM>::is_last_gc_exhaustive(
-                self.last_gc_was_defrag.load(Ordering::Relaxed),
-            )
+            && self
+                .immix_space
+                .is_last_gc_exhaustive(self.last_gc_was_defrag.load(Ordering::Relaxed))
     }
 
     fn collection_required(&self, space_full: bool, space: Option<SpaceStats<Self::VM>>) -> bool
@@ -131,7 +131,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         if full_heap {
             self.immix_space.prepare(
                 full_heap,
-                crate::policy::immix::defrag::StatsForDefrag::new(self),
+                Some(crate::policy::immix::defrag::StatsForDefrag::new(self)),
             );
         }
     }
@@ -146,9 +146,9 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             .store(full_heap, Ordering::Relaxed);
     }
 
-    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
-        self.gen
-            .set_next_gc_full_heap(CommonGenPlan::should_next_gc_be_full_heap(self));
+    fn end_of_gc(&mut self, tls: VMWorkerThread) {
+        let next_gc_full_heap = CommonGenPlan::should_next_gc_be_full_heap(self);
+        self.gen.end_of_gc(tls, next_gc_full_heap);
 
         let did_defrag = self.immix_space.end_of_gc();
         self.last_gc_was_defrag.store(did_defrag, Ordering::Relaxed);
@@ -249,13 +249,12 @@ impl<VM: VMBinding> GenImmix<VM> {
         let immix_space = ImmixSpace::new(
             plan_args.get_space_args("immix_mature", true, false, VMRequest::discontiguous()),
             ImmixSpaceArgs {
-                reset_log_bit_in_major_gc: false,
-                // We don't need to unlog objects at tracing. Instead, we unlog objects at copying.
-                // Any object is moved into the mature space, or is copied inside the mature space. We will unlog it.
-                unlog_object_when_traced: false,
+                // We need to unlog objects at tracing time since we currently clear all log bits during a major GC
+                unlog_object_when_traced: true,
                 // In GenImmix, young objects are not allocated in ImmixSpace directly.
                 #[cfg(feature = "vo_bit")]
                 mixed_age: false,
+                never_move_objects: false,
             },
         );
 

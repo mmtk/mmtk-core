@@ -10,7 +10,6 @@ use crate::util::memory::MmapStrategy;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::util::Address;
 use std::cell::UnsafeCell;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 const NON_MAP_FRACTION: f64 = 1.0 - 8.0 / 4096.0;
 
@@ -23,12 +22,6 @@ struct Map64Inner {
     descriptor_map: Vec<SpaceDescriptor>,
     base_address: Vec<Address>,
     high_water: Vec<Address>,
-
-    // TODO: Is this the right place for this field?
-    // This used to be a global variable. When we remove global states, this needs to be put somewhere.
-    // Currently I am putting it here, as for where this variable is used, we already have
-    // references to vm_map - so it is convenient to put it here.
-    cumulative_committed_pages: AtomicUsize,
 }
 
 unsafe impl Send for Map64 {}
@@ -53,7 +46,6 @@ impl Map64 {
                 high_water,
                 base_address,
                 finalized: false,
-                cumulative_committed_pages: AtomicUsize::new(0),
             }),
         }
     }
@@ -206,14 +198,11 @@ impl VMMap for Map64 {
     }
 
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
-        let index = Self::space_index(address).unwrap();
-        self.inner().descriptor_map[index]
-    }
-
-    fn add_to_cumulative_committed_pages(&self, pages: usize) {
-        self.inner()
-            .cumulative_committed_pages
-            .fetch_add(pages, Ordering::Relaxed);
+        if let Some(index) = Self::space_index(address) {
+            self.inner().descriptor_map[index]
+        } else {
+            SpaceDescriptor::UNINITIALIZED
+        }
     }
 }
 

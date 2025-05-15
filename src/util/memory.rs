@@ -143,7 +143,7 @@ macro_rules! mmap_anno_test {
 // Export this to external crates
 pub use mmap_anno_test;
 
-impl<'a> std::fmt::Display for MmapAnnotation<'a> {
+impl std::fmt::Display for MmapAnnotation<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             MmapAnnotation::Space { name } => write!(f, "mmtk:space:{name}"),
@@ -465,7 +465,7 @@ pub(crate) fn get_system_total_memory() -> u64 {
     // `Options`.  If we only load memory-related components on start-up, it should only take <1ms
     // to initialize the `System` instance.
     let sys = System::new_with_specifics(
-        RefreshKind::new().with_memory(MemoryRefreshKind::new().with_ram()),
+        RefreshKind::nothing().with_memory(MemoryRefreshKind::nothing().with_ram()),
     );
     sys.total_memory()
 }

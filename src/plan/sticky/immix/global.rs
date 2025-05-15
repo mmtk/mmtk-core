@@ -7,7 +7,6 @@ use crate::plan::PlanConstraints;
 use crate::policy::gc_work::TraceKind;
 use crate::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
 use crate::policy::immix::ImmixSpace;
-use crate::policy::immix::PREFER_COPY_ON_NURSERY_GC;
 use crate::policy::immix::TRACE_KIND_FAST;
 use crate::policy::sft::SFT;
 use crate::policy::space::Space;
@@ -41,7 +40,8 @@ pub struct StickyImmix<VM: VMBinding> {
 
 /// The plan constraints for the sticky immix plan.
 pub const STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
-    moves_objects: crate::policy::immix::DEFRAG || crate::policy::immix::PREFER_COPY_ON_NURSERY_GC,
+    // If we disable moving in Immix, this is a non-moving plan.
+    moves_objects: !cfg!(feature = "immix_non_moving"),
     needs_log_bit: true,
     barrier: crate::plan::BarrierSelector::ObjectBarrier,
     // We may trace duplicate edges in sticky immix (or any plan that uses object remembering barrier). See https://github.com/mmtk/mmtk-core/issues/743.
@@ -117,7 +117,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             // Prepare both large object space and immix space
             self.immix.immix_space.prepare(
                 false,
-                crate::policy::immix::defrag::StatsForDefrag::new(self),
+                Some(crate::policy::immix::defrag::StatsForDefrag::new(self)),
             );
             self.immix.common.los.prepare(false);
         } else {
@@ -135,7 +135,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         }
     }
 
-    fn end_of_gc(&mut self, _tls: crate::util::opaque_pointer::VMWorkerThread) {
+    fn end_of_gc(&mut self, tls: crate::util::opaque_pointer::VMWorkerThread) {
         let next_gc_full_heap =
             crate::plan::generational::global::CommonGenPlan::should_next_gc_be_full_heap(self);
         self.next_gc_full_heap
@@ -144,6 +144,8 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         let was_defrag = self.immix.immix_space.end_of_gc();
         self.immix
             .set_last_gc_was_defrag(was_defrag, Ordering::Relaxed);
+
+        self.immix.common.end_of_gc(tls);
     }
 
     fn collection_required(&self, space_full: bool, space: Option<SpaceStats<Self::VM>>) -> bool {
@@ -164,7 +166,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
 
     fn current_gc_may_move_object(&self) -> bool {
         if self.is_current_gc_nursery() {
-            PREFER_COPY_ON_NURSERY_GC
+            self.get_immix_space().prefer_copy_on_nursery_gc()
         } else {
             self.get_immix_space().in_defrag()
         }
@@ -254,6 +256,7 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                 trace!("Immix mature object {}, skip", object);
                 return object;
             } else {
+                // Nursery object
                 let object = if KIND == TRACE_KIND_TRANSITIVE_PIN || KIND == TRACE_KIND_FAST {
                     trace!(
                         "Immix nursery object {} is being traced without moving",
@@ -262,7 +265,7 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                     self.immix
                         .immix_space
                         .trace_object_without_moving(queue, object)
-                } else if crate::policy::immix::PREFER_COPY_ON_NURSERY_GC {
+                } else if self.immix.immix_space.prefer_copy_on_nursery_gc() {
                     let ret = self.immix.immix_space.trace_object_with_opportunistic_copy(
                         queue,
                         object,
@@ -326,12 +329,10 @@ impl<VM: VMBinding> StickyImmix<VM> {
                 // Every object we trace in full heap GC is a mature object. Thus in both cases,
                 // they should be unlogged.
                 unlog_object_when_traced: true,
-                // In full heap GC, mature objects may die, and their unlogged bit needs to be reset.
-                // Along with the option above, we unlog them again during tracing.
-                reset_log_bit_in_major_gc: true,
                 // In StickyImmix, both young and old objects are allocated in the ImmixSpace.
                 #[cfg(feature = "vo_bit")]
                 mixed_age: true,
+                never_move_objects: false,
             },
         );
         Self {

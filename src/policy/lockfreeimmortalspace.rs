@@ -8,6 +8,7 @@ use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
 
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::conversions;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::vm_layout;
@@ -46,7 +47,7 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
     fn is_live(&self, _object: ObjectReference) -> bool {
@@ -129,14 +130,18 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         unsafe { sft_map.eager_initialize(self.as_sft(), self.start, self.total_bytes) };
     }
 
+    fn estimate_side_meta_pages(&self, data_pages: usize) -> usize {
+        self.metadata.calculate_reserved_pages(data_pages)
+    }
+
     fn reserved_pages(&self) -> usize {
         let cursor = self.cursor.load(Ordering::Relaxed);
         let data_pages = conversions::bytes_to_pages_up(self.limit - cursor);
-        let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
+        let meta_pages = self.estimate_side_meta_pages(data_pages);
         data_pages + meta_pages
     }
 
-    fn acquire(&self, _tls: VMThread, pages: usize) -> Address {
+    fn acquire(&self, _tls: VMThread, pages: usize, alloc_options: AllocationOptions) -> Address {
         trace!("LockFreeImmortalSpace::acquire");
         let bytes = conversions::pages_to_bytes(pages);
         let start = self
@@ -146,7 +151,11 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             })
             .expect("update cursor failed");
         if start + bytes > self.limit {
-            panic!("OutOfMemory")
+            if alloc_options.on_fail.allow_oom_call() {
+                panic!("OutOfMemory");
+            } else {
+                return Address::ZERO;
+            }
         }
         if self.slow_path_zeroing {
             crate::util::memory::zero(start, bytes);

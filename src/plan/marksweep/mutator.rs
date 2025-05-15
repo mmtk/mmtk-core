@@ -1,13 +1,13 @@
-use crate::plan::barriers::NoBarrier;
 use crate::plan::marksweep::MarkSweep;
 use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::ReservedAllocators;
 use crate::plan::mutator_context::SpaceMapping;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
-use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use crate::MMTK;
@@ -16,12 +16,18 @@ use enum_map::EnumMap;
 
 #[cfg(feature = "malloc_mark_sweep")]
 mod malloc_mark_sweep {
+    use crate::plan::mutator_context::{common_prepare_func, common_release_func};
+
     use super::*;
 
     // Do nothing for malloc mark sweep (malloc allocator)
 
-    pub fn ms_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
-    pub fn ms_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
+    pub fn ms_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
+        common_prepare_func(mutator, tls);
+    }
+    pub fn ms_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
+        common_release_func(mutator, tls);
+    }
 
     // malloc mark sweep uses 1 malloc allocator
 
@@ -69,13 +75,20 @@ mod native_mark_sweep {
     // We forward calls to the allocator prepare and release
 
     #[cfg(not(feature = "malloc_mark_sweep"))]
-    pub fn ms_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+    pub fn ms_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
+        use crate::plan::mutator_context::common_prepare_func;
+
         get_freelist_allocator_mut::<VM>(mutator).prepare();
+        common_prepare_func(mutator, tls);
     }
 
     #[cfg(not(feature = "malloc_mark_sweep"))]
-    pub fn ms_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+    pub fn ms_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
+        use crate::plan::mutator_context::common_release_func;
+
         get_freelist_allocator_mut::<VM>(mutator).release();
+
+        common_release_func(mutator, tls);
     }
 
     // native mark sweep uses 1 free list allocator
@@ -121,11 +134,6 @@ pub fn create_ms_mutator<VM: VMBinding>(
         release_func: &ms_mutator_release,
     };
 
-    Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        barrier: Box::new(NoBarrier),
-        mutator_tls,
-        config,
-        plan: mmtk.get_plan(),
-    }
+    let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
+    builder.build()
 }

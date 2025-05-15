@@ -2,11 +2,12 @@ use super::defrag::StatsForDefrag;
 use super::line::*;
 use super::{block::*, defrag::Defrag};
 use crate::plan::VectorObjectQueue;
-use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
+use crate::policy::gc_work::{TraceKind, DEFAULT_TRACE, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::sft_map::SFTMap;
 use crate::policy::space::{CommonSpace, Space};
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::alloc::allocator::AllocatorContext;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;
@@ -65,14 +66,6 @@ pub struct ImmixSpaceArgs {
     /// (no matter we copy an object or not). So we have to use `PromoteToMature`, and instead
     /// just set the log bit in the space when an object is traced.
     pub unlog_object_when_traced: bool,
-    /// Reset log bit at the start of a major GC.
-    /// Normally we do not need to do this. When immix is used as the mature space,
-    /// any object should be set as unlogged, and that bit does not need to be cleared
-    /// even if the object is dead. But in sticky Immix, the mature object and
-    /// the nursery object are in the same space, we will have to use the
-    /// bit to differentiate them. So we reset all the log bits in major GCs,
-    /// and unlogged the objects when they are traced (alive).
-    pub reset_log_bit_in_major_gc: bool,
     /// Whether this ImmixSpace instance contains both young and old objects.
     /// This affects the updating of valid-object bits.  If some lines or blocks of this ImmixSpace
     /// instance contain young objects, their VO bits need to be updated during this GC.  Currently
@@ -81,18 +74,20 @@ pub struct ImmixSpaceArgs {
     // Currently only used when "vo_bit" is enabled.  Using #[cfg(...)] to eliminate dead code warning.
     #[cfg(feature = "vo_bit")]
     pub mixed_age: bool,
+    /// Disable copying for this Immix space.
+    pub never_move_objects: bool,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
 
 impl<VM: VMBinding> SFT for ImmixSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
 
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
         // If we never move objects, look no further.
-        if super::NEVER_MOVE_OBJECTS {
+        if !self.is_movable() {
             return None;
         }
 
@@ -110,7 +105,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         }
 
         // If we never move objects, look no further.
-        if super::NEVER_MOVE_OBJECTS {
+        if !self.is_movable() {
             return false;
         }
 
@@ -130,7 +125,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.is_object_pinned::<VM>(object)
     }
     fn is_movable(&self) -> bool {
-        !super::NEVER_MOVE_OBJECTS
+        !self.space_args.never_move_objects
     }
 
     #[cfg(feature = "sanity")]
@@ -162,6 +157,20 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
         panic!("We do not use SFT to trace objects for Immix. sft_trace_object() cannot be used.")
+    }
+
+    fn debug_print_object_info(&self, object: ObjectReference) {
+        println!("marked  = {}", self.is_marked(object));
+        println!(
+            "line marked = {}",
+            Line::from_unaligned_address(object.to_raw_address()).is_marked(self.mark_state)
+        );
+        println!(
+            "block state = {:?}",
+            Block::from_unaligned_address(object.to_raw_address()).get_state()
+        );
+        object_forwarding::debug_print_object_forwarding_info::<VM>(object);
+        self.common.debug_print_object_global_info(object);
     }
 }
 
@@ -238,10 +247,18 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         }
     }
 
+    #[allow(clippy::if_same_then_else)] // DEFAULT_TRACE needs a workaround which is documented below.
     fn may_move_objects<const KIND: TraceKind>() -> bool {
         if KIND == TRACE_KIND_DEFRAG {
             true
         } else if KIND == TRACE_KIND_FAST || KIND == TRACE_KIND_TRANSITIVE_PIN {
+            false
+        } else if KIND == DEFAULT_TRACE {
+            // FIXME: This is hacky. When we do a default trace, this should be a nonmoving space.
+            // The only exception is the nursery GC for sticky immix, for which, we use default trace.
+            // This function is only used for PlanProcessEdges, and for sticky immix nursery GC, we use
+            // GenNurseryProcessEdges. So it still works. But this is quite hacky anyway.
+            // See https://github.com/mmtk/mmtk-core/issues/1314 for details.
             false
         } else {
             unreachable!()
@@ -260,7 +277,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             vec![
                 MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
-                MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
                 *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
@@ -272,7 +288,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Line::MARK_TABLE),
                 MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
-                MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
                 *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
@@ -284,29 +299,44 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     pub fn new(
         args: crate::policy::space::PlanCreateSpaceArgs<VM>,
-        space_args: ImmixSpaceArgs,
+        mut space_args: ImmixSpaceArgs,
     ) -> Self {
-        #[cfg(feature = "immix_non_moving")]
-        info!(
-            "Creating non-moving ImmixSpace: {}. Block size: 2^{}",
-            args.name,
-            Block::LOG_BYTES
-        );
-
-        if space_args.unlog_object_when_traced || space_args.reset_log_bit_in_major_gc {
+        if space_args.unlog_object_when_traced {
             assert!(
                 args.constraints.needs_log_bit,
                 "Invalid args when the plan does not use log bit"
             );
         }
 
-        super::validate_features();
+        // Make sure we override the space args if we force non moving Immix
+        if cfg!(feature = "immix_non_moving") && !space_args.never_move_objects {
+            info!(
+                "Overriding never_moves_objects for Immix Space {}, as the immix_non_moving feature is set. Block size: 2^{}",
+                args.name,
+                Block::LOG_BYTES,
+            );
+            space_args.never_move_objects = true;
+        }
+
+        // validate features
+        if super::BLOCK_ONLY {
+            assert!(
+                space_args.never_move_objects,
+                "Block-only immix must not move objects"
+            );
+        }
+        assert!(
+            Block::LINES / 2 <= u8::MAX as usize - 2,
+            "Number of lines in a block should not exceed BlockState::MARK_MARKED"
+        );
+
         #[cfg(feature = "vo_bit")]
         vo_bit::helper::validate_config::<VM>();
         let vm_map = args.vm_map;
         let scheduler = args.scheduler.clone();
         let common =
             CommonSpace::new(args.into_policy_args(true, false, Self::side_metadata_specs()));
+        let space_index = common.descriptor.get_index();
         ImmixSpace {
             pr: if common.vmrequest.is_discontiguous() {
                 BlockPageResource::new_discontiguous(
@@ -324,7 +354,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 )
             },
             common,
-            chunk_map: ChunkMap::new(),
+            chunk_map: ChunkMap::new(space_index),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
             lines_consumed: AtomicUsize::new(0),
@@ -364,6 +394,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         full_heap_system_gc: bool,
     ) -> bool {
         self.defrag.decide_whether_to_defrag(
+            self.is_defrag_enabled(),
             emergency_collection,
             collect_whole_heap,
             collection_attempts,
@@ -379,7 +410,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self.scheduler
     }
 
-    pub fn prepare(&mut self, major_gc: bool, plan_stats: StatsForDefrag) {
+    pub fn prepare(&mut self, major_gc: bool, plan_stats: Option<StatsForDefrag>) {
         if major_gc {
             // Update mark_state
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
@@ -389,9 +420,17 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 unimplemented!("cyclic mark bits is not supported at the moment");
             }
 
+            if self.common.needs_log_bit {
+                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+                    for chunk in self.chunk_map.all_chunks() {
+                        side.bzero_metadata(chunk.start(), Chunk::BYTES);
+                    }
+                }
+            }
+
             // Prepare defrag info
-            if super::DEFRAG {
-                self.defrag.prepare(self, plan_stats);
+            if self.is_defrag_enabled() {
+                self.defrag.prepare(self, plan_stats.unwrap());
             }
 
             // Prepare each block for GC
@@ -483,7 +522,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Return whether this GC was a defrag GC, as a plan may want to know this.
     pub fn end_of_gc(&mut self) -> bool {
         let did_defrag = self.defrag.in_defrag();
-        if super::DEFRAG {
+        if self.is_defrag_enabled() {
             self.defrag.reset_in_defrag();
         }
         did_defrag
@@ -516,15 +555,20 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Allocate a clean block.
-    pub fn get_clean_block(&self, tls: VMThread, copy: bool) -> Option<Block> {
-        let block_address = self.acquire(tls, Block::PAGES);
+    pub fn get_clean_block(
+        &self,
+        tls: VMThread,
+        copy: bool,
+        alloc_options: AllocationOptions,
+    ) -> Option<Block> {
+        let block_address = self.acquire(tls, Block::PAGES, alloc_options);
         if block_address.is_zero() {
             return None;
         }
         self.defrag.notify_new_clean_block(copy);
         let block = Block::from_aligned_address(block_address);
         block.init(copy);
-        self.chunk_map.set(block.chunk(), ChunkState::Allocated);
+        self.chunk_map.set_allocated(block.chunk(), true);
         self.lines_consumed
             .fetch_add(Block::LINES, Ordering::SeqCst);
         Some(block)
@@ -806,8 +850,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         Some((start, end))
     }
 
-    pub fn is_last_gc_exhaustive(did_defrag_for_last_gc: bool) -> bool {
-        if super::DEFRAG {
+    pub fn is_last_gc_exhaustive(&self, did_defrag_for_last_gc: bool) -> bool {
+        if self.is_defrag_enabled() {
             did_defrag_for_last_gc
         } else {
             // If defrag is disabled, every GC is exhaustive.
@@ -833,11 +877,24 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.mark_lines(object);
         }
     }
+
+    pub(crate) fn prefer_copy_on_nursery_gc(&self) -> bool {
+        self.is_nursery_copy_enabled()
+    }
+
+    pub(crate) fn is_nursery_copy_enabled(&self) -> bool {
+        !self.space_args.never_move_objects && !cfg!(feature = "sticky_immix_non_moving_nursery")
+    }
+
+    pub(crate) fn is_defrag_enabled(&self) -> bool {
+        !self.space_args.never_move_objects
+    }
 }
 
 /// A work packet to prepare each block for a major GC.
 /// Performs the action on a range of chunks.
 pub struct PrepareBlockState<VM: VMBinding> {
+    #[allow(dead_code)]
     pub space: &'static ImmixSpace<VM>,
     pub chunk: Chunk,
     pub defrag_threshold: Option<usize>,
@@ -850,17 +907,6 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
         // See `ImmixSpace::prepare`.
         if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
             side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
-        }
-        if self.space.space_args.reset_log_bit_in_major_gc {
-            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                // We zero all the log bits in major GC, and for every object we trace, we will mark the log bit again.
-                side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
-            } else {
-                // If the log bit is not in side metadata, we cannot bulk zero. We can either
-                // clear the bit for dead objects in major GC, or clear the log bit for new
-                // objects. In either cases, we do not need to set log bit at tracing.
-                unimplemented!("We cannot bulk zero unlogged bit.")
-            }
         }
     }
 }
@@ -877,7 +923,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
                 continue;
             }
             // Check if this block needs to be defragmented.
-            let is_defrag_source = if !super::DEFRAG {
+            let is_defrag_source = if !self.space.is_defrag_enabled() {
                 // Do not set any block as defrag source if defrag is disabled.
                 false
             } else if super::DEFRAG_EVERY_BLOCK {
@@ -909,7 +955,7 @@ struct SweepChunk<VM: VMBinding> {
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        assert_eq!(self.space.chunk_map.get(self.chunk), ChunkState::Allocated);
+        assert!(self.space.chunk_map.get(self.chunk).unwrap().is_allocated());
 
         let mut histogram = self.space.defrag.new_histogram();
         let line_mark_state = if super::BLOCK_ONLY {
@@ -960,7 +1006,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
         probe!(mmtk, sweep_chunk, allocated_blocks);
         // Set this chunk as free if there is not live blocks.
         if allocated_blocks == 0 {
-            self.space.chunk_map.set(self.chunk, ChunkState::Free)
+            self.space.chunk_map.set_allocated(self.chunk, false)
         }
         self.space.defrag.add_completed_mark_histogram(histogram);
         self.epilogue.finish_one_work_packet();

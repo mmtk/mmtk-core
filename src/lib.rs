@@ -20,7 +20,7 @@
 //! * GC components:
 //!   * [Allocators](util/alloc/allocator/trait.Allocator.html): handlers of allocation requests which allocate objects to the bound space.
 //!   * [Policies](policy/space/trait.Space.html): definitions of semantics and behaviors for memory regions.
-//!      Each space is an instance of a policy, and takes up a unique proportion of the heap.
+//!     Each space is an instance of a policy, and takes up a unique proportion of the heap.
 //!   * [Work packets](scheduler/work/trait.GCWork.html): units of GC work scheduled by the MMTk's scheduler.
 //! * [GC plans](plan/global/trait.Plan.html): GC algorithms composed from components.
 //! * [Heap implementations](util/heap/index.html): the underlying implementations of memory resources that support spaces.
@@ -46,6 +46,7 @@ pub(crate) use mmtk::MMAPPER;
 pub use mmtk::MMTK;
 
 mod global_state;
+pub use crate::global_state::LiveBytesStats;
 
 mod policy;
 

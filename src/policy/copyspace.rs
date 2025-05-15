@@ -25,7 +25,7 @@ pub struct CopySpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for CopySpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
 
@@ -99,6 +99,11 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     ) -> ObjectReference {
         let worker = worker.into_mut::<VM>();
         self.trace_object(queue, object, self.common.copy, worker)
+    }
+
+    fn debug_print_object_info(&self, object: ObjectReference) {
+        object_forwarding::debug_print_object_forwarding_info::<VM>(object);
+        self.common.debug_print_object_global_info(object);
     }
 }
 
@@ -194,6 +199,12 @@ impl<VM: VMBinding> CopySpace<VM> {
                 *<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC
             {
                 side_forwarding_status_table.bzero_metadata(start, size);
+            }
+
+            if self.common.needs_log_bit {
+                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+                    side.bzero_metadata(start, size);
+                }
             }
 
             // Clear VO bits because all objects in the space are dead.

@@ -78,6 +78,11 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         self.nursery.release();
     }
 
+    pub fn end_of_gc(&mut self, tls: VMWorkerThread, next_gc_full_heap: bool) {
+        self.set_next_gc_full_heap(next_gc_full_heap);
+        self.common.end_of_gc(tls);
+    }
+
     /// Independent of how many pages remain in the page budget (a function of heap size), we must
     /// ensure we never exhaust virtual memory. Therefore we must never let the nursery grow to the
     /// extent that it can't be copied into the mature space.
@@ -117,9 +122,8 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         // Is the GC triggered by nursery?
         // - if space is none, it is not. Return false immediately.
         // - if space is some, we further check its descriptor.
-        let is_triggered_by_nursery = space.map_or(false, |s| {
-            s.0.common().descriptor == self.nursery.common().descriptor
-        });
+        let is_triggered_by_nursery =
+            space.is_some_and(|s| s.0.common().descriptor == self.nursery.common().descriptor);
         // If space is full and the GC is not triggered by nursery, next GC will be full heap GC.
         if space_full && !is_triggered_by_nursery {
             self.next_gc_full_heap.store(true, Ordering::SeqCst);
@@ -203,25 +207,6 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         is_full_heap
     }
 
-    /// Trace objects for spaces in generational and common plans for a full heap GC.
-    #[allow(unused)] // We now use `PlanTraceObject`, and this mehtod is not used.
-    pub fn trace_object_full_heap<Q: ObjectQueue>(
-        &self,
-        queue: &mut Q,
-        object: ObjectReference,
-        worker: &mut GCWorker<VM>,
-    ) -> ObjectReference {
-        if self.nursery.in_space(object) {
-            return self.nursery.trace_object::<Q>(
-                queue,
-                object,
-                Some(CopySemantics::PromoteToMature),
-                worker,
-            );
-        }
-        self.common.trace_object::<Q>(queue, object, worker)
-    }
-
     /// Trace objects for spaces in generational and common plans for a nursery GC.
     pub fn trace_object_nursery<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
@@ -247,6 +232,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         if self.common.get_los().in_space(object) {
             return self.common.get_los().trace_object::<Q>(queue, object);
         }
+
         object
     }
 
@@ -341,5 +327,5 @@ pub trait GenerationalPlanExt<VM: VMBinding>: GenerationalPlan<VM = VM> {
 /// with any plan (generational or not). For non generational plans, it will always return false.
 pub fn is_nursery_gc<VM: VMBinding>(plan: &dyn Plan<VM = VM>) -> bool {
     plan.generational()
-        .map_or(false, |plan| plan.is_current_gc_nursery())
+        .is_some_and(|plan| plan.is_current_gc_nursery())
 }

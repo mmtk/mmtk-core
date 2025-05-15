@@ -27,7 +27,7 @@ pub struct ImmortalSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
     fn is_live(&self, _object: ObjectReference) -> bool {
@@ -213,6 +213,15 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
             object
         );
         if self.mark_state.test_and_mark::<VM>(object) {
+            // Set the unlog bit if required
+            if self.common.needs_log_bit {
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
+                    object,
+                    1,
+                    None,
+                    Ordering::SeqCst,
+                );
+            }
             queue.enqueue(object);
         }
         object

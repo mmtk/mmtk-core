@@ -4,6 +4,7 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::externalpageresource::{ExternalPageResource, ExternalPages};
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
@@ -29,7 +30,7 @@ pub struct VMSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for VMSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.common.name
     }
     fn is_live(&self, _object: ObjectReference) -> bool {
@@ -136,7 +137,7 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
         unreachable!()
     }
 
-    fn acquire(&self, _tls: VMThread, _pages: usize) -> Address {
+    fn acquire(&self, _tls: VMThread, _pages: usize, _alloc_options: AllocationOptions) -> Address {
         unreachable!()
     }
 
@@ -283,6 +284,17 @@ impl<VM: VMBinding> VMSpace<VM> {
         );
         debug_assert!(self.in_space(object));
         if self.mark_state.test_and_mark::<VM>(object) {
+            // Flip the per-object unlogged bits to "unlogged" state for objects inside the
+            // bootimage
+            #[cfg(feature = "set_unlog_bits_vm_space")]
+            if self.common.needs_log_bit {
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
+                    object,
+                    1,
+                    None,
+                    Ordering::SeqCst,
+                );
+            }
             queue.enqueue(object);
         }
         object

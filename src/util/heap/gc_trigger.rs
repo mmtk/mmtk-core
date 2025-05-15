@@ -40,10 +40,19 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 GCTriggerSelector::FixedHeapSize(size) => Box::new(FixedHeapSizeTrigger {
                     total_pages: conversions::bytes_to_pages_up(size),
                 }),
-                GCTriggerSelector::DynamicHeapSize(min, max) => Box::new(MemBalancerTrigger::new(
-                    conversions::bytes_to_pages_up(min),
-                    conversions::bytes_to_pages_up(max),
-                )),
+                GCTriggerSelector::DynamicHeapSize(min, max) => 'dynamic_heap_size: {
+                    let min_pages = conversions::bytes_to_pages_up(min);
+                    let max_pages = conversions::bytes_to_pages_up(max);
+
+                    if *options.plan == crate::util::options::PlanSelector::NoGC {
+                        warn!("Cannot use dynamic heap size with NoGC.  Using fixed heap size trigger instead.");
+                        break 'dynamic_heap_size Box::new(FixedHeapSizeTrigger {
+                            total_pages: max_pages,
+                        });
+                    }
+
+                    Box::new(MemBalancerTrigger::new(min_pages, max_pages))
+                }
                 GCTriggerSelector::Delegated => {
                     <VM::VMCollection as crate::vm::Collection<VM>>::create_gc_trigger()
                 }

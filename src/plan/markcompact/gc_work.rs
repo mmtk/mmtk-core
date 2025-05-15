@@ -51,7 +51,6 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
         mmtk.slot_logger.reset();
 
         // We do two passes of transitive closures. We clear the live bytes from the first pass.
-        #[cfg(feature = "count_live_bytes_in_gc")]
         mmtk.scheduler
             .worker_group
             .get_and_clear_worker_live_bytes();

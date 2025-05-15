@@ -17,14 +17,17 @@ use crate::plan::AllocationSemantics;
 use crate::plan::{Mutator, MutatorContext};
 use crate::scheduler::WorkBucketStage;
 use crate::scheduler::{GCWork, GCWorker};
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::slot::MemorySlice;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
+
+use std::collections::HashMap;
 
 /// Initialize an MMTk instance. A VM should call this method after creating an [`crate::MMTK`]
 /// instance but before using any of the methods provided in MMTk (except `process()` and `process_bulk()`).
@@ -137,11 +140,28 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
     mutator.flush()
 }
 
-/// Allocate memory for an object. For performance reasons, a VM should
-/// implement the allocation fast-path on their side rather than just calling this function.
+/// Allocate memory for an object.
 ///
-/// If the VM provides a non-zero `offset` parameter, then the returned address will be
-/// such that the `RETURNED_ADDRESS + offset` is aligned to the `align` parameter.
+/// When the allocation is successful, it returns the starting address of the new object.  The
+/// memory range for the new object is `size` bytes starting from the returned address, and
+/// `RETURNED_ADDRESS + offset` is guaranteed to be aligned to the `align` parameter.  The returned
+/// address of a successful allocation will never be zero.
+///
+/// If MMTk fails to allocate memory, it will attempt a GC to free up some memory and retry the
+/// allocation.  After triggering GC, it will call [`crate::vm::Collection::block_for_gc`] to suspend
+/// the current thread that is allocating. Callers of `alloc` must be aware of this behavior.
+/// For example, JIT compilers that support
+/// precise stack scanning need to make the call site of `alloc` a GC-safe point by generating stack maps. See
+/// [`alloc_with_options`] if it is undesirable to trigger GC at this allocation site.
+///
+/// If MMTk has attempted at least one GC, and still cannot free up enough memory, it will call
+/// [`crate::vm::Collection::out_of_memory`] to inform the binding. The VM binding
+/// can implement that method to handle the out-of-memory event in a VM-specific way, including but
+/// not limited to throwing exceptions or errors. If [`crate::vm::Collection::out_of_memory`] returns
+/// normally without panicking or throwing exceptions, this function will return zero.
+///
+/// For performance reasons, a VM should implement the allocation fast-path on their side rather
+/// than just calling this function.
 ///
 /// Arguments:
 /// * `mutator`: The mutator to perform this allocation request.
@@ -156,24 +176,46 @@ pub fn alloc<VM: VMBinding>(
     offset: usize,
     semantics: AllocationSemantics,
 ) -> Address {
-    // MMTk has assumptions about minimal object size.
-    // We need to make sure that all allocations comply with the min object size.
-    // Ideally, we check the allocation size, and if it is smaller, we transparently allocate the min
-    // object size (the VM does not need to know this). However, for the VM bindings we support at the moment,
-    // their object sizes are all larger than MMTk's min object size, so we simply put an assertion here.
-    // If you plan to use MMTk with a VM with its object size smaller than MMTk's min object size, you should
-    // meet the min object size in the fastpath.
-    debug_assert!(size >= MIN_OBJECT_SIZE);
-    // Assert alignment
-    debug_assert!(align >= VM::MIN_ALIGNMENT);
-    debug_assert!(align <= VM::MAX_ALIGNMENT);
-    // Assert offset
-    debug_assert!(VM::USE_ALLOCATION_OFFSET || offset == 0);
+    #[cfg(debug_assertions)]
+    crate::util::alloc::allocator::assert_allocation_args::<VM>(size, align, offset);
 
     mutator.alloc(size, align, offset, semantics)
 }
 
-/// Invoke the allocation slow path. This is only intended for use when a binding implements the fastpath on
+/// Allocate memory for an object.
+///
+/// This allocation function allows alternation to the allocation behaviors, specified by the
+/// [`crate::util::alloc::AllocationOptions`]. For example, one can allow
+/// overcommit the memory to go beyond the heap size without triggering a GC. This function can be
+/// used in certain cases where the runtime needs a different allocation behavior other than
+/// what the default [`alloc`] provides.
+///
+/// Arguments:
+/// * `mutator`: The mutator to perform this allocation request.
+/// * `size`: The number of bytes required for the object.
+/// * `align`: Required alignment for the object.
+/// * `offset`: Offset associated with the alignment.
+/// * `semantics`: The allocation semantic required for the allocation.
+/// * `options`: the allocation options to change the default allocation behavior for this request.
+pub fn alloc_with_options<VM: VMBinding>(
+    mutator: &mut Mutator<VM>,
+    size: usize,
+    align: usize,
+    offset: usize,
+    semantics: AllocationSemantics,
+    options: crate::util::alloc::allocator::AllocationOptions,
+) -> Address {
+    #[cfg(debug_assertions)]
+    crate::util::alloc::allocator::assert_allocation_args::<VM>(size, align, offset);
+
+    mutator.alloc_with_options(size, align, offset, semantics, options)
+}
+
+/// Invoke the allocation slow path of [`alloc`].
+/// Like [`alloc`], this function may trigger GC and call [`crate::vm::Collection::block_for_gc`] or
+/// [`crate::vm::Collection::out_of_memory`].  The caller needs to be aware of that.
+///
+/// *Notes*: This is only intended for use when a binding implements the fastpath on
 /// the binding side. When the binding handles fast path allocation and the fast path fails, it can use this
 /// method for slow path allocation. Calling before exhausting fast path allocaiton buffer will lead to bad
 /// performance.
@@ -192,6 +234,34 @@ pub fn alloc_slow<VM: VMBinding>(
     semantics: AllocationSemantics,
 ) -> Address {
     mutator.alloc_slow(size, align, offset, semantics)
+}
+
+/// Invoke the allocation slow path of [`alloc_with_options`].
+///
+/// Like [`alloc_with_options`], This allocation function allows alternation to the allocation behaviors, specified by the
+/// [`crate::util::alloc::AllocationOptions`]. For example, one can allow
+/// overcommit the memory to go beyond the heap size without triggering a GC. This function can be
+/// used in certain cases where the runtime needs a different allocation behavior other than
+/// what the default [`alloc`] provides.
+///
+/// Like [`alloc_slow`], this function is also only intended for use when a binding implements the
+/// fastpath on the binding side.
+///
+/// Arguments:
+/// * `mutator`: The mutator to perform this allocation request.
+/// * `size`: The number of bytes required for the object.
+/// * `align`: Required alignment for the object.
+/// * `offset`: Offset associated with the alignment.
+/// * `semantics`: The allocation semantic required for the allocation.
+pub fn alloc_slow_with_options<VM: VMBinding>(
+    mutator: &mut Mutator<VM>,
+    size: usize,
+    align: usize,
+    offset: usize,
+    semantics: AllocationSemantics,
+    options: AllocationOptions,
+) -> Address {
+    mutator.alloc_slow_with_options(size, align, offset, semantics, options)
 }
 
 /// Perform post-allocation actions, usually initializing object metadata. For many allocators none are
@@ -531,16 +601,18 @@ pub fn free_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
     mmtk.get_plan().get_free_pages() << LOG_BYTES_IN_PAGE
 }
 
-/// Return the size of all the live objects in bytes in the last GC. MMTk usually accounts for memory in pages.
+/// Return a hash map for live bytes statistics in the last GC for each space.
+///
+/// MMTk usually accounts for memory in pages by each space.
 /// This is a special method that we count the size of every live object in a GC, and sum up the total bytes.
-/// We provide this method so users can compare with `used_bytes` (which does page accounting), and know if
-/// the heap is fragmented.
+/// We provide this method so users can use [`crate::LiveBytesStats`] to know if
+/// the space is fragmented.
 /// The value returned by this method is only updated when we finish tracing in a GC. A recommended timing
 /// to call this method is at the end of a GC (e.g. when the runtime is about to resume threads).
-#[cfg(feature = "count_live_bytes_in_gc")]
-pub fn live_bytes_in_last_gc<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
-    use std::sync::atomic::Ordering;
-    mmtk.state.live_bytes_in_last_gc.load(Ordering::SeqCst)
+pub fn live_bytes_in_last_gc<VM: VMBinding>(
+    mmtk: &MMTK<VM>,
+) -> HashMap<&'static str, crate::LiveBytesStats> {
+    mmtk.state.live_bytes_in_last_gc.borrow().clone()
 }
 
 /// Return the starting address of the heap. *Note that currently MMTk uses

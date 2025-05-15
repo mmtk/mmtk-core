@@ -247,7 +247,11 @@ impl Block {
                     if prev_line_is_marked {
                         holes += 1;
                     }
-
+                    // We need to clear the line mark state at least twice in every 128 GC
+                    // otherwise, the line mark state of the last GC will stick around
+                    if line_mark_state > Line::MAX_MARK_STATE - 2 {
+                        line.mark(0);
+                    }
                     #[cfg(feature = "immix_zero_on_release")]
                     crate::util::memory::zero(line.start(), Line::BYTES);
 

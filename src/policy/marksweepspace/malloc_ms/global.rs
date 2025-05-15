@@ -1,5 +1,3 @@
-use atomic::Atomic;
-
 use super::metadata::*;
 use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
@@ -7,10 +5,15 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::CommonSpace;
 use crate::scheduler::GCWorkScheduler;
+use crate::util::heap::chunk_map::Chunk;
+use crate::util::heap::chunk_map::ChunkMap;
 use crate::util::heap::gc_trigger::GCTrigger;
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::PageResource;
+use crate::util::linear_scan::Region;
 use crate::util::malloc::library::{BYTES_IN_MALLOC_PAGE, LOG_BYTES_IN_MALLOC_PAGE};
 use crate::util::malloc::malloc_ms_util::*;
+use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
@@ -30,7 +33,6 @@ use std::marker::PhantomData;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-#[cfg(debug_assertions)]
 use std::sync::Mutex;
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it
 // to make sure our allocation is correct.
@@ -42,12 +44,13 @@ pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
     active_bytes: AtomicUsize,
     active_pages: AtomicUsize,
-    pub chunk_addr_min: Atomic<Address>,
-    pub chunk_addr_max: Atomic<Address>,
     metadata: SideMetadataContext,
     /// Work packet scheduler
     scheduler: Arc<GCWorkScheduler<VM>>,
     gc_trigger: Arc<GCTrigger<VM>>,
+    descriptor: SpaceDescriptor,
+    chunk_map: ChunkMap,
+    mmap_metadata_lock: Mutex<()>,
     // Mapping between allocated address and its size - this is used to check correctness.
     // Size will be set to zero when the memory is freed.
     #[cfg(debug_assertions)]
@@ -64,7 +67,7 @@ pub struct MallocSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for MallocSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
 
@@ -98,7 +101,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     // For malloc space, we need to further check the VO bit.
     fn is_in_space(&self, object: ObjectReference) -> bool {
-        is_alloced_by_malloc(object)
+        self.is_alloced_by_malloc(object)
     }
 
     /// For malloc space, we just use the side metadata.
@@ -107,7 +110,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         debug_assert!(!addr.is_zero());
         // `addr` cannot be mapped by us. It should be mapped by the malloc library.
         debug_assert!(!addr.is_mapped());
-        has_object_alloced_by_malloc(addr)
+        self.has_object_alloced_by_malloc(addr)
     }
 
     #[cfg(feature = "is_mmtk_object")]
@@ -173,7 +176,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     // We have assertions in a debug build. We allow this pattern for the release build.
     #[allow(clippy::let_and_return)]
     fn in_space(&self, object: ObjectReference) -> bool {
-        let ret = is_alloced_by_malloc(object);
+        let ret = self.is_alloced_by_malloc(object);
 
         #[cfg(debug_assertions)]
         if ASSERT_ALLOCATION {
@@ -215,6 +218,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         "MallocSpace"
     }
 
+    fn estimate_side_meta_pages(&self, data_pages: usize) -> usize {
+        self.metadata.calculate_reserved_pages(data_pages)
+    }
+
     #[allow(clippy::assertions_on_constants)]
     fn reserved_pages(&self) -> usize {
         use crate::util::constants::LOG_BYTES_IN_PAGE;
@@ -222,7 +229,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         debug_assert!(LOG_BYTES_IN_MALLOC_PAGE >= LOG_BYTES_IN_PAGE);
         let data_pages = self.active_pages.load(Ordering::SeqCst)
             << (LOG_BYTES_IN_MALLOC_PAGE - LOG_BYTES_IN_PAGE);
-        let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
+        let meta_pages = self.estimate_side_meta_pages(data_pages);
         data_pages + meta_pages
     }
 
@@ -266,20 +273,20 @@ impl<VM: VMBinding> MallocSpace<VM> {
         if !cfg!(feature = "vo_bit") {
             specs.push(crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC);
         }
-        // MallocSpace also need a global chunk metadata.
-        // TODO: I don't know why this is a global spec. Can we replace it with the chunk map (and the local spec used in the chunk map)?
-        // One reason could be that the address range in this space is not in our control, and it could be anywhere in the heap, thus we have
-        // to make it a global spec. I am not too sure about this.
-        specs.push(ACTIVE_CHUNK_METADATA_SPEC);
     }
 
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+        if *args.options.count_live_bytes_in_gc {
+            // The implementation of counting live bytes needs a SpaceDescriptor which we do not have for MallocSpace.
+            // Besides we cannot meaningfully measure the live bytes vs total pages for MallocSpace.
+            panic!("count_live_bytes_in_gc is not supported by MallocSpace");
+        }
+        let descriptor = SpaceDescriptor::create_descriptor();
+        let chunk_map = ChunkMap::new(descriptor.get_index());
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
             active_pages: AtomicUsize::new(0),
-            chunk_addr_min: Atomic::new(Address::MAX),
-            chunk_addr_max: Atomic::new(Address::ZERO),
             metadata: SideMetadataContext {
                 global: args.global_side_metadata_specs.clone(),
                 local: metadata::extract_side_metadata(&[
@@ -290,6 +297,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
             },
             scheduler: args.scheduler.clone(),
             gc_trigger: args.gc_trigger,
+            descriptor,
+            chunk_map,
+            mmap_metadata_lock: Mutex::new(()),
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
             #[cfg(debug_assertions)]
@@ -320,6 +330,15 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
         if used_pages != 0 {
             self.active_pages.fetch_add(used_pages, Ordering::SeqCst);
+        }
+    }
+
+    fn set_chunk_mark(&self, start: Address, size: usize) {
+        let mut chunk = start.align_down(BYTES_IN_CHUNK);
+        while chunk < start + size {
+            self.chunk_map
+                .set_allocated(Chunk::from_aligned_address(chunk), true);
+            chunk += BYTES_IN_CHUNK;
         }
     }
 
@@ -360,14 +379,16 @@ impl<VM: VMBinding> MallocSpace<VM> {
         if !address.is_zero() {
             let actual_size = get_malloc_usable_size(address, is_offset_malloc);
 
-            // If the side metadata for the address has not yet been mapped, we will map all the side metadata for the range [address, address + actual_size).
-            if !is_meta_space_mapped(address, actual_size) {
+            if !self.is_meta_space_mapped(address, actual_size) {
                 // Map the metadata space for the associated chunk
                 self.map_metadata_and_update_bound(address, actual_size);
                 // Update SFT
                 assert!(crate::mmtk::SFT_MAP.has_sft_entry(address)); // make sure the address is okay with our SFT map
                 unsafe { crate::mmtk::SFT_MAP.update(self, address, actual_size) };
             }
+
+            // Set chunk marks for the current object
+            self.set_chunk_mark(address, actual_size);
 
             // Set page marks for current object
             self.set_page_mark(address, actual_size);
@@ -385,6 +406,43 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
 
         address
+    }
+
+    /// Check if metadata is mapped for a range [addr, addr + size). Metadata is mapped per chunk,
+    /// we will go through all the chunks for [address, address + size), and check if they are mapped.
+    /// If any of the chunks is not mapped, return false. Otherwise return true.
+    fn is_meta_space_mapped(&self, address: Address, size: usize) -> bool {
+        let mut chunk = address.align_down(BYTES_IN_CHUNK);
+        while chunk < address + size {
+            // is the chunk already mapped?
+            if !self.is_meta_space_mapped_for_address(chunk) {
+                return false;
+            }
+            chunk += BYTES_IN_CHUNK;
+        }
+        true
+    }
+
+    /// Check if metadata is mapped for a given address. We check with the chunk map: if the side metadata
+    /// for the chunk map is mapped, and if it is allocated in the chunk map.
+    fn is_meta_space_mapped_for_address(&self, address: Address) -> bool {
+        let is_chunk_map_mapped = |chunk_start: Address| {
+            const CHUNK_MAP_MAX_META_ADDRESS: Address =
+                ChunkMap::ALLOC_TABLE.upper_bound_address_for_contiguous();
+            let meta_address =
+                side_metadata::address_to_meta_address(&ChunkMap::ALLOC_TABLE, chunk_start);
+            if meta_address < CHUNK_MAP_MAX_META_ADDRESS {
+                meta_address.is_mapped()
+            } else {
+                false
+            }
+        };
+        let chunk_start = address.align_down(BYTES_IN_CHUNK);
+        is_chunk_map_mapped(chunk_start)
+            && self
+                .chunk_map
+                .get(Chunk::from_aligned_address(chunk_start))
+                .is_some()
     }
 
     pub fn free(&self, addr: Address) {
@@ -428,9 +486,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         );
 
         if !is_marked::<VM>(object, Ordering::Relaxed) {
-            let chunk_start = conversions::chunk_align_down(object.to_object_start::<VM>());
             set_mark_bit::<VM>(object, Ordering::SeqCst);
-            set_chunk_mark(chunk_start);
             queue.enqueue(object);
         }
 
@@ -438,66 +494,68 @@ impl<VM: VMBinding> MallocSpace<VM> {
     }
 
     fn map_metadata_and_update_bound(&self, addr: Address, size: usize) {
-        // Map the metadata space for the range [addr, addr + size)
-        map_meta_space(&self.metadata, addr, size, self.get_name());
+        // Acquire the lock before
+        let _lock = self.mmap_metadata_lock.lock().unwrap();
 
-        // Update the bounds of the max and min chunk addresses seen -- this is used later in the sweep
-        // Lockless compare-and-swap loops perform better than a locking variant
+        // Mmap metadata for each chunk
+        let map_metadata_space_for_chunk = |start: Address| {
+            debug_assert!(start.is_aligned_to(BYTES_IN_CHUNK));
+            // Attempt to map the local metadata for the policy.
+            // Note that this might fail. For example, we have marked a chunk as active but later we freed all
+            // the objects in it, and unset its chunk bit. However, we do not free its metadata. So for the chunk,
+            // its chunk bit is mapped, but not marked, and all its local metadata is also mapped.
+            let mmap_metadata_result =
+                self.metadata
+                    .try_map_metadata_space(start, BYTES_IN_CHUNK, self.get_name());
+            debug_assert!(
+                mmap_metadata_result.is_ok(),
+                "mmap sidemetadata failed for chunk_start ({})",
+                start
+            );
+            // Set the chunk mark at the end. So if we have chunk mark set, we know we have mapped side metadata
+            // for the chunk.
+            trace!("set chunk mark bit for {}", start);
+            self.chunk_map
+                .set_allocated(Chunk::from_aligned_address(start), true);
+        };
 
-        // Update chunk_addr_min, basing on the start of the allocation: addr.
-        {
-            let min_chunk_start = conversions::chunk_align_down(addr);
-            let mut min = self.chunk_addr_min.load(Ordering::Relaxed);
-            while min_chunk_start < min {
-                match self.chunk_addr_min.compare_exchange_weak(
-                    min,
-                    min_chunk_start,
-                    Ordering::AcqRel,
-                    Ordering::Relaxed,
-                ) {
-                    Ok(_) => break,
-                    Err(x) => min = x,
-                }
-            }
-        }
-
-        // Update chunk_addr_max, basing on the end of the allocation: addr + size.
-        {
-            let max_chunk_start = conversions::chunk_align_down(addr + size);
-            let mut max = self.chunk_addr_max.load(Ordering::Relaxed);
-            while max_chunk_start > max {
-                match self.chunk_addr_max.compare_exchange_weak(
-                    max,
-                    max_chunk_start,
-                    Ordering::AcqRel,
-                    Ordering::Relaxed,
-                ) {
-                    Ok(_) => break,
-                    Err(x) => max = x,
-                }
-            }
+        // Go through each chunk, and map for them.
+        let mut chunk = conversions::chunk_align_down(addr);
+        while chunk < addr + size {
+            map_metadata_space_for_chunk(chunk);
+            chunk += BYTES_IN_CHUNK;
         }
     }
 
-    pub fn prepare(&mut self) {}
+    /// Check if a given object was allocated by malloc
+    pub fn is_alloced_by_malloc(&self, object: ObjectReference) -> bool {
+        self.is_meta_space_mapped_for_address(object.to_raw_address())
+            && crate::util::metadata::vo_bit::is_vo_bit_set(object)
+    }
+
+    /// Check if there is an object allocated by malloc at the address.
+    ///
+    /// This function doesn't check if `addr` is aligned.
+    /// If not, it will try to load the VO bit for the address rounded down to the metadata's granularity.
+    #[cfg(feature = "is_mmtk_object")]
+    pub fn has_object_alloced_by_malloc(&self, addr: Address) -> Option<ObjectReference> {
+        if !self.is_meta_space_mapped_for_address(addr) {
+            return None;
+        }
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
+    }
+
+    pub fn prepare(&mut self, _full_heap: bool) {}
 
     pub fn release(&mut self) {
         use crate::scheduler::WorkBucketStage;
-        let mut work_packets: Vec<Box<dyn GCWork<VM>>> = vec![];
-        let mut chunk = self.chunk_addr_min.load(Ordering::Relaxed);
-        let end = self.chunk_addr_max.load(Ordering::Relaxed) + BYTES_IN_CHUNK;
-
-        // Since only a single thread generates the sweep work packets as well as it is a Stop-the-World collector,
-        // we can assume that the chunk mark metadata is not being accessed by anything else and hence we use
-        // non-atomic accesses
         let space = unsafe { &*(self as *const Self) };
-        while chunk < end {
-            if is_chunk_mapped(chunk) && unsafe { is_chunk_marked_unsafe(chunk) } {
-                work_packets.push(Box::new(MSSweepChunk { ms: space, chunk }));
-            }
-
-            chunk += BYTES_IN_CHUNK;
-        }
+        let work_packets = self.chunk_map.generate_tasks(|chunk| {
+            Box::new(MSSweepChunk {
+                ms: space,
+                chunk: chunk.start(),
+            })
+        });
 
         debug!("Generated {} sweep work packets", work_packets.len());
         #[cfg(debug_assertions)]
@@ -535,8 +593,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     /// Clean up for an empty chunk
     fn clean_up_empty_chunk(&self, chunk_start: Address) {
-        // Since the chunk mark metadata is a byte, we don't need synchronization
-        unsafe { unset_chunk_mark_unsafe(chunk_start) };
+        // Clear the chunk map
+        self.chunk_map
+            .set_allocated(Chunk::from_aligned_address(chunk_start), false);
         // Clear the SFT entry
         unsafe { crate::mmtk::SFT_MAP.clear(chunk_start) };
         // Clear the page marks - we are the only GC thread that is accessing this chunk

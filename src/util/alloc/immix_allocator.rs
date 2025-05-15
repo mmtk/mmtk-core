@@ -289,7 +289,11 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 
     // Get a clean block from ImmixSpace.
     fn acquire_clean_block(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        match self.immix_space().get_clean_block(self.tls, self.copy) {
+        match self.immix_space().get_clean_block(
+            self.tls,
+            self.copy,
+            self.get_context().get_alloc_options(),
+        ) {
             None => Address::ZERO,
             Some(block) => {
                 trace!(
@@ -298,6 +302,9 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     block.start(),
                     block.end()
                 );
+                // Bulk clear stale line mark state
+                Line::MARK_TABLE
+                    .bzero_metadata(block.start(), crate::policy::immix::block::Block::BYTES);
                 if self.request_for_large {
                     self.large_bump_pointer.cursor = block.start();
                     self.large_bump_pointer.limit = block.end();

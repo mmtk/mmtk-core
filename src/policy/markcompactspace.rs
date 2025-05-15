@@ -33,7 +33,7 @@ pub const GC_EXTRA_HEADER_WORD: usize = 1;
 const GC_EXTRA_HEADER_BYTES: usize = GC_EXTRA_HEADER_WORD << LOG_BYTES_IN_WORD;
 
 impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         self.get_name()
     }
 
@@ -101,6 +101,15 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
         // We should not use trace_object for markcompact space.
         // Depending on which trace it is, we should manually call either trace_mark or trace_forward.
         panic!("sft_trace_object() cannot be used with mark compact space")
+    }
+
+    fn debug_print_object_info(&self, object: ObjectReference) {
+        println!("marked = {}", MarkCompactSpace::<VM>::is_marked(object));
+        println!(
+            "head forwarding pointer = {:?}",
+            MarkCompactSpace::<VM>::get_header_forwarding_pointer(object)
+        );
+        self.common.debug_print_object_global_info(object);
     }
 }
 

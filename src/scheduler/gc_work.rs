@@ -153,15 +153,6 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
             let result = w.designated_work.push(Box::new(ReleaseCollector));
             debug_assert!(result.is_ok());
         }
-
-        #[cfg(feature = "count_live_bytes_in_gc")]
-        {
-            let live_bytes = mmtk
-                .scheduler
-                .worker_group
-                .get_and_clear_worker_live_bytes();
-            mmtk.state.set_live_bytes_in_last_gc(live_bytes);
-        }
     }
 }
 
@@ -556,7 +547,7 @@ pub trait ProcessEdgesWork:
     /// Higher capacity means the packet will take longer to finish, and may lead to
     /// bad load balancing. On the other hand, lower capacity would lead to higher cost
     /// on scheduling many small work packets. It is important to find a proper capacity.
-    const CAPACITY: usize = 4096;
+    const CAPACITY: usize = EDGES_WORK_BUFFER_SIZE;
     /// Do we update object reference? This has to be true for a moving GC.
     const OVERWRITE_REFERENCE: bool = true;
     /// If true, we do object scanning in this work packet with the same worker without scheduling overhead.
@@ -820,7 +811,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         &self,
         buffer: &[ObjectReference],
         worker: &mut GCWorker<<Self::E as ProcessEdgesWork>::VM>,
-        _mmtk: &'static MMTK<<Self::E as ProcessEdgesWork>::VM>,
+        mmtk: &'static MMTK<<Self::E as ProcessEdgesWork>::VM>,
     ) {
         let tls = worker.tls;
 
@@ -830,14 +821,21 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         let mut scan_later = vec![];
         {
             let mut closure = ObjectsClosure::<Self::E>::new(worker, self.get_bucket());
-            for object in objects_to_scan.iter().copied() {
-                // For any object we need to scan, we count its liv bytes
-                #[cfg(feature = "count_live_bytes_in_gc")]
-                closure
-                    .worker
-                    .shared
-                    .increase_live_bytes(VM::VMObjectModel::get_current_size(object));
 
+            // For any object we need to scan, we count its live bytes.
+            // Check the option outside the loop for better performance.
+            if crate::util::rust_util::unlikely(*mmtk.get_options().count_live_bytes_in_gc) {
+                // Borrow before the loop.
+                let mut live_bytes_stats = closure.worker.shared.live_bytes_per_space.borrow_mut();
+                for object in objects_to_scan.iter().copied() {
+                    crate::scheduler::worker::GCWorkerShared::<VM>::increase_live_bytes(
+                        &mut live_bytes_stats,
+                        object,
+                    );
+                }
+            }
+
+            for object in objects_to_scan.iter().copied() {
                 if <VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, object) {
                     trace!("Scan object (slot) {}", object);
                     // If an object supports slot-enqueuing, we enqueue its slots.

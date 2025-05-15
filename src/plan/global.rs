@@ -197,7 +197,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
 
     /// Inform the plan about the end of a GC. It is guaranteed that there is no further work for this GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
-    fn end_of_gc(&mut self, _tls: VMWorkerThread) {}
+    fn end_of_gc(&mut self, _tls: VMWorkerThread);
 
     /// Notify the plan that an emergency collection will happen. The plan should try to free as much memory as possible.
     /// The default implementation will force a full heap collection for generational plans.
@@ -266,6 +266,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         //    the reserved pages is larger than total pages after the copying GC (the reserved pages after a GC
         //    may be larger than the reserved pages before a GC, as we may end up using more memory for thread local
         //    buffers for copy allocators).
+        // 3. the binding disabled GC, and we end up over-allocating beyond the total pages determined by the GC trigger.
         let available_pages = total_pages.saturating_sub(reserved_pages);
         trace!(
             "Total pages = {}, reserved pages = {}, available pages = {}",
@@ -289,7 +290,12 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// Get the number of pages that are NOT used. This is clearly different from available pages.
     /// Free pages are unused, but some of them may have been reserved for some reason.
     fn get_free_pages(&self) -> usize {
-        self.get_total_pages() - self.get_used_pages()
+        let total_pages = self.get_total_pages();
+        let used_pages = self.get_used_pages();
+
+        // It is possible that the used pages is larger than the total pages, so we use saturating
+        // subtraction.  See the comments in `get_available_pages`.
+        total_pages.saturating_sub(used_pages)
     }
 
     /// Return whether last GC was an exhaustive attempt to collect the heap.
@@ -483,39 +489,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         pages
     }
 
-    pub fn trace_object<Q: ObjectQueue>(
-        &self,
-        queue: &mut Q,
-        object: ObjectReference,
-        worker: &mut GCWorker<VM>,
-    ) -> ObjectReference {
-        #[cfg(feature = "code_space")]
-        if self.code_space.in_space(object) {
-            trace!("trace_object: object in code space");
-            return self.code_space.trace_object::<Q>(queue, object);
-        }
-
-        #[cfg(feature = "code_space")]
-        if self.code_lo_space.in_space(object) {
-            trace!("trace_object: object in large code space");
-            return self.code_lo_space.trace_object::<Q>(queue, object);
-        }
-
-        #[cfg(feature = "ro_space")]
-        if self.ro_space.in_space(object) {
-            trace!("trace_object: object in ro_space space");
-            return self.ro_space.trace_object(queue, object);
-        }
-
-        #[cfg(feature = "vm_space")]
-        if self.vm_space.in_space(object) {
-            trace!("trace_object: object in boot space");
-            return self.vm_space.trace_object(queue, object);
-        }
-
-        VM::VMActivePlan::vm_trace_object::<Q>(queue, object, worker)
-    }
-
     pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
         self.code_space.prepare();
@@ -536,6 +509,10 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.ro_space.release();
         #[cfg(feature = "vm_space")]
         self.vm_space.release();
+    }
+
+    pub fn end_of_gc(&mut self, _tls: VMWorkerThread) {
+        // Do nothing here. None of the spaces needs end_of_gc.
     }
 
     pub(crate) fn collection_required<P: Plan>(&self, plan: &P, space_full: bool) -> bool {
@@ -569,6 +546,17 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 }
 
+cfg_if::cfg_if! {
+    // Use immortal or mark sweep as the non moving space if the features are enabled. Otherwise use Immix.
+    if #[cfg(feature = "immortal_as_nonmoving")] {
+        pub type NonMovingSpace<VM> = crate::policy::immortalspace::ImmortalSpace<VM>;
+    } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+        pub type NonMovingSpace<VM> = crate::policy::marksweepspace::native_ms::MarkSweepSpace<VM>;
+    } else {
+        pub type NonMovingSpace<VM> = crate::policy::immix::ImmixSpace<VM>;
+    }
+}
+
 /**
 CommonPlan is for representing state and features used by _many_ plans, but that are not fundamental to _all_ plans.  Examples include the Large Object Space and an Immortal space.  Features that are fundamental to _all_ plans must be included in BasePlan.
 */
@@ -578,9 +566,12 @@ pub struct CommonPlan<VM: VMBinding> {
     pub immortal: ImmortalSpace<VM>,
     #[space]
     pub los: LargeObjectSpace<VM>,
-    // TODO: We should use a marksweep space for nonmoving.
     #[space]
-    pub nonmoving: ImmortalSpace<VM>,
+    #[cfg_attr(
+        not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")),
+        post_scan
+    )] // Immix space needs post_scan
+    pub nonmoving: NonMovingSpace<VM>,
     #[parent]
     pub base: BasePlan<VM>,
 }
@@ -598,12 +589,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 args.get_space_args("los", true, false, VMRequest::discontiguous()),
                 false,
             ),
-            nonmoving: ImmortalSpace::new(args.get_space_args(
-                "nonmoving",
-                true,
-                false,
-                VMRequest::discontiguous(),
-            )),
+            nonmoving: Self::new_nonmoving_space(&mut args),
             base: BasePlan::new(args),
         }
     }
@@ -615,39 +601,23 @@ impl<VM: VMBinding> CommonPlan<VM> {
             + self.base.get_used_pages()
     }
 
-    pub fn trace_object<Q: ObjectQueue>(
-        &self,
-        queue: &mut Q,
-        object: ObjectReference,
-        worker: &mut GCWorker<VM>,
-    ) -> ObjectReference {
-        if self.immortal.in_space(object) {
-            trace!("trace_object: object in immortal space");
-            return self.immortal.trace_object(queue, object);
-        }
-        if self.los.in_space(object) {
-            trace!("trace_object: object in los");
-            return self.los.trace_object(queue, object);
-        }
-        if self.nonmoving.in_space(object) {
-            trace!("trace_object: object in nonmoving space");
-            return self.nonmoving.trace_object(queue, object);
-        }
-        self.base.trace_object::<Q>(queue, object, worker)
-    }
-
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.prepare();
         self.los.prepare(full_heap);
-        self.nonmoving.prepare();
+        self.prepare_nonmoving_space(full_heap);
         self.base.prepare(tls, full_heap)
     }
 
     pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.release();
         self.los.release(full_heap);
-        self.nonmoving.release();
+        self.release_nonmoving_space(full_heap);
         self.base.release(tls, full_heap)
+    }
+
+    pub fn end_of_gc(&mut self, tls: VMWorkerThread) {
+        self.end_of_gc_nonmoving_space();
+        self.base.end_of_gc(tls);
     }
 
     pub fn get_immortal(&self) -> &ImmortalSpace<VM> {
@@ -658,8 +628,64 @@ impl<VM: VMBinding> CommonPlan<VM> {
         &self.los
     }
 
-    pub fn get_nonmoving(&self) -> &ImmortalSpace<VM> {
+    pub fn get_nonmoving(&self) -> &NonMovingSpace<VM> {
         &self.nonmoving
+    }
+
+    fn new_nonmoving_space(args: &mut CreateSpecificPlanArgs<VM>) -> NonMovingSpace<VM> {
+        let space_args = args.get_space_args("nonmoving", true, false, VMRequest::discontiguous());
+        cfg_if::cfg_if! {
+            if #[cfg(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving"))] {
+                NonMovingSpace::new(space_args)
+            } else {
+                // Immix requires extra args.
+                NonMovingSpace::new(
+                    space_args,
+                    crate::policy::immix::ImmixSpaceArgs {
+                        unlog_object_when_traced: false,
+                        #[cfg(feature = "vo_bit")]
+                        mixed_age: false,
+                        never_move_objects: true,
+                    },
+                )
+            }
+        }
+    }
+
+    fn prepare_nonmoving_space(&mut self, _full_heap: bool) {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "immortal_as_nonmoving")] {
+                self.nonmoving.prepare();
+            } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+                self.nonmoving.prepare(_full_heap);
+            } else {
+                self.nonmoving.prepare(_full_heap, None);
+            }
+        }
+    }
+
+    fn release_nonmoving_space(&mut self, _full_heap: bool) {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "immortal_as_nonmoving")] {
+                self.nonmoving.release();
+            } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+                self.nonmoving.prepare(_full_heap);
+            } else {
+                self.nonmoving.release(_full_heap);
+            }
+        }
+    }
+
+    fn end_of_gc_nonmoving_space(&mut self) {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "immortal_as_nonmoving")] {
+                // Nothing we need to do for immortal space.
+            } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+                self.nonmoving.end_of_gc();
+            } else {
+                self.nonmoving.end_of_gc();
+            }
+        }
     }
 }
 
