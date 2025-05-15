@@ -657,7 +657,9 @@
 <span class="kw">use </span>std::cell::UnsafeCell;
 <span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::default::Default;
-<span class="kw">use </span>std::sync::atomic::{AtomicBool, Ordering};
+<span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
+</span><span class="kw">use </span>std::sync::atomic::AtomicBool;
+<span class="kw">use </span>std::sync::atomic::Ordering;
 <span class="kw">use </span>std::sync::Arc;
 <span class="kw">use </span>std::sync::Mutex;
 
@@ -751,7 +753,6 @@
     <span class="kw">pub</span>(<span class="kw">crate</span>) gc_trigger: Arc&lt;GCTrigger&lt;VM&gt;&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) gc_requester: Arc&lt;GCRequester&lt;VM&gt;&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) stats: Arc&lt;Stats&gt;,
-    inside_harness: AtomicBool,
     <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
     </span>inside_sanity: AtomicBool,
     <span class="doccomment">/// Analysis counters. The feature analysis allows us to periodically stop the world and collect some statistics.
@@ -848,7 +849,6 @@
             </span>sanity_checker: Mutex::new(SanityChecker::new()),
             <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
             </span>inside_sanity: AtomicBool::new(<span class="bool-val">false</span>),
-            inside_harness: AtomicBool::new(<span class="bool-val">false</span>),
             <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
             </span>slot_logger: SlotLogger::new(),
             <span class="attr">#[cfg(feature = <span class="string">"analysis"</span>)]
@@ -952,7 +952,7 @@
     </span><span class="kw">pub fn </span>harness_begin(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMMutatorThread) {
         <span class="macro">probe!</span>(mmtk, harness_begin);
         <span class="self">self</span>.handle_user_collection_request(tls, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
-        <span class="self">self</span>.inside_harness.store(<span class="bool-val">true</span>, Ordering::SeqCst);
+        <span class="self">self</span>.state.inside_harness.store(<span class="bool-val">true</span>, Ordering::SeqCst);
         <span class="self">self</span>.stats.start_all();
         <span class="self">self</span>.scheduler.enable_stat();
     }
@@ -962,7 +962,7 @@
     /// This is usually called by the benchmark harness right after the actual benchmark.
     </span><span class="kw">pub fn </span>harness_end(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>) {
         <span class="self">self</span>.stats.stop_all(<span class="self">self</span>);
-        <span class="self">self</span>.inside_harness.store(<span class="bool-val">false</span>, Ordering::SeqCst);
+        <span class="self">self</span>.state.inside_harness.store(<span class="bool-val">false</span>, Ordering::SeqCst);
         <span class="macro">probe!</span>(mmtk, harness_end);
     }
 
