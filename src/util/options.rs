@@ -275,7 +275,7 @@ impl Options {
     /// Arguments:
     /// * `options`: a string that is key value pairs separated by white spaces or commas, e.g.
     ///   `threads=1 stress_factor=4096`, or `threads=1,stress_factor=4096`. Each key-value pair
-    ///   will be set via [`Options::set_by_string`].
+    ///   will be set via [`Options::set_from_string`].
     pub fn set_bulk_from_string(&mut self, options: &str) -> bool {
         for opt in options.replace(',', " ").split_ascii_whitespace() {
             let kv_pair: Vec<&str> = opt.split('=').collect();
