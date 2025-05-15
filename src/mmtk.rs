@@ -81,13 +81,13 @@ impl MMTKBuilder {
 
     /// Set an option.
     pub fn set_option(&mut self, name: &str, val: &str) -> bool {
-        self.options.set_from_command_line(name, val)
+        self.options.set_from_string(name, val)
     }
 
     /// Set multiple options by a string. The string should be key-value pairs separated by white spaces,
     /// such as `threads=1 stress_factor=4096`.
     pub fn set_options_bulk_by_str(&mut self, options: &str) -> bool {
-        self.options.set_bulk_from_command_line(options)
+        self.options.set_bulk_from_string(options)
     }
 
     /// Custom VM layout constants. VM bindings may use this function for compressed or 39-bit heap support.
