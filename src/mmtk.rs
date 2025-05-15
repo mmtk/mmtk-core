@@ -12,6 +12,7 @@ use crate::util::address::ObjectReference;
 use crate::util::analysis::AnalysisManager;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::gc_trigger::GCTrigger;
+use crate::util::heap::inspection::SpaceInspector;
 use crate::util::heap::layout::heap_parameters::MAX_SPACES;
 use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::heap::layout::{self, Mmapper, VMMap};
@@ -595,5 +596,15 @@ impl<VM: VMBinding> MMTK<VM> {
             .base()
             .vm_space
             .initialize_object_metadata(object, false)
+    }
+
+    pub fn inspect_spaces<'a>(&'a self) -> Vec<&'a dyn SpaceInspector> {
+        let mut ret = vec![];
+        self.get_plan().for_each_space(&mut |space| {
+            if let Some(inspector) = space.as_inspector() {
+                ret.push(inspector);
+            }
+        });
+        ret
     }
 }

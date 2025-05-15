@@ -40,6 +40,7 @@ mod mock_test_handle_mmap_conflict;
 mod mock_test_handle_mmap_oom;
 #[cfg(feature = "vo_bit")]
 mod mock_test_heap_traversal;
+mod mock_test_heap_inspector;
 mod mock_test_init_fork;
 #[cfg(feature = "is_mmtk_object")]
 mod mock_test_internal_ptr_before_object_ref;

@@ -167,6 +167,9 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
         self
     }
+    fn as_inspector(&self) -> Option<&dyn crate::util::heap::inspection::SpaceInspector> {
+        Some(self)
+    }
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
@@ -409,7 +412,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             if self.common.needs_log_bit {
                 if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
                     for chunk in self.chunk_map.all_chunks() {
-                        side.bzero_metadata(chunk.start(), Chunk::BYTES);
+                        side.bzero_metadata(chunk .start(), Chunk::BYTES);
                     }
                 }
             }
@@ -1175,6 +1178,30 @@ impl ClearVOBitsAfterPrepare {
             .filter(|block| block.get_state() != BlockState::Unallocated)
         {
             block.clear_vo_bits_for_unmarked_regions(line_mark_state);
+        }
+    }
+}
+
+mod inspector {
+    use super::*;
+    use crate::util::heap::inspection::{RegionInspector, SpaceInspector, list_child_regions};
+    impl<VM: VMBinding> SpaceInspector for ImmixSpace<VM> {
+        fn name(&self) -> &str {
+            SFT::name(self)
+        }
+
+        fn list_regions(&self, parent_region: Option<&dyn RegionInspector>) -> Vec<Box<dyn RegionInspector>> {
+            if let Some(parent_region) = parent_region {
+                list_child_regions::<Chunk, Block>(parent_region).or_else(|| {
+                    if !crate::policy::immix::BLOCK_ONLY {
+                        list_child_regions::<Block, Line>(parent_region)
+                    } else {
+                        None
+                    }
+                }).unwrap_or_else(|| vec![])
+            } else {
+                self.chunk_map.all_chunks().map(|r: Chunk| Box::new(r) as Box<dyn RegionInspector>).collect()
+            }
         }
     }
 }
