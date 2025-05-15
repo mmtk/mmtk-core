@@ -42,6 +42,8 @@ pub struct GlobalState {
     pub(crate) stacks_prepared: AtomicBool,
     /// A counter that keeps tracks of the number of bytes allocated since last stress test
     pub(crate) allocation_bytes: AtomicUsize,
+    /// Are we inside the benchmark harness?
+    pub(crate) inside_harness: AtomicBool,
     /// A counteer that keeps tracks of the number of bytes allocated by malloc
     #[cfg(feature = "malloc_counted_size")]
     pub(crate) malloc_bytes: AtomicUsize,
@@ -200,6 +202,7 @@ impl Default for GlobalState {
             cur_collection_attempts: AtomicUsize::new(0),
             scanned_stacks: AtomicUsize::new(0),
             allocation_bytes: AtomicUsize::new(0),
+            inside_harness: AtomicBool::new(false),
             #[cfg(feature = "malloc_counted_size")]
             malloc_bytes: AtomicUsize::new(0),
             live_bytes_in_last_gc: AtomicRefCell::new(HashMap::new()),

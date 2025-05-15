@@ -123,7 +123,6 @@ pub struct MMTK<VM: VMBinding> {
     pub(crate) gc_trigger: Arc<GCTrigger<VM>>,
     pub(crate) gc_requester: Arc<GCRequester<VM>>,
     pub(crate) stats: Arc<Stats>,
-    inside_harness: AtomicBool,
     #[cfg(feature = "sanity")]
     inside_sanity: AtomicBool,
     /// Analysis counters. The feature analysis allows us to periodically stop the world and collect some statistics.
@@ -220,7 +219,6 @@ impl<VM: VMBinding> MMTK<VM> {
             sanity_checker: Mutex::new(SanityChecker::new()),
             #[cfg(feature = "sanity")]
             inside_sanity: AtomicBool::new(false),
-            inside_harness: AtomicBool::new(false),
             #[cfg(feature = "extreme_assertions")]
             slot_logger: SlotLogger::new(),
             #[cfg(feature = "analysis")]
@@ -324,7 +322,7 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn harness_begin(&self, tls: VMMutatorThread) {
         probe!(mmtk, harness_begin);
         self.handle_user_collection_request(tls, true, true);
-        self.inside_harness.store(true, Ordering::SeqCst);
+        self.state.inside_harness.store(true, Ordering::SeqCst);
         self.stats.start_all();
         self.scheduler.enable_stat();
     }
@@ -334,7 +332,7 @@ impl<VM: VMBinding> MMTK<VM> {
     /// This is usually called by the benchmark harness right after the actual benchmark.
     pub fn harness_end(&'static self) {
         self.stats.stop_all(self);
-        self.inside_harness.store(false, Ordering::SeqCst);
+        self.state.inside_harness.store(false, Ordering::SeqCst);
         probe!(mmtk, harness_end);
     }
 
