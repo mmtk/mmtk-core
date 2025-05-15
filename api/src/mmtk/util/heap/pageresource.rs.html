@@ -194,16 +194,10 @@
 <a href="#193" id="193">193</a>
 <a href="#194" id="194">194</a>
 <a href="#195" id="195">195</a>
-<a href="#196" id="196">196</a>
-<a href="#197" id="197">197</a>
-<a href="#198" id="198">198</a>
-<a href="#199" id="199">199</a>
-<a href="#200" id="200">200</a>
-<a href="#201" id="201">201</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
+<a href="#196" id="196">196</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
 <span class="kw">use </span><span class="kw">crate</span>::util::freelist::FreeList;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">crate</span>::vm::ActivePlan;
 <span class="kw">use </span>std::sync::Mutex;
 
 <span class="kw">use </span><span class="kw">super</span>::layout::VMMap;
@@ -271,14 +265,10 @@
      * This *MUST* be called by each PageResource during the
      * allocPages, and the caller must hold the lock.
      */
-    </span><span class="kw">fn </span>commit_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, reserved_pages: usize, actual_pages: usize, tls: VMThread) {
+    </span><span class="kw">fn </span>commit_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, reserved_pages: usize, actual_pages: usize, _tls: VMThread) {
         <span class="kw">let </span>delta = actual_pages - reserved_pages;
         <span class="self">self</span>.common().accounting.reserve(delta);
         <span class="self">self</span>.common().accounting.commit(actual_pages);
-        <span class="kw">if </span>VM::VMActivePlan::is_mutator(tls) {
-            <span class="self">self</span>.vm_map()
-                .add_to_cumulative_committed_pages(actual_pages);
-        }
     }
 
     <span class="kw">fn </span>reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {

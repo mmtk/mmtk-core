@@ -308,20 +308,7 @@
 <a href="#307" id="307">307</a>
 <a href="#308" id="308">308</a>
 <a href="#309" id="309">309</a>
-<a href="#310" id="310">310</a>
-<a href="#311" id="311">311</a>
-<a href="#312" id="312">312</a>
-<a href="#313" id="313">313</a>
-<a href="#314" id="314">314</a>
-<a href="#315" id="315">315</a>
-<a href="#316" id="316">316</a>
-<a href="#317" id="317">317</a>
-<a href="#318" id="318">318</a>
-<a href="#319" id="319">319</a>
-<a href="#320" id="320">320</a>
-<a href="#321" id="321">321</a>
-<a href="#322" id="322">322</a>
-<a href="#323" id="323">323</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::CreateFreeListResult;
+<a href="#310" id="310">310</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::CreateFreeListResult;
 <span class="kw">use </span><span class="kw">super</span>::map::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
@@ -332,7 +319,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::int_array_freelist::IntArrayFreeList;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>std::cell::UnsafeCell;
-<span class="kw">use </span>std::sync::atomic::{AtomicUsize, Ordering};
 <span class="kw">use </span>std::sync::{Mutex, MutexGuard};
 
 <span class="kw">pub struct </span>Map32 {
@@ -350,12 +336,6 @@
     total_available_discontiguous_chunks: usize,
     finalized: bool,
     descriptor_map: Vec&lt;SpaceDescriptor&gt;,
-
-    <span class="comment">// TODO: Is this the right place for this field?
-    // This used to be a global variable. When we remove global states, this needs to be put somewhere.
-    // Currently I am putting it here, as for where this variable is used, we already have
-    // references to vm_map - so it is convenient to put it here.
-    </span>cumulative_committed_pages: AtomicUsize,
 }
 
 <span class="kw">unsafe impl </span>Send <span class="kw">for </span>Map32 {}
@@ -374,7 +354,6 @@
                 total_available_discontiguous_chunks: <span class="number">0</span>,
                 finalized: <span class="bool-val">false</span>,
                 descriptor_map: <span class="macro">vec!</span>[SpaceDescriptor::UNINITIALIZED; max_chunks],
-                cumulative_committed_pages: AtomicUsize::new(<span class="number">0</span>),
             }),
             sync: Mutex::new(()),
         }
@@ -582,11 +561,6 @@
             .get(index)
             .copied()
             .unwrap_or(SpaceDescriptor::UNINITIALIZED)
-    }
-
-    <span class="kw">fn </span>add_to_cumulative_committed_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, pages: usize) {
-        <span class="self">self</span>.cumulative_committed_pages
-            .fetch_add(pages, Ordering::Relaxed);
     }
 }
 
