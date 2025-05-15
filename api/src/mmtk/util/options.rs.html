@@ -1277,7 +1277,42 @@
 <a href="#1276" id="1276">1276</a>
 <a href="#1277" id="1277">1277</a>
 <a href="#1278" id="1278">1278</a>
-<a href="#1279" id="1279">1279</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
+<a href="#1279" id="1279">1279</a>
+<a href="#1280" id="1280">1280</a>
+<a href="#1281" id="1281">1281</a>
+<a href="#1282" id="1282">1282</a>
+<a href="#1283" id="1283">1283</a>
+<a href="#1284" id="1284">1284</a>
+<a href="#1285" id="1285">1285</a>
+<a href="#1286" id="1286">1286</a>
+<a href="#1287" id="1287">1287</a>
+<a href="#1288" id="1288">1288</a>
+<a href="#1289" id="1289">1289</a>
+<a href="#1290" id="1290">1290</a>
+<a href="#1291" id="1291">1291</a>
+<a href="#1292" id="1292">1292</a>
+<a href="#1293" id="1293">1293</a>
+<a href="#1294" id="1294">1294</a>
+<a href="#1295" id="1295">1295</a>
+<a href="#1296" id="1296">1296</a>
+<a href="#1297" id="1297">1297</a>
+<a href="#1298" id="1298">1298</a>
+<a href="#1299" id="1299">1299</a>
+<a href="#1300" id="1300">1300</a>
+<a href="#1301" id="1301">1301</a>
+<a href="#1302" id="1302">1302</a>
+<a href="#1303" id="1303">1303</a>
+<a href="#1304" id="1304">1304</a>
+<a href="#1305" id="1305">1305</a>
+<a href="#1306" id="1306">1306</a>
+<a href="#1307" id="1307">1307</a>
+<a href="#1308" id="1308">1308</a>
+<a href="#1309" id="1309">1309</a>
+<a href="#1310" id="1310">1310</a>
+<a href="#1311" id="1311">1311</a>
+<a href="#1312" id="1312">1312</a>
+<a href="#1313" id="1313">1313</a>
+<a href="#1314" id="1314">1314</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>std::default::Default;
@@ -1403,29 +1438,30 @@
     <span class="bool-val">true
 </span>}
 
+<span class="doccomment">/// Error when setting an option by option name and option value as strings.
+</span><span class="kw">enum </span>SetOptionByStringError {
+    <span class="doccomment">/// The option name does not exist.
+    </span>InvalidKey,
+    <span class="doccomment">/// Error when converting the value from string.
+    </span>ValueParseError,
+    <span class="doccomment">/// The value failed validation.
+    </span>ValueValidationError,
+}
+
 <span class="doccomment">/// An MMTk option of a given type.
 /// This type allows us to store some metadata for the option. To get the value of an option,
 /// you can simply dereference it (for example, *options.threads).
 </span><span class="attr">#[derive(Clone)]
-</span><span class="kw">pub struct </span>MMTKOption&lt;T: Debug + Clone&gt; {
+</span><span class="kw">pub struct </span>MMTKOption&lt;T: Debug + Clone + FromStr&gt; {
     <span class="doccomment">/// The actual value for the option
     </span>value: T,
     <span class="doccomment">/// The validator to ensure the value is valid.
     </span>validator: <span class="kw">fn</span>(<span class="kw-2">&amp;</span>T) -&gt; bool,
-    <span class="doccomment">/// Can we set this option through env vars?
-    </span>from_env_var: bool,
-    <span class="doccomment">/// Can we set this option through command line options/API?
-    </span>from_command_line: bool,
 }
 
-<span class="kw">impl</span>&lt;T: Debug + Clone&gt; MMTKOption&lt;T&gt; {
+<span class="kw">impl</span>&lt;T: Debug + Clone + FromStr&gt; MMTKOption&lt;T&gt; {
     <span class="doccomment">/// Create a new MMTKOption
-    </span><span class="kw">pub fn </span>new(
-        value: T,
-        validator: <span class="kw">fn</span>(<span class="kw-2">&amp;</span>T) -&gt; bool,
-        from_env_var: bool,
-        from_command_line: bool,
-    ) -&gt; <span class="self">Self </span>{
+    </span><span class="kw">pub fn </span>new(value: T, validator: <span class="kw">fn</span>(<span class="kw-2">&amp;</span>T) -&gt; bool) -&gt; <span class="self">Self </span>{
         <span class="comment">// FIXME: We should enable the following check to make sure the initial value is valid.
         // However, we cannot enable it now. For options like perf events, the validator checks
         // if the perf event feature is enabled. So when the perf event features are not enabled,
@@ -1438,12 +1474,7 @@
         //     "Unable to create MMTKOption: initial value {:?} is invalid",
         //     value
         // );
-        </span>MMTKOption {
-            value,
-            validator,
-            from_env_var,
-            from_command_line,
-        }
+        </span>MMTKOption { value, validator }
     }
 
     <span class="doccomment">/// Set the option to the given value. Returns true if the value is valid, and we set the option to the value.
@@ -1457,7 +1488,7 @@
 }
 
 <span class="comment">// Dereference an option to get its value.
-</span><span class="kw">impl</span>&lt;T: Debug + Clone&gt; std::ops::Deref <span class="kw">for </span>MMTKOption&lt;T&gt; {
+</span><span class="kw">impl</span>&lt;T: Debug + Clone + FromStr&gt; std::ops::Deref <span class="kw">for </span>MMTKOption&lt;T&gt; {
     <span class="kw">type </span>Target = T;
 
     <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
@@ -1466,113 +1497,154 @@
 }
 
 <span class="macro">macro_rules!</span> options {
-    <span class="comment">// Verify whether we can set an option through env var or command line.
-    </span>(@verify_set_from(<span class="macro-nonterminal">$self</span>: expr, <span class="macro-nonterminal">$key</span>: expr, <span class="macro-nonterminal">$verify_field</span>: ident, $(<span class="macro-nonterminal">$name</span>: ident),<span class="kw-2">*</span>)) =&gt; {
-        <span class="kw">match </span><span class="macro-nonterminal">$key </span>{
-            $(<span class="macro">stringify!</span>(<span class="macro-nonterminal">$name</span>) =&gt; { <span class="macro">assert!</span>(<span class="macro-nonterminal">$self</span>.<span class="macro-nonterminal">$name</span>.<span class="macro-nonterminal">$verify_field</span>, <span class="string">"cannot set option {} (not {})"</span>, <span class="macro-nonterminal">$key</span>, <span class="macro">stringify!</span>(<span class="macro-nonterminal">$verify_field</span>)) }),*
-            <span class="kw">_ </span>=&gt; <span class="macro">panic!</span>(<span class="string">"Invalid Options key: {}"</span>, <span class="macro-nonterminal">$key</span>)
-        }
-    };
-
-    ($($(<span class="attr">#[<span class="macro-nonterminal">$outer</span>:meta]</span>)<span class="kw-2">*</span><span class="macro-nonterminal">$name</span>:ident: <span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty</span>[env_var: <span class="macro-nonterminal">$env_var</span>:expr, command_line: <span class="macro-nonterminal">$command_line</span>:expr][<span class="macro-nonterminal">$validator</span>:expr] = <span class="macro-nonterminal">$default</span>:expr),<span class="kw-2">*</span>,) =&gt; [
-        <span class="macro">options!</span>($(<span class="attr">#[<span class="macro-nonterminal">$outer</span>]</span>)<span class="kw-2">*</span>$(<span class="macro-nonterminal">$name</span>: <span class="macro-nonterminal">$</span><span class="kw">type</span>[<span class="macro-nonterminal">env_var</span>: <span class="macro-nonterminal">$env_var</span>, command_line: <span class="macro-nonterminal">$command_line</span>, mutable: <span class="macro-nonterminal">$mutable</span>][<span class="macro-nonterminal">$validator</span>] = <span class="macro-nonterminal">$default</span>),<span class="kw-2">*</span>);
+    ($($(<span class="attr">#[<span class="macro-nonterminal">$outer</span>:meta]</span>)<span class="kw-2">*</span><span class="macro-nonterminal">$name</span>:ident: <span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty </span>[<span class="macro-nonterminal">$validator</span>:expr] = <span class="macro-nonterminal">$default</span>:expr),<span class="kw-2">*</span>,) =&gt; [
+        <span class="macro">options!</span>($(<span class="attr">#[<span class="macro-nonterminal">$outer</span>]</span>)<span class="kw-2">*</span>$(<span class="macro-nonterminal">$name</span>: <span class="macro-nonterminal">$</span><span class="kw">type </span>[<span class="macro-nonterminal">$validator</span>] = <span class="macro-nonterminal">$default</span>),<span class="kw-2">*</span>);
     ];
-    ($($(<span class="attr">#[<span class="macro-nonterminal">$outer</span>:meta]</span>)<span class="kw-2">*</span><span class="macro-nonterminal">$name</span>:ident: <span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty</span>[env_var: <span class="macro-nonterminal">$env_var</span>:expr, command_line: <span class="macro-nonterminal">$command_line</span>:expr][<span class="macro-nonterminal">$validator</span>:expr] = <span class="macro-nonterminal">$default</span>:expr),<span class="kw-2">*</span>) =&gt; [
-        <span class="doccomment">/// MMTk command line options.
+    ($($(<span class="attr">#[<span class="macro-nonterminal">$outer</span>:meta]</span>)<span class="kw-2">*</span><span class="macro-nonterminal">$name</span>:ident: <span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty </span>[<span class="macro-nonterminal">$validator</span>:expr] = <span class="macro-nonterminal">$default</span>:expr),<span class="kw-2">*</span>) =&gt; [
+        <span class="doccomment">/// Options for an MMTk instance.  It affects many aspects of the behavior of the MMTk
+        /// instance, including the number of GC worker threads, the GC plan to use, etc.
+        ///
+        /// Options are set by the VM binding before creating an instance of MMTk.  The VM binding
+        /// usually parses command line options, environment variables, configuration files, etc.,
+        /// to determine the options.  MMTk also provides the [`Options::read_env_var_settings`]
+        /// method which reads environment variables of the form `MMTK_*` and set options.  It can
+        /// be convenient in the early development stage of a VM binding.
         </span><span class="attr">#[derive(Clone)]
         </span><span class="kw">pub struct </span>Options {
             $($(<span class="attr">#[<span class="macro-nonterminal">$outer</span>]</span>)<span class="kw-2">*</span><span class="kw">pub </span><span class="macro-nonterminal">$name</span>: MMTKOption&lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt;),*
         }
+
         <span class="kw">impl </span><span class="macro-nonterminal">Options </span>{
-            <span class="doccomment">/// Set an option from env var
-            </span><span class="kw">pub fn </span>set_from_env_var(<span class="kw-2">&amp;mut </span><span class="self">self</span>, s: <span class="kw-2">&amp;</span>str, val: <span class="kw-2">&amp;</span>str) -&gt; bool {
-                <span class="macro">options!</span>(@verify_set_from(<span class="self">self</span>, s, from_env_var, $(<span class="macro-nonterminal">$name</span>),<span class="kw-2">*</span>));
-                <span class="self">self</span>.set_inner(s, val)
-            }
-
-            <span class="doccomment">/// Set an option from command line
-            </span><span class="kw">pub fn </span>set_from_command_line(<span class="kw-2">&amp;mut </span><span class="self">self</span>, s: <span class="kw-2">&amp;</span>str, val: <span class="kw-2">&amp;</span>str) -&gt; bool {
-                <span class="macro">options!</span>(@verify_set_from(<span class="self">self</span>, s, from_command_line, $(<span class="macro-nonterminal">$name</span>),<span class="kw-2">*</span>));
-                <span class="self">self</span>.set_inner(s, val)
-            }
-
-            <span class="doccomment">/// Bulk process options. Returns true if all the options are processed successfully.
-            /// This method returns false if the option string is invalid, or if it includes any invalid option.
-            ///
-            /// Arguments:
-            /// * `options`: a string that is key value pairs separated by white spaces or commas, e.g. `threads=1 stress_factor=4096`,
-            ///   or `threads=1,stress_factor=4096`
-            </span><span class="kw">pub fn </span>set_bulk_from_command_line(<span class="kw-2">&amp;mut </span><span class="self">self</span>, options: <span class="kw-2">&amp;</span>str) -&gt; bool {
-                <span class="kw">for </span>opt <span class="kw">in </span>options.replace(<span class="string">","</span>, <span class="string">" "</span>).split_ascii_whitespace() {
-                    <span class="kw">let </span>kv_pair: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = opt.split(<span class="string">'='</span>).collect();
-                    <span class="kw">if </span>kv_pair.len() != <span class="number">2 </span>{
-                        <span class="kw">return </span><span class="bool-val">false</span>;
-                    }
-
-                    <span class="kw">let </span>key = kv_pair[<span class="number">0</span>];
-                    <span class="kw">let </span>val = kv_pair[<span class="number">1</span>];
-                    <span class="kw">if </span>!<span class="self">self</span>.set_from_command_line(key, val) {
-                        <span class="kw">return </span><span class="bool-val">false</span>;
-                    }
-                }
-
-                <span class="bool-val">true
-            </span>}
-
             <span class="doccomment">/// Set an option and run its validator for its value.
-            </span><span class="kw">fn </span>set_inner(<span class="kw-2">&amp;mut </span><span class="self">self</span>, s: <span class="kw-2">&amp;</span>str, val: <span class="kw-2">&amp;</span>str) -&gt; bool {
+            </span><span class="kw">fn </span>set_from_string_inner(<span class="kw-2">&amp;mut </span><span class="self">self</span>, s: <span class="kw-2">&amp;</span>str, val: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;(), SetOptionByStringError&gt; {
                 <span class="kw">match </span>s {
                     <span class="comment">// Parse the given value from str (by env vars or by calling process()) to the right type
-                    </span>$(<span class="macro">stringify!</span>(<span class="macro-nonterminal">$name</span>) =&gt; <span class="kw">if let </span><span class="prelude-val">Ok</span>(typed_val) = val.parse::&lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt;() {
-                        <span class="kw">let </span><span class="macro-nonterminal">is_set </span>= <span class="self">self</span>.<span class="macro-nonterminal">$name</span>.set(typed_val);
-                        <span class="kw">if </span>!is_set {
-                            <span class="macro">eprintln!</span>(<span class="string">"Warn: unable to set {}={:?}. Invalid value. Default value will be used."</span>, s, val);
+                    </span>$(<span class="macro">stringify!</span>(<span class="macro-nonterminal">$name</span>) =&gt; {
+                        <span class="kw">let </span><span class="prelude-val">Ok</span>(typed_val) = val.parse::&lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt;() <span class="kw">else </span>{
+                            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro-nonterminal">SetOptionByStringError::ValueParseError</span>);
+                        };
+
+                        <span class="kw">if </span>!<span class="self">self</span>.<span class="macro-nonterminal">$name</span>.set(typed_val) {
+                            <span class="kw">return </span><span class="prelude-val">Err</span>(SetOptionByStringError::ValueValidationError);
                         }
-                        is_set
-                    } <span class="kw">else </span>{
-                        <span class="macro">eprintln!</span>(<span class="string">"Warn: unable to set {}={:?}. Can't parse value. Default value will be used."</span>, s, val);
-                        <span class="bool-val">false
-                    </span>})*
-                    <span class="kw">_ </span>=&gt; <span class="macro">panic!</span>(<span class="string">"Invalid Options key: {}"</span>, s)
+
+                        <span class="prelude-val">Ok</span>(())
+                    })*
+                    <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(SetOptionByStringError::InvalidKey)
                 }
             }
 
             <span class="doccomment">/// Create an `Options` instance with built-in default settings.
             </span><span class="kw">fn </span>new() -&gt; <span class="self">Self </span>{
                 Options {
-                    $(<span class="macro-nonterminal">$name</span>: MMTKOption::new(<span class="macro-nonterminal">$default</span>, <span class="macro-nonterminal">$validator</span>, <span class="macro-nonterminal">$env_var</span>, <span class="macro-nonterminal">$command_line</span>)),*
+                    $(<span class="macro-nonterminal">$name</span>: MMTKOption::new(<span class="macro-nonterminal">$default</span>, <span class="macro-nonterminal">$validator</span>)),*
                 }
-            }
-
-            <span class="doccomment">/// Read options from environment variables, and apply those settings to self.
-            ///
-            /// If we have environment variables that start with `MMTK_` and match any option (such
-            /// as `MMTK_STRESS_FACTOR`), we set the option to its value (if it is a valid value).
-            </span><span class="kw">pub fn </span>read_env_var_settings(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-                <span class="kw">const </span>PREFIX: <span class="kw-2">&amp;</span>str = <span class="string">"MMTK_"</span>;
-                <span class="kw">for </span>(key, val) <span class="kw">in </span>std::env::vars() {
-                    <span class="comment">// strip the prefix, and get the lower case string
-                    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(rest_of_key) = key.strip_prefix(PREFIX) {
-                        <span class="kw">let </span>lowercase: <span class="kw-2">&amp;</span>str = <span class="kw-2">&amp;</span>rest_of_key.to_lowercase();
-                        <span class="kw">match </span>lowercase {
-                            $(<span class="macro">stringify!</span>(<span class="macro-nonterminal">$name</span>) =&gt; { <span class="self">self</span>.set_from_env_var(lowercase, <span class="kw-2">&amp;</span>val); },)*
-                            <span class="kw">_ </span>=&gt; {}
-                        }
-                    }
-                }
-            }
-        }
-
-        <span class="kw">impl </span>Default <span class="kw">for </span>Options {
-            <span class="doccomment">/// By default, `Options` instance is created with built-in default settings.
-            </span><span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
-                <span class="self">Self</span>::new()
             }
         }
     ]
 }
 
+<span class="kw">impl </span>Default <span class="kw">for </span>Options {
+    <span class="doccomment">/// By default, `Options` instance is created with built-in default settings.
+    </span><span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::new()
+    }
+}
+
 <span class="kw">impl </span>Options {
+    <span class="doccomment">/// Set an option by name and value as strings.  Returns true if the option is successfully set;
+    /// false otherwise.
+    ///
+    /// *WARNING*: This method involves string parsing which is not necessary in most cases. If you
+    /// can use [`MMTKOption::set`] directly, do it.  For example,
+    ///
+    /// ```rust
+    /// let mut builder = MMTKBuilder::new();
+    /// builder.options.threads.set(4);
+    /// builder.options.plan.set(PlanSelector::GenImmix);
+    ///
+    /// // All `T` in `MMTKOption&lt;T&gt;` implement `FromStr`.
+    /// builder.options.plan.set(user_input1.parse()?);
+    /// builder.options.thread_affinity.set(user_input2.parse()?);
+    /// ```
+    ///
+    /// Only use this method if the option name is also provided as strings, e.g. from command line
+    /// options or environment variables.
+    ///
+    /// Arguments:
+    /// * `s`: The name of the option, same as the field name.
+    /// * `val`: The value of the option, as a string.  It will be parsed by `FromStr::from_str`.
+    </span><span class="kw">pub fn </span>set_from_string(<span class="kw-2">&amp;mut </span><span class="self">self</span>, s: <span class="kw-2">&amp;</span>str, val: <span class="kw-2">&amp;</span>str) -&gt; bool {
+        <span class="self">self</span>.set_from_string_inner(s, val).is_ok()
+    }
+
+    <span class="doccomment">/// Set options in bulk by names and values as strings.
+    ///
+    /// Returns true if all the options are set successfully.
+    ///
+    /// Panics if the `options` argument contains any unrecognized keys.  Returns false if any
+    /// option given in the `options` argument cannot be set due to parsing errors or validation
+    /// errors.
+    ///
+    /// Arguments:
+    /// * `options`: a string that is key value pairs separated by white spaces or commas, e.g.
+    ///   `threads=1 stress_factor=4096`, or `threads=1,stress_factor=4096`. Each key-value pair
+    ///   will be set via [`Options::set_from_string`].
+    </span><span class="kw">pub fn </span>set_bulk_from_string(<span class="kw-2">&amp;mut </span><span class="self">self</span>, options: <span class="kw-2">&amp;</span>str) -&gt; bool {
+        <span class="kw">for </span>opt <span class="kw">in </span>options.replace(<span class="string">','</span>, <span class="string">" "</span>).split_ascii_whitespace() {
+            <span class="kw">let </span>kv_pair: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = opt.split(<span class="string">'='</span>).collect();
+            <span class="kw">if </span>kv_pair.len() != <span class="number">2 </span>{
+                <span class="kw">return </span><span class="bool-val">false</span>;
+            }
+
+            <span class="kw">let </span>key = kv_pair[<span class="number">0</span>];
+            <span class="kw">let </span>val = kv_pair[<span class="number">1</span>];
+            <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = <span class="self">self</span>.set_from_string_inner(key, val) {
+                <span class="kw">match </span>e {
+                    SetOptionByStringError::InvalidKey =&gt; {
+                        <span class="macro">panic!</span>(<span class="string">"Invalid Options key: {}"</span>, key);
+                    }
+                    SetOptionByStringError::ValueParseError =&gt; {
+                        <span class="macro">eprintln!</span>(<span class="string">"Warn: unable to set {}={:?}. Can't parse value. Default value will be used."</span>, key, val);
+                    }
+                    SetOptionByStringError::ValueValidationError =&gt; {
+                        <span class="macro">eprintln!</span>(<span class="string">"Warn: unable to set {}={:?}. Invalid value. Default value will be used."</span>, key, val);
+                    }
+                }
+                <span class="kw">return </span><span class="bool-val">false</span>;
+            }
+        }
+
+        <span class="bool-val">true
+    </span>}
+
+    <span class="doccomment">/// Read options from environment variables, and apply those settings to self.
+    ///
+    /// If we have environment variables that start with `MMTK_` and match any option (such as
+    /// `MMTK_STRESS_FACTOR`), we set the option to its value (if it is a valid value).
+    </span><span class="kw">pub fn </span>read_env_var_settings(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">const </span>PREFIX: <span class="kw-2">&amp;</span>str = <span class="string">"MMTK_"</span>;
+        <span class="kw">for </span>(key, val) <span class="kw">in </span>std::env::vars() {
+            <span class="comment">// strip the prefix, and get the lower case string
+            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(rest_of_key) = key.strip_prefix(PREFIX) {
+                <span class="kw">let </span>lowercase: <span class="kw-2">&amp;</span>str = <span class="kw-2">&amp;</span>rest_of_key.to_lowercase();
+                <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = <span class="self">self</span>.set_from_string_inner(lowercase, <span class="kw-2">&amp;</span>val) {
+                    <span class="kw">match </span>e {
+                        SetOptionByStringError::InvalidKey =&gt; {
+                            <span class="comment">/* Silently skip unrecognized keys. */
+                        </span>}
+                        SetOptionByStringError::ValueParseError =&gt; {
+                            <span class="macro">eprintln!</span>(<span class="string">"Warn: unable to set {}={:?}. Can't parse value. Default value will be used."</span>, key, val);
+                        }
+                        SetOptionByStringError::ValueValidationError =&gt; {
+                            <span class="macro">eprintln!</span>(<span class="string">"Warn: unable to set {}={:?}. Invalid value. Default value will be used."</span>, key, val);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     <span class="doccomment">/// Check if the options are set for stress GC. If either stress_factor or analysis_factor is set,
     /// we should do stress GC.
     </span><span class="kw">pub fn </span>is_stress_test_gc_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
@@ -2062,68 +2134,66 @@
     }
 }
 
-<span class="comment">// Currently we allow all the options to be set by env var for the sake of convenience.
-// At some point, we may disallow this and all the options can only be set by command line.
-</span><span class="macro">options!</span> {
+<span class="macro">options!</span> {
     <span class="doccomment">/// The GC plan to use.
-    </span>plan:                  PlanSelector         [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [always_valid] = PlanSelector::GenImmix,
+    </span>plan:                   PlanSelector            [always_valid] = PlanSelector::GenImmix,
     <span class="doccomment">/// Number of GC worker threads.
-    </span>threads:               usize                [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>usize| <span class="kw-2">*</span>v &gt; <span class="number">0</span>]    = num_cpus::get(),
+    </span>threads:                usize                   [|v: <span class="kw-2">&amp;</span>usize| <span class="kw-2">*</span>v &gt; <span class="number">0</span>] = num_cpus::get(),
     <span class="doccomment">/// Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
-    </span>use_short_stack_scans: bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">false</span>,
+    </span>use_short_stack_scans:  bool                    [always_valid] = <span class="bool-val">false</span>,
     <span class="doccomment">/// Enable a return barrier (not supported)
-    </span>use_return_barrier:    bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">false</span>,
+    </span>use_return_barrier:     bool                    [always_valid] = <span class="bool-val">false</span>,
     <span class="doccomment">/// Should we eagerly finish sweeping at the start of a collection? (not supported)
-    </span>eager_complete_sweep:  bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">false</span>,
+    </span>eager_complete_sweep:   bool                    [always_valid] = <span class="bool-val">false</span>,
     <span class="doccomment">/// Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
-    </span>ignore_system_gc:      bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">false</span>,
+    </span>ignore_system_gc:       bool                    [always_valid] = <span class="bool-val">false</span>,
     <span class="doccomment">/// The nursery size for generational plans. It can be one of Bounded, ProportionalBounded or Fixed.
     /// The nursery size can be set like 'Fixed:8192', for example,
     /// to have a Fixed nursery size of 8192 bytes, or 'ProportionalBounded:0.2,1.0' to have a nursery size
     /// between 20% and 100% of the heap size. You can omit lower bound and upper bound to use the default
     /// value for bounded nursery by using '_'. For example, 'ProportionalBounded:0.1,_' sets the min nursery
     /// to 10% of the heap size while using the default value for max nursery.
-    </span>nursery:               NurserySize          [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [|v: <span class="kw-2">&amp;</span>NurserySize| v.validate()]
+    </span>nursery:                NurserySize             [|v: <span class="kw-2">&amp;</span>NurserySize| v.validate()]
         = NurserySize::ProportionalBounded { min: DEFAULT_PROPORTIONAL_MIN_NURSERY, max: DEFAULT_PROPORTIONAL_MAX_NURSERY },
     <span class="doccomment">/// Should a major GC be performed when a system GC is required?
-    </span>full_heap_system_gc:   bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">false</span>,
+    </span>full_heap_system_gc:    bool                    [always_valid] = <span class="bool-val">false</span>,
     <span class="doccomment">/// Should finalization be disabled?
-    </span>no_finalizer:          bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">false</span>,
+    </span>no_finalizer:           bool                    [always_valid] = <span class="bool-val">false</span>,
     <span class="doccomment">/// Should reference type processing be disabled?
     /// If reference type processing is disabled, no weak reference processing work is scheduled,
     /// and we expect a binding to treat weak references as strong references.
     /// We disable weak reference processing by default, as we are still working on it. This will be changed to `false`
     /// once weak reference processing is implemented properly.
-    </span>no_reference_types:    bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">true</span>,
+    </span>no_reference_types:     bool                    [always_valid] = <span class="bool-val">true</span>,
     <span class="doccomment">/// The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)
-    </span>nursery_zeroing:       NurseryZeroingOptions[env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = NurseryZeroingOptions::Temporal,
+    </span>nursery_zeroing:        NurseryZeroingOptions   [always_valid] = NurseryZeroingOptions::Temporal,
     <span class="doccomment">/// How frequent (every X bytes) should we do a stress GC?
-    </span>stress_factor:         usize                [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = DEFAULT_STRESS_FACTOR,
+    </span>stress_factor:          usize                   [always_valid] = DEFAULT_STRESS_FACTOR,
     <span class="doccomment">/// How frequent (every X bytes) should we run analysis (a STW event that collects data)
-    </span>analysis_factor:       usize                [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = DEFAULT_STRESS_FACTOR,
+    </span>analysis_factor:        usize                   [always_valid] = DEFAULT_STRESS_FACTOR,
     <span class="doccomment">/// Precise stress test. Trigger stress GCs exactly at X bytes if this is true. This is usually used to test the GC correctness
     /// and will significantly slow down the mutator performance. If this is false, stress GCs will only be triggered when an allocation reaches
     /// the slow path. This means we may have allocated more than X bytes or fewer than X bytes when we actually trigger a stress GC.
     /// But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress
     /// factor (e.g. tens of metabytes).
-    </span>precise_stress:        bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">true</span>,
+    </span>precise_stress:         bool                    [always_valid] = <span class="bool-val">true</span>,
     <span class="doccomment">/// The start of vmspace.
-    </span>vm_space_start:        Address              [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = Address::ZERO,
+    </span>vm_space_start:         Address                 [always_valid] = Address::ZERO,
     <span class="doccomment">/// The size of vmspace.
-    </span>vm_space_size:         usize                [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>usize| <span class="kw-2">*</span>v &gt; <span class="number">0</span>]    = <span class="number">0xdc0_0000</span>,
+    </span>vm_space_size:          usize                   [|v: <span class="kw-2">&amp;</span>usize| <span class="kw-2">*</span>v &gt; <span class="number">0</span>] = <span class="number">0xdc0_0000</span>,
     <span class="doccomment">/// Perf events to measure
     /// Semicolons are used to separate events
     /// Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
     /// For example, PERF_COUNT_HW_CPU_CYCLES,0,-1 measures the CPU cycles for the current process on all the CPU cores.
     /// Measuring perf events for work packets. NOTE that be VERY CAREFUL when using this option, as this may greatly slowdown GC performance.
     </span><span class="comment">// TODO: Ideally this option should only be included when the features 'perf_counter' and 'work_packet_stats' are enabled. The current macro does not allow us to do this.
-    </span>work_perf_events:       PerfEventOptions     [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|<span class="kw">_</span>| <span class="macro">cfg!</span>(all(feature = <span class="string">"perf_counter"</span>, feature = <span class="string">"work_packet_stats"</span>))] = PerfEventOptions {events: <span class="macro">vec!</span>[]},
+    </span>work_perf_events:       PerfEventOptions        [|<span class="kw">_</span>| <span class="macro">cfg!</span>(all(feature = <span class="string">"perf_counter"</span>, feature = <span class="string">"work_packet_stats"</span>))] = PerfEventOptions {events: <span class="macro">vec!</span>[]},
     <span class="doccomment">/// Measuring perf events for GC and mutators
     </span><span class="comment">// TODO: Ideally this option should only be included when the features 'perf_counter' are enabled. The current macro does not allow us to do this.
-    </span>phase_perf_events:      PerfEventOptions     [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|<span class="kw">_</span>| <span class="macro">cfg!</span>(feature = <span class="string">"perf_counter"</span>)] = PerfEventOptions {events: <span class="macro">vec!</span>[]},
+    </span>phase_perf_events:      PerfEventOptions        [|<span class="kw">_</span>| <span class="macro">cfg!</span>(feature = <span class="string">"perf_counter"</span>)] = PerfEventOptions {events: <span class="macro">vec!</span>[]},
     <span class="doccomment">/// Should we exclude perf events occurring in kernel space. By default we include the kernel.
     /// Only set this option if you know the implications of excluding the kernel!
-    </span>perf_exclude_kernel:    bool                  [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|<span class="kw">_</span>| <span class="macro">cfg!</span>(feature = <span class="string">"perf_counter"</span>)] = <span class="bool-val">false</span>,
+    </span>perf_exclude_kernel:    bool                    [|<span class="kw">_</span>| <span class="macro">cfg!</span>(feature = <span class="string">"perf_counter"</span>)] = <span class="bool-val">false</span>,
     <span class="doccomment">/// Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS
     /// scheduler. If a list of cores are specified, cores are allocated to threads in a round-robin
     /// fashion. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
@@ -2137,15 +2207,15 @@
     /// `MMTK_THREAD_AFFINITY="12" taskset -c 6-12 &lt;program&gt;` will not work, on the other hand, as
     /// there is no core with (perceived) id 12.
     </span><span class="comment">// XXX: This option is currently only supported on Linux.
-    </span>thread_affinity:        AffinityKind         [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>AffinityKind| v.validate()] = AffinityKind::OsDefault,
+    </span>thread_affinity:        AffinityKind            [|v: <span class="kw-2">&amp;</span>AffinityKind| v.validate()] = AffinityKind::OsDefault,
     <span class="doccomment">/// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
     /// Default to a fixed heap size of 0.5x physical memory.
-    </span>gc_trigger:             GCTriggerSelector    [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((<span class="kw">crate</span>::util::memory::get_system_total_memory() <span class="kw">as </span>f64 * <span class="number">0.5f64</span>) <span class="kw">as </span>usize),
+    </span>gc_trigger:             GCTriggerSelector       [|v: <span class="kw-2">&amp;</span>GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((<span class="kw">crate</span>::util::memory::get_system_total_memory() <span class="kw">as </span>f64 * <span class="number">0.5f64</span>) <span class="kw">as </span>usize),
     <span class="doccomment">/// Enable transparent hugepage support for MMTk spaces via madvise (only Linux is supported)
     /// This only affects the memory for MMTk spaces.
-    </span>transparent_hugepages: bool                  [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [|v: <span class="kw-2">&amp;</span>bool| !v || <span class="macro">cfg!</span>(target_os = <span class="string">"linux"</span>)] = <span class="bool-val">false</span>,
+    </span>transparent_hugepages:  bool                    [|v: <span class="kw-2">&amp;</span>bool| !v || <span class="macro">cfg!</span>(target_os = <span class="string">"linux"</span>)] = <span class="bool-val">false</span>,
     <span class="doccomment">/// Count live bytes for objects in each space during a GC.
-    </span>count_live_bytes_in_gc: bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [always_valid] = <span class="bool-val">false
+    </span>count_live_bytes_in_gc: bool                    [always_valid] = <span class="bool-val">false
 </span>}
 
 <span class="attr">#[cfg(test)]
@@ -2478,7 +2548,7 @@
     </span><span class="kw">fn </span>test_process_valid() {
         serial_test(|| {
             <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
-            <span class="kw">let </span>success = options.set_from_command_line(<span class="string">"no_finalizer"</span>, <span class="string">"true"</span>);
+            <span class="kw">let </span>success = options.set_from_string(<span class="string">"no_finalizer"</span>, <span class="string">"true"</span>);
             <span class="macro">assert!</span>(success);
             <span class="macro">assert!</span>(<span class="kw-2">*</span>options.no_finalizer);
         })
@@ -2489,7 +2559,7 @@
         serial_test(|| {
             <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
             <span class="kw">let </span>default_no_finalizer = <span class="kw-2">*</span>options.no_finalizer;
-            <span class="kw">let </span>success = options.set_from_command_line(<span class="string">"no_finalizer"</span>, <span class="string">"100"</span>);
+            <span class="kw">let </span>success = options.set_from_string(<span class="string">"no_finalizer"</span>, <span class="string">"100"</span>);
             <span class="macro">assert!</span>(!success);
             <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.no_finalizer, default_no_finalizer);
         })
@@ -2499,7 +2569,7 @@
     </span><span class="kw">fn </span>test_process_bulk_empty() {
         serial_test(|| {
             <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
-            <span class="kw">let </span>success = options.set_bulk_from_command_line(<span class="string">""</span>);
+            <span class="kw">let </span>success = options.set_bulk_from_string(<span class="string">""</span>);
             <span class="macro">assert!</span>(success);
         })
     }
@@ -2508,7 +2578,7 @@
     </span><span class="kw">fn </span>test_process_bulk_valid() {
         serial_test(|| {
             <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
-            <span class="kw">let </span>success = options.set_bulk_from_command_line(<span class="string">"no_finalizer=true stress_factor=42"</span>);
+            <span class="kw">let </span>success = options.set_bulk_from_string(<span class="string">"no_finalizer=true stress_factor=42"</span>);
             <span class="macro">assert!</span>(success);
             <span class="macro">assert!</span>(<span class="kw-2">*</span>options.no_finalizer);
             <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, <span class="number">42</span>);
@@ -2519,7 +2589,7 @@
     </span><span class="kw">fn </span>test_process_bulk_comma_separated_valid() {
         serial_test(|| {
             <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
-            <span class="kw">let </span>success = options.set_bulk_from_command_line(<span class="string">"no_finalizer=true,stress_factor=42"</span>);
+            <span class="kw">let </span>success = options.set_bulk_from_string(<span class="string">"no_finalizer=true,stress_factor=42"</span>);
             <span class="macro">assert!</span>(success);
             <span class="macro">assert!</span>(<span class="kw-2">*</span>options.no_finalizer);
             <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, <span class="number">42</span>);
@@ -2530,7 +2600,7 @@
     </span><span class="kw">fn </span>test_process_bulk_invalid() {
         serial_test(|| {
             <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
-            <span class="kw">let </span>success = options.set_bulk_from_command_line(<span class="string">"no_finalizer=true stress_factor=a"</span>);
+            <span class="kw">let </span>success = options.set_bulk_from_string(<span class="string">"no_finalizer=true stress_factor=a"</span>);
             <span class="macro">assert!</span>(!success);
         })
     }

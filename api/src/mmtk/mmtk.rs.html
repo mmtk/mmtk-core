@@ -709,13 +709,13 @@
 
     <span class="doccomment">/// Set an option.
     </span><span class="kw">pub fn </span>set_option(<span class="kw-2">&amp;mut </span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>str, val: <span class="kw-2">&amp;</span>str) -&gt; bool {
-        <span class="self">self</span>.options.set_from_command_line(name, val)
+        <span class="self">self</span>.options.set_from_string(name, val)
     }
 
     <span class="doccomment">/// Set multiple options by a string. The string should be key-value pairs separated by white spaces,
     /// such as `threads=1 stress_factor=4096`.
     </span><span class="kw">pub fn </span>set_options_bulk_by_str(<span class="kw-2">&amp;mut </span><span class="self">self</span>, options: <span class="kw-2">&amp;</span>str) -&gt; bool {
-        <span class="self">self</span>.options.set_bulk_from_command_line(options)
+        <span class="self">self</span>.options.set_bulk_from_string(options)
     }
 
     <span class="doccomment">/// Custom VM layout constants. VM bindings may use this function for compressed or 39-bit heap support.
