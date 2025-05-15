@@ -30,6 +30,29 @@ Notes for the mmtk-core developers:
 
 <!-- Insert new versions here -->
 
+## 0.32.0
+
+### `Options` no longer differentiates between environment variables and command line arguments.
+
+```admonish tldr
+We replaced both `Options::set_from_command_line` and `Options::set_from_env_var` with
+`Options::set_from_string` because all options can now be set via either environment variable or
+command line arguments.
+```
+
+API changes:
+
+-   module `util::options`
+    +   `Options::set_from_command_line`: Removed.
+        *   Use `Options::set_from_string` instead.
+    +   `Options::set_from_env_var`: Removed.
+        *   Use `Options::set_from_string` instead.
+    +   `Options::set_bulk_from_command_line`: Removed.
+        *   Use `Options::set_bulk_from_string` instead.
+    +   All `<T>` in `MMTKOption<T>` now must implement `FromStr`.
+        *   This means you can parse a string into `T` when setting an `MMTKOption<T>`.  For
+            example, `options.plan.set(user_input.parse()?);`.
+
 ## 0.30.0
 
 ### `live_bytes_in_last_gc` becomes a runtime option, and returns a map for live bytes in each space
