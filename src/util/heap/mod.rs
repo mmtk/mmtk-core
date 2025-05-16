@@ -22,3 +22,5 @@ pub use self::layout::vm_layout;
 pub(crate) use self::monotonepageresource::MonotonePageResource;
 pub(crate) use self::pageresource::PageResource;
 pub(crate) use self::vmrequest::VMRequest;
+
+pub mod inspection;

@@ -2,6 +2,7 @@ use crate::global_state::GlobalState;
 use crate::plan::PlanConstraints;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::conversions::*;
+use crate::util::heap::inspection::SpaceInspector;
 use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
@@ -42,6 +43,9 @@ use downcast_rs::Downcast;
 pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn as_space(&self) -> &dyn Space<VM>;
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
+    fn as_inspector(&self) -> Option<&dyn SpaceInspector> {
+        None
+    }
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
 
     /// Get a mutable reference to the underlying page resource, or `None` if the space does not
