@@ -174,7 +174,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
-        enumerator.visit_address_range(self.start, self.start + self.total_bytes);
+        enumerator.visit_address_range(self.get_name(), self.start, self.start + self.total_bytes);
     }
 }
 

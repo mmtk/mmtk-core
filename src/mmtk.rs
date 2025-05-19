@@ -518,7 +518,7 @@ impl<VM: VMBinding> MMTK<VM> {
     #[cfg(feature = "vo_bit")]
     pub fn enumerate_objects<F>(&self, f: F)
     where
-        F: FnMut(ObjectReference),
+        F: FnMut(&str, crate::util::Address, usize, ObjectReference),
     {
         use crate::util::object_enum;
 

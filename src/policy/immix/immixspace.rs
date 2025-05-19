@@ -263,7 +263,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
 
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
-        object_enum::enumerate_blocks_from_chunk_map::<Block>(enumerator, &self.chunk_map);
+        object_enum::enumerate_blocks_from_chunk_map::<Block>(self.name(), enumerator, &self.chunk_map);
     }
 }
 
