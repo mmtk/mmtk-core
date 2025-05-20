@@ -401,6 +401,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             user_triggered_collection,
             self.reusable_blocks.len() == 0,
             full_heap_system_gc,
+            *self.common.options.immix_stress_defrag,
         );
         self.defrag.in_defrag()
     }
@@ -912,7 +913,7 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         // Clear object mark table for this chunk
         self.reset_object_mark();
         // Iterate over all blocks in this chunk
@@ -926,7 +927,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             let is_defrag_source = if !self.space.is_defrag_enabled() {
                 // Do not set any block as defrag source if defrag is disabled.
                 false
-            } else if super::DEFRAG_EVERY_BLOCK {
+            } else if *mmtk.options.immix_defrag_every_block {
                 // Set every block as defrag source if so desired.
                 true
             } else if let Some(defrag_threshold) = self.defrag_threshold {
