@@ -11,7 +11,6 @@ use crate::global_state::GcStatus;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
-use crate::util::rust_util::array_from_fn;
 use crate::vm::Collection;
 use crate::vm::VMBinding;
 use crate::Plan;
@@ -43,12 +42,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let worker_group = WorkerGroup::new(num_workers);
 
         // Create work buckets for workers.
-        // TODO: Replace `array_from_fn` with `std::array::from_fn` after bumping MSRV.
-        let mut work_buckets = EnumMap::from_array(array_from_fn(|stage_num| {
-            let stage = WorkBucketStage::from_usize(stage_num);
+        let mut work_buckets = EnumMap::from_fn(|stage| {
             let active = stage == WorkBucketStage::Unconstrained;
             WorkBucket::new(active, worker_monitor.clone())
-        }));
+        });
 
         // Set the open condition of each bucket.
         {
