@@ -867,6 +867,10 @@ options! {
     transparent_hugepages: bool                  [env_var: true, command_line: true]  [|v: &bool| !v || cfg!(target_os = "linux")] = false,
     /// Count live bytes for objects in each space during a GC.
     count_live_bytes_in_gc: bool                 [env_var: true, command_line: true] [always_valid] = false
+    /// Percentage of heap size reserved for defragmentation.
+    /// According to [this paper](https://doi.org/10.1145/1375581.1375586), Immix works well with
+    /// headroom between 1% to 3% of the heap size.
+    immix_defrag_headroom_percent: usize            [|v: &usize| *v <= 50] = 2
 }
 
 #[cfg(test)]
