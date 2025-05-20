@@ -614,10 +614,7 @@
 <a href="#613" id="613">613</a>
 <a href="#614" id="614">614</a>
 <a href="#615" id="615">615</a>
-<a href="#616" id="616">616</a>
-<a href="#617" id="617">617</a>
-<a href="#618" id="618">618</a>
-<a href="#619" id="619">619</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="self">self</span>::worker::PollResult;
+<a href="#616" id="616">616</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="self">self</span>::worker::PollResult;
 
 <span class="kw">use </span><span class="kw">super</span>::gc_work::ScheduleCollection;
 <span class="kw">use </span><span class="kw">super</span>::stat::SchedulerStat;
@@ -630,7 +627,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::MMTK;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::options::AffinityKind;
-<span class="kw">use </span><span class="kw">crate</span>::util::rust_util::array_from_fn;
 <span class="kw">use </span><span class="kw">crate</span>::vm::Collection;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span><span class="kw">crate</span>::Plan;
@@ -662,12 +658,10 @@
         <span class="kw">let </span>worker_group = WorkerGroup::new(num_workers);
 
         <span class="comment">// Create work buckets for workers.
-        // TODO: Replace `array_from_fn` with `std::array::from_fn` after bumping MSRV.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>work_buckets = EnumMap::from_array(array_from_fn(|stage_num| {
-            <span class="kw">let </span>stage = WorkBucketStage::from_usize(stage_num);
+        </span><span class="kw">let </span><span class="kw-2">mut </span>work_buckets = EnumMap::from_fn(|stage| {
             <span class="kw">let </span>active = stage == WorkBucketStage::Unconstrained;
             WorkBucket::new(active, worker_monitor.clone())
-        }));
+        });
 
         <span class="comment">// Set the open condition of each bucket.
         </span>{
