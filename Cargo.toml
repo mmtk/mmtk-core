@@ -157,8 +157,10 @@ immix_non_moving = []
 # if `immix_non_moving` is in use.
 sticky_immix_non_moving_nursery = []
 
-# Turn on stress copying for Immix. This is a debug feature to test copying for Immix plans.
-immix_stress_copying = []
+# Make Immix do defrag GC for every GC. This is only used for debugging.
+immix_stress_defrag = []
+# Make Immix use every block as a possible defrag source. This is only used for debugging.
+immix_defrag_every_block = []
 # Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
 immix_smaller_block = []
 # Zero the unmarked lines after a GC cycle in immix. This helps debug untraced objects.
