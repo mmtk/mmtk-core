@@ -401,7 +401,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             user_triggered_collection,
             self.reusable_blocks.len() == 0,
             full_heap_system_gc,
-            *self.common.options.immix_stress_defrag,
+            *self.common.options.immix_always_defrag,
         );
         self.defrag.in_defrag()
     }
