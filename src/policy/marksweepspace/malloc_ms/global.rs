@@ -149,6 +149,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         self
     }
 
+    fn as_inspector(&self) -> &dyn crate::util::heap::inspection::SpaceInspector {
+        self
+    }
+
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         unreachable!()
     }
@@ -893,5 +897,25 @@ pub struct MSSweepChunk<VM: VMBinding> {
 impl<VM: VMBinding> GCWork<VM> for MSSweepChunk<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         self.ms.sweep_chunk(self.chunk);
+    }
+}
+
+mod inspector {
+    use super::*;
+    use crate::util::heap::inspection::{RegionInspector, SpaceInspector};
+    impl<VM: VMBinding> SpaceInspector for MallocSpace<VM> {
+        fn list_top_regions(&self) -> Vec<Box<dyn RegionInspector>> {
+            self.chunk_map
+                .all_chunks()
+                .map(|r: Chunk| Box::new(r) as Box<dyn RegionInspector>)
+                .collect()
+        }
+
+        fn list_sub_regions(
+            &self,
+            _parent_region: &dyn RegionInspector,
+        ) -> Vec<Box<dyn RegionInspector>> {
+            vec![]
+        }
     }
 }

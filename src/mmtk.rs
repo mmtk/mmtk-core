@@ -598,12 +598,12 @@ impl<VM: VMBinding> MMTK<VM> {
             .initialize_object_metadata(object, false)
     }
 
-    pub fn inspect_spaces<'a>(&'a self) -> Vec<&'a dyn SpaceInspector> {
+    /// Inspect MMTk spaces. The space inspector allows users to inspect the heap hierarchically,
+    /// with all levels of regions. Users can further inspect objects in the regions if vo_bit is enabled.
+    pub fn inspect_spaces(&self) -> Vec<&dyn SpaceInspector> {
         let mut ret = vec![];
         self.get_plan().for_each_space(&mut |space| {
-            if let Some(inspector) = space.as_inspector() {
-                ret.push(inspector);
-            }
+            ret.push(space.as_inspector());
         });
         ret
     }

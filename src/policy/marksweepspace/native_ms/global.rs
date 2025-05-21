@@ -231,6 +231,10 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
         self
     }
 
+    fn as_inspector(&self) -> &dyn crate::util::heap::inspection::SpaceInspector {
+        self
+    }
+
     fn get_page_resource(&self) -> &dyn crate::util::heap::PageResource<VM> {
         &self.pr
     }
@@ -665,5 +669,28 @@ impl<VM: VMBinding> RecycleBlocks<VM> {
 impl<VM: VMBinding> Drop for RecycleBlocks<VM> {
     fn drop(&mut self) {
         epilogue::debug_assert_counter_zero(&self.counter, "RecycleBlocks::counter");
+    }
+}
+
+mod inspector {
+    use super::*;
+    use crate::util::heap::inspection::{list_sub_regions, RegionInspector, SpaceInspector};
+    impl<VM: VMBinding> SpaceInspector for MarkSweepSpace<VM> {
+        fn list_top_regions(&self) -> Vec<Box<dyn RegionInspector>> {
+            self.chunk_map
+                .all_chunks()
+                .map(|r: Chunk| Box::new(r) as Box<dyn RegionInspector>)
+                .collect()
+        }
+
+        fn list_sub_regions(
+            &self,
+            parent_region: &dyn RegionInspector,
+        ) -> Vec<Box<dyn RegionInspector>> {
+            if let Some(regions) = list_sub_regions::<Chunk, Block>(parent_region) {
+                return regions;
+            }
+            vec![]
+        }
     }
 }

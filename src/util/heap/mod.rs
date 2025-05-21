@@ -23,4 +23,5 @@ pub(crate) use self::monotonepageresource::MonotonePageResource;
 pub(crate) use self::pageresource::PageResource;
 pub(crate) use self::vmrequest::VMRequest;
 
+/// Heap inspection API.
 pub mod inspection;
