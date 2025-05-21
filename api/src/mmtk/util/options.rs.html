@@ -1312,7 +1312,16 @@
 <a href="#1311" id="1311">1311</a>
 <a href="#1312" id="1312">1312</a>
 <a href="#1313" id="1313">1313</a>
-<a href="#1314" id="1314">1314</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
+<a href="#1314" id="1314">1314</a>
+<a href="#1315" id="1315">1315</a>
+<a href="#1316" id="1316">1316</a>
+<a href="#1317" id="1317">1317</a>
+<a href="#1318" id="1318">1318</a>
+<a href="#1319" id="1319">1319</a>
+<a href="#1320" id="1320">1320</a>
+<a href="#1321" id="1321">1321</a>
+<a href="#1322" id="1322">1322</a>
+<a href="#1323" id="1323">1323</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>std::default::Default;
@@ -2215,7 +2224,16 @@
     /// This only affects the memory for MMTk spaces.
     </span>transparent_hugepages:  bool                    [|v: <span class="kw-2">&amp;</span>bool| !v || <span class="macro">cfg!</span>(target_os = <span class="string">"linux"</span>)] = <span class="bool-val">false</span>,
     <span class="doccomment">/// Count live bytes for objects in each space during a GC.
-    </span>count_live_bytes_in_gc: bool                    [always_valid] = <span class="bool-val">false
+    </span>count_live_bytes_in_gc: bool                    [always_valid] = <span class="bool-val">false</span>,
+    <span class="doccomment">/// Make every GC a defragment GC. (for debugging)
+    </span>immix_always_defrag: bool                       [always_valid] = <span class="bool-val">false</span>,
+    <span class="doccomment">/// Mark every allocated block as defragmentation source before GC. (for debugging)
+    /// Depending on the defrag headroom, Immix may not be able to defrag every block even if this option is set to true.
+    </span>immix_defrag_every_block: bool                  [always_valid] = <span class="bool-val">false</span>,
+    <span class="doccomment">/// Percentage of heap size reserved for defragmentation.
+    /// According to [this paper](https://doi.org/10.1145/1375581.1375586), Immix works well with
+    /// headroom between 1% to 3% of the heap size.
+    </span>immix_defrag_headroom_percent: usize            [|v: <span class="kw-2">&amp;</span>usize| <span class="kw-2">*</span>v &lt;= <span class="number">50</span>] = <span class="number">2
 </span>}
 
 <span class="attr">#[cfg(test)]

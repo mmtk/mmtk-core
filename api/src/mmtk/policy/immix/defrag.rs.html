@@ -212,7 +212,9 @@
 <a href="#211" id="211">211</a>
 <a href="#212" id="212">212</a>
 <a href="#213" id="213">213</a>
-<a href="#214" id="214">214</a></pre></div><pre class="rust"><code><span class="kw">use super</span>::{
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a></pre></div><pre class="rust"><code><span class="kw">use super</span>::{
     block::{Block, BlockState},
     line::Line,
     ImmixSpace,
@@ -259,7 +261,6 @@
     <span class="kw">const </span>NUM_BINS: usize = (Block::LINES &gt;&gt; <span class="number">1</span>) + <span class="number">1</span>;
     <span class="kw">const </span>DEFRAG_LINE_REUSE_RATIO: f32 = <span class="number">0.99</span>;
     <span class="kw">const </span>MIN_SPILL_THRESHOLD: usize = <span class="number">2</span>;
-    <span class="kw">const </span>DEFRAG_HEADROOM_PERCENT: usize = <span class="kw">super</span>::DEFRAG_HEADROOM_PERCENT;
 
     <span class="doccomment">/// Allocate a new local histogram.
     </span><span class="kw">pub const fn </span>new_histogram(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Histogram {
@@ -287,12 +288,13 @@
         user_triggered: bool,
         exhausted_reusable_space: bool,
         full_heap_system_gc: bool,
+        stress_defrag: bool,
     ) {
         <span class="kw">let </span>in_defrag = defrag_enabled
             &amp;&amp; (emergency_collection
                 || (collection_attempts &gt; <span class="number">1</span>)
                 || !exhausted_reusable_space
-                || <span class="kw">super</span>::STRESS_DEFRAG
+                || stress_defrag
                 || (collect_whole_heap &amp;&amp; user_triggered &amp;&amp; full_heap_system_gc));
         <span class="macro">info!</span>(<span class="string">"Defrag: {}"</span>, in_defrag);
         <span class="macro">probe!</span>(mmtk, immix_defrag, in_defrag);
@@ -302,7 +304,9 @@
 
     <span class="doccomment">/// Get the number of defrag headroom pages.
     </span><span class="kw">pub fn </span>defrag_headroom_pages&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, space: <span class="kw-2">&amp;</span>ImmixSpace&lt;VM&gt;) -&gt; usize {
-        space.get_page_resource().reserved_pages() * <span class="self">Self</span>::DEFRAG_HEADROOM_PERCENT / <span class="number">100
+        space.get_page_resource().reserved_pages()
+            * (<span class="kw-2">*</span>space.common().options.immix_defrag_headroom_percent)
+            / <span class="number">100
     </span>}
 
     <span class="doccomment">/// Check if the defrag space is exhausted.

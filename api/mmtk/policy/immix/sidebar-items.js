@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["BLOCK_ONLY","DEFRAG_EVERY_BLOCK","DEFRAG_HEADROOM_PERCENT","MARK_LINE_AT_SCAN_TIME","MAX_IMMIX_OBJECT_SIZE","STRESS_DEFRAG"],"mod":["block","defrag","immixspace","line"]};
+window.SIDEBAR_ITEMS = {"constant":["BLOCK_ONLY","MARK_LINE_AT_SCAN_TIME","MAX_IMMIX_OBJECT_SIZE"],"mod":["block","defrag","immixspace","line"]};
