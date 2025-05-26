@@ -87,9 +87,9 @@ usdt:$MMTK:mmtk:roots {
     }
 }
 
-usdt:$MMTK:mmtk:process_root_node {
+usdt:$MMTK:mmtk:process_root_nodes {
     if (@enable_print) {
-        printf("process_root_node,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+        printf("process_root_nodes,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
     }
 }
 

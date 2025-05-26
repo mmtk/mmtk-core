@@ -212,7 +212,7 @@ class LogProcessor:
 
                     roots_list.append(root_dict)
 
-                case "process_root_node":
+                case "process_root_nodes":
                     wp["args"] |= {
                         "num_roots": int(args[0]),
                         "num_enqueued_nodes": int(args[1]),
