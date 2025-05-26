@@ -1097,7 +1097,7 @@ impl<VM: VMBinding, R2OPE: ProcessEdgesWork<VM = VM>, O2OPE: ProcessEdgesWork<VM
     for ProcessRootNodes<VM, R2OPE, O2OPE>
 {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        trace!("ProcessRootNode");
+        trace!("ProcessRootNodes");
 
         #[cfg(feature = "sanity")]
         {
@@ -1148,7 +1148,7 @@ impl<VM: VMBinding, R2OPE: ProcessEdgesWork<VM = VM>, O2OPE: ProcessEdgesWork<VM
             crate::memory_manager::add_work_packet(mmtk, self.bucket, work);
         }
 
-        trace!("ProcessRootNode End");
+        trace!("ProcessRootNodes End");
     }
 }
 
