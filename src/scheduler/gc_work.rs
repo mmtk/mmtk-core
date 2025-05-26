@@ -1109,15 +1109,17 @@ impl<VM: VMBinding, R2OPE: ProcessEdgesWork<VM = VM>, O2OPE: ProcessEdgesWork<VM
             }
         }
 
+        let num_roots = self.roots.len();
+
         // This step conceptually traces the edges from root slots to the objects they point to.
         // However, VMs that deliver root objects instead of root slots are incapable of updating
         // root slots.  Therefore, we call `trace_object` on those objects, and assert the GC
         // doesn't move those objects because we cannot store the updated references back to the
         // slots.
         //
-        // The `scanned_root_objects` variable will hold those root objects which are traced for the
+        // The `root_objects_to_scan` variable will hold those root objects which are traced for the
         // first time.  We will create a work packet for scanning those roots.
-        let scanned_root_objects = {
+        let root_objects_to_scan = {
             // We create an instance of E to use its `trace_object` method and its object queue.
             let mut process_edges_work =
                 R2OPE::new(vec![], true, mmtk, WorkBucketStage::PinningRootsTrace);
@@ -1137,9 +1139,14 @@ impl<VM: VMBinding, R2OPE: ProcessEdgesWork<VM = VM>, O2OPE: ProcessEdgesWork<VM
             process_edges_work.nodes.take()
         };
 
-        let process_edges_work = O2OPE::new(vec![], false, mmtk, self.bucket);
-        let work = process_edges_work.create_scan_work(scanned_root_objects);
-        crate::memory_manager::add_work_packet(mmtk, self.bucket, work);
+        let num_enqueued_nodes = root_objects_to_scan.len();
+        probe!(mmtk, process_root_node, num_roots, num_enqueued_nodes);
+
+        if !root_objects_to_scan.is_empty() {
+            let process_edges_work = O2OPE::new(vec![], false, mmtk, self.bucket);
+            let work = process_edges_work.create_scan_work(root_objects_to_scan);
+            crate::memory_manager::add_work_packet(mmtk, self.bucket, work);
+        }
 
         trace!("ProcessRootNode End");
     }
