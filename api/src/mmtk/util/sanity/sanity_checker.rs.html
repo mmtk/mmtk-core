@@ -326,7 +326,7 @@
                 );
             }
             <span class="kw">for </span>roots <span class="kw">in </span><span class="kw-2">&amp;</span>sanity_checker.root_nodes {
-                scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessRootNode::&lt;
+                scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessRootNodes::&lt;
                     P::VM,
                     SanityGCProcessEdges&lt;P::VM&gt;,
                     SanityGCProcessEdges&lt;P::VM&gt;,

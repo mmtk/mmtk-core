@@ -1187,7 +1187,14 @@
 <a href="#1186" id="1186">1186</a>
 <a href="#1187" id="1187">1187</a>
 <a href="#1188" id="1188">1188</a>
-<a href="#1189" id="1189">1189</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
+<a href="#1189" id="1189">1189</a>
+<a href="#1190" id="1190">1190</a>
+<a href="#1191" id="1191">1191</a>
+<a href="#1192" id="1192">1192</a>
+<a href="#1193" id="1193">1193</a>
+<a href="#1194" id="1194">1194</a>
+<a href="#1195" id="1195">1195</a>
+<a href="#1196" id="1196">1196</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::global_state::GcStatus;
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectsClosure;
@@ -1945,7 +1952,7 @@
         </span><span class="kw">crate</span>::memory_manager::add_work_packet(
             <span class="self">self</span>.mmtk,
             WorkBucketStage::PinningRootsTrace,
-            ProcessRootNode::&lt;VM, PPE, DPE&gt;::new(nodes, WorkBucketStage::Closure),
+            ProcessRootNodes::&lt;VM, PPE, DPE&gt;::new(nodes, WorkBucketStage::Closure),
         );
     }
 
@@ -1954,7 +1961,7 @@
         <span class="kw">crate</span>::memory_manager::add_work_packet(
             <span class="self">self</span>.mmtk,
             WorkBucketStage::TPinningClosure,
-            ProcessRootNode::&lt;VM, PPE, PPE&gt;::new(nodes, WorkBucketStage::TPinningClosure),
+            ProcessRootNodes::&lt;VM, PPE, PPE&gt;::new(nodes, WorkBucketStage::TPinningClosure),
         );
     }
 }
@@ -2260,7 +2267,7 @@
 /// -   If `O2OPE` may move objects, then this `ProcessRootsNode&lt;VM, R2OPE, O2OPE&gt;` work packet
 ///     will only pin the objects in `roots` (because `R2OPE` must not move objects anyway), but
 ///     not their descendents.
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>ProcessRootNode&lt;
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>ProcessRootNodes&lt;
     VM: VMBinding,
     R2OPE: ProcessEdgesWork&lt;VM = VM&gt;,
     O2OPE: ProcessEdgesWork&lt;VM = VM&gt;,
@@ -2271,7 +2278,7 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding, R2OPE: ProcessEdgesWork&lt;VM = VM&gt;, O2OPE: ProcessEdgesWork&lt;VM = VM&gt;&gt;
-    ProcessRootNode&lt;VM, R2OPE, O2OPE&gt;
+    ProcessRootNodes&lt;VM, R2OPE, O2OPE&gt;
 {
     <span class="kw">pub fn </span>new(nodes: Vec&lt;ObjectReference&gt;, bucket: WorkBucketStage) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
@@ -2283,10 +2290,10 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding, R2OPE: ProcessEdgesWork&lt;VM = VM&gt;, O2OPE: ProcessEdgesWork&lt;VM = VM&gt;&gt; GCWork&lt;VM&gt;
-    <span class="kw">for </span>ProcessRootNode&lt;VM, R2OPE, O2OPE&gt;
+    <span class="kw">for </span>ProcessRootNodes&lt;VM, R2OPE, O2OPE&gt;
 {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">"ProcessRootNode"</span>);
+        <span class="macro">trace!</span>(<span class="string">"ProcessRootNodes"</span>);
 
         <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
         </span>{
@@ -2298,15 +2305,17 @@
             }
         }
 
+        <span class="kw">let </span>num_roots = <span class="self">self</span>.roots.len();
+
         <span class="comment">// This step conceptually traces the edges from root slots to the objects they point to.
         // However, VMs that deliver root objects instead of root slots are incapable of updating
         // root slots.  Therefore, we call `trace_object` on those objects, and assert the GC
         // doesn't move those objects because we cannot store the updated references back to the
         // slots.
         //
-        // The `scanned_root_objects` variable will hold those root objects which are traced for the
+        // The `root_objects_to_scan` variable will hold those root objects which are traced for the
         // first time.  We will create a work packet for scanning those roots.
-        </span><span class="kw">let </span>scanned_root_objects = {
+        </span><span class="kw">let </span>root_objects_to_scan = {
             <span class="comment">// We create an instance of E to use its `trace_object` method and its object queue.
             </span><span class="kw">let </span><span class="kw-2">mut </span>process_edges_work =
                 R2OPE::new(<span class="macro">vec!</span>[], <span class="bool-val">true</span>, mmtk, WorkBucketStage::PinningRootsTrace);
@@ -2326,11 +2335,16 @@
             </span>process_edges_work.nodes.take()
         };
 
-        <span class="kw">let </span>process_edges_work = O2OPE::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk, <span class="self">self</span>.bucket);
-        <span class="kw">let </span>work = process_edges_work.create_scan_work(scanned_root_objects);
-        <span class="kw">crate</span>::memory_manager::add_work_packet(mmtk, <span class="self">self</span>.bucket, work);
+        <span class="kw">let </span>num_enqueued_nodes = root_objects_to_scan.len();
+        <span class="macro">probe!</span>(mmtk, process_root_nodes, num_roots, num_enqueued_nodes);
 
-        <span class="macro">trace!</span>(<span class="string">"ProcessRootNode End"</span>);
+        <span class="kw">if </span>!root_objects_to_scan.is_empty() {
+            <span class="kw">let </span>process_edges_work = O2OPE::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk, <span class="self">self</span>.bucket);
+            <span class="kw">let </span>work = process_edges_work.create_scan_work(root_objects_to_scan);
+            <span class="kw">crate</span>::memory_manager::add_work_packet(mmtk, <span class="self">self</span>.bucket, work);
+        }
+
+        <span class="macro">trace!</span>(<span class="string">"ProcessRootNodes End"</span>);
     }
 }
 
