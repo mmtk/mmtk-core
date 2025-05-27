@@ -212,6 +212,12 @@ class LogProcessor:
 
                     roots_list.append(root_dict)
 
+                case "process_root_nodes":
+                    wp["args"] |= {
+                        "num_roots": int(args[0]),
+                        "num_enqueued_nodes": int(args[1]),
+                    }
+
                 case "process_slots":
                     wp["args"] |= {
                         # Group args by "process_slots" and "scan_objects" because a ProcessEdgesWork
