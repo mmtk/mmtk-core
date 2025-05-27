@@ -99,7 +99,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
 impl<VM: VMBinding> MarkSweep<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
-        let mut global_side_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        let mut global_side_metadata_specs = SideMetadataContext::new_global_specs::<VM>(&[]);
         MarkSweepSpace::<VM>::extend_global_side_metadata_specs(&mut global_side_metadata_specs);
 
         let mut plan_args = CreateSpecificPlanArgs {

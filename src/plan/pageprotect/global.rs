@@ -103,7 +103,7 @@ impl<VM: VMBinding> PageProtect<VM> {
         let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &CONSTRAINTS,
-            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
+            global_side_metadata_specs: SideMetadataContext::new_global_specs::<VM>(&[]),
         };
 
         let ret = PageProtect {

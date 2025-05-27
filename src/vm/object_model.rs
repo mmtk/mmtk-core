@@ -3,6 +3,7 @@ use atomic::Ordering;
 use self::specs::*;
 use crate::util::copy::*;
 use crate::util::metadata::header_metadata::HeaderMetadataSpec;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::metadata::MetadataValue;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
@@ -475,6 +476,10 @@ pub trait ObjectModel<VM: VMBinding> {
     /// to debug MMTk.
     fn is_object_sane(_object: ObjectReference) -> bool {
         true
+    }
+
+    fn binding_global_side_metadata_specs() -> Vec<SideMetadataSpec> {
+        vec![]
     }
 }
 

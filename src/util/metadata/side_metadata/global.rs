@@ -1331,9 +1331,11 @@ pub(crate) struct SideMetadataContext {
     pub local: Vec<SideMetadataSpec>,
 }
 
+use crate::vm::VMBinding;
+use crate::vm::ObjectModel;
 impl SideMetadataContext {
     #[allow(clippy::vec_init_then_push)] // allow this, as we conditionally push based on features.
-    pub fn new_global_specs(specs: &[SideMetadataSpec]) -> Vec<SideMetadataSpec> {
+    pub fn new_global_specs<VM: VMBinding>(specs: &[SideMetadataSpec]) -> Vec<SideMetadataSpec> {
         let mut ret = vec![];
 
         #[cfg(feature = "vo_bit")]
@@ -1349,6 +1351,8 @@ impl SideMetadataContext {
         // As we use either the mark sweep or (non moving) immix as the non moving space,
         // and both policies use the chunk map, we just add the chunk map table globally.
         ret.push(crate::util::heap::chunk_map::ChunkMap::ALLOC_TABLE);
+
+        ret.extend_from_slice(&VM::VMObjectModel::binding_global_side_metadata_specs());
 
         ret.extend_from_slice(specs);
         ret

@@ -139,7 +139,7 @@ impl<VM: VMBinding> Immix<VM> {
         let plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &IMMIX_CONSTRAINTS,
-            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
+            global_side_metadata_specs: SideMetadataContext::new_global_specs::<VM>(&[]),
         };
         Self::new_with_args(
             plan_args,

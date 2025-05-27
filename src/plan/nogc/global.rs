@@ -95,7 +95,7 @@ impl<VM: VMBinding> NoGC<VM> {
         let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &NOGC_CONSTRAINTS,
-            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
+            global_side_metadata_specs: SideMetadataContext::new_global_specs::<VM>(&[]),
         };
 
         let res = NoGC {

@@ -140,7 +140,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
         let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &SS_CONSTRAINTS,
-            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
+            global_side_metadata_specs: SideMetadataContext::new_global_specs::<VM>(&[]),
         };
 
         let res = SemiSpace {

@@ -325,7 +325,7 @@ impl<VM: VMBinding> StickyImmix<VM> {
         let plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &STICKY_IMMIX_CONSTRAINTS,
-            global_side_metadata_specs: SideMetadataContext::new_global_specs(
+            global_side_metadata_specs: SideMetadataContext::new_global_specs::<VM>(
                 &crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
             ),
         };

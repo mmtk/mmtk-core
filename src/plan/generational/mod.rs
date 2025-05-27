@@ -53,15 +53,15 @@ pub const GEN_CONSTRAINTS: PlanConstraints = PlanConstraints {
     ..PlanConstraints::default()
 };
 
-/// Create global side metadata specs for generational plans. This will call SideMetadataContext::new_global_specs().
-/// So if a plan calls this, it should not call SideMetadataContext::new_global_specs() again.
+/// Create global side metadata specs for generational plans. This will call SideMetadataContext::new_global_specs::<VM>().
+/// So if a plan calls this, it should not call SideMetadataContext::new_global_specs::<VM>() again.
 pub fn new_generational_global_metadata_specs<VM: VMBinding>() -> Vec<SideMetadataSpec> {
     let specs = if ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
         crate::util::metadata::extract_side_metadata(&[*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC])
     } else {
         vec![]
     };
-    SideMetadataContext::new_global_specs(&specs)
+    SideMetadataContext::new_global_specs::<VM>(&specs)
 }
 
 const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {

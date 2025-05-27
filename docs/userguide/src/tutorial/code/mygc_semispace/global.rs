@@ -175,7 +175,7 @@ impl<VM: VMBinding> MyGC<VM> {
         let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &MYGC_CONSTRAINTS,
-            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
+            global_side_metadata_specs: SideMetadataContext::new_global_specs::<VM>(&[]),
         };
 
         let res = MyGC {

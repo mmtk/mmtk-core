@@ -196,7 +196,7 @@
 //! ## Create and allocate side metadata for spaces
 //!
 //! A space needs to know all global metadata specs and its own policy-specific/local metadata specs in order to calculate and allocate metadata space.
-//! When a space is created by a plan (e.g. SemiSpace::new), the plan can create its global specs by `MetadataContext::new_global_specs(&[GLOBAL_META_1, GLOBAL_META_2])`. Then,
+//! When a space is created by a plan (e.g. SemiSpace::new), the plan can create its global specs by `MetadataContext::new_global_specs::<VM>(&[GLOBAL_META_1, GLOBAL_META_2])`. Then,
 //! the global specs are passed to each space that the plan creates.
 //!
 //! Each space will then combine the global specs and its own local specs to create a SideMetadataContext.

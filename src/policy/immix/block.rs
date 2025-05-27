@@ -261,6 +261,10 @@ impl Block {
                         side.bzero_metadata(line.start(), Line::BYTES);
                     }
 
+                    VM::VMObjectModel::binding_global_side_metadata_specs().into_iter().for_each(|spec| {
+                        spec.bzero_metadata(line.start(), Line::BYTES);
+                    });
+
                     prev_line_is_marked = false;
                 }
             }
