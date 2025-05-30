@@ -19,42 +19,48 @@ jobs:
     with:
       pull_request: ${{ github.event.pull_request.number }}
 
-  extended-tests-v8:
-    runs-on: ubuntu-20.04
-    needs: binding-refs
-    if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
-    steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v4
-        with:
-          path: mmtk-core
-      - name: Checkout V8 Binding
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ needs.binding-refs.outputs.v8_binding_repo }}
-          path: mmtk-v8
-          ref: ${{ needs.binding-refs.outputs.v8_binding_ref }}
-      - name: Use mmtk-core Rust toolchain for bindings
-        run: |
-          cp mmtk-core/rust-toolchain mmtk-v8/mmtk
-      - name: Overwrite MMTk core in V8 binding
-        run: |
-          rm -rf mmtk-v8/repos/*
-          mkdir -p mmtk-v8/repos/mmtk-core
-          cp -r mmtk-core/* mmtk-v8/repos/mmtk-core
-      - name: Setup
-        run: |
-          cd mmtk-v8
-          ./.github/scripts/ci-setup.sh
-          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
-          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
-      - name: Test
-        run: |
-          cd mmtk-v8
-          export RUST_BACKTRACE=1
-          export V8_ROOT=$GITHUB_WORKSPACE/v8_deps
-          .github/scripts/ci-test.sh
-          .github/scripts/ci-style.sh
+  # Our V8 version is too old, and the required environments are no longer supported.
+  # Disable the tests for now, until we plan to upgrade the V8 version and get it working again.
+  # See: https://mmtk.zulipchat.com/#narrow/channel/262677-ANU-Research/topic/The.20V8.20binding.20is.20beyond.20repair/near/509115086
+  # > After fixing some CI scripts issues, I find that some of the bundled Python code in V8 is depending on Python2,
+  # > which has reached EOL long ago, and will no longer be available on Ubuntu 24.04. Ubuntu 22.04 has Python 3 as the default
+  # > python executable, which causes the error on the CI. Ubuntu 20.04 will be unsupported the next month, so we can't keep using it.
+  # extended-tests-v8:
+  #   runs-on: ubuntu-20.04
+  #   needs: binding-refs
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
+  #   steps:
+  #     - name: Checkout MMTk Core
+  #       uses: actions/checkout@v4
+  #       with:
+  #         path: mmtk-core
+  #     - name: Checkout V8 Binding
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: ${{ needs.binding-refs.outputs.v8_binding_repo }}
+  #         path: mmtk-v8
+  #         ref: ${{ needs.binding-refs.outputs.v8_binding_ref }}
+  #     - name: Use mmtk-core Rust toolchain for bindings
+  #       run: |
+  #         cp mmtk-core/rust-toolchain mmtk-v8/mmtk
+  #     - name: Overwrite MMTk core in V8 binding
+  #       run: |
+  #         rm -rf mmtk-v8/repos/*
+  #         mkdir -p mmtk-v8/repos/mmtk-core
+  #         cp -r mmtk-core/* mmtk-v8/repos/mmtk-core
+  #     - name: Setup
+  #       run: |
+  #         cd mmtk-v8
+  #         ./.github/scripts/ci-setup.sh
+  #         sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
+  #         sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+  #     - name: Test
+  #       run: |
+  #         cd mmtk-v8
+  #         export RUST_BACKTRACE=1
+  #         export V8_ROOT=$GITHUB_WORKSPACE/v8_deps
+  #         .github/scripts/ci-test.sh
+  #         .github/scripts/ci-style.sh
 
   extended-tests-openjdk:
     needs: binding-refs

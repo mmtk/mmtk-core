@@ -24,6 +24,7 @@ use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
@@ -227,6 +228,10 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
     }
 
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
+        self
+    }
+
+    fn as_inspector(&self) -> &dyn crate::util::heap::inspection::SpaceInspector {
         self
     }
 
@@ -462,7 +467,13 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         crate::util::metadata::vo_bit::bzero_vo_bit(block.start(), Block::BYTES);
     }
 
-    pub fn acquire_block(&self, tls: VMThread, size: usize, align: usize) -> BlockAcquireResult {
+    pub fn acquire_block(
+        &self,
+        tls: VMThread,
+        size: usize,
+        align: usize,
+        alloc_options: AllocationOptions,
+    ) -> BlockAcquireResult {
         {
             let mut abandoned = self.abandoned.lock().unwrap();
             let bin = mi_bin::<VM>(size, align);
@@ -484,7 +495,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             }
         }
 
-        let acquired = self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE);
+        let acquired = self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE, alloc_options);
         if acquired.is_zero() {
             BlockAcquireResult::Exhausted
         } else {
@@ -658,5 +669,28 @@ impl<VM: VMBinding> RecycleBlocks<VM> {
 impl<VM: VMBinding> Drop for RecycleBlocks<VM> {
     fn drop(&mut self) {
         epilogue::debug_assert_counter_zero(&self.counter, "RecycleBlocks::counter");
+    }
+}
+
+mod inspector {
+    use super::*;
+    use crate::util::heap::inspection::{list_sub_regions, RegionInspector, SpaceInspector};
+    impl<VM: VMBinding> SpaceInspector for MarkSweepSpace<VM> {
+        fn list_top_regions(&self) -> Vec<Box<dyn RegionInspector>> {
+            self.chunk_map
+                .all_chunks()
+                .map(|r: Chunk| Box::new(r) as Box<dyn RegionInspector>)
+                .collect()
+        }
+
+        fn list_sub_regions(
+            &self,
+            parent_region: &dyn RegionInspector,
+        ) -> Vec<Box<dyn RegionInspector>> {
+            if let Some(regions) = list_sub_regions::<Chunk, Block>(parent_region) {
+                return regions;
+            }
+            vec![]
+        }
     }
 }

@@ -550,14 +550,16 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 }
 
-#[cfg(feature = "immortal_as_nonmoving")]
-pub type NonMovingSpace<VM> = crate::policy::immortalspace::ImmortalSpace<VM>;
-
-#[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
-pub type NonMovingSpace<VM> = crate::policy::immix::ImmixSpace<VM>;
-
-#[cfg(feature = "marksweep_as_nonmoving")]
-pub type NonMovingSpace<VM> = crate::policy::marksweepspace::native_ms::MarkSweepSpace<VM>;
+cfg_if::cfg_if! {
+    // Use immortal or mark sweep as the non moving space if the features are enabled. Otherwise use Immix.
+    if #[cfg(feature = "immortal_as_nonmoving")] {
+        pub type NonMovingSpace<VM> = crate::policy::immortalspace::ImmortalSpace<VM>;
+    } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+        pub type NonMovingSpace<VM> = crate::policy::marksweepspace::native_ms::MarkSweepSpace<VM>;
+    } else {
+        pub type NonMovingSpace<VM> = crate::policy::immix::ImmixSpace<VM>;
+    }
+}
 
 /**
 CommonPlan is for representing state and features used by _many_ plans, but that are not fundamental to _all_ plans.  Examples include the Large Object Space and an Immortal space.  Features that are fundamental to _all_ plans must be included in BasePlan.
@@ -636,44 +638,58 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
     fn new_nonmoving_space(args: &mut CreateSpecificPlanArgs<VM>) -> NonMovingSpace<VM> {
         let space_args = args.get_space_args("nonmoving", true, false, VMRequest::discontiguous());
-        #[cfg(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving"))]
-        return NonMovingSpace::new(space_args);
-        #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
-        return NonMovingSpace::new(
-            space_args,
-            crate::policy::immix::ImmixSpaceArgs {
-                unlog_object_when_traced: false,
-                #[cfg(feature = "vo_bit")]
-                mixed_age: false,
-                never_move_objects: true,
-            },
-        );
+        cfg_if::cfg_if! {
+            if #[cfg(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving"))] {
+                NonMovingSpace::new(space_args)
+            } else {
+                // Immix requires extra args.
+                NonMovingSpace::new(
+                    space_args,
+                    crate::policy::immix::ImmixSpaceArgs {
+                        unlog_object_when_traced: false,
+                        #[cfg(feature = "vo_bit")]
+                        mixed_age: false,
+                        never_move_objects: true,
+                    },
+                )
+            }
+        }
     }
 
     fn prepare_nonmoving_space(&mut self, _full_heap: bool) {
-        #[cfg(feature = "immortal_as_nonmoving")]
-        self.nonmoving.prepare();
-        #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
-        self.nonmoving.prepare(_full_heap, None);
-        #[cfg(feature = "marksweep_as_nonmoving")]
-        self.nonmoving.prepare(_full_heap);
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "immortal_as_nonmoving")] {
+                self.nonmoving.prepare();
+            } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+                self.nonmoving.prepare(_full_heap);
+            } else {
+                self.nonmoving.prepare(_full_heap, None);
+            }
+        }
     }
 
     fn release_nonmoving_space(&mut self, _full_heap: bool) {
-        #[cfg(feature = "immortal_as_nonmoving")]
-        self.nonmoving.release();
-        #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
-        self.nonmoving.release(_full_heap);
-        #[cfg(feature = "marksweep_as_nonmoving")]
-        self.nonmoving.release();
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "immortal_as_nonmoving")] {
+                self.nonmoving.release();
+            } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+                self.nonmoving.prepare(_full_heap);
+            } else {
+                self.nonmoving.release(_full_heap);
+            }
+        }
     }
 
     fn end_of_gc_nonmoving_space(&mut self) {
-        // Only mark sweep and immix need end of GC.
-        #[cfg(feature = "marksweep_as_nonmoving")]
-        self.nonmoving.end_of_gc();
-        #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
-        self.nonmoving.end_of_gc();
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "immortal_as_nonmoving")] {
+                // Nothing we need to do for immortal space.
+            } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+                self.nonmoving.end_of_gc();
+            } else {
+                self.nonmoving.end_of_gc();
+            }
+        }
     }
 }
 
@@ -702,13 +718,13 @@ pub trait HasSpaces {
     ///
     /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
     /// in the outer struct first.
-    fn for_each_space(&self, func: &mut dyn FnMut(&dyn Space<Self::VM>));
+    fn for_each_space<'a>(&'a self, func: &mut dyn FnMut(&'a dyn Space<Self::VM>));
 
     /// Visit each space field mutably.
     ///
     /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
     /// in the outer struct first.
-    fn for_each_space_mut(&mut self, func: &mut dyn FnMut(&mut dyn Space<Self::VM>));
+    fn for_each_space_mut<'a>(&'a mut self, func: &mut dyn FnMut(&'a mut dyn Space<Self::VM>));
 }
 
 /// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.

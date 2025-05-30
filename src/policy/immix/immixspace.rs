@@ -7,6 +7,7 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::sft_map::SFTMap;
 use crate::policy::space::{CommonSpace, Space};
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::alloc::allocator::AllocatorContext;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;
@@ -243,6 +244,9 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
         self
     }
+    fn as_inspector(&self) -> &dyn crate::util::heap::inspection::SpaceInspector {
+        self
+    }
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
@@ -330,14 +334,11 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         } else if KIND == TRACE_KIND_FAST || KIND == TRACE_KIND_TRANSITIVE_PIN {
             false
         } else if KIND == DEFAULT_TRACE {
-            // FIXME: This is quite hacky.
-            // 1. When we use immix as a non moving space, we will check this method to see
-            //    if the non moving space may move objects or not. The answer should always be false.
-            //    It doesn't matter what trace it is.
-            // 2. For StickyImmix, we use DEFAULT_TRACE for nursery GC. We may move objects. Luckily,
-            //    this function is only used in PlanProcessEdges, and sticky immix nursery GC does not
-            //    use PlanProcessEdges.
-            // I should fix this before merging.
+            // FIXME: This is hacky. When we do a default trace, this should be a nonmoving space.
+            // The only exception is the nursery GC for sticky immix, for which, we use default trace.
+            // This function is only used for PlanProcessEdges, and for sticky immix nursery GC, we use
+            // GenNurseryProcessEdges. So it still works. But this is quite hacky anyway.
+            // See https://github.com/mmtk/mmtk-core/issues/1314 for details.
             false
         } else {
             unreachable!()
@@ -737,8 +738,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Allocate a clean block.
-    pub fn get_clean_block(&self, tls: VMThread, copy: bool) -> Option<Block> {
-        let block_address = self.acquire(tls, Block::PAGES);
+    pub fn get_clean_block(
+        &self,
+        tls: VMThread,
+        copy: bool,
+        alloc_options: AllocationOptions,
+    ) -> Option<Block> {
+        let block_address = self.acquire(tls, Block::PAGES, alloc_options);
         if block_address.is_zero() {
             return None;
         }
@@ -1378,6 +1384,34 @@ impl ClearVOBitsAfterPrepare {
             .filter(|block| block.get_state() != BlockState::Unallocated)
         {
             block.clear_vo_bits_for_unmarked_regions(line_mark_state);
+        }
+    }
+}
+
+mod inspector {
+    use super::*;
+    use crate::util::heap::inspection::{list_sub_regions, RegionInspector, SpaceInspector};
+    impl<VM: VMBinding> SpaceInspector for ImmixSpace<VM> {
+        fn list_top_regions(&self) -> Vec<Box<dyn RegionInspector>> {
+            self.chunk_map
+                .all_chunks()
+                .map(|r: Chunk| Box::new(r) as Box<dyn RegionInspector>)
+                .collect()
+        }
+
+        fn list_sub_regions(
+            &self,
+            parent_region: &dyn RegionInspector,
+        ) -> Vec<Box<dyn RegionInspector>> {
+            if let Some(regions) = list_sub_regions::<Chunk, Block>(parent_region) {
+                return regions;
+            }
+            if !crate::policy::immix::BLOCK_ONLY {
+                if let Some(regions) = list_sub_regions::<Block, Line>(parent_region) {
+                    return regions;
+                }
+            }
+            vec![]
         }
     }
 }

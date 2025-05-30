@@ -4,6 +4,7 @@ use crate::plan::barriers::Barrier;
 use crate::plan::global::Plan;
 use crate::plan::AllocationSemantics;
 use crate::policy::space::Space;
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::Allocator;
 use crate::util::{Address, ObjectReference};
@@ -32,17 +33,12 @@ pub(crate) fn unreachable_prepare_func<VM: VMBinding>(
 pub(crate) fn common_prepare_func<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     // Prepare the free list allocator used for non moving
     #[cfg(feature = "marksweep_as_nonmoving")]
-    {
-        use crate::util::alloc::FreeListAllocator;
-        unsafe {
-            mutator
-                .allocators
-                .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
-        }
-        .downcast_mut::<FreeListAllocator<VM>>()
-        .unwrap()
-        .prepare();
+    unsafe {
+        mutator.allocator_impl_mut_for_semantic::<crate::util::alloc::FreeListAllocator<VM>>(
+            AllocationSemantics::NonMoving,
+        )
     }
+    .prepare();
 }
 
 /// A place-holder implementation for `MutatorConfig::release_func` that should not be called.
@@ -57,30 +53,20 @@ pub(crate) fn unreachable_release_func<VM: VMBinding>(
 /// An mutator release implementation for plans that use [`crate::plan::global::CommonPlan`].
 #[allow(unused_variables)]
 pub(crate) fn common_release_func<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-    // Release the free list allocator used for non moving
-    #[cfg(feature = "marksweep_as_nonmoving")]
-    {
-        use crate::util::alloc::FreeListAllocator;
-        unsafe {
-            mutator
-                .allocators
-                .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "marksweep_as_nonmoving")] {
+            // Release the free list allocator used for non moving
+            unsafe { mutator.allocator_impl_mut_for_semantic::<crate::util::alloc::FreeListAllocator<VM>>(
+                AllocationSemantics::NonMoving,
+            )}.release();
+        } else if #[cfg(feature = "immortal_as_nonmoving")] {
+            // Do nothig for the bump pointer allocator
+        } else {
+            // Reset the Immix allocator
+            unsafe { mutator.allocator_impl_mut_for_semantic::<crate::util::alloc::ImmixAllocator<VM>>(
+                AllocationSemantics::NonMoving,
+            )}.reset();
         }
-        .downcast_mut::<FreeListAllocator<VM>>()
-        .unwrap()
-        .release();
-    }
-    #[cfg(not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")))]
-    {
-        use crate::util::alloc::ImmixAllocator;
-        unsafe {
-            mutator
-                .allocators
-                .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
-        }
-        .downcast_mut::<ImmixAllocator<VM>>()
-        .unwrap()
-        .reset();
     }
 }
 
@@ -207,11 +193,30 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         offset: usize,
         allocator: AllocationSemantics,
     ) -> Address {
-        unsafe {
+        let allocator = unsafe {
             self.allocators
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
-        }
-        .alloc(size, align, offset)
+        };
+        // The value should be default/unset at the beginning of an allocation request.
+        debug_assert!(allocator.get_context().get_alloc_options().is_default());
+        allocator.alloc(size, align, offset)
+    }
+
+    fn alloc_with_options(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: usize,
+        allocator: AllocationSemantics,
+        options: AllocationOptions,
+    ) -> Address {
+        let allocator = unsafe {
+            self.allocators
+                .get_allocator_mut(self.config.allocator_mapping[allocator])
+        };
+        // The value should be default/unset at the beginning of an allocation request.
+        debug_assert!(allocator.get_context().get_alloc_options().is_default());
+        allocator.alloc_with_options(size, align, offset, options)
     }
 
     fn alloc_slow(
@@ -221,11 +226,30 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         offset: usize,
         allocator: AllocationSemantics,
     ) -> Address {
-        unsafe {
+        let allocator = unsafe {
             self.allocators
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
-        }
-        .alloc_slow(size, align, offset)
+        };
+        // The value should be default/unset at the beginning of an allocation request.
+        debug_assert!(allocator.get_context().get_alloc_options().is_default());
+        allocator.alloc_slow(size, align, offset)
+    }
+
+    fn alloc_slow_with_options(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: usize,
+        allocator: AllocationSemantics,
+        options: AllocationOptions,
+    ) -> Address {
+        let allocator = unsafe {
+            self.allocators
+                .get_allocator_mut(self.config.allocator_mapping[allocator])
+        };
+        // The value should be default/unset at the beginning of an allocation request.
+        debug_assert!(allocator.get_context().get_alloc_options().is_default());
+        allocator.alloc_slow_with_options(size, align, offset, options)
     }
 
     // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
@@ -312,6 +336,28 @@ impl<VM: VMBinding> Mutator<VM> {
         self.allocators.get_typed_allocator_mut(selector)
     }
 
+    /// Get the allocator of a concrete type for the semantic.
+    ///
+    /// # Safety
+    /// The semantic needs to match the allocator type.
+    pub unsafe fn allocator_impl_for_semantic<T: Allocator<VM>>(
+        &self,
+        semantic: AllocationSemantics,
+    ) -> &T {
+        self.allocator_impl::<T>(self.config.allocator_mapping[semantic])
+    }
+
+    /// Get the mutable allocator of a concrete type for the semantic.
+    ///
+    /// # Safety
+    /// The semantic needs to match the allocator type.
+    pub unsafe fn allocator_impl_mut_for_semantic<T: Allocator<VM>>(
+        &mut self,
+        semantic: AllocationSemantics,
+    ) -> &mut T {
+        self.allocator_impl_mut::<T>(self.config.allocator_mapping[semantic])
+    }
+
     /// Return the base offset from a mutator pointer to the allocator specified by the selector.
     pub fn get_allocator_base_offset(selector: AllocatorSelector) -> usize {
         use crate::util::alloc::*;
@@ -357,7 +403,7 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     fn prepare(&mut self, tls: VMWorkerThread);
     /// Do the release work for this mutator.
     fn release(&mut self, tls: VMWorkerThread);
-    /// Allocate memory for an object.
+    /// Allocate memory for an object. This function will trigger a GC on failed allocation.
     ///
     /// Arguments:
     /// * `size`: the number of bytes required for the object.
@@ -371,7 +417,25 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
         offset: usize,
         allocator: AllocationSemantics,
     ) -> Address;
-    /// The slow path allocation. This is only useful when the binding
+    /// Allocate memory for an object with more options to control this allocation request, e.g. not triggering a GC on fail.
+    ///
+    /// Arguments:
+    /// * `size`: the number of bytes required for the object.
+    /// * `align`: required alignment for the object.
+    /// * `offset`: offset associated with the alignment. The result plus the offset will be aligned to the given alignment.
+    /// * `allocator`: the allocation semantic used for this object.
+    /// * `options`: the allocation options to change the default allocation behavior for this request.
+    fn alloc_with_options(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: usize,
+        allocator: AllocationSemantics,
+        options: AllocationOptions,
+    ) -> Address;
+    /// The slow path allocation for [`MutatorContext::alloc`]. This function will trigger a GC on failed allocation.
+    ///
+    ///  This is only useful when the binding
     /// implements the fast path allocation, and would like to explicitly
     /// call the slow path after the fast path allocation fails.
     fn alloc_slow(
@@ -380,6 +444,19 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
         align: usize,
         offset: usize,
         allocator: AllocationSemantics,
+    ) -> Address;
+    /// The slow path allocation for [`MutatorContext::alloc_with_options`].
+    ///
+    /// This is only useful when the binding
+    /// implements the fast path allocation, and would like to explicitly
+    /// call the slow path after the fast path allocation fails.
+    fn alloc_slow_with_options(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: usize,
+        allocator: AllocationSemantics,
+        options: AllocationOptions,
     ) -> Address;
     /// Perform post-allocation actions.  For many allocators none are
     /// required.
@@ -530,17 +607,12 @@ pub(crate) fn create_allocator_mapping(
     if include_common_plan {
         map[AllocationSemantics::Immortal] = reserved.add_bump_pointer_allocator();
         map[AllocationSemantics::Los] = reserved.add_large_object_allocator();
-        map[AllocationSemantics::NonMoving] = if cfg!(not(any(
-            feature = "immortal_as_nonmoving",
-            feature = "marksweep_as_nonmoving"
-        ))) {
-            reserved.add_immix_allocator()
-        } else if cfg!(feature = "marksweep_as_nonmoving") {
+        map[AllocationSemantics::NonMoving] = if cfg!(feature = "marksweep_as_nonmoving") {
             reserved.add_free_list_allocator()
         } else if cfg!(feature = "immortal_as_nonmoving") {
             reserved.add_bump_pointer_allocator()
         } else {
-            panic!("No policy selected for nonmoving space")
+            reserved.add_immix_allocator()
         };
     }
 
@@ -596,15 +668,10 @@ pub(crate) fn create_space_mapping<VM: VMBinding>(
         vec.push((
             if cfg!(feature = "marksweep_as_nonmoving") {
                 reserved.add_free_list_allocator()
-            } else if cfg!(not(any(
-                feature = "immortal_as_nonmoving",
-                feature = "marksweep_as_nonmoving"
-            ))) {
-                reserved.add_immix_allocator()
             } else if cfg!(feature = "immortal_as_nonmoving") {
                 reserved.add_bump_pointer_allocator()
             } else {
-                panic!("No policy selected for nonmoving space")
+                reserved.add_immix_allocator()
             },
             plan.common().get_nonmoving(),
         ));
