@@ -309,6 +309,9 @@ mod inspector {
     use crate::util::heap::inspection::{RegionInspector, SpaceInspector};
 
     impl<VM: VMBinding> SpaceInspector for VMSpace<VM> {
+        fn used_pages(&self) -> usize {
+            self.reserved_pages()
+        }
         fn list_top_regions(&self) -> Vec<Box<dyn RegionInspector>> {
             let space = unsafe { &*(self as *const Self) };
             vec![Box::new(crate::util::heap::inspection::SpaceAsRegion::new(

@@ -904,6 +904,9 @@ mod inspector {
     use super::*;
     use crate::util::heap::inspection::{RegionInspector, SpaceInspector};
     impl<VM: VMBinding> SpaceInspector for MallocSpace<VM> {
+        fn used_pages(&self) -> usize {
+            self.reserved_pages()
+        }
         fn list_top_regions(&self) -> Vec<Box<dyn RegionInspector>> {
             self.chunk_map
                 .all_chunks()

@@ -166,6 +166,9 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<
 
 use crate::util::heap::inspection::{RegionInspector, SpaceInspector};
 impl<VM: VMBinding> SpaceInspector for CopySpace<VM> {
+    fn used_pages(&self) -> usize {
+        self.reserved_pages()
+    }
     fn list_top_regions(&self) -> Vec<Box<dyn RegionInspector>> {
         crate::util::heap::inspection::into_regions::<crate::util::heap::chunk_map::Chunk>(
             &mut self.pr.iterate_allocated_regions(),
