@@ -1,5 +1,6 @@
 use crate::policy::sft::SFT;
 use crate::policy::space::Space;
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::linear_scan::RegionIterator;
 #[cfg(feature = "vo_bit")]
 use crate::util::ObjectReference;
@@ -18,6 +19,7 @@ where
     fn policy_name(&self) -> &str {
         std::any::type_name::<Self>()
     }
+    fn used_pages(&self) -> usize;
     /// List the top-level regions used by this space. This is usually [`crate::util::heap::chunk_map::Chunk`] for most spaces.
     /// If there is no region used by the space at the moment, it returns an empty Vector.
     fn list_top_regions(&self) -> Vec<Box<dyn RegionInspector>>;
@@ -133,11 +135,12 @@ impl<VM: VMBinding> RegionInspector for SpaceAsRegion<VM> {
     fn size(&self) -> usize {
         0
     }
+
     #[cfg(feature = "vo_bit")]
     fn list_objects(&self) -> Vec<ObjectReference> {
         let mut res = vec![];
         let mut enumerator =
-            crate::util::object_enum::ClosureObjectEnumerator::<_, VM>::new(|object| {
+            crate::util::object_enum::ClosureObjectEnumerator::<_, VM>::new(|_, _, _, object| {
                 res.push(object);
             });
         self.space.enumerate_objects(&mut enumerator);
