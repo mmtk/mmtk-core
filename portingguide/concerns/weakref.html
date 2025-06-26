@@ -200,7 +200,7 @@ strong references.</li>
 one weak reference.</li>
 </ul>
 <p>The garbage collector may reclaim weakly reachable objects, clear weak references to weakly
-reachable objects, and/or performing associated clean-up operations.</p>
+reachable objects, and/or perform associated clean-up operations.</p>
 <p><strong>A note for Java programmers</strong>: In Java, the term "weak reference" often refers to instances of
 <code>java.lang.ref.Reference</code> (including the concrete classes <code>SoftReference</code>, <code>WeakReference</code>,
 <code>PhantomReference</code> and the hidden <code>FinalizerReference</code> class used by some JVM implementations to
@@ -377,7 +377,7 @@ a moved object, it should use <code>object.get_forwarded_object()</code> instead
 already moved.</p>
 <h2 id="supporting-weak-references"><a class="header" href="#supporting-weak-references">Supporting weak references</a></h2>
 <p>The general way to handle weak references is, after computing the transitive closure, iterate
-through all fields that contain weak references to objects.  For each field,</p>
+through all fields that contain weak references.  For each field,</p>
 <ul>
 <li>if the referent has already been reached, write the new address of the object to the field (or
 do nothing if the object is not moved);</li>
@@ -466,7 +466,7 @@ levels of strength.</p>
 </li>
 </ul>
 </li>
-<li>(This step may expand the transitive closure in emergency GCs if any referents are
+<li>(This step may expand the transitive closure in non-emergency GCs if any referents are
 retained.)</li>
 </ul>
 </li>
@@ -575,8 +575,8 @@ are reachable.</p>
 <p>To support ephemerons, the VM binding needs to identify ephemerons.  This includes ephemerons as
 individual objects, objects that contain ephemerons, and, equivalently, objects that contain
 key/value fields that have semantics similar to ephemerons.</p>
-<p>The following is the algorithm for processing ephemerons.  It gradually discovers ephemerons as we
-do the tracing.  We maintain a queue of ephemerons which is empty before the <code>Closure</code> stage.</p>
+<p>The following is an algorithm for processing ephemerons.  It gradually discovers ephemerons as we do
+the tracing.  We maintain a queue of ephemerons which is empty before the <code>Closure</code> stage.</p>
 <ol>
 <li>In <code>Scanning::scan_object</code> and <code>Scanning::scan_object_and_trace_edges</code>, we enqueue ephemerons
 (into the queue of ephemerons we created before) as we scan them, but do not trace either the
@@ -593,7 +593,7 @@ have unreachable keys.</li>
 <p>This algorithm can be modified if we have a list of all ephemerons before GC starts.  We no longer
 need to maintain the queue.</p>
 <ul>
-<li>In Step 1, we don't need to enqueue ephemerons.</li>
+<li>In Step 1, we don't need to enqueue ephemerons or trace their key or value fields.</li>
 <li>In Step 2, we iterate through all ephemerons.  We retain the value if both the ephemeron itself
 and the key have been reached, and the value has not been reached, yet.  We don't need to remove
 any ephemeron from the list.</li>
