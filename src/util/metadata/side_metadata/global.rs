@@ -1234,7 +1234,7 @@ impl SideMetadataSpec {
             start_meta_shift,
             end_meta_addr,
             end_meta_shift,
-            false,
+            true,
             &mut visitor,
         );
     }
