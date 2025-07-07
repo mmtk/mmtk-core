@@ -271,7 +271,7 @@ impl Default for MockVM {
             mutator: MockMethod::new_unimplemented(),
             mutators: MockMethod::new_unimplemented(),
             vm_trace_object: MockMethod::new_fixed(Box::new(|(_, object, _)| {
-                panic!("MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.", object)
+                panic!("MMTk cannot trace object {object:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.")
             })),
 
             stop_all_mutators: MockMethod::new_unimplemented(),
@@ -279,7 +279,7 @@ impl Default for MockVM {
             block_for_gc: MockMethod::new_unimplemented(),
             spawn_gc_thread: MockMethod::new_default(),
             out_of_memory: MockMethod::new_fixed(Box::new(|(_, err)| {
-                panic!("Out of memory with {:?}!", err)
+                panic!("Out of memory with {err:?}!")
             })),
             schedule_finalization: MockMethod::new_default(),
             post_forwarding: MockMethod::new_default(),

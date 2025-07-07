@@ -17,10 +17,10 @@ pub fn allocate_alignment() {
             MUTATOR.with_fixture_mut(|fixture| {
                 let min = MockVM::MIN_ALIGNMENT;
                 let max = MockVM::MAX_ALIGNMENT;
-                info!("Allowed alignment between {} and {}", min, max);
+                info!("Allowed alignment between {min} and {max}");
                 let mut align = min;
                 while align <= max {
-                    info!("Test allocation with alignment {}", align);
+                    info!("Test allocation with alignment {align}");
                     let addr = memory_manager::alloc(
                         &mut fixture.mutator,
                         8,
@@ -30,9 +30,7 @@ pub fn allocate_alignment() {
                     );
                     assert!(
                         addr.is_aligned_to(align),
-                        "Expected allocation alignment {}, returned address is {:?}",
-                        align,
-                        addr
+                        "Expected allocation alignment {align}, returned address is {addr:?}",
                     );
                     align *= 2;
                 }
@@ -51,13 +49,10 @@ pub fn allocate_offset() {
                 const OFFSET: usize = 4;
                 let min = MockVM::MIN_ALIGNMENT;
                 let max = MockVM::MAX_ALIGNMENT;
-                info!("Allowed alignment between {} and {}", min, max);
+                info!("Allowed alignment between {min} and {max}");
                 let mut align = min;
                 while align <= max {
-                    info!(
-                        "Test allocation with alignment {} and offset {}",
-                        align, OFFSET
-                    );
+                    info!("Test allocation with alignment {align} and offset {OFFSET}");
                     let addr = memory_manager::alloc(
                         &mut fixture.mutator,
                         8,
@@ -67,9 +62,7 @@ pub fn allocate_offset() {
                     );
                     assert!(
                         (addr + OFFSET).is_aligned_to(align),
-                        "Expected allocation alignment {}, returned address is {:?}",
-                        align,
-                        addr
+                        "Expected allocation alignment {align}, returned address is {addr:?}",
                     );
                     align *= 2;
                 }

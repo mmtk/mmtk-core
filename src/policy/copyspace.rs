@@ -229,7 +229,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         semantics: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
+        trace!("copyspace.trace_object({object:?}, {semantics:?})");
 
         // If this is not from space, we do not need to trace it (the object has been copied to the tosapce)
         if !self.is_from_space() {
@@ -243,8 +243,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
             crate::util::metadata::vo_bit::is_vo_bit_set(object),
-            "{:x}: VO bit not set",
-            object
+            "{object:x}: VO bit not set",
         );
 
         trace!("attempting to forward");
@@ -271,7 +270,7 @@ impl<VM: VMBinding> CopySpace<VM> {
 
             trace!("Forwarding pointer");
             queue.enqueue(new_object);
-            trace!("Copied [{:?} -> {:?}]", object, new_object);
+            trace!("Copied [{object:?} -> {new_object:?}]");
             new_object
         }
     }

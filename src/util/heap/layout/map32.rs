@@ -160,7 +160,7 @@ impl VMMap for Map32 {
     }
     #[allow(clippy::while_immutable_condition)]
     fn free_all_chunks(&self, any_chunk: Address) {
-        debug!("free_all_chunks: {}", any_chunk);
+        debug!("free_all_chunks: {any_chunk}");
         let (_sync, self_mut) = self.mut_self_with_sync();
         debug_assert!(any_chunk == conversions::chunk_align_down(any_chunk));
         if !any_chunk.is_zero() {
@@ -178,7 +178,7 @@ impl VMMap for Map32 {
     }
 
     unsafe fn free_contiguous_chunks(&self, start: Address) -> usize {
-        debug!("free_contiguous_chunks: {}", start);
+        debug!("free_contiguous_chunks: {start}");
         let (_sync, _) = self.mut_self_with_sync();
         debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = start.chunk_index();
@@ -224,9 +224,7 @@ impl VMMap for Map32 {
         let alloced_chunk = self_mut.region_map.alloc(trailing_chunks as _);
         debug_assert!(
             alloced_chunk == unavail_start_chunk as i32,
-            "{} != {}",
-            alloced_chunk,
-            unavail_start_chunk
+            "{alloced_chunk} != {unavail_start_chunk}",
         );
         /* set up the global page map and place chunks on free list */
         let mut first_page = 0;
@@ -265,6 +263,9 @@ impl Map32 {
         &mut *self.inner.get()
     }
 
+    /// Get a mutable reference to the inner Map32Inner with a lock.
+    /// The caller should only use the mutable reference when the lock is held.
+    #[allow(clippy::mut_from_ref)]
     fn mut_self_with_sync(&self) -> (MutexGuard<()>, &mut Map32Inner) {
         let guard = self.sync.lock().unwrap();
         (guard, unsafe { self.mut_self() })
@@ -287,7 +288,7 @@ impl Map32 {
             for offset in 0..chunks {
                 let index = (chunk + offset) as usize;
                 let chunk_start = conversions::chunk_index_to_address(index);
-                debug!("Clear descriptor for Chunk {}", chunk_start);
+                debug!("Clear descriptor for Chunk {chunk_start}");
                 self.mut_self().descriptor_map[index] = SpaceDescriptor::UNINITIALIZED;
                 SFT_MAP.clear(chunk_start);
             }

@@ -83,7 +83,7 @@ where
 
     match done_rx.recv_timeout(Duration::from_millis(millis)) {
         Ok(_) => handle.join().expect("Thread panicked"),
-        Err(e) => panic!("Thread took too long: {}", e),
+        Err(e) => panic!("Thread took too long: {e}"),
     }
 }
 

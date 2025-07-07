@@ -106,12 +106,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         let cur_nursery = self.nursery.reserved_pages();
         let max_nursery = self.common.base.gc_trigger.get_max_nursery_pages();
         let nursery_full = cur_nursery >= max_nursery;
-        trace!(
-            "nursery_full = {:?} (nursery = {}, max_nursery = {})",
-            nursery_full,
-            cur_nursery,
-            max_nursery,
-        );
+        trace!("nursery_full = {nursery_full:?} (nursery = {cur_nursery}, max_nursery = {max_nursery})");
         if nursery_full {
             return true;
         }
@@ -251,12 +246,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         let available = plan.get_available_pages();
         let min_nursery = plan.base().gc_trigger.get_min_nursery_pages();
         let next_gc_full_heap = available < min_nursery;
-        trace!(
-            "next gc will be full heap? {}, available pages = {}, min nursery = {}",
-            next_gc_full_heap,
-            available,
-            min_nursery
-        );
+        trace!("next gc will be full heap? {next_gc_full_heap}, available pages = {available}, min nursery = {min_nursery}");
         next_gc_full_heap
     }
 

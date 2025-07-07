@@ -197,7 +197,7 @@ impl MapState {
 
             match group.key {
                 MapState::Unmapped => {
-                    trace!("Trying to quarantine {} - {}", start_addr, end_addr);
+                    trace!("Trying to quarantine {start_addr} - {end_addr}");
                     mmap_noreserve(start_addr, end_addr - start_addr, strategy, anno)?;
 
                     for state in group {
@@ -205,10 +205,10 @@ impl MapState {
                     }
                 }
                 MapState::Quarantined => {
-                    trace!("Already quarantine {} - {}", start_addr, end_addr);
+                    trace!("Already quarantine {start_addr} - {end_addr}");
                 }
                 MapState::Mapped => {
-                    trace!("Already mapped {} - {}", start_addr, end_addr);
+                    trace!("Already mapped {start_addr} - {end_addr}");
                 }
                 MapState::Protected => {
                     panic!("Cannot quarantine protected memory")
@@ -233,7 +233,7 @@ impl MapState {
                 state.store(MapState::Protected, Ordering::Relaxed);
             }
             MapState::Protected => {}
-            _ => panic!("Cannot transition {:?} to protected", mmap_start),
+            _ => panic!("Cannot transition {mmap_start:?} to protected"),
         }
         Ok(())
     }

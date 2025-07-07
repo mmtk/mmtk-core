@@ -153,10 +153,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         // If it is RawMemoryFreeList, it will occupy `space_displacement` bytes at the start of
         // the space.  We add it to the start address.
         let actual_start = start + space_displacement;
-        debug!(
-            "  in new_contiguous: space_displacement = {:?}, actual_start = {}",
-            space_displacement, actual_start
-        );
+        debug!("  in new_contiguous: space_displacement = {space_displacement:?}, actual_start = {actual_start}");
 
         let growable = cfg!(target_pointer_width = "64");
         FreeListPageResource {
@@ -222,10 +219,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         // We are not using mmapper.protect(). mmapper.protect() protects the whole chunk and
         // may protect memory that is still in use.
         if let Err(e) = memory::mprotect(start, conversions::pages_to_bytes(pages)) {
-            panic!(
-                "Failed at protecting memory (starting at {}): {:?}",
-                start, e
-            );
+            panic!("Failed at protecting memory (starting at {start}): {e:?}",);
         }
     }
 
@@ -237,10 +231,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             conversions::pages_to_bytes(pages),
             self.protect_memory_on_release.unwrap(),
         ) {
-            panic!(
-                "Failed at unprotecting memory (starting at {}): {:?}",
-                start, e
-            );
+            panic!("Failed at unprotecting memory (starting at {start}): {e:?}",);
         }
     }
 

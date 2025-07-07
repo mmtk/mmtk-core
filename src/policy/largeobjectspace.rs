@@ -260,8 +260,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
             crate::util::metadata::vo_bit::is_vo_bit_set(object),
-            "{:x}: VO bit not set",
-            object
+            "{object:x}: VO bit not set",
         );
         let nursery_object = self.is_in_nursery(object);
         trace!(
@@ -273,7 +272,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             // Note that test_and_mark() has side effects of
             // clearing nursery bit/moving objects out of logical nursery
             if self.test_and_mark(object, self.mark_state) {
-                trace!("LOS object {} is being marked now", object);
+                trace!("LOS object {object} is being marked now");
                 self.treadmill.copy(object, nursery_object);
                 // We just moved the object out of the logical nursery, mark it as unlogged.
                 // We also unlog mature objects as their unlog bit may have been unset before the
@@ -284,10 +283,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 }
                 queue.enqueue(object);
             } else {
-                trace!(
-                    "LOS object {} is not being marked now, it was marked before",
-                    object
-                );
+                trace!("LOS object {object} is not being marked now, it was marked before");
             }
         }
         object

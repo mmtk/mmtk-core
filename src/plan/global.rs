@@ -233,13 +233,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         let vm_live_pages = conversions::bytes_to_pages_up(vm_live_bytes);
         let total = used_pages + collection_reserve + vm_live_pages;
 
-        trace!(
-            "Reserved pages = {}, used pages: {}, collection reserve: {}, VM live pages: {}",
-            total,
-            used_pages,
-            collection_reserve,
-            vm_live_pages,
-        );
+        trace!("Reserved pages = {total}, used pages: {used_pages}, collection reserve: {collection_reserve}, VM live pages: {vm_live_pages}");
 
         total
     }
@@ -268,12 +262,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         //    buffers for copy allocators).
         // 3. the binding disabled GC, and we end up over-allocating beyond the total pages determined by the GC trigger.
         let available_pages = total_pages.saturating_sub(reserved_pages);
-        trace!(
-            "Total pages = {}, reserved pages = {}, available pages = {}",
-            total_pages,
-            reserved_pages,
-            available_pages,
-        );
+        trace!("Total pages = {total_pages}, reserved pages = {reserved_pages}, available pages = {available_pages}");
         available_pages
     }
 

@@ -79,19 +79,14 @@ pub fn alloc<VM: VMBinding>(size: usize, align: usize, offset: usize) -> (Addres
         address = align_alloc(size, align);
         debug_assert!(
             address.is_aligned_to(align),
-            "Address: {:x} is not aligned to the given alignment: {}",
-            address,
-            align
+            "Address: {address:x} is not aligned to the given alignment: {align}",
         );
     } else {
         address = align_offset_alloc::<VM>(size, align, offset);
         is_offset_malloc = true;
         debug_assert!(
             (address + offset).is_aligned_to(align),
-            "Address: {:x} is not aligned to the given alignment: {} at offset: {}",
-            address,
-            align,
-            offset
+            "Address: {address:x} is not aligned to the given alignment: {align} at offset: {offset}",
         );
     }
     (address, is_offset_malloc)

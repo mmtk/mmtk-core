@@ -125,7 +125,7 @@ impl Stats {
         merge_phases: bool,
     ) -> Mutex<SizeCounter> {
         let u = self.new_event_counter(name, implicit_start, merge_phases);
-        let v = self.new_event_counter(&format!("{}.volume", name), implicit_start, merge_phases);
+        let v = self.new_event_counter(&format!("{name}.volume"), implicit_start, merge_phases);
         Mutex::new(SizeCounter::new(u, v))
     }
 
@@ -190,7 +190,7 @@ impl Stats {
             print!("\t");
         }
         for value in scheduler_stat.values() {
-            print!("{}\t", value);
+            print!("{value}\t");
         }
         println!();
         print!("Total time: ");
@@ -211,7 +211,7 @@ impl Stats {
             }
         }
         for name in scheduler_stat.keys() {
-            print!("{}\t", name);
+            print!("{name}\t");
         }
         println!();
     }

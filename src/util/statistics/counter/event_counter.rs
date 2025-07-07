@@ -57,7 +57,7 @@ impl EventCounter {
     }
 
     fn print_value(&self, value: u64) {
-        print!("{}", value);
+        print!("{value}");
     }
 }
 

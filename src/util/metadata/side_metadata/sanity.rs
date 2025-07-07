@@ -72,7 +72,7 @@ fn verify_global_specs_total_size(g_specs: &[SideMetadataSpec]) -> Result<()> {
     } else {
         Err(Error::new(
             ErrorKind::InvalidInput,
-            format!("Not enough global metadata space for: \n{:?}", g_specs),
+            format!("Not enough global metadata space for: \n{g_specs:?}"),
         ))
     }
 }
@@ -93,7 +93,7 @@ fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
         {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                format!("Local metadata is too big: \n{:?}", spec),
+                format!("Local metadata is too big: \n{spec:?}"),
             ));
         }
     }
@@ -147,10 +147,7 @@ fn verify_no_overlap_contiguous(
     if !(spec_1.get_absolute_offset() >= end_2 || spec_2.get_absolute_offset() >= end_1) {
         return Err(Error::new(
             ErrorKind::InvalidInput,
-            format!(
-                "Overlapping metadata specs detected:\nTHIS:\n{:#?}\nAND:\n{:#?}",
-                spec_1, spec_2
-            ),
+            format!("Overlapping metadata specs detected:\nTHIS:\n{spec_1:#?}\nAND:\n{spec_2:#?}",),
         ));
     }
     Ok(())
@@ -588,14 +585,10 @@ pub fn verify_load<T: MetadataValue>(
             };
             assert!(
                 expected_val == actual_val,
-                "verify_load({:#?}, {}) -> Expected (0x{:x}) but found (0x{:x})",
-                metadata_spec,
-                data_addr,
-                expected_val,
-                actual_val
+                "verify_load({metadata_spec:#?}, {data_addr}) -> Expected (0x{expected_val:x}) but found (0x{actual_val:x})",
             );
         }
-        None => panic!("Invalid Metadata Spec: {:#?}", metadata_spec),
+        None => panic!("Invalid Metadata Spec: {metadata_spec:#?}"),
     }
 }
 
@@ -624,7 +617,7 @@ pub fn verify_store<T: MetadataValue>(
             let content = spec_sanity_map.entry(data_addr).or_insert(0);
             *content = new_val_wrapped;
         }
-        None => panic!("Invalid Metadata Spec: {:#?}", metadata_spec),
+        None => panic!("Invalid Metadata Spec: {metadata_spec:#?}"),
     }
 }
 
@@ -659,13 +652,11 @@ pub fn verify_update<T: MetadataValue>(
             assert_eq!(
                 old_val.to_u64().unwrap(),
                 *cur_val,
-                "Expected old value: {} but found {}",
-                old_val,
-                cur_val
+                "Expected old value: {old_val} but found {cur_val}",
             );
             *cur_val = new_val_wrapped;
         }
-        None => panic!("Invalid metadata spec: {:#?}", metadata_spec),
+        None => panic!("Invalid metadata spec: {metadata_spec:#?}"),
     }
 }
 

@@ -28,7 +28,7 @@ pub struct ByteMapMmapper {
 
 impl fmt::Debug for ByteMapMmapper {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ByteMapMmapper({})", MMAP_NUM_CHUNKS)
+        write!(f, "ByteMapMmapper({MMAP_NUM_CHUNKS})")
     }
 }
 

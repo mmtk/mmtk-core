@@ -837,7 +837,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
 
             for object in objects_to_scan.iter().copied() {
                 if <VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, object) {
-                    trace!("Scan object (slot) {}", object);
+                    trace!("Scan object (slot) {object}");
                     // If an object supports slot-enqueuing, we enqueue its slots.
                     <VM as VMBinding>::VMScanning::scan_object(tls, object, &mut closure);
                     self.post_scan_object(object);
@@ -867,7 +867,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
             object_tracer_context.with_tracer(worker, |object_tracer| {
                 // Scan objects and trace their outgoing edges at the same time.
                 for object in scan_later.iter().copied() {
-                    trace!("Scan object (node) {}", object);
+                    trace!("Scan object (node) {object}");
                     <VM as VMBinding>::VMScanning::scan_object_and_trace_edges(
                         tls,
                         object,
@@ -1129,8 +1129,7 @@ impl<VM: VMBinding, R2OPE: ProcessEdgesWork<VM = VM>, O2OPE: ProcessEdgesWork<VM
                 let new_object = process_edges_work.trace_object(object);
                 debug_assert_eq!(
                     object, new_object,
-                    "Object moved while tracing root unmovable root object: {} -> {}",
-                    object, new_object
+                    "Object moved while tracing root unmovable root object: {object} -> {new_object}",
                 );
             }
 

@@ -130,7 +130,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 let max_bytes = heap_size_bytes as f64 * max;
                 let max_bytes = conversions::raw_align_up(max_bytes as usize, BYTES_IN_PAGE);
                 if max_bytes > DEFAULT_MAX_NURSERY {
-                    warn!("Proportional nursery with max size {} ({}) is larger than DEFAULT_MAX_NURSERY ({}). Use DEFAULT_MAX_NURSERY instead.", max, max_bytes, DEFAULT_MAX_NURSERY);
+                    warn!("Proportional nursery with max size {max} ({max_bytes}) is larger than DEFAULT_MAX_NURSERY ({DEFAULT_MAX_NURSERY}). Use DEFAULT_MAX_NURSERY instead.");
                     DEFAULT_MAX_NURSERY
                 } else {
                     max_bytes
@@ -153,7 +153,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
                         * min;
                 let min_bytes = conversions::raw_align_up(min_bytes as usize, BYTES_IN_PAGE);
                 if min_bytes < DEFAULT_MIN_NURSERY {
-                    warn!("Proportional nursery with min size {} ({}) is smaller than DEFAULT_MIN_NURSERY ({}). Use DEFAULT_MIN_NURSERY instead.", min, min_bytes, DEFAULT_MIN_NURSERY);
+                    warn!("Proportional nursery with min size {min} ({min_bytes}) is smaller than DEFAULT_MIN_NURSERY ({DEFAULT_MIN_NURSERY}). Use DEFAULT_MIN_NURSERY instead.");
                     DEFAULT_MIN_NURSERY
                 } else {
                     min_bytes
@@ -561,7 +561,7 @@ impl MemBalancerTrigger {
         extra_reserve: usize,
         stats: &mut MemBalancerStats,
     ) {
-        trace!("compute new heap limit: {:?}", stats);
+        trace!("compute new heap limit: {stats:?}");
 
         // Constants from the original paper
         const ALLOCATION_SMOOTH_FACTOR: f64 = 0.95;
@@ -593,16 +593,8 @@ impl MemBalancerTrigger {
             stats.collection_time,
             COLLECTION_SMOOTH_FACTOR,
         );
-        trace!(
-            "after smoothing, alloc mem = {}, alloc_time = {}",
-            alloc_mem,
-            alloc_time
-        );
-        trace!(
-            "after smoothing, gc mem    = {}, gc_time    = {}",
-            gc_mem,
-            gc_time
-        );
+        trace!("after smoothing, alloc mem = {alloc_mem}, alloc_time = {alloc_time}");
+        trace!("after smoothing, gc mem    = {gc_mem}, gc_time    = {gc_time}");
 
         // We got the smoothed stats. Now save the current stats as previous stats
         stats.allocation_pages_prev = Some(stats.allocation_pages);
@@ -632,12 +624,7 @@ impl MemBalancerTrigger {
 
         // This is the optimal heap limit due to mem balancer. We will need to clamp the value to the defined min/max range.
         let optimal_heap = live + e as usize + extra_reserve + pending_pages;
-        trace!(
-            "optimal = live {} + sqrt(live) {} + extra {}",
-            live,
-            e,
-            extra_reserve
-        );
+        trace!("optimal = live {live} + sqrt(live) {e} + extra {extra_reserve}");
 
         // The new heap size must be within min/max.
         let new_heap = optimal_heap.clamp(self.min_heap_pages, self.max_heap_pages);

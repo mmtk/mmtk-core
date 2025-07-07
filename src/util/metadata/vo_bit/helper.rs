@@ -141,11 +141,7 @@ pub(crate) fn on_trace_object<VM: VMBinding>(object: ObjectReference) {
     if strategy::<VM>().vo_bit_available_during_tracing() {
         // If the VO bits are available during tracing,
         // we validate the objects we trace using the VO bits.
-        debug_assert!(
-            vo_bit::is_vo_bit_set(object),
-            "{:x}: VO bit not set",
-            object
-        );
+        debug_assert!(vo_bit::is_vo_bit_set(object), "{object:x}: VO bit not set",);
     }
 }
 

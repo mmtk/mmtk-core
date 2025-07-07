@@ -74,9 +74,7 @@ impl Sub<Address> for Address {
     fn sub(self, other: Address) -> ByteSize {
         debug_assert!(
             self.0 >= other.0,
-            "for (addr_a - addr_b), a({}) needs to be larger than b({})",
-            self,
-            other
+            "for (addr_a - addr_b), a({self}) needs to be larger than b({other})",
         );
         self.0 - other.0
     }
@@ -624,7 +622,7 @@ impl ObjectReference {
     pub fn to_object_start<VM: VMBinding>(self) -> Address {
         use crate::vm::ObjectModel;
         let object_start = VM::VMObjectModel::ref_to_object_start(self);
-        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_object_start() returns {}", self, object_start);
+        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {self}, ref_to_object_start() returns {object_start}");
         debug_assert!(
             self.to_raw_address()
                 >= object_start + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,

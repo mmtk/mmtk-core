@@ -96,11 +96,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn acquire(&self, tls: VMThread, pages: usize, alloc_options: AllocationOptions) -> Address {
-        trace!(
-            "Space.acquire, tls={:?}, alloc_options={:?}",
-            tls,
-            alloc_options
-        );
+        trace!("Space.acquire, tls={tls:?}, alloc_options={alloc_options:?}",);
 
         debug_assert!(
             !self.will_oom_on_acquire(pages << LOG_BYTES_IN_PAGE),
@@ -304,12 +300,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      * @param new_chunk {@code true} if the new space encroached upon or started a new chunk or chunks.
      */
     fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
-        trace!(
-            "Grow space from {} for {} bytes (new chunk = {})",
-            start,
-            bytes,
-            new_chunk
-        );
+        trace!("Grow space from {start} for {bytes} bytes (new chunk = {new_chunk})",);
 
         // If this is not a new chunk, the SFT for [start, start + bytes) should alreayd be initialized.
         #[cfg(debug_assertions)]
@@ -465,10 +456,10 @@ pub(crate) fn print_vm_map<VM: VMBinding>(
         )?;
         match common.vmrequest {
             VMRequest::Extent { extent, .. } => {
-                write!(out, " E {}", extent)?;
+                write!(out, " E {extent}")?;
             }
             VMRequest::Fraction { frac, .. } => {
-                write!(out, " F {}", frac)?;
+                write!(out, " F {frac}")?;
             }
             _ => {}
         }
@@ -748,9 +739,9 @@ fn get_frac_available(frac: f32) -> usize {
     trace!("bytes={}*{}={}", frac, vm_layout().available_bytes(), bytes);
     let mb = bytes >> LOG_BYTES_IN_MBYTE;
     let rtn = mb << LOG_BYTES_IN_MBYTE;
-    trace!("rtn={}", rtn);
+    trace!("rtn={rtn}");
     let aligned_rtn = raw_align_up(rtn, BYTES_IN_CHUNK);
-    trace!("aligned_rtn={}", aligned_rtn);
+    trace!("aligned_rtn={aligned_rtn}");
     aligned_rtn
 }
 

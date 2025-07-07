@@ -137,11 +137,8 @@ impl ChunkMap {
             let old_state = self.get_internal(chunk);
             // If a chunk is free, any space may use it. If a chunk is not free, only the current space may update its state.
             assert!(
-                old_state.is_free() || old_state.get_space_index() == self.space_index,
-                "Chunk {:?}: old state {:?}, new state {:?}. Cannot set to new state.",
-                chunk,
-                old_state,
-                state
+                old_state.is_free() || old_state.get_space_index() == state.get_space_index(),
+                "Chunk {chunk:?}: old state {old_state:?}, new state {state:?}. Cannot set to new state.",
             );
         }
         // Update alloc byte

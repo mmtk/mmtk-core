@@ -61,7 +61,7 @@ struct InnerFragmentedMapper {
 
 impl fmt::Debug for FragmentedMapper {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "FragmentedMapper({})", MMAP_NUM_CHUNKS)
+        write!(f, "FragmentedMapper({MMAP_NUM_CHUNKS})")
     }
 }
 

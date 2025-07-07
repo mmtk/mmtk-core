@@ -126,7 +126,7 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
                 crate::policy::sft::EMPTY_SFT_NAME
             );
             // Set SFT
-            assert!(sft_map.has_sft_entry(start), "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.", start);
+            assert!(sft_map.has_sft_entry(start), "The VM space start (aligned to {start}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.");
             unsafe {
                 sft_map.eager_initialize(self.as_sft(), start, size);
             }
@@ -220,10 +220,7 @@ impl<VM: VMBinding> VMSpace<VM> {
         )
         .is_empty());
 
-        debug!(
-            "Align VM space ({}, {}) to chunk ({}, {})",
-            start, end, chunk_start, chunk_end
-        );
+        debug!("Align VM space ({start}, {end}) to chunk ({chunk_start}, {chunk_end})");
 
         // Mark as mapped in mmapper
         self.common.mmapper.mark_as_mapped(chunk_start, chunk_size);
@@ -236,7 +233,7 @@ impl<VM: VMBinding> VMSpace<VM> {
         // self.common.vm_map.insert(chunk_start, chunk_size, self.common.descriptor);
         // Set SFT if we should
         if set_sft {
-            assert!(SFT_MAP.has_sft_entry(chunk_start), "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.", chunk_start);
+            assert!(SFT_MAP.has_sft_entry(chunk_start), "The VM space start (aligned to {chunk_start}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.");
             unsafe {
                 SFT_MAP.update(self.as_sft(), chunk_start, chunk_size);
             }
@@ -279,8 +276,7 @@ impl<VM: VMBinding> VMSpace<VM> {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
             crate::util::metadata::vo_bit::is_vo_bit_set(object),
-            "{:x}: VO bit not set",
-            object
+            "{object:x}: VO bit not set",
         );
         debug_assert!(self.in_space(object));
         if self.mark_state.test_and_mark::<VM>(object) {

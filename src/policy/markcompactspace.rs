@@ -251,8 +251,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     ) -> ObjectReference {
         debug_assert!(
             crate::util::metadata::vo_bit::is_vo_bit_set(object),
-            "{:x}: VO bit not set",
-            object
+            "{object:x}: VO bit not set",
         );
         if MarkCompactSpace::<VM>::test_and_mark(object) {
             queue.enqueue(object);
@@ -267,8 +266,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     ) -> ObjectReference {
         debug_assert!(
             crate::util::metadata::vo_bit::is_vo_bit_set(object),
-            "{:x}: VO bit not set",
-            object
+            "{object:x}: VO bit not set",
         );
         // from this stage and onwards, mark bit is no longer needed
         // therefore, it can be reused to save one extra bit in metadata
@@ -416,12 +414,12 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
                 let maybe_forwarding_pointer = Self::get_header_forwarding_pointer(obj);
                 if let Some(forwarding_pointer) = maybe_forwarding_pointer {
-                    trace!("Compact {} to {}", obj, forwarding_pointer);
+                    trace!("Compact {obj} to {forwarding_pointer}");
                     let new_object = forwarding_pointer;
                     Self::clear_header_forwarding_pointer(new_object);
 
                     // copy object
-                    trace!(" copy from {} to {}", obj, new_object);
+                    trace!(" copy from {obj} to {new_object}");
                     let end_of_new_object =
                         VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
                     // update VO bit,
@@ -429,12 +427,12 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                     to = new_object.to_object_start::<VM>() + copied_size;
                     debug_assert_eq!(end_of_new_object, to);
                 } else {
-                    trace!("Skipping dead object {}", obj);
+                    trace!("Skipping dead object {obj}");
                 }
             }
         }
 
-        debug!("Compact end: to = {}", to);
+        debug!("Compact end: to = {to}");
 
         // reset the bump pointer
         self.pr.reset_cursor(to);

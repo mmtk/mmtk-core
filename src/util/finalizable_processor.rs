@@ -53,10 +53,10 @@ impl<F: Finalizable> FinalizableProcessor<F> {
 
         for mut f in self.candidates.drain(start..).collect::<Vec<F>>() {
             let reff = f.get_reference();
-            trace!("Pop {:?} for finalization", reff);
+            trace!("Pop {reff:?} for finalization");
             if reff.is_live() {
                 FinalizableProcessor::<F>::forward_finalizable_reference(e, &mut f);
-                trace!("{:?} is live, push {:?} back to candidates", reff, f);
+                trace!("{reff:?} is live, push {f:?} back to candidates");
                 self.candidates.push(f);
                 continue;
             }

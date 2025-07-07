@@ -73,10 +73,7 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         required_pages: usize,
         tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail> {
-        debug!(
-            "In MonotonePageResource, reserved_pages = {}, required_pages = {}",
-            reserved_pages, required_pages
-        );
+        debug!("In MonotonePageResource, reserved_pages = {reserved_pages}, required_pages = {required_pages}");
         let mut new_chunk = false;
         let mut sync = self.sync.lock().unwrap();
         let mut rtn = sync.cursor;
@@ -106,9 +103,9 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         }
 
         let bytes = pages_to_bytes(required_pages);
-        debug!("bytes={}", bytes);
+        debug!("bytes={bytes}");
         let mut tmp = sync.cursor + bytes;
-        debug!("tmp={:?}", tmp);
+        debug!("tmp={tmp:?}");
 
         if !self.common().contiguous && tmp > sync.sentinel {
             /* we're out of virtual memory within our discontiguous region, so ask for more */
@@ -136,7 +133,7 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         } else {
             //debug!("tmp={:?} <= sync.sentinel={:?}", tmp, sync.sentinel);
             sync.cursor = tmp;
-            debug!("update cursor = {}", tmp);
+            debug!("update cursor = {tmp}");
 
             /* In a contiguous space we can bump along into the next chunk, so preserve the currentChunk invariant */
             if self.common().contiguous && chunk_align_down(sync.cursor) != sync.current_chunk {

@@ -390,8 +390,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     ) -> ObjectReference {
         debug_assert!(
             self.in_space(object),
-            "Cannot mark an object {} that was not alloced by free list allocator.",
-            object,
+            "Cannot mark an object {object} that was not alloced by free list allocator.",
         );
         if self.attempt_mark(object) {
             let block = Block::containing(object);

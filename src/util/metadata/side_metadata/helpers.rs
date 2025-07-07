@@ -94,7 +94,7 @@ pub(super) fn align_metadata_address(
 #[cfg(test)]
 pub(crate) fn ensure_munmap_metadata(start: Address, size: usize) {
     use crate::util::memory;
-    trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
+    trace!("ensure_munmap_metadata({start}, 0x{size:x})");
 
     assert!(memory::munmap(start, size).is_ok())
 }
@@ -176,12 +176,7 @@ pub(crate) fn address_to_meta_address(
     #[cfg(target_pointer_width = "64")]
     let res = { address_to_contiguous_meta_address(metadata_spec, data_addr) };
 
-    trace!(
-        "address_to_meta_address({:?}, addr: {}) -> 0x{:x}",
-        metadata_spec,
-        data_addr,
-        res
-    );
+    trace!("address_to_meta_address({metadata_spec:?}, addr: {data_addr}) -> 0x{res:x}");
 
     res
 }
@@ -270,10 +265,7 @@ pub fn find_last_non_zero_bit_in_metadata_bytes(
         // The value we check has to be in the range.
         debug_assert!(
             cur >= meta_start && cur < meta_end,
-            "Check metadata value at meta address {}, which is not in the range of [{}, {})",
-            cur,
-            meta_start,
-            meta_end
+            "Check metadata value at meta address {cur}, which is not in the range of [{meta_start}, {meta_end})",            
         );
 
         // If we are looking at an address that is not in a mapped chunk, we need to check if the chunk if mapped.

@@ -147,7 +147,7 @@ impl WorkerMonitor {
         let mut should_wait = false;
 
         if all_parked {
-            trace!("Worker {} is the last worker parked.", ordinal);
+            trace!("Worker {ordinal} is the last worker parked.");
             let result = on_last_parked(&mut sync.goals);
             match result {
                 LastParkedResult::ParkSelf => {
@@ -272,16 +272,16 @@ mod tests {
                     // This emulates the use pattern in the scheduler, i.e. checking the condition
                     // ("Is there any work packets available") without holding a mutex.
                     while !should_unpark.load(Ordering::SeqCst) {
-                        println!("Thread {} parking...", ordinal);
+                        println!("Thread {ordinal} parking...");
                         worker_monitor
                             .park_and_wait(ordinal, |_goals| {
-                                println!("Thread {} is the last thread parked.", ordinal);
+                                println!("Thread {ordinal} is the last thread parked.");
                                 on_last_parked_called.fetch_add(1, Ordering::SeqCst);
                                 should_unpark.store(true, Ordering::SeqCst);
                                 super::LastParkedResult::WakeAll
                             })
                             .unwrap();
-                        println!("Thread {} unparked.", ordinal);
+                        println!("Thread {ordinal} unparked.");
                     }
                 });
             }
@@ -312,17 +312,17 @@ mod tests {
                     // Record the number of threads entering the following `while` loop.
                     threads_running.fetch_add(1, Ordering::SeqCst);
                     while !should_unpark.load(Ordering::SeqCst) {
-                        println!("Thread {} parking...", ordinal);
+                        println!("Thread {ordinal} parking...");
                         worker_monitor
                             .park_and_wait(ordinal, |_goals| {
-                                println!("Thread {} is the last thread parked.", ordinal);
+                                println!("Thread {ordinal} is the last thread parked.");
                                 on_last_parked_called.fetch_add(1, Ordering::SeqCst);
                                 should_unpark.store(true, Ordering::SeqCst);
                                 i_am_the_last_parked_worker = true;
                                 super::LastParkedResult::WakeSelf
                             })
                             .unwrap();
-                        println!("Thread {} unparked.", ordinal);
+                        println!("Thread {ordinal} unparked.");
                     }
                     threads_running.fetch_sub(1, Ordering::SeqCst);
 

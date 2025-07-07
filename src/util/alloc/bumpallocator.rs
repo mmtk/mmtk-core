@@ -212,11 +212,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
             trace!("Failed to acquire a new block");
             acquired_start
         } else {
-            trace!(
-                "Acquired a new block of size {} with start address {}",
-                block_size,
-                acquired_start
-            );
+            trace!("Acquired a new block of size {block_size} with start address {acquired_start}");
             if !stress_test {
                 self.set_limit(acquired_start, acquired_start + block_size);
                 self.alloc(size, align, offset)

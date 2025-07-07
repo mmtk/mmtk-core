@@ -74,13 +74,13 @@ pub const VO_BIT_SIDE_METADATA_ADDR: Address = VO_BIT_SIDE_METADATA_SPEC.get_abs
 
 /// Atomically set the VO bit for an object.
 pub(crate) fn set_vo_bit(object: ObjectReference) {
-    debug_assert!(!is_vo_bit_set(object), "{:x}: VO bit already set", object);
+    debug_assert!(!is_vo_bit_set(object), "{object:x}: VO bit already set");
     VO_BIT_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_raw_address(), 1, Ordering::SeqCst);
 }
 
 /// Atomically unset the VO bit for an object.
 pub(crate) fn unset_vo_bit(object: ObjectReference) {
-    debug_assert!(is_vo_bit_set(object), "{:x}: VO bit not set", object);
+    debug_assert!(is_vo_bit_set(object), "{object:x}: VO bit not set");
     VO_BIT_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_raw_address(), 0, Ordering::SeqCst);
 }
 
@@ -96,7 +96,7 @@ pub(crate) fn unset_vo_bit_nocheck(object: ObjectReference) {
 ///
 /// This is unsafe: check the comment on `side_metadata::store`
 pub(crate) unsafe fn unset_vo_bit_unsafe(object: ObjectReference) {
-    debug_assert!(is_vo_bit_set(object), "{:x}: VO bit not set", object);
+    debug_assert!(is_vo_bit_set(object), "{object:x}: VO bit not set");
     VO_BIT_SIDE_METADATA_SPEC.store::<u8>(object.to_raw_address(), 0);
 }
 
