@@ -209,8 +209,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
             crate::util::metadata::vo_bit::is_vo_bit_set(object),
-            "{:x}: VO bit not set",
-            object
+            "{object:x}: VO bit not set",
         );
         if self.mark_state.test_and_mark::<VM>(object) {
             // Set the unlog bit if required

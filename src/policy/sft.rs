@@ -130,10 +130,7 @@ impl SFT for EmptySpaceSFT {
         EMPTY_SFT_NAME
     }
     fn is_live(&self, object: ObjectReference) -> bool {
-        panic!(
-            "Called is_live() on {:x}, which maps to an empty space",
-            object
-        )
+        panic!("Called is_live() on {object:x}, which maps to an empty space")
     }
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
@@ -180,10 +177,7 @@ impl SFT for EmptySpaceSFT {
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        panic!(
-            "Called initialize_object_metadata() on {:x}, which maps to an empty space",
-            object
-        )
+        panic!("Called initialize_object_metadata() on {object:x}, which maps to an empty space")
     }
 
     fn sft_trace_object(
@@ -194,8 +188,7 @@ impl SFT for EmptySpaceSFT {
     ) -> ObjectReference {
         // We do not have the `VM` type parameter here, so we cannot forward the call to the VM.
         panic!(
-            "Call trace_object() on {}, which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().",
-            object,
+            "Call trace_object() on {object}, which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object()."
         )
     }
 }

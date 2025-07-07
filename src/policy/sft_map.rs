@@ -278,7 +278,7 @@ mod space_map {
 
             let assert_for_index = |i: usize| {
                 let (start, end) = SFTSpaceMap::index_to_space_range(i);
-                println!("Space: Index#{} = [{}, {})", i, start, end);
+                println!("Space: Index#{i} = [{start}, {end})");
                 assert_eq!(SFTSpaceMap::addr_to_index(start), i);
                 assert_eq!(SFTSpaceMap::addr_to_index(end - 1), i);
             };
@@ -290,7 +290,7 @@ mod space_map {
 
             // assert space end
             let (_, last_space_end) = SFTSpaceMap::index_to_space_range(MAX_SPACES);
-            println!("Space end = {}", last_space_end);
+            println!("Space end = {last_space_end}");
             println!("Heap  end = {}", vm_layout().heap_end);
             assert_eq!(last_space_end, vm_layout().heap_end);
 
@@ -407,7 +407,7 @@ mod dense_chunk_map {
                 last_chunk
             );
             while chunk < last_chunk {
-                trace!("Update {} to index {}", chunk, index);
+                trace!("Update {chunk} to index {index}");
                 SFT_DENSE_CHUNK_MAP_INDEX.store_atomic::<u8>(chunk, index, Ordering::SeqCst);
                 chunk += BYTES_IN_CHUNK;
             }
@@ -529,10 +529,7 @@ mod sparse_chunk_map {
             debug!("Update SFT for Chunk {} as {}", start, space.name(),);
             let first = start.chunk_index();
             let start_chunk = chunk_index_to_address(first);
-            debug!(
-                "Update SFT for {} bytes of Chunk {} #{}",
-                bytes, start_chunk, first
-            );
+            debug!("Update SFT for {bytes} bytes of Chunk {start_chunk} #{first}");
         }
 
         fn trace_sft_map(&self) {

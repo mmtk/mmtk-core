@@ -27,7 +27,7 @@ pub fn bench(c: &mut Criterion) {
             "alloc" => alloc::bench(c),
             "internal_pointer" => internal_pointer::bench(c),
             "sft" => sft::bench(c),
-            _ => panic!("Unknown benchmark {:?}", bench),
+            _ => panic!("Unknown benchmark {bench:?}"),
         },
         Err(_) => panic!("Need to name a benchmark by the env var MMTK_BENCH"),
     }

@@ -242,7 +242,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let mut new_packets = false;
         for (id, work_bucket) in self.work_buckets.iter() {
             if work_bucket.is_activated() && work_bucket.maybe_schedule_sentinel() {
-                trace!("Scheduled sentinel packet into {:?}", id);
+                trace!("Scheduled sentinel packet into {id:?}");
                 new_packets = true;
             }
         }
@@ -271,13 +271,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 new_packets = new_packets || !bucket.is_drained();
                 if new_packets {
                     // Quit the loop. There are already new packets in the newly opened buckets.
-                    trace!("Found new packets at stage {:?}.  Break.", id);
+                    trace!("Found new packets at stage {id:?}.  Break.");
                     break;
                 }
                 new_packets = new_packets || bucket.maybe_schedule_sentinel();
                 if new_packets {
                     // Quit the loop. A sentinel packet is added to the newly opened buckets.
-                    trace!("Sentinel is scheduled at stage {:?}.  Break.", id);
+                    trace!("Sentinel is scheduled at stage {id:?}.  Break.");
                     break;
                 }
             }
@@ -317,7 +317,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let mut error_example = None;
         for (id, bucket) in self.work_buckets.iter() {
             if bucket.is_activated() && !bucket.is_empty() {
-                error!("Work bucket {:?} is active but not empty!", id);
+                error!("Work bucket {id:?} is active but not empty!");
                 // This error can be hard to reproduce.
                 // If an error happens in the release build where logs are turned off,
                 // we should show at least one abnormal bucket in the panic message
@@ -326,7 +326,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             }
         }
         if let Some(id) = error_example {
-            panic!("Some active buckets (such as {:?}) are not empty.", id);
+            panic!("Some active buckets (such as {id:?}) are not empty.");
         }
     }
 

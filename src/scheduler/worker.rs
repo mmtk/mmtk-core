@@ -75,9 +75,7 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
             let space_index = space_descriptor.get_index();
             debug_assert!(
                 space_index < MAX_SPACES,
-                "Space index {} is not in the range of [0, {})",
-                space_index,
-                MAX_SPACES
+                "Space index {space_index} is not in the range of [0, {MAX_SPACES})",
             );
             // Accumulate the live bytes for the index
             live_bytes_per_space[space_index] += bytes;

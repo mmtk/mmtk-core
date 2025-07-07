@@ -546,8 +546,7 @@ impl<VM: VMBinding> MMTK<VM> {
                 let live_bytes = live_bytes_per_space[space_idx];
                 debug_assert!(
                     live_bytes <= used_bytes,
-                    "Live bytes of objects in {} ({} bytes) is larger than used pages ({} bytes), something is wrong.",
-                    space_name, live_bytes, used_bytes
+                    "Live bytes of objects in {space_name} ({live_bytes} bytes) is larger than used pages ({used_bytes} bytes), something is wrong."
                 );
                 ret.insert(space_name, crate::LiveBytesStats {
                     live_bytes,
@@ -604,7 +603,7 @@ impl<VM: VMBinding> MMTK<VM> {
 pub fn mmtk_debug_print_object(object: crate::util::ObjectReference) {
     // If the address is unmapped, we cannot access its metadata. Just quit.
     if !object.to_raw_address().is_mapped() {
-        println!("{} is not mapped in MMTk", object);
+        println!("{object} is not mapped in MMTk");
         return;
     }
 
@@ -613,10 +612,7 @@ pub fn mmtk_debug_print_object(object: crate::util::ObjectReference) {
         .to_raw_address()
         .is_aligned_to(crate::util::ObjectReference::ALIGNMENT)
     {
-        println!(
-            "{} is not properly aligned. It is not an object reference.",
-            object
-        );
+        println!("{object} is not properly aligned. It is not an object reference.",);
     }
 
     // Forward to the space

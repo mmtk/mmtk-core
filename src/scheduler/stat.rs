@@ -60,7 +60,7 @@ impl SchedulerStat {
             let val = counts.entry(pkt).or_default();
             *val += c;
         }
-        stat.insert("total-work.count".to_owned(), format!("{}", total_count));
+        stat.insert("total-work.count".to_owned(), format!("{total_count}"));
         // Work execution times
         let mut duration_overall: WorkCounterBase = Default::default();
         for (t, vs) in &self.work_counters {
@@ -109,7 +109,7 @@ impl SchedulerStat {
         );
 
         for (pkt, count) in counts {
-            stat.insert(pkt, format!("{}", count));
+            stat.insert(pkt, format!("{count}"));
         }
 
         for (pkt, time) in times {

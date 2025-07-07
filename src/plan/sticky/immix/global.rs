@@ -184,22 +184,19 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         if self.is_current_gc_nursery() {
             // Every reachable object should be logged
             if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::SeqCst) {
-                error!("Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
+                error!("Object {object} is not unlogged (all objects that have been traced should be unlogged/mature)");
                 return false;
             }
 
             // Every reachable object should be marked
             if self.immix.immix_space.in_space(object) && !self.immix.immix_space.is_marked(object)
             {
-                error!(
-                    "Object {} is not marked (all objects that have been traced should be marked)",
-                    object
-                );
+                error!("Object {object} is not marked (all objects that have been traced should be marked)");
                 return false;
             } else if self.immix.common.los.in_space(object)
                 && !self.immix.common.los.is_live(object)
             {
-                error!("LOS Object {} is not marked", object);
+                error!("LOS Object {object} is not marked");
                 return false;
             }
         }
@@ -253,15 +250,12 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
         if self.immix.immix_space.in_space(object) {
             if !self.is_object_in_nursery(object) {
                 // Mature object
-                trace!("Immix mature object {}, skip", object);
+                trace!("Immix mature object {object}, skip");
                 return object;
             } else {
                 // Nursery object
                 let object = if KIND == TRACE_KIND_TRANSITIVE_PIN || KIND == TRACE_KIND_FAST {
-                    trace!(
-                        "Immix nursery object {} is being traced without moving",
-                        object
-                    );
+                    trace!("Immix nursery object {object} is being traced without moving");
                     self.immix
                         .immix_space
                         .trace_object_without_moving(queue, object)
@@ -281,15 +275,12 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                         if ret == object {
                             "".to_string()
                         } else {
-                            format!("-> new object {}", ret)
+                            format!("-> new object {ret}")
                         }
                     );
                     ret
                 } else {
-                    trace!(
-                        "Immix nursery object {} is being traced without moving",
-                        object
-                    );
+                    trace!("Immix nursery object {object} is being traced without moving");
                     self.immix
                         .immix_space
                         .trace_object_without_moving(queue, object)

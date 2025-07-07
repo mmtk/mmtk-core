@@ -47,7 +47,7 @@ impl HeaderMetadataSpec {
     /// spec should be used with a mask to make sure that we exclude the forwarding bits.
     #[cfg(debug_assertions)]
     fn assert_mask<T: MetadataValue>(&self, mask: Option<T>) {
-        debug_assert!(mask.is_none() || self.num_of_bits >= 8, "optional_mask is only supported for 8X-bits in-header metadata. Problematic MetadataSpec: ({:?})", self);
+        debug_assert!(mask.is_none() || self.num_of_bits >= 8, "optional_mask is only supported for 8X-bits in-header metadata. Problematic MetadataSpec: ({self:?})");
     }
 
     /// Assert if this is a valid spec.
@@ -59,8 +59,7 @@ impl HeaderMetadataSpec {
             debug_assert!(
                 (self.bit_offset >> LOG_BITS_IN_BYTE)
                     == ((self.bit_offset + self.num_of_bits as isize - 1) >> LOG_BITS_IN_BYTE),
-                "Metadata << 8-bits: ({:?}) stretches over two bytes!",
-                self
+                "Metadata << 8-bits: ({self:?}) stretches over two bytes!",
             );
         } else if self.num_of_bits >= 8 && self.num_of_bits <= 64 {
             debug_assert!(

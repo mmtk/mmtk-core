@@ -288,13 +288,13 @@ impl Options {
             if let Err(e) = self.set_from_string_inner(key, val) {
                 match e {
                     SetOptionByStringError::InvalidKey => {
-                        panic!("Invalid Options key: {}", key);
+                        panic!("Invalid Options key: {key}");
                     }
                     SetOptionByStringError::ValueParseError => {
-                        eprintln!("Warn: unable to set {}={:?}. Can't parse value. Default value will be used.", key, val);
+                        eprintln!("Warn: unable to set {key}={val:?}. Can't parse value. Default value will be used.");
                     }
                     SetOptionByStringError::ValueValidationError => {
-                        eprintln!("Warn: unable to set {}={:?}. Invalid value. Default value will be used.", key, val);
+                        eprintln!("Warn: unable to set {key}={val:?}. Invalid value. Default value will be used.");
                     }
                 }
                 return false;
@@ -320,10 +320,10 @@ impl Options {
                             /* Silently skip unrecognized keys. */
                         }
                         SetOptionByStringError::ValueParseError => {
-                            eprintln!("Warn: unable to set {}={:?}. Can't parse value. Default value will be used.", key, val);
+                            eprintln!("Warn: unable to set {key}={val:?}. Can't parse value. Default value will be used.");
                         }
                         SetOptionByStringError::ValueValidationError => {
-                            eprintln!("Warn: unable to set {}={:?}. Invalid value. Default value will be used.", key, val);
+                            eprintln!("Warn: unable to set {key}={val:?}. Invalid value. Default value will be used.");
                         }
                     }
                 }
@@ -538,7 +538,7 @@ mod nursery_size_parsing_tests {
             assert_eq!(min, 1);
             assert_eq!(max, 2);
         } else {
-            panic!("Failed: {:?}", result);
+            panic!("Failed: {result:?}");
         }
 
         // Default min
@@ -547,7 +547,7 @@ mod nursery_size_parsing_tests {
             assert_eq!(min, DEFAULT_MIN_NURSERY);
             assert_eq!(max, 2);
         } else {
-            panic!("Failed: {:?}", result);
+            panic!("Failed: {result:?}");
         }
 
         // Default max
@@ -556,7 +556,7 @@ mod nursery_size_parsing_tests {
             assert_eq!(min, 1);
             assert_eq!(max, DEFAULT_MAX_NURSERY);
         } else {
-            panic!("Failed: {:?}", result);
+            panic!("Failed: {result:?}");
         }
 
         // Default both
@@ -565,7 +565,7 @@ mod nursery_size_parsing_tests {
             assert_eq!(min, DEFAULT_MIN_NURSERY);
             assert_eq!(max, DEFAULT_MAX_NURSERY);
         } else {
-            panic!("Failed: {:?}", result);
+            panic!("Failed: {result:?}");
         }
     }
 
@@ -579,7 +579,7 @@ mod nursery_size_parsing_tests {
             assert_eq!(min, 0.1);
             assert_eq!(max, 0.8);
         } else {
-            panic!("Failed: {:?}", result);
+            panic!("Failed: {result:?}");
         }
 
         // Default min
@@ -588,7 +588,7 @@ mod nursery_size_parsing_tests {
             assert_eq!(min, DEFAULT_PROPORTIONAL_MIN_NURSERY);
             assert_eq!(max, 0.8);
         } else {
-            panic!("Failed: {:?}", result);
+            panic!("Failed: {result:?}");
         }
 
         // Default max
@@ -597,7 +597,7 @@ mod nursery_size_parsing_tests {
             assert_eq!(min, 0.1);
             assert_eq!(max, DEFAULT_PROPORTIONAL_MAX_NURSERY);
         } else {
-            panic!("Failed: {:?}", result);
+            panic!("Failed: {result:?}");
         }
 
         // Default both
@@ -606,7 +606,7 @@ mod nursery_size_parsing_tests {
             assert_eq!(min, DEFAULT_PROPORTIONAL_MIN_NURSERY);
             assert_eq!(max, DEFAULT_PROPORTIONAL_MAX_NURSERY);
         } else {
-            panic!("Failed: {:?}", result);
+            panic!("Failed: {result:?}");
         }
     }
 }
@@ -664,9 +664,9 @@ impl GCTriggerSelector {
 
             if let Some(size) = size {
                 size.try_into()
-                    .map_err(|_| format!("size overflow: {}", size))
+                    .map_err(|_| format!("size overflow: {size}"))
             } else {
-                Err(format!("size overflow: {}", s))
+                Err(format!("size overflow: {s}"))
             }
         } else {
             s.parse::<usize>().map_err(|e| e.to_string())
@@ -710,7 +710,7 @@ impl FromStr for GCTriggerSelector {
             return Ok(Self::Delegated);
         }
 
-        Err(format!("Failed to parse the GC trigger option: {:?}", s))
+        Err(format!("Failed to parse the GC trigger option: {s:?}"))
     }
 }
 

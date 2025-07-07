@@ -454,7 +454,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                     .state
                     .allocation_success
                     .swap(true, Ordering::SeqCst);
-                trace!("fail with oom={}", fail_with_oom);
+                trace!("fail with oom={fail_with_oom}");
                 if fail_with_oom {
                     // Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
                     trace!("Throw HeapOutOfMemory!");
@@ -480,7 +480,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             // Record whether last collection was an Emergency collection. If so, we make one more
             // attempt to allocate before we signal an OOM.
             emergency_collection = self.get_context().state.is_emergency_collection();
-            trace!("Got emergency collection as {}", emergency_collection);
+            trace!("Got emergency collection as {emergency_collection}");
             previous_result_zero = true;
         }
     }

@@ -411,8 +411,7 @@ mod mixed {
                         assert_eq!(
                             objref,
                             Some(fixture.objref1),
-                            "Slot {} is not properly loaded",
-                            i
+                            "Slot {i} is not properly loaded",
                         );
                     }
 
@@ -423,8 +422,7 @@ mod mixed {
                         assert_eq!(
                             objref,
                             Some(fixture.objref2),
-                            "Slot {} is not properly loaded after store",
-                            i
+                            "Slot {i} is not properly loaded after store",
                         );
                     }
 

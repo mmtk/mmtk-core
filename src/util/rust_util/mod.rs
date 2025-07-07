@@ -112,13 +112,13 @@ pub fn debug_process_thread_id() -> String {
     {
         // `gettid()` is Linux-specific.
         let tid = unsafe { libc::gettid() };
-        format!("PID: {}, TID: {}", pid, tid)
+        format!("PID: {pid}, TID: {tid}")
     }
     #[cfg(not(target_os = "linux"))]
     {
         // TODO: When we support other platforms, use platform-specific methods to get thread
         // identifiers.
-        format!("PID: {}", pid)
+        format!("PID: {pid}")
     }
 }
 

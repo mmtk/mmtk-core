@@ -312,7 +312,7 @@ pub fn handle_mmap_error<VM: VMBinding>(
 ) -> ! {
     use std::io::ErrorKind;
 
-    eprintln!("Failed to mmap {}, size {}", addr, bytes);
+    eprintln!("Failed to mmap {addr}, size {bytes}");
     eprintln!("{}", get_process_memory_maps());
 
     match error.kind() {
@@ -342,7 +342,7 @@ pub fn handle_mmap_error<VM: VMBinding>(
         }
         _ => {}
     }
-    panic!("Unexpected mmap failure: {:?}", error)
+    panic!("Unexpected mmap failure: {error:?}")
 }
 
 /// Checks if the memory has already been mapped. If not, we panic.
@@ -440,7 +440,7 @@ pub fn get_process_memory_maps() -> String {
         // Handle the error case
         let error_message =
             std::str::from_utf8(&output.stderr).expect("Failed to convert error message to string");
-        panic!("Failed to get process memory map: {}", error_message)
+        panic!("Failed to get process memory map: {error_message}")
     }
 }
 
@@ -667,6 +667,6 @@ mod tests {
     #[test]
     fn test_get_system_total_memory() {
         let total = get_system_total_memory();
-        println!("Total memory: {:?}", total);
+        println!("Total memory: {total:?}");
     }
 }

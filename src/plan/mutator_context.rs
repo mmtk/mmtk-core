@@ -104,8 +104,7 @@ impl<VM: VMBinding> std::fmt::Debug for MutatorConfig<VM> {
                 None => "!!!missing space here!!!",
             };
             f.write_fmt(format_args!(
-                "- {:?} = {:?} ({:?})\n",
-                semantic, selector, space_name
+                "- {semantic:?} = {selector:?} ({space_name:?})\n",
             ))?;
         }
         f.write_str("Space mapping:\n")?;

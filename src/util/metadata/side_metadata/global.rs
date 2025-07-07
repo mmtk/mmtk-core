@@ -116,11 +116,7 @@ impl SideMetadataSpec {
     pub(crate) fn assert_metadata_mapped(&self, data_addr: Address) {
         let meta_start = address_to_meta_address(self, data_addr).align_down(BYTES_IN_PAGE);
 
-        trace!(
-            "ensure_metadata_is_mapped({}).meta_start({})",
-            data_addr,
-            meta_start
-        );
+        trace!("ensure_metadata_is_mapped({data_addr}).meta_start({meta_start:?})");
 
         memory::panic_if_unmapped(
             meta_start,
@@ -143,9 +139,7 @@ impl SideMetadataSpec {
                 if let Some(v) = val {
                     assert!(
                         v.to_u8().unwrap() < (1 << (1 << log_b)),
-                        "Input value {:?} is invalid for the spec {:?}",
-                        v,
-                        self
+                        "Input value {v:?} is invalid for the spec {self:?}",
                     );
                 }
             }
@@ -1515,7 +1509,7 @@ impl SideMetadataContext {
     ///     the actual unmapped space will be bigger than what you specify.
     #[cfg(test)]
     pub fn ensure_unmap_metadata_space(&self, start: Address, size: usize) {
-        trace!("ensure_unmap_metadata_space({}, 0x{:x})", start, size);
+        trace!("ensure_unmap_metadata_space({start}, 0x{size:x})");
         debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
         debug_assert!(size % BYTES_IN_PAGE == 0);
 

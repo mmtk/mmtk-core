@@ -36,10 +36,10 @@ impl TreadMill {
 
     pub fn add_to_treadmill(&self, object: ObjectReference, nursery: bool) {
         if nursery {
-            trace!("Adding {} to nursery", object);
+            trace!("Adding {object} to nursery");
             self.alloc_nursery.lock().unwrap().insert(object);
         } else {
-            trace!("Adding {} to to_space", object);
+            trace!("Adding {object} to to_space");
             self.to_space.lock().unwrap().insert(object);
         }
     }
@@ -65,16 +65,14 @@ impl TreadMill {
             let mut guard = self.collect_nursery.lock().unwrap();
             debug_assert!(
                 guard.contains(&object),
-                "copy source object ({}) must be in collect_nursery",
-                object
+                "copy source object ({object}) must be in collect_nursery",
             );
             guard.remove(&object);
         } else {
             let mut guard = self.from_space.lock().unwrap();
             debug_assert!(
                 guard.contains(&object),
-                "copy source object ({}) must be in from_space",
-                object
+                "copy source object ({object}) must be in from_space",
             );
             guard.remove(&object);
         }

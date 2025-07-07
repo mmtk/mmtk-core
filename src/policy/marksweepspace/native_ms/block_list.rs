@@ -356,7 +356,7 @@ mod tests {
         for size in 0..=MAX_BIN_SIZE {
             let bin = mi_bin_from_size(size);
             let bin_range = get_bin_size_range(bin, &block_lists);
-            assert!(bin_range.is_some(), "Invalid bin {} for size {}", bin, size);
+            assert!(bin_range.is_some(), "Invalid bin {bin} for size {size}");
             assert!(
                 size >= bin_range.unwrap().0 && bin < bin_range.unwrap().1,
                 "Assigning size={} to bin={} ({:?}) incorrect",

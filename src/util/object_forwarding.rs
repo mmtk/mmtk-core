@@ -66,9 +66,7 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
         // See: https://github.com/mmtk/mmtk-core/issues/579
         debug_assert!(
             forwarding_bits == FORWARDING_NOT_TRIGGERED_YET,
-            "Invalid/Corrupted forwarding word {:x} for object {}",
-            forwarding_bits,
-            object,
+            "Invalid/Corrupted forwarding word {forwarding_bits:x} for object {object}",
         );
         object
     }
@@ -162,8 +160,7 @@ pub fn clear_forwarding_bits<VM: VMBinding>(object: ObjectReference) {
 pub fn read_forwarding_pointer<VM: VMBinding>(object: ObjectReference) -> ObjectReference {
     debug_assert!(
         is_forwarded_or_being_forwarded::<VM>(object),
-        "read_forwarding_pointer called for object {:?} that has not started forwarding!",
-        object,
+        "read_forwarding_pointer called for object {object:?} that has not started forwarding!",
     );
 
     // We write the forwarding poiner. We know it is an object reference.
@@ -193,7 +190,7 @@ pub fn write_forwarding_pointer<VM: VMBinding>(
         get_forwarding_status::<VM>(object),
     );
 
-    trace!("write_forwarding_pointer({}, {})", object, new_object);
+    trace!("write_forwarding_pointer({object}, {new_object})");
     VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
         object,
         new_object.to_raw_address().as_usize(),

@@ -664,8 +664,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 if new_object == object {
                     debug_assert!(
                         self.is_marked(object) || self.defrag.space_exhausted() || self.is_pinned(object),
-                        "Forwarded object is the same as original object {} even though it should have been copied",
-                        object,
+                        "Forwarded object is the same as original object {object} even though it should have been copied",
                     );
                 } else {
                     // new_object != object

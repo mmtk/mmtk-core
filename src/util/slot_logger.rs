@@ -32,13 +32,9 @@ impl<SL: Slot> SlotLogger<SL> {
     /// * `slot` - The slot to log.
     ///
     pub fn log_slot(&self, slot: SL) {
-        trace!("log_slot({:?})", slot);
+        trace!("log_slot({slot:?})");
         let mut slot_log = self.slot_log.write().unwrap();
-        assert!(
-            slot_log.insert(slot),
-            "duplicate slot ({:?}) detected",
-            slot
-        );
+        assert!(slot_log.insert(slot), "duplicate slot ({slot:?}) detected",);
     }
 
     /// Reset the slot logger by clearing the hash-set of slots.

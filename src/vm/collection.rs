@@ -72,7 +72,7 @@ pub trait Collection<VM: VMBinding> {
     /// * `tls`: The thread pointer for the mutator which failed the allocation and triggered the OOM.
     /// * `err_kind`: The type of OOM error that was encountered.
     fn out_of_memory(_tls: VMThread, err_kind: AllocationError) {
-        panic!("Out of memory with {:?}!", err_kind);
+        panic!("Out of memory with {err_kind:?}!");
     }
 
     /// Inform the VM to schedule finalization threads.

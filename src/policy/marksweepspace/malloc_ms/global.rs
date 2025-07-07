@@ -126,7 +126,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        trace!("initialize_object_metadata for object {}", object);
+        trace!("initialize_object_metadata for object {object}");
         set_vo_bit(object);
     }
 
@@ -186,9 +186,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
                 // The VO bit tells that the object is in space.
                 debug_assert!(
                     *active_mem.get(&addr).unwrap() != 0,
-                    "active mem check failed for {} (object {}) - was freed",
-                    addr,
-                    object
+                    "active mem check failed for {addr} (object {object}) - was freed",
                 );
             } else {
                 // The VO bit tells that the object is not in space. It could never be allocated, or have been freed.
@@ -455,12 +453,12 @@ impl<VM: VMBinding> MallocSpace<VM> {
     // indirect call instructions in the generated assembly
     fn free_internal(&self, addr: Address, bytes: usize, offset_malloc_bit: bool) {
         if offset_malloc_bit {
-            trace!("Free memory {:x}", addr);
+            trace!("Free memory {addr:x}");
             offset_free(addr);
             unsafe { unset_offset_malloc_bit_unsafe(addr) };
         } else {
             let ptr = addr.to_mut_ptr();
-            trace!("Free memory {:?}", ptr);
+            trace!("Free memory {ptr:?}");
             unsafe {
                 free(ptr);
             }
@@ -481,8 +479,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     ) -> ObjectReference {
         assert!(
             self.in_space(object),
-            "Cannot mark an object {} that was not alloced by malloc.",
-            object,
+            "Cannot mark an object {object} that was not alloced by malloc.",
         );
 
         if !is_marked::<VM>(object, Ordering::Relaxed) {
@@ -509,12 +506,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     .try_map_metadata_space(start, BYTES_IN_CHUNK, self.get_name());
             debug_assert!(
                 mmap_metadata_result.is_ok(),
-                "mmap sidemetadata failed for chunk_start ({})",
-                start
+                "mmap sidemetadata failed for chunk_start ({start})",
             );
             // Set the chunk mark at the end. So if we have chunk mark set, we know we have mapped side metadata
             // for the chunk.
-            trace!("set chunk mark bit for {}", start);
+            trace!("set chunk mark bit for {start}");
             self.chunk_map
                 .set_allocated(Chunk::from_aligned_address(start), true);
         };
@@ -610,11 +606,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // We are the only thread that is dealing with the object. We can use non-atomic methods for the metadata.
         if !unsafe { is_marked_unsafe::<VM>(object) } {
             // Dead object
-            trace!("Object {} has been allocated but not marked", object);
+            trace!("Object {object} has been allocated but not marked");
 
             // Free object
             self.free_internal(obj_start, bytes, offset_malloc);
-            trace!("free object {}", object);
+            trace!("free object {object}");
             unsafe { unset_vo_bit_unsafe(object) };
 
             true
@@ -687,7 +683,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             #[cfg(debug_assertions)]
             let mut live_bytes = 0;
 
-            debug!("Check active chunk {:?}", chunk_start);
+            debug!("Check active chunk {chunk_start:?}");
             let mut address = chunk_start;
             let chunk_end = chunk_start + BYTES_IN_CHUNK;
 
@@ -758,21 +754,18 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     if ASSERT_ALLOCATION {
                         debug_assert!(
                             self.active_mem.lock().unwrap().contains_key(&obj_start),
-                            "Address {} with VO bit is not in active_mem",
-                            obj_start
+                            "Address {obj_start} with VO bit is not in active_mem",
                         );
                         debug_assert_eq!(
                             self.active_mem.lock().unwrap().get(&obj_start),
                             Some(&bytes),
-                            "Address {} size in active_mem does not match the size from malloc_usable_size",
-                            obj_start
+                            "Address {obj_start} size in active_mem does not match the size from malloc_usable_size",
                         );
                     }
 
                     debug_assert!(
                         unsafe { is_marked_unsafe::<VM>(object) },
-                        "Dead object = {} found after sweep",
-                        object
+                        "Dead object = {object} found after sweep",
                     );
 
                     live_bytes += bytes;
@@ -807,7 +800,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         #[cfg(debug_assertions)]
         let mut live_bytes = 0;
 
-        debug!("Check active chunk {:?}", chunk_start);
+        debug!("Check active chunk {chunk_start:?}");
 
         // The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
         let mut empty_page_start = Address::ZERO;
@@ -824,14 +817,12 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 let (obj_start, _, bytes) = Self::get_malloc_addr_size(object);
                 debug_assert!(
                     self.active_mem.lock().unwrap().contains_key(&obj_start),
-                    "Address {} with VO bit is not in active_mem",
-                    obj_start
+                    "Address {obj_start} with VO bit is not in active_mem",
                 );
                 debug_assert_eq!(
                     self.active_mem.lock().unwrap().get(&obj_start),
                     Some(&bytes),
-                    "Address {} size in active_mem does not match the size from malloc_usable_size",
-                    obj_start
+                    "Address {obj_start} size in active_mem does not match the size from malloc_usable_size",                    
                 );
             }
 

@@ -328,7 +328,7 @@ impl Block {
         // Current cursor
         let mut cursor = cell;
 
-        debug!("Sweep block {:?}, cell size {}", self, cell_size);
+        debug!("Sweep block {self:?}, cell size {cell_size}");
 
         while cell + cell_size <= self.end() {
             // possible object ref
@@ -338,19 +338,12 @@ impl Block {
                     cursor + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
                 )
             };
-            trace!(
-                "{:?}: cell = {}, last cell in free list = {}, cursor = {}, potential object = {}",
-                self,
-                cell,
-                last,
-                cursor,
-                potential_object_ref
-            );
+            trace!("{self:?}: cell = {cell}, last cell in free list = {last}, cursor = {cursor}, potential object = {potential_object_ref}");
 
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
                 .is_marked::<VM>(potential_object_ref, Ordering::SeqCst)
             {
-                debug!("{:?} Live cell: {}", self, cell);
+                debug!("{self:?} Live cell: {cell}");
                 // If the mark bit is set, the cell is alive.
                 // We directly jump to the end of the cell.
                 cell += cell_size;
@@ -361,10 +354,7 @@ impl Block {
 
                 if cursor >= cell + cell_size {
                     // We now stepped to the next cell. This means we did not find mark bit in the current cell, and we can add this cell to free list.
-                    debug!(
-                        "{:?} Free cell: {}, last cell in freelist is {}",
-                        self, cell, last
-                    );
+                    debug!("{self:?} Free cell: {cell}, last cell in freelist is {last}");
 
                     // Clear VO bit: we don't know where the object reference actually is, so we bulk zero the cell.
                     #[cfg(feature = "vo_bit")]
