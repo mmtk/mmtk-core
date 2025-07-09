@@ -22,6 +22,10 @@ use atomic::Ordering;
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
 pub(crate) const TRACE_KIND_FORWARD: TraceKind = 1;
 
+/// CompressorSpace is a stop-the-world and serial implementation of
+/// the Compressor, as described in Kermany and Petrank
+/// "The Compressor: concurrent, incremental, and parallel compaction"
+/// https://dl.acm.org/doi/10.1145/1133255.1134023
 pub struct CompressorSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
@@ -166,7 +170,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for Compressor
             false
         } else if KIND == TRACE_KIND_FORWARD {
             true
-        }else {
+        } else {
             unreachable!()
         }
     }
