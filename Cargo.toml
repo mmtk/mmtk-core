@@ -88,9 +88,9 @@ idna_adapter = "=1.1.0"
 # not worth it.
 upper_case_acronyms = "allow"
 # Temporarily allow this -- 9 July 2025. Clippy suggests that we should always inline format args if possible.
-# We see pushbacks on this in Rust 1.67, and the lint was downgraded to pedantic in 1.67.1. It was upgraded
+# We see pushbacks on this lint in Rust 1.67, and the lint was downgraded to pedantic in 1.67.1. It was upgraded
 # again in Rust 1.88. We temporarily disable this lint and see the reaction from the community.
-# If this was no pushback for this lint in a few momnths' time, we should remove the following line and migrate the codebase.
+# If there is no pushback for this lint in a few momnths' time, we should remove the following line and migrate the codebase.
 # See https://github.com/mmtk/mmtk-core/issues/1334.
 uninlined_format_args = "allow"
 
