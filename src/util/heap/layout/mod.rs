@@ -6,6 +6,7 @@ pub use self::mmapper::Mmapper;
 mod byte_map_mmapper;
 #[cfg(target_pointer_width = "64")]
 mod fragmented_mapper;
+mod multi_level_mapper;
 
 mod map;
 pub(crate) use self::map::CreateFreeListResult;
@@ -37,7 +38,8 @@ pub fn create_mmapper() -> Box<dyn Mmapper + Send + Sync> {
 #[cfg(target_pointer_width = "64")]
 pub fn create_mmapper() -> Box<dyn Mmapper + Send + Sync> {
     // TODO: ByteMapMmapper for 39-bit or less virtual space
-    Box::new(fragmented_mapper::FragmentedMapper::new())
+    // Box::new(fragmented_mapper::FragmentedMapper::new())
+    Box::new(multi_level_mapper::MultiLevelMapper::new())
 }
 
 use crate::util::Address;
