@@ -58,6 +58,9 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::StickyImmix => {
             crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
         }
+        PlanSelector::Compressor => {
+            crate::plan::compressor::mutator::create_compressor_mutator(tls, mmtk)
+        }
     })
 }
 
@@ -90,6 +93,9 @@ pub fn create_plan<VM: VMBinding>(
         }
         PlanSelector::StickyImmix => {
             Box::new(crate::plan::sticky::immix::StickyImmix::new(args)) as Box<dyn Plan<VM = VM>>
+        }
+        PlanSelector::Compressor => {
+            Box::new(crate::plan::compressor::Compressor::new(args)) as Box<dyn Plan<VM = VM>>
         }
     };
 
