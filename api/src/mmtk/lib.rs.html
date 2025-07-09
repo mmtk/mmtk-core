@@ -51,25 +51,7 @@
 <a href="#50" id="50">50</a>
 <a href="#51" id="51">51</a>
 <a href="#52" id="52">52</a>
-<a href="#53" id="53">53</a>
-<a href="#54" id="54">54</a>
-<a href="#55" id="55">55</a>
-<a href="#56" id="56">56</a>
-<a href="#57" id="57">57</a>
-<a href="#58" id="58">58</a>
-<a href="#59" id="59">59</a>
-<a href="#60" id="60">60</a>
-<a href="#61" id="61">61</a>
-<a href="#62" id="62">62</a></pre></div><pre class="rust"><code><span class="comment">// Allow this for now. Clippy suggests we should use Sft, Mmtk, rather than SFT and MMTK.
-// According to its documentation (https://rust-lang.github.io/rust-clippy/master/index.html#upper_case_acronyms),
-// with upper-case-acronyms-aggressive turned on, it should also warn us about SFTMap, VMBinding, GCWorker.
-// However, it seems clippy does not catch all these patterns at the moment. So it would be hard for us to
-// find all the patterns and consistently change all of them. I think it would be a better idea to just allow this.
-// We may reconsider this in the future. Plus, using upper case letters for acronyms does not sound a big issue
-// to me - considering it will break our API and all the efforts for all the developers to make the change, it may
-// not worth it.
-</span><span class="attr">#![allow(clippy::upper_case_acronyms)]
-</span><span class="comment">// Use the `{likely, unlikely}` provided by compiler when using nightly
+<a href="#53" id="53">53</a></pre></div><pre class="rust"><code><span class="comment">// Use the `{likely, unlikely}` provided by compiler when using nightly
 </span><span class="attr">#![cfg_attr(feature = <span class="string">"nightly"</span>, feature(core_intrinsics))]
 
 </span><span class="doccomment">//! Memory Management ToolKit (MMTk) is a portable and high performance memory manager
