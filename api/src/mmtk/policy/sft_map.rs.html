@@ -595,7 +595,11 @@
 <a href="#594" id="594">594</a>
 <a href="#595" id="595">595</a>
 <a href="#596" id="596">596</a>
-<a href="#597" id="597">597</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::sft::<span class="kw-2">*</span>;
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::sft::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
@@ -779,9 +783,13 @@
         </span>}
 
         <span class="kw">fn </span>get_checked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>SFT {
-            <span class="comment">// We should be able to map the entire address range to indices in the table.
-            </span><span class="macro">debug_assert!</span>(<span class="self">Self</span>::addr_to_index(address) &lt; <span class="self">self</span>.sft.len());
-            <span class="kw">unsafe </span>{ <span class="self">self</span>.get_unchecked(address) }
+            <span class="kw">if </span><span class="self">self</span>.has_sft_entry(address) {
+                <span class="comment">// We should be able to map the entire address range to indices in the table.
+                </span><span class="macro">debug_assert!</span>(<span class="self">Self</span>::addr_to_index(address) &lt; <span class="self">self</span>.sft.len());
+                <span class="kw">unsafe </span>{ <span class="self">self</span>.get_unchecked(address) }
+            } <span class="kw">else </span>{
+                <span class="kw-2">&amp;</span>EMPTY_SPACE_SFT
+            }
         }
 
         <span class="kw">unsafe fn </span>get_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>SFT {
