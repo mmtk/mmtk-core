@@ -28,7 +28,7 @@ cfg-if = "1.0"
 crossbeam = "0.8.1"
 delegate = "0.13.2"
 downcast-rs = "2.0.1"
-enum-map = "2.4.2"
+enum-map = "2.7.3"
 env_logger = { version = "0.11.3", optional = true }
 is-terminal = "0.4.7"
 itertools = "0.14.0"
@@ -76,6 +76,23 @@ built = { version = "0.7.7", features = ["git2"] }
 # But we don't need ICU4X (or even `url`) because we only use `git2` to get the Git commit hash.
 # We move away from ICU4X completely following the instruction in https://docs.rs/crate/idna_adapter/1.2.0
 idna_adapter = "=1.1.0"
+
+[lints.clippy]
+# Allow this. Clippy suggests we should use Sft, Mmtk, rather than SFT and MMTK.
+# According to its documentation (https://rust-lang.github.io/rust-clippy/master/index.html#upper_case_acronyms),
+# with upper-case-acronyms-aggressive turned on, it should also warn us about SFTMap, VMBinding, GCWorker.
+# However, it seems clippy does not catch all these patterns at the moment. So it would be hard for us to
+# find all the patterns and consistently change all of them. I think it would be a better idea to just allow this.
+# We may reconsider this in the future. Plus, using upper case letters for acronyms does not sound a big issue
+# to me - considering it will break our API and all the efforts for all the developers to make the change, it may
+# not worth it.
+upper_case_acronyms = "allow"
+# Temporarily allow this -- 9 July 2025. Clippy suggests that we should always inline format args if possible.
+# We see pushbacks on this lint in Rust 1.67, and the lint was downgraded to pedantic in 1.67.1. It was upgraded
+# again in Rust 1.88. We temporarily disable this lint and see the reaction from the community.
+# If there is no pushback for this lint in a few momnths' time, we should remove the following line and migrate the codebase.
+# See https://github.com/mmtk/mmtk-core/issues/1334.
+uninlined_format_args = "allow"
 
 [[bench]]
 name = "main"
