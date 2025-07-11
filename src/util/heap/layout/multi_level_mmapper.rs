@@ -47,7 +47,7 @@ const MAX_SLABS: usize = 1 << LOG_MAX_SLABS;
 type Slab = [Atomic<MapState>; 1 << LOG_MMAP_CHUNKS_PER_SLAB];
 
 /// A multi-level implementation of `Mmapper`.
-pub struct MultiLevelMapper {
+pub struct MultiLevelMmapper {
     /// Lock for transitioning map states.
     ///
     /// FIXME: We only needs the lock when transitioning map states.
@@ -58,16 +58,16 @@ pub struct MultiLevelMapper {
     slabs: Vec<OnceOptionBox<Slab>>,
 }
 
-unsafe impl Send for MultiLevelMapper {}
-unsafe impl Sync for MultiLevelMapper {}
+unsafe impl Send for MultiLevelMmapper {}
+unsafe impl Sync for MultiLevelMmapper {}
 
-impl fmt::Debug for MultiLevelMapper {
+impl fmt::Debug for MultiLevelMmapper {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "MultiLevelMapper({})", 1 << LOG_MAX_SLABS)
     }
 }
 
-impl Mmapper for MultiLevelMapper {
+impl Mmapper for MultiLevelMmapper {
     fn eagerly_mmap_all_spaces(&self, _space_map: &[Address]) {}
 
     fn mark_as_mapped(&self, mut start: Address, bytes: usize) {
@@ -232,7 +232,7 @@ impl Mmapper for MultiLevelMapper {
     }
 }
 
-impl MultiLevelMapper {
+impl MultiLevelMmapper {
     pub fn new() -> Self {
         Self {
             transition_lock: Default::default(),
@@ -292,7 +292,7 @@ impl MultiLevelMapper {
     }
 }
 
-impl Default for MultiLevelMapper {
+impl Default for MultiLevelMmapper {
     fn default() -> Self {
         Self::new()
     }
@@ -316,11 +316,11 @@ mod tests {
         conversions::raw_align_up(pages, MMAP_CHUNK_BYTES) / MMAP_CHUNK_BYTES
     }
 
-    fn get_chunk_map_state(mmapper: &MultiLevelMapper, chunk: Address) -> Option<MapState> {
+    fn get_chunk_map_state(mmapper: &MultiLevelMmapper, chunk: Address) -> Option<MapState> {
         assert_eq!(conversions::mmap_chunk_align_up(chunk), chunk);
         let mapped = mmapper.slab_table(chunk);
         mapped.map(|m| {
-            m[MultiLevelMapper::chunk_index(MultiLevelMapper::slab_align_down(chunk), chunk)]
+            m[MultiLevelMmapper::chunk_index(MultiLevelMmapper::slab_align_down(chunk), chunk)]
                 .load(Ordering::Relaxed)
         })
     }
@@ -331,7 +331,7 @@ mod tests {
             let pages = 1;
             with_cleanup(
                 || {
-                    let mmapper = MultiLevelMapper::new();
+                    let mmapper = MultiLevelMmapper::new();
                     mmapper
                         .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, mmap_anno_test!())
                         .unwrap();
@@ -359,7 +359,7 @@ mod tests {
             let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
             with_cleanup(
                 || {
-                    let mmapper = MultiLevelMapper::new();
+                    let mmapper = MultiLevelMmapper::new();
                     mmapper
                         .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, mmap_anno_test!())
                         .unwrap();
@@ -388,7 +388,7 @@ mod tests {
             let pages = (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
             with_cleanup(
                 || {
-                    let mmapper = MultiLevelMapper::new();
+                    let mmapper = MultiLevelMmapper::new();
                     mmapper
                         .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, mmap_anno_test!())
                         .unwrap();
@@ -417,7 +417,7 @@ mod tests {
             with_cleanup(
                 || {
                     // map 2 chunks
-                    let mmapper = MultiLevelMapper::new();
+                    let mmapper = MultiLevelMmapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
                         .ensure_mapped(
@@ -453,7 +453,7 @@ mod tests {
             with_cleanup(
                 || {
                     // map 2 chunks
-                    let mmapper = MultiLevelMapper::new();
+                    let mmapper = MultiLevelMmapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
                         .ensure_mapped(
