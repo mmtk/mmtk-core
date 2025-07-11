@@ -12,8 +12,8 @@ use std::io::Result;
 use std::sync::Mutex;
 
 /// Logarithm of the address space size a user-space program is allowed to use.
-/// This is the address space size of x86_64 and some other architectures,
-/// although we don't usually have this much physical memory.
+/// This is enough for ARM64, x86_64 and some other architectures.
+/// Feel free to increase it if we plan to support larger address spaces.
 const LOG_MAPPABLE_BYTES: usize = 48;
 /// Address space size a user-space program is allowed to use.
 const MAPPABLE_BYTES: usize = 1 << LOG_MAPPABLE_BYTES;
