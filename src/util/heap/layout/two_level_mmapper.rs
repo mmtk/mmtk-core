@@ -248,6 +248,7 @@ impl TwoLevelMmapper {
     fn slab_table(&self, addr: Address) -> Option<&Slab> {
         let index: usize = addr >> LOG_MMAP_SLAB_BYTES;
         let slot = self.slabs.get(index)?;
+        // Note: We don't need acquire here.  See `get_or_allocate_slab_table`.
         slot.get(Ordering::Relaxed)
     }
 
@@ -256,6 +257,9 @@ impl TwoLevelMmapper {
         let Some(slot) = self.slabs.get(index) else {
             panic!("Cannot allocate slab for address: {addr}");
         };
+        // Note: We set both order_load and order_store to `Relaxed` because we never populate the
+        // content of the slab before making the `OnceOptionBox` point to the new slab. For this
+        // reason, the release-acquire relation is not needed here.
         slot.get_or_init(Ordering::Relaxed, Ordering::Relaxed, Self::new_slab)
     }
 
