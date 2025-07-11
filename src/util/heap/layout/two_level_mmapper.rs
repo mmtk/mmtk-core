@@ -38,9 +38,9 @@ const MMAP_CHUNKS_PER_SLAB: usize = 1 << LOG_MMAP_CHUNKS_PER_SLAB;
 /// Invert this to get out-of-slab bits.
 const MMAP_SLAB_MASK: usize = (1 << LOG_MMAP_SLAB_BYTES) - 1;
 
-/// Logarithm of maximum number of slabs, which determines the maximum mappable address space.
+/// Logarithm of maximum number of slabs.
 const LOG_MAX_SLABS: usize = LOG_MAPPABLE_BYTES - LOG_MMAP_SLAB_BYTES;
-/// maximum number of slabs, which determines the maximum mappable address space.
+/// maximum number of slabs.
 const MAX_SLABS: usize = 1 << LOG_MAX_SLABS;
 
 /// The slab type.  Each slab holds the `MapState` of multiple chunks.
