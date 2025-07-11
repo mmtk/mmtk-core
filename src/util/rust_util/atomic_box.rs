@@ -22,9 +22,9 @@ impl<T> OnceOptionBox<T> {
         order_load: Ordering,
         order_store: Ordering,
         init: impl FnOnce() -> T,
-    ) -> Option<&T> {
+    ) -> &T {
         if let Some(get_result) = self.get(order_load) {
-            return Some(get_result);
+            return get_result;
         }
 
         let new_inner = Box::into_raw(Box::new(init()));
@@ -37,11 +37,11 @@ impl<T> OnceOptionBox<T> {
         match cas_result {
             Ok(old_inner) => {
                 debug_assert_eq!(old_inner, std::ptr::null_mut());
-                unsafe { new_inner.as_ref() }
+                unsafe { new_inner.as_ref().unwrap() }
             }
             Err(old_inner) => {
                 drop(unsafe { Box::from_raw(new_inner) });
-                unsafe { old_inner.as_ref() }
+                unsafe { old_inner.as_ref().unwrap() }
             }
         }
     }

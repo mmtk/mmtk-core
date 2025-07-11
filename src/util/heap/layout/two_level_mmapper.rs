@@ -25,7 +25,8 @@ const MAPPABLE_BYTES: usize = 1 << LOG_MAPPABLE_BYTES;
 /// [`TwoLevelMmapper::slabs`] and [`Slab`].
 ///
 /// TODO: Use `usize::midpoint` after bumping MSRV to 1.85
-const LOG_MMAP_SLAB_BYTES: usize = LOG_MMAP_CHUNK_BYTES + (LOG_MAPPABLE_BYTES - LOG_MMAP_CHUNK_BYTES) / 2;
+const LOG_MMAP_SLAB_BYTES: usize =
+    LOG_MMAP_CHUNK_BYTES + (LOG_MAPPABLE_BYTES - LOG_MMAP_CHUNK_BYTES) / 2;
 /// Number of bytes per slab.
 const MMAP_SLAB_BYTES: usize = 1 << LOG_MMAP_SLAB_BYTES;
 
@@ -245,29 +246,17 @@ impl TwoLevelMmapper {
     }
 
     fn slab_table(&self, addr: Address) -> Option<&Slab> {
-        self.get_or_optionally_allocate_slab_table(addr, false)
+        let index: usize = addr >> LOG_MMAP_SLAB_BYTES;
+        let slot = self.slabs.get(index)?;
+        slot.get(Ordering::Relaxed)
     }
 
     fn get_or_allocate_slab_table(&self, addr: Address) -> &Slab {
-        self.get_or_optionally_allocate_slab_table(addr, true)
-            .unwrap()
-    }
-
-    fn get_or_optionally_allocate_slab_table(
-        &self,
-        addr: Address,
-        allocate: bool,
-    ) -> Option<&Slab> {
-        let index = addr >> LOG_MMAP_SLAB_BYTES;
-        if index > self.slabs.len() {
-            panic!("addr: {addr}, index: {index}, slabs.len: {sl}", sl = self.slabs.len());
-        }
-        let slot = &self.slabs[index];
-        if allocate {
-            slot.get_or_init(Ordering::Acquire, Ordering::Release, Self::new_slab)
-        } else {
-            slot.get(Ordering::Acquire)
-        }
+        let index: usize = addr >> LOG_MMAP_SLAB_BYTES;
+        let Some(slot) = self.slabs.get(index) else {
+            panic!("Cannot allocate slab for address: {addr}");
+        };
+        slot.get_or_init(Ordering::Relaxed, Ordering::Relaxed, Self::new_slab)
     }
 
     fn chunk_index_to_address(base: Address, chunk: usize) -> Address {
