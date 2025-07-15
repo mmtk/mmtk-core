@@ -12,7 +12,7 @@ use crate::vm::VMBinding;
 use crate::MMTK;
 use std::marker::PhantomData;
 
-/// iterate through the heap and calculate the new location of live objects
+/// Iterate through the heap and calculate the new location of live objects.
 pub struct CalculateForwardingAddress<VM: VMBinding> {
     compressor_space: &'static CompressorSpace<VM>,
 }
@@ -29,8 +29,8 @@ impl<VM: VMBinding> CalculateForwardingAddress<VM> {
     }
 }
 
-/// create another round of root scanning work packets
-/// to update object references
+/// Create another round of root scanning work packets
+/// to update object references.
 pub struct UpdateReferences<VM: VMBinding> {
     plan: *const Compressor<VM>,
     p: PhantomData<VM>,
@@ -75,7 +75,7 @@ impl<VM: VMBinding> UpdateReferences<VM> {
     }
 }
 
-/// compact live objects based on forwarding pointers calculated before
+/// Compact live objects based on the previously-calculated forwarding pointers.
 pub struct Compact<VM: VMBinding> {
     compressor_space: &'static CompressorSpace<VM>,
 }
