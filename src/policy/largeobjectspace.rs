@@ -106,15 +106,25 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         max_search_bytes: usize,
     ) -> Option<ObjectReference> {
         use crate::util::metadata::vo_bit;
+        use crate::util::heap::vm_layout::MMAP_CHUNK_BYTES;
+
+        // We need to check if metadata address is mapped or not. But we only check at chunk granularity.
+        // This records the start of a chunk that is tested to be mapped.
+        let mut mapped_chunk = Address::MAX;
+
         // For large object space, it is a bit special. We only need to check VO bit for each page.
         let mut cur_page = ptr.align_down(BYTES_IN_PAGE);
         let low_page = ptr
             .saturating_sub(max_search_bytes)
             .align_down(BYTES_IN_PAGE);
         while cur_page >= low_page {
-            // If the page start is not mapped, there can't be an object in it.
-            if !cur_page.is_mapped() {
-                return None;
+            if cur_page < mapped_chunk {
+                if !cur_page.is_mapped() {
+                    // If the page start is not mapped, there can't be an object in it.
+                    return None;
+                }
+                // This is mapped. No need to check for this chunk.
+                mapped_chunk = cur_page.align_down(MMAP_CHUNK_BYTES);
             }
             // For performance, we only check the first word which maps to the first 512 bytes in the page.
             // In almost all the cases, it should be sufficient.
