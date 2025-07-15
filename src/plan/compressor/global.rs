@@ -25,6 +25,10 @@ use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
+/// Compressor implements a stop-the-world and serial implementation of
+/// the Compressor, as described in Kermany and Petrank
+/// "The Compressor: concurrent, incremental, and parallel compaction"
+/// https://dl.acm.org/doi/10.1145/1133255.1134023
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct Compressor<VM: VMBinding> {
     #[parent]
@@ -33,7 +37,7 @@ pub struct Compressor<VM: VMBinding> {
     pub compressor_space: CompressorSpace<VM>,
 }
 
-/// The plan constraints for the no gc plan.
+/// The plan constraints for the Compressor plan.
 pub const COMPRESSOR_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     needs_forward_after_liveness: true,

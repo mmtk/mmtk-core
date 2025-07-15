@@ -332,6 +332,10 @@ impl<VM: VMBinding> CompressorSpace<VM> {
 
         self.forwarding
             .scan_marked_objects(start, end, &mut |obj: ObjectReference| {
+                // We set the end bits based on the sizes of objects when they are
+                // marked, and we compute the live data and thus the forwarding
+                // addresses based on those sizes. The forwarding addresses would be
+                // incorrect if the sizes of objects were to change.
                 let copied_size = VM::VMObjectModel::get_size_when_copied(obj);
                 debug_assert!(copied_size == VM::VMObjectModel::get_current_size(obj));
                 let new_object = self.forward(obj, false);

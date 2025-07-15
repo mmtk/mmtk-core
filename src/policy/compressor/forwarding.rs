@@ -65,6 +65,9 @@ pub struct ForwardingMetadata<VM: VMBinding> {
     vm: PhantomData<VM>,
 }
 
+// A block in the Compressor is the granularity at which we record
+// the live data prior to the start of each block. We set it to 512 bytes
+// following the paper.
 const BLOCK_SIZE: usize = 512;
 
 impl<VM: VMBinding> ForwardingMetadata<VM> {
@@ -86,14 +89,23 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
     }
 
     pub fn mark_end_of_object(&self, object: ObjectReference) {
-        use crate::util::metadata::side_metadata::{address_to_meta_address, meta_byte_lshift};
         let end_of_object =
             object.to_raw_address() + VM::VMObjectModel::get_current_size(object) - MIN_OBJECT_SIZE;
-        let a1 = address_to_meta_address(&self.mark_bit_spec, object.to_raw_address());
-        let s1 = meta_byte_lshift(&self.mark_bit_spec, object.to_raw_address());
-        let a2 = address_to_meta_address(&self.mark_bit_spec, end_of_object);
-        let s2 = meta_byte_lshift(&self.mark_bit_spec, end_of_object);
-        debug_assert!((a1, s1) < (a2, s2));
+        #[cfg(debug_assertions)]
+        {
+            use crate::util::metadata::side_metadata::{address_to_meta_address, meta_byte_lshift};
+            // We require to be able to iterate upon start and end bits in the
+            // same bitmap. Therefore the start and end bits cannot be the
+            // same, else we would only encounter one of the two bits.
+            let a1 = address_to_meta_address(&self.mark_bit_spec, object.to_raw_address());
+            let s1 = meta_byte_lshift(&self.mark_bit_spec, object.to_raw_address());
+            let a2 = address_to_meta_address(&self.mark_bit_spec, end_of_object);
+            let s2 = meta_byte_lshift(&self.mark_bit_spec, end_of_object);
+            debug_assert!(
+                (a1, s1) < (a2, s2),
+                "The start and end mark bits should be different bits"
+            );
+        }
 
         self.mark_bit_spec
             .fetch_or_atomic(end_of_object, GC_MARK_BIT_MASK, Ordering::SeqCst);
