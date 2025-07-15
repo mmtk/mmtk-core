@@ -195,7 +195,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
             log_bytes_in_region,
             ..
         } = mark_bit_spec;
-        assert_eq!(log_num_of_bits, 0 as usize);
+        assert_eq!(log_num_of_bits, 0_usize);
         assert_eq!(log_bytes_in_region, LOG_MIN_OBJECT_SIZE as usize);
         let trigger = common.gc_trigger.as_ref();
         let size = trigger.policy.get_max_heap_size_in_pages() * BYTES_IN_PAGE;

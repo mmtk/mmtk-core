@@ -31,7 +31,7 @@ impl Transducer {
     }
     pub fn step(&mut self, address: Address) {
         if self.in_object {
-            self.live += address - self.last_bit_seen + (MIN_OBJECT_SIZE as usize);
+            self.live += address - self.last_bit_seen + MIN_OBJECT_SIZE;
         }
         self.in_object = !self.in_object;
         self.last_bit_seen = address;
@@ -77,7 +77,7 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
         let blocks = size / BLOCK_SIZE;
         block_offsets.resize_with(blocks, || AtomicUsize::new(0));
         ForwardingMetadata {
-            mark_bit_spec: mark_bit_spec,
+            mark_bit_spec,
             first_address: start,
             calculated: AtomicBool::new(false),
             block_offsets,
@@ -88,7 +88,7 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
     pub fn mark_end_of_object(&self, object: ObjectReference) {
         use crate::util::metadata::side_metadata::{address_to_meta_address, meta_byte_lshift};
         let end_of_object = object.to_raw_address() + VM::VMObjectModel::get_current_size(object)
-            - (MIN_OBJECT_SIZE as usize);
+            - MIN_OBJECT_SIZE;
         let a1 = address_to_meta_address(&self.mark_bit_spec, object.to_raw_address());
         let s1 = meta_byte_lshift(&self.mark_bit_spec, object.to_raw_address());
         let a2 = address_to_meta_address(&self.mark_bit_spec, end_of_object);
