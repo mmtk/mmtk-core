@@ -87,8 +87,8 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
 
     pub fn mark_end_of_object(&self, object: ObjectReference) {
         use crate::util::metadata::side_metadata::{address_to_meta_address, meta_byte_lshift};
-        let end_of_object = object.to_raw_address() + VM::VMObjectModel::get_current_size(object)
-            - MIN_OBJECT_SIZE;
+        let end_of_object =
+            object.to_raw_address() + VM::VMObjectModel::get_current_size(object) - MIN_OBJECT_SIZE;
         let a1 = address_to_meta_address(&self.mark_bit_spec, object.to_raw_address());
         let s1 = meta_byte_lshift(&self.mark_bit_spec, object.to_raw_address());
         let a2 = address_to_meta_address(&self.mark_bit_spec, end_of_object);
