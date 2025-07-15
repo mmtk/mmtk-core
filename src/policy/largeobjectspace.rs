@@ -105,8 +105,8 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         ptr: Address,
         max_search_bytes: usize,
     ) -> Option<ObjectReference> {
-        use crate::util::metadata::vo_bit;
         use crate::util::heap::vm_layout::MMAP_CHUNK_BYTES;
+        use crate::util::metadata::vo_bit;
 
         // We need to check if metadata address is mapped or not. But we only check at chunk granularity.
         // This records the start of a chunk that is tested to be mapped.
