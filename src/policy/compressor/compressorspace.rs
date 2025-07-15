@@ -1,22 +1,22 @@
 use crate::plan::VectorObjectQueue;
-use crate::policy::sft::SFT;
-use crate::policy::space::{CommonSpace, Space};
 use crate::policy::compressor::forwarding::ForwardingMetadata;
 use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::sft::GCWorkerMutRef;
+use crate::policy::sft::SFT;
+use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
 use crate::util::constants::{BYTES_IN_PAGE, LOG_MIN_OBJECT_SIZE};
 use crate::util::copy::CopySemantics;
 use crate::util::heap::{MonotonePageResource, PageResource};
-use crate::util::metadata::MetadataSpec;
 use crate::util::metadata::extract_side_metadata;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
-use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::metadata::MetadataSpec;
 use crate::util::object_enum::{self, ObjectEnumerator};
 use crate::util::{Address, ObjectReference};
-use crate::{vm::*, ObjectQueue};
 use crate::vm::slot::Slot;
+use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
 
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
@@ -179,19 +179,27 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for Compressor
 impl<VM: VMBinding> CompressorSpace<VM> {
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
         let vm_map = args.vm_map;
-        assert!(!args.vmrequest.is_discontiguous(), "The Compressor requires a contiguous heap");
+        assert!(
+            !args.vmrequest.is_discontiguous(),
+            "The Compressor requires a contiguous heap"
+        );
         let local_specs = extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]);
         let common = CommonSpace::new(args.into_policy_args(true, false, local_specs));
         // Check that we really have a mark *bitmap*.
-        let MetadataSpec::OnSide(mark_bit_spec) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.as_spec() else {
+        let MetadataSpec::OnSide(mark_bit_spec) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.as_spec()
+        else {
             panic!("The Compressor requires marks to be side metadata");
         };
-        let SideMetadataSpec { log_num_of_bits, log_bytes_in_region, .. } = mark_bit_spec;
+        let SideMetadataSpec {
+            log_num_of_bits,
+            log_bytes_in_region,
+            ..
+        } = mark_bit_spec;
         assert_eq!(log_num_of_bits, 0 as usize);
         assert_eq!(log_bytes_in_region, LOG_MIN_OBJECT_SIZE as usize);
         let trigger = common.gc_trigger.as_ref();
         let size = trigger.policy.get_max_heap_size_in_pages() * BYTES_IN_PAGE;
-        
+
         CompressorSpace {
             pr: MonotonePageResource::new_contiguous(common.start, common.extent, vm_map),
             forwarding: ForwardingMetadata::new(mark_bit_spec, common.start, size),
@@ -206,7 +214,9 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         }
     }
 
-    pub fn release(&self) { self.forwarding.release(); }
+    pub fn release(&self) {
+        self.forwarding.release();
+    }
 
     pub fn trace_mark_object<Q: ObjectQueue>(
         &self,
@@ -225,11 +235,11 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         }
         object
     }
-    
+
     pub fn trace_forward_object<Q: ObjectQueue>(
         &self,
         _queue: &mut Q,
-        object: ObjectReference
+        object: ObjectReference,
     ) -> ObjectReference {
         self.forward(object, true)
     }
@@ -275,7 +285,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     pub fn calculate_offset_vector(&self) {
         self.forwarding.calculate_offset_vector(&self.pr);
     }
-    
+
     pub fn forward(&self, object: ObjectReference, _vo_bit_valid: bool) -> ObjectReference {
         // We can't expect the VO bit to be valid whilst in the compaction loop.
         // If we are fixing a reference to an object which precedes the referent
@@ -296,7 +306,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     fn heap_span(&self) -> (Address, Address) {
         (self.forwarding.first_address, self.pr.cursor())
     }
-    
+
     pub fn compact(&self, worker: &mut GCWorker<VM>) {
         let mut to = Address::ZERO;
         // The allocator will never cause an object to span multiple regions,
@@ -307,34 +317,32 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         #[cfg(feature = "vo_bit")]
         {
             #[cfg(debug_assertions)]
-            self.forwarding.scan_marked_objects(
-                start,
-                end,
-                &mut |object: ObjectReference| {
+            self.forwarding
+                .scan_marked_objects(start, end, &mut |object: ObjectReference| {
                     debug_assert!(
                         crate::util::metadata::vo_bit::is_vo_bit_set(object),
                         "{:x}: VO bit not set",
                         object
                     );
-                }
-            );
+                });
             for (region_start, size) in self.pr.iterate_allocated_regions() {
                 crate::util::metadata::vo_bit::bzero_vo_bit(region_start, size);
             }
         }
-        
-        self.forwarding.scan_marked_objects(
-            start,
-            end,
-            &mut |obj: ObjectReference| {
+
+        self.forwarding
+            .scan_marked_objects(start, end, &mut |obj: ObjectReference| {
                 let copied_size = VM::VMObjectModel::get_size_when_copied(obj);
                 debug_assert!(copied_size == VM::VMObjectModel::get_current_size(obj));
                 let new_object = self.forward(obj, false);
-                debug_assert!(new_object.to_raw_address() >= to, "{0} < {to}", new_object.to_raw_address());
+                debug_assert!(
+                    new_object.to_raw_address() >= to,
+                    "{0} < {to}",
+                    new_object.to_raw_address()
+                );
                 // copy object
                 trace!(" copy from {} to {}", obj, new_object);
-                let end_of_new_object =
-                    VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
+                let end_of_new_object = VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
                 // update VO bit
                 #[cfg(feature = "vo_bit")]
                 vo_bit::set_vo_bit(new_object);
@@ -342,23 +350,17 @@ impl<VM: VMBinding> CompressorSpace<VM> {
                 debug_assert_eq!(end_of_new_object, to);
                 // update references in object
                 if VM::VMScanning::support_slot_enqueuing(worker.tls, new_object) {
-                    VM::VMScanning::scan_object(
-                        worker.tls,
-                        new_object,
-                        &mut |s: VM::VMSlot|
+                    VM::VMScanning::scan_object(worker.tls, new_object, &mut |s: VM::VMSlot| {
                         if let Some(o) = s.load() {
                             s.store(self.forward(o, false));
                         }
-                    );
+                    });
                 } else {
-                    VM::VMScanning::scan_object_and_trace_edges(
-                        worker.tls,
-                        new_object,
-                        &mut |o| self.forward(o, false)
-                    );
+                    VM::VMScanning::scan_object_and_trace_edges(worker.tls, new_object, &mut |o| {
+                        self.forward(o, false)
+                    });
                 }
-            }
-        );
+            });
         debug!("Compact end: to = {}", to);
         // reset the bump pointer
         self.pr.reset_cursor(to);

@@ -1,15 +1,12 @@
 use super::gc_work::CompressorWorkContext;
 use super::gc_work::{
-    CalculateForwardingAddress,
-    ForwardingProcessEdges,
-    MarkingProcessEdges,
-    Compact,
-    UpdateReferences
+    CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
+    UpdateReferences,
 };
-use crate::plan::global::{BasePlan, CommonPlan};
+use crate::plan::compressor::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
-use crate::plan::compressor::mutator::ALLOCATOR_MAPPING;
+use crate::plan::global::{BasePlan, CommonPlan};
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -47,19 +44,19 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
     fn constraints(&self) -> &'static PlanConstraints {
         &COMPRESSOR_CONSTRAINTS
     }
-    
+
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
         self.base().collection_required(self, space_full)
     }
-    
+
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
-    
+
     fn base(&self) -> &BasePlan<VM> {
         &self.common.base
     }
-    
+
     fn base_mut(&mut self) -> &mut BasePlan<Self::VM> {
         &mut self.common.base
     }
@@ -86,7 +83,7 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
         // TODO use schedule_common once it can work with the Compressor
         // The main issue there is that we need to ForwardingProcessEdges
         // in FinalizableForwarding.
-        
+
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<CompressorWorkContext<VM>>::new());
@@ -95,11 +92,13 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<CompressorWorkContext<VM>>::new(self));
 
-        scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
-            .add(CalculateForwardingAddress::<VM>::new(&self.compressor_space));
+        scheduler.work_buckets[WorkBucketStage::CalculateForwarding].add(
+            CalculateForwardingAddress::<VM>::new(&self.compressor_space),
+        );
         // do another trace to update references
         scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new(self));
-        scheduler.work_buckets[WorkBucketStage::Compact].add(Compact::<VM>::new(&self.compressor_space));
+        scheduler.work_buckets[WorkBucketStage::Compact]
+            .add(Compact::<VM>::new(&self.compressor_space));
 
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
@@ -166,8 +165,7 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
     }
 
     fn get_used_pages(&self) -> usize {
-        self.compressor_space.reserved_pages()
-            + self.common.get_used_pages()
+        self.compressor_space.reserved_pages() + self.common.get_used_pages()
     }
 }
 
