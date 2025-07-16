@@ -199,6 +199,9 @@ extreme_assertions = []
 # Enable multiple spaces for NoGC, each allocator maps to an individual ImmortalSpace.
 nogc_multi_space = []
 
+# Disable multiple spaces for Compressor.
+compressor_single_space = []
+
 # To collect statistics for each GC work packet. Enabling this may introduce a small overhead (several percentage slowdown on benchmark time).
 work_packet_stats = []
 
