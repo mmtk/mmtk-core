@@ -522,7 +522,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         debug_assert_ne!(pause, Pause::FullDefrag);
         if pause == Pause::InitialMark || pause == Pause::Full {
             // Select mature evacuation set
-            self.schedule_defrag_selection_packets(pause);
+            if !cfg!(feature = "lxr_no_evac") {
+                self.schedule_defrag_selection_packets(pause);
+            }
         }
         // Initialize mark state for tracing
         if pause == Pause::Full || pause == Pause::InitialMark {
@@ -774,7 +776,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /// Generate chunk sweep work packets.
     fn generate_lxr_full_trace_prepare_tasks(&self) -> Vec<Box<dyn GCWork<VM>>> {
-        assert!(self.rc_enabled && self.cm_enabled);
+        assert!(self.rc_enabled);
         self.chunk_map
             .generate_tasks_batched(|chunks| Box::new(PrepareChunksForFullGC { chunks }))
     }

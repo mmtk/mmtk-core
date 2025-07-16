@@ -364,7 +364,10 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             self.inc_objs += 1;
         }
         let los = self.lxr.los().in_space(o);
-        if !los && object_forwarding::is_forwarded_or_being_forwarded::<VM>(o) {
+        if crate::args::RC_NURSERY_EVACUATION
+            && !los
+            && object_forwarding::is_forwarded_or_being_forwarded::<VM>(o)
+        {
             while object_forwarding::is_being_forwarded::<VM>(o) {
                 std::hint::spin_loop();
             }
@@ -379,7 +382,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
             return new;
         }
-        if self.dont_evacuate(o, los) {
+        if !crate::args::RC_NURSERY_EVACUATION || self.dont_evacuate(o, los) {
             if self.inc(o) {
                 self.promote(o, false, los, depth);
             }
