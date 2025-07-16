@@ -116,6 +116,8 @@ perf_counter = ["dep:pfm"]
 # This feature is only used for tests with MockVM.
 # CI scripts run those tests with this feature.
 mock_test = ["test_private"]
+mock_test_header_metadata = []
+mock_test_side_metadata = []
 
 # This feature will expose some private functions for testings or benchmarking.
 test_private = []
