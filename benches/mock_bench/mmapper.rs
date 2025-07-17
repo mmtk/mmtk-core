@@ -1,6 +1,9 @@
 pub use criterion::Criterion;
 
-use mmtk::{memory_manager, util::test_util::fixtures::*};
+use mmtk::{
+    memory_manager,
+    util::{heap::vm_layout::BYTES_IN_CHUNK, test_util::fixtures::*, Address},
+};
 
 pub fn bench(c: &mut Criterion) {
     let mut fixture = MutatorFixture::create_with_heapsize(1 << 30);
@@ -21,6 +24,9 @@ pub fn bench(c: &mut Criterion) {
         mmtk::AllocationSemantics::Los,
     );
 
+    let low = unsafe { Address::from_usize(42usize) };
+    let high = unsafe { Address::from_usize(0xfffffffffffff000usize) };
+
     c.bench_function("is_mapped_regular", |b| {
         b.iter(|| {
             let is_mapped = regular.is_mapped();
@@ -32,6 +38,32 @@ pub fn bench(c: &mut Criterion) {
         b.iter(|| {
             let is_mapped = large.is_mapped();
             assert!(is_mapped);
+        })
+    });
+
+    c.bench_function("is_mapped_low", |b| {
+        b.iter(|| {
+            let is_mapped = low.is_mapped();
+            assert!(!is_mapped);
+        })
+    });
+
+    c.bench_function("is_mapped_high", |b| {
+        b.iter(|| {
+            let is_mapped = high.is_mapped();
+            assert!(!is_mapped);
+        })
+    });
+
+    c.bench_function("is_mapped_seq", |b| {
+        b.iter(|| {
+            let start = regular.as_usize();
+            let num_chunks = 16384usize;
+            let end = start + num_chunks * BYTES_IN_CHUNK;
+            for addr_usize in (start..end).step_by(BYTES_IN_CHUNK) {
+                let addr = unsafe { Address::from_usize(addr_usize) };
+                let _is_mapped = addr.is_mapped();
+            }
         })
     });
 }
