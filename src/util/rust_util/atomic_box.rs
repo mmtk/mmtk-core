@@ -55,3 +55,31 @@ impl<T> Drop for OnceOptionBox<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn construct() {
+        let oob = OnceOptionBox::<usize>::new();
+        let elem = oob.get(Ordering::Relaxed);
+        assert_eq!(elem, None);
+    }
+
+    #[test]
+    fn init() {
+        let oob = OnceOptionBox::<usize>::new();
+        let elem = oob.get_or_init(Ordering::Relaxed, Ordering::Relaxed, || 42);
+        assert_eq!(*elem, 42);
+    }
+
+    #[test]
+    fn reinit() {
+        let oob = OnceOptionBox::<usize>::new();
+        let elem = oob.get_or_init(Ordering::Relaxed, Ordering::Relaxed, || 42);
+        assert_eq!(*elem, 42);
+        let elem2 = oob.get_or_init(Ordering::Relaxed, Ordering::Relaxed, || 43);
+        assert_eq!(*elem2, 42);
+    }
+}
