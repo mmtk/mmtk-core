@@ -2,7 +2,7 @@ pub use criterion::Criterion;
 
 use mmtk::{
     memory_manager,
-    util::{heap::vm_layout::BYTES_IN_CHUNK, test_util::fixtures::*, Address},
+    util::{test_util::fixtures::*, Address},
 };
 
 pub fn bench(c: &mut Criterion) {
@@ -25,7 +25,7 @@ pub fn bench(c: &mut Criterion) {
     );
 
     let low = unsafe { Address::from_usize(42usize) };
-    let high = unsafe { Address::from_usize(0xfffffffffffff000usize) };
+    let high = unsafe { Address::from_usize(usize::MAX - 1024usize) };
 
     c.bench_function("is_mapped_regular", |b| {
         b.iter(|| {
@@ -59,6 +59,7 @@ pub fn bench(c: &mut Criterion) {
     #[cfg(target_pointer_width = "64")]
     c.bench_function("is_mapped_seq", |b| {
         b.iter(|| {
+            use mmtk::util::heap::vm_layout::BYTES_IN_CHUNK;
             let start = regular.as_usize();
             let num_chunks = 16384usize;
             let end = start + num_chunks * BYTES_IN_CHUNK;
