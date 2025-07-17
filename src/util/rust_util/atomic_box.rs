@@ -1,22 +1,40 @@
 use std::sync::atomic::{AtomicPtr, Ordering};
 
 /// A lazily initialized box.  Similar to an `Option<Box<T>>`, but can be initialized atomically.
+///
+/// It is designed for implementing shared data.  Therefore, methods with `&self`, namely
+/// [`OnceOptionBox::get`] and the [`OnceOptionBox::get_or_init`] methods, only return shared
+/// references to the content (`&T`).  The user should use types that support multi-threaded
+/// accesses, such as mutexes or atomic types, if the inner type is supposed to be modified
+/// concurrently.
+///
+/// Once initialized, this object will own its content.  THe content is allocated in the heap, and
+/// will be dropped and deallocated when this instance is dropped.
 pub struct OnceOptionBox<T> {
     inner: AtomicPtr<T>,
 }
 
 impl<T> OnceOptionBox<T> {
+    /// Create an empty `OnceOptionBox` instance.
     pub fn new() -> OnceOptionBox<T> {
         Self {
             inner: AtomicPtr::new(std::ptr::null_mut()),
         }
     }
 
+    /// Get a reference to the content of this box, or `None` if not yet initialized.
     pub fn get(&self, order: Ordering) -> Option<&T> {
         let ptr = self.inner.load(order);
         unsafe { ptr.as_ref() }
     }
 
+    /// Get a reference to the content of this box.  If not initialized, it will call `init` to
+    /// initialize this box.
+    ///
+    /// When multiple threads attempt to initialize this box concurrently, all threads may call
+    /// their supplied `init` closure, but only one thread will successfully initialize this box to
+    /// the return value of `init`.  Other threads will drop their return values of `init`.  All
+    /// callers will return the reference to the value created by the successful thread.
     pub fn get_or_init(
         &self,
         order_load: Ordering,
