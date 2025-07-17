@@ -55,6 +55,8 @@ pub fn bench(c: &mut Criterion) {
         })
     });
 
+    // The following bench involves large address ranges and cannot run on 32-bit machines.
+    #[cfg(target_pointer_width = "64")]
     c.bench_function("is_mapped_seq", |b| {
         b.iter(|| {
             let start = regular.as_usize();
