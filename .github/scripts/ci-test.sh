@@ -34,9 +34,7 @@ find ./src ./tests -type f -name "mock_test_*" | while read -r file; do
 
     # Run the test with each plan it needs.
     for MMTK_PLAN in $PLANS; do
-        env MMTK_PLAN=$MMTK_PLAN cargo test --features mock_test,mock_test_side_metadata,"$FEATURES" -- $t;
-        # We should alro run the tests with mock_test_header_metadata feature -- be careful that some plans like compressor requires side mark bits which will fail if we use header metadata (including mark bits).
-        # env MMTK_PLAN=$MMTK_PLAN cargo test --features mock_test,mock_test_header_metadata,"$FEATURES" -- $t;
+        env MMTK_PLAN=$MMTK_PLAN cargo test --features mock_test,"$FEATURES" -- $t;
     done
 done
 
