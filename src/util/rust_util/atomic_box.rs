@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicPtr, Ordering};
 /// accesses, such as mutexes or atomic types, if the inner type is supposed to be modified
 /// concurrently.
 ///
-/// Once initialized, this object will own its content.  THe content is allocated in the heap, and
+/// Once initialized, this object will own its content.  The content is allocated in the heap, and
 /// will be dropped and deallocated when this instance is dropped.
 ///
 /// # Comparison to existing data structures

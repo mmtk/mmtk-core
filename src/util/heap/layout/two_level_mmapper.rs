@@ -62,7 +62,7 @@ type Slab = [Atomic<MapState>; MMAP_CHUNKS_PER_SLAB];
 pub struct TwoLevelMmapper {
     /// Lock for transitioning map states.
     ///
-    /// FIXME: We only needs the lock when transitioning map states.
+    /// FIXME: We only need this lock when transitioning map states.
     /// The `TwoLevelMmapper` itself is completely lock-free even when allocating new slabs.
     /// We should move the lock one leve above, to `MapState`.
     transition_lock: Mutex<()>,
@@ -288,7 +288,7 @@ impl TwoLevelMmapper {
         Self::slab_align_down(addr) + MMAP_SLAB_BYTES
     }
 
-    /// Return the index of the chunk that contains `addr` within the slab starting at `slab`
+    /// Return the index of the chunk that contains `addr` within the slab starting at `slab`.
     /// If `addr` is beyond the end of the slab, the result could be beyond the end of the slab.
     fn chunk_index(slab: Address, addr: Address) -> usize {
         let delta = addr - slab;
