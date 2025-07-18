@@ -1,13 +1,14 @@
 use crate::policy::compressor::GC_MARK_BIT_MASK;
 use crate::util::constants::MIN_OBJECT_SIZE;
 use crate::util::heap::MonotonePageResource;
+use crate::util::metadata::side_metadata::spec_defs::{COMPRESSOR_MARK, COMPRESSOR_OFFSET_VECTOR};
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::{Address, ObjectReference};
 use crate::vm::object_model::ObjectModel;
 use crate::vm::VMBinding;
 use atomic::Ordering;
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::sync::atomic::AtomicBool;
 
 /// A finite-state machine which processes the positions of mark bits,
 /// and accumulates the size of live data that it has seen.
@@ -58,32 +59,24 @@ impl Transducer {
 }
 
 pub struct ForwardingMetadata<VM: VMBinding> {
-    mark_bit_spec: SideMetadataSpec,
     pub(crate) first_address: Address,
     calculated: AtomicBool,
-    block_offsets: Vec<AtomicUsize>,
     vm: PhantomData<VM>,
 }
 
 // A block in the Compressor is the granularity at which we record
 // the live data prior to the start of each block. We set it to 512 bytes
 // following the paper.
-const BLOCK_SIZE: usize = 512;
+pub(crate) const LOG_BLOCK_SIZE: usize = 9;
+pub(crate) const BLOCK_SIZE: usize = 1 << LOG_BLOCK_SIZE;
+pub(crate) const MARK_SPEC: SideMetadataSpec = COMPRESSOR_MARK;
+pub(crate) const OFFSET_VECTOR_SPEC: SideMetadataSpec = COMPRESSOR_OFFSET_VECTOR;
 
 impl<VM: VMBinding> ForwardingMetadata<VM> {
-    pub fn new(
-        mark_bit_spec: SideMetadataSpec,
-        start: Address,
-        size: usize,
-    ) -> ForwardingMetadata<VM> {
-        let mut block_offsets = vec![];
-        let blocks = size / BLOCK_SIZE;
-        block_offsets.resize_with(blocks, || AtomicUsize::new(0));
+    pub fn new(start: Address) -> ForwardingMetadata<VM> {
         ForwardingMetadata {
-            mark_bit_spec,
             first_address: start,
             calculated: AtomicBool::new(false),
-            block_offsets,
             vm: PhantomData,
         }
     }
@@ -97,18 +90,17 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
             // We require to be able to iterate upon start and end bits in the
             // same bitmap. Therefore the start and end bits cannot be the
             // same, else we would only encounter one of the two bits.
-            let a1 = address_to_meta_address(&self.mark_bit_spec, object.to_raw_address());
-            let s1 = meta_byte_lshift(&self.mark_bit_spec, object.to_raw_address());
-            let a2 = address_to_meta_address(&self.mark_bit_spec, end_of_object);
-            let s2 = meta_byte_lshift(&self.mark_bit_spec, end_of_object);
+            let a1 = address_to_meta_address(&MARK_SPEC, object.to_raw_address());
+            let s1 = meta_byte_lshift(&MARK_SPEC, object.to_raw_address());
+            let a2 = address_to_meta_address(&MARK_SPEC, end_of_object);
+            let s2 = meta_byte_lshift(&MARK_SPEC, end_of_object);
             debug_assert!(
                 (a1, s1) < (a2, s2),
                 "The start and end mark bits should be different bits"
             );
         }
 
-        self.mark_bit_spec
-            .fetch_or_atomic(end_of_object, GC_MARK_BIT_MASK, Ordering::SeqCst);
+        MARK_SPEC.fetch_or_atomic(end_of_object, GC_MARK_BIT_MASK, Ordering::SeqCst);
     }
 
     pub fn calculate_offset_vector(&self, pr: &MonotonePageResource<VM>) {
@@ -118,14 +110,14 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
         for block in 0..last_block {
             let block_start = self.first_address + (block * BLOCK_SIZE);
             let block_end = block_start + BLOCK_SIZE;
-            self.block_offsets[block].store(state.encode(block_start), Ordering::Relaxed);
-            self.mark_bit_spec.scan_non_zero_values::<u8>(
+            OFFSET_VECTOR_SPEC.store_atomic::<usize>(
                 block_start,
-                block_end,
-                &mut |addr: Address| {
-                    state.step(addr);
-                },
+                state.encode(block_start),
+                Ordering::Relaxed,
             );
+            MARK_SPEC.scan_non_zero_values::<u8>(block_start, block_end, &mut |addr: Address| {
+                state.step(addr);
+            });
         }
         self.calculated.store(true, Ordering::Relaxed);
     }
@@ -142,19 +134,15 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
         let block_number = (address - self.first_address) / BLOCK_SIZE;
         let block_address = self.first_address + (block_number * BLOCK_SIZE);
         let mut state = Transducer::decode(
-            self.block_offsets[block_number].load(Ordering::Relaxed),
+            OFFSET_VECTOR_SPEC.load_atomic::<usize>(block_address, Ordering::Relaxed),
             block_address,
         );
         // The transducer in this implementation computes the offset
         // relative to the start of the heap; whereas Total-Live-Data in
         // the paper computes the offset relative to the start of the block.
-        self.mark_bit_spec.scan_non_zero_values::<u8>(
-            block_address,
-            address,
-            &mut |addr: Address| {
-                state.step(addr);
-            },
-        );
+        MARK_SPEC.scan_non_zero_values::<u8>(block_address, address, &mut |addr: Address| {
+            state.step(addr);
+        });
         self.first_address + state.live
     }
 
@@ -165,13 +153,12 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
         f: &mut impl FnMut(ObjectReference),
     ) {
         let mut in_object = false;
-        self.mark_bit_spec
-            .scan_non_zero_values::<u8>(start, end, &mut |addr: Address| {
-                if !in_object {
-                    let object = ObjectReference::from_raw_address(addr).unwrap();
-                    f(object);
-                }
-                in_object = !in_object;
-            });
+        MARK_SPEC.scan_non_zero_values::<u8>(start, end, &mut |addr: Address| {
+            if !in_object {
+                let object = ObjectReference::from_raw_address(addr).unwrap();
+                f(object);
+            }
+            in_object = !in_object;
+        });
     }
 }

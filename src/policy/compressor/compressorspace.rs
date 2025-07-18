@@ -1,15 +1,13 @@
 use crate::plan::VectorObjectQueue;
-use crate::policy::compressor::forwarding::ForwardingMetadata;
+use crate::policy::compressor::forwarding;
 use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
-use crate::util::constants::{BYTES_IN_PAGE, LOG_MIN_OBJECT_SIZE};
 use crate::util::copy::CopySemantics;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::extract_side_metadata;
-use crate::util::metadata::side_metadata::SideMetadataSpec;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
 use crate::util::metadata::MetadataSpec;
@@ -20,7 +18,7 @@ use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
 
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
-pub(crate) const TRACE_KIND_FORWARD: TraceKind = 1;
+pub(crate) const TRACE_KIND_FORWARD_ROOT: TraceKind = 1;
 
 /// CompressorSpace is a stop-the-world and serial implementation of
 /// the Compressor, as described in Kermany and Petrank
@@ -29,8 +27,7 @@ pub(crate) const TRACE_KIND_FORWARD: TraceKind = 1;
 pub struct CompressorSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
-    mark_bit_spec: SideMetadataSpec,
-    forwarding: ForwardingMetadata<VM>,
+    forwarding: forwarding::ForwardingMetadata<VM>,
 }
 
 pub(crate) const GC_MARK_BIT_MASK: u8 = 1;
@@ -159,8 +156,8 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for Compressor
         );
         if KIND == TRACE_KIND_MARK {
             self.trace_mark_object(queue, object)
-        } else if KIND == TRACE_KIND_FORWARD {
-            self.trace_forward_object(queue, object)
+        } else if KIND == TRACE_KIND_FORWARD_ROOT {
+            self.trace_forward_root(queue, object)
         } else {
             unreachable!()
         }
@@ -168,7 +165,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for Compressor
     fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
         if KIND == TRACE_KIND_MARK {
             false
-        } else if KIND == TRACE_KIND_FORWARD {
+        } else if KIND == TRACE_KIND_FORWARD_ROOT {
             true
         } else {
             unreachable!()
@@ -183,34 +180,22 @@ impl<VM: VMBinding> CompressorSpace<VM> {
             !args.vmrequest.is_discontiguous(),
             "The Compressor requires a contiguous heap"
         );
-        let local_specs = extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]);
+        let local_specs = extract_side_metadata(&[
+            MetadataSpec::OnSide(forwarding::MARK_SPEC),
+            MetadataSpec::OnSide(forwarding::OFFSET_VECTOR_SPEC),
+        ]);
         let common = CommonSpace::new(args.into_policy_args(true, false, local_specs));
-        // Check that we really have a mark *bitmap*.
-        let MetadataSpec::OnSide(mark_bit_spec) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.as_spec()
-        else {
-            panic!("The Compressor requires marks to be side metadata");
-        };
-        let SideMetadataSpec {
-            log_num_of_bits,
-            log_bytes_in_region,
-            ..
-        } = mark_bit_spec;
-        assert_eq!(log_num_of_bits, 0_usize);
-        assert_eq!(log_bytes_in_region, LOG_MIN_OBJECT_SIZE as usize);
-        let trigger = common.gc_trigger.as_ref();
-        let size = trigger.policy.get_max_heap_size_in_pages() * BYTES_IN_PAGE;
 
         CompressorSpace {
             pr: MonotonePageResource::new_contiguous(common.start, common.extent, vm_map),
-            forwarding: ForwardingMetadata::new(mark_bit_spec, common.start, size),
+            forwarding: forwarding::ForwardingMetadata::new(common.start),
             common,
-            mark_bit_spec,
         }
     }
 
     pub fn prepare(&self) {
         for (from_start, size) in self.pr.iterate_allocated_regions() {
-            self.mark_bit_spec.bzero_metadata(from_start, size);
+            forwarding::MARK_SPEC.bzero_metadata(from_start, size);
         }
     }
 
@@ -236,7 +221,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         object
     }
 
-    pub fn trace_forward_object<Q: ObjectQueue>(
+    pub fn trace_forward_root<Q: ObjectQueue>(
         &self,
         _queue: &mut Q,
         object: ObjectReference,
@@ -245,39 +230,17 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     }
 
     pub fn test_and_mark(object: ObjectReference) -> bool {
-        loop {
-            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-                object,
-                None,
-                Ordering::SeqCst,
-            );
-            let mark_bit = old_value & GC_MARK_BIT_MASK;
-            if mark_bit != 0 {
-                return false;
-            }
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-                .compare_exchange_metadata::<VM, u8>(
-                    object,
-                    old_value,
-                    1,
-                    None,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                break;
-            }
-        }
-        true
+        let old = forwarding::MARK_SPEC.fetch_or_atomic(
+            object.to_raw_address(),
+            GC_MARK_BIT_MASK,
+            Ordering::SeqCst,
+        );
+        (old & GC_MARK_BIT_MASK) == 0
     }
 
     pub fn is_marked(object: ObjectReference) -> bool {
-        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-            object,
-            None,
-            Ordering::SeqCst,
-        );
+        let old_value =
+            forwarding::MARK_SPEC.load_atomic::<u8>(object.to_raw_address(), Ordering::SeqCst);
         let mark_bit = old_value & GC_MARK_BIT_MASK;
         mark_bit != 0
     }

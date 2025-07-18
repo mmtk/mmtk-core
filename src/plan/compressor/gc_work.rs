@@ -1,6 +1,6 @@
 use super::global::Compressor;
 use crate::policy::compressor::CompressorSpace;
-use crate::policy::compressor::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
+use crate::policy::compressor::{TRACE_KIND_FORWARD_ROOT, TRACE_KIND_MARK};
 use crate::scheduler::gc_work::PlanProcessEdges;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
@@ -95,7 +95,7 @@ impl<VM: VMBinding> Compact<VM> {
 /// Marking trace
 pub type MarkingProcessEdges<VM> = PlanProcessEdges<VM, Compressor<VM>, TRACE_KIND_MARK>;
 /// Forwarding trace
-pub type ForwardingProcessEdges<VM> = PlanProcessEdges<VM, Compressor<VM>, TRACE_KIND_FORWARD>;
+pub type ForwardingProcessEdges<VM> = PlanProcessEdges<VM, Compressor<VM>, TRACE_KIND_FORWARD_ROOT>;
 
 pub struct CompressorWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for CompressorWorkContext<VM> {

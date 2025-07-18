@@ -484,17 +484,21 @@ mod mockvm_metadata {
         VMLocalForwardingPointerSpec::in_header(0);
     pub const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec =
         VMLocalForwardingBitsSpec::side_first();
-    pub const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec = VMLocalMarkBitSpec::side_after(LOCAL_FORWARDING_BITS_SPEC.as_spec());
+    pub const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec =
+        VMLocalMarkBitSpec::side_after(LOCAL_FORWARDING_BITS_SPEC.as_spec());
     pub const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec =
         VMLocalLOSMarkNurserySpec::side_after(LOCAL_MARK_BIT_SPEC.as_spec());
 }
 
 impl crate::vm::ObjectModel<MockVM> for MockVM {
     const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = mockvm_metadata::GLOBAL_LOG_BIT_SPEC;
-    const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec = mockvm_metadata::LOCAL_FORWARDING_POINTER_SPEC;
-    const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec = mockvm_metadata::LOCAL_FORWARDING_BITS_SPEC;
+    const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec =
+        mockvm_metadata::LOCAL_FORWARDING_POINTER_SPEC;
+    const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec =
+        mockvm_metadata::LOCAL_FORWARDING_BITS_SPEC;
     const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec = mockvm_metadata::LOCAL_MARK_BIT_SPEC;
-    const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec = mockvm_metadata::LOCAL_LOS_MARK_NURSERY_SPEC;
+    const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec =
+        mockvm_metadata::LOCAL_LOS_MARK_NURSERY_SPEC;
 
     #[cfg(feature = "object_pinning")]
     const LOCAL_PINNING_BIT_SPEC: VMLocalPinningBitSpec = VMLocalPinningBitSpec::in_header(0);
