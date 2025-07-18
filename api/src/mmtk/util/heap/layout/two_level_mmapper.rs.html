@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/heap/layout/fragmented_mapper.rs`."><title>fragmented_mapper.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-b0742ba02757f159.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0 (90b35a623 2024-11-26)" data-channel="1.83.0" data-search-js="search-f0d225181b97f9a4.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../../../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">mmtk/util/heap/layout/</div>fragmented_mapper.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/heap/layout/two_level_mmapper.rs`."><title>two_level_mmapper.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-b0742ba02757f159.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0 (90b35a623 2024-11-26)" data-channel="1.83.0" data-search-js="search-f0d225181b97f9a4.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../../../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">mmtk/util/heap/layout/</div>two_level_mmapper.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
 <a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
@@ -505,187 +505,88 @@
 <a href="#504" id="504">504</a>
 <a href="#505" id="505">505</a>
 <a href="#506" id="506">506</a>
-<a href="#507" id="507">507</a>
-<a href="#508" id="508">508</a>
-<a href="#509" id="509">509</a>
-<a href="#510" id="510">510</a>
-<a href="#511" id="511">511</a>
-<a href="#512" id="512">512</a>
-<a href="#513" id="513">513</a>
-<a href="#514" id="514">514</a>
-<a href="#515" id="515">515</a>
-<a href="#516" id="516">516</a>
-<a href="#517" id="517">517</a>
-<a href="#518" id="518">518</a>
-<a href="#519" id="519">519</a>
-<a href="#520" id="520">520</a>
-<a href="#521" id="521">521</a>
-<a href="#522" id="522">522</a>
-<a href="#523" id="523">523</a>
-<a href="#524" id="524">524</a>
-<a href="#525" id="525">525</a>
-<a href="#526" id="526">526</a>
-<a href="#527" id="527">527</a>
-<a href="#528" id="528">528</a>
-<a href="#529" id="529">529</a>
-<a href="#530" id="530">530</a>
-<a href="#531" id="531">531</a>
-<a href="#532" id="532">532</a>
-<a href="#533" id="533">533</a>
-<a href="#534" id="534">534</a>
-<a href="#535" id="535">535</a>
-<a href="#536" id="536">536</a>
-<a href="#537" id="537">537</a>
-<a href="#538" id="538">538</a>
-<a href="#539" id="539">539</a>
-<a href="#540" id="540">540</a>
-<a href="#541" id="541">541</a>
-<a href="#542" id="542">542</a>
-<a href="#543" id="543">543</a>
-<a href="#544" id="544">544</a>
-<a href="#545" id="545">545</a>
-<a href="#546" id="546">546</a>
-<a href="#547" id="547">547</a>
-<a href="#548" id="548">548</a>
-<a href="#549" id="549">549</a>
-<a href="#550" id="550">550</a>
-<a href="#551" id="551">551</a>
-<a href="#552" id="552">552</a>
-<a href="#553" id="553">553</a>
-<a href="#554" id="554">554</a>
-<a href="#555" id="555">555</a>
-<a href="#556" id="556">556</a>
-<a href="#557" id="557">557</a>
-<a href="#558" id="558">558</a>
-<a href="#559" id="559">559</a>
-<a href="#560" id="560">560</a>
-<a href="#561" id="561">561</a>
-<a href="#562" id="562">562</a>
-<a href="#563" id="563">563</a>
-<a href="#564" id="564">564</a>
-<a href="#565" id="565">565</a>
-<a href="#566" id="566">566</a>
-<a href="#567" id="567">567</a>
-<a href="#568" id="568">568</a>
-<a href="#569" id="569">569</a>
-<a href="#570" id="570">570</a>
-<a href="#571" id="571">571</a>
-<a href="#572" id="572">572</a>
-<a href="#573" id="573">573</a>
-<a href="#574" id="574">574</a>
-<a href="#575" id="575">575</a>
-<a href="#576" id="576">576</a>
-<a href="#577" id="577">577</a>
-<a href="#578" id="578">578</a>
-<a href="#579" id="579">579</a>
-<a href="#580" id="580">580</a>
-<a href="#581" id="581">581</a>
-<a href="#582" id="582">582</a>
-<a href="#583" id="583">583</a>
-<a href="#584" id="584">584</a>
-<a href="#585" id="585">585</a>
-<a href="#586" id="586">586</a>
-<a href="#587" id="587">587</a>
-<a href="#588" id="588">588</a>
-<a href="#589" id="589">589</a>
-<a href="#590" id="590">590</a>
-<a href="#591" id="591">591</a>
-<a href="#592" id="592">592</a>
-<a href="#593" id="593">593</a>
-<a href="#594" id="594">594</a>
-<a href="#595" id="595">595</a>
-<a href="#596" id="596">596</a>
-<a href="#597" id="597">597</a>
-<a href="#598" id="598">598</a>
-<a href="#599" id="599">599</a>
-<a href="#600" id="600">600</a>
-<a href="#601" id="601">601</a>
-<a href="#602" id="602">602</a>
-<a href="#603" id="603">603</a>
-<a href="#604" id="604">604</a>
-<a href="#605" id="605">605</a>
-<a href="#606" id="606">606</a>
-<a href="#607" id="607">607</a>
-<a href="#608" id="608">608</a>
-<a href="#609" id="609">609</a>
-<a href="#610" id="610">610</a>
-<a href="#611" id="611">611</a>
-<a href="#612" id="612">612</a>
-<a href="#613" id="613">613</a>
-<a href="#614" id="614">614</a>
-<a href="#615" id="615">615</a>
-<a href="#616" id="616">616</a>
-<a href="#617" id="617">617</a>
-<a href="#618" id="618">618</a>
-<a href="#619" id="619">619</a>
-<a href="#620" id="620">620</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::mmapper::MapState;
+<a href="#507" id="507">507</a></pre></div><pre class="rust"><code><span class="doccomment">//! This module contains [`TwoLevelMmapper`], an implementation of [`Mmapper`] that is designed to
+//! work well on 64-bit machines.  Currently it supports 48-bit address spaces, and many constants
+//! and data structures (such as [`Slab`]) are larger than `i32::MAX`.  For this reason, this module
+//! is only available on 64-bit machines.
+
+</span><span class="kw">use </span><span class="kw">super</span>::mmapper::MapState;
 <span class="kw">use </span><span class="kw">super</span>::Mmapper;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory::{MmapAnnotation, MmapStrategy};
+<span class="kw">use </span><span class="kw">crate</span>::util::rust_util::atomic_box::OnceOptionBox;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>atomic::{Atomic, Ordering};
-<span class="kw">use </span>std::cell::UnsafeCell;
 <span class="kw">use </span>std::fmt;
 <span class="kw">use </span>std::io::Result;
 <span class="kw">use </span>std::sync::Mutex;
 
-<span class="kw">const </span>MMAP_NUM_CHUNKS: usize = <span class="number">1 </span>&lt;&lt; (<span class="number">33 </span>- LOG_MMAP_CHUNK_BYTES);
+<span class="doccomment">/// Logarithm of the address space size a user-space program is allowed to use.
+/// This is enough for ARM64, x86_64 and some other architectures.
+/// Feel free to increase it if we plan to support larger address spaces.
+</span><span class="kw">const </span>LOG_MAPPABLE_BYTES: usize = <span class="number">48</span>;
+<span class="doccomment">/// Address space size a user-space program is allowed to use.
+</span><span class="kw">const </span>MAPPABLE_BYTES: usize = <span class="number">1 </span>&lt;&lt; LOG_MAPPABLE_BYTES;
 
-<span class="comment">// 36 = 128G - physical memory larger than this is uncommon
-// 40 = 2T. Increased to 2T. Though we probably won't use this much memory, we allow quarantine memory range,
-// and that is usually used to quarantine a large amount of memory.
-</span><span class="kw">const </span>LOG_MAPPABLE_BYTES: usize = <span class="number">40</span>;
+<span class="doccomment">/// Log number of bytes per slab.
+/// For a two-level array, it is advisable to choose the arithmetic mean of [`LOG_MAPPABLE_BYTES`]
+/// and [`LOG_MMAP_CHUNK_BYTES`] in order to make [`MMAP_SLAB_BYTES`] the geometric mean of
+/// [`MAPPABLE_BYTES`] and [`MMAP_CHUNK_BYTES`].  This will balance the array size of
+/// [`TwoLevelMmapper::slabs`] and [`Slab`].
+///
+/// TODO: Use `usize::midpoint` after bumping MSRV to 1.85
+</span><span class="kw">const </span>LOG_MMAP_SLAB_BYTES: usize =
+    LOG_MMAP_CHUNK_BYTES + (LOG_MAPPABLE_BYTES - LOG_MMAP_CHUNK_BYTES) / <span class="number">2</span>;
+<span class="doccomment">/// Number of bytes per slab.
+</span><span class="kw">const </span>MMAP_SLAB_BYTES: usize = <span class="number">1 </span>&lt;&lt; LOG_MMAP_SLAB_BYTES;
 
-<span class="comment">/*
- * Size of a slab.  The value 10 gives a slab size of 1GB, with 1024
- * chunks per slab, ie a 1k slab map.  In a 64-bit address space, this
- * will require 1M of slab maps.
- */
-</span><span class="kw">const </span>LOG_MMAP_CHUNKS_PER_SLAB: usize = <span class="number">8</span>;
-<span class="kw">const </span>LOG_MMAP_SLAB_BYTES: usize = LOG_MMAP_CHUNKS_PER_SLAB + LOG_MMAP_CHUNK_BYTES;
-<span class="kw">const </span>MMAP_SLAB_EXTENT: usize = <span class="number">1 </span>&lt;&lt; LOG_MMAP_SLAB_BYTES;
-<span class="kw">const </span>MMAP_SLAB_MASK: usize = (<span class="number">1 </span>&lt;&lt; LOG_MMAP_SLAB_BYTES) - <span class="number">1</span>;
-<span class="doccomment">/**
- * Maximum number of slabs, which determines the maximum mappable address space.
- */
-</span><span class="kw">const </span>LOG_MAX_SLABS: usize = LOG_MAPPABLE_BYTES - LOG_MMAP_CHUNK_BYTES - LOG_MMAP_CHUNKS_PER_SLAB;
-<span class="kw">const </span>MAX_SLABS: usize = <span class="number">1 </span>&lt;&lt; LOG_MAX_SLABS;
-<span class="doccomment">/**
- * Parameters for the slab table.  The hash function requires it to be
- * a power of 2.  Must be larger than MAX_SLABS for hashing to work,
- * and should be much larger for it to be efficient.
- */
-</span><span class="kw">const </span>LOG_SLAB_TABLE_SIZE: usize = <span class="number">1 </span>+ LOG_MAX_SLABS;
-<span class="kw">const </span>HASH_MASK: usize = (<span class="number">1 </span>&lt;&lt; LOG_SLAB_TABLE_SIZE) - <span class="number">1</span>;
-<span class="kw">const </span>SLAB_TABLE_SIZE: usize = <span class="number">1 </span>&lt;&lt; LOG_SLAB_TABLE_SIZE;
-<span class="kw">const </span>SENTINEL: Address = Address::MAX;
+<span class="doccomment">/// Log number of chunks per slab.
+</span><span class="kw">const </span>LOG_MMAP_CHUNKS_PER_SLAB: usize = LOG_MMAP_SLAB_BYTES - LOG_MMAP_CHUNK_BYTES;
+<span class="doccomment">/// Number of chunks per slab.
+</span><span class="kw">const </span>MMAP_CHUNKS_PER_SLAB: usize = <span class="number">1 </span>&lt;&lt; LOG_MMAP_CHUNKS_PER_SLAB;
 
-<span class="kw">type </span>Slab = [Atomic&lt;MapState&gt;; MMAP_NUM_CHUNKS];
+<span class="doccomment">/// Mask for getting in-slab bits from an address.
+/// Invert this to get out-of-slab bits.
+</span><span class="kw">const </span>MMAP_SLAB_MASK: usize = (<span class="number">1 </span>&lt;&lt; LOG_MMAP_SLAB_BYTES) - <span class="number">1</span>;
 
-<span class="kw">pub struct </span>FragmentedMapper {
-    lock: Mutex&lt;()&gt;,
-    inner: UnsafeCell&lt;InnerFragmentedMapper&gt;,
+<span class="doccomment">/// Logarithm of maximum number of slabs.
+</span><span class="kw">const </span>LOG_MAX_SLABS: usize = LOG_MAPPABLE_BYTES - LOG_MMAP_SLAB_BYTES;
+<span class="doccomment">/// maximum number of slabs.
+</span><span class="kw">const </span>MAX_SLABS: usize = <span class="number">1 </span>&lt;&lt; LOG_MAX_SLABS;
+
+<span class="doccomment">/// The slab type.  Each slab holds the `MapState` of multiple chunks.
+</span><span class="kw">type </span>Slab = [Atomic&lt;MapState&gt;; MMAP_CHUNKS_PER_SLAB];
+
+<span class="doccomment">/// A two-level implementation of `Mmapper`.
+///
+/// It is essentially a lazily initialized array of [`Atomic&lt;MapState&gt;`].  Because it is designed to
+/// govern a large address range, and the array is sparse, we use a two-level design.  The higher
+/// level holds a vector of slabs, and each slab holds an array of [`Atomic&lt;MapState&gt;`].  Each slab
+/// governs an aligned region of [`MMAP_CHUNKS_PER_SLAB`] chunks.  Slabs are lazily created when the
+/// user intends to write into one of its `MapState`.
+</span><span class="kw">pub struct </span>TwoLevelMmapper {
+    <span class="doccomment">/// Lock for transitioning map states.
+    ///
+    /// FIXME: We only need this lock when transitioning map states.
+    /// The `TwoLevelMmapper` itself is completely lock-free even when allocating new slabs.
+    /// We should move the lock one leve above, to `MapState`.
+    </span>transition_lock: Mutex&lt;()&gt;,
+    <span class="doccomment">/// Slabs
+    </span>slabs: Vec&lt;OnceOptionBox&lt;Slab&gt;&gt;,
 }
 
-<span class="kw">unsafe impl </span>Send <span class="kw">for </span>FragmentedMapper {}
-<span class="kw">unsafe impl </span>Sync <span class="kw">for </span>FragmentedMapper {}
+<span class="kw">unsafe impl </span>Send <span class="kw">for </span>TwoLevelMmapper {}
+<span class="kw">unsafe impl </span>Sync <span class="kw">for </span>TwoLevelMmapper {}
 
-<span class="kw">struct </span>InnerFragmentedMapper {
-    free_slab_index: usize,
-    free_slabs: Vec&lt;<span class="prelude-ty">Option</span>&lt;Box&lt;Slab&gt;&gt;&gt;,
-    slab_table: Vec&lt;<span class="prelude-ty">Option</span>&lt;Box&lt;Slab&gt;&gt;&gt;,
-    slab_map: Vec&lt;Address&gt;,
-}
-
-<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>FragmentedMapper {
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>TwoLevelMmapper {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">'_</span>&gt;) -&gt; fmt::Result {
-        <span class="macro">write!</span>(f, <span class="string">"FragmentedMapper({})"</span>, MMAP_NUM_CHUNKS)
+        <span class="macro">write!</span>(f, <span class="string">"TwoLevelMapper({})"</span>, <span class="number">1 </span>&lt;&lt; LOG_MAX_SLABS)
     }
 }
 
-<span class="kw">impl </span>Mmapper <span class="kw">for </span>FragmentedMapper {
+<span class="kw">impl </span>Mmapper <span class="kw">for </span>TwoLevelMmapper {
     <span class="kw">fn </span>eagerly_mmap_all_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>, _space_map: <span class="kw-2">&amp;</span>[Address]) {}
 
     <span class="kw">fn </span>mark_as_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>start: Address, bytes: usize) {
@@ -756,7 +657,7 @@
 
         <span class="comment">// Transition the chunks in bulk.
         </span>{
-            <span class="kw">let </span>_guard = <span class="self">self</span>.lock.lock().unwrap();
+            <span class="kw">let </span>_guard = <span class="self">self</span>.transition_lock.lock().unwrap();
             MapState::bulk_transition_to_quarantined(
                 state_slices.as_slice(),
                 mmap_start,
@@ -798,7 +699,7 @@
                 }
 
                 <span class="kw">let </span>mmap_start = <span class="self">Self</span>::chunk_index_to_address(base, chunk);
-                <span class="kw">let </span>_guard = <span class="self">self</span>.lock.lock().unwrap();
+                <span class="kw">let </span>_guard = <span class="self">self</span>.transition_lock.lock().unwrap();
                 MapState::transition_to_mapped(entry, mmap_start, strategy, anno)<span class="question-mark">?</span>;
             }
             start = high;
@@ -825,7 +726,7 @@
 
     <span class="kw">fn </span>protect(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>start: Address, pages: usize) {
         <span class="kw">let </span>end = start + conversions::pages_to_bytes(pages);
-        <span class="kw">let </span>_guard = <span class="self">self</span>.lock.lock().unwrap();
+        <span class="kw">let </span>_guard = <span class="self">self</span>.transition_lock.lock().unwrap();
         <span class="comment">// Iterate over the slabs covered
         </span><span class="kw">while </span>start &lt; end {
             <span class="kw">let </span>base = <span class="self">Self</span>::slab_align_down(start);
@@ -850,164 +751,59 @@
     }
 }
 
-<span class="kw">impl </span>FragmentedMapper {
+<span class="kw">impl </span>TwoLevelMmapper {
     <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
-            lock: Mutex::new(()),
-            inner: UnsafeCell::new(InnerFragmentedMapper {
-                free_slab_index: <span class="number">0</span>,
-                free_slabs: (<span class="number">0</span>..MAX_SLABS).map(|<span class="kw">_</span>| <span class="prelude-val">Some</span>(<span class="self">Self</span>::new_slab())).collect(),
-                slab_table: (<span class="number">0</span>..SLAB_TABLE_SIZE).map(|<span class="kw">_</span>| <span class="prelude-val">None</span>).collect(),
-                slab_map: <span class="macro">vec!</span>[SENTINEL; SLAB_TABLE_SIZE],
-            }),
+            transition_lock: Default::default(),
+            slabs: <span class="kw">unsafe </span>{ <span class="kw">crate</span>::util::rust_util::zeroed_alloc::new_zeroed_vec(MAX_SLABS) },
         }
     }
 
-    <span class="kw">fn </span>new_slab() -&gt; Box&lt;Slab&gt; {
-        <span class="comment">// Because AtomicU8 does not implement Copy, it is a compilation error to usen the
-        // expression `[Atomic::new(MapState::Unmapped); MMAP_NUM_CHUNKS]` because that involves
-        // copying.  We must define a constant for it.
-        //
-        // TODO: Use the inline const expression `const { Atomic::new(MapState::Unmapped) }` after
-        // we bump MSRV to 1.79.
-
-        // If we declare a const Atomic, Clippy will warn about const items being interior mutable.
-        // Using inline const expression will eliminate this warning, but that is experimental until
-        // 1.79.  Fix it after we bump MSRV.
-        </span><span class="attr">#[allow(clippy::declare_interior_mutable_const)]
-        </span><span class="kw">const </span>INITIAL_ENTRY: Atomic&lt;MapState&gt; = Atomic::new(MapState::Unmapped);
-
-        <span class="kw">let </span>mapped: Box&lt;Slab&gt; = Box::new([INITIAL_ENTRY; MMAP_NUM_CHUNKS]);
-        mapped
-    }
-
-    <span class="kw">fn </span>hash(addr: Address) -&gt; usize {
-        <span class="kw">let </span><span class="kw-2">mut </span>initial = (addr &amp; !MMAP_SLAB_MASK) &gt;&gt; LOG_MMAP_SLAB_BYTES;
-        <span class="kw">let </span><span class="kw-2">mut </span>hash = <span class="number">0</span>;
-        <span class="kw">while </span>initial != <span class="number">0 </span>{
-            hash ^= initial &amp; HASH_MASK;
-            initial &gt;&gt;= LOG_SLAB_TABLE_SIZE;
-        }
-        hash
+    <span class="kw">fn </span>new_slab() -&gt; Slab {
+        std::array::from_fn(|<span class="kw">_</span>| Atomic::new(MapState::Unmapped))
     }
 
     <span class="kw">fn </span>slab_table(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Slab&gt; {
-        <span class="self">self</span>.get_or_optionally_allocate_slab_table(addr, <span class="bool-val">false</span>)
+        <span class="kw">let </span>index: usize = addr &gt;&gt; LOG_MMAP_SLAB_BYTES;
+        <span class="kw">let </span>slot = <span class="self">self</span>.slabs.get(index)<span class="question-mark">?</span>;
+        <span class="comment">// Note: We don't need acquire here.  See `get_or_allocate_slab_table`.
+        </span>slot.get(Ordering::Relaxed)
     }
 
     <span class="kw">fn </span>get_or_allocate_slab_table(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="kw-2">&amp;</span>Slab {
-        <span class="self">self</span>.get_or_optionally_allocate_slab_table(addr, <span class="bool-val">true</span>)
-            .unwrap()
-    }
-
-    <span class="kw">fn </span>inner(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>InnerFragmentedMapper {
-        <span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span><span class="self">self</span>.inner.get() }
-    }
-    <span class="attr">#[allow(clippy::mut_from_ref)]
-    </span><span class="kw">fn </span>inner_mut(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>InnerFragmentedMapper {
-        <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span><span class="self">self</span>.inner.get() }
-    }
-
-    <span class="kw">fn </span>get_or_optionally_allocate_slab_table(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        addr: Address,
-        allocate: bool,
-    ) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Slab&gt; {
-        <span class="macro">debug_assert!</span>(addr != SENTINEL);
-        <span class="kw">let </span>base = <span class="kw">unsafe </span>{ Address::from_usize(addr &amp; !MMAP_SLAB_MASK) };
-        <span class="kw">let </span>hash = <span class="self">Self</span>::hash(base);
-        <span class="kw">let </span><span class="kw-2">mut </span>index = hash; <span class="comment">// Use 'index' to iterate over the hash table so that we remember where we started
-        </span><span class="kw">loop </span>{
-            <span class="comment">/* Check for a hash-table hit.  Should be the frequent case. */
-            </span><span class="kw">if </span>base == <span class="self">self</span>.inner().slab_map[index] {
-                <span class="kw">return </span><span class="self">self</span>.slab_table_for(addr, index);
-            }
-            <span class="kw">let </span>_guard = <span class="self">self</span>.lock.lock().unwrap();
-
-            <span class="comment">/* Check whether another thread has allocated a slab while we were acquiring the lock */
-            </span><span class="kw">if </span>base == <span class="self">self</span>.inner().slab_map[index] {
-                <span class="comment">// drop(guard);
-                </span><span class="kw">return </span><span class="self">self</span>.slab_table_for(addr, index);
-            }
-
-            <span class="comment">/* Check for a free slot */
-            </span><span class="kw">if </span><span class="self">self</span>.inner().slab_map[index] == SENTINEL {
-                <span class="kw">if </span>!allocate {
-                    <span class="comment">// drop(guard);
-                    </span><span class="kw">return </span><span class="prelude-val">None</span>;
-                }
-                <span class="kw">unsafe </span>{
-                    <span class="self">self</span>.commit_free_slab(index);
-                }
-                <span class="self">self</span>.inner_mut().slab_map[index] = base;
-                <span class="kw">return </span><span class="self">self</span>.slab_table_for(addr, index);
-            }
-            <span class="comment">//   lock.release();
-            </span>index += <span class="number">1</span>;
-            index %= SLAB_TABLE_SIZE;
-            <span class="macro">assert!</span>(index != hash, <span class="string">"MMAP slab table is full!"</span>);
-        }
-    }
-
-    <span class="kw">fn </span>slab_table_for(<span class="kw-2">&amp;</span><span class="self">self</span>, _addr: Address, index: usize) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Slab&gt; {
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.inner().slab_table[index].is_some());
-        <span class="self">self</span>.inner().slab_table[index].as_ref().map(|x| x <span class="kw">as </span><span class="kw-2">&amp;</span>Slab)
-    }
-
-    <span class="doccomment">/**
-     * Take a free slab of chunks from the freeSlabs array, and insert it
-     * at the correct index in the slabTable.
-     * @param index slab table index
-     */
-    /// # Safety
-    ///
-    /// Caller must ensure that only one thread is calling this function at a time.
-    </span><span class="kw">unsafe fn </span>commit_free_slab(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize) {
-        <span class="macro">assert!</span>(
-            <span class="self">self</span>.inner().free_slab_index &lt; MAX_SLABS,
-            <span class="string">"All free slabs used: virtual address space is exhausled."
-        </span>);
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.inner().slab_table[index].is_none());
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.inner().free_slabs[<span class="self">self</span>.inner().free_slab_index].is_some());
-        ::std::mem::swap(
-            <span class="kw-2">&amp;mut </span><span class="self">self</span>.inner_mut().slab_table[index],
-            <span class="kw-2">&amp;mut </span><span class="self">self</span>.inner_mut().free_slabs[<span class="self">self</span>.inner().free_slab_index],
-        );
-        <span class="self">self</span>.inner_mut().free_slab_index += <span class="number">1</span>;
+        <span class="kw">let </span>index: usize = addr &gt;&gt; LOG_MMAP_SLAB_BYTES;
+        <span class="kw">let </span><span class="prelude-val">Some</span>(slot) = <span class="self">self</span>.slabs.get(index) <span class="kw">else </span>{
+            <span class="macro">panic!</span>(<span class="string">"Cannot allocate slab for address: {addr}"</span>);
+        };
+        <span class="comment">// Note: We set both order_load and order_store to `Relaxed` because we never populate the
+        // content of the slab before making the `OnceOptionBox` point to the new slab. For this
+        // reason, the release-acquire relation is not needed here.
+        </span>slot.get_or_init(Ordering::Relaxed, Ordering::Relaxed, <span class="self">Self</span>::new_slab)
     }
 
     <span class="kw">fn </span>chunk_index_to_address(base: Address, chunk: usize) -&gt; Address {
         base + (chunk &lt;&lt; LOG_MMAP_CHUNK_BYTES)
     }
 
-    <span class="doccomment">/**
-     * @param addr an address
-     * @return the base address of the enclosing slab
-     */
+    <span class="doccomment">/// Align `addr` down to slab size.
     </span><span class="kw">fn </span>slab_align_down(addr: Address) -&gt; Address {
-        <span class="kw">unsafe </span>{ Address::from_usize(addr &amp; !MMAP_SLAB_MASK) }
+        addr.align_down(MMAP_SLAB_BYTES)
     }
 
-    <span class="doccomment">/**
-     * @param addr an address
-     * @return the base address of the next slab
-     */
+    <span class="doccomment">/// Get the base address of the next slab after the slab that contains `addr`.
     </span><span class="kw">fn </span>slab_limit(addr: Address) -&gt; Address {
-        <span class="self">Self</span>::slab_align_down(addr) + MMAP_SLAB_EXTENT
+        <span class="self">Self</span>::slab_align_down(addr) + MMAP_SLAB_BYTES
     }
 
-    <span class="doccomment">/**
-     * @param slab Address of the slab
-     * @param addr Address within a chunk (could be in the next slab)
-     * @return The index of the chunk within the slab (could be beyond the end of the slab)
-     */
+    <span class="doccomment">/// Return the index of the chunk that contains `addr` within the slab starting at `slab`.
+    /// If `addr` is beyond the end of the slab, the result could be beyond the end of the slab.
     </span><span class="kw">fn </span>chunk_index(slab: Address, addr: Address) -&gt; usize {
         <span class="kw">let </span>delta = addr - slab;
         delta &gt;&gt; LOG_MMAP_CHUNK_BYTES
     }
 }
 
-<span class="kw">impl </span>Default <span class="kw">for </span>FragmentedMapper {
+<span class="kw">impl </span>Default <span class="kw">for </span>TwoLevelMmapper {
     <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
         <span class="self">Self</span>::new()
     }
@@ -1031,35 +827,13 @@
         conversions::raw_align_up(pages, MMAP_CHUNK_BYTES) / MMAP_CHUNK_BYTES
     }
 
-    <span class="kw">fn </span>get_chunk_map_state(mmapper: <span class="kw-2">&amp;</span>FragmentedMapper, chunk: Address) -&gt; <span class="prelude-ty">Option</span>&lt;MapState&gt; {
+    <span class="kw">fn </span>get_chunk_map_state(mmapper: <span class="kw-2">&amp;</span>TwoLevelMmapper, chunk: Address) -&gt; <span class="prelude-ty">Option</span>&lt;MapState&gt; {
         <span class="macro">assert_eq!</span>(conversions::mmap_chunk_align_up(chunk), chunk);
         <span class="kw">let </span>mapped = mmapper.slab_table(chunk);
         mapped.map(|m| {
-            m[FragmentedMapper::chunk_index(FragmentedMapper::slab_align_down(chunk), chunk)]
+            m[TwoLevelMmapper::chunk_index(TwoLevelMmapper::slab_align_down(chunk), chunk)]
                 .load(Ordering::Relaxed)
         })
-    }
-
-    <span class="attr">#[test]
-    </span><span class="kw">fn </span>address_hashing() {
-        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..<span class="number">10 </span>{
-            <span class="kw">unsafe </span>{
-                <span class="kw">let </span>a = i &lt;&lt; LOG_MMAP_SLAB_BYTES;
-                <span class="macro">assert_eq!</span>(FragmentedMapper::hash(Address::from_usize(a)), i);
-
-                <span class="kw">let </span>b = a + ((i + <span class="number">1</span>) &lt;&lt; (LOG_MMAP_SLAB_BYTES + LOG_SLAB_TABLE_SIZE + <span class="number">1</span>));
-                <span class="macro">assert_eq!</span>(
-                    FragmentedMapper::hash(Address::from_usize(b)),
-                    i ^ ((i + <span class="number">1</span>) &lt;&lt; <span class="number">1</span>)
-                );
-
-                <span class="kw">let </span>c = b + ((i + <span class="number">2</span>) &lt;&lt; (LOG_MMAP_SLAB_BYTES + LOG_SLAB_TABLE_SIZE * <span class="number">2 </span>+ <span class="number">2</span>));
-                <span class="macro">assert_eq!</span>(
-                    FragmentedMapper::hash(Address::from_usize(c)),
-                    i ^ ((i + <span class="number">1</span>) &lt;&lt; <span class="number">1</span>) ^ ((i + <span class="number">2</span>) &lt;&lt; <span class="number">2</span>)
-                );
-            }
-        }
     }
 
     <span class="attr">#[test]
@@ -1068,7 +842,7 @@
             <span class="kw">let </span>pages = <span class="number">1</span>;
             with_cleanup(
                 || {
-                    <span class="kw">let </span>mmapper = FragmentedMapper::new();
+                    <span class="kw">let </span>mmapper = TwoLevelMmapper::new();
                     mmapper
                         .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, <span class="macro">mmap_anno_test!</span>())
                         .unwrap();
@@ -1096,7 +870,7 @@
             <span class="kw">let </span>pages = MMAP_CHUNK_BYTES &gt;&gt; LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
             with_cleanup(
                 || {
-                    <span class="kw">let </span>mmapper = FragmentedMapper::new();
+                    <span class="kw">let </span>mmapper = TwoLevelMmapper::new();
                     mmapper
                         .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, <span class="macro">mmap_anno_test!</span>())
                         .unwrap();
@@ -1125,7 +899,7 @@
             <span class="kw">let </span>pages = (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / <span class="number">2</span>) &gt;&gt; LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
             with_cleanup(
                 || {
-                    <span class="kw">let </span>mmapper = FragmentedMapper::new();
+                    <span class="kw">let </span>mmapper = TwoLevelMmapper::new();
                     mmapper
                         .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, <span class="macro">mmap_anno_test!</span>())
                         .unwrap();
@@ -1154,7 +928,7 @@
             with_cleanup(
                 || {
                     <span class="comment">// map 2 chunks
-                    </span><span class="kw">let </span>mmapper = FragmentedMapper::new();
+                    </span><span class="kw">let </span>mmapper = TwoLevelMmapper::new();
                     <span class="kw">let </span>pages_per_chunk = MMAP_CHUNK_BYTES &gt;&gt; LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
                     mmapper
                         .ensure_mapped(
@@ -1190,7 +964,7 @@
             with_cleanup(
                 || {
                     <span class="comment">// map 2 chunks
-                    </span><span class="kw">let </span>mmapper = FragmentedMapper::new();
+                    </span><span class="kw">let </span>mmapper = TwoLevelMmapper::new();
                     <span class="kw">let </span>pages_per_chunk = MMAP_CHUNK_BYTES &gt;&gt; LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
                     mmapper
                         .ensure_mapped(

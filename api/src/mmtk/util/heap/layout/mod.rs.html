@@ -63,7 +63,7 @@
 <span class="kw">pub use </span><span class="self">self</span>::mmapper::Mmapper;
 <span class="kw">mod </span>byte_map_mmapper;
 <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
-</span><span class="kw">mod </span>fragmented_mapper;
+</span><span class="kw">mod </span>two_level_mmapper;
 
 <span class="kw">mod </span>map;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span><span class="self">self</span>::map::CreateFreeListResult;
@@ -95,7 +95,7 @@
 <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
 </span><span class="kw">pub fn </span>create_mmapper() -&gt; Box&lt;<span class="kw">dyn </span>Mmapper + Send + Sync&gt; {
     <span class="comment">// TODO: ByteMapMmapper for 39-bit or less virtual space
-    </span>Box::new(fragmented_mapper::FragmentedMapper::new())
+    </span>Box::new(two_level_mmapper::TwoLevelMmapper::new())
 }
 
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["available_range","create_mmapper","create_vm_map","heap_range"],"mod":["byte_map_mmapper","fragmented_mapper","heap_parameters","map","map32","map64","mmapper","vm_layout"]};
+window.SIDEBAR_ITEMS = {"fn":["available_range","create_mmapper","create_vm_map","heap_range"],"mod":["byte_map_mmapper","heap_parameters","map","map32","map64","mmapper","two_level_mmapper","vm_layout"]};

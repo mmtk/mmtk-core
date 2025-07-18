@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["cold","debug_process_thread_id","likely","min_of_usize","unlikely"],"mod":["rev_group","zeroed_alloc"],"struct":["InitializeOnce"]};
+window.SIDEBAR_ITEMS = {"fn":["cold","debug_process_thread_id","likely","min_of_usize","unlikely"],"mod":["atomic_box","rev_group","zeroed_alloc"],"struct":["InitializeOnce"]};
