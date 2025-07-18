@@ -43,7 +43,11 @@ pub fn create_compressor_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
-            let mut vec = create_space_mapping(RESERVED_ALLOCATORS, !cfg!(feature = "compressor_single_space"), plan);
+            let mut vec = create_space_mapping(
+                RESERVED_ALLOCATORS,
+                !cfg!(feature = "compressor_single_space"),
+                plan,
+            );
             vec.push((AllocatorSelector::BumpPointer(0), &plan.compressor_space));
             vec
         }),
