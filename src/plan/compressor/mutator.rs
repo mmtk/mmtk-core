@@ -20,7 +20,7 @@ const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
 };
 
 lazy_static! {
-    /// When nogc_multi_space is disabled, force all the allocation go to the default allocator and space.
+    /// When compressor_single_space is enabled, force all allocations to go to the default allocator and space.
     static ref ALLOCATOR_MAPPING_SINGLE_SPACE: EnumMap<AllocationSemantics, AllocatorSelector> = enum_map! {
         _ => AllocatorSelector::BumpPointer(0),
     };
