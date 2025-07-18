@@ -14,7 +14,7 @@ fi
 ALL_PLANS=$(sed -n '/enum PlanSelector/,/}/p' src/util/options.rs | sed -e 's;//.*;;g' -e '/^$/d' -e 's/,//g' | xargs | grep -o '{.*}' | grep -o '\w\+')
 ALL_DISCONTIGUOUS_PLANS=$(echo -n "$ALL_PLANS" | sed '/Compressor/d')
 
-if [[ $arch == "i686" ]]; then
+if [[ $arch == "x86" ]]; then
     ALL_PLANS=$ALL_DISCONTIGUOUS_PLANS
 fi
 
