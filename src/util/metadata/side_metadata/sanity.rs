@@ -232,8 +232,10 @@ impl SideMetadataSanity {
                 specs.append(&mut (*v).clone());
             }
         }
-
-        specs
+        // Deduplicate the specs using a hashset
+        std::collections::HashSet::<SideMetadataSpec>::from_iter(specs)
+            .into_iter()
+            .collect()
     }
 
     /// Verifies that all local side metadata specs:
@@ -851,5 +853,35 @@ mod tests {
         assert!(verify_local_specs_size(&[spec_1]).is_ok());
         assert!(verify_local_specs_size(&[spec_1, spec_1]).is_err());
         assert!(verify_local_specs_size(&[spec_1, spec_1, spec_1, spec_1, spec_1]).is_err());
+    }
+
+    #[test]
+    fn test_side_metadata_sanity_get_all_local_specs() {
+        let spec_1 = SideMetadataSpec {
+            name: "spec_1",
+            is_global: false,
+            offset: SideMetadataOffset::rel(0),
+            log_num_of_bits: 0,
+            log_bytes_in_region: 0,
+        };
+
+        let mut sanity = SideMetadataSanity::new();
+        sanity.verify_metadata_context(
+            "policy1",
+            &SideMetadataContext {
+                global: vec![],
+                local: vec![spec_1.clone()],
+            },
+        );
+        sanity.verify_metadata_context(
+            "policy2",
+            &SideMetadataContext {
+                global: vec![],
+                local: vec![spec_1.clone()],
+            },
+        );
+
+        let local_specs = sanity.get_all_specs(false);
+        assert_eq!(local_specs.len(), 1);
     }
 }
