@@ -1,3 +1,8 @@
+//! This module contains [`TwoLevelMmapper`], an implementation of [`Mmapper`] that is designed to
+//! work well on 64-bit machines.  Currently it supports 48-bit address spaces, and many constants
+//! and data structures (such as [`Slab`]) are larger than `i32::MAX`.  For this reason, this module
+//! is only available on 64-bit machines.
+
 use super::mmapper::MapState;
 use super::Mmapper;
 use crate::util::constants::BYTES_IN_PAGE;
@@ -45,9 +50,15 @@ const LOG_MAX_SLABS: usize = LOG_MAPPABLE_BYTES - LOG_MMAP_SLAB_BYTES;
 const MAX_SLABS: usize = 1 << LOG_MAX_SLABS;
 
 /// The slab type.  Each slab holds the `MapState` of multiple chunks.
-type Slab = [Atomic<MapState>; 1 << LOG_MMAP_CHUNKS_PER_SLAB];
+type Slab = [Atomic<MapState>; MMAP_CHUNKS_PER_SLAB];
 
 /// A two-level implementation of `Mmapper`.
+///
+/// It is essentially a lazily initialized array of [`Atomic<MapState>`].  Because it is designed to
+/// govern a large address range, and the array is sparse, we use a two-level design.  The higher
+/// level holds a vector of slabs, and each slab holds an array of [`Atomic<MapState>`].  Each slab
+/// governs an aligned region of [`MMAP_CHUNKS_PER_SLAB`] chunks.  Slabs are lazily created when the
+/// user intends to write into one of its `MapState`.
 pub struct TwoLevelMmapper {
     /// Lock for transitioning map states.
     ///

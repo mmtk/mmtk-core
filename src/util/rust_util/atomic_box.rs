@@ -10,6 +10,14 @@ use std::sync::atomic::{AtomicPtr, Ordering};
 ///
 /// Once initialized, this object will own its content.  THe content is allocated in the heap, and
 /// will be dropped and deallocated when this instance is dropped.
+///
+/// # Comparison to existing data structures
+///
+/// [`std::sync::OnceLock`] also provides thread-safe lazily-initialized cells.  But as its name
+/// suggests, it uses locks for synchronization, whereas `OnceOptionBox` is lock-free.  `OnceLock`
+/// also has a field of [`std::sync::Once`] which increases the space overhead.  `OnceOptionBox`
+/// only has one atomic pointer field and is more suitable for large arrays of lazily initialized
+/// elements.
 pub struct OnceOptionBox<T> {
     inner: AtomicPtr<T>,
 }

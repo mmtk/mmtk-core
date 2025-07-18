@@ -4,8 +4,6 @@ pub mod vm_layout;
 mod mmapper;
 pub use self::mmapper::Mmapper;
 mod byte_map_mmapper;
-// Only make `two_level_mapper` available on 64-bit architectures because it contains 64-bit `usize`
-// constants that only work on 64-bit architectures.
 #[cfg(target_pointer_width = "64")]
 mod two_level_mmapper;
 
