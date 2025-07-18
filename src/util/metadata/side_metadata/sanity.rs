@@ -870,14 +870,14 @@ mod tests {
             "policy1",
             &SideMetadataContext {
                 global: vec![],
-                local: vec![spec_1.clone()],
+                local: vec![spec_1],
             },
         );
         sanity.verify_metadata_context(
             "policy2",
             &SideMetadataContext {
                 global: vec![],
-                local: vec![spec_1.clone()],
+                local: vec![spec_1],
             },
         );
 
