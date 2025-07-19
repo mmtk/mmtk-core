@@ -377,7 +377,7 @@ pub struct BasePlan<VM: VMBinding> {
 /// is passed to each plan's constructor.
 pub struct CreateGeneralPlanArgs<'a, VM: VMBinding> {
     pub vm_map: &'static dyn VMMap,
-    pub mmapper: &'static dyn Mmapper,
+    pub mmapper: &'static Mmapper,
     pub options: Arc<Options>,
     pub state: Arc<GlobalState>,
     pub gc_trigger: Arc<crate::util::heap::gc_trigger::GCTrigger<VM>>,
