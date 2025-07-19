@@ -1,7 +1,7 @@
-//! This module contains [`TwoLevelMmapper`], an implementation of [`Mmapper`] that is designed to
-//! work well on 64-bit machines.  Currently it supports 48-bit address spaces, and many constants
-//! and data structures (such as [`Slab`]) are larger than `i32::MAX`.  For this reason, this module
-//! is only available on 64-bit machines.
+//! This module contains [`TwoLevelStateStorage`], an implementation of [`MapStateStorage`] that is
+//! designed to work well on 64-bit machines.  Currently it supports 48-bit address spaces, and many
+//! constants and data structures (such as [`Slab`]) are larger than `i32::MAX`.  For this reason,
+//! this module is only available on 64-bit machines.
 
 use super::MapState;
 use crate::util::conversions::raw_is_aligned;
@@ -13,7 +13,6 @@ use crate::util::Address;
 use atomic::{Atomic, Ordering};
 use std::fmt;
 use std::io::Result;
-use std::sync::Mutex;
 
 /// Logarithm of the address space size a user-space program is allowed to use.
 /// This is enough for ARM64, x86_64 and some other architectures.
@@ -26,7 +25,7 @@ const MAPPABLE_BYTES: usize = 1 << LOG_MAPPABLE_BYTES;
 /// For a two-level array, it is advisable to choose the arithmetic mean of [`LOG_MAPPABLE_BYTES`]
 /// and [`LOG_MMAP_CHUNK_BYTES`] in order to make [`MMAP_SLAB_BYTES`] the geometric mean of
 /// [`MAPPABLE_BYTES`] and [`MMAP_CHUNK_BYTES`].  This will balance the array size of
-/// [`TwoLevelMmapper::slabs`] and [`Slab`].
+/// [`TwoLevelStateStorage::slabs`] and [`Slab`].
 ///
 /// TODO: Use `usize::midpoint` after bumping MSRV to 1.85
 const LOG_MMAP_SLAB_BYTES: usize =
@@ -51,29 +50,28 @@ const MAX_SLABS: usize = 1 << LOG_MAX_SLABS;
 /// The slab type.  Each slab holds the `MapState` of multiple chunks.
 type Slab = [Atomic<MapState>; MMAP_CHUNKS_PER_SLAB];
 
-/// A two-level implementation of `Mmapper`.
+/// A two-level implementation of `MapStateStorage`.
 ///
 /// It is essentially a lazily initialized array of [`Atomic<MapState>`].  Because it is designed to
 /// govern a large address range, and the array is sparse, we use a two-level design.  The higher
 /// level holds a vector of slabs, and each slab holds an array of [`Atomic<MapState>`].  Each slab
 /// governs an aligned region of [`MMAP_CHUNKS_PER_SLAB`] chunks.  Slabs are lazily created when the
 /// user intends to write into one of its `MapState`.
-pub struct TwoLevelMmapper {
-    transition_lock: Mutex<()>,
+pub struct TwoLevelStateStorage {
     /// Slabs
     slabs: Vec<OnceOptionBox<Slab>>,
 }
 
-unsafe impl Send for TwoLevelMmapper {}
-unsafe impl Sync for TwoLevelMmapper {}
+unsafe impl Send for TwoLevelStateStorage {}
+unsafe impl Sync for TwoLevelStateStorage {}
 
-impl fmt::Debug for TwoLevelMmapper {
+impl fmt::Debug for TwoLevelStateStorage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "TwoLevelMapper({})", 1 << LOG_MAX_SLABS)
     }
 }
 
-impl MapStateStorage for TwoLevelMmapper {
+impl MapStateStorage for TwoLevelStateStorage {
     fn get_state(&self, chunk: Address) -> Option<MapState> {
         self.slab_table(chunk)
             .map(|slab| slab[Self::in_slab_index(chunk)].load(Ordering::Relaxed))
@@ -129,10 +127,9 @@ impl MapStateStorage for TwoLevelMmapper {
     }
 }
 
-impl TwoLevelMmapper {
+impl TwoLevelStateStorage {
     pub fn new() -> Self {
         Self {
-            transition_lock: Default::default(),
             slabs: unsafe { crate::util::rust_util::zeroed_alloc::new_zeroed_vec(MAX_SLABS) },
         }
     }
@@ -229,7 +226,7 @@ impl TwoLevelMmapper {
     }
 }
 
-impl Default for TwoLevelMmapper {
+impl Default for TwoLevelStateStorage {
     fn default() -> Self {
         Self::new()
     }

@@ -4,14 +4,14 @@ use crate::util::{constants::BYTES_IN_PAGE, heap::layout::vm_layout::*};
 use bytemuck::NoUninit;
 use std::{io::Result, sync::Mutex};
 
-mod byte_map_mmapper;
+mod byte_map_storage;
 #[cfg(target_pointer_width = "64")]
-mod two_level_mmapper;
+mod two_level_storage;
 
 #[cfg(target_pointer_width = "32")]
-type ChosenMapStateStorage = byte_map_mmapper::ByteMapMmapper;
+type ChosenMapStateStorage = byte_map_storage::ByteMapStateStorage;
 #[cfg(target_pointer_width = "64")]
-type ChosenMapStateStorage = two_level_mmapper::TwoLevelMmapper;
+type ChosenMapStateStorage = two_level_storage::TwoLevelStateStorage;
 
 trait MapStateStorage {
     fn get_state(&self, chunk: Address) -> Option<MapState>;

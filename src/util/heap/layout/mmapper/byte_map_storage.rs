@@ -5,7 +5,6 @@ use crate::util::rust_util::rev_group::RevisitableGroupByForIterator;
 use crate::util::Address;
 
 use crate::util::constants::*;
-use crate::util::conversions::pages_to_bytes;
 use crate::util::heap::layout::vm_layout::*;
 use std::fmt;
 use std::sync::atomic::Ordering;
@@ -21,18 +20,18 @@ const MMAP_NUM_CHUNKS: usize = if LOG_BYTES_IN_ADDRESS_SPACE == 32 {
 };
 pub const VERBOSE: bool = true;
 
-pub struct ByteMapMmapper {
+pub struct ByteMapStateStorage {
     lock: Mutex<()>,
     mapped: [Atomic<MapState>; MMAP_NUM_CHUNKS],
 }
 
-impl fmt::Debug for ByteMapMmapper {
+impl fmt::Debug for ByteMapStateStorage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ByteMapMmapper({})", MMAP_NUM_CHUNKS)
+        write!(f, "ByteMapStateStorage({})", MMAP_NUM_CHUNKS)
     }
 }
 
-impl MapStateStorage for ByteMapMmapper {
+impl MapStateStorage for ByteMapStateStorage {
     fn get_state(&self, chunk: Address) -> Option<MapState> {
         let index = chunk >> LOG_BYTES_IN_CHUNK;
         let slot = self.mapped.get(index)?;
@@ -112,7 +111,7 @@ impl MapStateStorage for ByteMapMmapper {
     }
 }
 
-impl ByteMapMmapper {
+impl ByteMapStateStorage {
     pub fn new() -> Self {
         // Because AtomicU8 does not implement Copy, it is a compilation error to usen the
         // expression `[Atomic::new(MapState::Unmapped); MMAP_NUM_CHUNKS]` because that involves
@@ -127,14 +126,14 @@ impl ByteMapMmapper {
         #[allow(clippy::declare_interior_mutable_const)]
         const INITIAL_ENTRY: Atomic<MapState> = Atomic::new(MapState::Unmapped);
 
-        ByteMapMmapper {
+        ByteMapStateStorage {
             lock: Mutex::new(()),
             mapped: [INITIAL_ENTRY; MMAP_NUM_CHUNKS],
         }
     }
 }
 
-impl Default for ByteMapMmapper {
+impl Default for ByteMapStateStorage {
     fn default() -> Self {
         Self::new()
     }
