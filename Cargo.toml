@@ -198,6 +198,9 @@ extreme_assertions = []
 nogc_multi_space = []
 
 # Disable multiple spaces for Compressor.
+# Enabling this feature will cause the Compressor to move all objects, which will be
+# slower for large objects and will be outright incorrect for bindings which allocate
+# non-moving objects; but compacting all objects will be more space-efficient.
 compressor_single_space = []
 
 # To collect statistics for each GC work packet. Enabling this may introduce a small overhead (several percentage slowdown on benchmark time).
