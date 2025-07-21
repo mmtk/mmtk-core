@@ -131,6 +131,15 @@ impl SideMetadataSpec {
         );
     }
 
+    #[cfg(debug_assertions)]
+    pub(crate) fn are_different_metadata(&self, addr1: Address, addr2: Address) -> bool {
+        let a1 = address_to_meta_address(self, addr1);
+        let a2 = address_to_meta_address(self, addr2);
+        let s1 = meta_byte_lshift(self, addr1);
+        let s2 = meta_byte_lshift(self, addr2);
+        (a1, s1) != (a2, s2)
+    }
+
     /// Used only for debugging.
     /// * Assert if the given MetadataValue type matches the spec.
     /// * Assert if the provided value is valid in the spec.

@@ -1,5 +1,5 @@
 use crate::policy::compressor::GC_MARK_BIT_MASK;
-use crate::util::constants::MIN_OBJECT_SIZE;
+use crate::util::constants::BYTES_IN_WORD;
 use crate::util::heap::MonotonePageResource;
 use crate::util::metadata::side_metadata::spec_defs::{COMPRESSOR_MARK, COMPRESSOR_OFFSET_VECTOR};
 use crate::util::metadata::side_metadata::SideMetadataSpec;
@@ -10,49 +10,63 @@ use atomic::Ordering;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicBool;
 
-/// A finite-state machine which processes the positions of mark bits,
-/// and accumulates the size of live data that it has seen.
+/// A finite-state machine which visits the positions of marked bits in
+/// the mark bitmap, and accumulates the size of live data that it has
+/// seen between marked bits.
 ///
 /// The Compressor caches the state of the transducer at the start of
-/// each block by serialising the state using [`Transducer::encode`];
-/// the state can then be deserialised using [`Transducer::decode`].
+/// each block by serialising the state using [`Transducer::encode`], and
+/// then deserialises the state whilst computing forwarding pointers
+/// using [`Transducer::decode`].
 #[derive(Debug)]
 struct Transducer {
+    // The total live data visited by the transducer.
     live: usize,
-    last_bit_seen: Address,
+    // The address of the last mark bit which the transducer visited.
+    last_bit_visited: Address,
+    // Whether or not the transducer is currently inside an object
+    // (i.e. if it has seen a first bit but no matching last bit yet).
     in_object: bool,
 }
 impl Transducer {
     pub fn new() -> Self {
         Self {
             live: 0,
-            last_bit_seen: Address::ZERO,
+            last_bit_visited: Address::ZERO,
             in_object: false,
         }
     }
-    pub fn step(&mut self, address: Address) {
+    pub fn visit_mark_bit(&mut self, address: Address) {
         if self.in_object {
-            self.live += address - self.last_bit_seen + MIN_OBJECT_SIZE;
+            // The size of an object is the distance between the end and
+            // start of the object, and the last word of the object is one
+            // word prior to the end of the object. Thus we must add an
+            // extra word, in order to compute the size of the object based
+            // on the distance between its first and last words.
+            let first_word = self.last_bit_visited;
+            let last_word = address;
+            let size = last_word - first_word + BYTES_IN_WORD;
+            self.live += size;
         }
         self.in_object = !self.in_object;
-        self.last_bit_seen = address;
+        self.last_bit_visited = address;
     }
 
-    pub fn encode(&self, address: Address) -> usize {
+    pub fn encode(&self, current_position: Address) -> usize {
         if self.in_object {
             // We count the space between the last mark bit and
             // the current address as live when we stop in the
             // middle of an object.
-            self.live + (address - self.last_bit_seen) + 1
+            self.live + (current_position - self.last_bit_visited) + 1
         } else {
             self.live
         }
     }
 
-    pub fn decode(offset: usize, address: Address) -> Self {
+    pub fn decode(offset: usize, current_position: Address) -> Self {
         Transducer {
             live: offset & !1,
-            last_bit_seen: address,
+            last_bit_visited: current_position,
             in_object: (offset & 1) == 1,
         }
     }
@@ -81,27 +95,24 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
         }
     }
 
-    pub fn mark_end_of_object(&self, object: ObjectReference) {
-        let end_of_object = object.to_object_start::<VM>()
+    pub fn mark_last_word_of_object(&self, object: ObjectReference) {
+        let last_word_of_object = object.to_object_start::<VM>()
             + VM::VMObjectModel::get_current_size(object)
-            - MIN_OBJECT_SIZE;
+            - BYTES_IN_WORD;
         #[cfg(debug_assertions)]
         {
-            use crate::util::metadata::side_metadata::{address_to_meta_address, meta_byte_lshift};
-            // We require to be able to iterate upon start and end bits in the
-            // same bitmap. Therefore the start and end bits cannot be the
+            // We require to be able to iterate upon first and last bits in the
+            // same bitmap. Therefore the first and last bits cannot be the
             // same, else we would only encounter one of the two bits.
-            let a1 = address_to_meta_address(&MARK_SPEC, object.to_raw_address());
-            let s1 = meta_byte_lshift(&MARK_SPEC, object.to_raw_address());
-            let a2 = address_to_meta_address(&MARK_SPEC, end_of_object);
-            let s2 = meta_byte_lshift(&MARK_SPEC, end_of_object);
+            // This requirement implies that objects must be at least two words
+            // large.
             debug_assert!(
-                (a1, s1) < (a2, s2),
-                "The start and end mark bits should be different bits"
+                MARK_SPEC.are_different_metadata(object.to_raw_address(), last_word_of_object),
+                "The first and last mark bits should be different bits."
             );
         }
 
-        MARK_SPEC.fetch_or_atomic(end_of_object, GC_MARK_BIT_MASK, Ordering::SeqCst);
+        MARK_SPEC.fetch_or_atomic(last_word_of_object, GC_MARK_BIT_MASK, Ordering::SeqCst);
     }
 
     pub fn calculate_offset_vector(&self, pr: &MonotonePageResource<VM>) {
@@ -117,7 +128,7 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
                 Ordering::Relaxed,
             );
             MARK_SPEC.scan_non_zero_values::<u8>(block_start, block_end, &mut |addr: Address| {
-                state.step(addr);
+                state.visit_mark_bit(addr);
             });
         }
         self.calculated.store(true, Ordering::Relaxed);
@@ -142,7 +153,7 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
         // relative to the start of the heap; whereas Total-Live-Data in
         // the paper computes the offset relative to the start of the block.
         MARK_SPEC.scan_non_zero_values::<u8>(block_address, address, &mut |addr: Address| {
-            state.step(addr);
+            state.visit_mark_bit(addr)
         });
         self.first_address + state.live
     }

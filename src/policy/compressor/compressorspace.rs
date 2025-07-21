@@ -215,7 +215,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         );
         if CompressorSpace::<VM>::test_and_mark(object) {
             queue.enqueue(object);
-            self.forwarding.mark_end_of_object(object);
+            self.forwarding.mark_last_word_of_object(object);
         }
         object
     }
