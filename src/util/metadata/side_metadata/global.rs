@@ -132,7 +132,7 @@ impl SideMetadataSpec {
     }
 
     #[cfg(debug_assertions)]
-    pub(crate) fn are_different_metadata(&self, addr1: Address, addr2: Address) -> bool {
+    pub(crate) fn are_different_metadata_bits(&self, addr1: Address, addr2: Address) -> bool {
         let a1 = address_to_meta_address(self, addr1);
         let a2 = address_to_meta_address(self, addr2);
         let s1 = meta_byte_lshift(self, addr1);

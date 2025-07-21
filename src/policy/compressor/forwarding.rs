@@ -107,7 +107,10 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
             // This requirement implies that objects must be at least two words
             // large.
             debug_assert!(
-                MARK_SPEC.are_different_metadata(object.to_raw_address(), last_word_of_object),
+                MARK_SPEC.are_different_metadata_bits(
+                    object.to_object_start::<VM>(),
+                    last_word_of_object
+                ),
                 "The first and last mark bits should be different bits."
             );
         }
