@@ -4,7 +4,7 @@ use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::{
-    create_allocator_mapping, create_space_mapping, ReservedAllocators,
+    common_release_func, create_allocator_mapping, create_space_mapping, ReservedAllocators,
 };
 use crate::plan::AllocationSemantics;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -59,7 +59,7 @@ pub fn create_compressor_mutator<VM: VMBinding>(
     builder.build()
 }
 
-pub fn compressor_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+pub fn compressor_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
     // reset the thread-local allocation bump pointer
     let bump_allocator = unsafe {
         mutator
@@ -69,4 +69,5 @@ pub fn compressor_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls
     .downcast_mut::<BumpAllocator<VM>>()
     .unwrap();
     bump_allocator.reset();
+    common_release_func(mutator, tls);
 }
