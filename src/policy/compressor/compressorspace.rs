@@ -27,6 +27,7 @@ pub struct CompressorSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
     forwarding: forwarding::ForwardingMetadata<VM>,
+    first_address: Address,
 }
 
 pub(crate) const GC_MARK_BIT_MASK: u8 = 1;
@@ -187,7 +188,8 @@ impl<VM: VMBinding> CompressorSpace<VM> {
 
         CompressorSpace {
             pr: MonotonePageResource::new_contiguous(common.start, common.extent, vm_map),
-            forwarding: forwarding::ForwardingMetadata::new(common.start),
+            forwarding: forwarding::ForwardingMetadata::new(),
+            first_address: common.start,
             common,
         }
     }
@@ -245,7 +247,12 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     }
 
     pub fn calculate_offset_vector(&self) {
-        self.forwarding.calculate_offset_vector(&self.pr);
+        let (start, end) = self.heap_span();
+        self.forwarding.calculate_offset_vector(&forwarding::ObjectVectorRegion {
+            from_start: start,
+            from_size: end - start,
+            to_start: start
+        });
     }
 
     pub fn forward(&self, object: ObjectReference, _vo_bit_valid: bool) -> ObjectReference {
@@ -266,7 +273,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     }
 
     fn heap_span(&self) -> (Address, Address) {
-        (self.forwarding.first_address, self.pr.cursor())
+        (self.first_address, self.pr.cursor())
     }
 
     pub fn compact(&self, worker: &mut GCWorker<VM>) {

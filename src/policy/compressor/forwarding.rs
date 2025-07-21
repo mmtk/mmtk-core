@@ -1,6 +1,5 @@
 use crate::policy::compressor::GC_MARK_BIT_MASK;
 use crate::util::constants::MIN_OBJECT_SIZE;
-use crate::util::heap::MonotonePageResource;
 use crate::util::metadata::side_metadata::spec_defs::{COMPRESSOR_MARK, COMPRESSOR_OFFSET_VECTOR};
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::{Address, ObjectReference};
@@ -10,29 +9,41 @@ use atomic::Ordering;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicBool;
 
+pub(crate) struct ObjectVectorRegion {
+    pub from_start: Address,
+    pub from_size: usize,
+    pub to_start: Address,
+}
+
+pub(crate) struct CopyRegion {
+    pub from_start: Address,
+    pub from_size: usize,
+}
+
 /// A finite-state machine which processes the positions of mark bits,
-/// and accumulates the size of live data that it has seen.
+/// and accumulates the start address of an object to be forwarded after
+/// all live data that the transducer has seen.
 ///
 /// The Compressor caches the state of the transducer at the start of
 /// each block by serialising the state using [`Transducer::encode`];
 /// the state can then be deserialised using [`Transducer::decode`].
 #[derive(Debug)]
 struct Transducer {
-    live: usize,
+    to: Address,
     last_bit_seen: Address,
     in_object: bool,
 }
 impl Transducer {
-    pub fn new() -> Self {
+    pub fn new(to: Address) -> Self {
         Self {
-            live: 0,
+            to,
             last_bit_seen: Address::ZERO,
             in_object: false,
         }
     }
     pub fn step(&mut self, address: Address) {
         if self.in_object {
-            self.live += address - self.last_bit_seen + MIN_OBJECT_SIZE;
+            self.to += address - self.last_bit_seen + MIN_OBJECT_SIZE;
         }
         self.in_object = !self.in_object;
         self.last_bit_seen = address;
@@ -43,23 +54,22 @@ impl Transducer {
             // We count the space between the last mark bit and
             // the current address as live when we stop in the
             // middle of an object.
-            self.live + (address - self.last_bit_seen) + 1
+            self.to.as_usize() + (address - self.last_bit_seen) + 1
         } else {
-            self.live
+            self.to.as_usize()
         }
     }
 
-    pub fn decode(offset: usize, address: Address) -> Self {
+    pub fn decode(value: usize, address: Address) -> Self {
         Transducer {
-            live: offset & !1,
+            to: unsafe { Address::from_usize(value & !1) },
             last_bit_seen: address,
-            in_object: (offset & 1) == 1,
+            in_object: (value & 1) == 1,
         }
     }
 }
 
 pub struct ForwardingMetadata<VM: VMBinding> {
-    pub(crate) first_address: Address,
     calculated: AtomicBool,
     vm: PhantomData<VM>,
 }
@@ -73,9 +83,8 @@ pub(crate) const MARK_SPEC: SideMetadataSpec = COMPRESSOR_MARK;
 pub(crate) const OFFSET_VECTOR_SPEC: SideMetadataSpec = COMPRESSOR_OFFSET_VECTOR;
 
 impl<VM: VMBinding> ForwardingMetadata<VM> {
-    pub fn new(start: Address) -> ForwardingMetadata<VM> {
+    pub fn new() -> ForwardingMetadata<VM> {
         ForwardingMetadata {
-            first_address: start,
             calculated: AtomicBool::new(false),
             vm: PhantomData,
         }
@@ -104,12 +113,12 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
         MARK_SPEC.fetch_or_atomic(end_of_object, GC_MARK_BIT_MASK, Ordering::SeqCst);
     }
 
-    pub fn calculate_offset_vector(&self, pr: &MonotonePageResource<VM>) {
-        let mut state = Transducer::new();
-        let last_block = (pr.cursor() - self.first_address) / BLOCK_SIZE;
+    pub fn calculate_offset_vector(&self, region: &ObjectVectorRegion) {
+        let mut state = Transducer::new(region.to_start);
+        let last_block = region.from_size / BLOCK_SIZE;
         debug!("calculating offset of {last_block} blocks");
         for block in 0..last_block {
-            let block_start = self.first_address + (block * BLOCK_SIZE);
+            let block_start = region.from_start + (block * BLOCK_SIZE);
             let block_end = block_start + BLOCK_SIZE;
             OFFSET_VECTOR_SPEC.store_atomic::<usize>(
                 block_start,
@@ -132,19 +141,21 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
             self.calculated.load(Ordering::Relaxed),
             "forward() should only be called when we have calculated an offset vector"
         );
-        let block_number = (address - self.first_address) / BLOCK_SIZE;
-        let block_address = self.first_address + (block_number * BLOCK_SIZE);
+        // Round down the address to its block.
+        let block_address = unsafe {
+            Address::from_usize(address.as_usize() & !(BLOCK_SIZE - 1))
+        };
         let mut state = Transducer::decode(
             OFFSET_VECTOR_SPEC.load_atomic::<usize>(block_address, Ordering::Relaxed),
             block_address,
         );
-        // The transducer in this implementation computes the offset
-        // relative to the start of the heap; whereas Total-Live-Data in
-        // the paper computes the offset relative to the start of the block.
+        // The transducer in this implementation computes the final
+        // address of an object; whereas Total-Live-Data in the paper computes
+        // the distance of the object from the start of the block.
         MARK_SPEC.scan_non_zero_values::<u8>(block_address, address, &mut |addr: Address| {
             state.step(addr);
         });
-        self.first_address + state.live
+        state.to
     }
 
     pub fn scan_marked_objects(
