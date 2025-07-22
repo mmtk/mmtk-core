@@ -1,6 +1,7 @@
 use crate::policy::compressor::GC_MARK_BIT_MASK;
 use crate::util::constants::BYTES_IN_WORD;
 use crate::util::heap::MonotonePageResource;
+use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::spec_defs::{COMPRESSOR_MARK, COMPRESSOR_OFFSET_VECTOR};
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::{Address, ObjectReference};
@@ -78,11 +79,22 @@ pub struct ForwardingMetadata<VM: VMBinding> {
     vm: PhantomData<VM>,
 }
 
-// A block in the Compressor is the granularity at which we record
-// the live data prior to the start of each block. We set it to 512 bytes
+// A block in the Compressor is the granularity at which we cache
+// the amount of live data preceding an address. We set it to 512 bytes
 // following the paper.
-pub(crate) const LOG_BLOCK_SIZE: usize = 9;
-pub(crate) const BLOCK_SIZE: usize = 1 << LOG_BLOCK_SIZE;
+#[derive(Copy, Clone, PartialEq, PartialOrd)]
+pub(crate) struct Block(Address);
+impl Region for Block {
+    const LOG_BYTES: usize = 9;
+    fn from_aligned_address(address: Address) -> Self {
+        assert!(address.is_aligned_to(Self::BYTES));
+        Block(address)
+    }
+    fn start(&self) -> Address {
+        self.0
+    }
+}
+
 pub(crate) const MARK_SPEC: SideMetadataSpec = COMPRESSOR_MARK;
 pub(crate) const OFFSET_VECTOR_SPEC: SideMetadataSpec = COMPRESSOR_OFFSET_VECTOR;
 
@@ -120,19 +132,21 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
 
     pub fn calculate_offset_vector(&self, pr: &MonotonePageResource<VM>) {
         let mut state = Transducer::new();
-        let last_block = (pr.cursor() - self.first_address) / BLOCK_SIZE;
-        debug!("calculating offset of {last_block} blocks");
-        for block in 0..last_block {
-            let block_start = self.first_address + (block * BLOCK_SIZE);
-            let block_end = block_start + BLOCK_SIZE;
+        let first_block = Block::from_aligned_address(self.first_address);
+        let last_block = Block::from_aligned_address(pr.cursor());
+        for block in RegionIterator::<Block>::new(first_block, last_block) {
             OFFSET_VECTOR_SPEC.store_atomic::<usize>(
-                block_start,
-                state.encode(block_start),
+                block.start(),
+                state.encode(block.start()),
                 Ordering::Relaxed,
             );
-            MARK_SPEC.scan_non_zero_values::<u8>(block_start, block_end, &mut |addr: Address| {
-                state.visit_mark_bit(addr);
-            });
+            MARK_SPEC.scan_non_zero_values::<u8>(
+                block.start(),
+                block.end(),
+                &mut |addr: Address| {
+                    state.visit_mark_bit(addr);
+                },
+            );
         }
         self.calculated.store(true, Ordering::Relaxed);
     }
@@ -146,16 +160,15 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
             self.calculated.load(Ordering::Relaxed),
             "forward() should only be called when we have calculated an offset vector"
         );
-        let block_number = (address - self.first_address) / BLOCK_SIZE;
-        let block_address = self.first_address + (block_number * BLOCK_SIZE);
+        let block = Block::from_unaligned_address(address);
         let mut state = Transducer::decode(
-            OFFSET_VECTOR_SPEC.load_atomic::<usize>(block_address, Ordering::Relaxed),
-            block_address,
+            OFFSET_VECTOR_SPEC.load_atomic::<usize>(block.start(), Ordering::Relaxed),
+            block.start(),
         );
         // The transducer in this implementation computes the offset
         // relative to the start of the heap; whereas Total-Live-Data in
         // the paper computes the offset relative to the start of the block.
-        MARK_SPEC.scan_non_zero_values::<u8>(block_address, address, &mut |addr: Address| {
+        MARK_SPEC.scan_non_zero_values::<u8>(block.start(), address, &mut |addr: Address| {
             state.visit_mark_bit(addr)
         });
         self.first_address + state.live
