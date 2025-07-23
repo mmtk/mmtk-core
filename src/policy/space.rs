@@ -671,8 +671,14 @@ impl<VM: VMBinding> CommonSpace<VM> {
         }
 
         // For contiguous space, we know its address range so we reserve metadata memory for its range.
+        // The accessible range for a single space never needs to be larger than the max heap size. We only need to reserve the accessible range.
+        let max_heap_size = conversions::raw_align_up(
+            conversions::pages_to_bytes(rtn.gc_trigger.policy.get_max_heap_size_in_pages()),
+            BYTES_IN_CHUNK,
+        );
+        let accessible_extent = usize::min(extent, max_heap_size);
         rtn.metadata
-            .try_map_metadata_address_range(rtn.start, rtn.extent, rtn.name)
+            .try_map_metadata_address_range(rtn.start, accessible_extent, rtn.name)
             .unwrap_or_else(|e| {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory: {e}");
