@@ -7,6 +7,7 @@ use crate::plan::compressor::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::{BasePlan, CommonPlan};
+use crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -38,6 +39,7 @@ pub struct Compressor<VM: VMBinding> {
 
 /// The plan constraints for the Compressor plan.
 pub const COMPRESSOR_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    max_non_los_default_alloc_bytes: MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
     moves_objects: true,
     needs_forward_after_liveness: true,
     ..PlanConstraints::default()
@@ -99,9 +101,9 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
             CalculateForwardingAddress::<VM>::new(&self.compressor_space),
         );
         // do another trace to update references
-        scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new(self));
+        scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new());
         scheduler.work_buckets[WorkBucketStage::Compact]
-            .add(Compact::<VM>::new(&self.compressor_space));
+            .add(Compact::<VM>::new(&self.compressor_space, &self.common.los));
 
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]

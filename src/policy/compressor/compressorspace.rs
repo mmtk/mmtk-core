@@ -1,6 +1,7 @@
 use crate::plan::VectorObjectQueue;
 use crate::policy::compressor::forwarding;
 use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
+use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
@@ -179,6 +180,10 @@ impl<VM: VMBinding> CompressorSpace<VM> {
             !args.vmrequest.is_discontiguous(),
             "The Compressor requires a contiguous heap"
         );
+        assert!(
+            VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS,
+            "The Compressor requires a unified object reference address model"
+        );
         let local_specs = extract_side_metadata(&[
             MetadataSpec::OnSide(forwarding::MARK_SPEC),
             MetadataSpec::OnSide(forwarding::OFFSET_VECTOR_SPEC),
@@ -249,6 +254,9 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     }
 
     pub fn forward(&self, object: ObjectReference, _vo_bit_valid: bool) -> ObjectReference {
+        if !self.in_space(object) {
+            return object;
+        }
         // We can't expect the VO bit to be valid whilst in the compaction loop.
         // If we are fixing a reference to an object which precedes the referent
         // the VO bit will have been cleared already.
@@ -269,7 +277,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         (self.forwarding.first_address, self.pr.cursor())
     }
 
-    pub fn compact(&self, worker: &mut GCWorker<VM>) {
+    pub fn compact(&self, worker: &mut GCWorker<VM>, los: &LargeObjectSpace<VM>) {
         let mut to = Address::ZERO;
         // The allocator will never cause an object to span multiple regions,
         // but the Compressor may move an object to span multiple regions.
@@ -291,6 +299,20 @@ impl<VM: VMBinding> CompressorSpace<VM> {
                 crate::util::metadata::vo_bit::bzero_vo_bit(region_start, size);
             }
         }
+
+        let update_references = &mut |object: ObjectReference| {
+            if VM::VMScanning::support_slot_enqueuing(worker.tls, object) {
+                VM::VMScanning::scan_object(worker.tls, object, &mut |s: VM::VMSlot| {
+                    if let Some(o) = s.load() {
+                        s.store(self.forward(o, false));
+                    }
+                });
+            } else {
+                VM::VMScanning::scan_object_and_trace_edges(worker.tls, object, &mut |o| {
+                    self.forward(o, false)
+                });
+            }
+        };
 
         self.forwarding
             .scan_marked_objects(start, end, &mut |obj: ObjectReference| {
@@ -314,19 +336,13 @@ impl<VM: VMBinding> CompressorSpace<VM> {
                 vo_bit::set_vo_bit(new_object);
                 to = new_object.to_object_start::<VM>() + copied_size;
                 debug_assert_eq!(end_of_new_object, to);
-                // update references in object
-                if VM::VMScanning::support_slot_enqueuing(worker.tls, new_object) {
-                    VM::VMScanning::scan_object(worker.tls, new_object, &mut |s: VM::VMSlot| {
-                        if let Some(o) = s.load() {
-                            s.store(self.forward(o, false));
-                        }
-                    });
-                } else {
-                    VM::VMScanning::scan_object_and_trace_edges(worker.tls, new_object, &mut |o| {
-                        self.forward(o, false)
-                    });
-                }
+                update_references(new_object);
             });
+        // Update references from the LOS to Compressor too.
+        los.enumerate_objects(&mut object_enum::ClosureObjectEnumerator::<_, VM>::new(
+            update_references,
+        ));
+
         debug!("Compact end: to = {}", to);
         // reset the bump pointer
         self.pr.reset_cursor(to);
