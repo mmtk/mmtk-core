@@ -64,9 +64,7 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
 
 impl<VM: VMBinding> UpdateReferences<VM> {
     pub fn new() -> Self {
-        Self {
-            p: PhantomData,
-        }
+        Self { p: PhantomData }
     }
 }
 
@@ -78,7 +76,7 @@ pub struct Compact<VM: VMBinding> {
 
 impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.compressor_space.compact(worker, &self.los);
+        self.compressor_space.compact(worker, self.los);
     }
 }
 
