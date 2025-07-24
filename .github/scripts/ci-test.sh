@@ -12,6 +12,15 @@ if [[ $arch == "x86_64" && $os == "linux" ]]; then
 fi
 
 ALL_PLANS=$(sed -n '/enum PlanSelector/,/}/p' src/util/options.rs | sed -e 's;//.*;;g' -e '/^$/d' -e 's/,//g' | xargs | grep -o '{.*}' | grep -o '\w\+')
+ALL_DISCONTIGUOUS_PLANS=$(echo -n "$ALL_PLANS" | sed '/Compressor/d')
+
+if [[ $arch == "x86" ]]; then
+    ALL_PLANS=$ALL_DISCONTIGUOUS_PLANS
+fi
+
+# At the moment, the Compressor does not work with the mock VM tests.
+# So we skip testing the Compressor entirely.
+ALL_PLANS=$ALL_DISCONTIGUOUS_PLANS
 
 # Test with mock VM:
 # - Find all the files that start with mock_test_
@@ -25,6 +34,8 @@ find ./src ./tests -type f -name "mock_test_*" | while read -r file; do
     PLANS=$(sed -n 's/^\/\/ *GITHUB-CI: *MMTK_PLAN=//p' $file | tr ',' '\n')
     if [[ $PLANS == 'all' ]]; then
         PLANS=$ALL_PLANS
+    elif [[ $PLANS == 'discontiguous' ]]; then
+        PLANS=$ALL_DISCONTIGUOUS_PLANS
     elif [[ -z $PLANS ]]; then
         PLANS=NoGC
     fi
