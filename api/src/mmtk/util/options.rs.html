@@ -1321,7 +1321,9 @@
 <a href="#1320" id="1320">1320</a>
 <a href="#1321" id="1321">1321</a>
 <a href="#1322" id="1322">1322</a>
-<a href="#1323" id="1323">1323</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
+<a href="#1323" id="1323">1323</a>
+<a href="#1324" id="1324">1324</a>
+<a href="#1325" id="1325">1325</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>std::default::Default;
@@ -1369,6 +1371,8 @@
     </span>Immix,
     <span class="doccomment">/// A mark-compact collector that marks objects and performs Cheney-style copying.
     </span>MarkCompact,
+    <span class="doccomment">/// A mark-compact collector that uses Compressor-style bitmaps.
+    </span>Compressor,
     <span class="doccomment">/// An Immix collector that uses a sticky mark bit to allow generational behaviors without a copying nursery.
     </span>StickyImmix,
 }

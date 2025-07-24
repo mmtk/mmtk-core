@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MARK_SPEC","OFFSET_VECTOR_SPEC"],"struct":["Block","ForwardingMetadata","Transducer"]};

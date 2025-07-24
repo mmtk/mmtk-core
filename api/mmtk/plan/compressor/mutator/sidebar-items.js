@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["RESERVED_ALLOCATORS"],"fn":["compressor_mutator_release","create_compressor_mutator"],"struct":["ALLOCATOR_MAPPING","ALLOCATOR_MAPPING_SINGLE_SPACE"]};
