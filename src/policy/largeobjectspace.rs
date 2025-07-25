@@ -274,6 +274,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
         debug_assert!(self.treadmill.is_from_space_empty());
         debug_assert!(self.treadmill.is_nursery_empty());
+        debug_assert!(self.common.needs_satb);
         let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         });
@@ -289,7 +290,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     pub fn prepare(&mut self, full_heap: bool) {
         if full_heap {
-            debug_assert!(self.treadmill.is_from_space_empty());
+            // debug_assert!(self.treadmill.is_from_space_empty());
             self.mark_state = MARK_BIT - self.mark_state;
         }
         self.treadmill.flip(full_heap);
@@ -353,7 +354,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             #[cfg(feature = "vo_bit")]
             crate::util::metadata::vo_bit::unset_vo_bit(object);
             // Clear log bits for dead objects to prevent a new nursery object having the unlog bit set
-            if self.common.needs_log_bit {
+            if self.common.needs_log_bit || self.common.needs_satb {
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
             }
             self.pr

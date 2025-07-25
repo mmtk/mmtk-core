@@ -64,6 +64,7 @@ pub const CONCURRENT_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
     needs_prepare_mutator: true,
     barrier: crate::BarrierSelector::SATBBarrier,
+    needs_satb: true,
     ..PlanConstraints::default()
 };
 

@@ -528,6 +528,7 @@ pub struct CommonSpace<VM: VMBinding> {
     /// This field equals to needs_log_bit in the plan constraints.
     // TODO: This should be a constant for performance.
     pub needs_log_bit: bool,
+    pub needs_satb: bool,
 
     /// A lock used during acquire() to make sure only one thread can allocate.
     pub acquire_lock: Mutex<()>,
@@ -598,6 +599,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             vm_map: args.plan_args.vm_map,
             mmapper: args.plan_args.mmapper,
             needs_log_bit: args.plan_args.constraints.needs_log_bit,
+            needs_satb: args.plan_args.constraints.needs_satb,
             gc_trigger: args.plan_args.gc_trigger,
             metadata: SideMetadataContext {
                 global: args.plan_args.global_side_metadata_specs,
