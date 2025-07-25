@@ -1,10 +1,12 @@
 //! This module contains code useful for tracing,
 //! i.e. visiting the reachable objects by traversing all or part of an object graph.
 
+use std::marker::PhantomData;
+
 use crate::scheduler::gc_work::{ProcessEdgesWork, SlotOf};
 use crate::scheduler::{GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
-use crate::util::ObjectReference;
-use crate::vm::SlotVisitor;
+use crate::util::{ObjectReference, VMThread, VMWorkerThread};
+use crate::vm::{Scanning, SlotVisitor, VMBinding};
 
 /// This trait represents an object queue to enqueue objects during tracing.
 pub trait ObjectQueue {
@@ -62,6 +64,21 @@ impl<T> VectorQueue<T> {
             self.buffer.reserve(Self::CAPACITY);
         }
         self.buffer.push(v);
+    }
+
+    /// Return the len of the queue
+    pub fn len(&self) -> usize {
+        self.buffer.len()
+    }
+
+    /// Replace what was in the queue with data in new_buffer
+    pub fn swap(&mut self, new_buffer: &mut Vec<T>) {
+        std::mem::swap(&mut self.buffer, new_buffer)
+    }
+
+    /// Empty the queue
+    pub fn clear(&mut self) {
+        self.buffer.clear()
     }
 }
 
@@ -132,5 +149,61 @@ impl<E: ProcessEdgesWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'_, E> {
 impl<E: ProcessEdgesWork> Drop for ObjectsClosure<'_, E> {
     fn drop(&mut self) {
         self.flush();
+    }
+}
+
+struct SlotIteratorImpl<VM: VMBinding, F: FnMut(VM::VMSlot)> {
+    f: F,
+    // should_discover_references: bool,
+    // should_claim_clds: bool,
+    // should_follow_clds: bool,
+    _p: PhantomData<VM>,
+}
+
+impl<VM: VMBinding, F: FnMut(VM::VMSlot)> SlotVisitor<VM::VMSlot> for SlotIteratorImpl<VM, F> {
+    fn visit_slot(&mut self, slot: VM::VMSlot) {
+        (self.f)(slot);
+    }
+}
+
+pub struct SlotIterator<VM: VMBinding> {
+    _p: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> SlotIterator<VM> {
+    pub fn iterate(
+        o: ObjectReference,
+        // should_discover_references: bool,
+        // should_claim_clds: bool,
+        // should_follow_clds: bool,
+        f: impl FnMut(VM::VMSlot),
+        // klass: Option<Address>,
+    ) {
+        let mut x = SlotIteratorImpl::<VM, _> {
+            f,
+            // should_discover_references,
+            // should_claim_clds,
+            // should_follow_clds,
+            _p: PhantomData,
+        };
+        // if let Some(klass) = klass {
+        //     <VM::VMScanning as Scanning<VM>>::scan_object_with_klass(
+        //         VMWorkerThread(VMThread::UNINITIALIZED),
+        //         o,
+        //         &mut x,
+        //         klass,
+        //     );
+        // } else {
+        //     <VM::VMScanning as Scanning<VM>>::scan_object(
+        //         VMWorkerThread(VMThread::UNINITIALIZED),
+        //         o,
+        //         &mut x,
+        //     );
+        // }
+        <VM::VMScanning as Scanning<VM>>::scan_object(
+            VMWorkerThread(VMThread::UNINITIALIZED),
+            o,
+            &mut x,
+        );
     }
 }

@@ -9,6 +9,7 @@ use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::{FreeListPageResource, PageResource};
 use crate::util::metadata;
+use crate::util::object_enum::ClosureObjectEnumerator;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
 use crate::util::treadmill::TreadMill;
@@ -59,6 +60,24 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
+        if self.concurrent_marking_active() {
+            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::<VM, u8>(
+                object,
+                self.mark_state,
+                None,
+                Ordering::SeqCst,
+            );
+            debug_assert!(
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.load_atomic::<VM, u8>(
+                    object,
+                    None,
+                    Ordering::Acquire
+                ) == 0
+            );
+
+            self.treadmill.add_to_treadmill(object, false);
+            return;
+        }
         let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
             object,
             None,
@@ -192,6 +211,13 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         self.treadmill.enumerate_objects(enumerator);
     }
+
+    fn concurrent_marking_active(&self) -> bool {
+        self.common()
+            .global_state
+            .concurrent_marking_active
+            .load(Ordering::Acquire)
+    }
 }
 
 use crate::scheduler::GCWorker;
@@ -243,6 +269,24 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
+    pub fn initial_pause_prepare(&self) {
+        use crate::util::object_enum::ClosureObjectEnumerator;
+
+        debug_assert!(self.treadmill.is_from_space_empty());
+        debug_assert!(self.treadmill.is_nursery_empty());
+        let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+        });
+        self.treadmill.enumerate_objects(&mut enumator);
+    }
+
+    pub fn final_pause_release(&self) {
+        let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
+        });
+        self.treadmill.enumerate_objects(&mut enumator);
+    }
+
     pub fn prepare(&mut self, full_heap: bool) {
         if full_heap {
             debug_assert!(self.treadmill.is_from_space_empty());
@@ -259,6 +303,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             self.sweep_large_pages(false);
         }
     }
+
     // Allow nested-if for this function to make it clear that test_and_mark() is only executed
     // for the outer condition is met.
     #[allow(clippy::collapsible_if)]
@@ -332,6 +377,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         pages: usize,
         alloc_options: AllocationOptions,
     ) -> Address {
+        self.common()
+            .global_state
+            .concurrent_marking_threshold
+            .fetch_add(pages, Ordering::Relaxed);
         self.acquire(tls, pages, alloc_options)
     }
 
@@ -390,6 +439,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             Ordering::Relaxed,
         ) & NURSERY_BIT
             == NURSERY_BIT
+    }
+
+    pub fn is_marked(&self, object: ObjectReference) -> bool {
+        self.test_mark_bit(object, self.mark_state)
     }
 }
 

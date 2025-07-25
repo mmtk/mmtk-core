@@ -58,6 +58,9 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::StickyImmix => {
             crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
         }
+        PlanSelector::ConcurrentImmix => {
+            crate::plan::concurrent::immix::mutator::create_concurrent_immix_mutator(tls, mmtk)
+        }
     })
 }
 
@@ -90,6 +93,10 @@ pub fn create_plan<VM: VMBinding>(
         }
         PlanSelector::StickyImmix => {
             Box::new(crate::plan::sticky::immix::StickyImmix::new(args)) as Box<dyn Plan<VM = VM>>
+        }
+        PlanSelector::ConcurrentImmix => {
+            Box::new(crate::plan::concurrent::immix::ConcurrentImmix::new(args))
+                as Box<dyn Plan<VM = VM>>
         }
     };
 
@@ -159,6 +166,11 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
 
     /// Schedule work for the upcoming GC.
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
+
+    /// Schedule work for the upcoming concurrent GC.
+    fn schedule_concurrent_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>) {
+        self.schedule_collection(_scheduler);
+    }
 
     /// Get the common plan. CommonPlan is included by most of MMTk GC plans.
     fn common(&self) -> &CommonPlan<Self::VM> {
@@ -331,6 +343,9 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
             space.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         })
     }
+
+    fn gc_pause_start(&self, _scheduler: &GCWorkScheduler<Self::VM>) {}
+    fn gc_pause_end(&self) {}
 }
 
 impl_downcast!(Plan assoc VM);
@@ -599,6 +614,14 @@ impl<VM: VMBinding> CommonPlan<VM> {
             + self.los.reserved_pages()
             + self.nonmoving.reserved_pages()
             + self.base.get_used_pages()
+    }
+
+    pub fn initial_pause_prepare(&mut self) {
+        self.los.initial_pause_prepare();
+    }
+
+    pub fn final_pause_release(&mut self) {
+        self.los.final_pause_release();
     }
 
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {

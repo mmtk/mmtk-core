@@ -7,34 +7,35 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 struct BucketQueue<VM: VMBinding> {
-    queue: Injector<Box<dyn GCWork<VM>>>,
+    // queue: Injector<Box<dyn GCWork<VM>>>,
+    queue: std::sync::RwLock<Injector<Box<dyn GCWork<VM>>>>,
 }
 
 impl<VM: VMBinding> BucketQueue<VM> {
     fn new() -> Self {
         Self {
-            queue: Injector::new(),
+            queue: std::sync::RwLock::new(Injector::new()),
         }
     }
 
     fn is_empty(&self) -> bool {
-        self.queue.is_empty()
+        self.queue.read().unwrap().is_empty()
     }
 
     fn steal_batch_and_pop(
         &self,
         dest: &Worker<Box<dyn GCWork<VM>>>,
     ) -> Steal<Box<dyn GCWork<VM>>> {
-        self.queue.steal_batch_and_pop(dest)
+        self.queue.read().unwrap().steal_batch_and_pop(dest)
     }
 
     fn push(&self, w: Box<dyn GCWork<VM>>) {
-        self.queue.push(w);
+        self.queue.read().unwrap().push(w);
     }
 
     fn push_all(&self, ws: Vec<Box<dyn GCWork<VM>>>) {
         for w in ws {
-            self.queue.push(w);
+            self.queue.read().unwrap().push(w);
         }
     }
 }
@@ -59,6 +60,8 @@ pub struct WorkBucket<VM: VMBinding> {
     /// recursively, such as ephemerons and Java-style SoftReference and finalizers.  Sentinels
     /// can be used repeatedly to discover and process more such objects.
     sentinel: Mutex<Option<Box<dyn GCWork<VM>>>>,
+    in_concurrent: AtomicBool,
+    disable: AtomicBool,
 }
 
 impl<VM: VMBinding> WorkBucket<VM> {
@@ -70,7 +73,53 @@ impl<VM: VMBinding> WorkBucket<VM> {
             monitor,
             can_open: None,
             sentinel: Mutex::new(None),
+            in_concurrent: AtomicBool::new(true),
+            disable: AtomicBool::new(false),
         }
+    }
+
+    pub fn set_in_concurrent(&self, in_concurrent: bool) {
+        self.in_concurrent.store(in_concurrent, Ordering::SeqCst);
+    }
+
+    pub fn set_as_enabled(&self) {
+        self.disable.store(false, Ordering::SeqCst)
+    }
+
+    pub fn set_as_disabled(&self) {
+        self.disable.store(true, Ordering::SeqCst)
+    }
+
+    pub fn disabled(&self) -> bool {
+        self.disable.load(Ordering::Relaxed)
+    }
+
+    pub fn enable_prioritized_queue(&mut self) {
+        self.prioritized_queue = Some(BucketQueue::new());
+    }
+
+    pub fn swap_queue(
+        &self,
+        mut new_queue: Injector<Box<dyn GCWork<VM>>>,
+    ) -> Injector<Box<dyn GCWork<VM>>> {
+        let mut queue = self.queue.queue.write().unwrap();
+        std::mem::swap::<Injector<Box<dyn GCWork<VM>>>>(&mut queue, &mut new_queue);
+        new_queue
+    }
+
+    pub fn swap_queue_prioritized(
+        &self,
+        mut new_queue: Injector<Box<dyn GCWork<VM>>>,
+    ) -> Injector<Box<dyn GCWork<VM>>> {
+        let mut queue = self
+            .prioritized_queue
+            .as_ref()
+            .unwrap()
+            .queue
+            .write()
+            .unwrap();
+        std::mem::swap::<Injector<Box<dyn GCWork<VM>>>>(&mut queue, &mut new_queue);
+        new_queue
     }
 
     fn notify_one_worker(&self) {
@@ -240,6 +289,8 @@ impl<VM: VMBinding> WorkBucket<VM> {
 pub enum WorkBucketStage {
     /// This bucket is always open.
     Unconstrained,
+    Initial,
+    ConcurrentSentinel,
     /// Preparation work.  Plans, spaces, GC workers, mutators, etc. should be prepared for GC at
     /// this stage.
     Prepare,

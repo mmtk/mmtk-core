@@ -203,6 +203,13 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_chunk_map::<Block>(enumerator, &self.chunk_map);
     }
+
+    fn concurrent_marking_active(&self) -> bool {
+        self.common()
+            .global_state
+            .concurrent_marking_active
+            .load(Ordering::Acquire)
+    }
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace<VM> {
@@ -411,6 +418,24 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self.scheduler
     }
 
+    pub fn initial_pause_prepare(&mut self) {
+        // make sure all allocated blocks have unlog bit set during initial mark
+        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+            for chunk in self.chunk_map.all_chunks() {
+                side.bset_metadata(chunk.start(), Chunk::BYTES);
+            }
+        }
+    }
+
+    pub fn final_pause_release(&mut self) {
+        // clear the unlog bit so that during normal mutator phase, stab barrier is effectively disabled (all objects are considered as logged and thus no slow path will be taken)
+        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+            for chunk in self.chunk_map.all_chunks() {
+                side.bzero_metadata(chunk.start(), Chunk::BYTES);
+            }
+        }
+    }
+
     pub fn prepare(&mut self, major_gc: bool, plan_stats: Option<StatsForDefrag>) {
         if major_gc {
             // Update mark_state
@@ -572,6 +597,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.chunk_map.set_allocated(block.chunk(), true);
         self.lines_consumed
             .fetch_add(Block::LINES, Ordering::SeqCst);
+        self.common()
+            .global_state
+            .concurrent_marking_threshold
+            .fetch_add(Block::PAGES, Ordering::Relaxed);
         Some(block)
     }
 
@@ -598,6 +627,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 self.lines_consumed.fetch_add(lines_delta, Ordering::SeqCst);
 
                 block.init(copy);
+                self.common()
+                    .global_state
+                    .concurrent_marking_threshold
+                    .fetch_add(Block::PAGES, Ordering::Relaxed);
                 return Some(block);
             } else {
                 return None;

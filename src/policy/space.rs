@@ -433,6 +433,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// the execution time.  For LOS, it will be cheaper to enumerate individual objects than
     /// scanning VO bits because it is sparse.
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator);
+
+    fn concurrent_marking_active(&self) -> bool {
+        false
+    }
 }
 
 /// Print the VM map for a space.
