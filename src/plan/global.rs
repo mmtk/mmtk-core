@@ -61,6 +61,9 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::ConcurrentImmix => {
             crate::plan::concurrent::immix::mutator::create_concurrent_immix_mutator(tls, mmtk)
         }
+        PlanSelector::Compressor => {
+            crate::plan::compressor::mutator::create_compressor_mutator(tls, mmtk)
+        }
     })
 }
 
@@ -97,6 +100,9 @@ pub fn create_plan<VM: VMBinding>(
         PlanSelector::ConcurrentImmix => {
             Box::new(crate::plan::concurrent::immix::ConcurrentImmix::new(args))
                 as Box<dyn Plan<VM = VM>>
+        }
+        PlanSelector::Compressor => {
+            Box::new(crate::plan::compressor::Compressor::new(args)) as Box<dyn Plan<VM = VM>>
         }
     };
 

@@ -21,6 +21,7 @@ pub mod gc_work;
 pub mod sft;
 pub mod sft_map;
 
+pub mod compressor;
 pub mod copyspace;
 pub mod immix;
 pub mod immortalspace;
