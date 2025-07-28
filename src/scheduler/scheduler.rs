@@ -20,6 +20,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
+type PostponeQueue<VM> = Injector<Box<dyn GCWork<VM>>>;
+
 pub struct GCWorkScheduler<VM: VMBinding> {
     /// Work buckets
     pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<VM>>,
@@ -688,15 +690,16 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_monitor.notify_work_available(true);
     }
 
-    fn schedule_postponed_concurrent_packets(
-        &self,
-    ) -> (Injector<Box<dyn GCWork<VM>>>, Injector<Box<dyn GCWork<VM>>>) {
+    fn schedule_postponed_concurrent_packets(&self) -> (PostponeQueue<VM>, PostponeQueue<VM>) {
         let mut queue = Injector::new();
-        type Q<VM> = Injector<Box<dyn GCWork<VM>>>;
-        std::mem::swap::<Q<VM>>(&mut queue, &mut self.postponed_concurrent_work.write());
+
+        std::mem::swap::<PostponeQueue<VM>>(
+            &mut queue,
+            &mut self.postponed_concurrent_work.write(),
+        );
 
         let mut pqueue = Injector::new();
-        std::mem::swap::<Q<VM>>(
+        std::mem::swap::<PostponeQueue<VM>>(
             &mut pqueue,
             &mut self.postponed_concurrent_work_prioritized.write(),
         );
@@ -705,8 +708,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     pub(super) fn schedule_concurrent_packets(
         &self,
-        queue: Injector<Box<dyn GCWork<VM>>>,
-        pqueue: Injector<Box<dyn GCWork<VM>>>,
+        queue: PostponeQueue<VM>,
+        pqueue: PostponeQueue<VM>,
     ) {
         // crate::MOVE_CONCURRENT_MARKING_TO_STW.store(false, Ordering::SeqCst);
         // crate::PAUSE_CONCURRENT_MARKING.store(false, Ordering::SeqCst);
