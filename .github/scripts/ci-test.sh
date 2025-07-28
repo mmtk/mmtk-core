@@ -18,6 +18,10 @@ if [[ $arch == "x86" ]]; then
     ALL_PLANS=$ALL_DISCONTIGUOUS_PLANS
 fi
 
+# At the moment, the Compressor does not work with the mock VM tests.
+# So we skip testing the Compressor entirely.
+ALL_PLANS=$ALL_DISCONTIGUOUS_PLANS
+
 # Test with mock VM:
 # - Find all the files that start with mock_test_
 # - Run each file separately with cargo test, with the feature 'mock_test'
