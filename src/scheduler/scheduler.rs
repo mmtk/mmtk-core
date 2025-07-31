@@ -650,13 +650,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // Reset the triggering information.
         mmtk.state.reset_collection_trigger();
 
-        // Set to NotInGC after everything, and right before resuming mutators.
-        mmtk.set_gc_status(GcStatus::NotInGC);
-        <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
-
         self.set_in_gc_pause(false);
         self.schedule_concurrent_packets(queue, pqueue);
         self.debug_assert_all_buckets_deactivated();
+
+        // Set to NotInGC after everything, and right before resuming mutators.
+        mmtk.set_gc_status(GcStatus::NotInGC);
+        <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
 
     pub fn enable_stat(&self) {
