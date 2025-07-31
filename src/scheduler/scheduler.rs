@@ -63,17 +63,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             let mut open_stages: Vec<WorkBucketStage> = vec![first_stw_stage];
             let stages = (0..WorkBucketStage::LENGTH).map(WorkBucketStage::from_usize);
             for stage in stages {
-                {
-                    if stage == WorkBucketStage::ConcurrentSentinel {
-                        work_buckets[stage].set_open_condition(
-                            move |scheduler: &GCWorkScheduler<VM>| {
-                                scheduler.work_buckets[WorkBucketStage::Unconstrained].is_drained()
-                            },
-                        );
-                        open_stages.push(stage);
-                        continue;
-                    }
-                }
                 // Unconstrained is always open.
                 // The first STW stage (Prepare) will be opened when the world stopped
                 // (i.e. when all mutators are suspended).
@@ -507,11 +496,20 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     LastParkedResult::WakeAll
                 } else {
                     // GC finished.
-                    self.on_gc_finished(worker);
+                    let concurrent_work_scheduled = self.on_gc_finished(worker);
 
                     // Clear the current goal
                     goals.on_current_goal_completed();
-                    self.respond_to_requests(worker, goals)
+
+                    if concurrent_work_scheduled {
+                        // It was the initial mark pause and scheduled concurrent work.
+                        // Wake up all GC workers to do concurrent work.
+                        LastParkedResult::WakeAll
+                    } else {
+                        // It was an STW GC or the final mark pause of a concurrent GC.
+                        // Respond to another goal.
+                        self.respond_to_requests(worker, goals)
+                    }
                 }
             }
             WorkerGoal::StopForFork => {
@@ -584,7 +582,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Called when GC has finished, i.e. when all work packets have been executed.
-    fn on_gc_finished(&self, worker: &GCWorker<VM>) {
+    ///
+    /// Return `true` if any concurrent work packets have been scheduled.
+    fn on_gc_finished(&self, worker: &GCWorker<VM>) -> bool {
         // All GC workers must have parked by now.
         debug_assert!(!self.worker_group.has_designated_work());
         debug_assert!(self.all_buckets_empty());
@@ -652,12 +652,14 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         mmtk.state.reset_collection_trigger();
 
         self.set_in_gc_pause(false);
-        self.schedule_concurrent_packets(queue, pqueue);
+        let concurrent_work_scheduled = self.schedule_concurrent_packets(queue, pqueue);
         self.debug_assert_all_buckets_deactivated();
 
         // Set to NotInGC after everything, and right before resuming mutators.
         mmtk.set_gc_status(GcStatus::NotInGC);
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
+
+        concurrent_work_scheduled
     }
 
     pub fn enable_stat(&self) {
@@ -711,24 +713,22 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         &self,
         queue: PostponeQueue<VM>,
         pqueue: PostponeQueue<VM>,
-    ) {
+    ) -> bool {
         // crate::MOVE_CONCURRENT_MARKING_TO_STW.store(false, Ordering::SeqCst);
         // crate::PAUSE_CONCURRENT_MARKING.store(false, Ordering::SeqCst);
-        let mut notify = false;
+        let mut concurrent_work_scheduled = false;
         if !queue.is_empty() {
             let old_queue = self.work_buckets[WorkBucketStage::Unconstrained].swap_queue(queue);
             debug_assert!(old_queue.is_empty());
-            notify = true;
+            concurrent_work_scheduled = true;
         }
         if !pqueue.is_empty() {
             let old_queue =
                 self.work_buckets[WorkBucketStage::Unconstrained].swap_queue_prioritized(pqueue);
             debug_assert!(old_queue.is_empty());
-            notify = true;
+            concurrent_work_scheduled = true;
         }
-        if notify {
-            self.wakeup_all_concurrent_workers();
-        }
+        concurrent_work_scheduled
     }
 
     pub fn wakeup_all_concurrent_workers(&self) {

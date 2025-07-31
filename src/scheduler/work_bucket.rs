@@ -289,8 +289,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
 pub enum WorkBucketStage {
     /// This bucket is always open.
     Unconstrained,
-    Initial,
-    ConcurrentSentinel,
     /// Preparation work.  Plans, spaces, GC workers, mutators, etc. should be prepared for GC at
     /// this stage.
     Prepare,
