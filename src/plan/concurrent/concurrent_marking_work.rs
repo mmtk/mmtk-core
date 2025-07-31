@@ -132,7 +132,13 @@ impl<VM: VMBinding> GCWork<VM> for ConcurrentTraceObjects<VM> {
                 iterations += 1;
             }
         }
-        probe!(mmtk, concurrent_trace_objects, num_objects, num_next_objects, iterations);
+        probe!(
+            mmtk,
+            concurrent_trace_objects,
+            num_objects,
+            num_next_objects,
+            iterations
+        );
         self.flush();
 
         let old_value = crate::NUM_CONCURRENT_TRACING_PACKETS.fetch_sub(1, Ordering::SeqCst);

@@ -433,7 +433,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
         // Finalization
         if !*self.base().options.no_finalizer {
-            use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
+            use crate::util::finalizable_processor::Finalization;
             // finalization
             scheduler.work_buckets[WorkBucketStage::FinalRefClosure]
                 .add(Finalization::<RefProcessingEdges<VM>>::new());
