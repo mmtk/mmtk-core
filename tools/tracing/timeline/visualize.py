@@ -146,6 +146,15 @@ class LogProcessor:
                     "stage": int(args[0]),
                 }
 
+            case "gcrequester_request":
+                result["tid"] = 1
+
+            case "num_concurrent_tracing_packets_change":
+                result["name"] = "Concurrent tracing packets"
+                result["args"] |= {
+                    "number": int(args[0]),
+                }
+
             case _:
                 if self.enrich_event_extra is not None:
                     # Call ``enrich_event_extra`` in the extension script if defined.
@@ -238,6 +247,21 @@ class LogProcessor:
                             "total_scanned": total_scanned,
                             "scan_for_slots": scan_for_slots,
                             "scan_and_trace": scan_and_trace,
+                        }
+                    }
+
+                case "concurrent_trace_objects":
+                    objects = int(args[0])
+                    next_objects = int(args[1])
+                    iterations = int(args[2])
+                    total_objects = objects + next_objects
+                    wp["args"] |= {
+                        # Put args in a group.  See comments in "process_slots".
+                        "scan_objects": {
+                            "objects": objects,
+                            "next_objects": next_objects,
+                            "total_objects": total_objects,
+                            "iterations": iterations,
                         }
                     }
 

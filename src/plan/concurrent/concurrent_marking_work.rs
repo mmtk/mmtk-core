@@ -35,7 +35,10 @@ impl<VM: VMBinding> ConcurrentTraceObjects<VM> {
             .get_plan()
             .downcast_ref::<ConcurrentImmix<VM>>()
             .unwrap();
-        crate::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
+        let old_value = crate::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
+        let new_value = old_value + 1;
+        probe!(mmtk, num_concurrent_tracing_packets_change, new_value);
+
         Self {
             plan,
             objects: Some(objects),
@@ -106,9 +109,13 @@ unsafe impl<VM: VMBinding> Send for ConcurrentTraceObjects<VM> {}
 impl<VM: VMBinding> GCWork<VM> for ConcurrentTraceObjects<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         self.worker = worker;
+        let mut num_objects = 0;
+        let mut num_next_objects = 0;
+        let mut iterations = 0;
         // mark objects
         if let Some(objects) = self.objects.take() {
-            self.trace_objects(&objects)
+            self.trace_objects(&objects);
+            num_objects = objects.len();
         }
         let pause_opt = self.plan.current_pause();
         if pause_opt == Some(Pause::FinalMark) || pause_opt.is_none() {
@@ -121,10 +128,16 @@ impl<VM: VMBinding> GCWork<VM> for ConcurrentTraceObjects<VM> {
                 next_objects.clear();
                 self.next_objects.swap(&mut next_objects);
                 self.trace_objects(&next_objects);
+                num_next_objects += next_objects.len();
+                iterations += 1;
             }
         }
+        probe!(mmtk, concurrent_trace_objects, num_objects, num_next_objects, iterations);
         self.flush();
-        crate::NUM_CONCURRENT_TRACING_PACKETS.fetch_sub(1, Ordering::SeqCst);
+
+        let old_value = crate::NUM_CONCURRENT_TRACING_PACKETS.fetch_sub(1, Ordering::SeqCst);
+        let new_value = old_value - 1;
+        probe!(mmtk, num_concurrent_tracing_packets_change, new_value);
     }
 }
 
