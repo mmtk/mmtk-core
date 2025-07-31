@@ -255,7 +255,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
                 self.set_concurrent_marking_state(false);
             }
         }
-        println!("{:?} start", pause);
+        info!("{:?} start", pause);
     }
 
     fn gc_pause_end(&self) {
@@ -265,7 +265,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         }
         self.previous_pause.store(Some(pause), Ordering::SeqCst);
         self.current_pause.store(None, Ordering::SeqCst);
-        println!("{:?} end", pause);
+        info!("{:?} end", pause);
     }
 }
 
@@ -410,6 +410,34 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         scheduler.work_buckets[WorkBucketStage::Release].add(Release::<
             ConcurrentImmixGCWorkContext<UnsupportedProcessEdges<VM>>,
         >::new(self));
+
+        // Deal with weak ref and finalizers
+        // TODO: Check against schedule_common_work and see if we are still missing any work packet
+        type RefProcessingEdges<VM> =
+            crate::scheduler::gc_work::PlanProcessEdges<VM, ConcurrentImmix<VM>, TRACE_KIND_FAST>;
+        // Reference processing
+        if !*self.base().options.no_reference_types {
+            use crate::util::reference_processor::{
+                PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
+            };
+            scheduler.work_buckets[WorkBucketStage::SoftRefClosure]
+                .add(SoftRefProcessing::<RefProcessingEdges<VM>>::new());
+            scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
+                .add(WeakRefProcessing::<VM>::new());
+            scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
+                .add(PhantomRefProcessing::<VM>::new());
+
+            use crate::util::reference_processor::RefEnqueue;
+            scheduler.work_buckets[WorkBucketStage::Release].add(RefEnqueue::<VM>::new());
+        }
+
+        // Finalization
+        if !*self.base().options.no_finalizer {
+            use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
+            // finalization
+            scheduler.work_buckets[WorkBucketStage::FinalRefClosure]
+                .add(Finalization::<RefProcessingEdges<VM>>::new());
+        }
     }
 
     pub fn concurrent_marking_in_progress(&self) -> bool {
