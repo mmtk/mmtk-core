@@ -54,6 +54,7 @@ pub struct ConcurrentImmix<VM: VMBinding> {
     current_pause: Atomic<Option<Pause>>,
     previous_pause: Atomic<Option<Pause>>,
     gc_cause: Atomic<GCCause>,
+    concurrent_marking_active: AtomicBool,
 }
 
 /// The plan constraints for the immix plan.
@@ -307,6 +308,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             current_pause: Atomic::new(None),
             previous_pause: Atomic::new(None),
             gc_cause: Atomic::new(GCCause::Unknown),
+            concurrent_marking_active: AtomicBool::new(false),
         };
 
         immix.verify_side_metadata_sanity();
@@ -441,21 +443,24 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
     }
 
     pub fn concurrent_marking_in_progress(&self) -> bool {
-        self.common()
-            .base
-            .global_state
-            .concurrent_marking_active
-            .load(Ordering::Acquire)
+        self.concurrent_marking_active.load(Ordering::Acquire)
     }
 
     fn set_concurrent_marking_state(&self, active: bool) {
+        use crate::plan::global::HasSpaces;
         use crate::vm::Collection;
 
+        // Update the binding about concurrent marking
         <VM as VMBinding>::VMCollection::set_concurrent_marking_state(active);
-        self.common()
-            .base
-            .global_state
-            .concurrent_marking_active
+
+        // Tell the spaces to allocate new objects as live
+        let allocate_object_as_live = active;
+        self.for_each_space(&mut |space: &dyn Space<VM>| {
+            space.set_allocate_as_live(allocate_object_as_live);
+        });
+
+        // Store the state.
+        self.concurrent_marking_active
             .store(active, Ordering::SeqCst);
     }
 

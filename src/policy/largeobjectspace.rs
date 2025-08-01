@@ -60,7 +60,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
-        if self.concurrent_marking_active() {
+        if self.should_allocate_as_live() {
             VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::<VM, u8>(
                 object,
                 self.mark_state,
@@ -210,13 +210,6 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         self.treadmill.enumerate_objects(enumerator);
-    }
-
-    fn concurrent_marking_active(&self) -> bool {
-        self.common()
-            .global_state
-            .concurrent_marking_active
-            .load(Ordering::Acquire)
     }
 }
 

@@ -203,13 +203,6 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_chunk_map::<Block>(enumerator, &self.chunk_map);
     }
-
-    fn concurrent_marking_active(&self) -> bool {
-        self.common()
-            .global_state
-            .concurrent_marking_active
-            .load(Ordering::Acquire)
-    }
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace<VM> {

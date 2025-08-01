@@ -266,7 +266,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     Some(end_line)
                 };
                 // mark objects if concurrent marking is active
-                if self.immix_space().concurrent_marking_active() {
+                if self.immix_space().should_allocate_as_live() {
                     let state = self
                         .space
                         .line_mark_state
@@ -321,7 +321,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                 Line::MARK_TABLE
                     .bzero_metadata(block.start(), crate::policy::immix::block::Block::BYTES);
                 // mark objects if concurrent marking is active
-                if self.immix_space().concurrent_marking_active() {
+                if self.immix_space().should_allocate_as_live() {
                     let state = self
                         .space
                         .line_mark_state

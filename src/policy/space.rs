@@ -34,6 +34,7 @@ use crate::util::memory::{self, HugePageSupport, MmapProtection, MmapStrategy};
 use crate::vm::VMBinding;
 
 use std::marker::PhantomData;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -434,8 +435,16 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// scanning VO bits because it is sparse.
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator);
 
-    fn concurrent_marking_active(&self) -> bool {
-        false
+    fn set_allocate_as_live(&self, live: bool) {
+        self.common()
+            .allocate_as_live
+            .store(live, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    fn should_allocate_as_live(&self) -> bool {
+        self.common()
+            .allocate_as_live
+            .load(std::sync::atomic::Ordering::Acquire)
     }
 }
 
@@ -537,6 +546,8 @@ pub struct CommonSpace<VM: VMBinding> {
     pub global_state: Arc<GlobalState>,
     pub options: Arc<Options>,
 
+    pub allocate_as_live: AtomicBool,
+
     p: PhantomData<VM>,
 }
 
@@ -608,6 +619,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             acquire_lock: Mutex::new(()),
             global_state: args.plan_args.global_state,
             options: args.plan_args.options.clone(),
+            allocate_as_live: AtomicBool::new(false),
             p: PhantomData,
         };
 
