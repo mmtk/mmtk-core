@@ -128,7 +128,16 @@ impl<VM: VMBinding> BarrierSemantics for SATBBarrierSemantics<VM> {
         }
     }
 
-    fn load_reference(&mut self, o: ObjectReference) {
+    /// Enqueue the referent during concurrent marking.
+    ///
+    /// Note: During concurrent marking, a collector based on snapshot-at-the-beginning (SATB) will
+    /// not reach objects that were weakly reachable at the time of `InitialMark`.  But if a mutator
+    /// loads from a weak reference field during concurrent marking, it will make the referent
+    /// strongly reachable, yet the referent is still not part of the SATB.  We must conservatively
+    /// enqueue the referent even though its reachability has not yet been established, otherwise it
+    /// (and its children) may be treated as garbage if it happened to be weakly reachable at the
+    /// time of `InitialMark`.
+    fn load_weak_reference(&mut self, o: ObjectReference) {
         if !self.immix.concurrent_marking_in_progress() {
             return;
         }

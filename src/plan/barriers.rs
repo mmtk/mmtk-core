@@ -46,8 +46,18 @@ impl BarrierSelector {
 pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
     fn flush(&mut self) {}
 
-    /// load referent from java.lang.Reference
-    fn load_reference(&mut self, _referent: ObjectReference) {}
+    /// Weak reference loading barrier.  A mutator should call this when loading from a weak
+    /// reference field, for example, when executing  `java.lang.ref.Reference.get()` in JVM, or
+    /// loading from a global weak table in CRuby.
+    ///
+    /// Note: Merely loading from a field holding weak reference into a local variable will create a
+    /// strong reference from the stack to the referent, changing its reachablilty from weakly
+    /// reachable to strongly reachable.  Concurrent garbage collectors may need to handle such
+    /// events specially.  See [SATBBarrier::load_weak_reference] for a concrete example.
+    ///
+    /// Arguments:
+    /// *   `referent`: The referent object which the weak reference is pointing to.
+    fn load_weak_reference(&mut self, _referent: ObjectReference) {}
 
     /// Subsuming barrier for object reference write
     fn object_reference_write(
@@ -166,7 +176,7 @@ pub trait BarrierSemantics: 'static + Send {
     /// Object will probably be modified
     fn object_probable_write_slow(&mut self, _obj: ObjectReference) {}
 
-    fn load_reference(&mut self, _o: ObjectReference) {}
+    fn load_weak_reference(&mut self, _o: ObjectReference) {}
 
     fn object_reference_clone_pre(&mut self, _obj: ObjectReference) {}
 }
@@ -280,8 +290,8 @@ impl<S: BarrierSemantics> Barrier<S::VM> for SATBBarrier<S> {
         self.semantics.flush();
     }
 
-    fn load_reference(&mut self, o: ObjectReference) {
-        self.semantics.load_reference(o)
+    fn load_weak_reference(&mut self, o: ObjectReference) {
+        self.semantics.load_weak_reference(o)
     }
 
     fn object_reference_clone_pre(&mut self, obj: ObjectReference) {
