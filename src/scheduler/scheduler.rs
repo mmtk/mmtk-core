@@ -694,18 +694,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     fn schedule_postponed_concurrent_packets(&self) -> (PostponeQueue<VM>, PostponeQueue<VM>) {
-        let mut queue = Injector::new();
-
-        std::mem::swap::<PostponeQueue<VM>>(
-            &mut queue,
-            &mut self.postponed_concurrent_work.write(),
-        );
-
-        let mut pqueue = Injector::new();
-        std::mem::swap::<PostponeQueue<VM>>(
-            &mut pqueue,
-            &mut self.postponed_concurrent_work_prioritized.write(),
-        );
+        let queue = std::mem::take(&mut *self.postponed_concurrent_work.write());
+        let pqueue = std::mem::take(&mut *self.postponed_concurrent_work_prioritized.write());
         (queue, pqueue)
     }
 
@@ -718,13 +708,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // crate::PAUSE_CONCURRENT_MARKING.store(false, Ordering::SeqCst);
         let mut concurrent_work_scheduled = false;
         if !queue.is_empty() {
-            let old_queue = self.work_buckets[WorkBucketStage::Unconstrained].swap_queue(queue);
+            let old_queue = self.work_buckets[WorkBucketStage::Unconstrained].replace_queue(queue);
             debug_assert!(old_queue.is_empty());
             concurrent_work_scheduled = true;
         }
         if !pqueue.is_empty() {
             let old_queue =
-                self.work_buckets[WorkBucketStage::Unconstrained].swap_queue_prioritized(pqueue);
+                self.work_buckets[WorkBucketStage::Unconstrained].replace_queue_prioritized(pqueue);
             debug_assert!(old_queue.is_empty());
             concurrent_work_scheduled = true;
         }

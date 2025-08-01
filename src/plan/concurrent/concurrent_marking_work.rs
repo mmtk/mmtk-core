@@ -119,14 +119,12 @@ impl<VM: VMBinding> GCWork<VM> for ConcurrentTraceObjects<VM> {
         }
         let pause_opt = self.plan.current_pause();
         if pause_opt == Some(Pause::FinalMark) || pause_opt.is_none() {
-            let mut next_objects = vec![];
             while !self.next_objects.is_empty() {
                 let pause_opt = self.plan.current_pause();
                 if !(pause_opt == Some(Pause::FinalMark) || pause_opt.is_none()) {
                     break;
                 }
-                next_objects.clear();
-                self.next_objects.swap(&mut next_objects);
+                let next_objects = self.next_objects.take();
                 self.trace_objects(&next_objects);
                 num_next_objects += next_objects.len();
                 iterations += 1;

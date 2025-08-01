@@ -71,11 +71,6 @@ impl<T> VectorQueue<T> {
         self.buffer.len()
     }
 
-    /// Replace what was in the queue with data in new_buffer
-    pub fn swap(&mut self, new_buffer: &mut Vec<T>) {
-        std::mem::swap(&mut self.buffer, new_buffer)
-    }
-
     /// Empty the queue
     pub fn clear(&mut self) {
         self.buffer.clear()

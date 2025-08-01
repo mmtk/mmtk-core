@@ -98,18 +98,17 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.prioritized_queue = Some(BucketQueue::new());
     }
 
-    pub fn swap_queue(
+    pub fn replace_queue(
         &self,
-        mut new_queue: Injector<Box<dyn GCWork<VM>>>,
+        new_queue: Injector<Box<dyn GCWork<VM>>>,
     ) -> Injector<Box<dyn GCWork<VM>>> {
         let mut queue = self.queue.queue.write().unwrap();
-        std::mem::swap::<Injector<Box<dyn GCWork<VM>>>>(&mut queue, &mut new_queue);
-        new_queue
+        std::mem::replace::<Injector<Box<dyn GCWork<VM>>>>(&mut queue, new_queue)
     }
 
-    pub fn swap_queue_prioritized(
+    pub fn replace_queue_prioritized(
         &self,
-        mut new_queue: Injector<Box<dyn GCWork<VM>>>,
+        new_queue: Injector<Box<dyn GCWork<VM>>>,
     ) -> Injector<Box<dyn GCWork<VM>>> {
         let mut queue = self
             .prioritized_queue
@@ -118,8 +117,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
             .queue
             .write()
             .unwrap();
-        std::mem::swap::<Injector<Box<dyn GCWork<VM>>>>(&mut queue, &mut new_queue);
-        new_queue
+        std::mem::replace::<Injector<Box<dyn GCWork<VM>>>>(&mut queue, new_queue)
     }
 
     fn notify_one_worker(&self) {
