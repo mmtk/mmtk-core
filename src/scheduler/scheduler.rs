@@ -14,11 +14,13 @@ use crate::util::options::AffinityKind;
 use crate::vm::Collection;
 use crate::vm::VMBinding;
 use crate::Plan;
-use crossbeam::deque::Steal;
+use crossbeam::deque::{Injector, Steal};
 use enum_map::{Enum, EnumMap};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
+
+type PostponeQueue<VM> = Injector<Box<dyn GCWork<VM>>>;
 
 pub struct GCWorkScheduler<VM: VMBinding> {
     /// Work buckets
@@ -29,6 +31,12 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     pub(crate) worker_monitor: Arc<WorkerMonitor>,
     /// How to assign the affinity of each GC thread. Specified by the user.
     affinity: AffinityKind,
+
+    pub(super) postponed_concurrent_work:
+        spin::RwLock<crossbeam::deque::Injector<Box<dyn GCWork<VM>>>>,
+    pub(super) postponed_concurrent_work_prioritized:
+        spin::RwLock<crossbeam::deque::Injector<Box<dyn GCWork<VM>>>>,
+    in_gc_pause: std::sync::atomic::AtomicBool,
 }
 
 // FIXME: GCWorkScheduler should be naturally Sync, but we cannot remove this `impl` yet.
@@ -46,6 +54,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             let active = stage == WorkBucketStage::Unconstrained;
             WorkBucket::new(active, worker_monitor.clone())
         });
+
+        work_buckets[WorkBucketStage::Unconstrained].enable_prioritized_queue();
 
         // Set the open condition of each bucket.
         {
@@ -75,7 +85,42 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             worker_group,
             worker_monitor,
             affinity,
+            postponed_concurrent_work: spin::RwLock::new(crossbeam::deque::Injector::new()),
+            postponed_concurrent_work_prioritized: spin::RwLock::new(
+                crossbeam::deque::Injector::new(),
+            ),
+            in_gc_pause: std::sync::atomic::AtomicBool::new(false),
         })
+    }
+
+    pub fn postpone(&self, w: impl GCWork<VM>) {
+        self.postponed_concurrent_work.read().push(Box::new(w))
+    }
+
+    pub fn postpone_prioritized(&self, w: impl GCWork<VM>) {
+        self.postponed_concurrent_work_prioritized
+            .read()
+            .push(Box::new(w))
+    }
+
+    pub fn postpone_dyn(&self, w: Box<dyn GCWork<VM>>) {
+        self.postponed_concurrent_work.read().push(w)
+    }
+
+    pub fn postpone_dyn_prioritized(&self, w: Box<dyn GCWork<VM>>) {
+        self.postponed_concurrent_work_prioritized.read().push(w)
+    }
+
+    pub fn postpone_all(&self, ws: Vec<Box<dyn GCWork<VM>>>) {
+        let postponed_concurrent_work = self.postponed_concurrent_work.read();
+        ws.into_iter()
+            .for_each(|w| postponed_concurrent_work.push(w));
+    }
+
+    pub fn postpone_all_prioritized(&self, ws: Vec<Box<dyn GCWork<VM>>>) {
+        let postponed_concurrent_work = self.postponed_concurrent_work_prioritized.read();
+        ws.into_iter()
+            .for_each(|w| postponed_concurrent_work.push(w));
     }
 
     pub fn num_workers(&self) -> usize {
@@ -132,6 +177,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Add the `ScheduleCollection` packet.  Called by the last parked worker.
     fn add_schedule_collection_packet(&self) {
         // We are still holding the mutex `WorkerMonitor::sync`.  Do not notify now.
+        probe!(mmtk, add_schedule_collection_packet);
         self.work_buckets[WorkBucketStage::Unconstrained].add_no_notify(ScheduleCollection);
     }
 
@@ -289,6 +335,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.work_buckets.iter().for_each(|(id, bkt)| {
             if id != WorkBucketStage::Unconstrained {
                 bkt.deactivate();
+                bkt.set_as_enabled();
             }
         });
     }
@@ -298,6 +345,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.work_buckets.iter().for_each(|(id, bkt)| {
             if id != WorkBucketStage::Unconstrained && id != first_stw_stage {
                 bkt.deactivate();
+                bkt.set_as_enabled();
             }
         });
     }
@@ -328,6 +376,18 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         if let Some(id) = error_example {
             panic!("Some active buckets (such as {:?}) are not empty.", id);
         }
+    }
+
+    pub(super) fn set_in_gc_pause(&self, in_gc_pause: bool) {
+        self.in_gc_pause
+            .store(in_gc_pause, std::sync::atomic::Ordering::SeqCst);
+        for wb in self.work_buckets.values() {
+            wb.set_in_concurrent(!in_gc_pause);
+        }
+    }
+
+    pub fn in_concurrent(&self) -> bool {
+        !self.in_gc_pause.load(std::sync::atomic::Ordering::SeqCst)
     }
 
     /// Get a schedulable work packet without retry.
@@ -436,11 +496,20 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     LastParkedResult::WakeAll
                 } else {
                     // GC finished.
-                    self.on_gc_finished(worker);
+                    let concurrent_work_scheduled = self.on_gc_finished(worker);
 
                     // Clear the current goal
                     goals.on_current_goal_completed();
-                    self.respond_to_requests(worker, goals)
+
+                    if concurrent_work_scheduled {
+                        // It was the initial mark pause and scheduled concurrent work.
+                        // Wake up all GC workers to do concurrent work.
+                        LastParkedResult::WakeAll
+                    } else {
+                        // It was an STW GC or the final mark pause of a concurrent GC.
+                        // Respond to another goal.
+                        self.respond_to_requests(worker, goals)
+                    }
                 }
             }
             WorkerGoal::StopForFork => {
@@ -513,7 +582,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Called when GC has finished, i.e. when all work packets have been executed.
-    fn on_gc_finished(&self, worker: &GCWorker<VM>) {
+    ///
+    /// Return `true` if any concurrent work packets have been scheduled.
+    fn on_gc_finished(&self, worker: &GCWorker<VM>) -> bool {
         // All GC workers must have parked by now.
         debug_assert!(!self.worker_group.has_designated_work());
         debug_assert!(self.all_buckets_empty());
@@ -523,6 +594,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.debug_assert_all_buckets_deactivated();
 
         let mmtk = worker.mmtk;
+
+        let (queue, pqueue) = self.schedule_postponed_concurrent_packets();
 
         // Tell GC trigger that GC ended - this happens before we resume mutators.
         mmtk.gc_trigger.policy.on_gc_end(mmtk);
@@ -574,13 +647,19 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             // reset the logging info at the end of each GC
             mmtk.slot_logger.reset();
         }
-
+        mmtk.get_plan().gc_pause_end();
         // Reset the triggering information.
         mmtk.state.reset_collection_trigger();
+
+        self.set_in_gc_pause(false);
+        let concurrent_work_scheduled = self.schedule_concurrent_packets(queue, pqueue);
+        self.debug_assert_all_buckets_deactivated();
 
         // Set to NotInGC after everything, and right before resuming mutators.
         mmtk.set_gc_status(GcStatus::NotInGC);
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
+
+        concurrent_work_scheduled
     }
 
     pub fn enable_stat(&self) {
@@ -611,6 +690,38 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // opening the first STW bucket.  In the future, we should redesign the opening condition
         // of work buckets to make the synchronization more robust,
         first_stw_bucket.activate();
+        self.worker_monitor.notify_work_available(true);
+    }
+
+    fn schedule_postponed_concurrent_packets(&self) -> (PostponeQueue<VM>, PostponeQueue<VM>) {
+        let queue = std::mem::take(&mut *self.postponed_concurrent_work.write());
+        let pqueue = std::mem::take(&mut *self.postponed_concurrent_work_prioritized.write());
+        (queue, pqueue)
+    }
+
+    pub(super) fn schedule_concurrent_packets(
+        &self,
+        queue: PostponeQueue<VM>,
+        pqueue: PostponeQueue<VM>,
+    ) -> bool {
+        // crate::MOVE_CONCURRENT_MARKING_TO_STW.store(false, Ordering::SeqCst);
+        // crate::PAUSE_CONCURRENT_MARKING.store(false, Ordering::SeqCst);
+        let mut concurrent_work_scheduled = false;
+        if !queue.is_empty() {
+            let old_queue = self.work_buckets[WorkBucketStage::Unconstrained].replace_queue(queue);
+            debug_assert!(old_queue.is_empty());
+            concurrent_work_scheduled = true;
+        }
+        if !pqueue.is_empty() {
+            let old_queue =
+                self.work_buckets[WorkBucketStage::Unconstrained].replace_queue_prioritized(pqueue);
+            debug_assert!(old_queue.is_empty());
+            concurrent_work_scheduled = true;
+        }
+        concurrent_work_scheduled
+    }
+
+    pub fn wakeup_all_concurrent_workers(&self) {
         self.worker_monitor.notify_work_available(true);
     }
 }
