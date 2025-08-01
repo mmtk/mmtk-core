@@ -38,7 +38,13 @@ impl<VM: VMBinding> SFT for CompressorSpace<VM> {
     }
 
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
-        Some(self.forward(object, false))
+        // Check if forwarding addresses have been calculated before attempting
+        // to forward objects
+        if self.forwarding.has_calculated_forwarding_addresses() {
+            Some(self.forward(object, false))
+        } else {
+            None
+        }
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
