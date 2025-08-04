@@ -1,7 +1,6 @@
 use crate::policy::compressor::region;
 use crate::policy::compressor::region::CompressorRegion;
 use crate::util::heap::{MonotonePageResource, PageResource};
-use crate::util::heap::blockpageresource::BlockPool;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::pageresource::{CommonPageResource, PRAllocFail, PRAllocResult};
 use crate::util::heap::space_descriptor::SpaceDescriptor;
@@ -13,10 +12,14 @@ use crate::util::object_enum::ObjectEnumerator;
 use crate::vm::VMBinding;
 use std::sync::Mutex;
 
+pub struct RegionAllocator {
+    pub region: CompressorRegion,
+    pub cursor: Address,
+}
+
 pub struct Bookkeeping {
-    pub all_regions: Vec<CompressorRegion>,
-    last_region: Option<CompressorRegion>,
-    pub reusable_regions: BlockPool<CompressorRegion>,
+    pub all_regions: Vec<RegionAllocator>,
+    pub allocation_cursor: usize,
 }
 
 pub struct CompressorPageResource<VM: VMBinding> {
@@ -55,32 +58,31 @@ impl<VM: VMBinding> PageResource<VM> for CompressorPageResource<VM> {
 }
 
 impl<VM: VMBinding> CompressorPageResource<VM> {
-    const TLAB_PAGES: usize = region::CompressorRegion::TLAB_BYTES >> LOG_BYTES_IN_PAGE as usize;
-    const REGION_PAGES: usize = region::CompressorRegion::LOG_BYTES - LOG_BYTES_IN_PAGE as usize;
+    // Same as crate::util::alloc::bumpallocator::BLOCK_SIZE
+    const TLAB_BYTES: usize = 8 << crate::util::constants::LOG_BYTES_IN_PAGE;
+    const TLAB_PAGES: usize = Self::TLAB_BYTES >> LOG_BYTES_IN_PAGE as usize;
+    const REGION_PAGES: usize = region::CompressorRegion::BYTES >> LOG_BYTES_IN_PAGE as usize;
     
     pub fn new_contiguous(
         start: Address,
         bytes: usize,
         vm_map: &'static dyn VMMap,
-        num_workers: usize,
     ) -> Self {
-        Self::new(MonotonePageResource::new_contiguous(start, bytes, vm_map), num_workers)
+        Self::new(MonotonePageResource::new_contiguous(start, bytes, vm_map))
     }
 
     pub fn new_discontiguous(
-        vm_map: &'static dyn VMMap,
-        num_workers: usize,
+        vm_map: &'static dyn VMMap
     ) -> Self {
-        Self::new(MonotonePageResource::new_discontiguous(vm_map), num_workers)
+        Self::new(MonotonePageResource::new_discontiguous(vm_map))
     }
 
-    fn new(mpr: MonotonePageResource<VM>, num_workers: usize) -> Self {
+    fn new(mpr: MonotonePageResource<VM>) -> Self {
         Self {
             mpr,
             bookkeeping: Mutex::new(Bookkeeping {
                 all_regions: vec![],
-                last_region: Option::None,
-                reusable_regions: BlockPool::new(num_workers),
+                allocation_cursor: 0,
             })
         }
     }
@@ -90,7 +92,7 @@ impl<VM: VMBinding> CompressorPageResource<VM> {
         space_descriptor: SpaceDescriptor,
         tls: VMThread
     ) -> Result<PRAllocResult, PRAllocFail> {
-        let mut bookkeeping = self.bookkeeping.lock().unwrap();
+        let mut b = self.bookkeeping.lock().unwrap();
         let succeed = |start: Address, new_chunk: bool| {
             Result::Ok(PRAllocResult {
                 start: start,
@@ -99,37 +101,39 @@ impl<VM: VMBinding> CompressorPageResource<VM> {
             })
         };
         // First try to reuse a region.
-        loop {
-            match bookkeeping.last_region {
-                Option::Some(region) =>
-                    if let Option::Some(address) = region.allocate_tlab() {
-                        return succeed(address, false);
-                    },
-                Option::None => {
-                    bookkeeping.last_region = bookkeeping.reusable_regions.pop();
-                    if bookkeeping.last_region.is_none() {
-                        break;
-                    }
-                }
+        while b.allocation_cursor < b.all_regions.len() {
+            let cursor = b.allocation_cursor;
+            if let Option::Some(address) =
+                self.allocate_tlab(&mut b.all_regions[cursor]) {
+                return succeed(address, false);
             }
+            b.allocation_cursor += 1;
         }
         // Else allocate a new region.
         let PRAllocResult { start, new_chunk, .. } =
             self.mpr.alloc_pages(space_descriptor, Self::REGION_PAGES, Self::REGION_PAGES, tls)?;
-        let region = CompressorRegion::from_aligned_address(start);
-        region.initialise();
-        bookkeeping.all_regions.push(region);
-        if let Option::Some(address) = region.allocate_tlab() {
-            succeed(address, new_chunk)
+        b.all_regions.push(RegionAllocator {
+            region: CompressorRegion::from_aligned_address(start),
+            cursor: start,
+        });
+        let cursor = b.allocation_cursor;
+        succeed(self.allocate_tlab(&mut b.all_regions[cursor]).unwrap(), new_chunk)
+    }
+
+    pub fn allocate_tlab(&self, alloc: &mut RegionAllocator) -> Option<Address> {
+        let free = alloc.cursor.align_up(Self::TLAB_BYTES);
+        if free >= alloc.region.end() {
+            Option::None
         } else {
-            Result::Err(PRAllocFail)
+            alloc.cursor = free + Self::TLAB_BYTES;
+            Option::Some(free)
         }
     }
 
     pub fn enumerate(&self, enumerator: &mut dyn ObjectEnumerator) {
         let bookkeeping = self.bookkeeping.lock().unwrap();
-        for r in bookkeeping.all_regions.iter() {
-            enumerator.visit_address_range(r.start(), r.end());
+        for alloc in bookkeeping.all_regions.iter() {
+            enumerator.visit_address_range(alloc.region.start(), alloc.cursor);
         }
     }
 }

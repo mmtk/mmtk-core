@@ -17,7 +17,6 @@ use crate::util::object_enum::{self, ObjectEnumerator};
 use crate::util::{Address, ObjectReference};
 use crate::vm::slot::Slot;
 use crate::{vm::*, ObjectQueue};
-use super::region::CompressorRegion;
 use super::compressorpageresource::CompressorPageResource;
 use atomic::Ordering;
 
@@ -186,16 +185,14 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         let local_specs = extract_side_metadata(&[
             MetadataSpec::OnSide(forwarding::MARK_SPEC),
             MetadataSpec::OnSide(forwarding::OFFSET_VECTOR_SPEC),
-            MetadataSpec::OnSide(CompressorRegion::REGION_USAGE_SPEC),
         ]);
         let is_discontiguous = args.vmrequest.is_discontiguous();
-        let scheduler = args.scheduler.clone();
         let common = CommonSpace::new(args.into_policy_args(true, false, local_specs));
         CompressorSpace {
             pr: if is_discontiguous {
-                CompressorPageResource::new_discontiguous(vm_map, scheduler.num_workers())
+                CompressorPageResource::new_discontiguous(vm_map)
             } else {
-                CompressorPageResource::new_contiguous(common.start, common.extent, vm_map, scheduler.num_workers())
+                CompressorPageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             forwarding: forwarding::ForwardingMetadata::new(),
             common,
@@ -205,7 +202,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     pub fn prepare(&self) {
         let bookkeeping = self.pr.bookkeeping.lock().unwrap();
         for r in bookkeeping.all_regions.iter() {
-            forwarding::MARK_SPEC.bzero_metadata(r.start(), r.end() - r.start());
+            forwarding::MARK_SPEC.bzero_metadata(r.region.start(), r.region.end() - r.region.start());
         }
     }
 
@@ -259,9 +256,9 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         let bookkeeping = self.pr.bookkeeping.lock().unwrap();
         for r in bookkeeping.all_regions.iter() {
             self.forwarding.calculate_offset_vector(&forwarding::ObjectVectorRegion {
-                from_start: r.start(),
-                from_size: r.usage() - r.start(),
-                to_start: r.start()
+                from_start: r.region.start(),
+                from_size: r.cursor - r.region.start(),
+                to_start: r.region.start(),
             });
         }
     }
@@ -301,10 +298,10 @@ impl<VM: VMBinding> CompressorSpace<VM> {
             }
         };
 
-        let bookkeeping = self.pr.bookkeeping.lock().unwrap();
-        for r in bookkeeping.all_regions.iter() {
-            let start = r.start();
-            let end = r.usage();
+        let mut bookkeeping = self.pr.bookkeeping.lock().unwrap();
+        for r in bookkeeping.all_regions.iter_mut() {
+            let start = r.region.start();
+            let end = r.cursor;
             #[cfg(feature = "vo_bit")]
             {
                 #[cfg(debug_assertions)]
@@ -343,12 +340,9 @@ impl<VM: VMBinding> CompressorSpace<VM> {
                     debug_assert_eq!(end_of_new_object, to);
                     update_references(new_object);
                 });
-            r.set_usage(to);
-            if to < r.end() {
-                bookkeeping.reusable_regions.push(*r);
-            }
+            r.cursor = end;
         }
-        bookkeeping.reusable_regions.flush_all();
+        bookkeeping.allocation_cursor = 0;
         // Update references from the LOS to Compressor too.
         los.enumerate_objects(&mut object_enum::ClosureObjectEnumerator::<_, VM>::new(
             update_references,
