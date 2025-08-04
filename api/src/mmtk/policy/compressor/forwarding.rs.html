@@ -190,7 +190,11 @@
 <a href="#189" id="189">189</a>
 <a href="#190" id="190">190</a>
 <a href="#191" id="191">191</a>
-<a href="#192" id="192">192</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::policy::compressor::GC_MARK_BIT_MASK;
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::policy::compressor::GC_MARK_BIT_MASK;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_WORD;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::MonotonePageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::{Region, RegionIterator};
@@ -213,12 +217,12 @@
 /// using [`Transducer::decode`].
 </span><span class="attr">#[derive(Debug)]
 </span><span class="kw">struct </span>Transducer {
-    <span class="comment">// The total live data visited by the transducer.
+    <span class="doccomment">/// The total live data visited by the transducer.
     </span>live: usize,
-    <span class="comment">// The address of the last mark bit which the transducer visited.
+    <span class="doccomment">/// The address of the last mark bit which the transducer visited.
     </span>last_bit_visited: Address,
-    <span class="comment">// Whether or not the transducer is currently inside an object
-    // (i.e. if it has seen a first bit but no matching last bit yet).
+    <span class="doccomment">/// Whether or not the transducer is currently inside an object
+    /// (i.e. if it has seen a first bit but no matching last bit yet).
     </span>in_object: bool,
 }
 <span class="kw">impl </span>Transducer {
@@ -380,6 +384,10 @@
             }
             in_object = !in_object;
         });
+    }
+
+    <span class="kw">pub fn </span>has_calculated_forwarding_addresses(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.calculated.load(Ordering::Relaxed)
     }
 }
 </code></pre></div></section></main></body></html>

@@ -1321,9 +1321,7 @@
 <a href="#1320" id="1320">1320</a>
 <a href="#1321" id="1321">1321</a>
 <a href="#1322" id="1322">1322</a>
-<a href="#1323" id="1323">1323</a>
-<a href="#1324" id="1324">1324</a>
-<a href="#1325" id="1325">1325</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
+<a href="#1323" id="1323">1323</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>std::default::Default;
@@ -2175,9 +2173,7 @@
     <span class="doccomment">/// Should reference type processing be disabled?
     /// If reference type processing is disabled, no weak reference processing work is scheduled,
     /// and we expect a binding to treat weak references as strong references.
-    /// We disable weak reference processing by default, as we are still working on it. This will be changed to `false`
-    /// once weak reference processing is implemented properly.
-    </span>no_reference_types:     bool                    [always_valid] = <span class="bool-val">true</span>,
+    </span>no_reference_types:     bool                    [always_valid] = <span class="bool-val">false</span>,
     <span class="doccomment">/// The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)
     </span>nursery_zeroing:        NurseryZeroingOptions   [always_valid] = NurseryZeroingOptions::Temporal,
     <span class="doccomment">/// How frequent (every X bytes) should we do a stress GC?
