@@ -16,11 +16,6 @@ pub(crate) struct ObjectVectorRegion {
     pub to_start: Address,
 }
 
-pub(crate) struct CopyRegion {
-    pub from_start: Address,
-    pub from_size: usize,
-}
-
 /// A finite-state machine which visits the positions of marked bits in
 /// the mark bitmap, and accumulates the size of live data that it has
 /// seen between marked bits.

@@ -98,6 +98,8 @@ define_side_metadata_specs!(
     COMPRESSOR_MARK = (global: false, log_num_of_bits: 0, log_bytes_in_region: LOG_BYTES_IN_WORD as usize),
     // Block offset vectors by Compressor
     COMPRESSOR_OFFSET_VECTOR = (global: false, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: crate::policy::compressor::forwarding::Block::LOG_BYTES),
+    // Region usage by Compressor
+    COMPRESSOR_REGION_USAGE = (global: false, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: crate::policy::compressor::region::CompressorRegion::LOG_BYTES),
 );
 
 #[cfg(test)]
