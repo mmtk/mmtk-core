@@ -70,12 +70,12 @@ pub(crate) fn generate_impl_items<'a>(
     };
 
     quote! {
-        fn for_each_space(&self, __func: &mut dyn FnMut(&dyn Space<VM>)) {
+        fn for_each_space<'a>(&'a self, __func: &mut dyn FnMut(&'a dyn Space<VM>)) {
             #(#space_visitors)*
             #parent_visitor
         }
 
-        fn for_each_space_mut(&mut self, __func: &mut dyn FnMut(&mut dyn Space<VM>)) {
+        fn for_each_space_mut<'a>(&'a mut self, __func: &mut dyn FnMut(&'a mut dyn Space<VM>)) {
             #(#space_visitors_mut)*
             #parent_visitor_mut
         }
