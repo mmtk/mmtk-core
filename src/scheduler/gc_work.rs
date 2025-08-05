@@ -30,14 +30,7 @@ impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
         mmtk.set_gc_status(GcStatus::GcPrepare);
 
         // Let the plan to schedule collection work
-        if mmtk.is_user_triggered_collection() || is_emergency {
-            // user triggered collection is always stop-the-world
-            mmtk.get_plan().schedule_collection(worker.scheduler());
-        } else {
-            // Let the plan to schedule collection work
-            mmtk.get_plan()
-                .schedule_concurrent_collection(worker.scheduler());
-        }
+        mmtk.get_plan().schedule_collection(worker.scheduler());
     }
 }
 

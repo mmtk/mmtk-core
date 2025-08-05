@@ -122,17 +122,6 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.current_pause
-            .store(Some(Pause::Full), Ordering::SeqCst);
-
-        Self::schedule_immix_full_heap_collection::<
-            ConcurrentImmix<VM>,
-            ConcurrentImmixSTWGCWorkContext<VM, TRACE_KIND_FAST>,
-            ConcurrentImmixSTWGCWorkContext<VM, TRACE_KIND_DEFRAG>,
-        >(self, &self.immix_space, scheduler);
-    }
-
-    fn schedule_concurrent_collection(&'static self, scheduler: &GCWorkScheduler<Self::VM>) {
         let pause = self.select_collection_kind();
         if pause == Pause::Full {
             self.current_pause
