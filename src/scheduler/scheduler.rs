@@ -647,7 +647,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             // reset the logging info at the end of each GC
             mmtk.slot_logger.reset();
         }
-        mmtk.get_plan().gc_pause_end();
         // Reset the triggering information.
         mmtk.state.reset_collection_trigger();
 

@@ -196,6 +196,14 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
     fn end_of_gc(&mut self, _tls: VMWorkerThread) {
         self.last_gc_was_defrag
             .store(self.immix_space.end_of_gc(), Ordering::Relaxed);
+
+        let pause = self.current_pause().unwrap();
+        if pause == Pause::InitialMark {
+            self.set_concurrent_marking_state(true);
+        }
+        self.previous_pause.store(Some(pause), Ordering::SeqCst);
+        self.current_pause.store(None, Ordering::SeqCst);
+        info!("{:?} end", pause);
     }
 
     fn current_gc_may_move_object(&self) -> bool {
@@ -222,7 +230,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         &self.common
     }
 
-    fn gc_pause_start(&self, _scheduler: &GCWorkScheduler<VM>) {
+    fn notify_mutators_paused(&self, _scheduler: &GCWorkScheduler<VM>) {
         use crate::vm::ActivePlan;
         let pause = self.current_pause().unwrap();
         match pause {
@@ -246,16 +254,6 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             }
         }
         info!("{:?} start", pause);
-    }
-
-    fn gc_pause_end(&self) {
-        let pause = self.current_pause().unwrap();
-        if pause == Pause::InitialMark {
-            self.set_concurrent_marking_state(true);
-        }
-        self.previous_pause.store(Some(pause), Ordering::SeqCst);
-        self.current_pause.store(None, Ordering::SeqCst);
-        info!("{:?} end", pause);
     }
 }
 
