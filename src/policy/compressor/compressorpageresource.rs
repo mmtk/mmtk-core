@@ -4,7 +4,7 @@ use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::pageresource::{CommonPageResource, PRAllocFail, PRAllocResult};
 use crate::util::heap::space_descriptor::SpaceDescriptor;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::Address;
 use crate::util::VMThread;
 use crate::util::linear_scan::Region;
@@ -59,9 +59,9 @@ impl<VM: VMBinding> PageResource<VM> for CompressorPageResource<VM> {
 
 impl<VM: VMBinding> CompressorPageResource<VM> {
     // Same as crate::util::alloc::bumpallocator::BLOCK_SIZE
-    const TLAB_BYTES: usize = 8 << crate::util::constants::LOG_BYTES_IN_PAGE;
-    const TLAB_PAGES: usize = Self::TLAB_BYTES >> LOG_BYTES_IN_PAGE as usize;
-    const REGION_PAGES: usize = region::CompressorRegion::BYTES >> LOG_BYTES_IN_PAGE as usize;
+    const TLAB_PAGES: usize = 8;
+    const TLAB_BYTES: usize = Self::TLAB_PAGES * BYTES_IN_PAGE;
+    const REGION_PAGES: usize = region::CompressorRegion::BYTES / BYTES_IN_PAGE;
     
     pub fn new_contiguous(
         start: Address,
@@ -105,7 +105,9 @@ impl<VM: VMBinding> CompressorPageResource<VM> {
             let cursor = b.allocation_cursor;
             if let Option::Some(address) =
                 self.allocate_tlab(&mut b.all_regions[cursor]) {
-                return succeed(address, false);
+                    self.commit_pages(Self::TLAB_PAGES, Self::TLAB_PAGES, tls);
+                    self.common().accounting.commit(Self::TLAB_PAGES);
+                    return succeed(address, false);
             }
             b.allocation_cursor += 1;
         }
@@ -121,13 +123,21 @@ impl<VM: VMBinding> CompressorPageResource<VM> {
     }
 
     pub fn allocate_tlab(&self, alloc: &mut RegionAllocator) -> Option<Address> {
-        let free = alloc.cursor.align_up(Self::TLAB_BYTES);
+        let free = alloc.cursor;
         if free >= alloc.region.end() {
             Option::None
         } else {
             alloc.cursor = free + Self::TLAB_BYTES;
             Option::Some(free)
         }
+    }
+
+    pub fn reset_cursor(&self, alloc: &mut RegionAllocator, address: Address) {
+        let old = alloc.cursor;
+        let new = address.align_up(Self::TLAB_BYTES);
+        let pages = (old - new) / BYTES_IN_PAGE;
+        self.common().accounting.release(pages);
+        alloc.cursor = new;
     }
 
     pub fn enumerate(&self, enumerator: &mut dyn ObjectEnumerator) {

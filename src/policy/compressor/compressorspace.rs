@@ -340,7 +340,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
                     debug_assert_eq!(end_of_new_object, to);
                     update_references(new_object);
                 });
-            r.cursor = end;
+            self.pr.reset_cursor(r, to);
         }
         bookkeeping.allocation_cursor = 0;
         // Update references from the LOS to Compressor too.
