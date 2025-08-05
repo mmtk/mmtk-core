@@ -45,9 +45,9 @@ impl<VM: VMBinding, R: Region + 'static> PageResource<VM> for RegionPageResource
         required_pages: usize,
         tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail> {
-        debug_assert_eq!(reserved_pages, required_pages);
-        debug_assert_eq!(reserved_pages, Self::TLAB_PAGES);
-        self.alloc(space_descriptor, tls)
+        assert!(reserved_pages <= Self::REGION_PAGES);
+        assert!(required_pages <= reserved_pages);
+        self.alloc(space_descriptor, reserved_pages, required_pages, tls)
     }
 
     fn get_available_physical_pages(&self) -> usize {
@@ -88,6 +88,8 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
     fn alloc(
         &self,
         space_descriptor: SpaceDescriptor,
+        reserved_pages: usize,
+        required_pages: usize,
         tls: VMThread
     ) -> Result<PRAllocResult, PRAllocFail> {
         let mut b = self.sync.lock().unwrap();
@@ -98,14 +100,14 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
                 new_chunk
             })
         };
+        let bytes = reserved_pages * BYTES_IN_PAGE;
         // First try to reuse a region.
         while b.allocation_cursor < b.all_regions.len() {
             let cursor = b.allocation_cursor;
             if let Option::Some(address) =
-                self.allocate_tlab(&mut b.all_regions[cursor]) {
-                    self.commit_pages(Self::TLAB_PAGES, Self::TLAB_PAGES, tls);
-                    self.common().accounting.commit(Self::TLAB_PAGES);
-                    return succeed(address, false);
+                self.allocate_from_region(&mut b.all_regions[cursor], bytes) {
+                self.commit_pages(reserved_pages, required_pages, tls);
+                return succeed(address, false);
             }
             b.allocation_cursor += 1;
         }
@@ -117,22 +119,22 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
             cursor: start,
         });
         let cursor = b.allocation_cursor;
-        succeed(self.allocate_tlab(&mut b.all_regions[cursor]).unwrap(), new_chunk)
+        succeed(self.allocate_from_region(&mut b.all_regions[cursor], bytes).unwrap(), new_chunk)
     }
 
-    fn allocate_tlab(&self, alloc: &mut RegionAllocator<R>) -> Option<Address> {
+    fn allocate_from_region(&self, alloc: &mut RegionAllocator<R>, bytes: usize) -> Option<Address> {
         let free = alloc.cursor;
-        if free >= alloc.region.end() {
+        if free + bytes > alloc.region.end() {
             Option::None
         } else {
-            alloc.cursor = free + Self::TLAB_BYTES;
+            alloc.cursor = free + bytes;
             Option::Some(free)
         }
     }
 
     pub fn reset_cursor(&self, alloc: &mut RegionAllocator<R>, address: Address) {
         let old = alloc.cursor;
-        let new = address.align_up(Self::TLAB_BYTES);
+        let new = address.align_up(BYTES_IN_PAGE);
         let pages = (old - new) / BYTES_IN_PAGE;
         self.common().accounting.release(pages);
         alloc.cursor = new;

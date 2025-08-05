@@ -1,5 +1,5 @@
 use crate::plan::VectorObjectQueue;
-use crate::policy::compressor::forwarding::CompressorRegion;
+use crate::policy::compressor::forwarding;
 use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::sft::GCWorkerMutRef;
