@@ -1,5 +1,3 @@
-use crate::policy::compressor::region;
-use crate::policy::compressor::region::CompressorRegion;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::pageresource::{CommonPageResource, PRAllocFail, PRAllocResult};
@@ -12,22 +10,22 @@ use crate::util::object_enum::ObjectEnumerator;
 use crate::vm::VMBinding;
 use std::sync::Mutex;
 
-pub struct RegionAllocator {
-    pub region: CompressorRegion,
+pub struct RegionAllocator<R: Region> {
+    pub region: R,
     pub cursor: Address,
 }
 
-pub struct Bookkeeping {
-    pub all_regions: Vec<RegionAllocator>,
-    pub allocation_cursor: usize,
+struct Sync<R: Region> {
+    all_regions: Vec<RegionAllocator<R>>,
+    allocation_cursor: usize,
 }
 
-pub struct CompressorPageResource<VM: VMBinding> {
+pub struct RegionPageResource<VM: VMBinding, R: Region> {
     mpr: MonotonePageResource<VM>,
-    pub bookkeeping: Mutex<Bookkeeping>,
+    sync: Mutex<Sync<R>>,
 }
 
-impl<VM: VMBinding> PageResource<VM> for CompressorPageResource<VM> {
+impl<VM: VMBinding, R: Region + 'static> PageResource<VM> for RegionPageResource<VM, R> {
     fn common(&self) -> &CommonPageResource {
         self.mpr.common()
     }
@@ -57,11 +55,11 @@ impl<VM: VMBinding> PageResource<VM> for CompressorPageResource<VM> {
     }
 }
 
-impl<VM: VMBinding> CompressorPageResource<VM> {
+impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
     // Same as crate::util::alloc::bumpallocator::BLOCK_SIZE
     const TLAB_PAGES: usize = 8;
     const TLAB_BYTES: usize = Self::TLAB_PAGES * BYTES_IN_PAGE;
-    const REGION_PAGES: usize = region::CompressorRegion::BYTES / BYTES_IN_PAGE;
+    const REGION_PAGES: usize = R::BYTES / BYTES_IN_PAGE;
     
     pub fn new_contiguous(
         start: Address,
@@ -80,7 +78,7 @@ impl<VM: VMBinding> CompressorPageResource<VM> {
     fn new(mpr: MonotonePageResource<VM>) -> Self {
         Self {
             mpr,
-            bookkeeping: Mutex::new(Bookkeeping {
+            sync: Mutex::new(Sync {
                 all_regions: vec![],
                 allocation_cursor: 0,
             })
@@ -92,7 +90,7 @@ impl<VM: VMBinding> CompressorPageResource<VM> {
         space_descriptor: SpaceDescriptor,
         tls: VMThread
     ) -> Result<PRAllocResult, PRAllocFail> {
-        let mut b = self.bookkeeping.lock().unwrap();
+        let mut b = self.sync.lock().unwrap();
         let succeed = |start: Address, new_chunk: bool| {
             Result::Ok(PRAllocResult {
                 start: start,
@@ -115,14 +113,14 @@ impl<VM: VMBinding> CompressorPageResource<VM> {
         let PRAllocResult { start, new_chunk, .. } =
             self.mpr.alloc_pages(space_descriptor, Self::REGION_PAGES, Self::REGION_PAGES, tls)?;
         b.all_regions.push(RegionAllocator {
-            region: CompressorRegion::from_aligned_address(start),
+            region: R::from_aligned_address(start),
             cursor: start,
         });
         let cursor = b.allocation_cursor;
         succeed(self.allocate_tlab(&mut b.all_regions[cursor]).unwrap(), new_chunk)
     }
 
-    pub fn allocate_tlab(&self, alloc: &mut RegionAllocator) -> Option<Address> {
+    fn allocate_tlab(&self, alloc: &mut RegionAllocator<R>) -> Option<Address> {
         let free = alloc.cursor;
         if free >= alloc.region.end() {
             Option::None
@@ -132,7 +130,7 @@ impl<VM: VMBinding> CompressorPageResource<VM> {
         }
     }
 
-    pub fn reset_cursor(&self, alloc: &mut RegionAllocator, address: Address) {
+    pub fn reset_cursor(&self, alloc: &mut RegionAllocator<R>, address: Address) {
         let old = alloc.cursor;
         let new = address.align_up(Self::TLAB_BYTES);
         let pages = (old - new) / BYTES_IN_PAGE;
@@ -140,10 +138,21 @@ impl<VM: VMBinding> CompressorPageResource<VM> {
         alloc.cursor = new;
     }
 
+    pub fn reset_allocator(&self) {
+        self.sync.lock().unwrap().allocation_cursor = 0;
+    }
+
     pub fn enumerate(&self, enumerator: &mut dyn ObjectEnumerator) {
-        let bookkeeping = self.bookkeeping.lock().unwrap();
-        for alloc in bookkeeping.all_regions.iter() {
+        let sync = self.sync.lock().unwrap();
+        for alloc in sync.all_regions.iter() {
             enumerator.visit_address_range(alloc.region.start(), alloc.cursor);
+        }
+    }
+
+    pub fn enumerate_regions(&self, enumerator: &mut impl FnMut(&mut RegionAllocator<R>)) {
+        let mut sync = self.sync.lock().unwrap();
+        for alloc in sync.all_regions.iter_mut() {
+            enumerator(alloc);
         }
     }
 }
