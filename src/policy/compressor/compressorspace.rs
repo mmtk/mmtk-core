@@ -201,7 +201,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     }
 
     pub fn prepare(&self) {
-        self.pr.enumerate_regions(&mut |r: &mut RegionAllocator<forwarding::CompressorRegion>| {
+        self.pr.enumerate_regions(&mut |r: &RegionAllocator<forwarding::CompressorRegion>| {
             forwarding::MARK_SPEC.bzero_metadata(r.region.start(), r.region.end() - r.region.start());
         });
     }
@@ -253,10 +253,10 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     }
 
     pub fn calculate_offset_vector(&self) {
-        self.pr.enumerate_regions(&mut |r: &mut RegionAllocator<forwarding::CompressorRegion>| {
+        self.pr.enumerate_regions(&mut |r: &RegionAllocator<forwarding::CompressorRegion>| {
             self.forwarding.calculate_offset_vector(&forwarding::ObjectVectorRegion {
                 from_start: r.region.start(),
-                from_size: r.cursor - r.region.start(),
+                from_size: r.cursor() - r.region.start(),
                 to_start: r.region.start(),
             });
         });
@@ -297,9 +297,9 @@ impl<VM: VMBinding> CompressorSpace<VM> {
             }
         };
 
-        self.pr.enumerate_regions(&mut |r: &mut RegionAllocator<forwarding::CompressorRegion>| {
+        self.pr.enumerate_regions(&mut |r: &RegionAllocator<forwarding::CompressorRegion>| {
             let start = r.region.start();
-            let end = r.cursor;
+            let end = r.cursor();
             #[cfg(feature = "vo_bit")]
             {
                 #[cfg(debug_assertions)]

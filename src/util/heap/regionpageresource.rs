@@ -8,11 +8,22 @@ use crate::util::VMThread;
 use crate::util::linear_scan::Region;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::vm::VMBinding;
-use std::sync::Mutex;
+use std::sync::RwLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub struct RegionAllocator<R: Region> {
     pub region: R,
-    pub cursor: Address,
+    cursor: AtomicUsize,
+}
+
+impl<R: Region> RegionAllocator<R> {
+    pub fn cursor(&self) -> Address {
+        let a = self.cursor.load(Ordering::Relaxed);
+        unsafe { Address::from_usize(a) }
+    }
+    pub fn set_cursor(&self, a: Address) {
+        self.cursor.store(a.as_usize(), Ordering::Relaxed);
+    }
 }
 
 struct Sync<R: Region> {
@@ -22,7 +33,7 @@ struct Sync<R: Region> {
 
 pub struct RegionPageResource<VM: VMBinding, R: Region> {
     mpr: MonotonePageResource<VM>,
-    sync: Mutex<Sync<R>>,
+    sync: RwLock<Sync<R>>,
 }
 
 impl<VM: VMBinding, R: Region + 'static> PageResource<VM> for RegionPageResource<VM, R> {
@@ -78,7 +89,7 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
     fn new(mpr: MonotonePageResource<VM>) -> Self {
         Self {
             mpr,
-            sync: Mutex::new(Sync {
+            sync: RwLock::new(Sync {
                 all_regions: vec![],
                 allocation_cursor: 0,
             })
@@ -92,7 +103,7 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
         required_pages: usize,
         tls: VMThread
     ) -> Result<PRAllocResult, PRAllocFail> {
-        let mut b = self.sync.lock().unwrap();
+        let mut b = self.sync.write().unwrap();
         let succeed = |start: Address, new_chunk: bool| {
             Result::Ok(PRAllocResult {
                 start: start,
@@ -116,44 +127,44 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
             self.mpr.alloc_pages(space_descriptor, Self::REGION_PAGES, Self::REGION_PAGES, tls)?;
         b.all_regions.push(RegionAllocator {
             region: R::from_aligned_address(start),
-            cursor: start,
+            cursor: AtomicUsize::new(start.as_usize()),
         });
         let cursor = b.allocation_cursor;
         succeed(self.allocate_from_region(&mut b.all_regions[cursor], bytes).unwrap(), new_chunk)
     }
 
     fn allocate_from_region(&self, alloc: &mut RegionAllocator<R>, bytes: usize) -> Option<Address> {
-        let free = alloc.cursor;
+        let free = alloc.cursor();
         if free + bytes > alloc.region.end() {
             Option::None
         } else {
-            alloc.cursor = free + bytes;
+            alloc.set_cursor(free + bytes);
             Option::Some(free)
         }
     }
 
-    pub fn reset_cursor(&self, alloc: &mut RegionAllocator<R>, address: Address) {
-        let old = alloc.cursor;
+    pub fn reset_cursor(&self, alloc: &RegionAllocator<R>, address: Address) {
+        let old = alloc.cursor();
         let new = address.align_up(BYTES_IN_PAGE);
         let pages = (old - new) / BYTES_IN_PAGE;
         self.common().accounting.release(pages);
-        alloc.cursor = new;
+        alloc.set_cursor(new);
     }
 
     pub fn reset_allocator(&self) {
-        self.sync.lock().unwrap().allocation_cursor = 0;
+        self.sync.write().unwrap().allocation_cursor = 0;
     }
 
     pub fn enumerate(&self, enumerator: &mut dyn ObjectEnumerator) {
-        let sync = self.sync.lock().unwrap();
+        let sync = self.sync.read().unwrap();
         for alloc in sync.all_regions.iter() {
-            enumerator.visit_address_range(alloc.region.start(), alloc.cursor);
+            enumerator.visit_address_range(alloc.region.start(), alloc.cursor());
         }
     }
 
-    pub fn enumerate_regions(&self, enumerator: &mut impl FnMut(&mut RegionAllocator<R>)) {
-        let mut sync = self.sync.lock().unwrap();
-        for alloc in sync.all_regions.iter_mut() {
+    pub fn enumerate_regions(&self, enumerator: &mut impl FnMut(&RegionAllocator<R>)) {
+        let sync = self.sync.read().unwrap();
+        for alloc in sync.all_regions.iter() {
             enumerator(alloc);
         }
     }
