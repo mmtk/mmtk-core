@@ -162,6 +162,11 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
         }
     }
 
+    pub fn with_regions<T>(&self, f: &mut impl FnMut(&Vec<RegionAllocator<R>>) -> T) -> T {
+        let sync = self.sync.read().unwrap();
+        f(&sync.all_regions)
+    }
+
     pub fn enumerate_regions(&self, enumerator: &mut impl FnMut(&RegionAllocator<R>)) {
         let sync = self.sync.read().unwrap();
         for alloc in sync.all_regions.iter() {

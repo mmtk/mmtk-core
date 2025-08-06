@@ -282,22 +282,27 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         ObjectReference::from_raw_address(self.forwarding.forward(object.to_raw_address())).unwrap()
     }
 
-    pub fn compact(&self, worker: &mut GCWorker<VM>, los: &LargeObjectSpace<VM>) {
-        let update_references = &mut |object: ObjectReference| {
-            if VM::VMScanning::support_slot_enqueuing(worker.tls, object) {
-                VM::VMScanning::scan_object(worker.tls, object, &mut |s: VM::VMSlot| {
-                    if let Some(o) = s.load() {
-                        s.store(self.forward(o, false));
-                    }
-                });
-            } else {
-                VM::VMScanning::scan_object_and_trace_edges(worker.tls, object, &mut |o| {
-                    self.forward(o, false)
-                });
-            }
-        };
+    pub fn regions(&self) -> usize {
+        self.pr.with_regions(&mut |r| r.len())
+    }
 
-        self.pr.enumerate_regions(&mut |r: &RegionAllocator<forwarding::CompressorRegion>| {
+    fn update_references(&self, worker: &mut GCWorker<VM>, object: ObjectReference) {
+        if VM::VMScanning::support_slot_enqueuing(worker.tls, object) {
+            VM::VMScanning::scan_object(worker.tls, object, &mut |s: VM::VMSlot| {
+                if let Some(o) = s.load() {
+                    s.store(self.forward(o, false));
+                }
+            });
+        } else {
+            VM::VMScanning::scan_object_and_trace_edges(worker.tls, object, &mut |o| {
+                self.forward(o, false)
+            });
+        }
+    }
+    
+    pub fn compact_region(&self, worker: &mut GCWorker<VM>, index: usize) {
+        self.pr.with_regions(&mut |regions: &Vec<RegionAllocator<forwarding::CompressorRegion>>| {
+            let r = &regions[index];
             let start = r.region.start();
             let end = r.cursor();
             #[cfg(feature = "vo_bit")]
@@ -336,14 +341,19 @@ impl<VM: VMBinding> CompressorSpace<VM> {
                     vo_bit::set_vo_bit(new_object);
                     to = new_object.to_object_start::<VM>() + copied_size;
                     debug_assert_eq!(end_of_new_object, to);
-                    update_references(new_object);
+                    self.update_references(worker, new_object);
                 });
-            self.pr.reset_cursor(r, to);
+            self.pr.reset_cursor(&r, to);
         });
+    }
+
+    pub fn after_compact(&self, worker: &mut GCWorker<VM>, los: &LargeObjectSpace<VM>) {
         self.pr.reset_allocator();
         // Update references from the LOS to Compressor too.
         los.enumerate_objects(&mut object_enum::ClosureObjectEnumerator::<_, VM>::new(
-            update_references,
+            &mut |o: ObjectReference| {
+                self.update_references(worker, o);
+            }
         ));
     }
 }

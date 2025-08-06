@@ -1,7 +1,7 @@
 use super::gc_work::CompressorWorkContext;
 use super::gc_work::{
-    CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
-    UpdateReferences,
+    AfterCompact, CalculateForwardingAddress, Compact,
+    ForwardingProcessEdges, MarkingProcessEdges, UpdateReferences,
 };
 use crate::plan::compressor::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::CreateGeneralPlanArgs;
@@ -14,6 +14,7 @@ use crate::plan::PlanConstraints;
 use crate::policy::compressor::CompressorSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
+use crate::scheduler::GCWork;
 use crate::scheduler::GCWorkScheduler;
 use crate::scheduler::WorkBucketStage;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -100,10 +101,18 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding].add(
             CalculateForwardingAddress::<VM>::new(&self.compressor_space),
         );
-        // do another trace to update references
+        // scan roots to update their references
         scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new());
+
+        let mut compact_packets: Vec<Box<dyn GCWork<VM>>> = vec![];
+        for index in 0..self.compressor_space.regions() {
+            compact_packets.push(Box::new(Compact::<VM>::new(&self.compressor_space, index)));
+        }
+        
         scheduler.work_buckets[WorkBucketStage::Compact]
-            .add(Compact::<VM>::new(&self.compressor_space, &self.common.los));
+            .bulk_add(compact_packets);
+        scheduler.work_buckets[WorkBucketStage::Compact]
+            .set_sentinel(Box::new(AfterCompact::<VM>::new(&self.compressor_space, &self.common.los)));
 
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]

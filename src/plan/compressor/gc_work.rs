@@ -68,19 +68,43 @@ impl<VM: VMBinding> UpdateReferences<VM> {
     }
 }
 
-/// Compact live objects based on the previously-calculated forwarding pointers.
+/// Compact live objects in a region.
 pub struct Compact<VM: VMBinding> {
     compressor_space: &'static CompressorSpace<VM>,
-    los: &'static LargeObjectSpace<VM>,
+    index: usize
 }
 
 impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.compressor_space.compact(worker, self.los);
+        self.compressor_space.compact_region(worker, self.index);
     }
 }
 
 impl<VM: VMBinding> Compact<VM> {
+    pub fn new(
+        compressor_space: &'static CompressorSpace<VM>,
+        index: usize,
+    ) -> Self {
+        Self {
+            compressor_space,
+            index,
+        }
+    }
+}
+
+/// Reset the allocator and update references in large object space.
+pub struct AfterCompact<VM: VMBinding> {
+    compressor_space: &'static CompressorSpace<VM>,
+    los: &'static LargeObjectSpace<VM>,
+}
+
+impl<VM: VMBinding> GCWork<VM> for AfterCompact<VM> {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        self.compressor_space.after_compact(worker, self.los);
+    }
+}
+
+impl<VM: VMBinding> AfterCompact<VM> {
     pub fn new(
         compressor_space: &'static CompressorSpace<VM>,
         los: &'static LargeObjectSpace<VM>,
