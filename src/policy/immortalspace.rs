@@ -157,7 +157,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
 
     pub fn prepare(&mut self) {
         self.mark_state.on_global_prepare::<VM>();
-        // Otherwise, we reset the mark bit for the allocated regions.
+        // Reset the mark bit for the allocated regions.
         for (addr, size) in self.pr.iterate_allocated_regions() {
             debug!(
                 "{:?}: reset mark bit from {} to {}",
