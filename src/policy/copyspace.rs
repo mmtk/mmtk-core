@@ -201,12 +201,6 @@ impl<VM: VMBinding> CopySpace<VM> {
                 side_forwarding_status_table.bzero_metadata(start, size);
             }
 
-            if self.common.needs_log_bit {
-                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                    side.bzero_metadata(start, size);
-                }
-            }
-
             // Clear VO bits because all objects in the space are dead.
             #[cfg(feature = "vo_bit")]
             crate::util::metadata::vo_bit::bzero_vo_bit(start, size);
@@ -216,6 +210,20 @@ impl<VM: VMBinding> CopySpace<VM> {
             self.pr.reset();
         }
         self.from_space.store(false, Ordering::SeqCst);
+    }
+
+    pub fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            log_bit.bzero_metadata(start, size);
+        }
+    }
+
+    pub fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            log_bit.bset_metadata(start, size);
+        }
     }
 
     fn is_from_space(&self) -> bool {

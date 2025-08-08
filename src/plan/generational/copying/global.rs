@@ -110,6 +110,9 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.release(tls);
         if full_heap {
+            if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
+                self.fromspace().clear_side_log_bits();
+            }
             self.fromspace().release();
         }
     }
