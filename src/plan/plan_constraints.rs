@@ -20,7 +20,7 @@ pub struct PlanConstraints {
     /// This depends on the copy allocator.
     pub max_non_los_copy_bytes: usize,
     /// Does this plan use the log bit? See vm::ObjectModel::GLOBAL_LOG_BIT_SPEC.
-    pub needs_log_bit: bool,
+    // pub needs_log_bit: bool,
     /// Some plans may allow benign race for testing mark bit, and this will lead to trace the same
     /// edge multiple times. If a plan allows tracing duplicated edges, we will not run duplicate
     /// edge check in extreme_assertions.
@@ -45,7 +45,10 @@ pub struct PlanConstraints {
     /// `MutatorConfig::prepare_func`).  Those plans can set this to `false` so that the
     /// `PrepareMutator` work packets will not be created at all.
     pub needs_prepare_mutator: bool,
-    pub needs_satb: bool,
+    // pub needs_satb: bool,
+    pub uses_log_bit: bool,
+    pub unlog_allocated_object: bool,
+    pub unlog_traced_object: bool,
 }
 
 impl PlanConstraints {
@@ -64,11 +67,14 @@ impl PlanConstraints {
             // We may trace duplicate edges in mark sweep. If we use mark sweep as the non moving policy, it will be included in every
             may_trace_duplicate_edges: cfg!(feature = "marksweep_as_nonmoving"),
             needs_forward_after_liveness: false,
-            needs_log_bit: false,
+            // needs_log_bit: false,
             barrier: BarrierSelector::NoBarrier,
             // If we use mark sweep as non moving space, we need to prepare mutator. See [`common_prepare_func`].
             needs_prepare_mutator: cfg!(feature = "marksweep_as_nonmoving"),
-            needs_satb: false,
+            // needs_satb: false,
+            uses_log_bit: false,
+            unlog_allocated_object: false,
+            unlog_traced_object: false,
         }
     }
 }

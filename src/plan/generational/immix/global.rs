@@ -129,6 +129,9 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.prepare(tls);
         if full_heap {
+            if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
+                self.immix_space.clear_side_log_bits();
+            }
             self.immix_space.prepare(
                 full_heap,
                 Some(crate::policy::immix::defrag::StatsForDefrag::new(self)),
@@ -250,7 +253,7 @@ impl<VM: VMBinding> GenImmix<VM> {
             plan_args.get_space_args("immix_mature", true, false, VMRequest::discontiguous()),
             ImmixSpaceArgs {
                 // We need to unlog objects at tracing time since we currently clear all log bits during a major GC
-                unlog_object_when_traced: true,
+                // unlog_object_when_traced: true,
                 // In GenImmix, young objects are not allocated in ImmixSpace directly.
                 #[cfg(feature = "vo_bit")]
                 mixed_age: false,

@@ -25,6 +25,7 @@ use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::vm::VMBinding;
+use crate::vm::ObjectModel;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
 
@@ -66,7 +67,7 @@ pub const CONCURRENT_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
     needs_prepare_mutator: true,
     barrier: crate::BarrierSelector::SATBBarrier,
-    needs_satb: true,
+    uses_log_bit: true,
     ..PlanConstraints::default()
 };
 
@@ -162,8 +163,12 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             Pause::InitialMark => {
                 // init prepare has to be executed first, otherwise, los objects will not be
                 // dealt with properly
-                self.common.initial_pause_prepare();
-                self.immix_space.initial_pause_prepare();
+                // self.common.initial_pause_prepare();
+                // self.immix_space.initial_pause_prepare();
+                if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
+                    self.common.set_side_log_bits();
+                    self.immix_space.set_side_log_bits();
+                }
                 self.common.prepare(tls, true);
                 self.immix_space.prepare(
                     true,
@@ -179,8 +184,12 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         match pause {
             Pause::InitialMark => (),
             Pause::Full | Pause::FinalMark => {
-                self.immix_space.final_pause_release();
-                self.common.final_pause_release();
+                if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
+                    self.immix_space.clear_side_log_bits();
+                    self.common.clear_side_log_bits();
+                }
+                // self.immix_space.final_pause_release();
+                // self.common.final_pause_release();
                 self.common.release(tls, true);
                 // release the collected region
                 self.immix_space.release(true);
@@ -278,7 +287,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         Self::new_with_args(
             plan_args,
             ImmixSpaceArgs {
-                unlog_object_when_traced: false,
+                // unlog_object_when_traced: false,
                 #[cfg(feature = "vo_bit")]
                 mixed_age: false,
                 never_move_objects: true,

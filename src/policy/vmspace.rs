@@ -61,7 +61,7 @@ impl<VM: VMBinding> SFT for VMSpace<VM> {
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         self.mark_state
             .on_object_metadata_initialization::<VM>(object);
-        if self.common.needs_log_bit {
+        if self.common.unlog_allocated_object {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
         #[cfg(feature = "vo_bit")]
@@ -248,7 +248,7 @@ impl<VM: VMBinding> VMSpace<VM> {
         });
 
         #[cfg(feature = "set_unlog_bits_vm_space")]
-        if self.common.needs_log_bit {
+        if self.common.uses_log_bit {
             // Bulk set unlog bits for all addresses in the VM space. This ensures that any
             // modification to the bootimage is logged
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
@@ -287,7 +287,7 @@ impl<VM: VMBinding> VMSpace<VM> {
             // Flip the per-object unlogged bits to "unlogged" state for objects inside the
             // bootimage
             #[cfg(feature = "set_unlog_bits_vm_space")]
-            if self.common.needs_log_bit {
+            if self.common.unlog_traced_object {
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
                     object,
                     1,

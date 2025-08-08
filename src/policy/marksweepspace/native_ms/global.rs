@@ -407,13 +407,13 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     pub fn prepare(&mut self, full_heap: bool) {
-        if self.common.needs_log_bit && full_heap {
-            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                for chunk in self.chunk_map.all_chunks() {
-                    side.bzero_metadata(chunk.start(), Chunk::BYTES);
-                }
-            }
-        }
+        // if self.common.needs_log_bit && full_heap {
+        //     if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+        //         for chunk in self.chunk_map.all_chunks() {
+        //             side.bzero_metadata(chunk.start(), Chunk::BYTES);
+        //         }
+        //     }
+        // }
 
         #[cfg(debug_assertions)]
         self.abandoned_in_gc.lock().unwrap().assert_empty();
@@ -425,6 +425,20 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             .generate_tasks(|chunk| Box::new(PrepareChunkMap { space, chunk }));
         self.scheduler.work_buckets[crate::scheduler::WorkBucketStage::Prepare]
             .bulk_add(work_packets);
+    }
+
+    pub fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
+        }
+    }
+
+    pub fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
+        }
     }
 
     pub fn release(&mut self) {

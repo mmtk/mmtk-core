@@ -31,6 +31,7 @@ pub struct LargeObjectSpace<VM: VMBinding> {
     mark_state: u8,
     in_nursery_gc: bool,
     treadmill: TreadMill,
+    clear_log_bit_on_sweep: bool,
 }
 
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
@@ -95,7 +96,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         );
 
         // If this object is freshly allocated, we do not set it as unlogged
-        if !alloc && self.common.needs_log_bit {
+        if !alloc && self.common.unlog_allocated_object {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
 
@@ -235,6 +236,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     pub fn new(
         args: crate::policy::space::PlanCreateSpaceArgs<VM>,
         protect_memory_on_release: bool,
+        clear_log_bit_on_sweep: bool,
     ) -> Self {
         let is_discontiguous = args.vmrequest.is_discontiguous();
         let vm_map = args.vm_map;
@@ -259,25 +261,47 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             mark_state: 0,
             in_nursery_gc: false,
             treadmill: TreadMill::new(),
+            clear_log_bit_on_sweep,
         }
     }
 
-    pub fn initial_pause_prepare(&self) {
+    pub fn clear_side_log_bits(&self) {
+        let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
+        });
+        self.treadmill.enumerate_objects(&mut enumator);
+    }
+
+    pub fn set_side_log_bits(&self) {
+        use crate::util::object_enum::ClosureObjectEnumerator;
+
         debug_assert!(self.treadmill.is_from_space_empty());
         debug_assert!(self.treadmill.is_nursery_empty());
-        debug_assert!(self.common.needs_satb);
+        // debug_assert!(self.common.needs_satb);
         let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         });
         self.treadmill.enumerate_objects(&mut enumator);
     }
 
-    pub fn final_pause_release(&self) {
-        let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
-        });
-        self.treadmill.enumerate_objects(&mut enumator);
-    }
+    // pub fn initial_pause_prepare(&self) {
+    //     // use crate::util::object_enum::ClosureObjectEnumerator;
+
+    //     // debug_assert!(self.treadmill.is_from_space_empty());
+    //     // debug_assert!(self.treadmill.is_nursery_empty());
+    //     // debug_assert!(self.common.needs_satb);
+    //     // let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
+    //     //     VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+    //     // });
+    //     // self.treadmill.enumerate_objects(&mut enumator);
+    // }
+
+    // pub fn final_pause_release(&self) {
+    //     // let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
+    //     //     VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
+    //     // });
+    //     // self.treadmill.enumerate_objects(&mut enumator);
+    // }
 
     pub fn prepare(&mut self, full_heap: bool) {
         if full_heap {
@@ -325,7 +349,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 // We just moved the object out of the logical nursery, mark it as unlogged.
                 // We also unlog mature objects as their unlog bit may have been unset before the
                 // full-heap GC
-                if self.common.needs_log_bit {
+                if self.common.unlog_traced_object {
                     VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
                         .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
                 }
@@ -345,7 +369,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             #[cfg(feature = "vo_bit")]
             crate::util::metadata::vo_bit::unset_vo_bit(object);
             // Clear log bits for dead objects to prevent a new nursery object having the unlog bit set
-            if self.common.needs_log_bit || self.common.needs_satb {
+            if self.clear_log_bit_on_sweep {
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
             }
             self.pr

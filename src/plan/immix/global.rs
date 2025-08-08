@@ -138,7 +138,7 @@ impl<VM: VMBinding> Immix<VM> {
         Self::new_with_args(
             plan_args,
             ImmixSpaceArgs {
-                unlog_object_when_traced: false,
+                // unlog_object_when_traced: false,
                 #[cfg(feature = "vo_bit")]
                 mixed_age: false,
                 never_move_objects: false,

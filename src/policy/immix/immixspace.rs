@@ -65,7 +65,7 @@ pub struct ImmixSpaceArgs {
     /// In sticky immix, we 'promote' an object to mature when we trace the object
     /// (no matter we copy an object or not). So we have to use `PromoteToMature`, and instead
     /// just set the log bit in the space when an object is traced.
-    pub unlog_object_when_traced: bool,
+    // pub unlog_object_when_traced: bool,
     /// Whether this ImmixSpace instance contains both young and old objects.
     /// This affects the updating of valid-object bits.  If some lines or blocks of this ImmixSpace
     /// instance contain young objects, their VO bits need to be updated during this GC.  Currently
@@ -301,12 +301,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         args: crate::policy::space::PlanCreateSpaceArgs<VM>,
         mut space_args: ImmixSpaceArgs,
     ) -> Self {
-        if space_args.unlog_object_when_traced {
-            assert!(
-                args.constraints.needs_log_bit,
-                "Invalid args when the plan does not use log bit"
-            );
-        }
+        // if space_args.unlog_object_when_traced {
+        //     assert!(
+        //         args.constraints.needs_log_bit,
+        //         "Invalid args when the plan does not use log bit"
+        //     );
+        // }
 
         // Make sure we override the space args if we force non moving Immix
         if cfg!(feature = "immix_non_moving") && !space_args.never_move_objects {
@@ -411,23 +411,23 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self.scheduler
     }
 
-    pub fn initial_pause_prepare(&mut self) {
-        // make sure all allocated blocks have unlog bit set during initial mark
-        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-            for chunk in self.chunk_map.all_chunks() {
-                side.bset_metadata(chunk.start(), Chunk::BYTES);
-            }
-        }
-    }
+    // pub fn initial_pause_prepare(&mut self) {
+    //     // make sure all allocated blocks have unlog bit set during initial mark
+    //     if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+    //         for chunk in self.chunk_map.all_chunks() {
+    //             side.bset_metadata(chunk.start(), Chunk::BYTES);
+    //         }
+    //     }
+    // }
 
-    pub fn final_pause_release(&mut self) {
-        // clear the unlog bit so that during normal mutator phase, stab barrier is effectively disabled (all objects are considered as logged and thus no slow path will be taken)
-        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-            for chunk in self.chunk_map.all_chunks() {
-                side.bzero_metadata(chunk.start(), Chunk::BYTES);
-            }
-        }
-    }
+    // pub fn final_pause_release(&mut self) {
+    //     // clear the unlog bit so that during normal mutator phase, stab barrier is effectively disabled (all objects are considered as logged and thus no slow path will be taken)
+    //     if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+    //         for chunk in self.chunk_map.all_chunks() {
+    //             side.bzero_metadata(chunk.start(), Chunk::BYTES);
+    //         }
+    //     }
+    // }
 
     pub fn prepare(&mut self, major_gc: bool, plan_stats: Option<StatsForDefrag>) {
         if major_gc {
@@ -439,13 +439,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 unimplemented!("cyclic mark bits is not supported at the moment");
             }
 
-            if self.common.needs_log_bit {
-                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                    for chunk in self.chunk_map.all_chunks() {
-                        side.bzero_metadata(chunk.start(), Chunk::BYTES);
-                    }
-                }
-            }
+            // if self.common.needs_log_bit {
+            //     if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+            //         for chunk in self.chunk_map.all_chunks() {
+            //             side.bzero_metadata(chunk.start(), Chunk::BYTES);
+            //         }
+            //     }
+            // }
 
             // Prepare defrag info
             if self.is_defrag_enabled() {
@@ -545,6 +545,20 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.defrag.reset_in_defrag();
         }
         did_defrag
+    }
+
+    pub fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
+        }
+    }
+
+    pub fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
+        }
     }
 
     /// Generate chunk sweep tasks
@@ -754,7 +768,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     fn unlog_object_if_needed(&self, object: ObjectReference) {
-        if self.space_args.unlog_object_when_traced {
+        if self.common.unlog_traced_object {
             // Make sure the side metadata for the line can fit into one byte. For smaller line size, we should
             // use `mark_as_unlogged` instead to mark the bit.
             const_assert!(
