@@ -110,6 +110,7 @@ impl<VM: VMBinding> PageProtect<VM> {
             space: LargeObjectSpace::new(
                 plan_args.get_space_args("pageprotect", true, false, VMRequest::discontiguous()),
                 true,
+                false, // PageProtect does not use log bit
             ),
             common: CommonPlan::new(plan_args),
         };

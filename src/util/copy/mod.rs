@@ -120,7 +120,7 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
             ));
         }
         // If we are copying objects in mature space, we would need to mark the object as mature.
-        if semantics.is_mature() && self.config.constraints.needs_log_bit {
+        if semantics.is_mature() && self.config.constraints.unlog_traced_object {
             // If the plan uses unlogged bit, we set the unlogged bit (the object is unlogged/mature)
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
                 .mark_byte_as_unlogged::<VM>(object, Ordering::Relaxed);

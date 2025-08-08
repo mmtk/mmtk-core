@@ -61,7 +61,7 @@ impl<VM: VMBinding> SFT for VMSpace<VM> {
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         self.mark_state
             .on_object_metadata_initialization::<VM>(object);
-        if self.common.needs_log_bit {
+        if self.common.unlog_allocated_object {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
         #[cfg(feature = "vo_bit")]
@@ -271,6 +271,22 @@ impl<VM: VMBinding> VMSpace<VM> {
         self.mark_state.on_global_release::<VM>();
     }
 
+    pub fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        let external_pages = self.pr.get_external_pages();
+        for ep in external_pages.iter() {
+            log_bit.bzero_metadata(ep.start, ep.end - ep.start);
+        }
+    }
+
+    pub fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        let external_pages = self.pr.get_external_pages();
+        for ep in external_pages.iter() {
+            log_bit.bset_metadata(ep.start, ep.end - ep.start);
+        }
+    }
+
     pub fn trace_object<Q: ObjectQueue>(
         &self,
         queue: &mut Q,
@@ -287,7 +303,7 @@ impl<VM: VMBinding> VMSpace<VM> {
             // Flip the per-object unlogged bits to "unlogged" state for objects inside the
             // bootimage
             #[cfg(feature = "set_unlog_bits_vm_space")]
-            if self.common.needs_log_bit {
+            if self.common.unlog_traced_object {
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
                     object,
                     1,

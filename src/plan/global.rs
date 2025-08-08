@@ -416,6 +416,8 @@ impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
             zeroed,
             permission_exec,
             vmrequest,
+            unlog_allocated_object: self.constraints.unlog_allocated_object,
+            unlog_traced_object: self.constraints.unlog_traced_object,
             global_side_metadata_specs: self.global_side_metadata_specs.clone(),
             vm_map: self.global_args.vm_map,
             mmapper: self.global_args.mmapper,
@@ -517,6 +519,28 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.vm_space.release();
     }
 
+    pub fn clear_side_log_bits(&self) {
+        #[cfg(feature = "code_space")]
+        self.code_space.clear_side_log_bits();
+        #[cfg(feature = "code_space")]
+        self.code_lo_space.clear_side_log_bits();
+        #[cfg(feature = "ro_space")]
+        self.ro_space.clear_side_log_bits();
+        #[cfg(feature = "vm_space")]
+        self.vm_space.clear_side_log_bits();
+    }
+
+    pub fn set_side_log_bits(&self) {
+        #[cfg(feature = "code_space")]
+        self.code_space.set_side_log_bits();
+        #[cfg(feature = "code_space")]
+        self.code_lo_space.set_side_log_bits();
+        #[cfg(feature = "ro_space")]
+        self.ro_space.set_side_log_bits();
+        #[cfg(feature = "vm_space")]
+        self.vm_space.set_side_log_bits();
+    }
+
     pub fn end_of_gc(&mut self, _tls: VMWorkerThread) {
         // Do nothing here. None of the spaces needs end_of_gc.
     }
@@ -584,6 +608,7 @@ pub struct CommonPlan<VM: VMBinding> {
 
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> CommonPlan<VM> {
+        let needs_log_bit = args.constraints.needs_log_bit;
         CommonPlan {
             immortal: ImmortalSpace::new(args.get_space_args(
                 "immortal",
@@ -594,6 +619,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             los: LargeObjectSpace::new(
                 args.get_space_args("los", true, false, VMRequest::discontiguous()),
                 false,
+                needs_log_bit,
             ),
             nonmoving: Self::new_nonmoving_space(&mut args),
             base: BasePlan::new(args),
@@ -619,6 +645,18 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.los.release(full_heap);
         self.release_nonmoving_space(full_heap);
         self.base.release(tls, full_heap)
+    }
+
+    pub fn clear_side_log_bits(&self) {
+        self.immortal.clear_side_log_bits();
+        self.los.clear_side_log_bits();
+        self.base.clear_side_log_bits();
+    }
+
+    pub fn set_side_log_bits(&self) {
+        self.immortal.set_side_log_bits();
+        self.los.set_side_log_bits();
+        self.base.set_side_log_bits();
     }
 
     pub fn end_of_gc(&mut self, tls: VMWorkerThread) {
@@ -648,7 +686,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 NonMovingSpace::new(
                     space_args,
                     crate::policy::immix::ImmixSpaceArgs {
-                        unlog_object_when_traced: false,
                         #[cfg(feature = "vo_bit")]
                         mixed_age: false,
                         never_move_objects: true,
