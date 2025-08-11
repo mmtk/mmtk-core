@@ -7,30 +7,37 @@ use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
 use crate::util::copy::CopySemantics;
+use crate::util::heap::regionpageresource::RegionAllocator;
 use crate::util::heap::PageResource;
+use crate::util::heap::RegionPageResource;
 use crate::util::linear_scan::Region;
 use crate::util::metadata::extract_side_metadata;
-use crate::util::metadata::MetadataSpec;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
+use crate::util::metadata::MetadataSpec;
 use crate::util::object_enum::{self, ObjectEnumerator};
 use crate::util::{Address, ObjectReference};
 use crate::vm::slot::Slot;
 use crate::{vm::*, ObjectQueue};
-use crate::util::heap::RegionPageResource;
-use crate::util::heap::regionpageresource::RegionAllocator;
 use atomic::Ordering;
 
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
 pub(crate) const TRACE_KIND_FORWARD_ROOT: TraceKind = 1;
 
-/// CompressorSpace is a stop-the-world and serial implementation of
+/// CompressorSpace is a stop-the-world implementation of
 /// the Compressor, as described in Kermany and Petrank,
 /// [The Compressor: concurrent, incremental, and parallel compaction](https://dl.acm.org/doi/10.1145/1133255.1134023).
+///
+/// CompressorSpace makes two other diversions from the paper:
+/// - The heap is structured into regions which the collector compacts separately.
+/// - The collector compacts each region in-place, instead of using two virtual
+///   spaces as in Kermany and Petrank. The virtual spaces are necessary for
+///   multiple threads to compact one heap; we side-step this by having one
+///   thread compact each region separately.
 pub struct CompressorSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: RegionPageResource<VM, forwarding::CompressorRegion>,
-    forwarding: forwarding::ForwardingMetadata<VM>
+    forwarding: forwarding::ForwardingMetadata<VM>,
 }
 
 pub(crate) const GC_MARK_BIT_MASK: u8 = 1;
@@ -201,9 +208,11 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     }
 
     pub fn prepare(&self) {
-        self.pr.enumerate_regions(&mut |r: &RegionAllocator<forwarding::CompressorRegion>| {
-            forwarding::MARK_SPEC.bzero_metadata(r.region.start(), r.region.end() - r.region.start());
-        });
+        self.pr
+            .enumerate_regions(&mut |r: &RegionAllocator<forwarding::CompressorRegion>| {
+                forwarding::MARK_SPEC
+                    .bzero_metadata(r.region.start(), r.region.end() - r.region.start());
+            });
     }
 
     pub fn release(&self) {
@@ -252,14 +261,22 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         mark_bit != 0
     }
 
-    pub fn calculate_offset_vector(&self) {
-        self.pr.enumerate_regions(&mut |r: &RegionAllocator<forwarding::CompressorRegion>| {
-            self.forwarding.calculate_offset_vector(&forwarding::ObjectVectorRegion {
-                from_start: r.region.start(),
-                from_size: r.cursor() - r.region.start(),
-                to_start: r.region.start(),
+    pub fn generate_tasks<T>(
+        &self,
+        f: &mut impl FnMut(&RegionAllocator<forwarding::CompressorRegion>, usize) -> T,
+    ) -> Vec<T> {
+        let mut packets = vec![];
+        let mut index = 0;
+        self.pr
+            .enumerate_regions(&mut |r: &RegionAllocator<forwarding::CompressorRegion>| {
+                packets.push(f(r, index));
+                index += 1;
             });
-        });
+        packets
+    }
+
+    pub fn calculate_offset_vector(&self, r: &forwarding::OffsetVectorRegion) {
+        self.forwarding.calculate_offset_vector(r);
     }
 
     pub fn forward(&self, object: ObjectReference, _vo_bit_valid: bool) -> ObjectReference {
@@ -282,10 +299,6 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         ObjectReference::from_raw_address(self.forwarding.forward(object.to_raw_address())).unwrap()
     }
 
-    pub fn regions(&self) -> usize {
-        self.pr.with_regions(&mut |r| r.len())
-    }
-
     fn update_references(&self, worker: &mut GCWorker<VM>, object: ObjectReference) {
         if VM::VMScanning::support_slot_enqueuing(worker.tls, object) {
             VM::VMScanning::scan_object(worker.tls, object, &mut |s: VM::VMSlot| {
@@ -299,9 +312,11 @@ impl<VM: VMBinding> CompressorSpace<VM> {
             });
         }
     }
-    
+
     pub fn compact_region(&self, worker: &mut GCWorker<VM>, index: usize) {
-        self.pr.with_regions(&mut |regions: &Vec<RegionAllocator<forwarding::CompressorRegion>>| {
+        self.pr.with_regions(&mut |regions: &Vec<
+            RegionAllocator<forwarding::CompressorRegion>,
+        >| {
             let r = &regions[index];
             let start = r.region.start();
             let end = r.cursor();
@@ -335,7 +350,8 @@ impl<VM: VMBinding> CompressorSpace<VM> {
                     );
                     // copy object
                     trace!(" copy from {} to {}", obj, new_object);
-                    let end_of_new_object = VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
+                    let end_of_new_object =
+                        VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
                     // update VO bit
                     #[cfg(feature = "vo_bit")]
                     vo_bit::set_vo_bit(new_object);
@@ -353,7 +369,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         los.enumerate_objects(&mut object_enum::ClosureObjectEnumerator::<_, VM>::new(
             &mut |o: ObjectReference| {
                 self.update_references(worker, o);
-            }
+            },
         ));
     }
 }

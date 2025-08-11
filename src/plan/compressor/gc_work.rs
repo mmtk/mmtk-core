@@ -1,4 +1,5 @@
 use super::global::Compressor;
+use crate::policy::compressor::forwarding::OffsetVectorRegion;
 use crate::policy::compressor::CompressorSpace;
 use crate::policy::compressor::{TRACE_KIND_FORWARD_ROOT, TRACE_KIND_MARK};
 use crate::policy::largeobjectspace::LargeObjectSpace;
@@ -13,20 +14,24 @@ use crate::vm::VMBinding;
 use crate::MMTK;
 use std::marker::PhantomData;
 
-/// Iterate through the heap and calculate the new location of live objects.
-pub struct CalculateForwardingAddress<VM: VMBinding> {
+/// Calculate the offset vector for a region.
+pub struct CalculateOffsetVector<VM: VMBinding> {
     compressor_space: &'static CompressorSpace<VM>,
+    region: OffsetVectorRegion,
 }
 
-impl<VM: VMBinding> GCWork<VM> for CalculateForwardingAddress<VM> {
+impl<VM: VMBinding> GCWork<VM> for CalculateOffsetVector<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.compressor_space.calculate_offset_vector();
+        self.compressor_space.calculate_offset_vector(&self.region);
     }
 }
 
-impl<VM: VMBinding> CalculateForwardingAddress<VM> {
-    pub fn new(compressor_space: &'static CompressorSpace<VM>) -> Self {
-        Self { compressor_space }
+impl<VM: VMBinding> CalculateOffsetVector<VM> {
+    pub fn new(compressor_space: &'static CompressorSpace<VM>, region: OffsetVectorRegion) -> Self {
+        Self {
+            compressor_space,
+            region,
+        }
     }
 }
 
@@ -45,11 +50,6 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
         mmtk.state.prepare_for_stack_scanning();
         #[cfg(feature = "extreme_assertions")]
         mmtk.slot_logger.reset();
-
-        // We do two passes of transitive closures. We clear the live bytes from the first pass.
-        mmtk.scheduler
-            .worker_group
-            .get_and_clear_worker_live_bytes();
 
         for mutator in VM::VMActivePlan::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots].add(ScanMutatorRoots::<
@@ -71,7 +71,7 @@ impl<VM: VMBinding> UpdateReferences<VM> {
 /// Compact live objects in a region.
 pub struct Compact<VM: VMBinding> {
     compressor_space: &'static CompressorSpace<VM>,
-    index: usize
+    index: usize,
 }
 
 impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
@@ -81,10 +81,7 @@ impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
 }
 
 impl<VM: VMBinding> Compact<VM> {
-    pub fn new(
-        compressor_space: &'static CompressorSpace<VM>,
-        index: usize,
-    ) -> Self {
+    pub fn new(compressor_space: &'static CompressorSpace<VM>, index: usize) -> Self {
         Self {
             compressor_space,
             index,

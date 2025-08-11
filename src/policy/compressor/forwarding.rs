@@ -10,7 +10,8 @@ use atomic::Ordering;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicBool;
 
-pub(crate) struct ObjectVectorRegion {
+#[derive(Clone, Copy)]
+pub(crate) struct OffsetVectorRegion {
     pub from_start: Address,
     pub from_size: usize,
     pub to_start: Address,
@@ -26,13 +27,13 @@ pub(crate) struct ObjectVectorRegion {
 /// using [`Transducer::decode`].
 #[derive(Debug)]
 struct Transducer {
-    // The address for the next object to be copied to, following preceding
-    // objects which were visited by the transducer.
+    /// The address for the next object to be copied to, following preceding
+    /// objects which were visited by the transducer.
     to: Address,
-    // The address of the last mark bit which the transducer visited.
+    /// The address of the last mark bit which the transducer visited.
     last_bit_visited: Address,
-    // Whether or not the transducer is currently inside an object
-    // (i.e. if it has seen a first bit but no matching last bit yet).
+    /// Whether or not the transducer is currently inside an object
+    /// (i.e. if it has seen a first bit but no matching last bit yet).
     in_object: bool,
 }
 impl Transducer {
@@ -100,12 +101,16 @@ impl Region for Block {
     }
 }
 
+// A region is the granularity at which we compact the heap.
 #[derive(Copy, Clone, PartialEq, PartialOrd)]
 pub(crate) struct CompressorRegion(Address);
 impl Region for CompressorRegion {
     const LOG_BYTES: usize = 20; // 1 MiB
     fn from_aligned_address(address: Address) -> Self {
-        assert!(address.is_aligned_to(Self::BYTES), "{address} is not aligned");
+        assert!(
+            address.is_aligned_to(Self::BYTES),
+            "{address} is not aligned"
+        );
         CompressorRegion(address)
     }
     fn start(&self) -> Address {
@@ -147,7 +152,7 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
         MARK_SPEC.fetch_or_atomic(last_word_of_object, GC_MARK_BIT_MASK, Ordering::SeqCst);
     }
 
-    pub fn calculate_offset_vector(&self, region: &ObjectVectorRegion) {
+    pub fn calculate_offset_vector(&self, region: &OffsetVectorRegion) {
         let mut state = Transducer::new(region.to_start);
         let first_block = Block::from_aligned_address(region.from_start);
         let last_block = Block::from_aligned_address(region.from_start + region.from_size);
