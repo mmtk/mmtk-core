@@ -5,7 +5,7 @@
 
 use super::MapState;
 use crate::util::conversions::raw_is_aligned;
-use crate::util::heap::layout::mmapper::MapStateStorage;
+use crate::util::heap::layout::mmapper::csm::MapStateStorage;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::rust_util::atomic_box::OnceOptionBox;
 use crate::util::rust_util::rev_group::RevisitableGroupByForIterator;

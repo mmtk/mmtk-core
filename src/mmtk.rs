@@ -48,7 +48,7 @@ lazy_static! {
     pub static ref VM_MAP: Box<dyn VMMap + Send + Sync> = layout::create_vm_map();
 
     /// A global Mmapper for mmaping and protection of virtual memory.
-    pub static ref MMAPPER: Box<Mmapper> = layout::create_mmapper();
+    pub static ref MMAPPER: Box<dyn Mmapper> = layout::create_mmapper();
 }
 
 use crate::util::rust_util::InitializeOnce;

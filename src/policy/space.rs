@@ -517,7 +517,7 @@ pub struct CommonSpace<VM: VMBinding> {
     pub extent: usize,
 
     pub vm_map: &'static dyn VMMap,
-    pub mmapper: &'static Mmapper,
+    pub mmapper: &'static dyn Mmapper,
 
     pub(crate) metadata: SideMetadataContext,
 
@@ -551,7 +551,7 @@ pub struct PlanCreateSpaceArgs<'a, VM: VMBinding> {
     pub vmrequest: VMRequest,
     pub global_side_metadata_specs: Vec<SideMetadataSpec>,
     pub vm_map: &'static dyn VMMap,
-    pub mmapper: &'static Mmapper,
+    pub mmapper: &'static dyn Mmapper,
     pub heap: &'a mut HeapMeta,
     pub constraints: &'a PlanConstraints,
     pub gc_trigger: Arc<GCTrigger<VM>>,
