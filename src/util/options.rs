@@ -46,6 +46,8 @@ pub enum PlanSelector {
     Immix,
     /// A mark-compact collector that marks objects and performs Cheney-style copying.
     MarkCompact,
+    /// A mark-compact collector that uses Compressor-style bitmaps.
+    Compressor,
     /// An Immix collector that uses a sticky mark bit to allow generational behaviors without a copying nursery.
     StickyImmix,
 }
@@ -848,9 +850,7 @@ options! {
     /// Should reference type processing be disabled?
     /// If reference type processing is disabled, no weak reference processing work is scheduled,
     /// and we expect a binding to treat weak references as strong references.
-    /// We disable weak reference processing by default, as we are still working on it. This will be changed to `false`
-    /// once weak reference processing is implemented properly.
-    no_reference_types:     bool                    [always_valid] = true,
+    no_reference_types:     bool                    [always_valid] = false,
     /// The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)
     nursery_zeroing:        NurseryZeroingOptions   [always_valid] = NurseryZeroingOptions::Temporal,
     /// How frequent (every X bytes) should we do a stress GC?

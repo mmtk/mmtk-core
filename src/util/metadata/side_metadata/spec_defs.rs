@@ -94,6 +94,10 @@ define_side_metadata_specs!(
     MS_LOCAL_FREE   = (global: false, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: crate::policy::marksweepspace::native_ms::Block::LOG_BYTES),
     // First cell of thread free list in block for native mimalloc
     MS_THREAD_FREE  = (global: false, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: crate::policy::marksweepspace::native_ms::Block::LOG_BYTES),
+    // Start and end marks by Compressor
+    COMPRESSOR_MARK = (global: false, log_num_of_bits: 0, log_bytes_in_region: LOG_BYTES_IN_WORD as usize),
+    // Block offset vectors by Compressor
+    COMPRESSOR_OFFSET_VECTOR = (global: false, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: crate::policy::compressor::forwarding::Block::LOG_BYTES),
 );
 
 #[cfg(test)]

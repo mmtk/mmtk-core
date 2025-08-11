@@ -42,8 +42,6 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        // Sanity checker cannot use this method to do the verification
-        // since the mark bit will be cleared during the second trace(update forwarding pointer)
         Self::is_marked(object)
     }
 
