@@ -37,7 +37,7 @@ lazy_static = "1.1"
 libc = "0.2"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 memoffset = "0.9"
-mimalloc-sys = { version = "0.1.6", optional = true }
+libmimalloc-sys = { version = "0.1.43", optional = true }
 # MMTk macros - we have to specify a version here in order to publish the crate, even though we use the dependency from a local path.
 mmtk-macros = { version="0.31.0", path = "macros/" }
 num_cpus = "1.8"
@@ -238,7 +238,7 @@ vo_bit_access = []
 # Group:malloc
 # only one of the following features should be enabled, or none to use the default malloc from libc
 # this does not replace the global Rust allocator, but provides these libraries for GC implementation
-malloc_mimalloc = ["dep:mimalloc-sys"]
+malloc_mimalloc = ["dep:libmimalloc-sys"]
 malloc_jemalloc = ["dep:jemalloc-sys"]
 
 # Use the native mimalloc allocator for malloc. This is not tested by me (Yi) yet, and it is only used to make sure that some code
