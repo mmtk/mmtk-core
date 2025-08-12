@@ -581,7 +581,7 @@
     <span class="doccomment">/// Get a mutable reference to the inner Map32Inner with a lock.
     /// The caller should only use the mutable reference while holding the lock.
     </span><span class="attr">#[allow(clippy::mut_from_ref)]
-    </span><span class="kw">fn </span>mut_self_with_sync(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (MutexGuard&lt;()&gt;, <span class="kw-2">&amp;mut </span>Map32Inner) {
+    </span><span class="kw">fn </span>mut_self_with_sync(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (MutexGuard&lt;<span class="lifetime">'_</span>, ()&gt;, <span class="kw-2">&amp;mut </span>Map32Inner) {
         <span class="kw">let </span>guard = <span class="self">self</span>.sync.lock().unwrap();
         (guard, <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() })
     }

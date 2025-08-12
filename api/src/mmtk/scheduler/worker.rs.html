@@ -568,11 +568,11 @@
     the mutator calls harness_begin or harness_end while the GC is running."</span>;
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorkerShared&lt;VM&gt; {
-    <span class="kw">pub fn </span>borrow_stat(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AtomicRef&lt;WorkerLocalStat&lt;VM&gt;&gt; {
+    <span class="kw">pub fn </span>borrow_stat(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AtomicRef&lt;<span class="lifetime">'_</span>, WorkerLocalStat&lt;VM&gt;&gt; {
         <span class="self">self</span>.stat.try_borrow().expect(STAT_BORROWED_MSG)
     }
 
-    <span class="kw">pub fn </span>borrow_stat_mut(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AtomicRefMut&lt;WorkerLocalStat&lt;VM&gt;&gt; {
+    <span class="kw">pub fn </span>borrow_stat_mut(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AtomicRefMut&lt;<span class="lifetime">'_</span>, WorkerLocalStat&lt;VM&gt;&gt; {
         <span class="self">self</span>.stat.try_borrow_mut().expect(STAT_BORROWED_MSG)
     }
 }

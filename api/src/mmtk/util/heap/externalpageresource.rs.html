@@ -160,7 +160,7 @@
         lock.push(pages);
     }
 
-    <span class="kw">pub fn </span>get_external_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; MutexGuard&lt;Vec&lt;ExternalPages&gt;&gt; {
+    <span class="kw">pub fn </span>get_external_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; MutexGuard&lt;<span class="lifetime">'_</span>, Vec&lt;ExternalPages&gt;&gt; {
         <span class="self">self</span>.ranges.lock().unwrap()
     }
 }

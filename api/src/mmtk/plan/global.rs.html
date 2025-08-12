@@ -1205,7 +1205,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
         zeroed: bool,
         permission_exec: bool,
         vmrequest: VMRequest,
-    ) -&gt; PlanCreateSpaceArgs&lt;VM&gt; {
+    ) -&gt; PlanCreateSpaceArgs&lt;<span class="lifetime">'_</span>, VM&gt; {
         PlanCreateSpaceArgs {
             name,
             zeroed,
