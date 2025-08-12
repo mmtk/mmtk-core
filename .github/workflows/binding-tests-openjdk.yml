@@ -45,3 +45,6 @@ jobs:
             cd mmtk-openjdk
             export RUST_BACKTRACE=1
             ./.github/scripts/${{ inputs.test-script }}
+        - name: Setup tmate session
+          if: ${{ failure() }}
+          uses: mxschmitt/action-tmate@v3
