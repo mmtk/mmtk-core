@@ -268,7 +268,7 @@ impl Map32 {
     /// Get a mutable reference to the inner Map32Inner with a lock.
     /// The caller should only use the mutable reference while holding the lock.
     #[allow(clippy::mut_from_ref)]
-    fn mut_self_with_sync(&self) -> (MutexGuard<()>, &mut Map32Inner) {
+    fn mut_self_with_sync(&self) -> (MutexGuard<'_, ()>, &mut Map32Inner) {
         let guard = self.sync.lock().unwrap();
         (guard, unsafe { self.mut_self() })
     }

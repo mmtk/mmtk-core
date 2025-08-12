@@ -111,11 +111,11 @@ const STAT_BORROWED_MSG: &str = "GCWorkerShared.stat is already borrowed.  This 
     the mutator calls harness_begin or harness_end while the GC is running.";
 
 impl<VM: VMBinding> GCWorkerShared<VM> {
-    pub fn borrow_stat(&self) -> AtomicRef<WorkerLocalStat<VM>> {
+    pub fn borrow_stat(&self) -> AtomicRef<'_, WorkerLocalStat<VM>> {
         self.stat.try_borrow().expect(STAT_BORROWED_MSG)
     }
 
-    pub fn borrow_stat_mut(&self) -> AtomicRefMut<WorkerLocalStat<VM>> {
+    pub fn borrow_stat_mut(&self) -> AtomicRefMut<'_, WorkerLocalStat<VM>> {
         self.stat.try_borrow_mut().expect(STAT_BORROWED_MSG)
     }
 }
