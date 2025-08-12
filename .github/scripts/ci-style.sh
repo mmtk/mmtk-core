@@ -13,10 +13,6 @@ if [[ $CLIPPY_VERSION == "clippy 0.1.72"* ]]; then
     export CARGO_INCREMENTAL=0
 fi
 
-if [[ $CLIPPY_VERSION == "clippy 0.1.77"* && $CARGO_BUILD_TARGET == "x86_64-apple-darwin" ]]; then
-    export SKIP_CLIPPY=1
-fi
-
 # --- Check main crate ---
 
 if [[ $SKIP_CLIPPY == 1 ]]; then
