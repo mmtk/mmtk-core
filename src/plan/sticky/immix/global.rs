@@ -46,8 +46,7 @@ pub const STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     barrier: crate::plan::BarrierSelector::ObjectBarrier,
     // We may trace duplicate edges in sticky immix (or any plan that uses object remembering barrier). See https://github.com/mmtk/mmtk-core/issues/743.
     may_trace_duplicate_edges: true,
-    unlog_allocated_object: true,
-    unlog_traced_object: true,
+    generational: true,
     ..immix::IMMIX_CONSTRAINTS
 };
 
@@ -332,7 +331,6 @@ impl<VM: VMBinding> StickyImmix<VM> {
             plan_args,
             crate::policy::immix::ImmixSpaceArgs {
                 // In StickyImmix, both young and old objects are allocated in the ImmixSpace.
-                #[cfg(feature = "vo_bit")]
                 mixed_age: true,
                 never_move_objects: false,
             },

@@ -45,10 +45,8 @@ pub struct PlanConstraints {
     /// `MutatorConfig::prepare_func`).  Those plans can set this to `false` so that the
     /// `PrepareMutator` work packets will not be created at all.
     pub needs_prepare_mutator: bool,
-    /// Should a policy unlog newly allocated objects?
-    pub unlog_allocated_object: bool,
-    /// Should a policy unlog traced objects?
-    pub unlog_traced_object: bool,
+    /// Is this plan generational?
+    pub generational: bool,
 }
 
 impl PlanConstraints {
@@ -71,8 +69,7 @@ impl PlanConstraints {
             barrier: BarrierSelector::NoBarrier,
             // If we use mark sweep as non moving space, we need to prepare mutator. See [`common_prepare_func`].
             needs_prepare_mutator: cfg!(feature = "marksweep_as_nonmoving"),
-            unlog_allocated_object: false,
-            unlog_traced_object: false,
+            generational: false,
         }
     }
 }

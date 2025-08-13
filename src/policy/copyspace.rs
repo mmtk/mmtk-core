@@ -344,6 +344,13 @@ impl<VM: VMBinding> PolicyCopyContext for CopySpaceCopyContext<VM> {
     ) -> Address {
         self.copy_allocator.alloc(bytes, align, offset)
     }
+
+    fn post_copy(&mut self, obj: ObjectReference, _bytes: usize) {
+        if self.copy_allocator.get_space().common().unlog_traced_object {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                .mark_byte_as_unlogged::<VM>(obj, Ordering::Relaxed);
+        }
+    }
 }
 
 impl<VM: VMBinding> CopySpaceCopyContext<VM> {
@@ -356,9 +363,7 @@ impl<VM: VMBinding> CopySpaceCopyContext<VM> {
             copy_allocator: BumpAllocator::new(tls.0, tospace, context),
         }
     }
-}
 
-impl<VM: VMBinding> CopySpaceCopyContext<VM> {
     pub fn rebind(&mut self, space: &CopySpace<VM>) {
         self.copy_allocator
             .rebind(unsafe { &*{ space as *const _ } });

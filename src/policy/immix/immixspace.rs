@@ -65,8 +65,6 @@ pub struct ImmixSpaceArgs {
     /// instance contain young objects, their VO bits need to be updated during this GC.  Currently
     /// only StickyImmix is affected.  GenImmix allocates young objects in a separete CopySpace
     /// nursery and its VO bits can be cleared in bulk.
-    // Currently only used when "vo_bit" is enabled.  Using #[cfg(...)] to eliminate dead code warning.
-    #[cfg(feature = "vo_bit")]
     pub mixed_age: bool,
     /// Disable copying for this Immix space.
     pub never_move_objects: bool,
@@ -877,6 +875,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         // Mark the line
         if !super::MARK_LINE_AT_SCAN_TIME {
             self.mark_lines(object);
+        }
+        if self.common.unlog_traced_object {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                .mark_byte_as_unlogged::<VM>(object, Ordering::Relaxed);
         }
     }
 

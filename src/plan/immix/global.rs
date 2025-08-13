@@ -138,7 +138,6 @@ impl<VM: VMBinding> Immix<VM> {
         Self::new_with_args(
             plan_args,
             ImmixSpaceArgs {
-                #[cfg(feature = "vo_bit")]
                 mixed_age: false,
                 never_move_objects: false,
             },
@@ -151,7 +150,21 @@ impl<VM: VMBinding> Immix<VM> {
     ) -> Self {
         let immix = Immix {
             immix_space: ImmixSpace::new(
-                plan_args.get_space_args("immix", true, false, VMRequest::discontiguous()),
+                if space_args.mixed_age {
+                    plan_args.get_mixed_age_space_args(
+                        "immix",
+                        true,
+                        false,
+                        VMRequest::discontiguous(),
+                    )
+                } else {
+                    plan_args.get_normal_space_args(
+                        "immix",
+                        true,
+                        false,
+                        VMRequest::discontiguous(),
+                    )
+                },
                 space_args,
             ),
             common: CommonPlan::new(plan_args),

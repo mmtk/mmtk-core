@@ -250,10 +250,14 @@ impl<VM: VMBinding> GenImmix<VM> {
                 crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
         };
         let immix_space = ImmixSpace::new(
-            plan_args.get_space_args("immix_mature", true, false, VMRequest::discontiguous()),
+            plan_args.get_mature_space_args(
+                "immix_mature",
+                true,
+                false,
+                VMRequest::discontiguous(),
+            ),
             ImmixSpaceArgs {
                 // In GenImmix, young objects are not allocated in ImmixSpace directly.
-                #[cfg(feature = "vo_bit")]
                 mixed_age: false,
                 never_move_objects: false,
             },
