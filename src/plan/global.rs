@@ -186,6 +186,12 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         None
     }
 
+    fn concurrent(
+        &self,
+    ) -> Option<&dyn crate::plan::concurrent::global::ConcurrentPlan<VM = Self::VM>> {
+        None
+    }
+
     /// Get the current run time options.
     fn options(&self) -> &Options {
         &self.base().options

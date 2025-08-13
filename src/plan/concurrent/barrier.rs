@@ -1,7 +1,9 @@
 use std::sync::atomic::Ordering;
 
+use super::{concurrent_marking_work::ProcessModBufSATB, Pause};
+use crate::plan::global::PlanTraceObject;
 use crate::{
-    plan::{barriers::BarrierSemantics, concurrent::immix::global::ConcurrentImmix, VectorQueue},
+    plan::{barriers::BarrierSemantics, concurrent::global::ConcurrentPlan, VectorQueue},
     scheduler::WorkBucketStage,
     util::ObjectReference,
     vm::{
@@ -11,25 +13,20 @@ use crate::{
     MMTK,
 };
 
-use super::{concurrent_marking_work::ProcessModBufSATB, Pause};
-
-pub struct SATBBarrierSemantics<VM: VMBinding> {
+pub struct SATBBarrierSemantics<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> {
     mmtk: &'static MMTK<VM>,
     satb: VectorQueue<ObjectReference>,
     refs: VectorQueue<ObjectReference>,
-    immix: &'static ConcurrentImmix<VM>,
+    plan: &'static P,
 }
 
-impl<VM: VMBinding> SATBBarrierSemantics<VM> {
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> SATBBarrierSemantics<VM, P> {
     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
             mmtk,
             satb: VectorQueue::default(),
             refs: VectorQueue::default(),
-            immix: mmtk
-                .get_plan()
-                .downcast_ref::<ConcurrentImmix<VM>>()
-                .unwrap(),
+            plan: mmtk.get_plan().downcast_ref::<P>().unwrap(),
         }
     }
 
@@ -63,14 +60,12 @@ impl<VM: VMBinding> SATBBarrierSemantics<VM> {
         if !self.satb.is_empty() {
             if self.should_create_satb_packets() {
                 let satb = self.satb.take();
-                if let Some(pause) = self.immix.current_pause() {
-                    debug_assert_ne!(pause, Pause::InitialMark);
-                    self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
-                        .add(ProcessModBufSATB::new(satb));
+                let bucket = if self.plan.concurrent_work_in_progress() {
+                    WorkBucketStage::Unconstrained
                 } else {
-                    self.mmtk.scheduler.work_buckets[WorkBucketStage::Unconstrained]
-                        .add(ProcessModBufSATB::new(satb));
-                }
+                    WorkBucketStage::Closure
+                };
+                self.mmtk.scheduler.work_buckets[bucket].add(ProcessModBufSATB::<VM, P>::new(satb));
             } else {
                 let _ = self.satb.take();
             };
@@ -82,24 +77,24 @@ impl<VM: VMBinding> SATBBarrierSemantics<VM> {
         if !self.refs.is_empty() {
             // debug_assert!(self.should_create_satb_packets());
             let nodes = self.refs.take();
-            if let Some(pause) = self.immix.current_pause() {
-                debug_assert_ne!(pause, Pause::InitialMark);
-                self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
-                    .add(ProcessModBufSATB::new(nodes));
+            let bucket = if self.plan.concurrent_work_in_progress() {
+                WorkBucketStage::Unconstrained
             } else {
-                self.mmtk.scheduler.work_buckets[WorkBucketStage::Unconstrained]
-                    .add(ProcessModBufSATB::new(nodes));
-            }
+                WorkBucketStage::Closure
+            };
+            self.mmtk.scheduler.work_buckets[bucket].add(ProcessModBufSATB::<VM, P>::new(nodes));
         }
     }
 
     fn should_create_satb_packets(&self) -> bool {
-        self.immix.concurrent_marking_in_progress()
-            || self.immix.current_pause() == Some(Pause::FinalMark)
+        self.plan.concurrent_work_in_progress()
+            || self.plan.current_pause() == Some(Pause::FinalMark)
     }
 }
 
-impl<VM: VMBinding> BarrierSemantics for SATBBarrierSemantics<VM> {
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> BarrierSemantics
+    for SATBBarrierSemantics<VM, P>
+{
     type VM = VM;
 
     #[cold]
@@ -138,7 +133,7 @@ impl<VM: VMBinding> BarrierSemantics for SATBBarrierSemantics<VM> {
     /// (and its children) may be treated as garbage if it happened to be weakly reachable at the
     /// time of `InitialMark`.
     fn load_weak_reference(&mut self, o: ObjectReference) {
-        if !self.immix.concurrent_marking_in_progress() {
+        if !self.plan.concurrent_work_in_progress() {
             return;
         }
         self.refs.push(o);

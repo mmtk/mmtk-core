@@ -1,4 +1,5 @@
 use crate::plan::concurrent::concurrent_marking_work::ProcessRootSlots;
+use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::immix::gc_work::ConcurrentImmixGCWorkContext;
 use crate::plan::concurrent::immix::gc_work::ConcurrentImmixSTWGCWorkContext;
 use crate::plan::concurrent::Pause;
@@ -378,7 +379,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         self.disable_unnecessary_buckets(scheduler, Pause::InitialMark);
 
         scheduler.work_buckets[WorkBucketStage::Unconstrained].add_prioritized(Box::new(
-            StopMutators::<ConcurrentImmixGCWorkContext<ProcessRootSlots<VM>>>::new_args(
+            StopMutators::<ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self>>>::new_args(
                 Pause::InitialMark,
             ),
         ));
@@ -391,7 +392,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         self.disable_unnecessary_buckets(scheduler, Pause::FinalMark);
 
         scheduler.work_buckets[WorkBucketStage::Unconstrained].add_prioritized(Box::new(
-            StopMutators::<ConcurrentImmixGCWorkContext<ProcessRootSlots<VM>>>::new_args(
+            StopMutators::<ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self>>>::new_args(
                 Pause::FinalMark,
             ),
         ));
@@ -451,11 +452,17 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             .store(active, Ordering::SeqCst);
     }
 
-    pub fn current_pause(&self) -> Option<Pause> {
+    fn previous_pause(&self) -> Option<Pause> {
+        self.previous_pause.load(Ordering::SeqCst)
+    }
+}
+
+impl<VM: VMBinding> ConcurrentPlan for ConcurrentImmix<VM> {
+    fn current_pause(&self) -> Option<Pause> {
         self.current_pause.load(Ordering::SeqCst)
     }
 
-    pub fn previous_pause(&self) -> Option<Pause> {
-        self.previous_pause.load(Ordering::SeqCst)
+    fn concurrent_work_in_progress(&self) -> bool {
+        self.concurrent_marking_in_progress()
     }
 }

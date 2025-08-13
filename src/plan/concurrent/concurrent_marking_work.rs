@@ -1,14 +1,11 @@
-use crate::plan::concurrent::immix::global::ConcurrentImmix;
+use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::Pause;
+use crate::plan::PlanTraceObject;
 use crate::plan::VectorQueue;
-use crate::policy::gc_work::PolicyTraceObject;
 use crate::policy::immix::TRACE_KIND_FAST;
-use crate::policy::space::Space;
 use crate::scheduler::gc_work::{ScanObjects, SlotOf};
 use crate::util::ObjectReference;
 use crate::vm::slot::Slot;
-
-use crate::Plan;
 use crate::{
     plan::ObjectQueue,
     scheduler::{gc_work::ProcessEdgesBase, GCWork, GCWorker, ProcessEdgesWork, WorkBucketStage},
@@ -18,8 +15,8 @@ use crate::{
 use atomic::Ordering;
 use std::ops::{Deref, DerefMut};
 
-pub struct ConcurrentTraceObjects<VM: VMBinding> {
-    plan: &'static ConcurrentImmix<VM>,
+pub struct ConcurrentTraceObjects<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> {
+    plan: &'static P,
     // objects to mark and scan
     objects: Option<Vec<ObjectReference>>,
     // recursively generated objects
@@ -27,14 +24,13 @@ pub struct ConcurrentTraceObjects<VM: VMBinding> {
     worker: *mut GCWorker<VM>,
 }
 
-impl<VM: VMBinding> ConcurrentTraceObjects<VM> {
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>>
+    ConcurrentTraceObjects<VM, P>
+{
     const SATB_BUFFER_SIZE: usize = 8192;
 
     pub fn new(objects: Vec<ObjectReference>, mmtk: &'static MMTK<VM>) -> Self {
-        let plan = mmtk
-            .get_plan()
-            .downcast_ref::<ConcurrentImmix<VM>>()
-            .unwrap();
+        let plan = mmtk.get_plan().downcast_ref::<P>().unwrap();
         let old_value = crate::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
         let new_value = old_value + 1;
         probe!(mmtk, num_concurrent_tracing_packets_change, new_value);
@@ -63,14 +59,8 @@ impl<VM: VMBinding> ConcurrentTraceObjects<VM> {
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if self.plan.immix_space.in_space(object) {
-            self.plan
-                .immix_space
-                .trace_object::<Self, { TRACE_KIND_FAST }>(self, object, None, self.worker());
-        } else {
-            self.plan.common().get_los().trace_object(self, object);
-        }
-        object
+        self.plan
+            .trace_object::<Self, { TRACE_KIND_FAST }>(self, object, self.worker())
     }
 
     fn trace_objects(&mut self, objects: &[ObjectReference]) {
@@ -93,7 +83,9 @@ impl<VM: VMBinding> ConcurrentTraceObjects<VM> {
     }
 }
 
-impl<VM: VMBinding> ObjectQueue for ConcurrentTraceObjects<VM> {
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> ObjectQueue
+    for ConcurrentTraceObjects<VM, P>
+{
     fn enqueue(&mut self, object: ObjectReference) {
         debug_assert!(
             object.to_raw_address().is_mapped(),
@@ -104,9 +96,14 @@ impl<VM: VMBinding> ObjectQueue for ConcurrentTraceObjects<VM> {
     }
 }
 
-unsafe impl<VM: VMBinding> Send for ConcurrentTraceObjects<VM> {}
+unsafe impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> Send
+    for ConcurrentTraceObjects<VM, P>
+{
+}
 
-impl<VM: VMBinding> GCWork<VM> for ConcurrentTraceObjects<VM> {
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> GCWork<VM>
+    for ConcurrentTraceObjects<VM, P>
+{
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         self.worker = worker;
         let mut num_objects = 0;
@@ -145,24 +142,35 @@ impl<VM: VMBinding> GCWork<VM> for ConcurrentTraceObjects<VM> {
     }
 }
 
-pub struct ProcessModBufSATB {
+pub struct ProcessModBufSATB<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> {
     nodes: Option<Vec<ObjectReference>>,
+    _p: std::marker::PhantomData<(VM, P)>,
 }
 
-impl ProcessModBufSATB {
+unsafe impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> Send
+    for ProcessModBufSATB<VM, P>
+{
+}
+
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> ProcessModBufSATB<VM, P> {
     pub fn new(nodes: Vec<ObjectReference>) -> Self {
-        Self { nodes: Some(nodes) }
+        Self {
+            nodes: Some(nodes),
+            _p: std::marker::PhantomData,
+        }
     }
 }
 
-impl<VM: VMBinding> GCWork<VM> for ProcessModBufSATB {
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> GCWork<VM>
+    for ProcessModBufSATB<VM, P>
+{
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let mut w = if let Some(nodes) = self.nodes.take() {
             if nodes.is_empty() {
                 return;
             }
 
-            ConcurrentTraceObjects::new(nodes, mmtk)
+            ConcurrentTraceObjects::<VM, P>::new(nodes, mmtk)
         } else {
             return;
         };
@@ -170,11 +178,19 @@ impl<VM: VMBinding> GCWork<VM> for ProcessModBufSATB {
     }
 }
 
-pub struct ProcessRootSlots<VM: VMBinding> {
+pub struct ProcessRootSlots<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> {
     base: ProcessEdgesBase<VM>,
+    _p: std::marker::PhantomData<P>,
 }
 
-impl<VM: VMBinding> ProcessEdgesWork for ProcessRootSlots<VM> {
+unsafe impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> Send
+    for ProcessRootSlots<VM, P>
+{
+}
+
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> ProcessEdgesWork
+    for ProcessRootSlots<VM, P>
+{
     type VM = VM;
     type ScanObjectsWorkType = ScanObjects<Self>;
     const OVERWRITE_REFERENCE: bool = false;
@@ -188,7 +204,10 @@ impl<VM: VMBinding> ProcessEdgesWork for ProcessRootSlots<VM> {
     ) -> Self {
         debug_assert!(roots);
         let base = ProcessEdgesBase::new(slots, roots, mmtk, bucket);
-        Self { base }
+        Self {
+            base,
+            _p: std::marker::PhantomData,
+        }
     }
 
     fn flush(&mut self) {}
@@ -201,7 +220,7 @@ impl<VM: VMBinding> ProcessEdgesWork for ProcessRootSlots<VM> {
         let pause = self
             .base
             .plan()
-            .downcast_ref::<ConcurrentImmix<VM>>()
+            .concurrent()
             .unwrap()
             .current_pause()
             .unwrap();
@@ -219,7 +238,7 @@ impl<VM: VMBinding> ProcessEdgesWork for ProcessRootSlots<VM> {
                         // create the packet
                         let worker = self.worker();
                         let mmtk = self.mmtk();
-                        let w = ConcurrentTraceObjects::new(root_objects.clone(), mmtk);
+                        let w = ConcurrentTraceObjects::<VM, P>::new(root_objects.clone(), mmtk);
 
                         match pause {
                             Pause::InitialMark => worker.scheduler().postpone(w),
@@ -232,7 +251,7 @@ impl<VM: VMBinding> ProcessEdgesWork for ProcessRootSlots<VM> {
             }
             if !root_objects.is_empty() {
                 let worker = self.worker();
-                let w = ConcurrentTraceObjects::new(root_objects.clone(), self.mmtk());
+                let w = ConcurrentTraceObjects::<VM, P>::new(root_objects.clone(), self.mmtk());
 
                 match pause {
                     Pause::InitialMark => worker.scheduler().postpone(w),
@@ -247,14 +266,18 @@ impl<VM: VMBinding> ProcessEdgesWork for ProcessRootSlots<VM> {
     }
 }
 
-impl<VM: VMBinding> Deref for ProcessRootSlots<VM> {
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> Deref
+    for ProcessRootSlots<VM, P>
+{
     type Target = ProcessEdgesBase<VM>;
     fn deref(&self) -> &Self::Target {
         &self.base
     }
 }
 
-impl<VM: VMBinding> DerefMut for ProcessRootSlots<VM> {
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> DerefMut
+    for ProcessRootSlots<VM, P>
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }

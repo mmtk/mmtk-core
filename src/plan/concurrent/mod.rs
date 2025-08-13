@@ -1,5 +1,7 @@
 pub mod barrier;
-pub mod concurrent_marking_work;
+pub(super) mod concurrent_marking_work;
+pub(super) mod global;
+
 pub mod immix;
 
 use bytemuck::NoUninit;

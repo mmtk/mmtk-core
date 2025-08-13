@@ -79,6 +79,9 @@ pub fn create_concurrent_immix_mutator<VM: VMBinding>(
 
     let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
     builder
-        .barrier(Box::new(SATBBarrier::new(SATBBarrierSemantics::new(mmtk))))
+        .barrier(Box::new(SATBBarrier::new(SATBBarrierSemantics::<
+            VM,
+            ConcurrentImmix<VM>,
+        >::new(mmtk))))
         .build()
 }
