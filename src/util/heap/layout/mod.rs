@@ -26,14 +26,9 @@ pub fn create_vm_map() -> Box<dyn VMMap + Send + Sync> {
     }
 }
 
-#[cfg(target_pointer_width = "32")]
-pub fn create_mmapper() -> Box<dyn Mmapper + Send + Sync> {
-    Box::new(byte_map_mmapper::ByteMapMmapper::new())
-}
-
-#[cfg(target_pointer_width = "64")]
 pub fn create_mmapper() -> Box<dyn Mmapper> {
-    // TODO: ByteMapMmapper for 39-bit or less virtual space
+    // TODO: Select a MapStateStorage based on the actuall address space size.
+    // For example, choose ByteMapStateStorage for 39-bit or less virtual space.
 
     use crate::util::heap::layout::mmapper::csm::ChunkStateMmapper;
     Box::new(ChunkStateMmapper::new())
