@@ -410,7 +410,7 @@ impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
         zeroed: bool,
         permission_exec: bool,
         vmrequest: VMRequest,
-    ) -> PlanCreateSpaceArgs<VM> {
+    ) -> PlanCreateSpaceArgs<'_, VM> {
         PlanCreateSpaceArgs {
             name,
             zeroed,
