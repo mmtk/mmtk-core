@@ -709,16 +709,16 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     object,
                     semantics,
                     copy_context,
-                    |_new_object| {
+                    |new_object| {
                         // post_copy should have set the unlog bit
                         // if `unlog_traced_object` is true.
                         debug_assert!(
                             !self.common.unlog_traced_object
                                 || VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                                    .is_unlogged::<VM>(object, Ordering::Relaxed)
+                                    .is_unlogged::<VM>(new_object, Ordering::Relaxed)
                         );
                         #[cfg(feature = "vo_bit")]
-                        vo_bit::helper::on_object_forwarded::<VM>(_new_object);
+                        vo_bit::helper::on_object_forwarded::<VM>(new_object);
                     },
                 )
             };
