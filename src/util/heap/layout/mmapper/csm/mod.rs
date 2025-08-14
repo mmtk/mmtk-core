@@ -14,15 +14,22 @@ type ChosenMapStateStorage = byte_map_storage::ByteMapStateStorage;
 #[cfg(target_pointer_width = "64")]
 type ChosenMapStateStorage = two_level_storage::TwoLevelStateStorage;
 
+/// The back-end storage of [`ChunkStateMmapper`].  It is responsible for holding the states of each
+/// chunk (eagerly or lazily) and transitioning the states in bulk.
 trait MapStateStorage {
     fn get_state(&self, chunk: Address) -> Option<MapState>;
-    // fn set_state(&self, chunk: Address, state: MapState);
     fn bulk_set_state(&self, start: Address, bytes: usize, state: MapState);
     fn bulk_transition_state<F>(&self, start: Address, bytes: usize, transformer: F) -> Result<()>
     where
         F: FnMut(Address, usize, MapState) -> Result<Option<MapState>>;
 }
 
+/// A [`Mmapper`] implementation based on a logical array of chunk states.
+///
+/// The [`ChunkStateMmapper::storage`] field holds the state of each chunk, and the
+/// [`ChunkStateMmapper`] itself actually makes system calls to manage the memory mapping.
+///
+/// As the name suggests, this implementation of [`Mmapper`] operates at the granularity of chunks.
 pub struct ChunkStateMmapper {
     /// Lock for transitioning map states.
     transition_lock: Mutex<()>,
@@ -226,7 +233,6 @@ enum MapState {
     /// The chunk is mapped and is also protected by MMTk.
     Protected,
 }
-
 
 #[cfg(test)]
 mod tests {
