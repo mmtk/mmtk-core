@@ -1,10 +1,9 @@
 use super::MapState;
-use crate::util::conversions::raw_is_aligned;
+use crate::util::heap::layout::mmapper::csm::ChunkRange;
 use crate::util::heap::layout::mmapper::csm::MapStateStorage;
 use crate::util::rust_util::rev_group::RevisitableGroupByForIterator;
 use crate::util::Address;
 
-use crate::util::constants::*;
 use crate::util::heap::layout::vm_layout::*;
 use std::fmt;
 use std::sync::atomic::Ordering;
@@ -13,13 +12,12 @@ use std::sync::Mutex;
 use atomic::Atomic;
 use std::io::Result;
 
-const MMAP_NUM_CHUNKS: usize = if LOG_BYTES_IN_ADDRESS_SPACE == 32 {
-    1 << (LOG_BYTES_IN_ADDRESS_SPACE as usize - LOG_MMAP_CHUNK_BYTES)
-} else {
-    1 << (33 - LOG_MMAP_CHUNK_BYTES)
-};
-pub const VERBOSE: bool = true;
+/// For now, we only use `ByteMapStateStorage` for 32-bit address range.
+const MMAP_NUM_CHUNKS: usize = 1 << (32 - LOG_MMAP_CHUNK_BYTES);
 
+/// A [`MapStateStorage`] implementation based on a simple array.
+///
+/// Currently it is sized to cover a 32-bit address range.
 pub struct ByteMapStateStorage {
     lock: Mutex<()>,
     mapped: [Atomic<MapState>; MMAP_NUM_CHUNKS],
@@ -38,56 +36,20 @@ impl MapStateStorage for ByteMapStateStorage {
         Some(slot.load(Ordering::SeqCst))
     }
 
-    // fn set_state(&self, chunk: Address, state: MapState) {
-    //     let index = chunk >> LOG_BYTES_IN_CHUNK;
-    //     let Some(slot) = self.mapped.get(index) else {
-    //         panic!("Chunk {chunk} out of range.");
-    //     };
-    //     slot.store(state, Ordering::SeqCst);
-    // }
-
-    fn bulk_set_state(&self, start: Address, bytes: usize, state: MapState) {
-        debug_assert!(
-            start.is_aligned_to(BYTES_IN_CHUNK),
-            "start {start} is not aligned"
-        );
-        debug_assert!(
-            raw_is_aligned(bytes, BYTES_IN_CHUNK),
-            "bytes {bytes} is not aligned"
-        );
-        let index_start = start >> LOG_BYTES_IN_CHUNK;
-        let index_limit = (start + bytes) >> LOG_BYTES_IN_CHUNK;
-        if index_start >= self.mapped.len() {
-            panic!("chunk {start} out of range");
-        }
-        if index_limit >= self.mapped.len() {
-            panic!("bytes {bytes} out of range");
-        }
+    fn bulk_set_state(&self, range: ChunkRange, state: MapState) {
+        let index_start = range.start >> LOG_BYTES_IN_CHUNK;
+        let index_limit = range.limit() >> LOG_BYTES_IN_CHUNK;
         for index in index_start..index_limit {
             self.mapped[index].store(state, Ordering::Relaxed);
         }
     }
 
-    fn bulk_transition_state<F>(&self, start: Address, bytes: usize, mut transformer: F) -> Result<()>
+    fn bulk_transition_state<F>(&self, range: ChunkRange, mut transformer: F) -> Result<()>
     where
-        F: FnMut(Address, usize, MapState) -> Result<Option<MapState>>,
+        F: FnMut(ChunkRange, MapState) -> Result<Option<MapState>>,
     {
-        debug_assert!(
-            start.is_aligned_to(BYTES_IN_CHUNK),
-            "start {start} is not aligned"
-        );
-        debug_assert!(
-            raw_is_aligned(bytes, BYTES_IN_CHUNK),
-            "bytes {bytes} is not aligned"
-        );
-        let index_start = start >> LOG_BYTES_IN_CHUNK;
-        let index_limit = (start + bytes) >> LOG_BYTES_IN_CHUNK;
-        if index_start >= self.mapped.len() {
-            panic!("start {start} out of range");
-        }
-        if index_limit >= self.mapped.len() {
-            panic!("bytes {bytes} out of range");
-        }
+        let index_start = range.start >> LOG_BYTES_IN_CHUNK;
+        let index_limit = range.limit() >> LOG_BYTES_IN_CHUNK;
 
         let mut group_start = index_start;
         for group in self.mapped.as_slice()[index_start..index_limit]
@@ -99,7 +61,8 @@ impl MapStateStorage for ByteMapStateStorage {
             let group_start_addr =
                 unsafe { Address::from_usize(group_start << LOG_BYTES_IN_CHUNK) };
             let group_bytes = group.len << LOG_BYTES_IN_CHUNK;
-            if let Some(new_state) = transformer(group_start_addr, group_bytes, state)? {
+            let group_range = ChunkRange::new_aligned(group_start_addr, group_bytes);
+            if let Some(new_state) = transformer(group_range, state)? {
                 for index in group_start..group_end {
                     self.mapped[index].store(new_state, Ordering::Relaxed);
                 }

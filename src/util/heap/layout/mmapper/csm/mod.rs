@@ -1,7 +1,9 @@
+use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::conversions::raw_is_aligned;
+use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::layout::Mmapper;
 use crate::util::memory::*;
 use crate::util::Address;
-use crate::util::{constants::BYTES_IN_PAGE, heap::layout::vm_layout::*};
 use bytemuck::NoUninit;
 use std::{io::Result, sync::Mutex};
 
@@ -14,14 +16,57 @@ type ChosenMapStateStorage = byte_map_storage::ByteMapStateStorage;
 #[cfg(target_pointer_width = "64")]
 type ChosenMapStateStorage = two_level_storage::TwoLevelStateStorage;
 
+/// A range of whole chunks.  Always aligned.
+///
+/// This type is used internally by the chunk state mmapper and its storage backends.
+#[derive(Clone, Copy)]
+struct ChunkRange {
+    start: Address,
+    bytes: usize,
+}
+
+impl ChunkRange {
+    fn new_aligned(start: Address, bytes: usize) -> Self {
+        debug_assert!(
+            start.is_aligned_to(BYTES_IN_CHUNK),
+            "start {start} is not chunk-aligned"
+        );
+        debug_assert!(
+            raw_is_aligned(bytes, BYTES_IN_CHUNK),
+            "bytes 0x{bytes:x} is not a multiple of chunks"
+        );
+        Self { start, bytes }
+    }
+
+    fn new_unaligned(start: Address, bytes: usize) -> Self {
+        let start_aligned = start.align_down(BYTES_IN_CHUNK);
+        let end_aligned = (start + bytes).align_up(BYTES_IN_CHUNK);
+        Self::new_aligned(start_aligned, end_aligned - start_aligned)
+    }
+
+    fn limit(&self) -> Address {
+        self.start + self.bytes
+    }
+
+    fn is_within_limit(&self, limit: Address) -> bool {
+        self.limit() <= limit
+    }
+}
+
+impl std::fmt::Display for ChunkRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-{}", self.start, self.limit())
+    }
+}
+
 /// The back-end storage of [`ChunkStateMmapper`].  It is responsible for holding the states of each
 /// chunk (eagerly or lazily) and transitioning the states in bulk.
 trait MapStateStorage {
     fn get_state(&self, chunk: Address) -> Option<MapState>;
-    fn bulk_set_state(&self, start: Address, bytes: usize, state: MapState);
-    fn bulk_transition_state<F>(&self, start: Address, bytes: usize, transformer: F) -> Result<()>
+    fn bulk_set_state(&self, range: ChunkRange, state: MapState);
+    fn bulk_transition_state<F>(&self, range: ChunkRange, transformer: F) -> Result<()>
     where
-        F: FnMut(Address, usize, MapState) -> Result<Option<MapState>>;
+        F: FnMut(ChunkRange, MapState) -> Result<Option<MapState>>;
 }
 
 /// A [`Mmapper`] implementation based on a logical array of chunk states.
@@ -73,11 +118,8 @@ impl Mmapper for ChunkStateMmapper {
     fn mark_as_mapped(&self, start: Address, bytes: usize) {
         let _guard = self.transition_lock.lock().unwrap();
 
-        let chunk_start: Address = start.align_down(BYTES_IN_CHUNK);
-        let chunk_end = (start + bytes).align_up(BYTES_IN_CHUNK);
-        let aligned_bytes = chunk_end - chunk_start;
-        self.storage
-            .bulk_set_state(chunk_start, aligned_bytes, MapState::Mapped);
+        let range = ChunkRange::new_unaligned(start, bytes);
+        self.storage.bulk_set_state(range, MapState::Mapped);
     }
 
     /// Quarantine/reserve address range. We mmap from the OS with no reserve and with PROT_NONE,
@@ -86,7 +128,7 @@ impl Mmapper for ChunkStateMmapper {
     ///
     /// Arguments:
     /// * `start`: Address of the first page to be quarantined
-    /// * `bytes`: Number of bytes to quarantine from the start
+    /// * `pages`: Number of pages to quarantine from the start
     /// * `strategy`: The mmap strategy.  The `prot` field is ignored because we always use
     ///   `PROT_NONE`.
     /// * `anno`: Human-readable annotation to apply to newly mapped memory ranges.
@@ -99,35 +141,33 @@ impl Mmapper for ChunkStateMmapper {
     ) -> Result<()> {
         let _guard = self.transition_lock.lock().unwrap();
 
-        let chunk_start: Address = start.align_down(BYTES_IN_CHUNK);
-        let chunk_end = (start + pages * BYTES_IN_PAGE).align_up(BYTES_IN_CHUNK);
-        let aligned_bytes = chunk_end - chunk_start;
-        self.storage.bulk_transition_state(
-            chunk_start,
-            aligned_bytes,
-            |group_start, group_bytes, state| {
-                let group_end = group_start + group_bytes;
+        let bytes = pages << LOG_BYTES_IN_PAGE;
+        let range = ChunkRange::new_unaligned(start, bytes);
+
+        self.storage
+            .bulk_transition_state(range, |group_range, state| {
+                let group_start: Address = group_range.start;
+                let group_bytes = group_range.bytes;
 
                 match state {
                     MapState::Unmapped => {
-                        trace!("Trying to quarantine {} - {}", group_start, group_end);
+                        trace!("Trying to quarantine {group_range}");
                         mmap_noreserve(group_start, group_bytes, strategy, anno)?;
                         Ok(Some(MapState::Quarantined))
                     }
                     MapState::Quarantined => {
-                        trace!("Already quarantine {} - {}", group_start, group_end);
+                        trace!("Already quarantine {group_range}");
                         Ok(None)
                     }
                     MapState::Mapped => {
-                        trace!("Already mapped {} - {}", group_start, group_end);
+                        trace!("Already mapped {group_range}");
                         Ok(None)
                     }
                     MapState::Protected => {
                         panic!("Cannot quarantine protected memory")
                     }
                 }
-            },
-        )
+            })
     }
 
     /// Ensure that a range of pages is mmapped (or equivalent).  If the
@@ -151,28 +191,30 @@ impl Mmapper for ChunkStateMmapper {
     ) -> Result<()> {
         let _guard = self.transition_lock.lock().unwrap();
 
-        let chunk_start: Address = start.align_down(BYTES_IN_CHUNK);
-        let chunk_end = (start + pages * BYTES_IN_PAGE).align_up(BYTES_IN_CHUNK);
-        let aligned_bytes = chunk_end - chunk_start;
-        self.storage.bulk_transition_state(
-            chunk_start,
-            aligned_bytes,
-            |group_start, group_bytes, state| match state {
-                MapState::Unmapped => {
-                    dzmmap_noreplace(group_start, group_bytes, strategy, anno)?;
-                    Ok(Some(MapState::Mapped))
+        let bytes = pages << LOG_BYTES_IN_PAGE;
+        let range = ChunkRange::new_unaligned(start, bytes);
+
+        self.storage
+            .bulk_transition_state(range, |group_range, state| {
+                let group_start: Address = group_range.start;
+                let group_bytes = group_range.bytes;
+
+                match state {
+                    MapState::Unmapped => {
+                        dzmmap_noreplace(group_start, group_bytes, strategy, anno)?;
+                        Ok(Some(MapState::Mapped))
+                    }
+                    MapState::Protected => {
+                        munprotect(group_start, group_bytes, strategy.prot)?;
+                        Ok(Some(MapState::Mapped))
+                    }
+                    MapState::Quarantined => {
+                        unsafe { dzmmap(group_start, group_bytes, strategy, anno) }?;
+                        Ok(Some(MapState::Mapped))
+                    }
+                    MapState::Mapped => Ok(None),
                 }
-                MapState::Protected => {
-                    munprotect(group_start, group_bytes, strategy.prot)?;
-                    Ok(Some(MapState::Mapped))
-                }
-                MapState::Quarantined => {
-                    unsafe { dzmmap(group_start, group_bytes, strategy, anno) }?;
-                    Ok(Some(MapState::Mapped))
-                }
-                MapState::Mapped => Ok(None),
-            },
-        )
+            })
     }
 
     /// Is the page pointed to by this address mapped? Returns true if
@@ -192,29 +234,23 @@ impl Mmapper for ChunkStateMmapper {
     fn protect(&self, start: Address, pages: usize) {
         let _guard = self.transition_lock.lock().unwrap();
 
-        let chunk_start: Address = start.align_down(BYTES_IN_CHUNK);
-        let chunk_end = (start + pages * BYTES_IN_PAGE).align_up(BYTES_IN_CHUNK);
-        let aligned_bytes = chunk_end - chunk_start;
-        self.storage
-            .bulk_transition_state(
-                chunk_start,
-                aligned_bytes,
-                |group_start, group_bytes, state| {
-                    let group_end = group_start + group_bytes;
+        let bytes = pages << LOG_BYTES_IN_PAGE;
+        let range = ChunkRange::new_unaligned(start, bytes);
 
-                    match state {
-                        MapState::Mapped => {
-                            crate::util::memory::mprotect(group_start, group_bytes).unwrap();
-                            Ok(Some(MapState::Protected))
-                        }
-                        MapState::Protected => Ok(None),
-                        _ => panic!(
-                            "Cannot transition {}-{} to protected",
-                            group_start, group_end
-                        ),
+        self.storage
+            .bulk_transition_state(range, |group_range, state| {
+                let group_start: Address = group_range.start;
+                let group_bytes = group_range.bytes;
+
+                match state {
+                    MapState::Mapped => {
+                        crate::util::memory::mprotect(group_start, group_bytes).unwrap();
+                        Ok(Some(MapState::Protected))
                     }
-                },
-            )
+                    MapState::Protected => Ok(None),
+                    _ => panic!("Cannot transition {group_range} to protected",),
+                }
+            })
             .unwrap();
     }
 }

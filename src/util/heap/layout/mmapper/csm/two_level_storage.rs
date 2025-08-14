@@ -4,8 +4,7 @@
 //! this module is only available on 64-bit machines.
 
 use super::MapState;
-use crate::util::conversions::raw_is_aligned;
-use crate::util::heap::layout::mmapper::csm::MapStateStorage;
+use crate::util::heap::layout::mmapper::csm::{ChunkRange, MapStateStorage};
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::rust_util::atomic_box::OnceOptionBox;
 use crate::util::rust_util::rev_group::RevisitableGroupByForIterator;
@@ -20,6 +19,8 @@ use std::io::Result;
 const LOG_MAPPABLE_BYTES: usize = 48;
 /// Address space size a user-space program is allowed to use.
 const MAPPABLE_BYTES: usize = 1 << LOG_MAPPABLE_BYTES;
+/// The limit of mappable address
+const MAPPABLE_ADDRESS_LIMIT: Address = unsafe { Address::from_usize(MAPPABLE_BYTES) };
 
 /// Log number of bytes per slab.
 /// For a two-level array, it is advisable to choose the arithmetic mean of [`LOG_MAPPABLE_BYTES`]
@@ -77,29 +78,25 @@ impl MapStateStorage for TwoLevelStateStorage {
             .map(|slab| slab[Self::in_slab_index(chunk)].load(Ordering::Relaxed))
     }
 
-    fn bulk_set_state(&self, start: Address, bytes: usize, state: MapState) {
-        self.foreach_slab_slice_for_write(start, bytes, |_low, _high, slice| {
+    fn bulk_set_state(&self, range: ChunkRange, state: MapState) {
+        self.foreach_slab_slice_for_write(range, |slice| {
             for slot in slice {
                 slot.store(state, Ordering::Relaxed);
             }
         });
     }
 
-    fn bulk_transition_state<F>(
-        &self,
-        start: Address,
-        bytes: usize,
-        mut transformer: F,
-    ) -> Result<()>
+    fn bulk_transition_state<F>(&self, range: ChunkRange, mut transformer: F) -> Result<()>
     where
-        F: FnMut(Address, usize, MapState) -> Result<Option<MapState>>,
+        F: FnMut(ChunkRange, MapState) -> Result<Option<MapState>>,
     {
         let mut slice_indices = Vec::new();
 
-        self.foreach_slab_slice_for_write(start, bytes, |_low, _high, slice| {
+        self.foreach_slab_slice_for_write(range, |slice| {
             slice_indices.push(slice);
         });
 
+        let start = range.start;
         // Chunk index from `start`.
         let mut start_index: usize = 0usize;
 
@@ -111,10 +108,11 @@ impl MapStateStorage for TwoLevelStateStorage {
         {
             let state = group.key;
             let end_index = start_index + group.len;
-            let start_addr = start + MMAP_CHUNK_BYTES * start_index;
+            let group_start = start + (start_index << LOG_MMAP_CHUNK_BYTES);
             let group_bytes = group.len << LOG_MMAP_CHUNK_BYTES;
+            let group_range = ChunkRange::new_aligned(group_start, group_bytes);
 
-            if let Some(new_state) = transformer(start_addr, group_bytes, state)? {
+            if let Some(new_state) = transformer(group_range, state)? {
                 for slot in group {
                     slot.store(new_state, Ordering::Relaxed);
                 }
@@ -164,27 +162,19 @@ impl TwoLevelStateStorage {
         (addr & MMAP_SLAB_MASK) >> LOG_BYTES_IN_CHUNK
     }
 
-    fn foreach_slab_slice_for_write<'s, F>(&'s self, start: Address, bytes: usize, mut f: F)
+    /// Visit all slabs that overlap with the `range` from low to high address.  For each slab, call
+    /// `f` with the slice of the slab that overlap with the chunks within the `range`.
+    fn foreach_slab_slice_for_write<'s, F>(&'s self, range: ChunkRange, mut f: F)
     where
-        F: FnMut(Address, Address, &'s [Atomic<MapState>]),
+        F: FnMut(&'s [Atomic<MapState>]),
     {
         debug_assert!(
-            start.is_aligned_to(BYTES_IN_CHUNK),
-            "start {start} is not aligned"
+            range.is_within_limit(MAPPABLE_ADDRESS_LIMIT),
+            "range {range} out of bound"
         );
-        debug_assert!(
-            raw_is_aligned(bytes, BYTES_IN_CHUNK),
-            "bytes {bytes} is not aligned"
-        );
-        if start.as_usize() >= MAPPABLE_BYTES {
-            panic!("start {start} out of range");
-        }
-        let limit = start + bytes;
-        if limit.as_usize() >= MAPPABLE_BYTES {
-            panic!("bytes {bytes} out of range");
-        }
 
-        let mut low = start;
+        let limit = range.limit();
+        let mut low = range.start;
         while low < limit {
             let high = (low + MMAP_SLAB_BYTES)
                 .align_down(MMAP_SLAB_BYTES)
@@ -198,7 +188,7 @@ impl TwoLevelStateStorage {
             } else {
                 high_index
             };
-            f(low, high, &slab[low_index..ub_index]);
+            f(&slab[low_index..ub_index]);
 
             low = high;
         }
