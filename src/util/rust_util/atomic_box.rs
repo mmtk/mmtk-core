@@ -1,5 +1,7 @@
 use std::sync::atomic::{AtomicPtr, Ordering};
 
+use bytemuck::Zeroable;
+
 /// A lazily initialized box.  Similar to an `Option<Box<T>>`, but can be initialized atomically.
 ///
 /// It is designed for implementing shared data.  Therefore, methods with `&self`, namely
@@ -81,6 +83,8 @@ impl<T> Drop for OnceOptionBox<T> {
         }
     }
 }
+
+unsafe impl<T> Zeroable for OnceOptionBox<T> {}
 
 #[cfg(test)]
 mod tests {

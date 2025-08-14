@@ -198,7 +198,7 @@ struct BlockQueue<B: Region> {
 impl<B: Region> BlockQueue<B> {
     /// Create an array
     fn new() -> Self {
-        let zeroed_vec = unsafe { new_zeroed_vec(Self::CAPACITY) };
+        let zeroed_vec = new_zeroed_vec(Self::CAPACITY);
         let boxed_slice = zeroed_vec.into_boxed_slice();
         let data = UnsafeCell::new(boxed_slice);
         Self {
