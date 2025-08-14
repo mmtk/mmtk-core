@@ -124,7 +124,6 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         } else {
             self.full_heap_gc_count.lock().unwrap().inc();
             if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
-                self.immix.common.clear_side_log_bits();
                 self.immix.immix_space.clear_side_log_bits();
             }
             self.immix.prepare(tls);
