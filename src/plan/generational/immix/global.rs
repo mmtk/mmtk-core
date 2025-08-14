@@ -130,6 +130,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         self.gen.prepare(tls);
         if full_heap {
             if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
+                self.gen.common.clear_side_log_bits();
                 self.immix_space.clear_side_log_bits();
             }
             self.immix_space.prepare(
