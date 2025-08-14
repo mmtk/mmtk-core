@@ -412,7 +412,7 @@ impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
         unlog_allocated_object: bool,
         unlog_traced_object: bool,
         vmrequest: VMRequest,
-    ) -> PlanCreateSpaceArgs<VM> {
+    ) -> PlanCreateSpaceArgs<'_, VM> {
         PlanCreateSpaceArgs {
             name,
             zeroed,
