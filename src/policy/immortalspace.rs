@@ -115,6 +115,20 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, &self.pr);
     }
+
+    fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            log_bit.bzero_metadata(start, size);
+        }
+    }
+
+    fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            log_bit.bset_metadata(start, size);
+        }
+    }
 }
 
 use crate::scheduler::GCWorker;
@@ -171,20 +185,6 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
 
     pub fn release(&mut self) {
         self.mark_state.on_global_release::<VM>();
-    }
-
-    pub fn clear_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        for (start, size) in self.pr.iterate_allocated_regions() {
-            log_bit.bzero_metadata(start, size);
-        }
-    }
-
-    pub fn set_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        for (start, size) in self.pr.iterate_allocated_regions() {
-            log_bit.bset_metadata(start, size);
-        }
     }
 
     pub fn trace_object<Q: ObjectQueue>(

@@ -195,6 +195,20 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_chunk_map::<Block>(enumerator, &self.chunk_map);
     }
+
+    fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
+        }
+    }
+
+    fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
+        }
+    }
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace<VM> {
@@ -513,21 +527,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         did_defrag
     }
 
-    pub fn clear_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        for chunk in self.chunk_map.all_chunks() {
-            log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn set_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        for chunk in self.chunk_map.all_chunks() {
-            log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
-        }
-    }
-
     /// Generate chunk sweep tasks
     fn generate_sweep_tasks(&self) -> Vec<Box<dyn GCWork<VM>>> {
         self.defrag.mark_histograms.lock().clear();
@@ -699,6 +698,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     self.mark_lines(object);
                 }
 
+                self.unlog_object_if_needed(object);
+
                 object
             } else {
                 // We are forwarding objects. When the copy allocator allocates the block, it should
@@ -709,6 +710,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     semantics,
                     copy_context,
                     |_new_object| {
+                        // post_copy should have set the unlog bit
+                        // if `unlog_traced_object` is true.
+                        debug_assert!(
+                            !self.common.unlog_traced_object
+                                || VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                                    .is_unlogged::<VM>(object, Ordering::Relaxed)
+                        );
                         #[cfg(feature = "vo_bit")]
                         vo_bit::helper::on_object_forwarded::<VM>(_new_object);
                     },
@@ -721,7 +729,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
             queue.enqueue(new_object);
             debug_assert!(new_object.is_live());
-            self.unlog_object_if_needed(new_object);
             new_object
         }
     }

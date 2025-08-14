@@ -154,6 +154,22 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
             enumerator.visit_address_range(ep.start, ep.end);
         }
     }
+
+    fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        let external_pages = self.pr.get_external_pages();
+        for ep in external_pages.iter() {
+            log_bit.bzero_metadata(ep.start, ep.end - ep.start);
+        }
+    }
+
+    fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        let external_pages = self.pr.get_external_pages();
+        for ep in external_pages.iter() {
+            log_bit.bset_metadata(ep.start, ep.end - ep.start);
+        }
+    }
 }
 
 use crate::scheduler::GCWorker;
@@ -269,22 +285,6 @@ impl<VM: VMBinding> VMSpace<VM> {
 
     pub fn release(&mut self) {
         self.mark_state.on_global_release::<VM>();
-    }
-
-    pub fn clear_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        let external_pages = self.pr.get_external_pages();
-        for ep in external_pages.iter() {
-            log_bit.bzero_metadata(ep.start, ep.end - ep.start);
-        }
-    }
-
-    pub fn set_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        let external_pages = self.pr.get_external_pages();
-        for ep in external_pages.iter() {
-            log_bit.bset_metadata(ep.start, ep.end - ep.start);
-        }
     }
 
     pub fn trace_object<Q: ObjectQueue>(

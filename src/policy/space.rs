@@ -433,6 +433,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// the execution time.  For LOS, it will be cheaper to enumerate individual objects than
     /// scanning VO bits because it is sparse.
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator);
+
+    /// Clear the side log bits for allocated regions in this space.
+    /// This method is only called if the plan knows the log bits are side metadata.
+    fn clear_side_log_bits(&self);
+
+    /// Set the side log bits for allocated regions in this space.
+    /// This method is only called if the plan knows the log bits are side metadata.
+    fn set_side_log_bits(&self);
 }
 
 /// Print the VM map for a space.

@@ -143,6 +143,20 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, &self.pr);
     }
+
+    fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            log_bit.bzero_metadata(start, size);
+        }
+    }
+
+    fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            log_bit.bset_metadata(start, size);
+        }
+    }
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<VM> {
@@ -210,20 +224,6 @@ impl<VM: VMBinding> CopySpace<VM> {
             self.pr.reset();
         }
         self.from_space.store(false, Ordering::SeqCst);
-    }
-
-    pub fn clear_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        for (start, size) in self.pr.iterate_allocated_regions() {
-            log_bit.bzero_metadata(start, size);
-        }
-    }
-
-    pub fn set_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        for (start, size) in self.pr.iterate_allocated_regions() {
-            log_bit.bset_metadata(start, size);
-        }
     }
 
     fn is_from_space(&self) -> bool {

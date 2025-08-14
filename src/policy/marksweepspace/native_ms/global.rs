@@ -254,6 +254,20 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_chunk_map::<Block>(enumerator, &self.chunk_map);
     }
+
+    fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
+        }
+    }
+
+    fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
+        }
+    }
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepSpace<VM> {
@@ -417,20 +431,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             .generate_tasks(|chunk| Box::new(PrepareChunkMap { space, chunk }));
         self.scheduler.work_buckets[crate::scheduler::WorkBucketStage::Prepare]
             .bulk_add(work_packets);
-    }
-
-    pub fn clear_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        for chunk in self.chunk_map.all_chunks() {
-            log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
-        }
-    }
-
-    pub fn set_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        for chunk in self.chunk_map.all_chunks() {
-            log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
-        }
     }
 
     pub fn release(&mut self) {
