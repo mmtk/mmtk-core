@@ -73,9 +73,11 @@ impl fmt::Debug for TwoLevelStateStorage {
 }
 
 impl MapStateStorage for TwoLevelStateStorage {
-    fn get_state(&self, chunk: Address) -> Option<MapState> {
-        self.slab_table(chunk)
-            .map(|slab| slab[Self::in_slab_index(chunk)].load(Ordering::Relaxed))
+    fn get_state(&self, chunk: Address) -> MapState {
+        let Some(slab) = self.slab_table(chunk) else {
+            return MapState::Unmapped;
+        };
+        slab[Self::in_slab_index(chunk)].load(Ordering::Relaxed)
     }
 
     fn bulk_set_state(&self, range: ChunkRange, state: MapState) {

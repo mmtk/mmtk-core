@@ -30,10 +30,12 @@ impl fmt::Debug for ByteMapStateStorage {
 }
 
 impl MapStateStorage for ByteMapStateStorage {
-    fn get_state(&self, chunk: Address) -> Option<MapState> {
+    fn get_state(&self, chunk: Address) -> MapState {
         let index = chunk >> LOG_BYTES_IN_CHUNK;
-        let slot = self.mapped.get(index)?;
-        Some(slot.load(Ordering::SeqCst))
+        let Some(slot) = self.mapped.get(index) else {
+            return MapState::Unmapped;
+        };
+        slot.load(Ordering::SeqCst)
     }
 
     fn bulk_set_state(&self, range: ChunkRange, state: MapState) {

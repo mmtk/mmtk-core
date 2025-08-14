@@ -62,7 +62,11 @@ impl std::fmt::Display for ChunkRange {
 /// The back-end storage of [`ChunkStateMmapper`].  It is responsible for holding the states of each
 /// chunk (eagerly or lazily) and transitioning the states in bulk.
 trait MapStateStorage {
-    fn get_state(&self, chunk: Address) -> Option<MapState>;
+    /// Return the state of a given `chunk` (must be aligned).
+    ///
+    /// Note that all chunks are logically `MapState::Unmapped` before the states are stored.  They
+    /// include chunks outside the mappable address range.
+    fn get_state(&self, chunk: Address) -> MapState;
     fn bulk_set_state(&self, range: ChunkRange, state: MapState);
     fn bulk_transition_state<F>(&self, range: ChunkRange, transformer: F) -> Result<()>
     where
@@ -91,7 +95,7 @@ impl ChunkStateMmapper {
     }
 
     #[cfg(test)]
-    fn get_state(&self, chunk: Address) -> Option<MapState> {
+    fn get_state(&self, chunk: Address) -> MapState {
         self.storage.get_state(chunk)
     }
 }
@@ -223,7 +227,7 @@ impl Mmapper for ChunkStateMmapper {
     /// Arguments:
     /// * `addr`: Address in question
     fn is_mapped_address(&self, addr: Address) -> bool {
-        self.storage.get_state(addr) == Some(MapState::Mapped)
+        self.storage.get_state(addr) == MapState::Mapped
     }
 
     /// Mark a number of pages as inaccessible.
@@ -288,7 +292,7 @@ mod tests {
         conversions::raw_align_up(pages, MMAP_CHUNK_BYTES) / MMAP_CHUNK_BYTES
     }
 
-    fn get_chunk_map_state(mmapper: &ChunkStateMmapper, chunk: Address) -> Option<MapState> {
+    fn get_chunk_map_state(mmapper: &ChunkStateMmapper, chunk: Address) -> MapState {
         assert_eq!(conversions::mmap_chunk_align_up(chunk), chunk);
         mmapper.get_state(chunk)
     }
@@ -311,7 +315,7 @@ mod tests {
                                 &mmapper,
                                 FIXED_ADDRESS + (i << LOG_BYTES_IN_CHUNK)
                             ),
-                            Some(MapState::Mapped)
+                            MapState::Mapped
                         );
                     }
                 },
@@ -339,7 +343,7 @@ mod tests {
                                 &mmapper,
                                 FIXED_ADDRESS + (i << LOG_BYTES_IN_CHUNK)
                             ),
-                            Some(MapState::Mapped)
+                            MapState::Mapped
                         );
                     }
                 },
@@ -368,7 +372,7 @@ mod tests {
                                 &mmapper,
                                 FIXED_ADDRESS + (i << LOG_BYTES_IN_CHUNK)
                             ),
-                            Some(MapState::Mapped)
+                            MapState::Mapped
                         );
                     }
                 },
@@ -401,11 +405,11 @@ mod tests {
 
                     assert_eq!(
                         get_chunk_map_state(&mmapper, FIXED_ADDRESS),
-                        Some(MapState::Protected)
+                        MapState::Protected
                     );
                     assert_eq!(
                         get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES),
-                        Some(MapState::Mapped)
+                        MapState::Mapped
                     );
                 },
                 || {
@@ -434,11 +438,11 @@ mod tests {
 
                     assert_eq!(
                         get_chunk_map_state(&mmapper, FIXED_ADDRESS),
-                        Some(MapState::Mapped)
+                        MapState::Mapped
                     );
                     assert_eq!(
                         get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES),
-                        Some(MapState::Mapped)
+                        MapState::Mapped
                     );
 
                     // protect 1 chunk
@@ -446,11 +450,11 @@ mod tests {
 
                     assert_eq!(
                         get_chunk_map_state(&mmapper, FIXED_ADDRESS),
-                        Some(MapState::Protected)
+                        MapState::Protected
                     );
                     assert_eq!(
                         get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES),
-                        Some(MapState::Mapped)
+                        MapState::Mapped
                     );
 
                     // ensure mapped - this will unprotect the previously protected chunk
@@ -464,11 +468,11 @@ mod tests {
                         .unwrap();
                     assert_eq!(
                         get_chunk_map_state(&mmapper, FIXED_ADDRESS),
-                        Some(MapState::Mapped)
+                        MapState::Mapped
                     );
                     assert_eq!(
                         get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_CHUNK_BYTES),
-                        Some(MapState::Mapped)
+                        MapState::Mapped
                     );
                 },
                 || {
