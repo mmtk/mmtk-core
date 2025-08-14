@@ -67,7 +67,23 @@ trait MapStateStorage {
     /// Note that all chunks are logically `MapState::Unmapped` before the states are stored.  They
     /// include chunks outside the mappable address range.
     fn get_state(&self, chunk: Address) -> MapState;
+
+    /// Set all chunks within `range` to `state`.
     fn bulk_set_state(&self, range: ChunkRange, state: MapState);
+
+    /// Visit the chunk states within `range` and allow the `transformer` callback to inspect and
+    /// change the states.
+    ///
+    /// It visits chunks from low to high addresses, and calls `transformer(group_range,
+    /// group_state)` for each contiguous chunk range `group_range` that have the same state
+    /// `group_state`.  `transformer` can take actions accordingly and return one of the three
+    /// values:
+    /// -   `Err(err)`: Stop visiting and return `Err(err)` from `bulk_transition_state`
+    ///     immediately.
+    /// -   `Ok(None)`: Continue visiting the next chunk range without changing chunk states.
+    /// -   `Ok(Some(new_state))`: Set the state of all chunks within `group_range` to `new_state`.
+    ///
+    /// Return `Ok(())` if finished visiting all chunks normally.
     fn bulk_transition_state<F>(&self, range: ChunkRange, transformer: F) -> Result<()>
     where
         F: FnMut(ChunkRange, MapState) -> Result<Option<MapState>>;
