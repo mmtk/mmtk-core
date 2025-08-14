@@ -442,7 +442,7 @@ impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
         zeroed: bool,
         permission_exec: bool,
         vmrequest: VMRequest,
-    ) -> PlanCreateSpaceArgs<VM> {
+    ) -> PlanCreateSpaceArgs<'_, VM> {
         // Objects are allocatd as young, and when traced, they stay young. If they are copied out of the nursery space, they will be moved to a mature space,
         // and log bits will be set in that case by the mature space.
         self._get_space_args(name, zeroed, permission_exec, false, false, vmrequest)
@@ -455,7 +455,7 @@ impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
         zeroed: bool,
         permission_exec: bool,
         vmrequest: VMRequest,
-    ) -> PlanCreateSpaceArgs<VM> {
+    ) -> PlanCreateSpaceArgs<'_, VM> {
         // Objects are allocated as mature (pre-tenured), and when traced, they stay mature.
         // If an object gets copied into a mature space, the object is also mature,
         self._get_space_args(name, zeroed, permission_exec, true, true, vmrequest)
@@ -468,7 +468,7 @@ impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
         zeroed: bool,
         permission_exec: bool,
         vmrequest: VMRequest,
-    ) -> PlanCreateSpaceArgs<VM> {
+    ) -> PlanCreateSpaceArgs<'_, VM> {
         // Objects are allocated as young, and when traced, they become mature objects.
         self._get_space_args(name, zeroed, permission_exec, false, true, vmrequest)
     }
@@ -480,7 +480,7 @@ impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
         zeroed: bool,
         permission_exec: bool,
         vmrequest: VMRequest,
-    ) -> PlanCreateSpaceArgs<VM> {
+    ) -> PlanCreateSpaceArgs<'_, VM> {
         // Non generational plan: we do not use any of the flags about log bits.
         self._get_space_args(name, zeroed, permission_exec, false, false, vmrequest)
     }
@@ -491,7 +491,7 @@ impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
         &mut self,
         generational: bool,
         name: &'static str,
-    ) -> PlanCreateSpaceArgs<VM> {
+    ) -> PlanCreateSpaceArgs<'_, VM> {
         self.get_base_space_args(
             generational,
             name,
@@ -505,7 +505,7 @@ impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
         generational: bool,
         name: &'static str,
         permission_exec: bool,
-    ) -> PlanCreateSpaceArgs<VM> {
+    ) -> PlanCreateSpaceArgs<'_, VM> {
         if generational {
             // In generational plans, common/base spaces behave like a mature space:
             // * the objects in these spaces are not traced in a nursery GC
