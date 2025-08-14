@@ -63,6 +63,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> SATBBarrie
                 let bucket = if self.plan.concurrent_work_in_progress() {
                     WorkBucketStage::Unconstrained
                 } else {
+                    debug_assert_eq!(self.plan.current_pause(), Some(Pause::FinalMark));
                     WorkBucketStage::Closure
                 };
                 self.mmtk.scheduler.work_buckets[bucket].add(ProcessModBufSATB::<VM, P>::new(satb));
@@ -80,6 +81,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> SATBBarrie
             let bucket = if self.plan.concurrent_work_in_progress() {
                 WorkBucketStage::Unconstrained
             } else {
+                debug_assert_eq!(self.plan.current_pause(), Some(Pause::FinalMark));
                 WorkBucketStage::Closure
             };
             self.mmtk.scheduler.work_buckets[bucket].add(ProcessModBufSATB::<VM, P>::new(nodes));

@@ -256,6 +256,10 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         }
         info!("{:?} start", pause);
     }
+
+    fn concurrent(&self) -> Option<&dyn ConcurrentPlan<VM = VM>> {
+        Some(self)
+    }
 }
 
 impl<VM: VMBinding> ConcurrentImmix<VM> {

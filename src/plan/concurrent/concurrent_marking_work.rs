@@ -59,8 +59,12 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>>
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        self.plan
-            .trace_object::<Self, { TRACE_KIND_FAST }>(self, object, self.worker())
+        let new_object =
+            self.plan
+                .trace_object::<Self, { TRACE_KIND_FAST }>(self, object, self.worker());
+        // No copying should happen.
+        debug_assert_eq!(object, new_object);
+        object
     }
 
     fn trace_objects(&mut self, objects: &[ObjectReference]) {
