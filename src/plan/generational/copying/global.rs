@@ -110,6 +110,9 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.release(tls);
         if full_heap {
+            if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
+                self.fromspace().clear_side_log_bits();
+            }
             self.fromspace().release();
         }
     }
@@ -209,11 +212,11 @@ impl<VM: VMBinding> GenCopy<VM> {
         };
 
         let copyspace0 = CopySpace::new(
-            plan_args.get_space_args("copyspace0", true, false, VMRequest::discontiguous()),
+            plan_args.get_mature_space_args("copyspace0", true, false, VMRequest::discontiguous()),
             false,
         );
         let copyspace1 = CopySpace::new(
-            plan_args.get_space_args("copyspace1", true, false, VMRequest::discontiguous()),
+            plan_args.get_mature_space_args("copyspace1", true, false, VMRequest::discontiguous()),
             true,
         );
 

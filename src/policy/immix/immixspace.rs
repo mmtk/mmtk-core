@@ -60,19 +60,11 @@ pub struct ImmixSpace<VM: VMBinding> {
 
 /// Some arguments for Immix Space.
 pub struct ImmixSpaceArgs {
-    /// Mark an object as unlogged when we trace an object.
-    /// Normally we set the log bit when we copy an object with [`crate::util::copy::CopySemantics::PromoteToMature`].
-    /// In sticky immix, we 'promote' an object to mature when we trace the object
-    /// (no matter we copy an object or not). So we have to use `PromoteToMature`, and instead
-    /// just set the log bit in the space when an object is traced.
-    pub unlog_object_when_traced: bool,
     /// Whether this ImmixSpace instance contains both young and old objects.
     /// This affects the updating of valid-object bits.  If some lines or blocks of this ImmixSpace
     /// instance contain young objects, their VO bits need to be updated during this GC.  Currently
     /// only StickyImmix is affected.  GenImmix allocates young objects in a separete CopySpace
     /// nursery and its VO bits can be cleared in bulk.
-    // Currently only used when "vo_bit" is enabled.  Using #[cfg(...)] to eliminate dead code warning.
-    #[cfg(feature = "vo_bit")]
     pub mixed_age: bool,
     /// Disable copying for this Immix space.
     pub never_move_objects: bool,
@@ -203,6 +195,20 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_chunk_map::<Block>(enumerator, &self.chunk_map);
     }
+
+    fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
+        }
+    }
+
+    fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
+        }
+    }
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace<VM> {
@@ -301,7 +307,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         args: crate::policy::space::PlanCreateSpaceArgs<VM>,
         mut space_args: ImmixSpaceArgs,
     ) -> Self {
-        if space_args.unlog_object_when_traced {
+        if args.unlog_traced_object {
             assert!(
                 args.constraints.needs_log_bit,
                 "Invalid args when the plan does not use log bit"
@@ -419,14 +425,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             } else {
                 // For header metadata, we use cyclic mark bits.
                 unimplemented!("cyclic mark bits is not supported at the moment");
-            }
-
-            if self.common.needs_log_bit {
-                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                    for chunk in self.chunk_map.all_chunks() {
-                        side.bzero_metadata(chunk.start(), Chunk::BYTES);
-                    }
-                }
             }
 
             // Prepare defrag info
@@ -700,6 +698,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     self.mark_lines(object);
                 }
 
+                self.unlog_object_if_needed(object);
+
                 object
             } else {
                 // We are forwarding objects. When the copy allocator allocates the block, it should
@@ -709,9 +709,16 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     object,
                     semantics,
                     copy_context,
-                    |_new_object| {
+                    |new_object| {
+                        // post_copy should have set the unlog bit
+                        // if `unlog_traced_object` is true.
+                        debug_assert!(
+                            !self.common.unlog_traced_object
+                                || VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                                    .is_unlogged::<VM>(new_object, Ordering::Relaxed)
+                        );
                         #[cfg(feature = "vo_bit")]
-                        vo_bit::helper::on_object_forwarded::<VM>(_new_object);
+                        vo_bit::helper::on_object_forwarded::<VM>(new_object);
                     },
                 )
             };
@@ -722,13 +729,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
             queue.enqueue(new_object);
             debug_assert!(new_object.is_live());
-            self.unlog_object_if_needed(new_object);
             new_object
         }
     }
 
     fn unlog_object_if_needed(&self, object: ObjectReference) {
-        if self.space_args.unlog_object_when_traced {
+        if self.common.unlog_traced_object {
             // Make sure the side metadata for the line can fit into one byte. For smaller line size, we should
             // use `mark_as_unlogged` instead to mark the bit.
             const_assert!(
@@ -876,6 +882,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         // Mark the line
         if !super::MARK_LINE_AT_SCAN_TIME {
             self.mark_lines(object);
+        }
+        if self.common.unlog_traced_object {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                .mark_byte_as_unlogged::<VM>(object, Ordering::Relaxed);
         }
     }
 

@@ -146,11 +146,21 @@ impl<VM: VMBinding> SemiSpace<VM> {
         let res = SemiSpace {
             hi: AtomicBool::new(false),
             copyspace0: CopySpace::new(
-                plan_args.get_space_args("copyspace0", true, false, VMRequest::discontiguous()),
+                plan_args.get_normal_space_args(
+                    "copyspace0",
+                    true,
+                    false,
+                    VMRequest::discontiguous(),
+                ),
                 false,
             ),
             copyspace1: CopySpace::new(
-                plan_args.get_space_args("copyspace1", true, false, VMRequest::discontiguous()),
+                plan_args.get_normal_space_args(
+                    "copyspace1",
+                    true,
+                    false,
+                    VMRequest::discontiguous(),
+                ),
                 true,
             ),
             common: CommonPlan::new(plan_args),

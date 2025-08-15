@@ -9,6 +9,7 @@ use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::{FreeListPageResource, PageResource};
 use crate::util::metadata;
+use crate::util::object_enum::ClosureObjectEnumerator;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
 use crate::util::treadmill::TreadMill;
@@ -30,6 +31,7 @@ pub struct LargeObjectSpace<VM: VMBinding> {
     mark_state: u8,
     in_nursery_gc: bool,
     treadmill: TreadMill,
+    clear_log_bit_on_sweep: bool,
 }
 
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
@@ -76,7 +78,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         );
 
         // If this object is freshly allocated, we do not set it as unlogged
-        if !alloc && self.common.needs_log_bit {
+        if !alloc && self.common.unlog_allocated_object {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
 
@@ -192,6 +194,22 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         self.treadmill.enumerate_objects(enumerator);
     }
+
+    fn clear_side_log_bits(&self) {
+        let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
+        });
+        self.treadmill.enumerate_objects(&mut enumator);
+    }
+
+    fn set_side_log_bits(&self) {
+        debug_assert!(self.treadmill.is_from_space_empty());
+        debug_assert!(self.treadmill.is_nursery_empty());
+        let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+        });
+        self.treadmill.enumerate_objects(&mut enumator);
+    }
 }
 
 use crate::scheduler::GCWorker;
@@ -216,6 +234,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     pub fn new(
         args: crate::policy::space::PlanCreateSpaceArgs<VM>,
         protect_memory_on_release: bool,
+        clear_log_bit_on_sweep: bool,
     ) -> Self {
         let is_discontiguous = args.vmrequest.is_discontiguous();
         let vm_map = args.vm_map;
@@ -240,6 +259,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             mark_state: 0,
             in_nursery_gc: false,
             treadmill: TreadMill::new(),
+            clear_log_bit_on_sweep,
         }
     }
 
@@ -288,7 +308,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 // We just moved the object out of the logical nursery, mark it as unlogged.
                 // We also unlog mature objects as their unlog bit may have been unset before the
                 // full-heap GC
-                if self.common.needs_log_bit {
+                if self.common.unlog_traced_object {
                     VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
                         .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
                 }
@@ -308,7 +328,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             #[cfg(feature = "vo_bit")]
             crate::util::metadata::vo_bit::unset_vo_bit(object);
             // Clear log bits for dead objects to prevent a new nursery object having the unlog bit set
-            if self.common.needs_log_bit {
+            if self.clear_log_bit_on_sweep {
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
             }
             self.pr
