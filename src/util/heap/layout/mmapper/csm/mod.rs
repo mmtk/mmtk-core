@@ -16,11 +16,6 @@ type ChosenMapStateStorage = byte_map_storage::ByteMapStateStorage;
 #[cfg(target_pointer_width = "64")]
 type ChosenMapStateStorage = two_level_storage::TwoLevelStateStorage;
 
-/// log_2 of the granularity at which we map and unmap virtual address space in the heap
-pub const LOG_MMAP_GRANULARITY: usize = LOG_BYTES_IN_CHUNK;
-/// Granularity at which we map and unmap virtual address space in the heap
-pub const MMAP_GRANULARITY: usize = 1 << LOG_MMAP_GRANULARITY;
-
 /// A range of whole chunks.  Always aligned.
 ///
 /// This type is used internally by the chunk state mmapper and its storage backends.
@@ -268,11 +263,11 @@ mod tests {
     const MAX_BYTES: usize = CHUNK_STATE_MMAPPER_TEST_REGION.size;
 
     fn pages_to_chunks_up(pages: usize) -> usize {
-        conversions::raw_align_up(pages, MMAP_GRANULARITY) / MMAP_GRANULARITY
+        conversions::raw_align_up(pages, BYTES_IN_CHUNK) / BYTES_IN_CHUNK
     }
 
     fn get_chunk_map_state(mmapper: &ChunkStateMmapper, chunk: Address) -> MapState {
-        chunk.is_aligned_to(MMAP_GRANULARITY);
+        chunk.is_aligned_to(BYTES_IN_CHUNK);
         mmapper.get_state(chunk)
     }
 
@@ -307,7 +302,7 @@ mod tests {
     #[test]
     fn ensure_mapped_1chunk() {
         serial_test(|| {
-            let pages = MMAP_GRANULARITY >> LOG_BYTES_IN_PAGE as usize;
+            let pages = BYTES_IN_CHUNK >> LOG_BYTES_IN_PAGE as usize;
             with_cleanup(
                 || {
                     let mmapper = ChunkStateMmapper::new();
@@ -336,7 +331,7 @@ mod tests {
     #[test]
     fn ensure_mapped_more_than_1chunk() {
         serial_test(|| {
-            let pages = (MMAP_GRANULARITY + MMAP_GRANULARITY / 2) >> LOG_BYTES_IN_PAGE as usize;
+            let pages = (BYTES_IN_CHUNK + BYTES_IN_CHUNK / 2) >> LOG_BYTES_IN_PAGE as usize;
             with_cleanup(
                 || {
                     let mmapper = ChunkStateMmapper::new();
@@ -369,7 +364,7 @@ mod tests {
                 || {
                     // map 2 chunks
                     let mmapper = ChunkStateMmapper::new();
-                    let pages_per_chunk = MMAP_GRANULARITY >> LOG_BYTES_IN_PAGE as usize;
+                    let pages_per_chunk = BYTES_IN_CHUNK >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
                         .ensure_mapped(
                             FIXED_ADDRESS,
@@ -387,7 +382,7 @@ mod tests {
                         MapState::Protected
                     );
                     assert_eq!(
-                        get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_GRANULARITY),
+                        get_chunk_map_state(&mmapper, FIXED_ADDRESS + BYTES_IN_CHUNK),
                         MapState::Mapped
                     );
                 },
@@ -405,7 +400,7 @@ mod tests {
                 || {
                     // map 2 chunks
                     let mmapper = ChunkStateMmapper::new();
-                    let pages_per_chunk = MMAP_GRANULARITY >> LOG_BYTES_IN_PAGE as usize;
+                    let pages_per_chunk = BYTES_IN_CHUNK >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
                         .ensure_mapped(
                             FIXED_ADDRESS,
@@ -420,7 +415,7 @@ mod tests {
                         MapState::Mapped
                     );
                     assert_eq!(
-                        get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_GRANULARITY),
+                        get_chunk_map_state(&mmapper, FIXED_ADDRESS + BYTES_IN_CHUNK),
                         MapState::Mapped
                     );
 
@@ -432,7 +427,7 @@ mod tests {
                         MapState::Protected
                     );
                     assert_eq!(
-                        get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_GRANULARITY),
+                        get_chunk_map_state(&mmapper, FIXED_ADDRESS + BYTES_IN_CHUNK),
                         MapState::Mapped
                     );
 
@@ -450,7 +445,7 @@ mod tests {
                         MapState::Mapped
                     );
                     assert_eq!(
-                        get_chunk_map_state(&mmapper, FIXED_ADDRESS + MMAP_GRANULARITY),
+                        get_chunk_map_state(&mmapper, FIXED_ADDRESS + BYTES_IN_CHUNK),
                         MapState::Mapped
                     );
                 },

@@ -1,7 +1,6 @@
 use super::MapState;
 use crate::util::heap::layout::mmapper::csm::ChunkRange;
 use crate::util::heap::layout::mmapper::csm::MapStateStorage;
-use crate::util::heap::layout::mmapper::csm::LOG_MMAP_GRANULARITY;
 use crate::util::rust_util::rev_group::RevisitableGroupByForIterator;
 use crate::util::Address;
 
@@ -14,7 +13,7 @@ use atomic::Atomic;
 use std::io::Result;
 
 /// For now, we only use `ByteMapStateStorage` for 32-bit address range.
-const MMAP_NUM_CHUNKS: usize = 1 << (32 - LOG_MMAP_GRANULARITY);
+const MMAP_NUM_CHUNKS: usize = 1 << (32 - LOG_BYTES_IN_CHUNK);
 
 /// A [`MapStateStorage`] implementation based on a simple array.
 ///
