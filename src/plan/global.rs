@@ -58,6 +58,9 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::StickyImmix => {
             crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
         }
+        PlanSelector::ConcurrentImmix => {
+            crate::plan::concurrent::immix::mutator::create_concurrent_immix_mutator(tls, mmtk)
+        }
         PlanSelector::Compressor => {
             crate::plan::compressor::mutator::create_compressor_mutator(tls, mmtk)
         }
@@ -93,6 +96,10 @@ pub fn create_plan<VM: VMBinding>(
         }
         PlanSelector::StickyImmix => {
             Box::new(crate::plan::sticky::immix::StickyImmix::new(args)) as Box<dyn Plan<VM = VM>>
+        }
+        PlanSelector::ConcurrentImmix => {
+            Box::new(crate::plan::concurrent::immix::ConcurrentImmix::new(args))
+                as Box<dyn Plan<VM = VM>>
         }
         PlanSelector::Compressor => {
             Box::new(crate::plan::compressor::Compressor::new(args)) as Box<dyn Plan<VM = VM>>
@@ -179,6 +186,12 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         None
     }
 
+    fn concurrent(
+        &self,
+    ) -> Option<&dyn crate::plan::concurrent::global::ConcurrentPlan<VM = Self::VM>> {
+        None
+    }
+
     /// Get the current run time options.
     fn options(&self) -> &Options {
         &self.base().options
@@ -187,6 +200,9 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// Get the allocator mapping between [`crate::AllocationSemantics`] and [`crate::util::alloc::AllocatorSelector`].
     /// This defines what space this plan will allocate objects into for different semantics.
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
+
+    /// Called when all mutators are paused. This is called before prepare.
+    fn notify_mutators_paused(&self, _scheduler: &GCWorkScheduler<Self::VM>) {}
 
     /// Prepare the plan before a GC. This is invoked in an initial step in the GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
@@ -203,6 +219,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
 
     /// Inform the plan about the end of a GC. It is guaranteed that there is no further work for this GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
+    // TODO: This is actually called at the end of a pause/STW, rather than the end of a GC. It should be renamed.
     fn end_of_gc(&mut self, _tls: VMWorkerThread);
 
     /// Notify the plan that an emergency collection will happen. The plan should try to free as much memory as possible.
@@ -605,6 +622,14 @@ impl<VM: VMBinding> CommonPlan<VM> {
             + self.los.reserved_pages()
             + self.nonmoving.reserved_pages()
             + self.base.get_used_pages()
+    }
+
+    pub fn initial_pause_prepare(&mut self) {
+        self.los.initial_pause_prepare();
+    }
+
+    pub fn final_pause_release(&mut self) {
+        self.los.final_pause_release();
     }
 
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {

@@ -465,6 +465,7 @@ mod tests {
     }
 }
 
+use crate::plan::SlotIterator;
 use crate::vm::VMBinding;
 
 /// `ObjectReference` represents address for an object. Compared with `Address`, operations allowed
@@ -698,6 +699,10 @@ impl ObjectReference {
     #[cfg(feature = "sanity")]
     pub fn is_sane(self) -> bool {
         unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_sane()
+    }
+
+    pub fn iterate_fields<VM: VMBinding, F: FnMut(VM::VMSlot)>(self, f: F) {
+        SlotIterator::<VM>::iterate(self, f)
     }
 }
 
