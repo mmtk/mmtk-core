@@ -19,10 +19,6 @@ pub const BYTES_IN_CHUNK: usize = 1 << LOG_BYTES_IN_CHUNK;
 pub const CHUNK_MASK: usize = (1 << LOG_BYTES_IN_CHUNK) - 1;
 /// Coarsest unit of address space allocation, in pages
 pub const PAGES_IN_CHUNK: usize = 1 << (LOG_BYTES_IN_CHUNK - LOG_BYTES_IN_PAGE as usize);
-/// log_2 of the granularity at which we map and unmap virtual address space in the heap
-pub const LOG_MMAP_CHUNK_BYTES: usize = LOG_BYTES_IN_CHUNK;
-/// Granularity at which we map and unmap virtual address space in the heap
-pub const MMAP_CHUNK_BYTES: usize = 1 << LOG_MMAP_CHUNK_BYTES;
 
 /// Runtime-initialized virtual memory constants
 #[derive(Clone, Debug)]

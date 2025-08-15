@@ -32,6 +32,22 @@ Notes for the mmtk-core developers:
 
 ## 0.32.0
 
+### Removed the notion of "mmap chunk"
+
+```admonish tldr
+Constants such as `MMAP_CHUNK_BYTES` were related to the implementation details of the memory
+mapper, and should not have been exposed.
+```
+
+API changes:
+
+-   module `util::conversions`
+    +   `mmap_chunk_align_down`: Removed.
+    +   `mmap_chunk_align_up`: Removed.
+-   module `util::heap::vm_layout`
+    +   `LOG_MMAP_CHUNK_BYTES`: Removed.
+    +   `MMAP_CHUNK_BYTES`: Removed.
+
 ### `Options` no longer differentiates between environment variables and command line arguments.
 
 ```admonish tldr

@@ -54,18 +54,15 @@ const TEST_ADDRESS: Address =
 const TEST_ADDRESS: Address =
     crate::util::conversions::chunk_align_down(unsafe { Address::from_usize(0x2_0000_0000) });
 
-// util::heap::layout::fragmented_mmapper
-pub(crate) const FRAGMENTED_MMAPPER_TEST_REGION: MmapTestRegion =
-    MmapTestRegion::reserve_before_address(TEST_ADDRESS, MMAP_CHUNK_BYTES * 2);
-// util::heap::layout::byte_map_mmaper
-pub(crate) const BYTE_MAP_MMAPPER_TEST_REGION: MmapTestRegion =
-    MmapTestRegion::reserve_before(FRAGMENTED_MMAPPER_TEST_REGION, MMAP_CHUNK_BYTES * 2);
+// util::heap::layout::mmapper::csm
+pub(crate) const CHUNK_STATE_MMAPPER_TEST_REGION: MmapTestRegion =
+    MmapTestRegion::reserve_before_address(TEST_ADDRESS, BYTES_IN_CHUNK * 2);
 // util::memory
 pub(crate) const MEMORY_TEST_REGION: MmapTestRegion =
-    MmapTestRegion::reserve_before(BYTE_MAP_MMAPPER_TEST_REGION, MMAP_CHUNK_BYTES);
+    MmapTestRegion::reserve_before(CHUNK_STATE_MMAPPER_TEST_REGION, BYTES_IN_CHUNK);
 // util::raw_memory_freelist
 pub(crate) const RAW_MEMORY_FREELIST_TEST_REGION: MmapTestRegion =
-    MmapTestRegion::reserve_before(MEMORY_TEST_REGION, MMAP_CHUNK_BYTES);
+    MmapTestRegion::reserve_before(MEMORY_TEST_REGION, BYTES_IN_CHUNK);
 
 // https://github.com/rust-lang/rfcs/issues/2798#issuecomment-552949300
 pub fn panic_after<T, F>(millis: u64, f: F) -> T
