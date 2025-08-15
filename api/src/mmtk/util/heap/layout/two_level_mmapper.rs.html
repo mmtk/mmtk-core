@@ -505,7 +505,8 @@
 <a href="#504" id="504">504</a>
 <a href="#505" id="505">505</a>
 <a href="#506" id="506">506</a>
-<a href="#507" id="507">507</a></pre></div><pre class="rust"><code><span class="doccomment">//! This module contains [`TwoLevelMmapper`], an implementation of [`Mmapper`] that is designed to
+<a href="#507" id="507">507</a>
+<a href="#508" id="508">508</a></pre></div><pre class="rust"><code><span class="doccomment">//! This module contains [`TwoLevelMmapper`], an implementation of [`Mmapper`] that is designed to
 //! work well on 64-bit machines.  Currently it supports 48-bit address spaces, and many constants
 //! and data structures (such as [`Slab`]) are larger than `i32::MAX`.  For this reason, this module
 //! is only available on 64-bit machines.
@@ -517,6 +518,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory::{MmapAnnotation, MmapStrategy};
 <span class="kw">use </span><span class="kw">crate</span>::util::rust_util::atomic_box::OnceOptionBox;
+<span class="kw">use </span><span class="kw">crate</span>::util::rust_util::zeroed_alloc::new_zeroed_vec;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>atomic::{Atomic, Ordering};
 <span class="kw">use </span>std::fmt;
@@ -755,7 +757,7 @@
     <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             transition_lock: Default::default(),
-            slabs: <span class="kw">unsafe </span>{ <span class="kw">crate</span>::util::rust_util::zeroed_alloc::new_zeroed_vec(MAX_SLABS) },
+            slabs: new_zeroed_vec(MAX_SLABS),
         }
     }
 

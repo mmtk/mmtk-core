@@ -613,7 +613,7 @@
 <span class="kw">impl</span>&lt;B: Region&gt; BlockQueue&lt;B&gt; {
     <span class="doccomment">/// Create an array
     </span><span class="kw">fn </span>new() -&gt; <span class="self">Self </span>{
-        <span class="kw">let </span>zeroed_vec = <span class="kw">unsafe </span>{ new_zeroed_vec(<span class="self">Self</span>::CAPACITY) };
+        <span class="kw">let </span>zeroed_vec = new_zeroed_vec(<span class="self">Self</span>::CAPACITY);
         <span class="kw">let </span>boxed_slice = zeroed_vec.into_boxed_slice();
         <span class="kw">let </span>data = UnsafeCell::new(boxed_slice);
         <span class="self">Self </span>{

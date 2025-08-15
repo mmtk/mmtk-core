@@ -311,7 +311,9 @@
 <a href="#310" id="310">310</a>
 <a href="#311" id="311">311</a>
 <a href="#312" id="312">312</a>
-<a href="#313" id="313">313</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::CreateFreeListResult;
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::CreateFreeListResult;
 <span class="kw">use </span><span class="kw">super</span>::map::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
@@ -320,6 +322,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
 <span class="kw">use </span><span class="kw">crate</span>::util::int_array_freelist::IntArrayFreeList;
+<span class="kw">use </span><span class="kw">crate</span>::util::rust_util::zeroed_alloc::new_zeroed_vec;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>std::cell::UnsafeCell;
 <span class="kw">use </span>std::sync::{Mutex, MutexGuard};
@@ -356,7 +359,8 @@
                 shared_discontig_fl_count: <span class="number">0</span>,
                 total_available_discontiguous_chunks: <span class="number">0</span>,
                 finalized: <span class="bool-val">false</span>,
-                descriptor_map: <span class="macro">vec!</span>[SpaceDescriptor::UNINITIALIZED; max_chunks],
+                <span class="comment">// This can be big on 64-bit machines.  Use `new_zeroed_vec`.
+                </span>descriptor_map: new_zeroed_vec(max_chunks),
             }),
             sync: Mutex::new(()),
         }
