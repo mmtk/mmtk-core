@@ -1,3 +1,5 @@
+use bytemuck::Zeroable;
+
 use crate::util::constants::*;
 use crate::util::heap::layout::vm_layout::{self, vm_layout};
 use crate::util::Address;
@@ -26,7 +28,10 @@ static DISCONTIGUOUS_SPACE_INDEX: AtomicUsize = AtomicUsize::new(DISCONTIG_INDEX
 const DISCONTIG_INDEX_INCREMENT: usize = 1 << TYPE_BITS;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
+#[repr(transparent)]
 pub struct SpaceDescriptor(usize);
+
+unsafe impl Zeroable for SpaceDescriptor {}
 
 impl SpaceDescriptor {
     pub const UNINITIALIZED: Self = SpaceDescriptor(0);
