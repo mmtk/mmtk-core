@@ -10,6 +10,7 @@ use crate::util::conversions;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::memory::{MmapAnnotation, MmapStrategy};
 use crate::util::rust_util::atomic_box::OnceOptionBox;
+use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::util::Address;
 use atomic::{Atomic, Ordering};
 use std::fmt;
@@ -248,7 +249,7 @@ impl TwoLevelMmapper {
     pub fn new() -> Self {
         Self {
             transition_lock: Default::default(),
-            slabs: unsafe { crate::util::rust_util::zeroed_alloc::new_zeroed_vec(MAX_SLABS) },
+            slabs: new_zeroed_vec(MAX_SLABS),
         }
     }
 
