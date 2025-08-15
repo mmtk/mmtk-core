@@ -35,7 +35,7 @@ impl MapStateStorage for ByteMapStateStorage {
         let Some(slot) = self.mapped.get(index) else {
             return MapState::Unmapped;
         };
-        slot.load(Ordering::SeqCst)
+        slot.load(Ordering::Relaxed)
     }
 
     fn bulk_set_state(&self, range: ChunkRange, state: MapState) {
@@ -53,10 +53,19 @@ impl MapStateStorage for ByteMapStateStorage {
         let index_start = range.start >> LOG_BYTES_IN_CHUNK;
         let index_limit = range.limit() >> LOG_BYTES_IN_CHUNK;
 
+        if index_start + 1 == index_limit {
+            let slot = &self.mapped[index_start];
+            let state = slot.load(Ordering::Relaxed);
+            if let Some(new_state) = transformer(range, state)? {
+                slot.store(new_state, Ordering::Relaxed);
+            }
+            return Ok(());
+        }
+
         let mut group_start = index_start;
         for group in self.mapped.as_slice()[index_start..index_limit]
             .iter()
-            .revisitable_group_by(|s| s.load(Ordering::SeqCst))
+            .revisitable_group_by(|s| s.load(Ordering::Relaxed))
         {
             let state = group.key;
             let group_end = group_start + group.len;

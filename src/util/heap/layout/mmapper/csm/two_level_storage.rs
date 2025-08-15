@@ -81,6 +81,13 @@ impl MapStateStorage for TwoLevelStateStorage {
     }
 
     fn bulk_set_state(&self, range: ChunkRange, state: MapState) {
+        if range.bytes == BYTES_IN_CHUNK {
+            let addr = range.start;
+            let slab = self.get_or_allocate_slab_table(addr);
+            slab[Self::in_slab_index(addr)].store(state, Ordering::Relaxed);
+            return;
+        }
+
         self.foreach_slab_slice_for_write(range, |slice| {
             for slot in slice {
                 slot.store(state, Ordering::Relaxed);
@@ -92,6 +99,19 @@ impl MapStateStorage for TwoLevelStateStorage {
     where
         F: FnMut(ChunkRange, MapState) -> Result<Option<MapState>>,
     {
+        if range.bytes == BYTES_IN_CHUNK {
+            let addr = range.start;
+            let slab = self.get_or_allocate_slab_table(addr);
+            let slot = &slab[Self::in_slab_index(addr)];
+
+            let old_state = slot.load(Ordering::Relaxed);
+            if let Some(new_state) = transformer(range, old_state)? {
+                slot.store(new_state, Ordering::Relaxed);
+            };
+
+            return Ok(());
+        }
+
         let mut slice_indices = Vec::new();
 
         self.foreach_slab_slice_for_write(range, |slice| {
