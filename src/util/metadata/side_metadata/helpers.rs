@@ -252,12 +252,14 @@ pub fn find_last_non_zero_bit_in_metadata_bytes(
     meta_end: Address,
 ) -> FindMetaBitResult {
     use crate::util::constants::BYTES_IN_ADDRESS;
-    use crate::util::heap::vm_layout::MMAP_CHUNK_BYTES;
+
+    let mmap_granularity = MMAPPER.granularity();
 
     let mut cur = meta_end;
-    // We need to check if metadata address is mapped or not. But we only check at chunk granularity.
-    // This records the start of a chunk that is tested to be mapped.
-    let mut mapped_chunk = Address::MAX;
+    // We need to check if metadata address is mapped or not.  But we make use of the granularity of
+    // the `Mmapper` to reduce the number of checks.  This records the start of a grain that is
+    // tested to be mapped.
+    let mut mapped_grain = Address::MAX;
     while cur > meta_start {
         // If we can check the whole word, set step to word size. Otherwise, the step is 1 (byte) and we check byte.
         let step = if cur.is_aligned_to(BYTES_IN_ADDRESS) && cur - BYTES_IN_ADDRESS >= meta_start {
@@ -277,10 +279,10 @@ pub fn find_last_non_zero_bit_in_metadata_bytes(
         );
 
         // If we are looking at an address that is not in a mapped chunk, we need to check if the chunk if mapped.
-        if cur < mapped_chunk {
+        if cur < mapped_grain {
             if cur.is_mapped() {
                 // This is mapped. No need to check for this chunk.
-                mapped_chunk = cur.align_down(MMAP_CHUNK_BYTES);
+                mapped_grain = cur.align_down(mmap_granularity);
             } else {
                 return FindMetaBitResult::UnmappedMetadata;
             }

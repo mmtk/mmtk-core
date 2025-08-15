@@ -4,7 +4,7 @@
 //! this module is only available on 64-bit machines.
 
 use super::MapState;
-use crate::util::heap::layout::mmapper::csm::{ChunkRange, MapStateStorage};
+use crate::util::heap::layout::mmapper::csm::{ChunkRange, MapStateStorage, LOG_MMAP_GRANULARITY};
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::rust_util::atomic_box::OnceOptionBox;
 use crate::util::rust_util::rev_group::RevisitableGroupByForIterator;
@@ -22,20 +22,19 @@ const MAPPABLE_BYTES: usize = 1 << LOG_MAPPABLE_BYTES;
 /// The limit of mappable address
 const MAPPABLE_ADDRESS_LIMIT: Address = unsafe { Address::from_usize(MAPPABLE_BYTES) };
 
-/// Log number of bytes per slab.
-/// For a two-level array, it is advisable to choose the arithmetic mean of [`LOG_MAPPABLE_BYTES`]
-/// and [`LOG_MMAP_CHUNK_BYTES`] in order to make [`MMAP_SLAB_BYTES`] the geometric mean of
-/// [`MAPPABLE_BYTES`] and [`MMAP_CHUNK_BYTES`].  This will balance the array size of
-/// [`TwoLevelStateStorage::slabs`] and [`Slab`].
+/// Log number of bytes per slab. For a two-level array, it is advisable to choose the arithmetic
+/// mean of [`LOG_MAPPABLE_BYTES`] and [`LOG_MMAP_GRANULARITY`] in order to make [`MMAP_SLAB_BYTES`]
+/// the geometric mean of [`MAPPABLE_BYTES`] and [`MMAP_GRANULARITY`].  This will balance the array
+/// size of [`TwoLevelStateStorage::slabs`] and [`Slab`].
 ///
 /// TODO: Use `usize::midpoint` after bumping MSRV to 1.85
 const LOG_MMAP_SLAB_BYTES: usize =
-    LOG_MMAP_CHUNK_BYTES + (LOG_MAPPABLE_BYTES - LOG_MMAP_CHUNK_BYTES) / 2;
+    LOG_MMAP_GRANULARITY + (LOG_MAPPABLE_BYTES - LOG_MMAP_GRANULARITY) / 2;
 /// Number of bytes per slab.
 const MMAP_SLAB_BYTES: usize = 1 << LOG_MMAP_SLAB_BYTES;
 
 /// Log number of chunks per slab.
-const LOG_MMAP_CHUNKS_PER_SLAB: usize = LOG_MMAP_SLAB_BYTES - LOG_MMAP_CHUNK_BYTES;
+const LOG_MMAP_CHUNKS_PER_SLAB: usize = LOG_MMAP_SLAB_BYTES - LOG_MMAP_GRANULARITY;
 /// Number of chunks per slab.
 const MMAP_CHUNKS_PER_SLAB: usize = 1 << LOG_MMAP_CHUNKS_PER_SLAB;
 
@@ -110,8 +109,8 @@ impl MapStateStorage for TwoLevelStateStorage {
         {
             let state = group.key;
             let end_index = start_index + group.len;
-            let group_start = start + (start_index << LOG_MMAP_CHUNK_BYTES);
-            let group_bytes = group.len << LOG_MMAP_CHUNK_BYTES;
+            let group_start = start + (start_index << LOG_MMAP_GRANULARITY);
+            let group_bytes = group.len << LOG_MMAP_GRANULARITY;
             let group_range = ChunkRange::new_aligned(group_start, group_bytes);
 
             if let Some(new_state) = transformer(group_range, state)? {
@@ -197,7 +196,7 @@ impl TwoLevelStateStorage {
     }
 
     fn chunk_index_to_address(base: Address, chunk: usize) -> Address {
-        base + (chunk << LOG_MMAP_CHUNK_BYTES)
+        base + (chunk << LOG_MMAP_GRANULARITY)
     }
 
     /// Align `addr` down to slab size.
@@ -214,7 +213,7 @@ impl TwoLevelStateStorage {
     /// If `addr` is beyond the end of the slab, the result could be beyond the end of the slab.
     fn chunk_index(slab: Address, addr: Address) -> usize {
         let delta = addr - slab;
-        delta >> LOG_MMAP_CHUNK_BYTES
+        delta >> LOG_MMAP_GRANULARITY
     }
 }
 
