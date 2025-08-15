@@ -124,4 +124,16 @@ usdt:$MMTK:mmtk:sweep_chunk {
     }
 }
 
+usdt:$MMTK:mmtk:finalization {
+    if (@enable_print) {
+        printf("finalization,meta,%d,%lu,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2, arg3);
+    }
+}
+
+usdt:$MMTK:mmtk:reference_scanned {
+    if (@enable_print) {
+        printf("reference_scanned,meta,%d,%lu,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2, arg3);
+    }
+}
+
 // vim: ft=bpftrace ts=4 sw=4 sts=4 et

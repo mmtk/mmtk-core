@@ -146,7 +146,7 @@ pub struct ReferenceProcessor {
     allow_new_candidate: AtomicBool,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Semantics {
     SOFT,
     WEAK,
@@ -371,13 +371,26 @@ impl ReferenceProcessor {
             .filter_map(|reff| self.process_reference::<VM>(*reff, &mut enqueued_references))
             .collect();
 
+        let num_old = sync.references.len();
+        let num_new = new_set.len();
+        let num_enqueued = enqueued_references.len();
+
         debug!(
             "{:?} reference table from {} to {} ({} enqueued)",
-            self.semantics,
-            sync.references.len(),
-            new_set.len(),
-            enqueued_references.len()
+            self.semantics, num_old, num_new, num_enqueued,
         );
+
+        let semantics_int = self.semantics as usize;
+
+        probe!(
+            mmtk,
+            reference_scanned,
+            semantics_int,
+            num_old,
+            num_new,
+            num_enqueued
+        );
+
         sync.references = new_set;
         sync.enqueued_references.extend(enqueued_references);
 
