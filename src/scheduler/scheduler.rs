@@ -551,15 +551,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         probe!(mmtk, gc_end);
 
         if *mmtk.get_options().count_live_bytes_in_gc {
-            // Aggregate the live bytes
             let live_bytes = mmtk
                 .scheduler
                 .worker_group
                 .get_and_clear_worker_live_bytes();
-            let mut live_bytes_in_last_gc = mmtk.state.live_bytes_in_last_gc.borrow_mut();
-            *live_bytes_in_last_gc = mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
-            // Logging
-            for (space_name, &stats) in live_bytes_in_last_gc.iter() {
+            let mut stats = mmtk.state.live_bytes_in_last_gc.borrow_mut();
+            *stats = mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
+            for (space_name, &stats) in stats.iter() {
                 info!(
                     "{} = {} pages ({:.1}% live)",
                     space_name,
@@ -568,6 +566,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 );
             }
         }
+
+        #[cfg(feature = "dump_memory_stats")]
+        mmtk.get_plan().dump_memory_stats();
 
         #[cfg(feature = "extreme_assertions")]
         if crate::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {

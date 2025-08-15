@@ -84,6 +84,12 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         self.immix.common()
     }
 
+    #[cfg(feature = "dump_memory_stats")]
+    fn dump_memory_stats(&self) {
+        self.immix.immix_space.dump_memory_stats();
+        self.common().los.dump_memory_stats();
+    }
+
     fn schedule_collection(&'static self, scheduler: &crate::scheduler::GCWorkScheduler<Self::VM>) {
         let is_full_heap = self.requires_full_heap_collection();
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
@@ -262,9 +268,11 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                         "Immix nursery object {} is being traced without moving",
                         object
                     );
-                    self.immix
-                        .immix_space
-                        .trace_object_without_moving(queue, object)
+                    self.immix.immix_space.trace_object_without_moving(
+                        queue,
+                        object,
+                        KIND == TRACE_KIND_TRANSITIVE_PIN,
+                    )
                 } else if self.immix.immix_space.prefer_copy_on_nursery_gc() {
                     let ret = self.immix.immix_space.trace_object_with_opportunistic_copy(
                         queue,
@@ -292,7 +300,7 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                     );
                     self.immix
                         .immix_space
-                        .trace_object_without_moving(queue, object)
+                        .trace_object_without_moving(queue, object, false)
                 };
 
                 return object;
