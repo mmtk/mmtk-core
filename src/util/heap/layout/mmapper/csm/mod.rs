@@ -51,6 +51,14 @@ impl ChunkRange {
     fn is_within_limit(&self, limit: Address) -> bool {
         self.limit() <= limit
     }
+
+    fn is_empty(&self) -> bool {
+        self.bytes == 0
+    }
+
+    fn is_single_chunk(&self) -> bool {
+        self.bytes == BYTES_IN_CHUNK
+    }
 }
 
 impl std::fmt::Display for ChunkRange {

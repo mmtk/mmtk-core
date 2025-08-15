@@ -81,7 +81,11 @@ impl MapStateStorage for TwoLevelStateStorage {
     }
 
     fn bulk_set_state(&self, range: ChunkRange, state: MapState) {
-        if range.bytes == BYTES_IN_CHUNK {
+        if range.is_empty() {
+            return;
+        }
+
+        if range.is_single_chunk() {
             let addr = range.start;
             let slab = self.get_or_allocate_slab_table(addr);
             slab[Self::in_slab_index(addr)].store(state, Ordering::Relaxed);
@@ -99,7 +103,11 @@ impl MapStateStorage for TwoLevelStateStorage {
     where
         F: FnMut(ChunkRange, MapState) -> Result<Option<MapState>>,
     {
-        if range.bytes == BYTES_IN_CHUNK {
+        if range.is_empty() {
+            return Ok(());
+        }
+
+        if range.is_single_chunk() {
             let addr = range.start;
             let slab = self.get_or_allocate_slab_table(addr);
             let slot = &slab[Self::in_slab_index(addr)];

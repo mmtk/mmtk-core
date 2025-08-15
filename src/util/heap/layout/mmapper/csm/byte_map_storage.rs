@@ -39,6 +39,10 @@ impl MapStateStorage for ByteMapStateStorage {
     }
 
     fn bulk_set_state(&self, range: ChunkRange, state: MapState) {
+        if range.is_empty() {
+            return;
+        }
+
         let index_start = range.start >> LOG_BYTES_IN_CHUNK;
         let index_limit = range.limit() >> LOG_BYTES_IN_CHUNK;
         for index in index_start..index_limit {
@@ -50,17 +54,23 @@ impl MapStateStorage for ByteMapStateStorage {
     where
         F: FnMut(ChunkRange, MapState) -> Result<Option<MapState>>,
     {
-        let index_start = range.start >> LOG_BYTES_IN_CHUNK;
-        let index_limit = range.limit() >> LOG_BYTES_IN_CHUNK;
+        if range.is_empty() {
+            return Ok(());
+        }
 
-        if index_start + 1 == index_limit {
-            let slot = &self.mapped[index_start];
+        if range.is_single_chunk() {
+            let chunk = range.start;
+            let index = chunk >> LOG_BYTES_IN_CHUNK;
+            let slot: &Atomic<MapState> = &self.mapped[index];
             let state = slot.load(Ordering::Relaxed);
             if let Some(new_state) = transformer(range, state)? {
                 slot.store(new_state, Ordering::Relaxed);
             }
             return Ok(());
         }
+
+        let index_start = range.start >> LOG_BYTES_IN_CHUNK;
+        let index_limit = range.limit() >> LOG_BYTES_IN_CHUNK;
 
         let mut group_start = index_start;
         for group in self.mapped.as_slice()[index_start..index_limit]
