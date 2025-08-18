@@ -50,7 +50,7 @@ struct Transducer {
 impl Transducer {
     pub fn new(to: Address) -> Self {
         Self {
-            to: to,
+            to,
             last_bit_visited: Address::ZERO,
             in_object: false,
         }

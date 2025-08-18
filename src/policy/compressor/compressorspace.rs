@@ -371,7 +371,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
                     debug_assert_eq!(end_of_new_object, to);
                     self.update_references(worker, new_object);
                 });
-            self.pr.reset_cursor(&r, to);
+            self.pr.reset_cursor(r, to);
         });
     }
 

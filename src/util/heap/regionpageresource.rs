@@ -106,7 +106,7 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
         let mut b = self.sync.write().unwrap();
         let succeed = |start: Address, new_chunk: bool| {
             Result::Ok(PRAllocResult {
-                start: start,
+                start,
                 pages: Self::TLAB_PAGES,
                 new_chunk,
             })
