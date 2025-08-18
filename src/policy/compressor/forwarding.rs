@@ -211,4 +211,8 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
             in_object = !in_object;
         });
     }
+
+    pub fn has_calculated_forwarding_addresses(&self) -> bool {
+        self.calculated.load(Ordering::Relaxed)
+    }
 }

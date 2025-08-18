@@ -22,8 +22,6 @@ pub struct ImmortalSpace<VM: VMBinding> {
     mark_state: MarkState,
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
-    /// Is this used as VM space? If this is used as VM space, we never allocate into this space, but we trace objects normally.
-    vm_space: bool,
 }
 
 impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
@@ -154,46 +152,20 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
-            vm_space: false,
-        }
-    }
-
-    #[cfg(feature = "vm_space")]
-    pub fn new_vm_space(
-        args: crate::policy::space::PlanCreateSpaceArgs<VM>,
-        start: Address,
-        size: usize,
-    ) -> Self {
-        assert!(!args.vmrequest.is_discontiguous());
-        ImmortalSpace {
-            mark_state: MarkState::new(),
-            pr: MonotonePageResource::new_contiguous(start, size, args.vm_map),
-            common: CommonSpace::new(args.into_policy_args(
-                false,
-                true,
-                metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]),
-            )),
-            vm_space: true,
         }
     }
 
     pub fn prepare(&mut self) {
         self.mark_state.on_global_prepare::<VM>();
-        if self.vm_space {
-            // If this is VM space, we never allocate into it, and we should reset the mark bit for the entire space.
-            self.mark_state
-                .on_block_reset::<VM>(self.common.start, self.common.extent)
-        } else {
-            // Otherwise, we reset the mark bit for the allocated regions.
-            for (addr, size) in self.pr.iterate_allocated_regions() {
-                debug!(
-                    "{:?}: reset mark bit from {} to {}",
-                    self.name(),
-                    addr,
-                    addr + size
-                );
-                self.mark_state.on_block_reset::<VM>(addr, size);
-            }
+        // Reset the mark bit for the allocated regions.
+        for (addr, size) in self.pr.iterate_allocated_regions() {
+            debug!(
+                "{:?}: reset mark bit from {} to {}",
+                self.name(),
+                addr,
+                addr + size
+            );
+            self.mark_state.on_block_reset::<VM>(addr, size);
         }
     }
 

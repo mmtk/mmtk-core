@@ -22,7 +22,7 @@ doctest = false
 atomic = "0.6.0"
 atomic_refcell = "0.1.7"
 atomic-traits = "0.4.0"
-bytemuck = { version = "1.14.0", features = ["derive"] }
+bytemuck = { version = "1.14.0", features = ["derive", "zeroable_maybe_uninit"] }
 bytemuck_derive = "=1.8.1" # We can remove this dependency when we use MSRV 1.84+
 cfg-if = "1.0"
 crossbeam = "0.8.1"
@@ -47,6 +47,7 @@ portable-atomic = "1.4.3"
 probe = "0.5"
 regex = "1.7.0"
 rustversion = "1.0"
+rayon-core = "=1.12.1" # We can remove this dependency when we use MSRV 1.80+
 spin = "0.9.5"
 static_assertions = "1.1.0"
 strum = "0.27.1"

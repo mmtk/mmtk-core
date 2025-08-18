@@ -1,71 +1,86 @@
+//! This module contains [`TwoLevelMmapper`], an implementation of [`Mmapper`] that is designed to
+//! work well on 64-bit machines.  Currently it supports 48-bit address spaces, and many constants
+//! and data structures (such as [`Slab`]) are larger than `i32::MAX`.  For this reason, this module
+//! is only available on 64-bit machines.
+
 use super::mmapper::MapState;
 use super::Mmapper;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::memory::{MmapAnnotation, MmapStrategy};
+use crate::util::rust_util::atomic_box::OnceOptionBox;
+use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::util::Address;
 use atomic::{Atomic, Ordering};
-use std::cell::UnsafeCell;
 use std::fmt;
 use std::io::Result;
 use std::sync::Mutex;
 
-const MMAP_NUM_CHUNKS: usize = 1 << (33 - LOG_MMAP_CHUNK_BYTES);
+/// Logarithm of the address space size a user-space program is allowed to use.
+/// This is enough for ARM64, x86_64 and some other architectures.
+/// Feel free to increase it if we plan to support larger address spaces.
+const LOG_MAPPABLE_BYTES: usize = 48;
+/// Address space size a user-space program is allowed to use.
+const MAPPABLE_BYTES: usize = 1 << LOG_MAPPABLE_BYTES;
 
-// 36 = 128G - physical memory larger than this is uncommon
-// 40 = 2T. Increased to 2T. Though we probably won't use this much memory, we allow quarantine memory range,
-// and that is usually used to quarantine a large amount of memory.
-const LOG_MAPPABLE_BYTES: usize = 40;
+/// Log number of bytes per slab.
+/// For a two-level array, it is advisable to choose the arithmetic mean of [`LOG_MAPPABLE_BYTES`]
+/// and [`LOG_MMAP_CHUNK_BYTES`] in order to make [`MMAP_SLAB_BYTES`] the geometric mean of
+/// [`MAPPABLE_BYTES`] and [`MMAP_CHUNK_BYTES`].  This will balance the array size of
+/// [`TwoLevelMmapper::slabs`] and [`Slab`].
+///
+/// TODO: Use `usize::midpoint` after bumping MSRV to 1.85
+const LOG_MMAP_SLAB_BYTES: usize =
+    LOG_MMAP_CHUNK_BYTES + (LOG_MAPPABLE_BYTES - LOG_MMAP_CHUNK_BYTES) / 2;
+/// Number of bytes per slab.
+const MMAP_SLAB_BYTES: usize = 1 << LOG_MMAP_SLAB_BYTES;
 
-/*
- * Size of a slab.  The value 10 gives a slab size of 1GB, with 1024
- * chunks per slab, ie a 1k slab map.  In a 64-bit address space, this
- * will require 1M of slab maps.
- */
-const LOG_MMAP_CHUNKS_PER_SLAB: usize = 8;
-const LOG_MMAP_SLAB_BYTES: usize = LOG_MMAP_CHUNKS_PER_SLAB + LOG_MMAP_CHUNK_BYTES;
-const MMAP_SLAB_EXTENT: usize = 1 << LOG_MMAP_SLAB_BYTES;
+/// Log number of chunks per slab.
+const LOG_MMAP_CHUNKS_PER_SLAB: usize = LOG_MMAP_SLAB_BYTES - LOG_MMAP_CHUNK_BYTES;
+/// Number of chunks per slab.
+const MMAP_CHUNKS_PER_SLAB: usize = 1 << LOG_MMAP_CHUNKS_PER_SLAB;
+
+/// Mask for getting in-slab bits from an address.
+/// Invert this to get out-of-slab bits.
 const MMAP_SLAB_MASK: usize = (1 << LOG_MMAP_SLAB_BYTES) - 1;
-/**
- * Maximum number of slabs, which determines the maximum mappable address space.
- */
-const LOG_MAX_SLABS: usize = LOG_MAPPABLE_BYTES - LOG_MMAP_CHUNK_BYTES - LOG_MMAP_CHUNKS_PER_SLAB;
+
+/// Logarithm of maximum number of slabs.
+const LOG_MAX_SLABS: usize = LOG_MAPPABLE_BYTES - LOG_MMAP_SLAB_BYTES;
+/// maximum number of slabs.
 const MAX_SLABS: usize = 1 << LOG_MAX_SLABS;
-/**
- * Parameters for the slab table.  The hash function requires it to be
- * a power of 2.  Must be larger than MAX_SLABS for hashing to work,
- * and should be much larger for it to be efficient.
- */
-const LOG_SLAB_TABLE_SIZE: usize = 1 + LOG_MAX_SLABS;
-const HASH_MASK: usize = (1 << LOG_SLAB_TABLE_SIZE) - 1;
-const SLAB_TABLE_SIZE: usize = 1 << LOG_SLAB_TABLE_SIZE;
-const SENTINEL: Address = Address::MAX;
 
-type Slab = [Atomic<MapState>; MMAP_NUM_CHUNKS];
+/// The slab type.  Each slab holds the `MapState` of multiple chunks.
+type Slab = [Atomic<MapState>; MMAP_CHUNKS_PER_SLAB];
 
-pub struct FragmentedMapper {
-    lock: Mutex<()>,
-    inner: UnsafeCell<InnerFragmentedMapper>,
+/// A two-level implementation of `Mmapper`.
+///
+/// It is essentially a lazily initialized array of [`Atomic<MapState>`].  Because it is designed to
+/// govern a large address range, and the array is sparse, we use a two-level design.  The higher
+/// level holds a vector of slabs, and each slab holds an array of [`Atomic<MapState>`].  Each slab
+/// governs an aligned region of [`MMAP_CHUNKS_PER_SLAB`] chunks.  Slabs are lazily created when the
+/// user intends to write into one of its `MapState`.
+pub struct TwoLevelMmapper {
+    /// Lock for transitioning map states.
+    ///
+    /// FIXME: We only need this lock when transitioning map states.
+    /// The `TwoLevelMmapper` itself is completely lock-free even when allocating new slabs.
+    /// We should move the lock one leve above, to `MapState`.
+    transition_lock: Mutex<()>,
+    /// Slabs
+    slabs: Vec<OnceOptionBox<Slab>>,
 }
 
-unsafe impl Send for FragmentedMapper {}
-unsafe impl Sync for FragmentedMapper {}
+unsafe impl Send for TwoLevelMmapper {}
+unsafe impl Sync for TwoLevelMmapper {}
 
-struct InnerFragmentedMapper {
-    free_slab_index: usize,
-    free_slabs: Vec<Option<Box<Slab>>>,
-    slab_table: Vec<Option<Box<Slab>>>,
-    slab_map: Vec<Address>,
-}
-
-impl fmt::Debug for FragmentedMapper {
+impl fmt::Debug for TwoLevelMmapper {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "FragmentedMapper({})", MMAP_NUM_CHUNKS)
+        write!(f, "TwoLevelMapper({})", 1 << LOG_MAX_SLABS)
     }
 }
 
-impl Mmapper for FragmentedMapper {
+impl Mmapper for TwoLevelMmapper {
     fn eagerly_mmap_all_spaces(&self, _space_map: &[Address]) {}
 
     fn mark_as_mapped(&self, mut start: Address, bytes: usize) {
@@ -136,7 +151,7 @@ impl Mmapper for FragmentedMapper {
 
         // Transition the chunks in bulk.
         {
-            let _guard = self.lock.lock().unwrap();
+            let _guard = self.transition_lock.lock().unwrap();
             MapState::bulk_transition_to_quarantined(
                 state_slices.as_slice(),
                 mmap_start,
@@ -178,7 +193,7 @@ impl Mmapper for FragmentedMapper {
                 }
 
                 let mmap_start = Self::chunk_index_to_address(base, chunk);
-                let _guard = self.lock.lock().unwrap();
+                let _guard = self.transition_lock.lock().unwrap();
                 MapState::transition_to_mapped(entry, mmap_start, strategy, anno)?;
             }
             start = high;
@@ -205,7 +220,7 @@ impl Mmapper for FragmentedMapper {
 
     fn protect(&self, mut start: Address, pages: usize) {
         let end = start + conversions::pages_to_bytes(pages);
-        let _guard = self.lock.lock().unwrap();
+        let _guard = self.transition_lock.lock().unwrap();
         // Iterate over the slabs covered
         while start < end {
             let base = Self::slab_align_down(start);
@@ -230,164 +245,59 @@ impl Mmapper for FragmentedMapper {
     }
 }
 
-impl FragmentedMapper {
+impl TwoLevelMmapper {
     pub fn new() -> Self {
         Self {
-            lock: Mutex::new(()),
-            inner: UnsafeCell::new(InnerFragmentedMapper {
-                free_slab_index: 0,
-                free_slabs: (0..MAX_SLABS).map(|_| Some(Self::new_slab())).collect(),
-                slab_table: (0..SLAB_TABLE_SIZE).map(|_| None).collect(),
-                slab_map: vec![SENTINEL; SLAB_TABLE_SIZE],
-            }),
+            transition_lock: Default::default(),
+            slabs: new_zeroed_vec(MAX_SLABS),
         }
     }
 
-    fn new_slab() -> Box<Slab> {
-        // Because AtomicU8 does not implement Copy, it is a compilation error to usen the
-        // expression `[Atomic::new(MapState::Unmapped); MMAP_NUM_CHUNKS]` because that involves
-        // copying.  We must define a constant for it.
-        //
-        // TODO: Use the inline const expression `const { Atomic::new(MapState::Unmapped) }` after
-        // we bump MSRV to 1.79.
-
-        // If we declare a const Atomic, Clippy will warn about const items being interior mutable.
-        // Using inline const expression will eliminate this warning, but that is experimental until
-        // 1.79.  Fix it after we bump MSRV.
-        #[allow(clippy::declare_interior_mutable_const)]
-        const INITIAL_ENTRY: Atomic<MapState> = Atomic::new(MapState::Unmapped);
-
-        let mapped: Box<Slab> = Box::new([INITIAL_ENTRY; MMAP_NUM_CHUNKS]);
-        mapped
-    }
-
-    fn hash(addr: Address) -> usize {
-        let mut initial = (addr & !MMAP_SLAB_MASK) >> LOG_MMAP_SLAB_BYTES;
-        let mut hash = 0;
-        while initial != 0 {
-            hash ^= initial & HASH_MASK;
-            initial >>= LOG_SLAB_TABLE_SIZE;
-        }
-        hash
+    fn new_slab() -> Slab {
+        std::array::from_fn(|_| Atomic::new(MapState::Unmapped))
     }
 
     fn slab_table(&self, addr: Address) -> Option<&Slab> {
-        self.get_or_optionally_allocate_slab_table(addr, false)
+        let index: usize = addr >> LOG_MMAP_SLAB_BYTES;
+        let slot = self.slabs.get(index)?;
+        // Note: We don't need acquire here.  See `get_or_allocate_slab_table`.
+        slot.get(Ordering::Relaxed)
     }
 
     fn get_or_allocate_slab_table(&self, addr: Address) -> &Slab {
-        self.get_or_optionally_allocate_slab_table(addr, true)
-            .unwrap()
-    }
-
-    fn inner(&self) -> &InnerFragmentedMapper {
-        unsafe { &*self.inner.get() }
-    }
-    #[allow(clippy::mut_from_ref)]
-    fn inner_mut(&self) -> &mut InnerFragmentedMapper {
-        unsafe { &mut *self.inner.get() }
-    }
-
-    fn get_or_optionally_allocate_slab_table(
-        &self,
-        addr: Address,
-        allocate: bool,
-    ) -> Option<&Slab> {
-        debug_assert!(addr != SENTINEL);
-        let base = unsafe { Address::from_usize(addr & !MMAP_SLAB_MASK) };
-        let hash = Self::hash(base);
-        let mut index = hash; // Use 'index' to iterate over the hash table so that we remember where we started
-        loop {
-            /* Check for a hash-table hit.  Should be the frequent case. */
-            if base == self.inner().slab_map[index] {
-                return self.slab_table_for(addr, index);
-            }
-            let _guard = self.lock.lock().unwrap();
-
-            /* Check whether another thread has allocated a slab while we were acquiring the lock */
-            if base == self.inner().slab_map[index] {
-                // drop(guard);
-                return self.slab_table_for(addr, index);
-            }
-
-            /* Check for a free slot */
-            if self.inner().slab_map[index] == SENTINEL {
-                if !allocate {
-                    // drop(guard);
-                    return None;
-                }
-                unsafe {
-                    self.commit_free_slab(index);
-                }
-                self.inner_mut().slab_map[index] = base;
-                return self.slab_table_for(addr, index);
-            }
-            //   lock.release();
-            index += 1;
-            index %= SLAB_TABLE_SIZE;
-            assert!(index != hash, "MMAP slab table is full!");
-        }
-    }
-
-    fn slab_table_for(&self, _addr: Address, index: usize) -> Option<&Slab> {
-        debug_assert!(self.inner().slab_table[index].is_some());
-        self.inner().slab_table[index].as_ref().map(|x| x as &Slab)
-    }
-
-    /**
-     * Take a free slab of chunks from the freeSlabs array, and insert it
-     * at the correct index in the slabTable.
-     * @param index slab table index
-     */
-    /// # Safety
-    ///
-    /// Caller must ensure that only one thread is calling this function at a time.
-    unsafe fn commit_free_slab(&self, index: usize) {
-        assert!(
-            self.inner().free_slab_index < MAX_SLABS,
-            "All free slabs used: virtual address space is exhausled."
-        );
-        debug_assert!(self.inner().slab_table[index].is_none());
-        debug_assert!(self.inner().free_slabs[self.inner().free_slab_index].is_some());
-        ::std::mem::swap(
-            &mut self.inner_mut().slab_table[index],
-            &mut self.inner_mut().free_slabs[self.inner().free_slab_index],
-        );
-        self.inner_mut().free_slab_index += 1;
+        let index: usize = addr >> LOG_MMAP_SLAB_BYTES;
+        let Some(slot) = self.slabs.get(index) else {
+            panic!("Cannot allocate slab for address: {addr}");
+        };
+        // Note: We set both order_load and order_store to `Relaxed` because we never populate the
+        // content of the slab before making the `OnceOptionBox` point to the new slab. For this
+        // reason, the release-acquire relation is not needed here.
+        slot.get_or_init(Ordering::Relaxed, Ordering::Relaxed, Self::new_slab)
     }
 
     fn chunk_index_to_address(base: Address, chunk: usize) -> Address {
         base + (chunk << LOG_MMAP_CHUNK_BYTES)
     }
 
-    /**
-     * @param addr an address
-     * @return the base address of the enclosing slab
-     */
+    /// Align `addr` down to slab size.
     fn slab_align_down(addr: Address) -> Address {
-        unsafe { Address::from_usize(addr & !MMAP_SLAB_MASK) }
+        addr.align_down(MMAP_SLAB_BYTES)
     }
 
-    /**
-     * @param addr an address
-     * @return the base address of the next slab
-     */
+    /// Get the base address of the next slab after the slab that contains `addr`.
     fn slab_limit(addr: Address) -> Address {
-        Self::slab_align_down(addr) + MMAP_SLAB_EXTENT
+        Self::slab_align_down(addr) + MMAP_SLAB_BYTES
     }
 
-    /**
-     * @param slab Address of the slab
-     * @param addr Address within a chunk (could be in the next slab)
-     * @return The index of the chunk within the slab (could be beyond the end of the slab)
-     */
+    /// Return the index of the chunk that contains `addr` within the slab starting at `slab`.
+    /// If `addr` is beyond the end of the slab, the result could be beyond the end of the slab.
     fn chunk_index(slab: Address, addr: Address) -> usize {
         let delta = addr - slab;
         delta >> LOG_MMAP_CHUNK_BYTES
     }
 }
 
-impl Default for FragmentedMapper {
+impl Default for TwoLevelMmapper {
     fn default() -> Self {
         Self::new()
     }
@@ -411,35 +321,13 @@ mod tests {
         conversions::raw_align_up(pages, MMAP_CHUNK_BYTES) / MMAP_CHUNK_BYTES
     }
 
-    fn get_chunk_map_state(mmapper: &FragmentedMapper, chunk: Address) -> Option<MapState> {
+    fn get_chunk_map_state(mmapper: &TwoLevelMmapper, chunk: Address) -> Option<MapState> {
         assert_eq!(conversions::mmap_chunk_align_up(chunk), chunk);
         let mapped = mmapper.slab_table(chunk);
         mapped.map(|m| {
-            m[FragmentedMapper::chunk_index(FragmentedMapper::slab_align_down(chunk), chunk)]
+            m[TwoLevelMmapper::chunk_index(TwoLevelMmapper::slab_align_down(chunk), chunk)]
                 .load(Ordering::Relaxed)
         })
-    }
-
-    #[test]
-    fn address_hashing() {
-        for i in 0..10 {
-            unsafe {
-                let a = i << LOG_MMAP_SLAB_BYTES;
-                assert_eq!(FragmentedMapper::hash(Address::from_usize(a)), i);
-
-                let b = a + ((i + 1) << (LOG_MMAP_SLAB_BYTES + LOG_SLAB_TABLE_SIZE + 1));
-                assert_eq!(
-                    FragmentedMapper::hash(Address::from_usize(b)),
-                    i ^ ((i + 1) << 1)
-                );
-
-                let c = b + ((i + 2) << (LOG_MMAP_SLAB_BYTES + LOG_SLAB_TABLE_SIZE * 2 + 2));
-                assert_eq!(
-                    FragmentedMapper::hash(Address::from_usize(c)),
-                    i ^ ((i + 1) << 1) ^ ((i + 2) << 2)
-                );
-            }
-        }
     }
 
     #[test]
@@ -448,7 +336,7 @@ mod tests {
             let pages = 1;
             with_cleanup(
                 || {
-                    let mmapper = FragmentedMapper::new();
+                    let mmapper = TwoLevelMmapper::new();
                     mmapper
                         .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, mmap_anno_test!())
                         .unwrap();
@@ -476,7 +364,7 @@ mod tests {
             let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
             with_cleanup(
                 || {
-                    let mmapper = FragmentedMapper::new();
+                    let mmapper = TwoLevelMmapper::new();
                     mmapper
                         .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, mmap_anno_test!())
                         .unwrap();
@@ -505,7 +393,7 @@ mod tests {
             let pages = (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
             with_cleanup(
                 || {
-                    let mmapper = FragmentedMapper::new();
+                    let mmapper = TwoLevelMmapper::new();
                     mmapper
                         .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, mmap_anno_test!())
                         .unwrap();
@@ -534,7 +422,7 @@ mod tests {
             with_cleanup(
                 || {
                     // map 2 chunks
-                    let mmapper = FragmentedMapper::new();
+                    let mmapper = TwoLevelMmapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
                         .ensure_mapped(
@@ -570,7 +458,7 @@ mod tests {
             with_cleanup(
                 || {
                     // map 2 chunks
-                    let mmapper = FragmentedMapper::new();
+                    let mmapper = TwoLevelMmapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
                         .ensure_mapped(
