@@ -29,11 +29,17 @@ pub(crate) const TRACE_KIND_FORWARD_ROOT: TraceKind = 1;
 /// [The Compressor: concurrent, incremental, and parallel compaction](https://dl.acm.org/doi/10.1145/1133255.1134023).
 ///
 /// CompressorSpace makes two other diversions from the paper:
-/// - The heap is structured into regions which the collector compacts separately.
+/// - The heap is structured into regions ([`forwarding::CompressorRegion`])
+///   which the collector compacts separately.
 /// - The collector compacts each region in-place, instead of using two virtual
-///   spaces as in Kermany and Petrank. The virtual spaces are necessary for
-///   multiple threads to compact one heap; we side-step this by having one
-///   thread compact each region separately.
+///   spaces as in Kermany and Petrank. The virtual spaces side-step a race which
+///   would occur if multiple threads attempted to compact one heap in place: one thread
+///   could move an object to the location of another object which has yet to be moved by
+///   another thread. Kermany and Petrank move objects between from- and to- virtual spaces,
+///   preventing the old objects from being overwritten. (They reclaim memory by unmapping
+///   pages of the from-virtual space after moving all objects out of said pages.)
+///   We instead side-step this race by assigning only a single thread to each region, and
+///   running multiple single-threaded Compressors at once.
 pub struct CompressorSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: RegionPageResource<VM, forwarding::CompressorRegion>,
