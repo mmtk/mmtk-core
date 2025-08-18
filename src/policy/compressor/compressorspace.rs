@@ -281,8 +281,8 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         packets
     }
 
-    pub fn calculate_offset_vector(&self, r: &forwarding::OffsetVectorRegion) {
-        self.forwarding.calculate_offset_vector(r);
+    pub fn calculate_offset_vector(&self, region: forwarding::CompressorRegion, cursor: Address) {
+        self.forwarding.calculate_offset_vector(region, cursor);
     }
 
     pub fn forward(&self, object: ObjectReference, _vo_bit_valid: bool) -> ObjectReference {

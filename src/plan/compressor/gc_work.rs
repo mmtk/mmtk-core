@@ -1,5 +1,5 @@
 use super::global::Compressor;
-use crate::policy::compressor::forwarding::OffsetVectorRegion;
+use crate::policy::compressor::forwarding::CompressorRegion;
 use crate::policy::compressor::CompressorSpace;
 use crate::policy::compressor::{TRACE_KIND_FORWARD_ROOT, TRACE_KIND_MARK};
 use crate::policy::largeobjectspace::LargeObjectSpace;
@@ -8,6 +8,7 @@ use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
 use crate::scheduler::WorkBucketStage;
+use crate::util::Address;
 use crate::vm::ActivePlan;
 use crate::vm::Scanning;
 use crate::vm::VMBinding;
@@ -17,20 +18,27 @@ use std::marker::PhantomData;
 /// Calculate the offset vector for a region.
 pub struct CalculateOffsetVector<VM: VMBinding> {
     compressor_space: &'static CompressorSpace<VM>,
-    region: OffsetVectorRegion,
+    region: CompressorRegion,
+    cursor: Address,
 }
 
 impl<VM: VMBinding> GCWork<VM> for CalculateOffsetVector<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.compressor_space.calculate_offset_vector(&self.region);
+        self.compressor_space
+            .calculate_offset_vector(self.region, self.cursor);
     }
 }
 
 impl<VM: VMBinding> CalculateOffsetVector<VM> {
-    pub fn new(compressor_space: &'static CompressorSpace<VM>, region: OffsetVectorRegion) -> Self {
+    pub fn new(
+        compressor_space: &'static CompressorSpace<VM>,
+        region: CompressorRegion,
+        cursor: Address,
+    ) -> Self {
         Self {
             compressor_space,
             region,
+            cursor,
         }
     }
 }

@@ -11,7 +11,6 @@ use crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::policy::compressor::forwarding::OffsetVectorRegion;
 use crate::policy::compressor::CompressorSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
@@ -22,7 +21,6 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::gc_trigger::SpaceStats;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
-use crate::util::linear_scan::Region;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -104,11 +102,8 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
             self.compressor_space.generate_tasks(&mut |r, _| {
                 Box::new(CalculateOffsetVector::<VM>::new(
                     &self.compressor_space,
-                    OffsetVectorRegion {
-                        from_start: r.region.start(),
-                        from_size: r.cursor() - r.region.start(),
-                        to_start: r.region.start(),
-                    },
+                    r.region,
+                    r.cursor(),
                 )) as Box<dyn GCWork<VM>>
             });
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding]

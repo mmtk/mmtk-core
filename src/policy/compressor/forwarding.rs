@@ -10,11 +10,21 @@ use atomic::Ordering;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicBool;
 
-#[derive(Clone, Copy)]
-pub(crate) struct OffsetVectorRegion {
-    pub from_start: Address,
-    pub from_size: usize,
-    pub to_start: Address,
+// A region is the granularity at which we compact the heap.
+#[derive(Copy, Clone, PartialEq, PartialOrd)]
+pub(crate) struct CompressorRegion(Address);
+impl Region for CompressorRegion {
+    const LOG_BYTES: usize = 20; // 1 MiB
+    fn from_aligned_address(address: Address) -> Self {
+        assert!(
+            address.is_aligned_to(Self::BYTES),
+            "{address} is not aligned"
+        );
+        CompressorRegion(address)
+    }
+    fn start(&self) -> Address {
+        self.0
+    }
 }
 
 /// A finite-state machine which visits the positions of marked bits in
@@ -101,23 +111,6 @@ impl Region for Block {
     }
 }
 
-// A region is the granularity at which we compact the heap.
-#[derive(Copy, Clone, PartialEq, PartialOrd)]
-pub(crate) struct CompressorRegion(Address);
-impl Region for CompressorRegion {
-    const LOG_BYTES: usize = 20; // 1 MiB
-    fn from_aligned_address(address: Address) -> Self {
-        assert!(
-            address.is_aligned_to(Self::BYTES),
-            "{address} is not aligned"
-        );
-        CompressorRegion(address)
-    }
-    fn start(&self) -> Address {
-        self.0
-    }
-}
-
 pub(crate) const MARK_SPEC: SideMetadataSpec = COMPRESSOR_MARK;
 pub(crate) const OFFSET_VECTOR_SPEC: SideMetadataSpec = COMPRESSOR_OFFSET_VECTOR;
 
@@ -152,10 +145,10 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
         MARK_SPEC.fetch_or_atomic(last_word_of_object, GC_MARK_BIT_MASK, Ordering::SeqCst);
     }
 
-    pub fn calculate_offset_vector(&self, region: &OffsetVectorRegion) {
-        let mut state = Transducer::new(region.to_start);
-        let first_block = Block::from_aligned_address(region.from_start);
-        let last_block = Block::from_aligned_address(region.from_start + region.from_size);
+    pub fn calculate_offset_vector(&self, region: CompressorRegion, cursor: Address) {
+        let mut state = Transducer::new(region.start());
+        let first_block = Block::from_aligned_address(region.start());
+        let last_block = Block::from_aligned_address(cursor);
         for block in RegionIterator::<Block>::new(first_block, last_block) {
             OFFSET_VECTOR_SPEC.store_atomic::<usize>(
                 block.start(),
