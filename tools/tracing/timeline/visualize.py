@@ -277,6 +277,13 @@ class LogProcessor:
                         "num_enqueued": int(args[3]),
                     })
 
+                case "reference_retained":
+                    wp["args"] |= {
+                        "num_refs": int(args[0]),
+                        "num_live": int(args[1]),
+                        "num_retained": int(args[2]),
+                    }
+
                 case _:
                     processed_for_wp = False
         else:

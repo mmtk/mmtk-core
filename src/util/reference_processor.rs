@@ -413,6 +413,10 @@ impl ReferenceProcessor {
             sync.references
         );
 
+        let num_refs = sync.references.len();
+        let mut num_live = 0usize;
+        let mut num_retained = 0usize;
+
         for reference in sync.references.iter() {
             trace!("Processing reference: {:?}", reference);
 
@@ -421,13 +425,23 @@ impl ReferenceProcessor {
                 // following trace. We postpone the decision.
                 continue;
             }
+            num_live += 1;
             // Reference is definitely reachable.  Retain the referent.
             if let Some(referent) = <E::VM as VMBinding>::VMReferenceGlue::get_referent(*reference)
             {
                 Self::keep_referent_alive(trace, referent);
+                num_retained += 1;
                 trace!(" ~> {:?} (retained)", referent);
             }
         }
+
+        probe!(
+            mmtk,
+            reference_retained,
+            num_refs,
+            num_live,
+            num_retained,
+        );
 
         debug!("Ending ReferenceProcessor.retain({:?})", self.semantics);
     }
