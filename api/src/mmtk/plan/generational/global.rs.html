@@ -372,7 +372,7 @@
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; CommonGenPlan&lt;VM&gt; {
     <span class="kw">pub fn </span>new(<span class="kw-2">mut </span>args: CreateSpecificPlanArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>nursery = CopySpace::new(
-            args.get_space_args(<span class="string">"nursery"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
+            args.get_nursery_space_args(<span class="string">"nursery"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
             <span class="bool-val">true</span>,
         );
         <span class="kw">let </span>full_heap_gc_count = args

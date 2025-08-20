@@ -85,7 +85,8 @@
 <a href="#84" id="84">84</a>
 <a href="#85" id="85">85</a>
 <a href="#86" id="86">86</a>
-<a href="#87" id="87">87</a></pre></div><pre class="rust"><code><span class="doccomment">//! Generational plans
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a></pre></div><pre class="rust"><code><span class="doccomment">//! Generational plans
 
 </span><span class="kw">use </span>enum_map::EnumMap;
 
@@ -132,6 +133,7 @@
 </span><span class="kw">pub const </span>GEN_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: <span class="bool-val">true</span>,
     needs_log_bit: ACTIVE_BARRIER.equals(BarrierSelector::ObjectBarrier),
+    generational: <span class="bool-val">true</span>,
     barrier: ACTIVE_BARRIER,
     <span class="comment">// We may trace duplicate edges in sticky immix (or any plan that uses object remembering barrier). See https://github.com/mmtk/mmtk-core/issues/743.
     </span>may_trace_duplicate_edges: ACTIVE_BARRIER.equals(BarrierSelector::ObjectBarrier),

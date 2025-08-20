@@ -356,7 +356,20 @@
 <a href="#355" id="355">355</a>
 <a href="#356" id="356">356</a>
 <a href="#357" id="357">357</a>
-<a href="#358" id="358">358</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
+<a href="#358" id="358">358</a>
+<a href="#359" id="359">359</a>
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
+<a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
@@ -501,6 +514,20 @@
     <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
         object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, <span class="kw-2">&amp;</span><span class="self">self</span>.pr);
     }
+
+    <span class="kw">fn </span>clear_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span>log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        <span class="kw">for </span>(start, size) <span class="kw">in </span><span class="self">self</span>.pr.iterate_allocated_regions() {
+            log_bit.bzero_metadata(start, size);
+        }
+    }
+
+    <span class="kw">fn </span>set_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span>log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        <span class="kw">for </span>(start, size) <span class="kw">in </span><span class="self">self</span>.pr.iterate_allocated_regions() {
+            log_bit.bset_metadata(start, size);
+        }
+    }
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; <span class="kw">crate</span>::policy::gc_work::PolicyTraceObject&lt;VM&gt; <span class="kw">for </span>CopySpace&lt;VM&gt; {
@@ -557,12 +584,6 @@
                 <span class="kw-2">*</span>&lt;VM::VMObjectModel <span class="kw">as </span>ObjectModel&lt;VM&gt;&gt;::LOCAL_FORWARDING_BITS_SPEC
             {
                 side_forwarding_status_table.bzero_metadata(start, size);
-            }
-
-            <span class="kw">if </span><span class="self">self</span>.common.needs_log_bit {
-                <span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                    side.bzero_metadata(start, size);
-                }
             }
 
             <span class="comment">// Clear VO bits because all objects in the space are dead.
@@ -694,6 +715,13 @@
     ) -&gt; Address {
         <span class="self">self</span>.copy_allocator.alloc(bytes, align, offset)
     }
+
+    <span class="kw">fn </span>post_copy(<span class="kw-2">&amp;mut </span><span class="self">self</span>, obj: ObjectReference, _bytes: usize) {
+        <span class="kw">if </span><span class="self">self</span>.copy_allocator.get_space().common().unlog_traced_object {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                .mark_byte_as_unlogged::&lt;VM&gt;(obj, Ordering::Relaxed);
+        }
+    }
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; CopySpaceCopyContext&lt;VM&gt; {
@@ -706,9 +734,7 @@
             copy_allocator: BumpAllocator::new(tls.<span class="number">0</span>, tospace, context),
         }
     }
-}
 
-<span class="kw">impl</span>&lt;VM: VMBinding&gt; CopySpaceCopyContext&lt;VM&gt; {
     <span class="kw">pub fn </span>rebind(<span class="kw-2">&amp;mut </span><span class="self">self</span>, space: <span class="kw-2">&amp;</span>CopySpace&lt;VM&gt;) {
         <span class="self">self</span>.copy_allocator
             .rebind(<span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span>{ space <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ </span>} });

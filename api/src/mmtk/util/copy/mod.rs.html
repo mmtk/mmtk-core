@@ -262,14 +262,7 @@
 <a href="#261" id="261">261</a>
 <a href="#262" id="262">262</a>
 <a href="#263" id="263">263</a>
-<a href="#264" id="264">264</a>
-<a href="#265" id="265">265</a>
-<a href="#266" id="266">266</a>
-<a href="#267" id="267">267</a>
-<a href="#268" id="268">268</a>
-<a href="#269" id="269">269</a>
-<a href="#270" id="270">270</a>
-<a href="#271" id="271">271</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::mem::MaybeUninit;
+<a href="#264" id="264">264</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::mem::MaybeUninit;
 <span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
@@ -285,7 +278,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span><span class="kw">crate</span>::MMTK;
-<span class="kw">use </span>std::sync::atomic::Ordering;
 
 <span class="kw">use </span>enum_map::Enum;
 <span class="kw">use </span>enum_map::EnumMap;
@@ -389,12 +381,6 @@
             </span><span class="macro">debug_assert!</span>(!object_forwarding::is_forwarded_or_being_forwarded::&lt;VM&gt;(
                 object
             ));
-        }
-        <span class="comment">// If we are copying objects in mature space, we would need to mark the object as mature.
-        </span><span class="kw">if </span>semantics.is_mature() &amp;&amp; <span class="self">self</span>.config.constraints.needs_log_bit {
-            <span class="comment">// If the plan uses unlogged bit, we set the unlogged bit (the object is unlogged/mature)
-            </span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                .mark_byte_as_unlogged::&lt;VM&gt;(object, Ordering::Relaxed);
         }
         <span class="comment">// Policy specific post copy.
         </span><span class="kw">match </span><span class="self">self</span>.config.copy_mapping[semantics] {

@@ -265,7 +265,10 @@
 <a href="#264" id="264">264</a>
 <a href="#265" id="265">265</a>
 <a href="#266" id="266">266</a>
-<a href="#267" id="267">267</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenCopyGCWorkContext;
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenCopyGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::GenCopyNurseryGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::CommonGenPlan;
@@ -377,6 +380,9 @@
         <span class="kw">let </span>full_heap = !<span class="self">self</span>.gen.is_current_gc_nursery();
         <span class="self">self</span>.gen.release(tls);
         <span class="kw">if </span>full_heap {
+            <span class="kw">if </span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
+                <span class="self">self</span>.fromspace().clear_side_log_bits();
+            }
             <span class="self">self</span>.fromspace().release();
         }
     }
@@ -476,11 +482,11 @@
         };
 
         <span class="kw">let </span>copyspace0 = CopySpace::new(
-            plan_args.get_space_args(<span class="string">"copyspace0"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
+            plan_args.get_mature_space_args(<span class="string">"copyspace0"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
             <span class="bool-val">false</span>,
         );
         <span class="kw">let </span>copyspace1 = CopySpace::new(
-            plan_args.get_space_args(<span class="string">"copyspace1"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
+            plan_args.get_mature_space_args(<span class="string">"copyspace1"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
             <span class="bool-val">true</span>,
         );
 

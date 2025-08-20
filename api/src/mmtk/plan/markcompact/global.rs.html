@@ -421,7 +421,7 @@
             global_side_metadata_specs,
         };
 
-        <span class="kw">let </span>mc_space = MarkCompactSpace::new(plan_args.get_space_args(
+        <span class="kw">let </span>mc_space = MarkCompactSpace::new(plan_args.get_normal_space_args(
             <span class="string">"mc"</span>,
             <span class="bool-val">true</span>,
             <span class="bool-val">false</span>,

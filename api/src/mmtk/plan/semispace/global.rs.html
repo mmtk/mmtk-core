@@ -193,7 +193,17 @@
 <a href="#192" id="192">192</a>
 <a href="#193" id="193">193</a>
 <a href="#194" id="194">194</a>
-<a href="#195" id="195">195</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::SSGCWorkContext;
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::SSGCWorkContext;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
@@ -341,11 +351,21 @@
         <span class="kw">let </span>res = SemiSpace {
             hi: AtomicBool::new(<span class="bool-val">false</span>),
             copyspace0: CopySpace::new(
-                plan_args.get_space_args(<span class="string">"copyspace0"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
+                plan_args.get_normal_space_args(
+                    <span class="string">"copyspace0"</span>,
+                    <span class="bool-val">true</span>,
+                    <span class="bool-val">false</span>,
+                    VMRequest::discontiguous(),
+                ),
                 <span class="bool-val">false</span>,
             ),
             copyspace1: CopySpace::new(
-                plan_args.get_space_args(<span class="string">"copyspace1"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
+                plan_args.get_normal_space_args(
+                    <span class="string">"copyspace1"</span>,
+                    <span class="bool-val">true</span>,
+                    <span class="bool-val">false</span>,
+                    VMRequest::discontiguous(),
+                ),
                 <span class="bool-val">true</span>,
             ),
             common: CommonPlan::new(plan_args),

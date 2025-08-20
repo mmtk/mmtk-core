@@ -226,19 +226,19 @@
         };
 
         <span class="kw">let </span>res = NoGC {
-            nogc_space: NoGCImmortalSpace::new(plan_args.get_space_args(
+            nogc_space: NoGCImmortalSpace::new(plan_args.get_normal_space_args(
                 <span class="string">"nogc_space"</span>,
                 <span class="macro">cfg!</span>(not(feature = <span class="string">"nogc_no_zeroing"</span>)),
                 <span class="bool-val">false</span>,
                 VMRequest::discontiguous(),
             )),
-            immortal: ImmortalSpace::new(plan_args.get_space_args(
+            immortal: ImmortalSpace::new(plan_args.get_normal_space_args(
                 <span class="string">"immortal"</span>,
                 <span class="bool-val">true</span>,
                 <span class="bool-val">false</span>,
                 VMRequest::discontiguous(),
             )),
-            los: ImmortalSpace::new(plan_args.get_space_args(
+            los: ImmortalSpace::new(plan_args.get_normal_space_args(
                 <span class="string">"los"</span>,
                 <span class="bool-val">true</span>,
                 <span class="bool-val">false</span>,

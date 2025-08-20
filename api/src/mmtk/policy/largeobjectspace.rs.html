@@ -396,7 +396,27 @@
 <a href="#395" id="395">395</a>
 <a href="#396" id="396">396</a>
 <a href="#397" id="397">397</a>
-<a href="#398" id="398">398</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
+<a href="#410" id="410">410</a>
+<a href="#411" id="411">411</a>
+<a href="#412" id="412">412</a>
+<a href="#413" id="413">413</a>
+<a href="#414" id="414">414</a>
+<a href="#415" id="415">415</a>
+<a href="#416" id="416">416</a>
+<a href="#417" id="417">417</a>
+<a href="#418" id="418">418</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
@@ -407,6 +427,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::{FreeListPageResource, PageResource};
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata;
+<span class="kw">use </span><span class="kw">crate</span>::util::object_enum::ClosureObjectEnumerator;
 <span class="kw">use </span><span class="kw">crate</span>::util::object_enum::ObjectEnumerator;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::treadmill::TreadMill;
@@ -428,6 +449,7 @@
     mark_state: u8,
     in_nursery_gc: bool,
     treadmill: TreadMill,
+    clear_log_bit_on_sweep: bool,
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; SFT <span class="kw">for </span>LargeObjectSpace&lt;VM&gt; {
@@ -474,7 +496,7 @@
         );
 
         <span class="comment">// If this object is freshly allocated, we do not set it as unlogged
-        </span><span class="kw">if </span>!alloc &amp;&amp; <span class="self">self</span>.common.needs_log_bit {
+        </span><span class="kw">if </span>!alloc &amp;&amp; <span class="self">self</span>.common.unlog_allocated_object {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::&lt;VM&gt;(object, Ordering::SeqCst);
         }
 
@@ -590,6 +612,22 @@
     <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
         <span class="self">self</span>.treadmill.enumerate_objects(enumerator);
     }
+
+    <span class="kw">fn </span>clear_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span><span class="kw-2">mut </span>enumator = ClosureObjectEnumerator::&lt;<span class="kw">_</span>, VM&gt;::new(|object| {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::&lt;VM&gt;(object, Ordering::SeqCst);
+        });
+        <span class="self">self</span>.treadmill.enumerate_objects(<span class="kw-2">&amp;mut </span>enumator);
+    }
+
+    <span class="kw">fn </span>set_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.treadmill.is_from_space_empty());
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.treadmill.is_nursery_empty());
+        <span class="kw">let </span><span class="kw-2">mut </span>enumator = ClosureObjectEnumerator::&lt;<span class="kw">_</span>, VM&gt;::new(|object| {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::&lt;VM&gt;(object, Ordering::SeqCst);
+        });
+        <span class="self">self</span>.treadmill.enumerate_objects(<span class="kw-2">&amp;mut </span>enumator);
+    }
 }
 
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
@@ -614,6 +652,7 @@
     <span class="kw">pub fn </span>new(
         args: <span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs&lt;VM&gt;,
         protect_memory_on_release: bool,
+        clear_log_bit_on_sweep: bool,
     ) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>is_discontiguous = args.vmrequest.is_discontiguous();
         <span class="kw">let </span>vm_map = args.vm_map;
@@ -638,6 +677,7 @@
             mark_state: <span class="number">0</span>,
             in_nursery_gc: <span class="bool-val">false</span>,
             treadmill: TreadMill::new(),
+            clear_log_bit_on_sweep,
         }
     }
 
@@ -686,7 +726,7 @@
                 <span class="comment">// We just moved the object out of the logical nursery, mark it as unlogged.
                 // We also unlog mature objects as their unlog bit may have been unset before the
                 // full-heap GC
-                </span><span class="kw">if </span><span class="self">self</span>.common.needs_log_bit {
+                </span><span class="kw">if </span><span class="self">self</span>.common.unlog_traced_object {
                     VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
                         .mark_as_unlogged::&lt;VM&gt;(object, Ordering::SeqCst);
                 }
@@ -706,7 +746,7 @@
             <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
             </span><span class="kw">crate</span>::util::metadata::vo_bit::unset_vo_bit(object);
             <span class="comment">// Clear log bits for dead objects to prevent a new nursery object having the unlog bit set
-            </span><span class="kw">if </span><span class="self">self</span>.common.needs_log_bit {
+            </span><span class="kw">if </span><span class="self">self</span>.clear_log_bit_on_sweep {
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::&lt;VM&gt;(object, Ordering::SeqCst);
             }
             <span class="self">self</span>.pr

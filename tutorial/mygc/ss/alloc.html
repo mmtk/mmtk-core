@@ -295,7 +295,7 @@ Instead, we will define the two copyspaces here.</li>
 </ol>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>            copyspace0: CopySpace::new(plan_args.get_space_args("copyspace0", true, false, VMRequest::discontiguous()), false),
+</span>            copyspace0: CopySpace::new(plan_args.get_normal_space_args("copyspace0", true, false, VMRequest::discontiguous()), false),
 <span class="boring">}</span></code></pre></pre>
 <ol start="3">
 <li>Create another copyspace, called <code>copyspace1</code>, defining it as a fromspace
@@ -315,8 +315,8 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.)</li>
 
         let res = MyGC {
             hi: AtomicBool::new(false),
-            copyspace0: CopySpace::new(plan_args.get_space_args("copyspace0", true, false, VMRequest::discontiguous()), false),
-            copyspace1: CopySpace::new(plan_args.get_space_args("copyspace1", true, false, VMRequest::discontiguous()), true),
+            copyspace0: CopySpace::new(plan_args.get_normal_space_args("copyspace0", true, false, VMRequest::discontiguous()), false),
+            copyspace1: CopySpace::new(plan_args.get_normal_space_args("copyspace1", true, false, VMRequest::discontiguous()), true),
             common: CommonPlan::new(plan_args),
         };
 

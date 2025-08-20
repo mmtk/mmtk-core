@@ -199,7 +199,21 @@
 <a href="#198" id="198">198</a>
 <a href="#199" id="199">199</a>
 <a href="#200" id="200">200</a>
-<a href="#201" id="201">201</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{CommonSpace, Space};
@@ -257,7 +271,7 @@
     <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, _alloc: bool) {
         <span class="self">self</span>.mark_state
             .on_object_metadata_initialization::&lt;VM&gt;(object);
-        <span class="kw">if </span><span class="self">self</span>.common.needs_log_bit {
+        <span class="kw">if </span><span class="self">self</span>.common.unlog_allocated_object {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::&lt;VM&gt;(object, Ordering::SeqCst);
         }
         <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
@@ -315,6 +329,20 @@
 
     <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
         object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, <span class="kw-2">&amp;</span><span class="self">self</span>.pr);
+    }
+
+    <span class="kw">fn </span>clear_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span>log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        <span class="kw">for </span>(start, size) <span class="kw">in </span><span class="self">self</span>.pr.iterate_allocated_regions() {
+            log_bit.bzero_metadata(start, size);
+        }
+    }
+
+    <span class="kw">fn </span>set_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span>log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        <span class="kw">for </span>(start, size) <span class="kw">in </span><span class="self">self</span>.pr.iterate_allocated_regions() {
+            log_bit.bset_metadata(start, size);
+        }
     }
 }
 
@@ -387,7 +415,7 @@
         );
         <span class="kw">if </span><span class="self">self</span>.mark_state.test_and_mark::&lt;VM&gt;(object) {
             <span class="comment">// Set the unlog bit if required
-            </span><span class="kw">if </span><span class="self">self</span>.common.needs_log_bit {
+            </span><span class="kw">if </span><span class="self">self</span>.common.unlog_traced_object {
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::&lt;VM, u8&gt;(
                     object,
                     <span class="number">1</span>,

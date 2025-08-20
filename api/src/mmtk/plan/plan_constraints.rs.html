@@ -77,7 +77,10 @@
 <a href="#76" id="76">76</a>
 <a href="#77" id="77">77</a>
 <a href="#78" id="78">78</a>
-<a href="#79" id="79">79</a></pre></div><pre class="rust"><code><span class="doccomment">//! Plan-specific constraints.
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
+<a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a></pre></div><pre class="rust"><code><span class="doccomment">//! Plan-specific constraints.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::BarrierSelector;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
@@ -124,6 +127,8 @@
     /// `MutatorConfig::prepare_func`).  Those plans can set this to `false` so that the
     /// `PrepareMutator` work packets will not be created at all.
     </span><span class="kw">pub </span>needs_prepare_mutator: bool,
+    <span class="doccomment">/// Is this plan generational?
+    </span><span class="kw">pub </span>generational: bool,
 }
 
 <span class="kw">impl </span>PlanConstraints {
@@ -146,6 +151,7 @@
             barrier: BarrierSelector::NoBarrier,
             <span class="comment">// If we use mark sweep as non moving space, we need to prepare mutator. See [`common_prepare_func`].
             </span>needs_prepare_mutator: <span class="macro">cfg!</span>(feature = <span class="string">"marksweep_as_nonmoving"</span>),
+            generational: <span class="bool-val">false</span>,
         }
     }
 }

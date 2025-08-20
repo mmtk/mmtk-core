@@ -1193,7 +1193,17 @@
 <a href="#1192" id="1192">1192</a>
 <a href="#1193" id="1193">1193</a>
 <a href="#1194" id="1194">1194</a>
-<a href="#1195" id="1195">1195</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::StatsForDefrag;
+<a href="#1195" id="1195">1195</a>
+<a href="#1196" id="1196">1196</a>
+<a href="#1197" id="1197">1197</a>
+<a href="#1198" id="1198">1198</a>
+<a href="#1199" id="1199">1199</a>
+<a href="#1200" id="1200">1200</a>
+<a href="#1201" id="1201">1201</a>
+<a href="#1202" id="1202">1202</a>
+<a href="#1203" id="1203">1203</a>
+<a href="#1204" id="1204">1204</a>
+<a href="#1205" id="1205">1205</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::StatsForDefrag;
 <span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
@@ -1255,19 +1265,11 @@
 
 <span class="doccomment">/// Some arguments for Immix Space.
 </span><span class="kw">pub struct </span>ImmixSpaceArgs {
-    <span class="doccomment">/// Mark an object as unlogged when we trace an object.
-    /// Normally we set the log bit when we copy an object with [`crate::util::copy::CopySemantics::PromoteToMature`].
-    /// In sticky immix, we 'promote' an object to mature when we trace the object
-    /// (no matter we copy an object or not). So we have to use `PromoteToMature`, and instead
-    /// just set the log bit in the space when an object is traced.
-    </span><span class="kw">pub </span>unlog_object_when_traced: bool,
     <span class="doccomment">/// Whether this ImmixSpace instance contains both young and old objects.
     /// This affects the updating of valid-object bits.  If some lines or blocks of this ImmixSpace
     /// instance contain young objects, their VO bits need to be updated during this GC.  Currently
     /// only StickyImmix is affected.  GenImmix allocates young objects in a separete CopySpace
     /// nursery and its VO bits can be cleared in bulk.
-    </span><span class="comment">// Currently only used when "vo_bit" is enabled.  Using #[cfg(...)] to eliminate dead code warning.
-    </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
     </span><span class="kw">pub </span>mixed_age: bool,
     <span class="doccomment">/// Disable copying for this Immix space.
     </span><span class="kw">pub </span>never_move_objects: bool,
@@ -1398,6 +1400,20 @@
     <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
         object_enum::enumerate_blocks_from_chunk_map::&lt;Block&gt;(enumerator, <span class="kw-2">&amp;</span><span class="self">self</span>.chunk_map);
     }
+
+    <span class="kw">fn </span>clear_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span>log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        <span class="kw">for </span>chunk <span class="kw">in </span><span class="self">self</span>.chunk_map.all_chunks() {
+            log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
+        }
+    }
+
+    <span class="kw">fn </span>set_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span>log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        <span class="kw">for </span>chunk <span class="kw">in </span><span class="self">self</span>.chunk_map.all_chunks() {
+            log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
+        }
+    }
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; <span class="kw">crate</span>::policy::gc_work::PolicyTraceObject&lt;VM&gt; <span class="kw">for </span>ImmixSpace&lt;VM&gt; {
@@ -1496,7 +1512,7 @@
         args: <span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs&lt;VM&gt;,
         <span class="kw-2">mut </span>space_args: ImmixSpaceArgs,
     ) -&gt; <span class="self">Self </span>{
-        <span class="kw">if </span>space_args.unlog_object_when_traced {
+        <span class="kw">if </span>args.unlog_traced_object {
             <span class="macro">assert!</span>(
                 args.constraints.needs_log_bit,
                 <span class="string">"Invalid args when the plan does not use log bit"
@@ -1614,14 +1630,6 @@
             } <span class="kw">else </span>{
                 <span class="comment">// For header metadata, we use cyclic mark bits.
                 </span><span class="macro">unimplemented!</span>(<span class="string">"cyclic mark bits is not supported at the moment"</span>);
-            }
-
-            <span class="kw">if </span><span class="self">self</span>.common.needs_log_bit {
-                <span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                    <span class="kw">for </span>chunk <span class="kw">in </span><span class="self">self</span>.chunk_map.all_chunks() {
-                        side.bzero_metadata(chunk.start(), Chunk::BYTES);
-                    }
-                }
             }
 
             <span class="comment">// Prepare defrag info
@@ -1895,6 +1903,8 @@
                     <span class="self">self</span>.mark_lines(object);
                 }
 
+                <span class="self">self</span>.unlog_object_if_needed(object);
+
                 object
             } <span class="kw">else </span>{
                 <span class="comment">// We are forwarding objects. When the copy allocator allocates the block, it should
@@ -1904,9 +1914,16 @@
                     object,
                     semantics,
                     copy_context,
-                    |_new_object| {
+                    |new_object| {
+                        <span class="comment">// post_copy should have set the unlog bit
+                        // if `unlog_traced_object` is true.
+                        </span><span class="macro">debug_assert!</span>(
+                            !<span class="self">self</span>.common.unlog_traced_object
+                                || VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                                    .is_unlogged::&lt;VM&gt;(new_object, Ordering::Relaxed)
+                        );
                         <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-                        </span>vo_bit::helper::on_object_forwarded::&lt;VM&gt;(_new_object);
+                        </span>vo_bit::helper::on_object_forwarded::&lt;VM&gt;(new_object);
                     },
                 )
             };
@@ -1917,13 +1934,12 @@
 
             queue.enqueue(new_object);
             <span class="macro">debug_assert!</span>(new_object.is_live());
-            <span class="self">self</span>.unlog_object_if_needed(new_object);
             new_object
         }
     }
 
     <span class="kw">fn </span>unlog_object_if_needed(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
-        <span class="kw">if </span><span class="self">self</span>.space_args.unlog_object_when_traced {
+        <span class="kw">if </span><span class="self">self</span>.common.unlog_traced_object {
             <span class="comment">// Make sure the side metadata for the line can fit into one byte. For smaller line size, we should
             // use `mark_as_unlogged` instead to mark the bit.
             </span><span class="macro">const_assert!</span>(
@@ -2071,6 +2087,10 @@
         <span class="comment">// Mark the line
         </span><span class="kw">if </span>!<span class="kw">super</span>::MARK_LINE_AT_SCAN_TIME {
             <span class="self">self</span>.mark_lines(object);
+        }
+        <span class="kw">if </span><span class="self">self</span>.common.unlog_traced_object {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                .mark_byte_as_unlogged::&lt;VM&gt;(object, Ordering::Relaxed);
         }
     }
 

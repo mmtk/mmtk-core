@@ -274,7 +274,12 @@
 <a href="#273" id="273">273</a>
 <a href="#274" id="274">274</a>
 <a href="#275" id="275">275</a>
-<a href="#276" id="276">276</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext;
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixNurseryGCWorkContext;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::CommonGenPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
@@ -405,6 +410,9 @@
         <span class="kw">let </span>full_heap = !<span class="self">self</span>.gen.is_current_gc_nursery();
         <span class="self">self</span>.gen.prepare(tls);
         <span class="kw">if </span>full_heap {
+            <span class="kw">if </span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
+                <span class="self">self</span>.immix_space.clear_side_log_bits();
+            }
             <span class="self">self</span>.immix_space.prepare(
                 full_heap,
                 <span class="prelude-val">Some</span>(<span class="kw">crate</span>::policy::immix::defrag::StatsForDefrag::new(<span class="self">self</span>)),
@@ -523,12 +531,14 @@
                 <span class="kw">crate</span>::plan::generational::new_generational_global_metadata_specs::&lt;VM&gt;(),
         };
         <span class="kw">let </span>immix_space = ImmixSpace::new(
-            plan_args.get_space_args(<span class="string">"immix_mature"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
+            plan_args.get_mature_space_args(
+                <span class="string">"immix_mature"</span>,
+                <span class="bool-val">true</span>,
+                <span class="bool-val">false</span>,
+                VMRequest::discontiguous(),
+            ),
             ImmixSpaceArgs {
-                <span class="comment">// We need to unlog objects at tracing time since we currently clear all log bits during a major GC
-                </span>unlog_object_when_traced: <span class="bool-val">true</span>,
                 <span class="comment">// In GenImmix, young objects are not allocated in ImmixSpace directly.
-                </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
                 </span>mixed_age: <span class="bool-val">false</span>,
                 never_move_objects: <span class="bool-val">false</span>,
             },

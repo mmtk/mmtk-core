@@ -793,7 +793,128 @@
 <a href="#792" id="792">792</a>
 <a href="#793" id="793">793</a>
 <a href="#794" id="794">794</a>
-<a href="#795" id="795">795</a></pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
+<a href="#795" id="795">795</a>
+<a href="#796" id="796">796</a>
+<a href="#797" id="797">797</a>
+<a href="#798" id="798">798</a>
+<a href="#799" id="799">799</a>
+<a href="#800" id="800">800</a>
+<a href="#801" id="801">801</a>
+<a href="#802" id="802">802</a>
+<a href="#803" id="803">803</a>
+<a href="#804" id="804">804</a>
+<a href="#805" id="805">805</a>
+<a href="#806" id="806">806</a>
+<a href="#807" id="807">807</a>
+<a href="#808" id="808">808</a>
+<a href="#809" id="809">809</a>
+<a href="#810" id="810">810</a>
+<a href="#811" id="811">811</a>
+<a href="#812" id="812">812</a>
+<a href="#813" id="813">813</a>
+<a href="#814" id="814">814</a>
+<a href="#815" id="815">815</a>
+<a href="#816" id="816">816</a>
+<a href="#817" id="817">817</a>
+<a href="#818" id="818">818</a>
+<a href="#819" id="819">819</a>
+<a href="#820" id="820">820</a>
+<a href="#821" id="821">821</a>
+<a href="#822" id="822">822</a>
+<a href="#823" id="823">823</a>
+<a href="#824" id="824">824</a>
+<a href="#825" id="825">825</a>
+<a href="#826" id="826">826</a>
+<a href="#827" id="827">827</a>
+<a href="#828" id="828">828</a>
+<a href="#829" id="829">829</a>
+<a href="#830" id="830">830</a>
+<a href="#831" id="831">831</a>
+<a href="#832" id="832">832</a>
+<a href="#833" id="833">833</a>
+<a href="#834" id="834">834</a>
+<a href="#835" id="835">835</a>
+<a href="#836" id="836">836</a>
+<a href="#837" id="837">837</a>
+<a href="#838" id="838">838</a>
+<a href="#839" id="839">839</a>
+<a href="#840" id="840">840</a>
+<a href="#841" id="841">841</a>
+<a href="#842" id="842">842</a>
+<a href="#843" id="843">843</a>
+<a href="#844" id="844">844</a>
+<a href="#845" id="845">845</a>
+<a href="#846" id="846">846</a>
+<a href="#847" id="847">847</a>
+<a href="#848" id="848">848</a>
+<a href="#849" id="849">849</a>
+<a href="#850" id="850">850</a>
+<a href="#851" id="851">851</a>
+<a href="#852" id="852">852</a>
+<a href="#853" id="853">853</a>
+<a href="#854" id="854">854</a>
+<a href="#855" id="855">855</a>
+<a href="#856" id="856">856</a>
+<a href="#857" id="857">857</a>
+<a href="#858" id="858">858</a>
+<a href="#859" id="859">859</a>
+<a href="#860" id="860">860</a>
+<a href="#861" id="861">861</a>
+<a href="#862" id="862">862</a>
+<a href="#863" id="863">863</a>
+<a href="#864" id="864">864</a>
+<a href="#865" id="865">865</a>
+<a href="#866" id="866">866</a>
+<a href="#867" id="867">867</a>
+<a href="#868" id="868">868</a>
+<a href="#869" id="869">869</a>
+<a href="#870" id="870">870</a>
+<a href="#871" id="871">871</a>
+<a href="#872" id="872">872</a>
+<a href="#873" id="873">873</a>
+<a href="#874" id="874">874</a>
+<a href="#875" id="875">875</a>
+<a href="#876" id="876">876</a>
+<a href="#877" id="877">877</a>
+<a href="#878" id="878">878</a>
+<a href="#879" id="879">879</a>
+<a href="#880" id="880">880</a>
+<a href="#881" id="881">881</a>
+<a href="#882" id="882">882</a>
+<a href="#883" id="883">883</a>
+<a href="#884" id="884">884</a>
+<a href="#885" id="885">885</a>
+<a href="#886" id="886">886</a>
+<a href="#887" id="887">887</a>
+<a href="#888" id="888">888</a>
+<a href="#889" id="889">889</a>
+<a href="#890" id="890">890</a>
+<a href="#891" id="891">891</a>
+<a href="#892" id="892">892</a>
+<a href="#893" id="893">893</a>
+<a href="#894" id="894">894</a>
+<a href="#895" id="895">895</a>
+<a href="#896" id="896">896</a>
+<a href="#897" id="897">897</a>
+<a href="#898" id="898">898</a>
+<a href="#899" id="899">899</a>
+<a href="#900" id="900">900</a>
+<a href="#901" id="901">901</a>
+<a href="#902" id="902">902</a>
+<a href="#903" id="903">903</a>
+<a href="#904" id="904">904</a>
+<a href="#905" id="905">905</a>
+<a href="#906" id="906">906</a>
+<a href="#907" id="907">907</a>
+<a href="#908" id="908">908</a>
+<a href="#909" id="909">909</a>
+<a href="#910" id="910">910</a>
+<a href="#911" id="911">911</a>
+<a href="#912" id="912">912</a>
+<a href="#913" id="913">913</a>
+<a href="#914" id="914">914</a>
+<a href="#915" id="915">915</a>
+<a href="#916" id="916">916</a></pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
@@ -1199,11 +1320,13 @@ BasePlan should contain all plan-related state and functions that are _fundament
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; CreateSpecificPlanArgs&lt;<span class="lifetime">'_</span>, VM&gt; {
     <span class="doccomment">/// Get a PlanCreateSpaceArgs that can be used to create a space
-    </span><span class="kw">pub fn </span>get_space_args(
+    </span><span class="kw">pub fn </span>_get_space_args(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         name: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
         zeroed: bool,
         permission_exec: bool,
+        unlog_allocated_object: bool,
+        unlog_traced_object: bool,
         vmrequest: VMRequest,
     ) -&gt; PlanCreateSpaceArgs&lt;<span class="lifetime">'_</span>, VM&gt; {
         PlanCreateSpaceArgs {
@@ -1211,6 +1334,8 @@ BasePlan should contain all plan-related state and functions that are _fundament
             zeroed,
             permission_exec,
             vmrequest,
+            unlog_allocated_object,
+            unlog_traced_object,
             global_side_metadata_specs: <span class="self">self</span>.global_side_metadata_specs.clone(),
             vm_map: <span class="self">self</span>.global_args.vm_map,
             mmapper: <span class="self">self</span>.global_args.mmapper,
@@ -1222,40 +1347,122 @@ BasePlan should contain all plan-related state and functions that are _fundament
             global_state: <span class="self">self</span>.global_args.state.clone(),
         }
     }
+
+    <span class="comment">// The following are some convenience methods for common presets.
+    // These are not an exhaustive list -- it is just common presets that are used by most plans.
+
+    </span><span class="doccomment">/// Get a preset for a nursery space (where young objects are located).
+    </span><span class="kw">pub fn </span>get_nursery_space_args(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        name: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
+        zeroed: bool,
+        permission_exec: bool,
+        vmrequest: VMRequest,
+    ) -&gt; PlanCreateSpaceArgs&lt;<span class="lifetime">'_</span>, VM&gt; {
+        <span class="comment">// Objects are allocatd as young, and when traced, they stay young. If they are copied out of the nursery space, they will be moved to a mature space,
+        // and log bits will be set in that case by the mature space.
+        </span><span class="self">self</span>._get_space_args(name, zeroed, permission_exec, <span class="bool-val">false</span>, <span class="bool-val">false</span>, vmrequest)
+    }
+
+    <span class="doccomment">/// Get a preset for a mature space (where mature objects are located).
+    </span><span class="kw">pub fn </span>get_mature_space_args(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        name: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
+        zeroed: bool,
+        permission_exec: bool,
+        vmrequest: VMRequest,
+    ) -&gt; PlanCreateSpaceArgs&lt;<span class="lifetime">'_</span>, VM&gt; {
+        <span class="comment">// Objects are allocated as mature (pre-tenured), and when traced, they stay mature.
+        // If an object gets copied into a mature space, the object is also mature,
+        </span><span class="self">self</span>._get_space_args(name, zeroed, permission_exec, <span class="bool-val">true</span>, <span class="bool-val">true</span>, vmrequest)
+    }
+
+    <span class="comment">// Get a preset for a mixed age space (where both young and mature objects are located).
+    </span><span class="kw">pub fn </span>get_mixed_age_space_args(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        name: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
+        zeroed: bool,
+        permission_exec: bool,
+        vmrequest: VMRequest,
+    ) -&gt; PlanCreateSpaceArgs&lt;<span class="lifetime">'_</span>, VM&gt; {
+        <span class="comment">// Objects are allocated as young, and when traced, they become mature objects.
+        </span><span class="self">self</span>._get_space_args(name, zeroed, permission_exec, <span class="bool-val">false</span>, <span class="bool-val">true</span>, vmrequest)
+    }
+
+    <span class="doccomment">/// Get a preset for spaces in a non-generational plan.
+    </span><span class="kw">pub fn </span>get_normal_space_args(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        name: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
+        zeroed: bool,
+        permission_exec: bool,
+        vmrequest: VMRequest,
+    ) -&gt; PlanCreateSpaceArgs&lt;<span class="lifetime">'_</span>, VM&gt; {
+        <span class="comment">// Non generational plan: we do not use any of the flags about log bits.
+        </span><span class="self">self</span>._get_space_args(name, zeroed, permission_exec, <span class="bool-val">false</span>, <span class="bool-val">false</span>, vmrequest)
+    }
+
+    <span class="doccomment">/// Get a preset for spaces in [`crate::plan::global::CommonPlan`].
+    /// Spaces like LOS which may include both young and mature objects should not use this method.
+    </span><span class="kw">pub fn </span>get_common_space_args(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        generational: bool,
+        name: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
+    ) -&gt; PlanCreateSpaceArgs&lt;<span class="lifetime">'_</span>, VM&gt; {
+        <span class="self">self</span>.get_base_space_args(
+            generational,
+            name,
+            <span class="bool-val">false</span>, <span class="comment">// Common spaces are not executable.
+        </span>)
+    }
+
+    <span class="doccomment">/// Get a preset for spaces in [`crate::plan::global::BasePlan`].
+    </span><span class="kw">pub fn </span>get_base_space_args(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        generational: bool,
+        name: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
+        permission_exec: bool,
+    ) -&gt; PlanCreateSpaceArgs&lt;<span class="lifetime">'_</span>, VM&gt; {
+        <span class="kw">if </span>generational {
+            <span class="comment">// In generational plans, common/base spaces behave like a mature space:
+            // * the objects in these spaces are not traced in a nursery GC
+            // * the log bits for the objects are maintained exactly the same as a mature space.
+            // Thus we consider them as mature spaces.
+            </span><span class="self">self</span>.get_mature_space_args(name, <span class="bool-val">true</span>, permission_exec, VMRequest::discontiguous())
+        } <span class="kw">else </span>{
+            <span class="self">self</span>.get_normal_space_args(name, <span class="bool-val">true</span>, permission_exec, VMRequest::discontiguous())
+        }
+    }
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; BasePlan&lt;VM&gt; {
     <span class="attr">#[allow(unused_mut)] </span><span class="comment">// 'args' only needs to be mutable for certain features
     </span><span class="kw">pub fn </span>new(<span class="kw-2">mut </span>args: CreateSpecificPlanArgs&lt;VM&gt;) -&gt; BasePlan&lt;VM&gt; {
+        <span class="kw">let </span>_generational = args.constraints.generational;
         BasePlan {
             <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
-            </span>code_space: ImmortalSpace::new(args.get_space_args(
+            </span>code_space: ImmortalSpace::new(args.get_base_space_args(
+                _generational,
                 <span class="string">"code_space"</span>,
                 <span class="bool-val">true</span>,
-                <span class="bool-val">true</span>,
-                VMRequest::discontiguous(),
             )),
             <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
-            </span>code_lo_space: ImmortalSpace::new(args.get_space_args(
+            </span>code_lo_space: ImmortalSpace::new(args.get_base_space_args(
+                _generational,
                 <span class="string">"code_lo_space"</span>,
                 <span class="bool-val">true</span>,
-                <span class="bool-val">true</span>,
-                VMRequest::discontiguous(),
             )),
             <span class="attr">#[cfg(feature = <span class="string">"ro_space"</span>)]
-            </span>ro_space: ImmortalSpace::new(args.get_space_args(
+            </span>ro_space: ImmortalSpace::new(args.get_base_space_args(
+                _generational,
                 <span class="string">"ro_space"</span>,
-                <span class="bool-val">true</span>,
                 <span class="bool-val">false</span>,
-                VMRequest::discontiguous(),
             )),
             <span class="attr">#[cfg(feature = <span class="string">"vm_space"</span>)]
-            </span>vm_space: VMSpace::new(args.get_space_args(
+            </span>vm_space: VMSpace::new(args.get_base_space_args(
+                _generational,
                 <span class="string">"vm_space"</span>,
-                <span class="bool-val">false</span>,
                 <span class="bool-val">false</span>, <span class="comment">// it doesn't matter -- we are not mmapping for VM space.
-                </span>VMRequest::discontiguous(),
-            )),
+            </span>)),
 
             global_state: args.global_args.state.clone(),
             gc_trigger: args.global_args.gc_trigger,
@@ -1310,6 +1517,28 @@ BasePlan should contain all plan-related state and functions that are _fundament
         </span><span class="self">self</span>.ro_space.release();
         <span class="attr">#[cfg(feature = <span class="string">"vm_space"</span>)]
         </span><span class="self">self</span>.vm_space.release();
+    }
+
+    <span class="kw">pub fn </span>clear_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
+        </span><span class="self">self</span>.code_space.clear_side_log_bits();
+        <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
+        </span><span class="self">self</span>.code_lo_space.clear_side_log_bits();
+        <span class="attr">#[cfg(feature = <span class="string">"ro_space"</span>)]
+        </span><span class="self">self</span>.ro_space.clear_side_log_bits();
+        <span class="attr">#[cfg(feature = <span class="string">"vm_space"</span>)]
+        </span><span class="self">self</span>.vm_space.clear_side_log_bits();
+    }
+
+    <span class="kw">pub fn </span>set_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
+        </span><span class="self">self</span>.code_space.set_side_log_bits();
+        <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
+        </span><span class="self">self</span>.code_lo_space.set_side_log_bits();
+        <span class="attr">#[cfg(feature = <span class="string">"ro_space"</span>)]
+        </span><span class="self">self</span>.ro_space.set_side_log_bits();
+        <span class="attr">#[cfg(feature = <span class="string">"vm_space"</span>)]
+        </span><span class="self">self</span>.vm_space.set_side_log_bits();
     }
 
     <span class="kw">pub fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _tls: VMWorkerThread) {
@@ -1379,16 +1608,19 @@ CommonPlan is for representing state and features used by _many_ plans, but that
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; CommonPlan&lt;VM&gt; {
     <span class="kw">pub fn </span>new(<span class="kw-2">mut </span>args: CreateSpecificPlanArgs&lt;VM&gt;) -&gt; CommonPlan&lt;VM&gt; {
+        <span class="kw">let </span>needs_log_bit = args.constraints.needs_log_bit;
+        <span class="kw">let </span>generational = args.constraints.generational;
         CommonPlan {
-            immortal: ImmortalSpace::new(args.get_space_args(
-                <span class="string">"immortal"</span>,
-                <span class="bool-val">true</span>,
-                <span class="bool-val">false</span>,
-                VMRequest::discontiguous(),
-            )),
+            immortal: ImmortalSpace::new(args.get_common_space_args(generational, <span class="string">"immortal"</span>)),
             los: LargeObjectSpace::new(
-                args.get_space_args(<span class="string">"los"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
+                <span class="comment">// LOS is a bit special, as it is a mixed age space. It has a logical nursery.
+                </span><span class="kw">if </span>generational {
+                    args.get_mixed_age_space_args(<span class="string">"los"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous())
+                } <span class="kw">else </span>{
+                    args.get_normal_space_args(<span class="string">"los"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous())
+                },
                 <span class="bool-val">false</span>,
+                needs_log_bit,
             ),
             nonmoving: <span class="self">Self</span>::new_nonmoving_space(<span class="kw-2">&amp;mut </span>args),
             base: BasePlan::new(args),
@@ -1416,6 +1648,18 @@ CommonPlan is for representing state and features used by _many_ plans, but that
         <span class="self">self</span>.base.release(tls, full_heap)
     }
 
+    <span class="kw">pub fn </span>clear_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.immortal.clear_side_log_bits();
+        <span class="self">self</span>.los.clear_side_log_bits();
+        <span class="self">self</span>.base.clear_side_log_bits();
+    }
+
+    <span class="kw">pub fn </span>set_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.immortal.set_side_log_bits();
+        <span class="self">self</span>.los.set_side_log_bits();
+        <span class="self">self</span>.base.set_side_log_bits();
+    }
+
     <span class="kw">pub fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
         <span class="self">self</span>.end_of_gc_nonmoving_space();
         <span class="self">self</span>.base.end_of_gc(tls);
@@ -1434,7 +1678,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
     }
 
     <span class="kw">fn </span>new_nonmoving_space(args: <span class="kw-2">&amp;mut </span>CreateSpecificPlanArgs&lt;VM&gt;) -&gt; NonMovingSpace&lt;VM&gt; {
-        <span class="kw">let </span>space_args = args.get_space_args(<span class="string">"nonmoving"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous());
+        <span class="kw">let </span>space_args = args.get_common_space_args(args.constraints.generational, <span class="string">"nonmoving"</span>);
         <span class="macro">cfg_if::cfg_if!</span> {
             <span class="kw">if </span><span class="attr">#[cfg(any(feature = <span class="string">"immortal_as_nonmoving"</span>, feature = <span class="string">"marksweep_as_nonmoving"</span>))] </span>{
                 NonMovingSpace::new(space_args)
@@ -1443,9 +1687,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
                 </span>NonMovingSpace::new(
                     space_args,
                     <span class="kw">crate</span>::policy::immix::ImmixSpaceArgs {
-                        unlog_object_when_traced: <span class="bool-val">false</span>,
-                        <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-                        </span>mixed_age: <span class="bool-val">false</span>,
+                        mixed_age: <span class="bool-val">false</span>,
                         never_move_objects: <span class="bool-val">true</span>,
                     },
                 )
