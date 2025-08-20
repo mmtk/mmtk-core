@@ -241,6 +241,14 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     fn enumerate_objects(&self, _enumerator: &mut dyn ObjectEnumerator) {
         unimplemented!()
     }
+
+    fn clear_side_log_bits(&self) {
+        unimplemented!()
+    }
+
+    fn set_side_log_bits(&self) {
+        unimplemented!()
+    }
 }
 
 use crate::scheduler::GCWorker;
