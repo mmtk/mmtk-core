@@ -10,8 +10,9 @@ use atomic::Ordering;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicBool;
 
-/// A [`CompressorRegion`] is the granularity at which [`CompressorSpace`] compacts the heap.
-/// Objects are allocated inside one region, and are only ever moved *within* that region.
+/// A [`CompressorRegion`] is the granularity at which [`super::CompressorSpace`]
+/// compacts the heap. Objects are allocated inside one region, and are only ever
+/// moved *within* that region.
 #[derive(Copy, Clone, PartialEq, PartialOrd)]
 pub(crate) struct CompressorRegion(Address);
 impl Region for CompressorRegion {
