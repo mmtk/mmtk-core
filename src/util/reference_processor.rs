@@ -435,13 +435,7 @@ impl ReferenceProcessor {
             }
         }
 
-        probe!(
-            mmtk,
-            reference_retained,
-            num_refs,
-            num_live,
-            num_retained,
-        );
+        probe!(mmtk, reference_retained, num_refs, num_live, num_retained,);
 
         debug!("Ending ReferenceProcessor.retain({:?})", self.semantics);
     }
