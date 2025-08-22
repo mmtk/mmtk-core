@@ -322,6 +322,9 @@ impl<VM: VMBinding> WorkBucket<VM> {
 pub enum WorkBucketStage {
     /// This bucket is always open.
     Unconstrained,
+    /// This bucket is intended for concurrent work. Though some concurrent work may be put and executed in the unconstrained bucket,
+    /// work in the unconstrained bucket will always be consumed during STW. Users can disable this bucket
+    /// and cache some concurrent work during STW, and only enable this bucket and allow concurrent execution once a STW is done.
     Concurrent,
     /// Preparation work.  Plans, spaces, GC workers, mutators, etc. should be prepared for GC at
     /// this stage.
