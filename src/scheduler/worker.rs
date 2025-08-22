@@ -157,7 +157,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
     /// pushed to the global bucket with a higher priority.
     pub fn add_work_prioritized(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
-        if !self.scheduler().work_buckets[bucket].is_activated()
+        if !self.scheduler().work_buckets[bucket].is_open()
             || self.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS
         {
             self.scheduler.work_buckets[bucket].add_prioritized(Box::new(work));
@@ -170,7 +170,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
     /// pushed to the global bucket.
     pub fn add_work(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
-        if !self.scheduler().work_buckets[bucket].is_activated()
+        if !self.scheduler().work_buckets[bucket].is_open()
             || self.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS
         {
             self.scheduler.work_buckets[bucket].add(work);

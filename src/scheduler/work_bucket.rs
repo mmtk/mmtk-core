@@ -6,7 +6,7 @@ use enum_map::Enum;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-struct BucketQueue<VM: VMBinding> {
+pub struct BucketQueue<VM: VMBinding> {
     // queue: Injector<Box<dyn GCWork<VM>>>,
     queue: std::sync::RwLock<Injector<Box<dyn GCWork<VM>>>>,
 }
@@ -40,12 +40,53 @@ impl<VM: VMBinding> BucketQueue<VM> {
     }
 }
 
+use std::fmt;
+impl<VM: VMBinding> fmt::Debug for BucketQueue<VM> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut items = Vec::new();
+
+        {
+            let queue = self.queue.write().unwrap();
+            // Drain queue by stealing until empty
+            loop {
+                match queue.steal() {
+                    crossbeam::deque::Steal::Success(work) => {
+                        items.push(work);
+                    }
+                    crossbeam::deque::Steal::Retry => continue,
+                    crossbeam::deque::Steal::Empty => break,
+                }
+            }
+        }
+
+        // Format collected items (just type names or Debug, depending on GCWork)
+        let debug_items: Vec<String> = items
+            .iter()
+            .map(|i| i.get_type_name().to_string()) // placeholder since GCWork isn’t Debug
+            .collect();
+
+        // Push items back into the queue
+        {
+            let queue = self.queue.write().unwrap();
+            for work in items {
+                queue.push(work);
+            }
+        }
+
+        f.debug_struct("BucketQueue")
+            .field("queue", &debug_items)
+            .finish()
+    }
+}
+
 pub type BucketOpenCondition<VM> = Box<dyn (Fn(&GCWorkScheduler<VM>) -> bool) + Send>;
 
 pub struct WorkBucket<VM: VMBinding> {
-    active: AtomicBool,
-    queue: BucketQueue<VM>,
-    prioritized_queue: Option<BucketQueue<VM>>,
+    // Whether this bucket has been opened.
+    open: AtomicBool,
+    pub stage: WorkBucketStage,
+    pub queue: BucketQueue<VM>,
+    pub prioritized_queue: Option<BucketQueue<VM>>,
     monitor: Arc<WorkerMonitor>,
     can_open: Option<BucketOpenCondition<VM>>,
     /// After this bucket is activated and all pending work packets (including the packets in this
@@ -60,26 +101,25 @@ pub struct WorkBucket<VM: VMBinding> {
     /// recursively, such as ephemerons and Java-style SoftReference and finalizers.  Sentinels
     /// can be used repeatedly to discover and process more such objects.
     sentinel: Mutex<Option<Box<dyn GCWork<VM>>>>,
-    in_concurrent: AtomicBool,
+
+    // A disabled work bucket will behave as if it does not exist in terms of scheduling,
+    // except that users can add work to a disabled bucket, and enable it later to allow those
+    // work to be scheduled.
     disable: AtomicBool,
 }
 
 impl<VM: VMBinding> WorkBucket<VM> {
-    pub(crate) fn new(active: bool, monitor: Arc<WorkerMonitor>) -> Self {
+    pub(crate) fn new(stage: WorkBucketStage, open: bool, monitor: Arc<WorkerMonitor>) -> Self {
         Self {
-            active: AtomicBool::new(active),
+            open: AtomicBool::new(open),
+            stage,
             queue: BucketQueue::new(),
             prioritized_queue: None,
             monitor,
             can_open: None,
             sentinel: Mutex::new(None),
-            in_concurrent: AtomicBool::new(true),
             disable: AtomicBool::new(false),
         }
-    }
-
-    pub fn set_in_concurrent(&self, in_concurrent: bool) {
-        self.in_concurrent.store(in_concurrent, Ordering::SeqCst);
     }
 
     pub fn set_as_enabled(&self) {
@@ -90,7 +130,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.disable.store(true, Ordering::SeqCst)
     }
 
-    pub fn disabled(&self) -> bool {
+    pub fn is_disabled(&self) -> bool {
         self.disable.load(Ordering::Relaxed)
     }
 
@@ -122,7 +162,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
     fn notify_one_worker(&self) {
         // If the bucket is not activated, don't notify anyone.
-        if !self.is_activated() {
+        if !self.is_open() {
             return;
         }
         // Notify one if there're any parked workers.
@@ -131,20 +171,20 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
     pub fn notify_all_workers(&self) {
         // If the bucket is not activated, don't notify anyone.
-        if !self.is_activated() {
+        if !self.is_open() {
             return;
         }
         // Notify all if there're any parked workers.
         self.monitor.notify_work_available(true);
     }
 
-    pub fn is_activated(&self) -> bool {
-        self.active.load(Ordering::SeqCst)
+    pub fn is_open(&self) -> bool {
+        self.open.load(Ordering::SeqCst)
     }
 
     /// Enable the bucket
-    pub fn activate(&self) {
-        self.active.store(true, Ordering::SeqCst);
+    pub fn open(&self) {
+        self.open.store(true, Ordering::SeqCst);
     }
 
     /// Test if the bucket is drained
@@ -158,13 +198,13 @@ impl<VM: VMBinding> WorkBucket<VM> {
     }
 
     pub fn is_drained(&self) -> bool {
-        self.is_activated() && self.is_empty()
+        self.is_disabled() || (self.is_open() && self.is_empty())
     }
 
     /// Disable the bucket
-    pub fn deactivate(&self) {
-        debug_assert!(self.queue.is_empty(), "Bucket not drained before close");
-        self.active.store(false, Ordering::Relaxed);
+    pub fn close(&self) {
+        debug_assert!(self.queue.is_empty(), "Bucket {:?} not drained before close", self.stage);
+        self.open.store(false, Ordering::Relaxed);
     }
 
     /// Add a work packet to this bucket
@@ -203,7 +243,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
     /// Panic if this bucket cannot receive prioritized packets.
     pub fn bulk_add_prioritized(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
         self.prioritized_queue.as_ref().unwrap().push_all(work_vec);
-        if self.is_activated() {
+        if self.is_open() {
             self.notify_all_workers();
         }
     }
@@ -214,14 +254,14 @@ impl<VM: VMBinding> WorkBucket<VM> {
             return;
         }
         self.queue.push_all(work_vec);
-        if self.is_activated() {
+        if self.is_open() {
             self.notify_all_workers();
         }
     }
 
     /// Get a work packet from this bucket
     pub fn poll(&self, worker: &Worker<Box<dyn GCWork<VM>>>) -> Steal<Box<dyn GCWork<VM>>> {
-        if !self.is_activated() || self.is_empty() {
+        if self.is_disabled() || !self.is_open() || self.is_empty() {
             return Steal::Empty;
         }
         if let Some(prioritized_queue) = self.prioritized_queue.as_ref() {
@@ -252,8 +292,9 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
     pub fn update(&self, scheduler: &GCWorkScheduler<VM>) -> bool {
         if let Some(can_open) = self.can_open.as_ref() {
-            if !self.is_activated() && can_open(scheduler) {
-                self.activate();
+            if !self.is_open() && can_open(scheduler) {
+                debug!("Opening work bucket: {:?}", self.stage);
+                self.open();
                 return true;
             }
         }
@@ -262,7 +303,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
     pub fn maybe_schedule_sentinel(&self) -> bool {
         debug_assert!(
-            self.is_activated(),
+            self.is_open(),
             "Attempted to schedule sentinel work while bucket is not open"
         );
         let maybe_sentinel = {
@@ -287,6 +328,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
 pub enum WorkBucketStage {
     /// This bucket is always open.
     Unconstrained,
+    Concurrent,
     /// Preparation work.  Plans, spaces, GC workers, mutators, etc. should be prepared for GC at
     /// this stage.
     Prepare,
@@ -346,6 +388,14 @@ pub enum WorkBucketStage {
 impl WorkBucketStage {
     /// The first stop-the-world bucket.
     pub fn first_stw_stage() -> Self {
-        WorkBucketStage::from_usize(1)
+        WorkBucketStage::Prepare
+    }
+
+    pub fn is_stw(&self) -> bool {
+        !self.is_concurrent()
+    }
+
+    pub fn is_concurrent(&self) -> bool {
+        matches!(self, WorkBucketStage::Unconstrained | WorkBucketStage::Concurrent)
     }
 }

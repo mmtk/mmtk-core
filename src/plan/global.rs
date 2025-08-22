@@ -366,6 +366,7 @@ pub struct BasePlan<VM: VMBinding> {
     pub(crate) global_state: Arc<GlobalState>,
     pub options: Arc<Options>,
     pub gc_trigger: Arc<GCTrigger<VM>>,
+    pub scheduler: Arc<GCWorkScheduler<VM>>,
 
     // Spaces in base plan
     #[cfg(feature = "code_space")]
@@ -568,6 +569,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             global_state: args.global_args.state.clone(),
             gc_trigger: args.global_args.gc_trigger,
             options: args.global_args.options,
+            scheduler: args.global_args.scheduler,
         }
     }
 
