@@ -27,16 +27,6 @@ pub const fn chunk_align_down(addr: Address) -> Address {
     addr.align_down(BYTES_IN_CHUNK)
 }
 
-/// Align up an address to the nearest chunk at which granularity we mmap memory.
-pub const fn mmap_chunk_align_up(addr: Address) -> Address {
-    addr.align_up(MMAP_CHUNK_BYTES)
-}
-
-/// Align down an address to the nearest chunk at which granularity we mmap memory.
-pub const fn mmap_chunk_align_down(addr: Address) -> Address {
-    addr.align_down(MMAP_CHUNK_BYTES)
-}
-
 /// Convert size in bytes to the number of chunks (aligned up).
 pub fn bytes_to_chunks_up(bytes: usize) -> usize {
     (bytes + BYTES_IN_CHUNK - 1) >> LOG_BYTES_IN_CHUNK

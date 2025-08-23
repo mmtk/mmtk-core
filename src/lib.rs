@@ -33,7 +33,7 @@ extern crate probe;
 
 mod mmtk;
 pub use mmtk::MMTKBuilder;
-pub(crate) use mmtk::MMAPPER;
+pub use mmtk::MMAPPER;
 pub use mmtk::MMTK;
 
 mod global_state;
