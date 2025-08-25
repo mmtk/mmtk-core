@@ -252,6 +252,11 @@ impl ReferenceProcessor {
 
     /// Inform the binding to enqueue the weak references whose referents were cleared in this GC.
     pub fn enqueue<VM: VMBinding>(&self, tls: VMWorkerThread) {
+        // We will acquire a lock below. If anyone tries to insert new weak refs which will acquire the same lock, a deadlock will occur.
+        // This does happen for OpenJDK with ConcurrentImmix where a write barrier is triggered during the enqueueing of weak references,
+        // and the write barrier scans the objects and attempts to add new weak references.
+        // Disallow new candidates to prevent the deadlock.
+        self.disallow_new_candidate();
         let mut sync = self.sync.lock().unwrap();
 
         // This is the end of a GC. We do some assertions here to make sure our reference tables are correct.

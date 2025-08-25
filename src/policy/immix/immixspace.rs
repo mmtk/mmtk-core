@@ -417,6 +417,24 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self.scheduler
     }
 
+    // pub fn initial_pause_prepare(&mut self) {
+    //     // make sure all allocated blocks have unlog bit set during initial mark
+    //     if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+    //         for chunk in self.chunk_map.all_chunks() {
+    //             side.bset_metadata(chunk.start(), Chunk::BYTES);
+    //         }
+    //     }
+    // }
+
+    // pub fn final_pause_release(&mut self) {
+    //     // clear the unlog bit so that during normal mutator phase, stab barrier is effectively disabled (all objects are considered as logged and thus no slow path will be taken)
+    //     if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+    //         for chunk in self.chunk_map.all_chunks() {
+    //             side.bzero_metadata(chunk.start(), Chunk::BYTES);
+    //         }
+    //     }
+    // }
+
     pub fn prepare(&mut self, major_gc: bool, plan_stats: Option<StatsForDefrag>) {
         if major_gc {
             // Update mark_state
@@ -527,6 +545,20 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         did_defrag
     }
 
+    pub fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
+        }
+    }
+
+    pub fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
+        }
+    }
+
     /// Generate chunk sweep tasks
     fn generate_sweep_tasks(&self) -> Vec<Box<dyn GCWork<VM>>> {
         self.defrag.mark_histograms.lock().clear();
@@ -570,6 +602,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.chunk_map.set_allocated(block.chunk(), true);
         self.lines_consumed
             .fetch_add(Block::LINES, Ordering::SeqCst);
+        self.common()
+            .global_state
+            .concurrent_marking_threshold
+            .fetch_add(Block::PAGES, Ordering::Relaxed);
         Some(block)
     }
 
@@ -596,6 +632,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 self.lines_consumed.fetch_add(lines_delta, Ordering::SeqCst);
 
                 block.init(copy);
+                self.common()
+                    .global_state
+                    .concurrent_marking_threshold
+                    .fetch_add(Block::PAGES, Ordering::Relaxed);
                 return Some(block);
             } else {
                 return None;

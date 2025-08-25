@@ -17,7 +17,7 @@ pub(crate) use scheduler::GCWorkScheduler;
 mod stat;
 mod work_counter;
 
-mod work;
+pub(crate) mod work;
 pub use work::GCWork;
 pub(crate) use work::GCWorkContext;
 
