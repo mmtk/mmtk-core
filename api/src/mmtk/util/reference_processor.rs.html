@@ -594,7 +594,28 @@
 <a href="#593" id="593">593</a>
 <a href="#594" id="594">594</a>
 <a href="#595" id="595">595</a>
-<a href="#596" id="596">596</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
+<a href="#603" id="603">603</a>
+<a href="#604" id="604">604</a>
+<a href="#605" id="605">605</a>
+<a href="#606" id="606">606</a>
+<a href="#607" id="607">607</a>
+<a href="#608" id="608">608</a>
+<a href="#609" id="609">609</a>
+<a href="#610" id="610">610</a>
+<a href="#611" id="611">611</a>
+<a href="#612" id="612">612</a>
+<a href="#613" id="613">613</a>
+<a href="#614" id="614">614</a>
+<a href="#615" id="615">615</a>
+<a href="#616" id="616">616</a>
+<a href="#617" id="617">617</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
 <span class="kw">use </span>std::sync::atomic::AtomicBool;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 <span class="kw">use </span>std::sync::Mutex;
@@ -742,7 +763,7 @@
     </span>allow_new_candidate: AtomicBool,
 }
 
-<span class="attr">#[derive(Debug, PartialEq)]
+<span class="attr">#[derive(Debug, PartialEq, Clone, Copy)]
 </span><span class="kw">pub enum </span>Semantics {
     SOFT,
     WEAK,
@@ -967,13 +988,26 @@
             .filter_map(|reff| <span class="self">self</span>.process_reference::&lt;VM&gt;(<span class="kw-2">*</span>reff, <span class="kw-2">&amp;mut </span>enqueued_references))
             .collect();
 
+        <span class="kw">let </span>num_old = sync.references.len();
+        <span class="kw">let </span>num_new = new_set.len();
+        <span class="kw">let </span>num_enqueued = enqueued_references.len();
+
         <span class="macro">debug!</span>(
             <span class="string">"{:?} reference table from {} to {} ({} enqueued)"</span>,
-            <span class="self">self</span>.semantics,
-            sync.references.len(),
-            new_set.len(),
-            enqueued_references.len()
+            <span class="self">self</span>.semantics, num_old, num_new, num_enqueued,
         );
+
+        <span class="kw">let </span>semantics_int = <span class="self">self</span>.semantics <span class="kw">as </span>usize;
+
+        <span class="macro">probe!</span>(
+            mmtk,
+            reference_scanned,
+            semantics_int,
+            num_old,
+            num_new,
+            num_enqueued
+        );
+
         sync.references = new_set;
         sync.enqueued_references.extend(enqueued_references);
 
@@ -996,6 +1030,10 @@
             sync.references
         );
 
+        <span class="kw">let </span>num_refs = sync.references.len();
+        <span class="kw">let </span><span class="kw-2">mut </span>num_live = <span class="number">0usize</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>num_retained = <span class="number">0usize</span>;
+
         <span class="kw">for </span>reference <span class="kw">in </span>sync.references.iter() {
             <span class="macro">trace!</span>(<span class="string">"Processing reference: {:?}"</span>, reference);
 
@@ -1004,13 +1042,17 @@
                 // following trace. We postpone the decision.
                 </span><span class="kw">continue</span>;
             }
+            num_live += <span class="number">1</span>;
             <span class="comment">// Reference is definitely reachable.  Retain the referent.
             </span><span class="kw">if let </span><span class="prelude-val">Some</span>(referent) = &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::get_referent(<span class="kw-2">*</span>reference)
             {
                 <span class="self">Self</span>::keep_referent_alive(trace, referent);
+                num_retained += <span class="number">1</span>;
                 <span class="macro">trace!</span>(<span class="string">" ~&gt; {:?} (retained)"</span>, referent);
             }
         }
+
+        <span class="macro">probe!</span>(mmtk, reference_retained, num_refs, num_live, num_retained,);
 
         <span class="macro">debug!</span>(<span class="string">"Ending ReferenceProcessor.retain({:?})"</span>, <span class="self">self</span>.semantics);
     }
