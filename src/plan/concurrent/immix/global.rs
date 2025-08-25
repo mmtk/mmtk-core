@@ -378,7 +378,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         &'static self,
         scheduler: &GCWorkScheduler<VM>,
     ) {
-        use crate::scheduler::gc_work::{Prepare, StopMutators, UnsupportedProcessEdges};
+        use crate::scheduler::gc_work::Prepare;
 
         self.disable_unnecessary_buckets(scheduler, Pause::InitialMark);
 

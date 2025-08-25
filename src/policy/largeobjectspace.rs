@@ -263,8 +263,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     pub fn initial_pause_prepare(&self) {
-        use crate::util::object_enum::ClosureObjectEnumerator;
-
         debug_assert!(self.treadmill.is_from_space_empty());
         debug_assert!(self.treadmill.is_nursery_empty());
         debug_assert!(self.common.needs_satb);
