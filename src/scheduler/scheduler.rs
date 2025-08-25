@@ -253,7 +253,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             }))
     }
 
-    /// Schedule "sentinel" work packets for all activated buckets.
+    /// Schedule "sentinel" work packets for all open buckets.
     pub(crate) fn schedule_sentinels(&self) -> bool {
         let mut new_packets = false;
         for (id, work_bucket) in self.work_buckets.iter() {
@@ -539,7 +539,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         debug_assert!(!self.worker_group.has_designated_work());
         self.debug_assert_all_stw_buckets_empty();
 
-        // Deactivate all work buckets to prepare for the next GC.
+        // Close all work buckets to prepare for the next GC.
         self.close_all_stw_buckets();
         self.debug_assert_all_stw_buckets_closed();
 

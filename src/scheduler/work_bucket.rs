@@ -79,15 +79,20 @@ pub type BucketOpenCondition<VM> = Box<dyn (Fn(&GCWorkScheduler<VM>) -> bool) + 
 pub struct WorkBucket<VM: VMBinding> {
     /// Whether this bucket has been opened. Work from an open bucket can be fetched by workers.
     open: AtomicBool,
+    /// Whether this bucket is enabled.
+    /// A disabled work bucket will behave as if it does not exist in terms of scheduling,
+    /// except that users can add work to a disabled bucket, and enable it later to allow those
+    /// work to be scheduled.
+    enabled: AtomicBool,
     /// The stage name of this bucket.
     stage: WorkBucketStage,
     queue: BucketQueue<VM>,
     prioritized_queue: Option<BucketQueue<VM>>,
     monitor: Arc<WorkerMonitor>,
-    /// The open condition for a bucket. If this is `Some`, the bucket will be activated
-    /// when the condition is met. If this is `None`, the bucket needs to be activated manually.
+    /// The open condition for a bucket. If this is `Some`, the bucket will be open
+    /// when the condition is met. If this is `None`, the bucket needs to be open manually.
     can_open: Option<BucketOpenCondition<VM>>,
-    /// After this bucket is activated and all pending work packets (including the packets in this
+    /// After this bucket is open and all pending work packets (including the packets in this
     /// bucket) are drained, this work packet, if exists, will be added to this bucket.  When this
     /// happens, it will prevent opening subsequent work packets.
     ///
@@ -99,12 +104,6 @@ pub struct WorkBucket<VM: VMBinding> {
     /// recursively, such as ephemerons and Java-style SoftReference and finalizers.  Sentinels
     /// can be used repeatedly to discover and process more such objects.
     sentinel: Mutex<Option<Box<dyn GCWork<VM>>>>,
-
-    /// Whether this bucket is enabled.
-    /// A disabled work bucket will behave as if it does not exist in terms of scheduling,
-    /// except that users can add work to a disabled bucket, and enable it later to allow those
-    /// work to be scheduled.
-    enabled: AtomicBool,
 }
 
 impl<VM: VMBinding> WorkBucket<VM> {
@@ -134,7 +133,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
     }
 
     fn notify_one_worker(&self) {
-        // If the bucket is not activated, don't notify anyone.
+        // If the bucket is not open, don't notify anyone.
         if !self.is_open() || !self.is_enabled() {
             return;
         }
@@ -143,7 +142,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
     }
 
     pub fn notify_all_workers(&self) {
-        // If the bucket is not activated, don't notify anyone.
+        // If the bucket is not open, don't notify anyone.
         if !self.is_open() || !self.is_enabled() {
             return;
         }
@@ -379,12 +378,12 @@ impl WorkBucketStage {
         matches!(self, &WorkBucketStage::FIRST_STW_STAGE)
     }
 
-    /// Is this stage always activated?
+    /// Is this stage always open?
     pub const fn is_always_open(&self) -> bool {
         matches!(self, WorkBucketStage::Unconstrained)
     }
 
-    /// Is this stage activated by default?
+    /// Is this stage open by default?
     pub const fn is_open_by_default(&self) -> bool {
         matches!(
             self,
