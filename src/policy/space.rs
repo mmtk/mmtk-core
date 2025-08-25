@@ -446,6 +446,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             .allocate_as_live
             .load(std::sync::atomic::Ordering::Acquire)
     }
+
+    /// Clear the side log bits for allocated regions in this space.
+    /// This method is only called if the plan knows the log bits are side metadata.
+    fn clear_side_log_bits(&self);
+
+    /// Set the side log bits for allocated regions in this space.
+    /// This method is only called if the plan knows the log bits are side metadata.
+    fn set_side_log_bits(&self);
 }
 
 /// Print the VM map for a space.
@@ -536,10 +544,7 @@ pub struct CommonSpace<VM: VMBinding> {
 
     /// This field equals to needs_log_bit in the plan constraints.
     // TODO: This should be a constant for performance.
-    // pub needs_log_bit: bool,
-    // pub needs_satb: bool,
-
-    pub uses_log_bit: bool,
+    pub needs_log_bit: bool,
     pub unlog_allocated_object: bool,
     pub unlog_traced_object: bool,
 
@@ -615,9 +620,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             extent: 0,
             vm_map: args.plan_args.vm_map,
             mmapper: args.plan_args.mmapper,
-            // needs_log_bit: args.plan_args.constraints.needs_log_bit,
-            // needs_satb: args.plan_args.constraints.needs_satb,
-            uses_log_bit: args.plan_args.constraints.uses_log_bit,
+            needs_log_bit: args.plan_args.constraints.needs_log_bit,
             unlog_allocated_object: args.plan_args.unlog_allocated_object,
             unlog_traced_object: args.plan_args.unlog_traced_object,
             gc_trigger: args.plan_args.gc_trigger,
@@ -757,14 +760,14 @@ impl<VM: VMBinding> CommonSpace<VM> {
             "vo bit = {}",
             crate::util::metadata::vo_bit::is_vo_bit_set(object)
         );
-        // if self.needs_log_bit {
-        //     use crate::vm::object_model::ObjectModel;
-        //     use std::sync::atomic::Ordering;
-        //     println!(
-        //         "log bit = {}",
-        //         VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::Relaxed),
-        //     );
-        // }
+        if self.needs_log_bit {
+            use crate::vm::object_model::ObjectModel;
+            use std::sync::atomic::Ordering;
+            println!(
+                "log bit = {}",
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::Relaxed),
+            );
+        }
     }
 }
 

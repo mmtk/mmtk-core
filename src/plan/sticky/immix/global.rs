@@ -42,12 +42,11 @@ pub struct StickyImmix<VM: VMBinding> {
 pub const STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     // If we disable moving in Immix, this is a non-moving plan.
     moves_objects: !cfg!(feature = "immix_non_moving"),
-    uses_log_bit: true,
+    needs_log_bit: true,
     barrier: crate::plan::BarrierSelector::ObjectBarrier,
     // We may trace duplicate edges in sticky immix (or any plan that uses object remembering barrier). See https://github.com/mmtk/mmtk-core/issues/743.
     may_trace_duplicate_edges: true,
-    unlog_allocated_object: true,
-    unlog_traced_object: true,
+    generational: true,
     ..immix::IMMIX_CONSTRAINTS
 };
 
@@ -125,7 +124,6 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         } else {
             self.full_heap_gc_count.lock().unwrap().inc();
             if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
-                self.immix.common.clear_side_log_bits();
                 self.immix.immix_space.clear_side_log_bits();
             }
             self.immix.prepare(tls);
@@ -331,12 +329,7 @@ impl<VM: VMBinding> StickyImmix<VM> {
         let immix = immix::Immix::new_with_args(
             plan_args,
             crate::policy::immix::ImmixSpaceArgs {
-                // Every object we trace in nursery GC becomes a mature object.
-                // Every object we trace in full heap GC is a mature object. Thus in both cases,
-                // they should be unlogged.
-                // unlog_object_when_traced: true,
                 // In StickyImmix, both young and old objects are allocated in the ImmixSpace.
-                #[cfg(feature = "vo_bit")]
                 mixed_age: true,
                 never_move_objects: false,
             },

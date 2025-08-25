@@ -421,11 +421,13 @@ pub struct CreateSpecificPlanArgs<'a, VM: VMBinding> {
 
 impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
     /// Get a PlanCreateSpaceArgs that can be used to create a space
-    pub fn get_space_args(
+    pub fn _get_space_args(
         &mut self,
         name: &'static str,
         zeroed: bool,
         permission_exec: bool,
+        unlog_allocated_object: bool,
+        unlog_traced_object: bool,
         vmrequest: VMRequest,
     ) -> PlanCreateSpaceArgs<'_, VM> {
         PlanCreateSpaceArgs {
@@ -433,8 +435,8 @@ impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
             zeroed,
             permission_exec,
             vmrequest,
-            unlog_allocated_object: self.constraints.unlog_allocated_object,
-            unlog_traced_object: self.constraints.unlog_traced_object,
+            unlog_allocated_object,
+            unlog_traced_object,
             global_side_metadata_specs: self.global_side_metadata_specs.clone(),
             vm_map: self.global_args.vm_map,
             mmapper: self.global_args.mmapper,
@@ -446,39 +448,121 @@ impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
             global_state: self.global_args.state.clone(),
         }
     }
+
+    // The following are some convenience methods for common presets.
+    // These are not an exhaustive list -- it is just common presets that are used by most plans.
+
+    /// Get a preset for a nursery space (where young objects are located).
+    pub fn get_nursery_space_args(
+        &mut self,
+        name: &'static str,
+        zeroed: bool,
+        permission_exec: bool,
+        vmrequest: VMRequest,
+    ) -> PlanCreateSpaceArgs<'_, VM> {
+        // Objects are allocatd as young, and when traced, they stay young. If they are copied out of the nursery space, they will be moved to a mature space,
+        // and log bits will be set in that case by the mature space.
+        self._get_space_args(name, zeroed, permission_exec, false, false, vmrequest)
+    }
+
+    /// Get a preset for a mature space (where mature objects are located).
+    pub fn get_mature_space_args(
+        &mut self,
+        name: &'static str,
+        zeroed: bool,
+        permission_exec: bool,
+        vmrequest: VMRequest,
+    ) -> PlanCreateSpaceArgs<'_, VM> {
+        // Objects are allocated as mature (pre-tenured), and when traced, they stay mature.
+        // If an object gets copied into a mature space, the object is also mature,
+        self._get_space_args(name, zeroed, permission_exec, true, true, vmrequest)
+    }
+
+    // Get a preset for a mixed age space (where both young and mature objects are located).
+    pub fn get_mixed_age_space_args(
+        &mut self,
+        name: &'static str,
+        zeroed: bool,
+        permission_exec: bool,
+        vmrequest: VMRequest,
+    ) -> PlanCreateSpaceArgs<'_, VM> {
+        // Objects are allocated as young, and when traced, they become mature objects.
+        self._get_space_args(name, zeroed, permission_exec, false, true, vmrequest)
+    }
+
+    /// Get a preset for spaces in a non-generational plan.
+    pub fn get_normal_space_args(
+        &mut self,
+        name: &'static str,
+        zeroed: bool,
+        permission_exec: bool,
+        vmrequest: VMRequest,
+    ) -> PlanCreateSpaceArgs<'_, VM> {
+        // Non generational plan: we do not use any of the flags about log bits.
+        self._get_space_args(name, zeroed, permission_exec, false, false, vmrequest)
+    }
+
+    /// Get a preset for spaces in [`crate::plan::global::CommonPlan`].
+    /// Spaces like LOS which may include both young and mature objects should not use this method.
+    pub fn get_common_space_args(
+        &mut self,
+        generational: bool,
+        name: &'static str,
+    ) -> PlanCreateSpaceArgs<'_, VM> {
+        self.get_base_space_args(
+            generational,
+            name,
+            false, // Common spaces are not executable.
+        )
+    }
+
+    /// Get a preset for spaces in [`crate::plan::global::BasePlan`].
+    pub fn get_base_space_args(
+        &mut self,
+        generational: bool,
+        name: &'static str,
+        permission_exec: bool,
+    ) -> PlanCreateSpaceArgs<'_, VM> {
+        if generational {
+            // In generational plans, common/base spaces behave like a mature space:
+            // * the objects in these spaces are not traced in a nursery GC
+            // * the log bits for the objects are maintained exactly the same as a mature space.
+            // Thus we consider them as mature spaces.
+            self.get_mature_space_args(name, true, permission_exec, VMRequest::discontiguous())
+        } else {
+            self.get_normal_space_args(name, true, permission_exec, VMRequest::discontiguous())
+        }
+    }
 }
 
 impl<VM: VMBinding> BasePlan<VM> {
     #[allow(unused_mut)] // 'args' only needs to be mutable for certain features
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> BasePlan<VM> {
+        let _generational = args.constraints.generational;
         BasePlan {
             #[cfg(feature = "code_space")]
-            code_space: ImmortalSpace::new(args.get_space_args(
+            code_space: ImmortalSpace::new(args.get_base_space_args(
+                _generational,
                 "code_space",
                 true,
-                true,
-                VMRequest::discontiguous(),
             )),
             #[cfg(feature = "code_space")]
-            code_lo_space: ImmortalSpace::new(args.get_space_args(
+            code_lo_space: ImmortalSpace::new(args.get_base_space_args(
+                _generational,
                 "code_lo_space",
                 true,
-                true,
-                VMRequest::discontiguous(),
             )),
             #[cfg(feature = "ro_space")]
-            ro_space: ImmortalSpace::new(args.get_space_args(
+            ro_space: ImmortalSpace::new(args.get_base_space_args(
+                _generational,
                 "ro_space",
-                true,
                 false,
-                VMRequest::discontiguous(),
             )),
             #[cfg(feature = "vm_space")]
-            vm_space: VMSpace::new(args.get_space_args(
+            vm_space: VMSpace::new(args.get_base_space_args(
+                _generational,
                 "vm_space",
-                false,
                 false, // it doesn't matter -- we are not mmapping for VM space.
-                VMRequest::discontiguous(),
             )),
 
             global_state: args.global_args.state.clone(),
@@ -625,18 +709,19 @@ pub struct CommonPlan<VM: VMBinding> {
 
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> CommonPlan<VM> {
-        let uses_log_bit = args.constraints.uses_log_bit;
+        let needs_log_bit = args.constraints.needs_log_bit;
+        let generational = args.constraints.generational;
         CommonPlan {
-            immortal: ImmortalSpace::new(args.get_space_args(
-                "immortal",
-                true,
-                false,
-                VMRequest::discontiguous(),
-            )),
+            immortal: ImmortalSpace::new(args.get_common_space_args(generational, "immortal")),
             los: LargeObjectSpace::new(
-                args.get_space_args("los", true, false, VMRequest::discontiguous()),
+                // LOS is a bit special, as it is a mixed age space. It has a logical nursery.
+                if generational {
+                    args.get_mixed_age_space_args("los", true, false, VMRequest::discontiguous())
+                } else {
+                    args.get_normal_space_args("los", true, false, VMRequest::discontiguous())
+                },
                 false,
-                uses_log_bit,
+                needs_log_bit,
             ),
             nonmoving: Self::new_nonmoving_space(&mut args),
             base: BasePlan::new(args),
@@ -702,7 +787,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     fn new_nonmoving_space(args: &mut CreateSpecificPlanArgs<VM>) -> NonMovingSpace<VM> {
-        let space_args = args.get_space_args("nonmoving", true, false, VMRequest::discontiguous());
+        let space_args = args.get_common_space_args(args.constraints.generational, "nonmoving");
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving"))] {
                 NonMovingSpace::new(space_args)
@@ -711,8 +796,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 NonMovingSpace::new(
                     space_args,
                     crate::policy::immix::ImmixSpaceArgs {
-                        // unlog_object_when_traced: false,
-                        #[cfg(feature = "vo_bit")]
                         mixed_age: false,
                         never_move_objects: true,
                     },

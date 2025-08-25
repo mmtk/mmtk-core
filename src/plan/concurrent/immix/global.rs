@@ -24,8 +24,8 @@ use crate::util::copy::*;
 use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
-use crate::vm::VMBinding;
 use crate::vm::ObjectModel;
+use crate::vm::VMBinding;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
 
@@ -67,7 +67,7 @@ pub const CONCURRENT_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
     needs_prepare_mutator: true,
     barrier: crate::BarrierSelector::SATBBarrier,
-    uses_log_bit: true,
+    needs_log_bit: true,
     ..PlanConstraints::default()
 };
 
@@ -287,8 +287,6 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         Self::new_with_args(
             plan_args,
             ImmixSpaceArgs {
-                // unlog_object_when_traced: false,
-                #[cfg(feature = "vo_bit")]
                 mixed_age: false,
                 never_move_objects: true,
             },
@@ -301,7 +299,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
     ) -> Self {
         let immix = ConcurrentImmix {
             immix_space: ImmixSpace::new(
-                plan_args.get_space_args("immix", true, false, VMRequest::discontiguous()),
+                plan_args.get_normal_space_args("immix", true, false, VMRequest::discontiguous()),
                 space_args,
             ),
             common: CommonPlan::new(plan_args),

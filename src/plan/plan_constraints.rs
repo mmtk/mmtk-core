@@ -20,7 +20,7 @@ pub struct PlanConstraints {
     /// This depends on the copy allocator.
     pub max_non_los_copy_bytes: usize,
     /// Does this plan use the log bit? See vm::ObjectModel::GLOBAL_LOG_BIT_SPEC.
-    // pub needs_log_bit: bool,
+    pub needs_log_bit: bool,
     /// Some plans may allow benign race for testing mark bit, and this will lead to trace the same
     /// edge multiple times. If a plan allows tracing duplicated edges, we will not run duplicate
     /// edge check in extreme_assertions.
@@ -45,10 +45,8 @@ pub struct PlanConstraints {
     /// `MutatorConfig::prepare_func`).  Those plans can set this to `false` so that the
     /// `PrepareMutator` work packets will not be created at all.
     pub needs_prepare_mutator: bool,
-    // pub needs_satb: bool,
-    pub uses_log_bit: bool,
-    pub unlog_allocated_object: bool,
-    pub unlog_traced_object: bool,
+    /// Is this plan generational?
+    pub generational: bool,
 }
 
 impl PlanConstraints {
@@ -59,6 +57,7 @@ impl PlanConstraints {
             moves_objects: false,
             max_non_los_default_alloc_bytes: MAX_INT,
             max_non_los_copy_bytes: MAX_INT,
+            needs_log_bit: false,
             // As `LAZY_SWEEP` is true, needs_linear_scan is true for all the plans. This is strange.
             // https://github.com/mmtk/mmtk-core/issues/1027 tracks the issue.
             needs_linear_scan: crate::util::constants::SUPPORT_CARD_SCANNING
@@ -71,10 +70,7 @@ impl PlanConstraints {
             barrier: BarrierSelector::NoBarrier,
             // If we use mark sweep as non moving space, we need to prepare mutator. See [`common_prepare_func`].
             needs_prepare_mutator: cfg!(feature = "marksweep_as_nonmoving"),
-            // needs_satb: false,
-            uses_log_bit: false,
-            unlog_allocated_object: false,
-            unlog_traced_object: false,
+            generational: false,
         }
     }
 }

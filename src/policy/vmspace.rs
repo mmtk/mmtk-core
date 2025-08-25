@@ -154,6 +154,22 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
             enumerator.visit_address_range(ep.start, ep.end);
         }
     }
+
+    fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        let external_pages = self.pr.get_external_pages();
+        for ep in external_pages.iter() {
+            log_bit.bzero_metadata(ep.start, ep.end - ep.start);
+        }
+    }
+
+    fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        let external_pages = self.pr.get_external_pages();
+        for ep in external_pages.iter() {
+            log_bit.bset_metadata(ep.start, ep.end - ep.start);
+        }
+    }
 }
 
 use crate::scheduler::GCWorker;
@@ -248,7 +264,7 @@ impl<VM: VMBinding> VMSpace<VM> {
         });
 
         #[cfg(feature = "set_unlog_bits_vm_space")]
-        if self.common.uses_log_bit {
+        if self.common.needs_log_bit {
             // Bulk set unlog bits for all addresses in the VM space. This ensures that any
             // modification to the bootimage is logged
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
