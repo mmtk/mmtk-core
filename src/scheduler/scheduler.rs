@@ -43,8 +43,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
         // Create work buckets for workers.
         let mut work_buckets = EnumMap::from_fn(|stage: WorkBucketStage| {
-            let active = stage.is_activated_by_default();
-            WorkBucket::new(stage, active, worker_monitor.clone())
+            WorkBucket::new(stage, worker_monitor.clone())
         });
 
         // Set the open condition of each bucket.
@@ -52,7 +51,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             let mut open_stages: Vec<WorkBucketStage> = vec![WorkBucketStage::FIRST_STW_STAGE];
             let stages = (0..WorkBucketStage::LENGTH).map(WorkBucketStage::from_usize);
             for stage in stages {
-                if stage.is_sequentially_activated() {
+                if stage.is_sequentially_opened() {
                     let cur_stages = open_stages.clone();
                     // Other work packets will be opened after previous stages are done
                     // (i.e their buckets are drained and all workers parked).
@@ -66,10 +65,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                         },
                     );
                     open_stages.push(stage);
-                }
-                // Disable the bucket by default.
-                if stage.is_disabled_by_default() {
-                    work_buckets[stage].set_as_disabled();
                 }
             }
         }
@@ -236,7 +231,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     fn are_buckets_drained(&self, buckets: &[WorkBucketStage]) -> bool {
         buckets
             .iter()
-            .all(|&b| self.work_buckets[b].is_disabled() || self.work_buckets[b].is_drained())
+            .all(|&b| !self.work_buckets[b].is_enabled() || self.work_buckets[b].is_drained())
     }
 
     pub fn debug_assert_all_stw_buckets_empty(&self) {
@@ -250,8 +245,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                         "Work bucket {:?} is not empty but it is expected to be empty!",
                         bucket.get_stage()
                     );
-                    warn!("Queue: {:?}", bucket.get_queue());
-                    warn!("PriorityQueue: {:?}", bucket.get_prioritized_queue());
+                    warn!("Queue: {:?}", bucket.get_queue().debug_dump_packets());
+                    warn!(
+                        "PriorityQueue: {:?}",
+                        bucket
+                            .get_prioritized_queue()
+                            .and_then(|q| Some(q.debug_dump_packets()))
+                    );
                     false
                 } else {
                     true
@@ -263,7 +263,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub(crate) fn schedule_sentinels(&self) -> bool {
         let mut new_packets = false;
         for (id, work_bucket) in self.work_buckets.iter() {
-            if work_bucket.is_activated() && work_bucket.maybe_schedule_sentinel() {
+            if work_bucket.is_open() && work_bucket.maybe_schedule_sentinel() {
                 trace!("Scheduled sentinel packet into {:?}", id);
                 new_packets = true;
             }
@@ -282,11 +282,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let mut new_packets = false;
         for i in 0..WorkBucketStage::LENGTH {
             let id = WorkBucketStage::from_usize(i);
-            if id.is_always_activated() {
+            if id.is_always_open() {
                 continue;
             }
             let bucket = &self.work_buckets[id];
-            if bucket.is_disabled() {
+            if !bucket.is_enabled() {
                 debug!("Work bucket {:?} is disabled. Skip.", id);
                 continue;
             }
@@ -312,10 +312,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         buckets_updated && new_packets
     }
 
-    pub fn deactivate_all_stw(&self) {
+    pub fn close_all_stw_buckets(&self) {
         self.work_buckets.iter().for_each(|(id, bkt)| {
             if id.is_stw() {
-                bkt.deactivate();
+                bkt.close();
             }
         });
     }
@@ -323,28 +323,28 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn reset_state(&self) {
         self.work_buckets.iter().for_each(|(id, bkt)| {
             if id.is_stw() && !id.is_first_stw_stage() {
-                bkt.deactivate();
+                bkt.close();
             }
         });
     }
 
-    pub fn debug_assert_all_stw_buckets_deactivated(&self) {
+    pub fn debug_assert_all_stw_buckets_closed(&self) {
         if cfg!(debug_assertions) {
             self.work_buckets.iter().for_each(|(id, bkt)| {
                 if id.is_stw() {
-                    assert!(!bkt.is_activated());
+                    assert!(!bkt.is_open());
                 }
             });
         }
     }
 
     /// Check if all the work buckets are empty
-    pub(crate) fn assert_all_activated_buckets_are_empty(&self) {
+    pub(crate) fn assert_all_open_buckets_are_empty(&self) {
         let mut error_example = None;
         for (id, bucket) in self.work_buckets.iter() {
-            if !bucket.is_disabled() && bucket.is_activated() && !bucket.is_empty() {
+            if bucket.is_enabled() && bucket.is_open() && !bucket.is_empty() {
                 error!("Work bucket {:?} is not drained!", id);
-                error!("Queue: {:?}", bucket.get_queue());
+                error!("Queue: {:?}", bucket.get_queue().debug_dump_packets());
                 // This error can be hard to reproduce.
                 // If an error happens in the release build where logs are turned off,
                 // we should show at least one abnormal bucket in the panic message
@@ -454,7 +454,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 trace!("The last worker parked during GC.  Try to find more work to do...");
 
                 // During GC, if all workers parked, all open buckets must have been drained.
-                self.assert_all_activated_buckets_are_empty();
+                self.assert_all_open_buckets_are_empty();
 
                 // Find more work for workers to do.
                 let found_more_work = self.find_more_work_for_workers();
@@ -546,8 +546,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.debug_assert_all_stw_buckets_empty();
 
         // Deactivate all work buckets to prepare for the next GC.
-        self.deactivate_all_stw();
-        self.debug_assert_all_stw_buckets_deactivated();
+        self.close_all_stw_buckets();
+        self.debug_assert_all_stw_buckets_closed();
 
         let mmtk = worker.mmtk;
 
@@ -629,7 +629,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.gc_requester.clear_request();
         let first_stw_bucket = &self.work_buckets[WorkBucketStage::FIRST_STW_STAGE];
-        debug_assert!(!first_stw_bucket.is_activated());
+        debug_assert!(!first_stw_bucket.is_open());
         // Note: This is the only place where a bucket is opened without having all workers parked.
         // We usually require all workers to park before opening new buckets because otherwise
         // packets will be executed out of order.  However, since `Prepare` is the first STW
@@ -637,7 +637,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // cannot execute work packets out of order.  This is not generally true if we are not
         // opening the first STW bucket.  In the future, we should redesign the opening condition
         // of work buckets to make the synchronization more robust,
-        first_stw_bucket.activate();
+        first_stw_bucket.open();
         self.worker_monitor.notify_work_available(true);
     }
 }

@@ -37,11 +37,11 @@ impl<VM: VMBinding> BucketQueue<VM> {
             self.queue.push(w);
         }
     }
-}
 
-use std::fmt;
-impl<VM: VMBinding> fmt::Debug for BucketQueue<VM> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    /// Dump all the packets in this queue for debugging purpose.
+    /// This function may dump items from the queue temporarily, thus should only be called when it is safe to do so
+    /// (e.g. when the execution has failed already and the system is going to panic).
+    pub fn debug_dump_packets(&self) -> Vec<String> {
         let mut items = Vec::new();
 
         {
@@ -70,9 +70,7 @@ impl<VM: VMBinding> fmt::Debug for BucketQueue<VM> {
             }
         }
 
-        f.debug_struct("BucketQueue")
-            .field("queue", &debug_items)
-            .finish()
+        debug_items
     }
 }
 
@@ -80,7 +78,7 @@ pub type BucketOpenCondition<VM> = Box<dyn (Fn(&GCWorkScheduler<VM>) -> bool) + 
 
 pub struct WorkBucket<VM: VMBinding> {
     /// Whether this bucket has been opened. Work from an open bucket can be fetched by workers.
-    active: AtomicBool,
+    open: AtomicBool,
     /// The stage name of this bucket.
     stage: WorkBucketStage,
     queue: BucketQueue<VM>,
@@ -102,36 +100,33 @@ pub struct WorkBucket<VM: VMBinding> {
     /// can be used repeatedly to discover and process more such objects.
     sentinel: Mutex<Option<Box<dyn GCWork<VM>>>>,
 
+    /// Whether this bucket is enabled.
     /// A disabled work bucket will behave as if it does not exist in terms of scheduling,
     /// except that users can add work to a disabled bucket, and enable it later to allow those
     /// work to be scheduled.
-    disable: AtomicBool,
+    enabled: AtomicBool,
 }
 
 impl<VM: VMBinding> WorkBucket<VM> {
-    pub(crate) fn new(stage: WorkBucketStage, active: bool, monitor: Arc<WorkerMonitor>) -> Self {
+    pub(crate) fn new(stage: WorkBucketStage, monitor: Arc<WorkerMonitor>) -> Self {
         Self {
-            active: AtomicBool::new(active),
+            open: AtomicBool::new(stage.is_open_by_default()),
             stage,
             queue: BucketQueue::new(),
             prioritized_queue: None,
             monitor,
             can_open: None,
             sentinel: Mutex::new(None),
-            disable: AtomicBool::new(false),
+            enabled: AtomicBool::new(stage.is_enabled_by_default()),
         }
     }
 
-    pub fn set_as_enabled(&self) {
-        self.disable.store(false, Ordering::SeqCst)
+    pub fn set_enabled(&self, enabled: bool) {
+        self.enabled.store(enabled, Ordering::SeqCst)
     }
 
-    pub fn set_as_disabled(&self) {
-        self.disable.store(true, Ordering::SeqCst)
-    }
-
-    pub fn is_disabled(&self) -> bool {
-        self.disable.load(Ordering::Relaxed)
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.load(Ordering::Relaxed)
     }
 
     pub fn enable_prioritized_queue(&mut self) {
@@ -140,7 +135,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
     fn notify_one_worker(&self) {
         // If the bucket is not activated, don't notify anyone.
-        if !self.is_activated() {
+        if !self.is_open() || !self.is_enabled() {
             return;
         }
         // Notify one if there're any parked workers.
@@ -149,20 +144,20 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
     pub fn notify_all_workers(&self) {
         // If the bucket is not activated, don't notify anyone.
-        if !self.is_activated() {
+        if !self.is_open() || !self.is_enabled() {
             return;
         }
         // Notify all if there're any parked workers.
         self.monitor.notify_work_available(true);
     }
 
-    pub fn is_activated(&self) -> bool {
-        self.active.load(Ordering::SeqCst)
+    pub fn is_open(&self) -> bool {
+        self.open.load(Ordering::SeqCst)
     }
 
-    /// Enable the bucket
-    pub fn activate(&self) {
-        self.active.store(true, Ordering::SeqCst);
+    /// Open the bucket
+    pub fn open(&self) {
+        self.open.store(true, Ordering::SeqCst);
     }
 
     /// Test if the bucket is drained
@@ -176,17 +171,17 @@ impl<VM: VMBinding> WorkBucket<VM> {
     }
 
     pub fn is_drained(&self) -> bool {
-        self.is_disabled() || (self.is_activated() && self.is_empty())
+        !self.is_enabled() || (self.is_open() && self.is_empty())
     }
 
-    /// Disable the bucket
-    pub fn deactivate(&self) {
+    /// Close the bucket
+    pub fn close(&self) {
         debug_assert!(
             self.queue.is_empty(),
             "Bucket {:?} not drained before close",
             self.stage
         );
-        self.active.store(false, Ordering::Relaxed);
+        self.open.store(false, Ordering::Relaxed);
     }
 
     /// Add a work packet to this bucket
@@ -225,9 +220,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
     /// Panic if this bucket cannot receive prioritized packets.
     pub fn bulk_add_prioritized(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
         self.prioritized_queue.as_ref().unwrap().push_all(work_vec);
-        if self.is_activated() {
-            self.notify_all_workers();
-        }
+        self.notify_all_workers();
     }
 
     /// Add multiple packets
@@ -236,14 +229,12 @@ impl<VM: VMBinding> WorkBucket<VM> {
             return;
         }
         self.queue.push_all(work_vec);
-        if self.is_activated() {
-            self.notify_all_workers();
-        }
+        self.notify_all_workers();
     }
 
     /// Get a work packet from this bucket
     pub fn poll(&self, worker: &Worker<Box<dyn GCWork<VM>>>) -> Steal<Box<dyn GCWork<VM>>> {
-        if self.is_disabled() || !self.is_activated() || self.is_empty() {
+        if !self.is_enabled() || !self.is_open() || self.is_empty() {
             return Steal::Empty;
         }
         if let Some(prioritized_queue) = self.prioritized_queue.as_ref() {
@@ -274,9 +265,9 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
     pub fn update(&self, scheduler: &GCWorkScheduler<VM>) -> bool {
         if let Some(can_open) = self.can_open.as_ref() {
-            if !self.is_activated() && can_open(scheduler) {
+            if !self.is_open() && can_open(scheduler) {
                 debug!("Opening work bucket: {:?}", self.stage);
-                self.activate();
+                self.open();
                 return true;
             }
         }
@@ -285,7 +276,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
     pub fn maybe_schedule_sentinel(&self) -> bool {
         debug_assert!(
-            self.is_activated(),
+            self.is_open(),
             "Attempted to schedule sentinel work while bucket is not open"
         );
         let maybe_sentinel = {
@@ -393,25 +384,25 @@ impl WorkBucketStage {
     }
 
     /// Is this stage always activated?
-    pub const fn is_always_activated(&self) -> bool {
+    pub const fn is_always_open(&self) -> bool {
         matches!(self, WorkBucketStage::Unconstrained)
     }
 
     /// Is this stage activated by default?
-    pub const fn is_activated_by_default(&self) -> bool {
+    pub const fn is_open_by_default(&self) -> bool {
         matches!(
             self,
             WorkBucketStage::Unconstrained | WorkBucketStage::Concurrent
         )
     }
 
-    /// Is this stage disabled by default?
-    pub const fn is_disabled_by_default(&self) -> bool {
-        matches!(self, WorkBucketStage::Concurrent)
+    /// Is this stage enabled by default?
+    pub const fn is_enabled_by_default(&self) -> bool {
+        !matches!(self, WorkBucketStage::Concurrent)
     }
 
     /// Is this stage sequentially opened? All the stop-the-world stages, except the first one, are sequentially opened.
-    pub const fn is_sequentially_activated(&self) -> bool {
+    pub const fn is_sequentially_opened(&self) -> bool {
         self.is_stw() && !self.is_first_stw_stage()
     }
 
@@ -420,7 +411,7 @@ impl WorkBucketStage {
         !self.is_concurrent()
     }
 
-    /// Is this stage concurrent (which may be executedd during mutator time)?
+    /// Is this stage concurrent (which may be executed during mutator time)?
     pub const fn is_concurrent(&self) -> bool {
         matches!(
             self,
