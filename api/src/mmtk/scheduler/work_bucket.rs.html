@@ -302,7 +302,119 @@
 <a href="#301" id="301">301</a>
 <a href="#302" id="302">302</a>
 <a href="#303" id="303">303</a>
-<a href="#304" id="304">304</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::worker_monitor::WorkerMonitor;
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
+<a href="#317" id="317">317</a>
+<a href="#318" id="318">318</a>
+<a href="#319" id="319">319</a>
+<a href="#320" id="320">320</a>
+<a href="#321" id="321">321</a>
+<a href="#322" id="322">322</a>
+<a href="#323" id="323">323</a>
+<a href="#324" id="324">324</a>
+<a href="#325" id="325">325</a>
+<a href="#326" id="326">326</a>
+<a href="#327" id="327">327</a>
+<a href="#328" id="328">328</a>
+<a href="#329" id="329">329</a>
+<a href="#330" id="330">330</a>
+<a href="#331" id="331">331</a>
+<a href="#332" id="332">332</a>
+<a href="#333" id="333">333</a>
+<a href="#334" id="334">334</a>
+<a href="#335" id="335">335</a>
+<a href="#336" id="336">336</a>
+<a href="#337" id="337">337</a>
+<a href="#338" id="338">338</a>
+<a href="#339" id="339">339</a>
+<a href="#340" id="340">340</a>
+<a href="#341" id="341">341</a>
+<a href="#342" id="342">342</a>
+<a href="#343" id="343">343</a>
+<a href="#344" id="344">344</a>
+<a href="#345" id="345">345</a>
+<a href="#346" id="346">346</a>
+<a href="#347" id="347">347</a>
+<a href="#348" id="348">348</a>
+<a href="#349" id="349">349</a>
+<a href="#350" id="350">350</a>
+<a href="#351" id="351">351</a>
+<a href="#352" id="352">352</a>
+<a href="#353" id="353">353</a>
+<a href="#354" id="354">354</a>
+<a href="#355" id="355">355</a>
+<a href="#356" id="356">356</a>
+<a href="#357" id="357">357</a>
+<a href="#358" id="358">358</a>
+<a href="#359" id="359">359</a>
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
+<a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
+<a href="#387" id="387">387</a>
+<a href="#388" id="388">388</a>
+<a href="#389" id="389">389</a>
+<a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
+<a href="#410" id="410">410</a>
+<a href="#411" id="411">411</a>
+<a href="#412" id="412">412</a>
+<a href="#413" id="413">413</a>
+<a href="#414" id="414">414</a>
+<a href="#415" id="415">415</a>
+<a href="#416" id="416">416</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::worker_monitor::WorkerMonitor;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span>crossbeam::deque::{Injector, Steal, Worker};
@@ -310,7 +422,7 @@
 <span class="kw">use </span>std::sync::atomic::{AtomicBool, Ordering};
 <span class="kw">use </span>std::sync::{Arc, Mutex};
 
-<span class="kw">struct </span>BucketQueue&lt;VM: VMBinding&gt; {
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">struct </span>BucketQueue&lt;VM: VMBinding&gt; {
     queue: Injector&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
 }
 
@@ -341,17 +453,62 @@
             <span class="self">self</span>.queue.push(w);
         }
     }
+
+    <span class="doccomment">/// Dump all the packets in this queue for debugging purpose.
+    /// This function may dump items from the queue temporarily, thus should only be called when it is safe to do so
+    /// (e.g. when the execution has failed already and the system is going to panic).
+    </span><span class="kw">pub fn </span>debug_dump_packets(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;String&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>items = Vec::new();
+
+        {
+            <span class="comment">// Drain queue by stealing until empty
+            </span><span class="kw">loop </span>{
+                <span class="kw">match </span><span class="self">self</span>.queue.steal() {
+                    crossbeam::deque::Steal::Success(work) =&gt; {
+                        items.push(work);
+                    }
+                    crossbeam::deque::Steal::Retry =&gt; <span class="kw">continue</span>,
+                    crossbeam::deque::Steal::Empty =&gt; <span class="kw">break</span>,
+                }
+            }
+        }
+
+        <span class="comment">// Format collected items (just type names or Debug, depending on GCWork)
+        </span><span class="kw">let </span>debug_items: Vec&lt;String&gt; = items
+            .iter()
+            .map(|i| i.get_type_name().to_string()) <span class="comment">// placeholder since GCWork isn’t Debug
+            </span>.collect();
+
+        <span class="comment">// Push items back into the queue
+        </span>{
+            <span class="kw">for </span>work <span class="kw">in </span>items {
+                <span class="self">self</span>.queue.push(work);
+            }
+        }
+
+        debug_items
+    }
 }
 
 <span class="kw">pub type </span>BucketOpenCondition&lt;VM&gt; = Box&lt;<span class="kw">dyn </span>(Fn(<span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;) -&gt; bool) + Send&gt;;
 
 <span class="kw">pub struct </span>WorkBucket&lt;VM: VMBinding&gt; {
-    active: AtomicBool,
+    <span class="doccomment">/// Whether this bucket has been opened. Work from an open bucket can be fetched by workers.
+    </span>open: AtomicBool,
+    <span class="doccomment">/// Whether this bucket is enabled.
+    /// A disabled work bucket will behave as if it does not exist in terms of scheduling,
+    /// except that users can add work to a disabled bucket, and enable it later to allow those
+    /// work to be scheduled.
+    </span>enabled: AtomicBool,
+    <span class="doccomment">/// The stage name of this bucket.
+    </span>stage: WorkBucketStage,
     queue: BucketQueue&lt;VM&gt;,
     prioritized_queue: <span class="prelude-ty">Option</span>&lt;BucketQueue&lt;VM&gt;&gt;,
     monitor: Arc&lt;WorkerMonitor&gt;,
-    can_open: <span class="prelude-ty">Option</span>&lt;BucketOpenCondition&lt;VM&gt;&gt;,
-    <span class="doccomment">/// After this bucket is activated and all pending work packets (including the packets in this
+    <span class="doccomment">/// The open condition for a bucket. If this is `Some`, the bucket will be open
+    /// when the condition is met. If this is `None`, the bucket needs to be open manually.
+    </span>can_open: <span class="prelude-ty">Option</span>&lt;BucketOpenCondition&lt;VM&gt;&gt;,
+    <span class="doccomment">/// After this bucket is open and all pending work packets (including the packets in this
     /// bucket) are drained, this work packet, if exists, will be added to this bucket.  When this
     /// happens, it will prevent opening subsequent work packets.
     ///
@@ -366,9 +523,11 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; WorkBucket&lt;VM&gt; {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(active: bool, monitor: Arc&lt;WorkerMonitor&gt;) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(stage: WorkBucketStage, monitor: Arc&lt;WorkerMonitor&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
-            active: AtomicBool::new(active),
+            open: AtomicBool::new(stage.is_open_by_default()),
+            enabled: AtomicBool::new(stage.is_enabled_by_default()),
+            stage,
             queue: BucketQueue::new(),
             prioritized_queue: <span class="prelude-val">None</span>,
             monitor,
@@ -377,9 +536,21 @@
         }
     }
 
+    <span class="kw">pub fn </span>set_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>, enabled: bool) {
+        <span class="self">self</span>.enabled.store(enabled, Ordering::SeqCst)
+    }
+
+    <span class="kw">pub fn </span>is_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.enabled.load(Ordering::Relaxed)
+    }
+
+    <span class="kw">pub fn </span>enable_prioritized_queue(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.prioritized_queue = <span class="prelude-val">Some</span>(BucketQueue::new());
+    }
+
     <span class="kw">fn </span>notify_one_worker(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="comment">// If the bucket is not activated, don't notify anyone.
-        </span><span class="kw">if </span>!<span class="self">self</span>.is_activated() {
+        <span class="comment">// If the bucket is not open, don't notify anyone.
+        </span><span class="kw">if </span>!<span class="self">self</span>.is_open() || !<span class="self">self</span>.is_enabled() {
             <span class="kw">return</span>;
         }
         <span class="comment">// Notify one if there're any parked workers.
@@ -387,21 +558,21 @@
     }
 
     <span class="kw">pub fn </span>notify_all_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="comment">// If the bucket is not activated, don't notify anyone.
-        </span><span class="kw">if </span>!<span class="self">self</span>.is_activated() {
+        <span class="comment">// If the bucket is not open, don't notify anyone.
+        </span><span class="kw">if </span>!<span class="self">self</span>.is_open() || !<span class="self">self</span>.is_enabled() {
             <span class="kw">return</span>;
         }
         <span class="comment">// Notify all if there're any parked workers.
         </span><span class="self">self</span>.monitor.notify_work_available(<span class="bool-val">true</span>);
     }
 
-    <span class="kw">pub fn </span>is_activated(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.active.load(Ordering::SeqCst)
+    <span class="kw">pub fn </span>is_open(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.open.load(Ordering::SeqCst)
     }
 
-    <span class="doccomment">/// Enable the bucket
-    </span><span class="kw">pub fn </span>activate(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.active.store(<span class="bool-val">true</span>, Ordering::SeqCst);
+    <span class="doccomment">/// Open the bucket
+    </span><span class="kw">pub fn </span>open(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.open.store(<span class="bool-val">true</span>, Ordering::SeqCst);
     }
 
     <span class="doccomment">/// Test if the bucket is drained
@@ -415,13 +586,17 @@
     }
 
     <span class="kw">pub fn </span>is_drained(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.is_activated() &amp;&amp; <span class="self">self</span>.is_empty()
+        !<span class="self">self</span>.is_enabled() || (<span class="self">self</span>.is_open() &amp;&amp; <span class="self">self</span>.is_empty())
     }
 
-    <span class="doccomment">/// Disable the bucket
-    </span><span class="kw">pub fn </span>deactivate(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.queue.is_empty(), <span class="string">"Bucket not drained before close"</span>);
-        <span class="self">self</span>.active.store(<span class="bool-val">false</span>, Ordering::Relaxed);
+    <span class="doccomment">/// Close the bucket
+    </span><span class="kw">pub fn </span>close(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="macro">debug_assert!</span>(
+            <span class="self">self</span>.queue.is_empty(),
+            <span class="string">"Bucket {:?} not drained before close"</span>,
+            <span class="self">self</span>.stage
+        );
+        <span class="self">self</span>.open.store(<span class="bool-val">false</span>, Ordering::Relaxed);
     }
 
     <span class="doccomment">/// Add a work packet to this bucket
@@ -460,9 +635,7 @@
     /// Panic if this bucket cannot receive prioritized packets.
     </span><span class="kw">pub fn </span>bulk_add_prioritized(<span class="kw-2">&amp;</span><span class="self">self</span>, work_vec: Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;) {
         <span class="self">self</span>.prioritized_queue.as_ref().unwrap().push_all(work_vec);
-        <span class="kw">if </span><span class="self">self</span>.is_activated() {
-            <span class="self">self</span>.notify_all_workers();
-        }
+        <span class="self">self</span>.notify_all_workers();
     }
 
     <span class="doccomment">/// Add multiple packets
@@ -471,14 +644,12 @@
             <span class="kw">return</span>;
         }
         <span class="self">self</span>.queue.push_all(work_vec);
-        <span class="kw">if </span><span class="self">self</span>.is_activated() {
-            <span class="self">self</span>.notify_all_workers();
-        }
+        <span class="self">self</span>.notify_all_workers();
     }
 
     <span class="doccomment">/// Get a work packet from this bucket
     </span><span class="kw">pub fn </span>poll(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;) -&gt; Steal&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; {
-        <span class="kw">if </span>!<span class="self">self</span>.is_activated() || <span class="self">self</span>.is_empty() {
+        <span class="kw">if </span>!<span class="self">self</span>.is_enabled() || !<span class="self">self</span>.is_open() || <span class="self">self</span>.is_empty() {
             <span class="kw">return </span>Steal::Empty;
         }
         <span class="kw">if let </span><span class="prelude-val">Some</span>(prioritized_queue) = <span class="self">self</span>.prioritized_queue.as_ref() {
@@ -509,8 +680,9 @@
 
     <span class="kw">pub fn </span>update(<span class="kw-2">&amp;</span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;) -&gt; bool {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(can_open) = <span class="self">self</span>.can_open.as_ref() {
-            <span class="kw">if </span>!<span class="self">self</span>.is_activated() &amp;&amp; can_open(scheduler) {
-                <span class="self">self</span>.activate();
+            <span class="kw">if </span>!<span class="self">self</span>.is_open() &amp;&amp; can_open(scheduler) {
+                <span class="macro">debug!</span>(<span class="string">"Opening work bucket: {:?}"</span>, <span class="self">self</span>.stage);
+                <span class="self">self</span>.open();
                 <span class="kw">return </span><span class="bool-val">true</span>;
             }
         }
@@ -519,7 +691,7 @@
 
     <span class="kw">pub fn </span>maybe_schedule_sentinel(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="macro">debug_assert!</span>(
-            <span class="self">self</span>.is_activated(),
+            <span class="self">self</span>.is_open(),
             <span class="string">"Attempted to schedule sentinel work while bucket is not open"
         </span>);
         <span class="kw">let </span>maybe_sentinel = {
@@ -536,6 +708,14 @@
             <span class="bool-val">false
         </span>}
     }
+
+    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>get_queue(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>BucketQueue&lt;VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.queue
+    }
+
+    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>get_stage(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; WorkBucketStage {
+        <span class="self">self</span>.stage
+    }
 }
 
 <span class="doccomment">/// This enum defines all the work bucket types. The scheduler
@@ -544,6 +724,10 @@
 </span><span class="kw">pub enum </span>WorkBucketStage {
     <span class="doccomment">/// This bucket is always open.
     </span>Unconstrained,
+    <span class="doccomment">/// This bucket is intended for concurrent work. Though some concurrent work may be put and executed in the unconstrained bucket,
+    /// work in the unconstrained bucket will always be consumed during STW. Users can disable this bucket
+    /// and cache some concurrent work during STW, and only enable this bucket and allow concurrent execution once a STW is done.
+    </span>Concurrent,
     <span class="doccomment">/// Preparation work.  Plans, spaces, GC workers, mutators, etc. should be prepared for GC at
     /// this stage.
     </span>Prepare,
@@ -601,9 +785,49 @@
 }
 
 <span class="kw">impl </span>WorkBucketStage {
-    <span class="doccomment">/// The first stop-the-world bucket.
-    </span><span class="kw">pub fn </span>first_stw_stage() -&gt; <span class="self">Self </span>{
-        WorkBucketStage::from_usize(<span class="number">1</span>)
+    <span class="doccomment">/// The first stop-the-world stage. This stage has no open condition, and will be opened manually
+    /// once all the mutators threads are stopped.
+    </span><span class="kw">pub const </span>FIRST_STW_STAGE: <span class="self">Self </span>= WorkBucketStage::Prepare;
+
+    <span class="doccomment">/// Is this the first stop-the-world stage? See [`Self::FIRST_STW_STAGE`].
+    </span><span class="kw">pub const fn </span>is_first_stw_stage(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="macro">matches!</span>(<span class="self">self</span>, <span class="kw-2">&amp;</span>WorkBucketStage::FIRST_STW_STAGE)
+    }
+
+    <span class="doccomment">/// Is this stage always open?
+    </span><span class="kw">pub const fn </span>is_always_open(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="macro">matches!</span>(<span class="self">self</span>, WorkBucketStage::Unconstrained)
+    }
+
+    <span class="doccomment">/// Is this stage open by default?
+    </span><span class="kw">pub const fn </span>is_open_by_default(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="macro">matches!</span>(
+            <span class="self">self</span>,
+            WorkBucketStage::Unconstrained | WorkBucketStage::Concurrent
+        )
+    }
+
+    <span class="doccomment">/// Is this stage enabled by default?
+    </span><span class="kw">pub const fn </span>is_enabled_by_default(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        !<span class="macro">matches!</span>(<span class="self">self</span>, WorkBucketStage::Concurrent)
+    }
+
+    <span class="doccomment">/// Is this stage sequentially opened? All the stop-the-world stages, except the first one, are sequentially opened.
+    </span><span class="kw">pub const fn </span>is_sequentially_opened(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.is_stw() &amp;&amp; !<span class="self">self</span>.is_first_stw_stage()
+    }
+
+    <span class="doccomment">/// Is this stage a stop-the-world stage?
+    </span><span class="kw">pub const fn </span>is_stw(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        !<span class="self">self</span>.is_concurrent()
+    }
+
+    <span class="doccomment">/// Is this stage concurrent (which may be executed during mutator time)?
+    </span><span class="kw">pub const fn </span>is_concurrent(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="macro">matches!</span>(
+            <span class="self">self</span>,
+            WorkBucketStage::Unconstrained | WorkBucketStage::Concurrent
+        )
     }
 }
 </code></pre></div></section></main></body></html>

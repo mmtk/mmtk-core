@@ -611,10 +611,10 @@
     <span class="kw">const </span>LOCALLY_CACHED_WORK_PACKETS: usize = <span class="number">16</span>;
 
     <span class="doccomment">/// Add a work packet to the work queue and mark it with a higher priority.
-    /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
+    /// If the bucket is open, the packet will be pushed to the local queue, otherwise it will be
     /// pushed to the global bucket with a higher priority.
     </span><span class="kw">pub fn </span>add_work_prioritized(<span class="kw-2">&amp;mut </span><span class="self">self</span>, bucket: WorkBucketStage, work: <span class="kw">impl </span>GCWork&lt;VM&gt;) {
-        <span class="kw">if </span>!<span class="self">self</span>.scheduler().work_buckets[bucket].is_activated()
+        <span class="kw">if </span>!<span class="self">self</span>.scheduler().work_buckets[bucket].is_open()
             || <span class="self">self</span>.local_work_buffer.len() &gt;= <span class="self">Self</span>::LOCALLY_CACHED_WORK_PACKETS
         {
             <span class="self">self</span>.scheduler.work_buckets[bucket].add_prioritized(Box::new(work));
@@ -624,10 +624,10 @@
     }
 
     <span class="doccomment">/// Add a work packet to the work queue.
-    /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
+    /// If the bucket is open, the packet will be pushed to the local queue, otherwise it will be
     /// pushed to the global bucket.
     </span><span class="kw">pub fn </span>add_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, bucket: WorkBucketStage, work: <span class="kw">impl </span>GCWork&lt;VM&gt;) {
-        <span class="kw">if </span>!<span class="self">self</span>.scheduler().work_buckets[bucket].is_activated()
+        <span class="kw">if </span>!<span class="self">self</span>.scheduler().work_buckets[bucket].is_open()
             || <span class="self">self</span>.local_work_buffer.len() &gt;= <span class="self">Self</span>::LOCALLY_CACHED_WORK_PACKETS
         {
             <span class="self">self</span>.scheduler.work_buckets[bucket].add(work);
@@ -650,7 +650,7 @@
     ///
     /// 1. Any packet that should be processed only by this worker.
     /// 2. Poll from the local work queue.
-    /// 3. Poll from activated global work-buckets
+    /// 3. Poll from open global work-buckets
     /// 4. Steal from other workers
     </span><span class="kw">fn </span>poll(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; PollResult&lt;VM&gt; {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(work) = <span class="self">self</span>.shared.designated_work.pop() {

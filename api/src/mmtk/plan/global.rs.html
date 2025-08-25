@@ -914,7 +914,9 @@
 <a href="#913" id="913">913</a>
 <a href="#914" id="914">914</a>
 <a href="#915" id="915">915</a>
-<a href="#916" id="916">916</a></pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
+<a href="#916" id="916">916</a>
+<a href="#917" id="917">917</a>
+<a href="#918" id="918">918</a></pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
@@ -1265,6 +1267,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="kw">pub</span>(<span class="kw">crate</span>) global_state: Arc&lt;GlobalState&gt;,
     <span class="kw">pub </span>options: Arc&lt;Options&gt;,
     <span class="kw">pub </span>gc_trigger: Arc&lt;GCTrigger&lt;VM&gt;&gt;,
+    <span class="kw">pub </span>scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
 
     <span class="comment">// Spaces in base plan
     </span><span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
@@ -1467,6 +1470,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
             global_state: args.global_args.state.clone(),
             gc_trigger: args.global_args.gc_trigger,
             options: args.global_args.options,
+            scheduler: args.global_args.scheduler,
         }
     }
 

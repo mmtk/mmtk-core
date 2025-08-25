@@ -614,7 +614,28 @@
 <a href="#613" id="613">613</a>
 <a href="#614" id="614">614</a>
 <a href="#615" id="615">615</a>
-<a href="#616" id="616">616</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="self">self</span>::worker::PollResult;
+<a href="#616" id="616">616</a>
+<a href="#617" id="617">617</a>
+<a href="#618" id="618">618</a>
+<a href="#619" id="619">619</a>
+<a href="#620" id="620">620</a>
+<a href="#621" id="621">621</a>
+<a href="#622" id="622">622</a>
+<a href="#623" id="623">623</a>
+<a href="#624" id="624">624</a>
+<a href="#625" id="625">625</a>
+<a href="#626" id="626">626</a>
+<a href="#627" id="627">627</a>
+<a href="#628" id="628">628</a>
+<a href="#629" id="629">629</a>
+<a href="#630" id="630">630</a>
+<a href="#631" id="631">631</a>
+<a href="#632" id="632">632</a>
+<a href="#633" id="633">633</a>
+<a href="#634" id="634">634</a>
+<a href="#635" id="635">635</a>
+<a href="#636" id="636">636</a>
+<a href="#637" id="637">637</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="self">self</span>::worker::PollResult;
 
 <span class="kw">use </span><span class="kw">super</span>::gc_work::ScheduleCollection;
 <span class="kw">use </span><span class="kw">super</span>::stat::SchedulerStat;
@@ -658,26 +679,25 @@
         <span class="kw">let </span>worker_group = WorkerGroup::new(num_workers);
 
         <span class="comment">// Create work buckets for workers.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>work_buckets = EnumMap::from_fn(|stage| {
-            <span class="kw">let </span>active = stage == WorkBucketStage::Unconstrained;
-            WorkBucket::new(active, worker_monitor.clone())
+        </span><span class="kw">let </span><span class="kw-2">mut </span>work_buckets = EnumMap::from_fn(|stage: WorkBucketStage| {
+            WorkBucket::new(stage, worker_monitor.clone())
         });
 
         <span class="comment">// Set the open condition of each bucket.
         </span>{
-            <span class="kw">let </span>first_stw_stage = WorkBucketStage::first_stw_stage();
-            <span class="kw">let </span><span class="kw-2">mut </span>open_stages: Vec&lt;WorkBucketStage&gt; = <span class="macro">vec!</span>[first_stw_stage];
+            <span class="kw">let </span><span class="kw-2">mut </span>open_stages: Vec&lt;WorkBucketStage&gt; = <span class="macro">vec!</span>[WorkBucketStage::FIRST_STW_STAGE];
             <span class="kw">let </span>stages = (<span class="number">0</span>..WorkBucketStage::LENGTH).map(WorkBucketStage::from_usize);
             <span class="kw">for </span>stage <span class="kw">in </span>stages {
-                <span class="comment">// Unconstrained is always open.
-                // The first STW stage (Prepare) will be opened when the world stopped
-                // (i.e. when all mutators are suspended).
-                </span><span class="kw">if </span>stage != WorkBucketStage::Unconstrained &amp;&amp; stage != first_stw_stage {
+                <span class="kw">if </span>stage.is_sequentially_opened() {
+                    <span class="kw">let </span>cur_stages = open_stages.clone();
                     <span class="comment">// Other work packets will be opened after previous stages are done
                     // (i.e their buckets are drained and all workers parked).
-                    </span><span class="kw">let </span>cur_stages = open_stages.clone();
-                    work_buckets[stage].set_open_condition(
+                    </span>work_buckets[stage].set_open_condition(
                         <span class="kw">move </span>|scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;| {
+                            <span class="macro">debug!</span>(
+                                <span class="string">"Check if {:?} can be opened? These needs to be drained: {:?}"</span>,
+                                stage, <span class="kw-2">&amp;</span>cur_stages
+                            );
                             scheduler.are_buckets_drained(<span class="kw-2">&amp;</span>cur_stages)
                         },
                     );
@@ -846,18 +866,35 @@
     }
 
     <span class="kw">fn </span>are_buckets_drained(<span class="kw-2">&amp;</span><span class="self">self</span>, buckets: <span class="kw-2">&amp;</span>[WorkBucketStage]) -&gt; bool {
-        buckets.iter().all(|<span class="kw-2">&amp;</span>b| <span class="self">self</span>.work_buckets[b].is_drained())
+        buckets
+            .iter()
+            .all(|<span class="kw-2">&amp;</span>b| !<span class="self">self</span>.work_buckets[b].is_enabled() || <span class="self">self</span>.work_buckets[b].is_drained())
     }
 
-    <span class="kw">pub fn </span>all_buckets_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.work_buckets.values().all(|bucket| bucket.is_empty())
+    <span class="kw">pub fn </span>debug_assert_all_stw_buckets_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="macro">debug_assert!</span>(<span class="self">self
+            </span>.work_buckets
+            .values()
+            .filter(|bucket| bucket.get_stage().is_stw())
+            .all(|bucket| {
+                <span class="kw">if </span>!bucket.is_empty() {
+                    <span class="macro">warn!</span>(
+                        <span class="string">"Work bucket {:?} is not empty but it is expected to be empty!"</span>,
+                        bucket.get_stage()
+                    );
+                    <span class="macro">warn!</span>(<span class="string">"Queue: {:?}"</span>, bucket.get_queue().debug_dump_packets());
+                    <span class="bool-val">false
+                </span>} <span class="kw">else </span>{
+                    <span class="bool-val">true
+                </span>}
+            }))
     }
 
-    <span class="doccomment">/// Schedule "sentinel" work packets for all activated buckets.
+    <span class="doccomment">/// Schedule "sentinel" work packets for all open buckets.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>schedule_sentinels(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw">let </span><span class="kw-2">mut </span>new_packets = <span class="bool-val">false</span>;
         <span class="kw">for </span>(id, work_bucket) <span class="kw">in </span><span class="self">self</span>.work_buckets.iter() {
-            <span class="kw">if </span>work_bucket.is_activated() &amp;&amp; work_bucket.maybe_schedule_sentinel() {
+            <span class="kw">if </span>work_bucket.is_open() &amp;&amp; work_bucket.maybe_schedule_sentinel() {
                 <span class="macro">trace!</span>(<span class="string">"Scheduled sentinel packet into {:?}"</span>, id);
                 new_packets = <span class="bool-val">true</span>;
             }
@@ -876,10 +913,15 @@
         <span class="kw">let </span><span class="kw-2">mut </span>new_packets = <span class="bool-val">false</span>;
         <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..WorkBucketStage::LENGTH {
             <span class="kw">let </span>id = WorkBucketStage::from_usize(i);
-            <span class="kw">if </span>id == WorkBucketStage::Unconstrained {
+            <span class="kw">if </span>id.is_always_open() {
                 <span class="kw">continue</span>;
             }
             <span class="kw">let </span>bucket = <span class="kw-2">&amp;</span><span class="self">self</span>.work_buckets[id];
+            <span class="kw">if </span>!bucket.is_enabled() {
+                <span class="macro">debug!</span>(<span class="string">"Work bucket {:?} is disabled. Skip."</span>, id);
+                <span class="kw">continue</span>;
+            }
+            <span class="macro">debug!</span>(<span class="string">"Checking if {:?} can be opened..."</span>, id);
             <span class="kw">let </span>bucket_opened = bucket.update(<span class="self">self</span>);
             buckets_updated = buckets_updated || bucket_opened;
             <span class="kw">if </span>bucket_opened {
@@ -901,39 +943,39 @@
         buckets_updated &amp;&amp; new_packets
     }
 
-    <span class="kw">pub fn </span>deactivate_all(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+    <span class="kw">pub fn </span>close_all_stw_buckets(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="self">self</span>.work_buckets.iter().for_each(|(id, bkt)| {
-            <span class="kw">if </span>id != WorkBucketStage::Unconstrained {
-                bkt.deactivate();
+            <span class="kw">if </span>id.is_stw() {
+                bkt.close();
             }
         });
     }
 
     <span class="kw">pub fn </span>reset_state(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">let </span>first_stw_stage = WorkBucketStage::first_stw_stage();
         <span class="self">self</span>.work_buckets.iter().for_each(|(id, bkt)| {
-            <span class="kw">if </span>id != WorkBucketStage::Unconstrained &amp;&amp; id != first_stw_stage {
-                bkt.deactivate();
+            <span class="kw">if </span>id.is_stw() &amp;&amp; !id.is_first_stw_stage() {
+                bkt.close();
             }
         });
     }
 
-    <span class="kw">pub fn </span>debug_assert_all_buckets_deactivated(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+    <span class="kw">pub fn </span>debug_assert_all_stw_buckets_closed(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">if </span><span class="macro">cfg!</span>(debug_assertions) {
             <span class="self">self</span>.work_buckets.iter().for_each(|(id, bkt)| {
-                <span class="kw">if </span>id != WorkBucketStage::Unconstrained {
-                    <span class="macro">assert!</span>(!bkt.is_activated());
+                <span class="kw">if </span>id.is_stw() {
+                    <span class="macro">assert!</span>(!bkt.is_open());
                 }
             });
         }
     }
 
     <span class="doccomment">/// Check if all the work buckets are empty
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>assert_all_activated_buckets_are_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>assert_all_open_buckets_are_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let </span><span class="kw-2">mut </span>error_example = <span class="prelude-val">None</span>;
         <span class="kw">for </span>(id, bucket) <span class="kw">in </span><span class="self">self</span>.work_buckets.iter() {
-            <span class="kw">if </span>bucket.is_activated() &amp;&amp; !bucket.is_empty() {
-                <span class="macro">error!</span>(<span class="string">"Work bucket {:?} is active but not empty!"</span>, id);
+            <span class="kw">if </span>bucket.is_enabled() &amp;&amp; bucket.is_open() &amp;&amp; !bucket.is_empty() {
+                <span class="macro">error!</span>(<span class="string">"Work bucket {:?} is not drained!"</span>, id);
+                <span class="macro">error!</span>(<span class="string">"Queue: {:?}"</span>, bucket.get_queue().debug_dump_packets());
                 <span class="comment">// This error can be hard to reproduce.
                 // If an error happens in the release build where logs are turned off,
                 // we should show at least one abnormal bucket in the panic message
@@ -942,7 +984,7 @@
             }
         }
         <span class="kw">if let </span><span class="prelude-val">Some</span>(id) = error_example {
-            <span class="macro">panic!</span>(<span class="string">"Some active buckets (such as {:?}) are not empty."</span>, id);
+            <span class="macro">panic!</span>(<span class="string">"Some open buckets (such as {:?}) are not empty."</span>, id);
         }
     }
 
@@ -1043,7 +1085,7 @@
                 </span><span class="macro">trace!</span>(<span class="string">"The last worker parked during GC.  Try to find more work to do..."</span>);
 
                 <span class="comment">// During GC, if all workers parked, all open buckets must have been drained.
-                </span><span class="self">self</span>.assert_all_activated_buckets_are_empty();
+                </span><span class="self">self</span>.assert_all_open_buckets_are_empty();
 
                 <span class="comment">// Find more work for workers to do.
                 </span><span class="kw">let </span>found_more_work = <span class="self">self</span>.find_more_work_for_workers();
@@ -1132,11 +1174,11 @@
     </span><span class="kw">fn </span>on_gc_finished(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) {
         <span class="comment">// All GC workers must have parked by now.
         </span><span class="macro">debug_assert!</span>(!<span class="self">self</span>.worker_group.has_designated_work());
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.all_buckets_empty());
+        <span class="self">self</span>.debug_assert_all_stw_buckets_empty();
 
-        <span class="comment">// Deactivate all work buckets to prepare for the next GC.
-        </span><span class="self">self</span>.deactivate_all();
-        <span class="self">self</span>.debug_assert_all_buckets_deactivated();
+        <span class="comment">// Close all work buckets to prepare for the next GC.
+        </span><span class="self">self</span>.close_all_stw_buckets();
+        <span class="self">self</span>.debug_assert_all_stw_buckets_closed();
 
         <span class="kw">let </span>mmtk = worker.mmtk;
 
@@ -1217,8 +1259,8 @@
 
     <span class="kw">pub fn </span>notify_mutators_paused(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
         mmtk.gc_requester.clear_request();
-        <span class="kw">let </span>first_stw_bucket = <span class="kw-2">&amp;</span><span class="self">self</span>.work_buckets[WorkBucketStage::first_stw_stage()];
-        <span class="macro">debug_assert!</span>(!first_stw_bucket.is_activated());
+        <span class="kw">let </span>first_stw_bucket = <span class="kw-2">&amp;</span><span class="self">self</span>.work_buckets[WorkBucketStage::FIRST_STW_STAGE];
+        <span class="macro">debug_assert!</span>(!first_stw_bucket.is_open());
         <span class="comment">// Note: This is the only place where a bucket is opened without having all workers parked.
         // We usually require all workers to park before opening new buckets because otherwise
         // packets will be executed out of order.  However, since `Prepare` is the first STW
@@ -1226,7 +1268,7 @@
         // cannot execute work packets out of order.  This is not generally true if we are not
         // opening the first STW bucket.  In the future, we should redesign the opening condition
         // of work buckets to make the synchronization more robust,
-        </span>first_stw_bucket.activate();
+        </span>first_stw_bucket.open();
         <span class="self">self</span>.worker_monitor.notify_work_available(<span class="bool-val">true</span>);
     }
 }
