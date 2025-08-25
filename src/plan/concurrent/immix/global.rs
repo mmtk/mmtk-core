@@ -273,8 +273,6 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
 
 impl<VM: VMBinding> ConcurrentImmix<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
-        use crate::vm::ObjectModel;
-
         let spec = crate::util::metadata::extract_side_metadata(&[
             *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
         ]);
