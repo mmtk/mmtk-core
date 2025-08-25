@@ -1,6 +1,6 @@
 use super::gc_work::CompressorWorkContext;
 use super::gc_work::{
-    CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
+    AfterCompact, CalculateOffsetVector, Compact, ForwardingProcessEdges, MarkingProcessEdges,
     UpdateReferences,
 };
 use crate::plan::compressor::mutator::ALLOCATOR_MAPPING;
@@ -14,6 +14,7 @@ use crate::plan::PlanConstraints;
 use crate::policy::compressor::CompressorSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
+use crate::scheduler::GCWork;
 use crate::scheduler::GCWorkScheduler;
 use crate::scheduler::WorkBucketStage;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -97,13 +98,29 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<CompressorWorkContext<VM>>::new(self));
 
-        scheduler.work_buckets[WorkBucketStage::CalculateForwarding].add(
-            CalculateForwardingAddress::<VM>::new(&self.compressor_space),
-        );
-        // do another trace to update references
+        let offset_vector_packets: Vec<Box<dyn GCWork<VM>>> =
+            self.compressor_space.generate_tasks(&mut |r, _| {
+                Box::new(CalculateOffsetVector::<VM>::new(
+                    &self.compressor_space,
+                    r.region,
+                    r.cursor(),
+                )) as Box<dyn GCWork<VM>>
+            });
+        scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
+            .bulk_add(offset_vector_packets);
+
+        // scan roots to update their references
         scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new());
-        scheduler.work_buckets[WorkBucketStage::Compact]
-            .add(Compact::<VM>::new(&self.compressor_space, &self.common.los));
+
+        let compact_packets: Vec<Box<dyn GCWork<VM>>> =
+            self.compressor_space.generate_tasks(&mut |_, index| {
+                Box::new(Compact::<VM>::new(&self.compressor_space, index)) as Box<dyn GCWork<VM>>
+            });
+
+        scheduler.work_buckets[WorkBucketStage::Compact].bulk_add(compact_packets);
+        scheduler.work_buckets[WorkBucketStage::Compact].set_sentinel(Box::new(
+            AfterCompact::<VM>::new(&self.compressor_space, &self.common.los),
+        ));
 
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
