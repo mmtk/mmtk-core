@@ -110,13 +110,13 @@ impl<VM: VMBinding> WorkBucket<VM> {
     pub(crate) fn new(stage: WorkBucketStage, monitor: Arc<WorkerMonitor>) -> Self {
         Self {
             open: AtomicBool::new(stage.is_open_by_default()),
+            enabled: AtomicBool::new(stage.is_enabled_by_default()),
             stage,
             queue: BucketQueue::new(),
             prioritized_queue: None,
             monitor,
             can_open: None,
             sentinel: Mutex::new(None),
-            enabled: AtomicBool::new(stage.is_enabled_by_default()),
         }
     }
 
