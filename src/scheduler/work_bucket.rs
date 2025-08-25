@@ -298,10 +298,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
         &self.queue
     }
 
-    pub(super) fn get_prioritized_queue(&self) -> Option<&BucketQueue<VM>> {
-        self.prioritized_queue.as_ref()
-    }
-
     pub(super) fn get_stage(&self) -> WorkBucketStage {
         self.stage
     }

@@ -246,12 +246,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                         bucket.get_stage()
                     );
                     warn!("Queue: {:?}", bucket.get_queue().debug_dump_packets());
-                    warn!(
-                        "PriorityQueue: {:?}",
-                        bucket
-                            .get_prioritized_queue()
-                            .and_then(|q| Some(q.debug_dump_packets()))
-                    );
                     false
                 } else {
                     true
