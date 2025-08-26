@@ -82,6 +82,7 @@ pub fn create_concurrent_immix_mutator<VM: VMBinding>(
         .barrier(Box::new(SATBBarrier::new(SATBBarrierSemantics::<
             VM,
             ConcurrentImmix<VM>,
+            { crate::policy::immix::TRACE_KIND_FAST },
         >::new(mmtk))))
         .build()
 }

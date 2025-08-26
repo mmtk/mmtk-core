@@ -2,6 +2,7 @@ use std::sync::atomic::Ordering;
 
 use super::{concurrent_marking_work::ProcessModBufSATB, Pause};
 use crate::plan::global::PlanTraceObject;
+use crate::policy::gc_work::TraceKind;
 use crate::{
     plan::{barriers::BarrierSemantics, concurrent::global::ConcurrentPlan, VectorQueue},
     scheduler::WorkBucketStage,
@@ -13,14 +14,20 @@ use crate::{
     MMTK,
 };
 
-pub struct SATBBarrierSemantics<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> {
+pub struct SATBBarrierSemantics<
+    VM: VMBinding,
+    P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,
+    const KIND: TraceKind,
+> {
     mmtk: &'static MMTK<VM>,
     satb: VectorQueue<ObjectReference>,
     refs: VectorQueue<ObjectReference>,
     plan: &'static P,
 }
 
-impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> SATBBarrierSemantics<VM, P> {
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
+    SATBBarrierSemantics<VM, P, KIND>
+{
     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
             mmtk,
@@ -66,7 +73,8 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> SATBBarrie
                     debug_assert_ne!(self.plan.current_pause(), Some(Pause::InitialMark));
                     WorkBucketStage::Closure
                 };
-                self.mmtk.scheduler.work_buckets[bucket].add(ProcessModBufSATB::<VM, P>::new(satb));
+                self.mmtk.scheduler.work_buckets[bucket]
+                    .add(ProcessModBufSATB::<VM, P, KIND>::new(satb));
             } else {
                 let _ = self.satb.take();
             };
@@ -84,7 +92,8 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> SATBBarrie
                 debug_assert_ne!(self.plan.current_pause(), Some(Pause::InitialMark));
                 WorkBucketStage::Closure
             };
-            self.mmtk.scheduler.work_buckets[bucket].add(ProcessModBufSATB::<VM, P>::new(nodes));
+            self.mmtk.scheduler.work_buckets[bucket]
+                .add(ProcessModBufSATB::<VM, P, KIND>::new(nodes));
         }
     }
 
@@ -94,8 +103,8 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> SATBBarrie
     }
 }
 
-impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> BarrierSemantics
-    for SATBBarrierSemantics<VM, P>
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
+    BarrierSemantics for SATBBarrierSemantics<VM, P, KIND>
 {
     type VM = VM;
 
