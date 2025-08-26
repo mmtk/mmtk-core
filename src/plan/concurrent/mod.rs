@@ -6,6 +6,9 @@ pub mod immix;
 
 use bytemuck::NoUninit;
 
+/// The pause type for a concurrent GC phase.
+// TODO: This is probably not be general enough for all the concurrent plans.
+// TODO: We could consider moving this to specific plans later.
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone, NoUninit)]
 pub enum Pause {

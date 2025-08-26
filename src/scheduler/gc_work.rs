@@ -2,7 +2,6 @@ use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::global_state::GcStatus;
 use crate::plan::ObjectsClosure;
-use crate::plan::Pause;
 use crate::plan::VectorObjectQueue;
 use crate::util::*;
 use crate::vm::slot::Slot;
@@ -193,21 +192,28 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseCollector {
 /// TODO: Smaller work granularity
 #[derive(Default)]
 pub struct StopMutators<C: GCWorkContext> {
-    pause: Pause,
+    /// If this is true, we skip creating [`ScanMutatorRoots`] work packets for mutators.
+    /// By default, this is false.
+    skip_mutator_roots: bool,
+    /// Flush mutators once they are stopped. By default this is false. [`ScanMutatorRoots`] will flush mutators.
+    flush_mutator: bool,
     phantom: PhantomData<C>,
 }
 
 impl<C: GCWorkContext> StopMutators<C> {
     pub fn new() -> Self {
         Self {
-            pause: Pause::Full,
+            skip_mutator_roots: false,
+            flush_mutator: false,
             phantom: PhantomData,
         }
     }
 
-    pub fn new_args(pause: Pause) -> Self {
+    /// Create a `StopMutators` work packet that does not create `ScanMutatorRoots` work packets for mutators, and will simply flush mutators.
+    pub fn new_no_scan_roots() -> Self {
         Self {
-            pause,
+            skip_mutator_roots: true,
+            flush_mutator: true,
             phantom: PhantomData,
         }
     }
@@ -221,11 +227,12 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
             // TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
             // Should we push to Unconstrained instead?
 
-            if self.pause != Pause::FinalMark {
+            if self.flush_mutator {
+                mutator.flush();
+            }
+            if !self.skip_mutator_roots {
                 mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                     .add(ScanMutatorRoots::<C>(mutator));
-            } else {
-                mutator.flush();
             }
         });
         trace!("stop_all_mutators end");

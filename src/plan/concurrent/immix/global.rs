@@ -345,9 +345,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
         scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
             ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self, TRACE_KIND_FAST>>,
-        >::new_args(
-            Pause::InitialMark
-        ));
+        >::new_no_scan_roots());
         scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<
             ConcurrentImmixGCWorkContext<UnsupportedProcessEdges<VM>>,
         >::new(self));
@@ -358,9 +356,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
         scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
             ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self, TRACE_KIND_FAST>>,
-        >::new_args(
-            Pause::FinalMark
-        ));
+        >::new_no_scan_roots());
 
         scheduler.work_buckets[WorkBucketStage::Release].add(Release::<
             ConcurrentImmixGCWorkContext<UnsupportedProcessEdges<VM>>,

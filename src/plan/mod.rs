@@ -19,7 +19,6 @@ pub use barriers::BarrierSelector;
 pub(crate) mod gc_requester;
 
 mod global;
-pub(crate) use concurrent::Pause;
 pub(crate) use global::create_gc_worker_context;
 pub(crate) use global::create_mutator;
 pub(crate) use global::create_plan;
