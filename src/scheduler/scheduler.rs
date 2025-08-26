@@ -652,6 +652,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             }
         }
 
+        mmtk.state
+            .set_used_pages_after_last_gc(mmtk.get_plan().get_used_pages());
+
         #[cfg(feature = "extreme_assertions")]
         if crate::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {
             // reset the logging info at the end of each GC

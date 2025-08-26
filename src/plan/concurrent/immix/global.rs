@@ -85,13 +85,15 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             return true;
         }
         let threshold = self.get_total_pages() >> 1;
-        let concurrent_marking_threshold = self
+        let used_pages_after_last_gc = self
             .common
             .base
             .global_state
-            .concurrent_marking_threshold
-            .load(Ordering::Acquire);
-        if !concurrent_marking_in_progress && concurrent_marking_threshold > threshold {
+            .get_used_pages_after_last_gc();
+        let used_pages_now = self.get_used_pages();
+        let allocated = used_pages_now.saturating_sub(used_pages_after_last_gc);
+        if !concurrent_marking_in_progress && allocated > threshold {
+            info!("Allocated {allocated} pages since last GC ({used_pages_now} - {used_pages_after_last_gc} > {threshold}): Do concurrent marking");
             debug_assert!(crate::concurrent_marking_packets_drained());
             debug_assert!(!self.concurrent_marking_in_progress());
             let prev_pause = self.previous_pause();
@@ -195,12 +197,6 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
                 self.immix_space.release(true);
             }
         }
-        // reset the concurrent marking page counting
-        self.common()
-            .base
-            .global_state
-            .concurrent_marking_threshold
-            .store(0, Ordering::Release);
     }
 
     fn end_of_gc(&mut self, _tls: VMWorkerThread) {
@@ -368,16 +364,21 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             scheduler.work_buckets[WorkBucketStage::FinalRefClosure].set_enabled(false);
             scheduler.work_buckets[WorkBucketStage::SoftRefClosure].set_enabled(false);
             scheduler.work_buckets[WorkBucketStage::PhantomRefClosure].set_enabled(false);
+        } else {
+            scheduler.work_buckets[WorkBucketStage::WeakRefClosure].set_enabled(true);
+            scheduler.work_buckets[WorkBucketStage::FinalRefClosure].set_enabled(true);
+            scheduler.work_buckets[WorkBucketStage::SoftRefClosure].set_enabled(true);
+            scheduler.work_buckets[WorkBucketStage::PhantomRefClosure].set_enabled(true);
         }
         // scheduler.work_buckets[WorkBucketStage::TPinningClosure].set_as_disabled();
         // scheduler.work_buckets[WorkBucketStage::PinningRootsTrace].set_as_disabled();
         // scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_enabled(false);
-        scheduler.work_buckets[WorkBucketStage::CalculateForwarding].set_enabled(false);
-        scheduler.work_buckets[WorkBucketStage::SecondRoots].set_enabled(false);
-        scheduler.work_buckets[WorkBucketStage::RefForwarding].set_enabled(false);
-        scheduler.work_buckets[WorkBucketStage::FinalizableForwarding].set_enabled(false);
-        scheduler.work_buckets[WorkBucketStage::Compact].set_enabled(false);
+        // scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_enabled(false);
+        // scheduler.work_buckets[WorkBucketStage::CalculateForwarding].set_enabled(false);
+        // scheduler.work_buckets[WorkBucketStage::SecondRoots].set_enabled(false);
+        // scheduler.work_buckets[WorkBucketStage::RefForwarding].set_enabled(false);
+        // scheduler.work_buckets[WorkBucketStage::FinalizableForwarding].set_enabled(false);
+        // scheduler.work_buckets[WorkBucketStage::Compact].set_enabled(false);
     }
 
     pub(crate) fn schedule_concurrent_marking_initial_pause(

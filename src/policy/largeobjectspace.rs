@@ -407,10 +407,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         pages: usize,
         alloc_options: AllocationOptions,
     ) -> Address {
-        self.common()
-            .global_state
-            .concurrent_marking_threshold
-            .fetch_add(pages, Ordering::Relaxed);
         self.acquire(tls, pages, alloc_options)
     }
 

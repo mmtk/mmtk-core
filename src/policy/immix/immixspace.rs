@@ -602,10 +602,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.chunk_map.set_allocated(block.chunk(), true);
         self.lines_consumed
             .fetch_add(Block::LINES, Ordering::SeqCst);
-        self.common()
-            .global_state
-            .concurrent_marking_threshold
-            .fetch_add(Block::PAGES, Ordering::Relaxed);
         Some(block)
     }
 
@@ -632,10 +628,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 self.lines_consumed.fetch_add(lines_delta, Ordering::SeqCst);
 
                 block.init(copy);
-                self.common()
-                    .global_state
-                    .concurrent_marking_threshold
-                    .fetch_add(Block::PAGES, Ordering::Relaxed);
                 return Some(block);
             } else {
                 return None;
