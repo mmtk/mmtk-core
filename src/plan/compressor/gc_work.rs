@@ -1,5 +1,4 @@
 use super::global::Compressor;
-use crate::policy::compressor::forwarding::CompressorRegion;
 use crate::policy::compressor::CompressorSpace;
 use crate::policy::compressor::{TRACE_KIND_FORWARD_ROOT, TRACE_KIND_MARK};
 use crate::policy::largeobjectspace::LargeObjectSpace;
@@ -8,37 +7,31 @@ use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
 use crate::scheduler::WorkBucketStage;
-use crate::util::Address;
 use crate::vm::ActivePlan;
 use crate::vm::Scanning;
 use crate::vm::VMBinding;
 use crate::MMTK;
-use std::marker::PhantomData;
+use std::marker::{PhantomData, Send};
 
-/// Calculate the offset vector for a region.
-pub struct CalculateOffsetVector<VM: VMBinding> {
+/// Generate more packets by calling a method on [`CompressorSpace`].
+pub struct GenerateWork<VM: VMBinding, F: Fn(&'static CompressorSpace<VM>) + Send + 'static> {
     compressor_space: &'static CompressorSpace<VM>,
-    region: CompressorRegion,
-    cursor: Address,
+    f: F,
 }
 
-impl<VM: VMBinding> GCWork<VM> for CalculateOffsetVector<VM> {
+impl<VM: VMBinding, F: Fn(&'static CompressorSpace<VM>) + Send + 'static> GCWork<VM>
+    for GenerateWork<VM, F>
+{
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.compressor_space
-            .calculate_offset_vector(self.region, self.cursor);
+        (self.f)(self.compressor_space);
     }
 }
 
-impl<VM: VMBinding> CalculateOffsetVector<VM> {
-    pub fn new(
-        compressor_space: &'static CompressorSpace<VM>,
-        region: CompressorRegion,
-        cursor: Address,
-    ) -> Self {
+impl<VM: VMBinding, F: Fn(&'static CompressorSpace<VM>) + Send + 'static> GenerateWork<VM, F> {
+    pub fn new(compressor_space: &'static CompressorSpace<VM>, f: F) -> Self {
         Self {
             compressor_space,
-            region,
-            cursor,
+            f,
         }
     }
 }
@@ -73,27 +66,6 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
 impl<VM: VMBinding> UpdateReferences<VM> {
     pub fn new() -> Self {
         Self { p: PhantomData }
-    }
-}
-
-/// Compact live objects in a region.
-pub struct Compact<VM: VMBinding> {
-    compressor_space: &'static CompressorSpace<VM>,
-    index: usize,
-}
-
-impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.compressor_space.compact_region(worker, self.index);
-    }
-}
-
-impl<VM: VMBinding> Compact<VM> {
-    pub fn new(compressor_space: &'static CompressorSpace<VM>, index: usize) -> Self {
-        Self {
-            compressor_space,
-            index,
-        }
     }
 }
 

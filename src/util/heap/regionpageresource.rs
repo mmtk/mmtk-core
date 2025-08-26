@@ -11,13 +11,13 @@ use crate::vm::VMBinding;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::RwLock;
 
-/// A region in a RegionPageResource and its allocation cursor.
-pub struct RegionAllocator<R: Region> {
+/// A region in a [`RegionPageResource`] and its allocation cursor.
+pub struct AllocatedRegion<R: Region> {
     pub region: R,
     cursor: AtomicUsize,
 }
 
-impl<R: Region> RegionAllocator<R> {
+impl<R: Region> AllocatedRegion<R> {
     pub fn cursor(&self) -> Address {
         let a = self.cursor.load(Ordering::Relaxed);
         unsafe { Address::from_usize(a) }
@@ -29,11 +29,11 @@ impl<R: Region> RegionAllocator<R> {
 }
 
 struct Sync<R: Region> {
-    all_regions: Vec<RegionAllocator<R>>,
+    all_regions: Vec<AllocatedRegion<R>>,
     next_region: usize,
 }
 
-/// A PageResource which allocates pages from a region-structured heap.
+/// A [`PageResource`] which allocates pages from a region-structured heap.
 /// We assume that allocations are much smaller than regions, as we
 /// scan linearly over all regions to allocate, and do not revisit regions
 /// before a garbage collection cycle.
@@ -129,7 +129,7 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
             Self::REGION_PAGES,
             tls,
         )?;
-        b.all_regions.push(RegionAllocator {
+        b.all_regions.push(AllocatedRegion {
             region: R::from_aligned_address(start),
             cursor: AtomicUsize::new(start.as_usize()),
         });
@@ -143,7 +143,7 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
 
     fn allocate_from_region(
         &self,
-        alloc: &mut RegionAllocator<R>,
+        alloc: &mut AllocatedRegion<R>,
         bytes: usize,
     ) -> Option<Address> {
         let free = alloc.cursor();
@@ -156,7 +156,7 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
     }
 
     /// Reset the allocation cursor for one region.
-    pub fn reset_cursor(&self, alloc: &RegionAllocator<R>, address: Address) {
+    pub fn reset_cursor(&self, alloc: &AllocatedRegion<R>, address: Address) {
         let old = alloc.cursor();
         let new = address.align_up(BYTES_IN_PAGE);
         let pages = (old - new) / BYTES_IN_PAGE;
@@ -177,12 +177,12 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
         }
     }
 
-    pub fn with_regions<T>(&self, f: &mut impl FnMut(&Vec<RegionAllocator<R>>) -> T) -> T {
+    pub fn with_regions<T>(&self, f: &mut impl FnMut(&Vec<AllocatedRegion<R>>) -> T) -> T {
         let sync = self.sync.read().unwrap();
         f(&sync.all_regions)
     }
 
-    pub fn enumerate_regions(&self, enumerator: &mut impl FnMut(&RegionAllocator<R>)) {
+    pub fn enumerate_regions(&self, enumerator: &mut impl FnMut(&AllocatedRegion<R>)) {
         let sync = self.sync.read().unwrap();
         for alloc in sync.all_regions.iter() {
             enumerator(alloc);

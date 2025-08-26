@@ -2,14 +2,12 @@ use crate::plan::VectorObjectQueue;
 use crate::policy::compressor::forwarding;
 use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::largeobjectspace::LargeObjectSpace;
-use crate::policy::sft::GCWorkerMutRef;
-use crate::policy::sft::SFT;
+use crate::policy::sft::{GCWorkerMutRef, SFT};
 use crate::policy::space::{CommonSpace, Space};
-use crate::scheduler::GCWorker;
+use crate::scheduler::{GCWork, GCWorkScheduler, GCWorker, WorkBucketStage};
 use crate::util::copy::CopySemantics;
-use crate::util::heap::regionpageresource::RegionAllocator;
-use crate::util::heap::PageResource;
-use crate::util::heap::RegionPageResource;
+use crate::util::heap::regionpageresource::AllocatedRegion;
+use crate::util::heap::{PageResource, RegionPageResource};
 use crate::util::linear_scan::Region;
 use crate::util::metadata::extract_side_metadata;
 #[cfg(feature = "vo_bit")]
@@ -18,8 +16,10 @@ use crate::util::metadata::MetadataSpec;
 use crate::util::object_enum::{self, ObjectEnumerator};
 use crate::util::{Address, ObjectReference};
 use crate::vm::slot::Slot;
+use crate::MMTK;
 use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
+use std::sync::Arc;
 
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
 pub(crate) const TRACE_KIND_FORWARD_ROOT: TraceKind = 1;
@@ -44,6 +44,7 @@ pub struct CompressorSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: RegionPageResource<VM, forwarding::CompressorRegion>,
     forwarding: forwarding::ForwardingMetadata<VM>,
+    scheduler: Arc<GCWorkScheduler<VM>>,
 }
 
 pub(crate) const GC_MARK_BIT_MASK: u8 = 1;
@@ -207,6 +208,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
             MetadataSpec::OnSide(forwarding::OFFSET_VECTOR_SPEC),
         ]);
         let is_discontiguous = args.vmrequest.is_discontiguous();
+        let scheduler = args.scheduler.clone();
         let common = CommonSpace::new(args.into_policy_args(true, false, local_specs));
         CompressorSpace {
             pr: if is_discontiguous {
@@ -216,12 +218,13 @@ impl<VM: VMBinding> CompressorSpace<VM> {
             },
             forwarding: forwarding::ForwardingMetadata::new(),
             common,
+            scheduler,
         }
     }
 
     pub fn prepare(&self) {
         self.pr
-            .enumerate_regions(&mut |r: &RegionAllocator<forwarding::CompressorRegion>| {
+            .enumerate_regions(&mut |r: &AllocatedRegion<forwarding::CompressorRegion>| {
                 forwarding::MARK_SPEC
                     .bzero_metadata(r.region.start(), r.region.end() - r.region.start());
             });
@@ -275,19 +278,31 @@ impl<VM: VMBinding> CompressorSpace<VM> {
 
     pub fn generate_tasks<T>(
         &self,
-        f: &mut impl FnMut(&RegionAllocator<forwarding::CompressorRegion>, usize) -> T,
+        f: &mut impl FnMut(&AllocatedRegion<forwarding::CompressorRegion>, usize) -> T,
     ) -> Vec<T> {
         let mut packets = vec![];
         let mut index = 0;
-        self.pr
-            .enumerate_regions(&mut |r: &RegionAllocator<forwarding::CompressorRegion>| {
-                packets.push(f(r, index));
-                index += 1;
-            });
+        self.pr.enumerate_regions(&mut |r| {
+            packets.push(f(r, index));
+            index += 1;
+        });
         packets
     }
 
-    pub fn calculate_offset_vector(&self, region: forwarding::CompressorRegion, cursor: Address) {
+    pub fn add_offset_vector_tasks(&'static self) {
+        let offset_vector_packets: Vec<Box<dyn GCWork<VM>>> = self.generate_tasks(&mut |r, _| {
+            Box::new(CalculateOffsetVector::<VM>::new(self, r.region, r.cursor()))
+                as Box<dyn GCWork<VM>>
+        });
+        self.scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
+            .bulk_add(offset_vector_packets);
+    }
+
+    pub fn calculate_offset_vector_for_region(
+        &self,
+        region: forwarding::CompressorRegion,
+        cursor: Address,
+    ) {
         self.forwarding.calculate_offset_vector(region, cursor);
     }
 
@@ -325,10 +340,15 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         }
     }
 
+    pub fn add_compact_tasks(&'static self) {
+        let compact_packets: Vec<Box<dyn GCWork<VM>>> = self.generate_tasks(&mut |_, i| {
+            Box::new(Compact::<VM>::new(self, i)) as Box<dyn GCWork<VM>>
+        });
+        self.scheduler.work_buckets[WorkBucketStage::Compact].bulk_add(compact_packets);
+    }
+
     pub fn compact_region(&self, worker: &mut GCWorker<VM>, index: usize) {
-        self.pr.with_regions(&mut |regions: &Vec<
-            RegionAllocator<forwarding::CompressorRegion>,
-        >| {
+        self.pr.with_regions(&mut |regions| {
             let r = &regions[index];
             let start = r.region.start();
             let end = r.cursor();
@@ -357,7 +377,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
                     let new_object = self.forward(obj, false);
                     debug_assert!(
                         new_object.to_raw_address() >= to,
-                        "{0} < {to}",
+                        "whilst forwarding {obj}, the new address {0} should be after the end of the last object {to}",
                         new_object.to_raw_address()
                     );
                     // copy object
@@ -383,5 +403,54 @@ impl<VM: VMBinding> CompressorSpace<VM> {
                 self.update_references(worker, o);
             },
         ));
+    }
+}
+
+/// Calculate the offset vector for a region.
+pub struct CalculateOffsetVector<VM: VMBinding> {
+    compressor_space: &'static CompressorSpace<VM>,
+    region: forwarding::CompressorRegion,
+    cursor: Address,
+}
+
+impl<VM: VMBinding> GCWork<VM> for CalculateOffsetVector<VM> {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        self.compressor_space
+            .calculate_offset_vector_for_region(self.region, self.cursor);
+    }
+}
+
+impl<VM: VMBinding> CalculateOffsetVector<VM> {
+    pub fn new(
+        compressor_space: &'static CompressorSpace<VM>,
+        region: forwarding::CompressorRegion,
+        cursor: Address,
+    ) -> Self {
+        Self {
+            compressor_space,
+            region,
+            cursor,
+        }
+    }
+}
+
+/// Compact live objects in a region.
+pub struct Compact<VM: VMBinding> {
+    compressor_space: &'static CompressorSpace<VM>,
+    index: usize,
+}
+
+impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        self.compressor_space.compact_region(worker, self.index);
+    }
+}
+
+impl<VM: VMBinding> Compact<VM> {
+    pub fn new(compressor_space: &'static CompressorSpace<VM>, index: usize) -> Self {
+        Self {
+            compressor_space,
+            index,
+        }
     }
 }
