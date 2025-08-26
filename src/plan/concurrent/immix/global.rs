@@ -343,11 +343,11 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
         self.set_ref_closure_buckets_enabled(false);
 
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add_prioritized(
-            Box::new(StopMutators::<
-                ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self, TRACE_KIND_FAST>>,
-            >::new_args(Pause::InitialMark)),
-        );
+        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
+            ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self, TRACE_KIND_FAST>>,
+        >::new_args(
+            Pause::InitialMark
+        ));
         scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<
             ConcurrentImmixGCWorkContext<UnsupportedProcessEdges<VM>>,
         >::new(self));
@@ -356,11 +356,11 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
     fn schedule_concurrent_marking_final_pause(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.set_ref_closure_buckets_enabled(true);
 
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add_prioritized(
-            Box::new(StopMutators::<
-                ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self, TRACE_KIND_FAST>>,
-            >::new_args(Pause::FinalMark)),
-        );
+        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
+            ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self, TRACE_KIND_FAST>>,
+        >::new_args(
+            Pause::FinalMark
+        ));
 
         scheduler.work_buckets[WorkBucketStage::Release].add(Release::<
             ConcurrentImmixGCWorkContext<UnsupportedProcessEdges<VM>>,

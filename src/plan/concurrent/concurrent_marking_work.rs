@@ -54,7 +54,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
             let objects = self.next_objects.take();
             let worker = self.worker();
             let w = Self::new(objects, worker.mmtk);
-            worker.add_work(WorkBucketStage::Unconstrained, w);
+            worker.add_work(WorkBucketStage::Concurrent, w);
         }
     }
 

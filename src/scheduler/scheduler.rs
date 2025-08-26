@@ -51,8 +51,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             WorkBucket::new(stage, worker_monitor.clone())
         });
 
-        work_buckets[WorkBucketStage::Unconstrained].enable_prioritized_queue();
-
         // Set the open condition of each bucket.
         {
             let mut open_stages: Vec<WorkBucketStage> = vec![WorkBucketStage::FIRST_STW_STAGE];

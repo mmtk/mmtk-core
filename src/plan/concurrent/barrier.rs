@@ -71,7 +71,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
             if self.should_create_satb_packets() {
                 let satb = self.satb.take();
                 let bucket = if self.plan.concurrent_work_in_progress() {
-                    WorkBucketStage::Unconstrained
+                    WorkBucketStage::Concurrent
                 } else {
                     debug_assert_ne!(self.plan.current_pause(), Some(Pause::InitialMark));
                     WorkBucketStage::Closure
@@ -90,7 +90,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
             // debug_assert!(self.should_create_satb_packets());
             let nodes = self.refs.take();
             let bucket = if self.plan.concurrent_work_in_progress() {
-                WorkBucketStage::Unconstrained
+                WorkBucketStage::Concurrent
             } else {
                 debug_assert_ne!(self.plan.current_pause(), Some(Pause::InitialMark));
                 WorkBucketStage::Closure
