@@ -19,8 +19,10 @@ use downcast_rs::Downcast;
 pub enum BarrierSelector {
     /// No barrier is used.
     NoBarrier,
-    /// Object remembering barrier is used.
+    /// Object remembering psot-write barrier is used.
     ObjectBarrier,
+    /// Object remembering pre-write barrier with weak reference loading barrier.
+    // TODO: We might be able to generalize this to object remembering pre-write barrier.
     SATBBarrier,
 }
 

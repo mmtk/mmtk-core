@@ -83,6 +83,6 @@ pub fn create_concurrent_immix_mutator<VM: VMBinding>(
             VM,
             ConcurrentImmix<VM>,
             { crate::policy::immix::TRACE_KIND_FAST },
-        >::new(mmtk))))
+        >::new(mmtk, mutator_tls))))
         .build()
 }

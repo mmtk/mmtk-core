@@ -3,6 +3,7 @@ use std::sync::atomic::Ordering;
 use super::{concurrent_marking_work::ProcessModBufSATB, Pause};
 use crate::plan::global::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
+use crate::util::VMMutatorThread;
 use crate::{
     plan::{barriers::BarrierSemantics, concurrent::global::ConcurrentPlan, VectorQueue},
     scheduler::WorkBucketStage,
@@ -20,6 +21,7 @@ pub struct SATBBarrierSemantics<
     const KIND: TraceKind,
 > {
     mmtk: &'static MMTK<VM>,
+    tls: VMMutatorThread,
     satb: VectorQueue<ObjectReference>,
     refs: VectorQueue<ObjectReference>,
     plan: &'static P,
@@ -28,9 +30,10 @@ pub struct SATBBarrierSemantics<
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
     SATBBarrierSemantics<VM, P, KIND>
 {
-    pub fn new(mmtk: &'static MMTK<VM>) -> Self {
+    pub fn new(mmtk: &'static MMTK<VM>, tls: VMMutatorThread) -> Self {
         Self {
             mmtk,
+            tls,
             satb: VectorQueue::default(),
             refs: VectorQueue::default(),
             plan: mmtk.get_plan().downcast_ref::<P>().unwrap(),
@@ -154,7 +157,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 
     fn object_probable_write_slow(&mut self, obj: ObjectReference) {
-        obj.iterate_fields::<VM, _>(|s| {
+        crate::plan::tracing::SlotIterator::<VM, _>::iterate_fields(obj, self.tls.0, |s| {
             self.enqueue_node(Some(obj), s, None);
         });
     }

@@ -186,6 +186,8 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         None
     }
 
+    /// Return a reference to `ConcurrentPlan` to allow
+    /// access methods specific to concurrent plans if the plan is a concurrent plan.
     fn concurrent(
         &self,
     ) -> Option<&dyn crate::plan::concurrent::global::ConcurrentPlan<VM = Self::VM>> {

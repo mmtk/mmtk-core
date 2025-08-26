@@ -147,55 +147,25 @@ impl<E: ProcessEdgesWork> Drop for ObjectsClosure<'_, E> {
     }
 }
 
-struct SlotIteratorImpl<VM: VMBinding, F: FnMut(VM::VMSlot)> {
+/// For iterating over the slots of an object.
+pub struct SlotIterator<VM: VMBinding, F: FnMut(VM::VMSlot)> {
     f: F,
-    // should_discover_references: bool,
-    // should_claim_clds: bool,
-    // should_follow_clds: bool,
     _p: PhantomData<VM>,
 }
 
-impl<VM: VMBinding, F: FnMut(VM::VMSlot)> SlotVisitor<VM::VMSlot> for SlotIteratorImpl<VM, F> {
+impl<VM: VMBinding, F: FnMut(VM::VMSlot)> SlotVisitor<VM::VMSlot> for SlotIterator<VM, F> {
     fn visit_slot(&mut self, slot: VM::VMSlot) {
         (self.f)(slot);
     }
 }
 
-pub struct SlotIterator<VM: VMBinding> {
-    _p: PhantomData<VM>,
-}
-
-impl<VM: VMBinding> SlotIterator<VM> {
-    pub fn iterate(
-        o: ObjectReference,
-        // should_discover_references: bool,
-        // should_claim_clds: bool,
-        // should_follow_clds: bool,
-        f: impl FnMut(VM::VMSlot),
-        // klass: Option<Address>,
-    ) {
-        let mut x = SlotIteratorImpl::<VM, _> {
-            f,
-            // should_discover_references,
-            // should_claim_clds,
-            // should_follow_clds,
-            _p: PhantomData,
-        };
-        // if let Some(klass) = klass {
-        //     <VM::VMScanning as Scanning<VM>>::scan_object_with_klass(
-        //         VMWorkerThread(VMThread::UNINITIALIZED),
-        //         o,
-        //         &mut x,
-        //         klass,
-        //     );
-        // } else {
-        //     <VM::VMScanning as Scanning<VM>>::scan_object(
-        //         VMWorkerThread(VMThread::UNINITIALIZED),
-        //         o,
-        //         &mut x,
-        //     );
-        // }
+impl<VM: VMBinding, F: FnMut(VM::VMSlot)> SlotIterator<VM, F> {
+    /// Iterate over the slots of an object by applying a function to each slot.
+    pub fn iterate_fields(o: ObjectReference, _tls: VMThread, f: F) {
+        let mut x = SlotIterator::<VM, _> { f, _p: PhantomData };
         <VM::VMScanning as Scanning<VM>>::scan_object(
+            // FIXME: We should use tls from the arguments.
+            // See https://github.com/mmtk/mmtk-core/issues/1375
             VMWorkerThread(VMThread::UNINITIALIZED),
             o,
             &mut x,

@@ -74,16 +74,20 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 
     fn scan_and_enqueue(&mut self, object: ObjectReference) {
-        object.iterate_fields::<VM, _>(|s| {
-            let Some(t) = s.load() else {
-                return;
-            };
+        crate::plan::tracing::SlotIterator::<VM, _>::iterate_fields(
+            object,
+            self.worker().tls.0,
+            |s| {
+                let Some(t) = s.load() else {
+                    return;
+                };
 
-            self.next_objects.push(t);
-            if self.next_objects.len() > Self::SATB_BUFFER_SIZE {
-                self.flush();
-            }
-        });
+                self.next_objects.push(t);
+                if self.next_objects.len() > Self::SATB_BUFFER_SIZE {
+                    self.flush();
+                }
+            },
+        );
     }
 }
 
