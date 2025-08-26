@@ -80,21 +80,21 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
 
         let concurrent_marking_in_progress = self.concurrent_marking_in_progress();
 
-        if concurrent_marking_in_progress && crate::concurrent_marking_packets_drained() {
+        if concurrent_marking_in_progress
+            && self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].is_drained()
+        {
             self.gc_cause.store(GCCause::FinalMark, Ordering::Release);
             return true;
         }
         let threshold = self.get_total_pages() >> 1;
-        let used_pages_after_last_gc = self
-            .common
-            .base
-            .global_state
-            .get_used_pages_after_last_gc();
+        let used_pages_after_last_gc = self.common.base.global_state.get_used_pages_after_last_gc();
         let used_pages_now = self.get_used_pages();
         let allocated = used_pages_now.saturating_sub(used_pages_after_last_gc);
         if !concurrent_marking_in_progress && allocated > threshold {
             info!("Allocated {allocated} pages since last GC ({used_pages_now} - {used_pages_after_last_gc} > {threshold}): Do concurrent marking");
-            debug_assert!(crate::concurrent_marking_packets_drained());
+            debug_assert!(
+                self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].is_empty()
+            );
             debug_assert!(!self.concurrent_marking_in_progress());
             let prev_pause = self.previous_pause();
             debug_assert!(prev_pause.is_none() || prev_pause.unwrap() != Pause::InitialMark);
@@ -130,8 +130,8 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         if pause == Pause::Full {
             self.current_pause
                 .store(Some(Pause::Full), Ordering::SeqCst);
-
-            Self::schedule_immix_full_heap_collection::<
+            self.set_ref_closure_buckets_enabled(true);
+            crate::plan::immix::global::Immix::schedule_immix_full_heap_collection::<
                 ConcurrentImmix<VM>,
                 ConcurrentImmixSTWGCWorkContext<VM, TRACE_KIND_FAST>,
                 ConcurrentImmixSTWGCWorkContext<VM, TRACE_KIND_DEFRAG>,
@@ -292,6 +292,16 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         mut plan_args: CreateSpecificPlanArgs<VM>,
         space_args: ImmixSpaceArgs,
     ) -> Self {
+        // These buckets are not used in an Immix plan. We can simply disable them.
+        // TODO: We should be more systmatic on this, and disable unnecessary buckets for other plans as well.
+        let scheduler = &plan_args.global_args.scheduler;
+        scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::CalculateForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::SecondRoots].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::RefForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::FinalizableForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::Compact].set_enabled(false);
+
         let immix = ConcurrentImmix {
             immix_space: ImmixSpace::new(
                 plan_args.get_normal_space_args("immix", true, false, VMRequest::discontiguous()),
@@ -310,75 +320,24 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         immix
     }
 
-    /// Schedule a full heap immix collection. This method is used by immix/genimmix/stickyimmix
-    /// to schedule a full heap collection. A plan must call set_collection_kind and set_gc_status before this method.
-    pub(crate) fn schedule_immix_full_heap_collection<
-        PlanType: Plan<VM = VM>,
-        FastContext: GCWorkContext<VM = VM, PlanType = PlanType>,
-        DefragContext: GCWorkContext<VM = VM, PlanType = PlanType>,
-    >(
-        plan: &'static DefragContext::PlanType,
-        immix_space: &ImmixSpace<VM>,
-        scheduler: &GCWorkScheduler<VM>,
-    ) -> bool {
-        let in_defrag = immix_space.decide_whether_to_defrag(
-            plan.base().global_state.is_emergency_collection(),
-            true,
-            plan.base()
-                .global_state
-                .cur_collection_attempts
-                .load(Ordering::SeqCst),
-            plan.base().global_state.is_user_triggered_collection(),
-            *plan.base().options.full_heap_system_gc,
-        );
-
-        if in_defrag {
-            scheduler.schedule_common_work::<DefragContext>(plan);
-        } else {
-            scheduler.schedule_common_work::<FastContext>(plan);
-        }
-        in_defrag
-    }
-
     fn select_collection_kind(&self) -> Pause {
-        let emergency = self.base().global_state.is_emergency_collection();
-        let user_triggered = self.base().global_state.is_user_triggered_collection();
-        let concurrent_marking_in_progress = self.concurrent_marking_in_progress();
-        let concurrent_marking_packets_drained = crate::concurrent_marking_packets_drained();
-
-        if emergency || user_triggered {
-            return Pause::Full;
-        } else if !concurrent_marking_in_progress && concurrent_marking_packets_drained {
-            return Pause::InitialMark;
-        } else if concurrent_marking_in_progress && concurrent_marking_packets_drained {
-            return Pause::FinalMark;
+        match self.gc_cause.load(Ordering::Acquire) {
+            GCCause::FullHeap => Pause::Full,
+            GCCause::InitialMark => Pause::InitialMark,
+            GCCause::FinalMark => Pause::FinalMark,
+            GCCause::Unknown => {
+                panic!("Collection kind is not set when scheduling a collection");
+            }
         }
-
-        Pause::Full
     }
 
-    fn disable_unnecessary_buckets(&'static self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
-        if pause == Pause::InitialMark {
-            // scheduler.work_buckets[WorkBucketStage::Closure].set_as_disabled();
-            scheduler.work_buckets[WorkBucketStage::WeakRefClosure].set_enabled(false);
-            scheduler.work_buckets[WorkBucketStage::FinalRefClosure].set_enabled(false);
-            scheduler.work_buckets[WorkBucketStage::SoftRefClosure].set_enabled(false);
-            scheduler.work_buckets[WorkBucketStage::PhantomRefClosure].set_enabled(false);
-        } else {
-            scheduler.work_buckets[WorkBucketStage::WeakRefClosure].set_enabled(true);
-            scheduler.work_buckets[WorkBucketStage::FinalRefClosure].set_enabled(true);
-            scheduler.work_buckets[WorkBucketStage::SoftRefClosure].set_enabled(true);
-            scheduler.work_buckets[WorkBucketStage::PhantomRefClosure].set_enabled(true);
-        }
-        // scheduler.work_buckets[WorkBucketStage::TPinningClosure].set_as_disabled();
-        // scheduler.work_buckets[WorkBucketStage::PinningRootsTrace].set_as_disabled();
-        // scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_as_disabled();
-        // scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_enabled(false);
-        // scheduler.work_buckets[WorkBucketStage::CalculateForwarding].set_enabled(false);
-        // scheduler.work_buckets[WorkBucketStage::SecondRoots].set_enabled(false);
-        // scheduler.work_buckets[WorkBucketStage::RefForwarding].set_enabled(false);
-        // scheduler.work_buckets[WorkBucketStage::FinalizableForwarding].set_enabled(false);
-        // scheduler.work_buckets[WorkBucketStage::Compact].set_enabled(false);
+    fn set_ref_closure_buckets_enabled(&self, do_closure: bool) {
+        let scheduler = &self.common.base.scheduler;
+        scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_enabled(do_closure);
+        scheduler.work_buckets[WorkBucketStage::WeakRefClosure].set_enabled(do_closure);
+        scheduler.work_buckets[WorkBucketStage::FinalRefClosure].set_enabled(do_closure);
+        scheduler.work_buckets[WorkBucketStage::SoftRefClosure].set_enabled(do_closure);
+        scheduler.work_buckets[WorkBucketStage::PhantomRefClosure].set_enabled(do_closure);
     }
 
     pub(crate) fn schedule_concurrent_marking_initial_pause(
@@ -387,7 +346,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
     ) {
         use crate::scheduler::gc_work::Prepare;
 
-        self.disable_unnecessary_buckets(scheduler, Pause::InitialMark);
+        self.set_ref_closure_buckets_enabled(false);
 
         scheduler.work_buckets[WorkBucketStage::Unconstrained].add_prioritized(Box::new(
             StopMutators::<ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self>>>::new_args(
@@ -400,7 +359,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
     }
 
     fn schedule_concurrent_marking_final_pause(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.disable_unnecessary_buckets(scheduler, Pause::FinalMark);
+        self.set_ref_closure_buckets_enabled(true);
 
         scheduler.work_buckets[WorkBucketStage::Unconstrained].add_prioritized(Box::new(
             StopMutators::<ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self>>>::new_args(

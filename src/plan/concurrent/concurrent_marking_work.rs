@@ -12,7 +12,6 @@ use crate::{
     vm::*,
     MMTK,
 };
-use atomic::Ordering;
 use std::ops::{Deref, DerefMut};
 
 pub struct ConcurrentTraceObjects<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> {
@@ -31,9 +30,6 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>>
 
     pub fn new(objects: Vec<ObjectReference>, mmtk: &'static MMTK<VM>) -> Self {
         let plan = mmtk.get_plan().downcast_ref::<P>().unwrap();
-        let old_value = crate::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
-        let new_value = old_value + 1;
-        probe!(mmtk, num_concurrent_tracing_packets_change, new_value);
 
         Self {
             plan,
@@ -139,10 +135,6 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> GCWork<VM>
             iterations
         );
         self.flush();
-
-        let old_value = crate::NUM_CONCURRENT_TRACING_PACKETS.fetch_sub(1, Ordering::SeqCst);
-        let new_value = old_value - 1;
-        probe!(mmtk, num_concurrent_tracing_packets_change, new_value);
     }
 }
 

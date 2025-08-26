@@ -32,7 +32,6 @@ extern crate static_assertions;
 extern crate probe;
 
 mod mmtk;
-use std::sync::atomic::AtomicUsize;
 
 pub use mmtk::MMTKBuilder;
 pub(crate) use mmtk::MMAPPER;
@@ -53,9 +52,3 @@ pub mod vm;
 pub use crate::plan::{
     AllocationSemantics, BarrierSelector, Mutator, MutatorContext, ObjectQueue, Plan,
 };
-
-static NUM_CONCURRENT_TRACING_PACKETS: AtomicUsize = AtomicUsize::new(0);
-
-fn concurrent_marking_packets_drained() -> bool {
-    crate::NUM_CONCURRENT_TRACING_PACKETS.load(std::sync::atomic::Ordering::SeqCst) == 0
-}
