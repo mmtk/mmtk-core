@@ -16,4 +16,4 @@ pub const BLOCK_ONLY: bool = false;
 
 /// Mark lines when scanning objects.
 /// Otherwise, do it at mark time.
-pub const MARK_LINE_AT_SCAN_TIME: bool = false;
+pub const MARK_LINE_AT_SCAN_TIME: bool = true;

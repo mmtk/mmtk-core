@@ -88,6 +88,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
                 }
             },
         );
+        self.plan.post_scan_object(object);
     }
 }
 
