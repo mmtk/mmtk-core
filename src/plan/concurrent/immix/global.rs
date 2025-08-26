@@ -44,6 +44,8 @@ enum GCCause {
     FinalMark,
 }
 
+/// A concurrent Immix plan. The plan supports concurrent collection (strictly non-moving) and STW full heap collection (which may do defrag).
+/// The concurrent GC consists of two STW pauses (initial mark and final mark) with concurrent marking in between.
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct ConcurrentImmix<VM: VMBinding> {
     #[post_scan]
@@ -62,7 +64,7 @@ pub struct ConcurrentImmix<VM: VMBinding> {
 /// The plan constraints for the immix plan.
 pub const CONCURRENT_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     // If we disable moving in Immix, this is a non-moving plan.
-    moves_objects: false,
+    moves_objects: !cfg!(feature = "immix_non_moving"),
     // Max immix object size is half of a block.
     max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
     needs_prepare_mutator: true,
@@ -274,24 +276,17 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
         ]);
 
-        let plan_args = CreateSpecificPlanArgs {
+        let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &CONCURRENT_IMMIX_CONSTRAINTS,
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&spec),
         };
-        Self::new_with_args(
-            plan_args,
-            ImmixSpaceArgs {
-                mixed_age: false,
-                never_move_objects: true,
-            },
-        )
-    }
 
-    pub fn new_with_args(
-        mut plan_args: CreateSpecificPlanArgs<VM>,
-        space_args: ImmixSpaceArgs,
-    ) -> Self {
+        let immix_args = ImmixSpaceArgs {
+            mixed_age: false,
+            never_move_objects: false,
+        };
+
         // These buckets are not used in an Immix plan. We can simply disable them.
         // TODO: We should be more systmatic on this, and disable unnecessary buckets for other plans as well.
         let scheduler = &plan_args.global_args.scheduler;
@@ -305,7 +300,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         let immix = ConcurrentImmix {
             immix_space: ImmixSpace::new(
                 plan_args.get_normal_space_args("immix", true, false, VMRequest::discontiguous()),
-                space_args,
+                immix_args,
             ),
             common: CommonPlan::new(plan_args),
             last_gc_was_defrag: AtomicBool::new(false),
