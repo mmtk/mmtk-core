@@ -6,50 +6,48 @@ use enum_map::Enum;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-pub struct BucketQueue<VM: VMBinding> {
-    // queue: Injector<Box<dyn GCWork<VM>>>,
-    queue: std::sync::RwLock<Injector<Box<dyn GCWork<VM>>>>,
+pub(super) struct BucketQueue<VM: VMBinding> {
+    queue: Injector<Box<dyn GCWork<VM>>>,
 }
 
 impl<VM: VMBinding> BucketQueue<VM> {
     fn new() -> Self {
         Self {
-            queue: std::sync::RwLock::new(Injector::new()),
+            queue: Injector::new(),
         }
     }
 
     fn is_empty(&self) -> bool {
-        self.queue.read().unwrap().is_empty()
+        self.queue.is_empty()
     }
 
     fn steal_batch_and_pop(
         &self,
         dest: &Worker<Box<dyn GCWork<VM>>>,
     ) -> Steal<Box<dyn GCWork<VM>>> {
-        self.queue.read().unwrap().steal_batch_and_pop(dest)
+        self.queue.steal_batch_and_pop(dest)
     }
 
     fn push(&self, w: Box<dyn GCWork<VM>>) {
-        self.queue.read().unwrap().push(w);
+        self.queue.push(w);
     }
 
     fn push_all(&self, ws: Vec<Box<dyn GCWork<VM>>>) {
         for w in ws {
-            self.queue.read().unwrap().push(w);
+            self.queue.push(w);
         }
     }
-}
 
-use std::fmt;
-impl<VM: VMBinding> fmt::Debug for BucketQueue<VM> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    /// Dump all the packets in this queue for debugging purpose.
+    /// This function may dump items from the queue temporarily, thus should only be called when it is safe to do so
+    /// (e.g. when the execution has failed already and the system is going to panic).
+    pub fn debug_dump_packets(&self) -> Vec<String> {
         let mut items = Vec::new();
 
         {
-            let queue = self.queue.write().unwrap();
             // Drain queue by stealing until empty
             loop {
-                match queue.steal() {
+                match self.queue.steal() {
                     crossbeam::deque::Steal::Success(work) => {
                         items.push(work);
                     }
@@ -67,29 +65,34 @@ impl<VM: VMBinding> fmt::Debug for BucketQueue<VM> {
 
         // Push items back into the queue
         {
-            let queue = self.queue.write().unwrap();
             for work in items {
-                queue.push(work);
+                self.queue.push(work);
             }
         }
 
-        f.debug_struct("BucketQueue")
-            .field("queue", &debug_items)
-            .finish()
+        debug_items
     }
 }
 
 pub type BucketOpenCondition<VM> = Box<dyn (Fn(&GCWorkScheduler<VM>) -> bool) + Send>;
 
 pub struct WorkBucket<VM: VMBinding> {
-    // Whether this bucket has been opened.
+    /// Whether this bucket has been opened. Work from an open bucket can be fetched by workers.
     open: AtomicBool,
-    pub stage: WorkBucketStage,
-    pub queue: BucketQueue<VM>,
-    pub prioritized_queue: Option<BucketQueue<VM>>,
+    /// Whether this bucket is enabled.
+    /// A disabled work bucket will behave as if it does not exist in terms of scheduling,
+    /// except that users can add work to a disabled bucket, and enable it later to allow those
+    /// work to be scheduled.
+    enabled: AtomicBool,
+    /// The stage name of this bucket.
+    stage: WorkBucketStage,
+    queue: BucketQueue<VM>,
+    prioritized_queue: Option<BucketQueue<VM>>,
     monitor: Arc<WorkerMonitor>,
+    /// The open condition for a bucket. If this is `Some`, the bucket will be open
+    /// when the condition is met. If this is `None`, the bucket needs to be open manually.
     can_open: Option<BucketOpenCondition<VM>>,
-    /// After this bucket is activated and all pending work packets (including the packets in this
+    /// After this bucket is open and all pending work packets (including the packets in this
     /// bucket) are drained, this work packet, if exists, will be added to this bucket.  When this
     /// happens, it will prevent opening subsequent work packets.
     ///
@@ -101,68 +104,37 @@ pub struct WorkBucket<VM: VMBinding> {
     /// recursively, such as ephemerons and Java-style SoftReference and finalizers.  Sentinels
     /// can be used repeatedly to discover and process more such objects.
     sentinel: Mutex<Option<Box<dyn GCWork<VM>>>>,
-
-    // A disabled work bucket will behave as if it does not exist in terms of scheduling,
-    // except that users can add work to a disabled bucket, and enable it later to allow those
-    // work to be scheduled.
-    disable: AtomicBool,
 }
 
 impl<VM: VMBinding> WorkBucket<VM> {
-    pub(crate) fn new(stage: WorkBucketStage, open: bool, monitor: Arc<WorkerMonitor>) -> Self {
+    pub(crate) fn new(stage: WorkBucketStage, monitor: Arc<WorkerMonitor>) -> Self {
         Self {
-            open: AtomicBool::new(open),
+            open: AtomicBool::new(stage.is_open_by_default()),
+            enabled: AtomicBool::new(stage.is_enabled_by_default()),
             stage,
             queue: BucketQueue::new(),
             prioritized_queue: None,
             monitor,
             can_open: None,
             sentinel: Mutex::new(None),
-            disable: AtomicBool::new(false),
         }
     }
 
-    pub fn set_as_enabled(&self) {
-        self.disable.store(false, Ordering::SeqCst)
+    pub fn set_enabled(&self, enabled: bool) {
+        self.enabled.store(enabled, Ordering::SeqCst)
     }
 
-    pub fn set_as_disabled(&self) {
-        self.disable.store(true, Ordering::SeqCst)
-    }
-
-    pub fn is_disabled(&self) -> bool {
-        self.disable.load(Ordering::Relaxed)
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.load(Ordering::Relaxed)
     }
 
     pub fn enable_prioritized_queue(&mut self) {
         self.prioritized_queue = Some(BucketQueue::new());
     }
 
-    pub fn replace_queue(
-        &self,
-        new_queue: Injector<Box<dyn GCWork<VM>>>,
-    ) -> Injector<Box<dyn GCWork<VM>>> {
-        let mut queue = self.queue.queue.write().unwrap();
-        std::mem::replace::<Injector<Box<dyn GCWork<VM>>>>(&mut queue, new_queue)
-    }
-
-    pub fn replace_queue_prioritized(
-        &self,
-        new_queue: Injector<Box<dyn GCWork<VM>>>,
-    ) -> Injector<Box<dyn GCWork<VM>>> {
-        let mut queue = self
-            .prioritized_queue
-            .as_ref()
-            .unwrap()
-            .queue
-            .write()
-            .unwrap();
-        std::mem::replace::<Injector<Box<dyn GCWork<VM>>>>(&mut queue, new_queue)
-    }
-
     fn notify_one_worker(&self) {
-        // If the bucket is not activated, don't notify anyone.
-        if !self.is_open() {
+        // If the bucket is not open, don't notify anyone.
+        if !self.is_open() || !self.is_enabled() {
             return;
         }
         // Notify one if there're any parked workers.
@@ -170,8 +142,8 @@ impl<VM: VMBinding> WorkBucket<VM> {
     }
 
     pub fn notify_all_workers(&self) {
-        // If the bucket is not activated, don't notify anyone.
-        if !self.is_open() {
+        // If the bucket is not open, don't notify anyone.
+        if !self.is_open() || !self.is_enabled() {
             return;
         }
         // Notify all if there're any parked workers.
@@ -182,7 +154,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.open.load(Ordering::SeqCst)
     }
 
-    /// Enable the bucket
+    /// Open the bucket
     pub fn open(&self) {
         self.open.store(true, Ordering::SeqCst);
     }
@@ -198,12 +170,16 @@ impl<VM: VMBinding> WorkBucket<VM> {
     }
 
     pub fn is_drained(&self) -> bool {
-        self.is_disabled() || (self.is_open() && self.is_empty())
+        !self.is_enabled() || (self.is_open() && self.is_empty())
     }
 
-    /// Disable the bucket
+    /// Close the bucket
     pub fn close(&self) {
-        debug_assert!(self.queue.is_empty(), "Bucket {:?} not drained before close", self.stage);
+        debug_assert!(
+            self.queue.is_empty(),
+            "Bucket {:?} not drained before close",
+            self.stage
+        );
         self.open.store(false, Ordering::Relaxed);
     }
 
@@ -243,9 +219,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
     /// Panic if this bucket cannot receive prioritized packets.
     pub fn bulk_add_prioritized(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
         self.prioritized_queue.as_ref().unwrap().push_all(work_vec);
-        if self.is_open() {
-            self.notify_all_workers();
-        }
+        self.notify_all_workers();
     }
 
     /// Add multiple packets
@@ -254,14 +228,12 @@ impl<VM: VMBinding> WorkBucket<VM> {
             return;
         }
         self.queue.push_all(work_vec);
-        if self.is_open() {
-            self.notify_all_workers();
-        }
+        self.notify_all_workers();
     }
 
     /// Get a work packet from this bucket
     pub fn poll(&self, worker: &Worker<Box<dyn GCWork<VM>>>) -> Steal<Box<dyn GCWork<VM>>> {
-        if self.is_disabled() || !self.is_open() || self.is_empty() {
+        if !self.is_enabled() || !self.is_open() || self.is_empty() {
             return Steal::Empty;
         }
         if let Some(prioritized_queue) = self.prioritized_queue.as_ref() {
@@ -320,6 +292,14 @@ impl<VM: VMBinding> WorkBucket<VM> {
             false
         }
     }
+
+    pub(super) fn get_queue(&self) -> &BucketQueue<VM> {
+        &self.queue
+    }
+
+    pub(super) fn get_stage(&self) -> WorkBucketStage {
+        self.stage
+    }
 }
 
 /// This enum defines all the work bucket types. The scheduler
@@ -328,6 +308,9 @@ impl<VM: VMBinding> WorkBucket<VM> {
 pub enum WorkBucketStage {
     /// This bucket is always open.
     Unconstrained,
+    /// This bucket is intended for concurrent work. Though some concurrent work may be put and executed in the unconstrained bucket,
+    /// work in the unconstrained bucket will always be consumed during STW. Users can disable this bucket
+    /// and cache some concurrent work during STW, and only enable this bucket and allow concurrent execution once a STW is done.
     Concurrent,
     /// Preparation work.  Plans, spaces, GC workers, mutators, etc. should be prepared for GC at
     /// this stage.
@@ -386,16 +369,48 @@ pub enum WorkBucketStage {
 }
 
 impl WorkBucketStage {
-    /// The first stop-the-world bucket.
-    pub fn first_stw_stage() -> Self {
-        WorkBucketStage::Prepare
+    /// The first stop-the-world stage. This stage has no open condition, and will be opened manually
+    /// once all the mutators threads are stopped.
+    pub const FIRST_STW_STAGE: Self = WorkBucketStage::Prepare;
+
+    /// Is this the first stop-the-world stage? See [`Self::FIRST_STW_STAGE`].
+    pub const fn is_first_stw_stage(&self) -> bool {
+        matches!(self, &WorkBucketStage::FIRST_STW_STAGE)
     }
 
-    pub fn is_stw(&self) -> bool {
+    /// Is this stage always open?
+    pub const fn is_always_open(&self) -> bool {
+        matches!(self, WorkBucketStage::Unconstrained)
+    }
+
+    /// Is this stage open by default?
+    pub const fn is_open_by_default(&self) -> bool {
+        matches!(
+            self,
+            WorkBucketStage::Unconstrained | WorkBucketStage::Concurrent
+        )
+    }
+
+    /// Is this stage enabled by default?
+    pub const fn is_enabled_by_default(&self) -> bool {
+        !matches!(self, WorkBucketStage::Concurrent)
+    }
+
+    /// Is this stage sequentially opened? All the stop-the-world stages, except the first one, are sequentially opened.
+    pub const fn is_sequentially_opened(&self) -> bool {
+        self.is_stw() && !self.is_first_stw_stage()
+    }
+
+    /// Is this stage a stop-the-world stage?
+    pub const fn is_stw(&self) -> bool {
         !self.is_concurrent()
     }
 
-    pub fn is_concurrent(&self) -> bool {
-        matches!(self, WorkBucketStage::Unconstrained | WorkBucketStage::Concurrent)
+    /// Is this stage concurrent (which may be executed during mutator time)?
+    pub const fn is_concurrent(&self) -> bool {
+        matches!(
+            self,
+            WorkBucketStage::Unconstrained | WorkBucketStage::Concurrent
+        )
     }
 }

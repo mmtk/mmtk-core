@@ -245,7 +245,9 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> ProcessEdg
                         let w = ConcurrentTraceObjects::<VM, P>::new(root_objects.clone(), mmtk);
 
                         match pause {
-                            Pause::InitialMark => worker.scheduler().work_buckets[WorkBucketStage::Concurrent].add_no_notify(w),
+                            Pause::InitialMark => worker.scheduler().work_buckets
+                                [WorkBucketStage::Concurrent]
+                                .add_no_notify(w),
                             _ => unreachable!(),
                         }
 
@@ -258,7 +260,9 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>> ProcessEdg
                 let w = ConcurrentTraceObjects::<VM, P>::new(root_objects.clone(), self.mmtk());
 
                 match pause {
-                    Pause::InitialMark => worker.scheduler().work_buckets[WorkBucketStage::Concurrent].add_no_notify(w),
+                    Pause::InitialMark => worker.scheduler().work_buckets
+                        [WorkBucketStage::Concurrent]
+                        .add_no_notify(w),
                     _ => unreachable!(),
                 }
             }

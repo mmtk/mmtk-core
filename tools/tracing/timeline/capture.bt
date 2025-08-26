@@ -139,4 +139,23 @@ usdt:$MMTK:mmtk:add_schedule_collection_packet {
 usdt:$MMTK:mmtk:num_concurrent_tracing_packets_change {
         printf("num_concurrent_tracing_packets_change,C,%d,%lu,%lu\n", tid, nsecs, arg0);
 }
+
+usdt:$MMTK:mmtk:finalization {
+    if (@enable_print) {
+        printf("finalization,meta,%d,%lu,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2, arg3);
+    }
+}
+
+usdt:$MMTK:mmtk:reference_scanned {
+    if (@enable_print) {
+        printf("reference_scanned,meta,%d,%lu,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2, arg3);
+    }
+}
+
+usdt:$MMTK:mmtk:reference_retained {
+    if (@enable_print) {
+        printf("reference_retained,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
+    }
+}
+
 // vim: ft=bpftrace ts=4 sw=4 sts=4 et
