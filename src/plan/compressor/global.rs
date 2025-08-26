@@ -7,14 +7,11 @@ use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::{BasePlan, CommonPlan};
 use crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN;
-use crate::plan::AllocationSemantics;
-use crate::plan::Plan;
-use crate::plan::PlanConstraints;
+use crate::plan::{AllocationSemantics, Plan, PlanConstraints};
 use crate::policy::compressor::CompressorSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::GCWorkScheduler;
-use crate::scheduler::WorkBucketStage;
+use crate::scheduler::{GCWorkScheduler, WorkBucketStage};
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::gc_trigger::SpaceStats;
 #[allow(unused_imports)]
@@ -25,7 +22,7 @@ use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
-/// Compressor implements a stop-the-world and serial implementation of
+/// [`Compressor`] implements a stop-the-world and parallel implementation of
 /// the Compressor, as described in Kermany and Petrank,
 /// [The Compressor: concurrent, incremental, and parallel compaction](https://dl.acm.org/doi/10.1145/1133255.1134023).
 #[derive(HasSpaces, PlanTraceObject)]

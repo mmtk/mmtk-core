@@ -1,15 +1,10 @@
 use super::global::Compressor;
-use crate::policy::compressor::CompressorSpace;
-use crate::policy::compressor::{TRACE_KIND_FORWARD_ROOT, TRACE_KIND_MARK};
+use crate::policy::compressor::{CompressorSpace, TRACE_KIND_FORWARD_ROOT, TRACE_KIND_MARK};
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::scheduler::gc_work::PlanProcessEdges;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::GCWork;
-use crate::scheduler::GCWorker;
-use crate::scheduler::WorkBucketStage;
-use crate::vm::ActivePlan;
-use crate::vm::Scanning;
-use crate::vm::VMBinding;
+use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
+use crate::vm::{ActivePlan, Scanning, VMBinding};
 use crate::MMTK;
 use std::marker::{PhantomData, Send};
 

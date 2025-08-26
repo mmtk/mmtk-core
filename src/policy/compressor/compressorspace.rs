@@ -24,11 +24,12 @@ use std::sync::Arc;
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
 pub(crate) const TRACE_KIND_FORWARD_ROOT: TraceKind = 1;
 
-/// CompressorSpace is a stop-the-world implementation of
+/// [`CompressorSpace`] is a stop-the-world implementation of
 /// the Compressor, as described in Kermany and Petrank,
 /// [The Compressor: concurrent, incremental, and parallel compaction](https://dl.acm.org/doi/10.1145/1133255.1134023).
 ///
-/// CompressorSpace makes two other diversions from the paper:
+/// [`CompressorSpace`] makes two main diversions from the paper
+/// (aside from [`CompressorSpace`] being stop-the-world):
 /// - The heap is structured into regions ([`forwarding::CompressorRegion`])
 ///   which the collector compacts separately.
 /// - The collector compacts each region in-place, instead of using two virtual
