@@ -73,9 +73,6 @@ impl<VM: VMBinding, R: Region + 'static> PageResource<VM> for RegionPageResource
 }
 
 impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
-    // Same as crate::util::alloc::bumpallocator::BLOCK_SIZE
-    const TLAB_PAGES: usize = 8;
-    const TLAB_BYTES: usize = Self::TLAB_PAGES * BYTES_IN_PAGE;
     const REGION_PAGES: usize = R::BYTES / BYTES_IN_PAGE;
 
     pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static dyn VMMap) -> Self {
@@ -107,7 +104,7 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
         let succeed = |start: Address, new_chunk: bool| {
             Result::Ok(PRAllocResult {
                 start,
-                pages: Self::TLAB_PAGES,
+                pages: required_pages,
                 new_chunk,
             })
         };
