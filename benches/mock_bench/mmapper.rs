@@ -2,7 +2,10 @@ pub use criterion::Criterion;
 
 use mmtk::{
     memory_manager, mmap_anno_test,
-    util::{constants::BYTES_IN_PAGE, memory::MmapStrategy, test_util::fixtures::*, Address},
+    util::{
+        constants::BYTES_IN_PAGE, memory::MmapStrategy, test_private::MMAPPER,
+        test_util::fixtures::*, Address,
+    },
 };
 
 pub fn bench(c: &mut Criterion) {
@@ -76,9 +79,7 @@ pub fn bench(c: &mut Criterion) {
         let strategy = MmapStrategy::new(false, mmtk::util::memory::MmapProtection::ReadWrite);
         let anno = mmap_anno_test!();
         b.iter(|| {
-            mmtk::MMAPPER
-                .ensure_mapped(start, 1, strategy, anno)
-                .unwrap();
+            MMAPPER.ensure_mapped(start, 1, strategy, anno).unwrap();
         })
     });
 }
