@@ -739,14 +739,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
             + self.base.get_used_pages()
     }
 
-    // pub fn initial_pause_prepare(&mut self) {
-    //     self.los.initial_pause_prepare();
-    // }
-
-    // pub fn final_pause_release(&mut self) {
-    //     self.los.final_pause_release();
-    // }
-
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.prepare();
         self.los.prepare(full_heap);

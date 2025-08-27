@@ -204,6 +204,18 @@ unsafe impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, con
 }
 
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
+    ProcessRootSlots<VM, P, KIND>
+{
+    fn create_and_schedule_concurrent_trace_objects_work(&self, objects: &Vec<ObjectReference>) {
+        let worker = self.worker();
+        let mmtk = self.mmtk();
+        let w = ConcurrentTraceObjects::<VM, P, KIND>::new(objects.clone(), mmtk);
+
+        worker.scheduler().work_buckets[WorkBucketStage::Concurrent].add_no_notify(w);
+    }
+}
+
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
     ProcessEdgesWork for ProcessRootSlots<VM, P, KIND>
 {
     type VM = VM;
@@ -243,6 +255,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         if pause == Pause::FinalMark {
             return;
         }
+        debug_assert_eq!(pause, Pause::InitialMark);
         let mut root_objects = Vec::with_capacity(Self::CAPACITY);
         if !self.slots.is_empty() {
             let slots = std::mem::take(&mut self.slots);
@@ -250,34 +263,13 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
                 if let Some(object) = slot.load() {
                     root_objects.push(object);
                     if root_objects.len() == Self::CAPACITY {
-                        // create the packet
-                        let worker = self.worker();
-                        let mmtk = self.mmtk();
-                        let w =
-                            ConcurrentTraceObjects::<VM, P, KIND>::new(root_objects.clone(), mmtk);
-
-                        match pause {
-                            Pause::InitialMark => worker.scheduler().work_buckets
-                                [WorkBucketStage::Concurrent]
-                                .add_no_notify(w),
-                            _ => unreachable!(),
-                        }
-
+                        self.create_and_schedule_concurrent_trace_objects_work(&root_objects);
                         root_objects.clear();
                     }
                 }
             }
             if !root_objects.is_empty() {
-                let worker = self.worker();
-                let w =
-                    ConcurrentTraceObjects::<VM, P, KIND>::new(root_objects.clone(), self.mmtk());
-
-                match pause {
-                    Pause::InitialMark => worker.scheduler().work_buckets
-                        [WorkBucketStage::Concurrent]
-                        .add_no_notify(w),
-                    _ => unreachable!(),
-                }
+                self.create_and_schedule_concurrent_trace_objects_work(&root_objects);
             }
         }
     }

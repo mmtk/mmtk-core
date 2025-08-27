@@ -200,6 +200,7 @@ pub struct ObjectBarrier<S: BarrierSemantics> {
 }
 
 impl<S: BarrierSemantics> ObjectBarrier<S> {
+    /// Create a new ObjectBarrier with the given semantics.
     pub fn new(semantics: S) -> Self {
         Self { semantics }
     }
@@ -284,13 +285,16 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
     }
 }
 
+/// A SATB (Snapshot-At-The-Beginning) barrier implementation.
+/// This barrier is basically a pre-write object barrier with a weak reference loading barrier.
 pub struct SATBBarrier<S: BarrierSemantics> {
-    // This only affects the reference load barrier.
+    /// This only affects the weak reference load barrier.
     active: bool,
     semantics: S,
 }
 
 impl<S: BarrierSemantics> SATBBarrier<S> {
+    /// Create a new SATBBarrier with the given semantics.
     pub fn new(semantics: S) -> Self {
         Self {
             active: false,

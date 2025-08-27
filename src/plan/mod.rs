@@ -55,6 +55,7 @@ mod nogc;
 mod pageprotect;
 mod semispace;
 
+pub(crate) use concurrent::global::ConcurrentPlan;
 pub(crate) use generational::global::is_nursery_gc;
 pub(crate) use generational::global::GenerationalPlan;
 

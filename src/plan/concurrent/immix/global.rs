@@ -52,7 +52,7 @@ pub struct ConcurrentImmix<VM: VMBinding> {
     concurrent_marking_active: AtomicBool,
 }
 
-/// The plan constraints for the immix plan.
+/// The plan constraints for the concurrent immix plan.
 pub const CONCURRENT_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     // If we disable moving in Immix, this is a non-moving plan.
     moves_objects: !cfg!(feature = "immix_non_moving"),
@@ -123,20 +123,20 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         let pause = self.select_collection_kind();
         self.current_pause.store(Some(pause), Ordering::SeqCst);
-        if pause == Pause::Full {
-            self.set_ref_closure_buckets_enabled(true);
-            crate::plan::immix::global::Immix::schedule_immix_full_heap_collection::<
-                ConcurrentImmix<VM>,
-                ConcurrentImmixSTWGCWorkContext<VM, TRACE_KIND_FAST>,
-                ConcurrentImmixSTWGCWorkContext<VM, TRACE_KIND_DEFRAG>,
-            >(self, &self.immix_space, scheduler);
-        } else {
-            // Schedule work
-            match pause {
-                Pause::InitialMark => self.schedule_concurrent_marking_initial_pause(scheduler),
-                Pause::FinalMark => self.schedule_concurrent_marking_final_pause(scheduler),
-                _ => unreachable!(),
+
+        match pause {
+            Pause::Full => {
+                // Ref closure buckets is disabled by initial mark, and needs to be re-enabled for full GC before
+                // we reuse the normal Immix scheduling.
+                self.set_ref_closure_buckets_enabled(true);
+                crate::plan::immix::global::Immix::schedule_immix_full_heap_collection::<
+                    ConcurrentImmix<VM>,
+                    ConcurrentImmixSTWGCWorkContext<VM, TRACE_KIND_FAST>,
+                    ConcurrentImmixSTWGCWorkContext<VM, TRACE_KIND_DEFRAG>,
+                >(self, &self.immix_space, scheduler);
             }
+            Pause::InitialMark => self.schedule_concurrent_marking_initial_pause(scheduler),
+            Pause::FinalMark => self.schedule_concurrent_marking_final_pause(scheduler),
         }
     }
 
@@ -155,10 +155,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
                 );
             }
             Pause::InitialMark => {
-                // init prepare has to be executed first, otherwise, los objects will not be
-                // dealt with properly
-                // self.common.initial_pause_prepare();
-                // self.immix_space.initial_pause_prepare();
+                // Bulk set log bits so SATB barrier will be triggered on the existing objects.
                 if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
                     self.common.set_side_log_bits();
                     self.immix_space.set_side_log_bits();
@@ -178,14 +175,12 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         match pause {
             Pause::InitialMark => (),
             Pause::Full | Pause::FinalMark => {
+                // Bulk clear log bits so SATB barrier will not be triggered.
                 if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
                     self.immix_space.clear_side_log_bits();
                     self.common.clear_side_log_bits();
                 }
-                // self.immix_space.final_pause_release();
-                // self.common.final_pause_release();
                 self.common.release(tls, true);
-                // release the collected region
                 self.immix_space.release(true);
             }
         }
@@ -251,7 +246,6 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
                 self.set_concurrent_marking_state(false);
             }
         }
-        // scheduler.work_buckets[WorkBucketStage::Concurrent].close();
         info!("{:?} start", pause);
     }
 

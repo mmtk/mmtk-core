@@ -291,35 +291,14 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     pub fn set_side_log_bits(&self) {
         debug_assert!(self.treadmill.is_from_space_empty());
         debug_assert!(self.treadmill.is_nursery_empty());
-        // debug_assert!(self.common.needs_satb);
         let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         });
         self.treadmill.enumerate_objects(&mut enumator);
     }
 
-    // pub fn initial_pause_prepare(&self) {
-    //     // use crate::util::object_enum::ClosureObjectEnumerator;
-
-    //     // debug_assert!(self.treadmill.is_from_space_empty());
-    //     // debug_assert!(self.treadmill.is_nursery_empty());
-    //     // debug_assert!(self.common.needs_satb);
-    //     // let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
-    //     //     VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
-    //     // });
-    //     // self.treadmill.enumerate_objects(&mut enumator);
-    // }
-
-    // pub fn final_pause_release(&self) {
-    //     // let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
-    //     //     VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
-    //     // });
-    //     // self.treadmill.enumerate_objects(&mut enumator);
-    // }
-
     pub fn prepare(&mut self, full_heap: bool) {
         if full_heap {
-            // debug_assert!(self.treadmill.is_from_space_empty());
             self.mark_state = MARK_BIT - self.mark_state;
         }
         self.treadmill.flip(full_heap);

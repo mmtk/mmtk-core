@@ -57,7 +57,6 @@ impl PlanConstraints {
             moves_objects: false,
             max_non_los_default_alloc_bytes: MAX_INT,
             max_non_los_copy_bytes: MAX_INT,
-            needs_log_bit: false,
             // As `LAZY_SWEEP` is true, needs_linear_scan is true for all the plans. This is strange.
             // https://github.com/mmtk/mmtk-core/issues/1027 tracks the issue.
             needs_linear_scan: crate::util::constants::SUPPORT_CARD_SCANNING
@@ -66,7 +65,7 @@ impl PlanConstraints {
             // We may trace duplicate edges in mark sweep. If we use mark sweep as the non moving policy, it will be included in every
             may_trace_duplicate_edges: cfg!(feature = "marksweep_as_nonmoving"),
             needs_forward_after_liveness: false,
-            // needs_log_bit: false,
+            needs_log_bit: false,
             barrier: BarrierSelector::NoBarrier,
             // If we use mark sweep as non moving space, we need to prepare mutator. See [`common_prepare_func`].
             needs_prepare_mutator: cfg!(feature = "marksweep_as_nonmoving"),

@@ -87,7 +87,6 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     #[cold]
     fn flush_weak_refs(&mut self) {
         if !self.refs.is_empty() {
-            // debug_assert!(self.should_create_satb_packets());
             let nodes = self.refs.take();
             let bucket = if self.plan.concurrent_work_in_progress() {
                 WorkBucketStage::Concurrent
