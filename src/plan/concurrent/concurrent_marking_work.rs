@@ -263,9 +263,9 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
                 if let Some(object) = slot.load() {
                     root_objects.push(object);
                     if root_objects.len() == Self::CAPACITY {
-                        self.create_and_schedule_concurrent_trace_objects_work(
-                            root_objects.drain(..).collect(),
-                        );
+                        let mut buffer = Vec::with_capacity(Self::CAPACITY);
+                        std::mem::swap(&mut buffer, &mut root_objects);
+                        self.create_and_schedule_concurrent_trace_objects_work(buffer);
                     }
                 }
             }
