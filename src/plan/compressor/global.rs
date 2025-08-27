@@ -95,7 +95,7 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
 
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding].add(GenerateWork::new(
             &self.compressor_space,
-            &|space: &'static CompressorSpace<VM>| space.add_offset_vector_tasks(),
+            CompressorSpace::<VM>::add_offset_vector_tasks,
         ));
 
         // scan roots to update their references
@@ -103,7 +103,7 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
 
         scheduler.work_buckets[WorkBucketStage::Compact].add(GenerateWork::new(
             &self.compressor_space,
-            &|space: &'static CompressorSpace<VM>| space.add_compact_tasks(),
+            CompressorSpace::<VM>::add_compact_tasks,
         ));
 
         scheduler.work_buckets[WorkBucketStage::Compact].set_sentinel(Box::new(

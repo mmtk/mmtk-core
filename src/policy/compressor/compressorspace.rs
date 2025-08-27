@@ -123,11 +123,12 @@ impl<VM: VMBinding> SFT for CompressorSpace<VM> {
     ) -> ObjectReference {
         // We should not use trace_object for compressor space.
         // Depending on which trace it is, we should manually call either trace_mark or trace_forward.
-        panic!("sft_trace_object() cannot be used with Compressor space")
+        panic!("sft_trace_object() cannot be used with CompressorSpace")
     }
 
     fn debug_print_object_info(&self, object: ObjectReference) {
         println!("marked = {}", CompressorSpace::<VM>::is_marked(object));
+        println!("forwarding = {:?}", self.get_forwarded_object(object));
         self.common.debug_print_object_global_info(object);
     }
 }
@@ -277,10 +278,10 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         mark_bit != 0
     }
 
-    pub fn generate_tasks<T>(
+    fn generate_tasks(
         &self,
-        f: &mut impl FnMut(&AllocatedRegion<forwarding::CompressorRegion>, usize) -> T,
-    ) -> Vec<T> {
+        f: &mut impl FnMut(&AllocatedRegion<forwarding::CompressorRegion>, usize) -> Box<dyn GCWork<VM>>,
+    ) -> Vec<Box<dyn GCWork<VM>>> {
         let mut packets = vec![];
         let mut index = 0;
         self.pr.enumerate_regions(&mut |r| {
@@ -293,7 +294,6 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     pub fn add_offset_vector_tasks(&'static self) {
         let offset_vector_packets: Vec<Box<dyn GCWork<VM>>> = self.generate_tasks(&mut |r, _| {
             Box::new(CalculateOffsetVector::<VM>::new(self, r.region, r.cursor()))
-                as Box<dyn GCWork<VM>>
         });
         self.scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
             .bulk_add(offset_vector_packets);
@@ -311,11 +311,10 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         if !self.in_space(object) {
             return object;
         }
-        // We can't expect the VO bit to be valid whilst in the compaction loop.
-        // If we are fixing a reference to an object which precedes the referent
-        // the VO bit will have been cleared already.
-        // Thus the assertion really only is any good whilst we are fixing
-        // the roots.
+        // We can't expect the VO bit to be valid whilst compacting the heap.
+        // If we are fixing a reference to an object which was moved before the referent,
+        // the relevant VO bit will have been cleared, and this assertion would fail.
+        // Thus we can only ever expect the VO bit to be valid whilst fixing the roots.
         #[cfg(feature = "vo_bit")]
         if _vo_bit_valid {
             debug_assert!(
@@ -342,9 +341,8 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     }
 
     pub fn add_compact_tasks(&'static self) {
-        let compact_packets: Vec<Box<dyn GCWork<VM>>> = self.generate_tasks(&mut |_, i| {
-            Box::new(Compact::<VM>::new(self, i)) as Box<dyn GCWork<VM>>
-        });
+        let compact_packets: Vec<Box<dyn GCWork<VM>>> =
+            self.generate_tasks(&mut |_, i| Box::new(Compact::<VM>::new(self, i)));
         self.scheduler.work_buckets[WorkBucketStage::Compact].bulk_add(compact_packets);
     }
 
