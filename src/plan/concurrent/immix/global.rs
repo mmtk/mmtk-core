@@ -398,10 +398,6 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
     fn set_concurrent_marking_state(&self, active: bool) {
         use crate::plan::global::HasSpaces;
-        use crate::vm::Collection;
-
-        // Update the binding about concurrent marking
-        <VM as VMBinding>::VMCollection::set_concurrent_marking_state(active);
 
         // Tell the spaces to allocate new objects as live
         let allocate_object_as_live = active;
@@ -412,6 +408,12 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         // Store the state.
         self.concurrent_marking_active
             .store(active, Ordering::SeqCst);
+
+        // We also set SATB barrier as active -- this is done in Mutator prepare/release.
+    }
+
+    pub(super) fn is_concurrent_marking_active(&self) -> bool {
+        self.concurrent_marking_active.load(Ordering::SeqCst)
     }
 
     fn previous_pause(&self) -> Option<Pause> {

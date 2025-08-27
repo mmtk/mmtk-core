@@ -15,6 +15,8 @@
 
 mod barriers;
 pub use barriers::BarrierSelector;
+pub use barriers::ObjectBarrier;
+pub use barriers::SATBBarrier;
 
 pub(crate) mod gc_requester;
 

@@ -46,6 +46,17 @@ impl BarrierSelector {
 /// As a performance optimization, the binding may also choose to port the fast-path to the VM side,
 /// and call the slow-path (`object_reference_write_slow`) only if necessary.
 pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
+    /// Check if the barrier is active. For barriers that are always active, this always returns true.
+    fn is_active(&self) -> bool {
+        true
+    }
+
+    /// Set the barrier active or inactive. For barriers that are always active, this should not be called.
+    fn set_active(&mut self, _val: bool) {
+        unreachable!()
+    }
+
+    /// Flush thread-local states like buffers or remembered sets.
     fn flush(&mut self) {}
 
     /// Weak reference loading barrier.  A mutator should call this when loading from a weak
@@ -274,13 +285,19 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
 }
 
 pub struct SATBBarrier<S: BarrierSemantics> {
+    // This only affects the reference load barrier.
+    active: bool,
     semantics: S,
 }
 
 impl<S: BarrierSemantics> SATBBarrier<S> {
     pub fn new(semantics: S) -> Self {
-        Self { semantics }
+        Self {
+            active: false,
+            semantics,
+        }
     }
+
     fn object_is_unlogged(&self, object: ObjectReference) -> bool {
         // unsafe { S::UNLOG_BIT_SPEC.load::<S::VM, u8>(object, None) != 0 }
         S::UNLOG_BIT_SPEC.load_atomic::<S::VM, u8>(object, None, Ordering::SeqCst) != 0
@@ -288,12 +305,22 @@ impl<S: BarrierSemantics> SATBBarrier<S> {
 }
 
 impl<S: BarrierSemantics> Barrier<S::VM> for SATBBarrier<S> {
+    fn set_active(&mut self, val: bool) {
+        self.active = val;
+    }
+
+    fn is_active(&self) -> bool {
+        self.active
+    }
+
     fn flush(&mut self) {
         self.semantics.flush();
     }
 
     fn load_weak_reference(&mut self, o: ObjectReference) {
-        self.semantics.load_weak_reference(o)
+        if self.active {
+            self.semantics.load_weak_reference(o)
+        }
     }
 
     fn object_reference_clone_pre(&mut self, obj: ObjectReference) {
