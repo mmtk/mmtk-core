@@ -35,15 +35,6 @@ use enum_map::EnumMap;
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
-#[derive(Debug, Clone, Copy, bytemuck::NoUninit, PartialEq, Eq)]
-#[repr(u8)]
-enum GCCause {
-    Unknown,
-    FullHeap,
-    InitialMark,
-    FinalMark,
-}
-
 /// A concurrent Immix plan. The plan supports concurrent collection (strictly non-moving) and STW full heap collection (which may do defrag).
 /// The concurrent GC consists of two STW pauses (initial mark and final mark) with concurrent marking in between.
 #[derive(HasSpaces, PlanTraceObject)]
@@ -57,7 +48,7 @@ pub struct ConcurrentImmix<VM: VMBinding> {
     last_gc_was_defrag: AtomicBool,
     current_pause: Atomic<Option<Pause>>,
     previous_pause: Atomic<Option<Pause>>,
-    gc_cause: Atomic<GCCause>,
+    gc_cause: Atomic<Option<Pause>>,
     concurrent_marking_active: AtomicBool,
 }
 
@@ -76,7 +67,7 @@ pub const CONCURRENT_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
 impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
         if self.base().collection_required(self, space_full) {
-            self.gc_cause.store(GCCause::FullHeap, Ordering::Release);
+            self.gc_cause.store(Some(Pause::Full), Ordering::Release);
             return true;
         }
 
@@ -85,7 +76,8 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         if concurrent_marking_in_progress
             && self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].is_drained()
         {
-            self.gc_cause.store(GCCause::FinalMark, Ordering::Release);
+            self.gc_cause
+                .store(Some(Pause::FinalMark), Ordering::Release);
             return true;
         }
         let threshold = self.get_total_pages() >> 1;
@@ -100,7 +92,8 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             debug_assert!(!self.concurrent_marking_in_progress());
             let prev_pause = self.previous_pause();
             debug_assert!(prev_pause.is_none() || prev_pause.unwrap() != Pause::InitialMark);
-            self.gc_cause.store(GCCause::InitialMark, Ordering::Release);
+            self.gc_cause
+                .store(Some(Pause::InitialMark), Ordering::Release);
             return true;
         }
         false
@@ -129,9 +122,8 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         let pause = self.select_collection_kind();
+        self.current_pause.store(Some(pause), Ordering::SeqCst);
         if pause == Pause::Full {
-            self.current_pause
-                .store(Some(Pause::Full), Ordering::SeqCst);
             self.set_ref_closure_buckets_enabled(true);
             crate::plan::immix::global::Immix::schedule_immix_full_heap_collection::<
                 ConcurrentImmix<VM>,
@@ -139,8 +131,6 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
                 ConcurrentImmixSTWGCWorkContext<VM, TRACE_KIND_DEFRAG>,
             >(self, &self.immix_space, scheduler);
         } else {
-            // Set current pause kind
-            self.current_pause.store(Some(pause), Ordering::SeqCst);
             // Schedule work
             match pause {
                 Pause::InitialMark => self.schedule_concurrent_marking_initial_pause(scheduler),
@@ -306,7 +296,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             last_gc_was_defrag: AtomicBool::new(false),
             current_pause: Atomic::new(None),
             previous_pause: Atomic::new(None),
-            gc_cause: Atomic::new(GCCause::Unknown),
+            gc_cause: Atomic::new(None),
             concurrent_marking_active: AtomicBool::new(false),
         };
 
@@ -316,14 +306,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
     }
 
     fn select_collection_kind(&self) -> Pause {
-        match self.gc_cause.load(Ordering::Acquire) {
-            GCCause::FullHeap => Pause::Full,
-            GCCause::InitialMark => Pause::InitialMark,
-            GCCause::FinalMark => Pause::FinalMark,
-            GCCause::Unknown => {
-                panic!("Collection kind is not set when scheduling a collection");
-            }
-        }
+        self.gc_cause.load(Ordering::Acquire).take().unwrap()
     }
 
     fn set_ref_closure_buckets_enabled(&self, do_closure: bool) {
