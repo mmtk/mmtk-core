@@ -206,7 +206,7 @@ unsafe impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, con
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
     ProcessRootSlots<VM, P, KIND>
 {
-    fn create_and_schedule_concurrent_trace_objects_work(&self, objects: &Vec<ObjectReference>) {
+    fn create_and_schedule_concurrent_trace_objects_work(&self, objects: Vec<ObjectReference>) {
         let worker = self.worker();
         let mmtk = self.mmtk();
         let w = ConcurrentTraceObjects::<VM, P, KIND>::new(objects.clone(), mmtk);
@@ -263,13 +263,14 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
                 if let Some(object) = slot.load() {
                     root_objects.push(object);
                     if root_objects.len() == Self::CAPACITY {
-                        self.create_and_schedule_concurrent_trace_objects_work(&root_objects);
-                        root_objects.clear();
+                        self.create_and_schedule_concurrent_trace_objects_work(
+                            root_objects.drain(..).collect(),
+                        );
                     }
                 }
             }
             if !root_objects.is_empty() {
-                self.create_and_schedule_concurrent_trace_objects_work(&root_objects);
+                self.create_and_schedule_concurrent_trace_objects_work(root_objects);
             }
         }
     }
