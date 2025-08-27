@@ -345,7 +345,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
         scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
             ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self, TRACE_KIND_FAST>>,
-        >::new_no_scan_roots());
+        >::new());
         scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<
             ConcurrentImmixGCWorkContext<UnsupportedProcessEdges<VM>>,
         >::new(self));
@@ -354,6 +354,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
     fn schedule_concurrent_marking_final_pause(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.set_ref_closure_buckets_enabled(true);
 
+        // Skip root scanning in the final mark
         scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
             ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self, TRACE_KIND_FAST>>,
         >::new_no_scan_roots());
