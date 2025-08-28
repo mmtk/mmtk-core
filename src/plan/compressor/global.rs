@@ -188,7 +188,7 @@ impl<VM: VMBinding> Compressor<VM> {
         };
 
         let res = Compressor {
-            compressor_space: CompressorSpace::new(plan_args.get_space_args(
+            compressor_space: CompressorSpace::new(plan_args.get_normal_space_args(
                 "compressor_space",
                 true,
                 false,

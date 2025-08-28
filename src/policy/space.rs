@@ -433,6 +433,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// the execution time.  For LOS, it will be cheaper to enumerate individual objects than
     /// scanning VO bits because it is sparse.
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator);
+
+    /// Clear the side log bits for allocated regions in this space.
+    /// This method is only called if the plan knows the log bits are side metadata.
+    fn clear_side_log_bits(&self);
+
+    /// Set the side log bits for allocated regions in this space.
+    /// This method is only called if the plan knows the log bits are side metadata.
+    fn set_side_log_bits(&self);
 }
 
 /// Print the VM map for a space.
@@ -524,6 +532,8 @@ pub struct CommonSpace<VM: VMBinding> {
     /// This field equals to needs_log_bit in the plan constraints.
     // TODO: This should be a constant for performance.
     pub needs_log_bit: bool,
+    pub unlog_allocated_object: bool,
+    pub unlog_traced_object: bool,
 
     /// A lock used during acquire() to make sure only one thread can allocate.
     pub acquire_lock: Mutex<()>,
@@ -548,6 +558,8 @@ pub struct PlanCreateSpaceArgs<'a, VM: VMBinding> {
     pub name: &'static str,
     pub zeroed: bool,
     pub permission_exec: bool,
+    pub unlog_allocated_object: bool,
+    pub unlog_traced_object: bool,
     pub vmrequest: VMRequest,
     pub global_side_metadata_specs: Vec<SideMetadataSpec>,
     pub vm_map: &'static dyn VMMap,
@@ -594,6 +606,8 @@ impl<VM: VMBinding> CommonSpace<VM> {
             vm_map: args.plan_args.vm_map,
             mmapper: args.plan_args.mmapper,
             needs_log_bit: args.plan_args.constraints.needs_log_bit,
+            unlog_allocated_object: args.plan_args.unlog_allocated_object,
+            unlog_traced_object: args.plan_args.unlog_traced_object,
             gc_trigger: args.plan_args.gc_trigger,
             metadata: SideMetadataContext {
                 global: args.plan_args.global_side_metadata_specs,
