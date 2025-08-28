@@ -119,8 +119,6 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
         self.memory_region_copy_post(src, dst);
     }
 
-    fn object_reference_clone_pre(&mut self, _obj: ObjectReference) {}
-
     /// Full pre-barrier for array copy
     fn memory_region_copy_pre(&mut self, _src: VM::VMMemorySlice, _dst: VM::VMMemorySlice) {}
 
@@ -190,8 +188,6 @@ pub trait BarrierSemantics: 'static + Send {
     fn object_probable_write_slow(&mut self, _obj: ObjectReference) {}
 
     fn load_weak_reference(&mut self, _o: ObjectReference) {}
-
-    fn object_reference_clone_pre(&mut self, _obj: ObjectReference) {}
 }
 
 /// Generic object barrier with a type argument defining it's slow-path behaviour.
@@ -325,10 +321,6 @@ impl<S: BarrierSemantics> Barrier<S::VM> for SATBBarrier<S> {
         if self.active {
             self.semantics.load_weak_reference(o)
         }
-    }
-
-    fn object_reference_clone_pre(&mut self, obj: ObjectReference) {
-        self.semantics.object_reference_clone_pre(obj);
     }
 
     fn object_probable_write(&mut self, obj: ObjectReference) {
