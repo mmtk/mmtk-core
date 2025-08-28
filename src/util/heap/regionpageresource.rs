@@ -8,23 +8,23 @@ use crate::util::object_enum::ObjectEnumerator;
 use crate::util::Address;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use atomic::Atomic;
+use std::sync::atomic::Ordering;
 use std::sync::RwLock;
 
 /// A region in a [`RegionPageResource`] and its allocation cursor.
 pub struct AllocatedRegion<R: Region> {
     pub region: R,
-    cursor: AtomicUsize,
+    cursor: Atomic<Address>,
 }
 
 impl<R: Region> AllocatedRegion<R> {
     pub fn cursor(&self) -> Address {
-        let a = self.cursor.load(Ordering::Relaxed);
-        unsafe { Address::from_usize(a) }
+        self.cursor.load(Ordering::Relaxed)
     }
 
     fn set_cursor(&self, a: Address) {
-        self.cursor.store(a.as_usize(), Ordering::Relaxed);
+        self.cursor.store(a, Ordering::Relaxed);
     }
 }
 
@@ -131,7 +131,7 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
         )?;
         b.all_regions.push(AllocatedRegion {
             region: R::from_aligned_address(start),
-            cursor: AtomicUsize::new(start.as_usize()),
+            cursor: Atomic::<Address>::new(start),
         });
         let cursor = b.next_region;
         succeed(
