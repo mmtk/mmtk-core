@@ -122,6 +122,9 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         let pause = if self.concurrent_marking_in_progress() {
+            // FIXME: Currently it is unsafe to bypass `FinalMark` and go directly from `InitialMark` to `Full`.
+            // It is related to defragmentation.  See https://github.com/mmtk/mmtk-core/issues/1357 for more details.
+            // We currently force `FinalMark` to happen if the last pause is `InitialMark`.
             Pause::FinalMark
         } else if self.should_do_full_gc.load(Ordering::SeqCst) {
             Pause::Full
@@ -203,7 +206,14 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         }
         self.previous_pause.store(Some(pause), Ordering::SeqCst);
         self.current_pause.store(None, Ordering::SeqCst);
-        self.should_do_full_gc.store(false, Ordering::SeqCst);
+        if pause != Pause::FinalMark {
+            self.should_do_full_gc.store(false, Ordering::SeqCst);
+        } else {
+            // FIXME: Currently it is unsafe to trigger full GC during concurrent marking.
+            // See `Self::schedule_collection`.
+            // We keep the value of `self.should_do_full_gc` so that if full GC is triggered,
+            // the next GC will be full GC.
+        }
         info!("{:?} end", pause);
     }
 
