@@ -300,7 +300,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
     }
 
     fn select_collection_kind(&self) -> Pause {
-        self.gc_cause.load(Ordering::Acquire).take().unwrap()
+        self.gc_cause.load(Ordering::Acquire).unwrap()
     }
 
     fn set_ref_closure_buckets_enabled(&self, do_closure: bool) {
