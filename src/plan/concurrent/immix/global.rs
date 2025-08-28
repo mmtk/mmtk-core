@@ -48,7 +48,7 @@ pub struct ConcurrentImmix<VM: VMBinding> {
     last_gc_was_defrag: AtomicBool,
     current_pause: Atomic<Option<Pause>>,
     previous_pause: Atomic<Option<Pause>>,
-    gc_cause: Atomic<Option<Pause>>,
+    should_do_full_gc: AtomicBool,
     concurrent_marking_active: AtomicBool,
 }
 
@@ -67,7 +67,8 @@ pub const CONCURRENT_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
 impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
         if self.base().collection_required(self, space_full) {
-            self.gc_cause.store(Some(Pause::Full), Ordering::Release);
+            self.should_do_full_gc.store(true, Ordering::Release);
+            info!("Triggering full GC");
             return true;
         }
 
@@ -76,10 +77,12 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         if concurrent_marking_in_progress
             && self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].is_drained()
         {
-            self.gc_cause
-                .store(Some(Pause::FinalMark), Ordering::Release);
+            // After the Concurrent bucket is drained during concurrent marking,
+            // we trigger the FinalMark pause at the next poll() site (here).
+            // FIXME: Immediately trigger FinalMark when the Concurrent bucket is drained.
             return true;
         }
+
         let threshold = self.get_total_pages() >> 1;
         let used_pages_after_last_gc = self.common.base.global_state.get_used_pages_after_last_gc();
         let used_pages_now = self.get_used_pages();
@@ -90,10 +93,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
                 self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].is_empty()
             );
             debug_assert!(!self.concurrent_marking_in_progress());
-            let prev_pause = self.previous_pause();
-            debug_assert!(prev_pause.is_none() || prev_pause.unwrap() != Pause::InitialMark);
-            self.gc_cause
-                .store(Some(Pause::InitialMark), Ordering::Release);
+            debug_assert_ne!(self.previous_pause(), Some(Pause::InitialMark));
             return true;
         }
         false
@@ -121,7 +121,14 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        let pause = self.select_collection_kind();
+        let pause = if self.concurrent_marking_in_progress() {
+            Pause::FinalMark
+        } else if self.should_do_full_gc.load(Ordering::SeqCst) {
+            Pause::Full
+        } else {
+            Pause::InitialMark
+        };
+
         self.current_pause.store(Some(pause), Ordering::SeqCst);
 
         match pause {
@@ -196,6 +203,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         }
         self.previous_pause.store(Some(pause), Ordering::SeqCst);
         self.current_pause.store(None, Ordering::SeqCst);
+        self.should_do_full_gc.store(false, Ordering::SeqCst);
         info!("{:?} end", pause);
     }
 
@@ -290,17 +298,13 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             last_gc_was_defrag: AtomicBool::new(false),
             current_pause: Atomic::new(None),
             previous_pause: Atomic::new(None),
-            gc_cause: Atomic::new(None),
+            should_do_full_gc: AtomicBool::new(false),
             concurrent_marking_active: AtomicBool::new(false),
         };
 
         immix.verify_side_metadata_sanity();
 
         immix
-    }
-
-    fn select_collection_kind(&self) -> Pause {
-        self.gc_cause.load(Ordering::Acquire).unwrap()
     }
 
     fn set_ref_closure_buckets_enabled(&self, do_closure: bool) {
