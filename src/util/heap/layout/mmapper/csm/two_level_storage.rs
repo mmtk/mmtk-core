@@ -227,27 +227,6 @@ impl TwoLevelStateStorage {
             low = high;
         }
     }
-
-    fn chunk_index_to_address(base: Address, chunk: usize) -> Address {
-        base + (chunk << LOG_BYTES_IN_CHUNK)
-    }
-
-    /// Align `addr` down to slab size.
-    fn slab_align_down(addr: Address) -> Address {
-        addr.align_down(MMAP_SLAB_BYTES)
-    }
-
-    /// Get the base address of the next slab after the slab that contains `addr`.
-    fn slab_limit(addr: Address) -> Address {
-        Self::slab_align_down(addr) + MMAP_SLAB_BYTES
-    }
-
-    /// Return the index of the chunk that contains `addr` within the slab starting at `slab`.
-    /// If `addr` is beyond the end of the slab, the result could be beyond the end of the slab.
-    fn chunk_index(slab: Address, addr: Address) -> usize {
-        let delta = addr - slab;
-        delta >> LOG_BYTES_IN_CHUNK
-    }
 }
 
 impl Default for TwoLevelStateStorage {
