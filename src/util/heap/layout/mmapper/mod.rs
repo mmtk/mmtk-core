@@ -21,6 +21,12 @@ pub trait Mmapper: Sync {
     /// See trait-level doc for [`Mmapper`] for details.
     fn log_granularity(&self) -> u8;
 
+    /// The logarithm of the address space size this `Mmapper` can handle.
+    ///
+    /// In other words, this `Mmapper` cannot handle addresses greater than or equal to
+    /// `1 << self.log_mappable_bytes()`.
+    fn log_mappable_bytes(&self) -> u8;
+
     /// The granularity of `Mmapper`.  Don't override this method.  Override
     /// [`Mmapper::log_granularity`] instead.
     ///

@@ -115,6 +115,16 @@ impl VMLayout {
             assert!(self.heap_start.is_aligned_to(self.max_space_extent()));
         }
     }
+
+    pub(crate) fn validate_address_space(&self) {
+        let log_mappable_bytes = crate::mmtk::MMAPPER.log_mappable_bytes();
+        assert!(
+            self.log_address_space <= log_mappable_bytes as usize,
+            "log_address_space is {log_address_space}, but \
+            the MMAPPER can only handle up to {log_mappable_bytes} bits",
+            log_address_space = self.log_address_space,
+        );
+    }
 }
 
 impl VMLayout {

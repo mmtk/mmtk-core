@@ -12,8 +12,14 @@ use std::sync::Mutex;
 use atomic::Atomic;
 use std::io::Result;
 
+/// Logarithm of the address space size that [`ByteMapStateStorage`] is able to handle.
+/// This is enough for 32-bit architectures.
+/// We may increase it beyond 32 so that it is usable on 64-bit machines in certain VMs with
+/// limited address spaces, too.
+const LOG_MAPPABLE_BYTES: usize = 32;
+
 /// For now, we only use `ByteMapStateStorage` for 32-bit address range.
-const MMAP_NUM_CHUNKS: usize = 1 << (32 - LOG_BYTES_IN_CHUNK);
+const MMAP_NUM_CHUNKS: usize = 1 << (LOG_MAPPABLE_BYTES - LOG_BYTES_IN_CHUNK);
 
 /// A [`MapStateStorage`] implementation based on a simple array.
 ///
@@ -30,6 +36,10 @@ impl fmt::Debug for ByteMapStateStorage {
 }
 
 impl MapStateStorage for ByteMapStateStorage {
+    fn log_mappable_bytes(&self) -> u8 {
+        LOG_MAPPABLE_BYTES as u8
+    }
+
     fn get_state(&self, chunk: Address) -> MapState {
         let index = chunk >> LOG_BYTES_IN_CHUNK;
         let Some(slot) = self.mapped.get(index) else {

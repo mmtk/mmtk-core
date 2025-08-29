@@ -14,7 +14,7 @@ use atomic::{Atomic, Ordering};
 use std::fmt;
 use std::io::Result;
 
-/// Logarithm of the address space size a user-space program is allowed to use.
+/// Logarithm of the address space size that [`TwoLevelStateStorage`] is able to handle.
 /// This is enough for ARM64, x86_64 and some other architectures.
 /// Feel free to increase it if we plan to support larger address spaces.
 const LOG_MAPPABLE_BYTES: usize = 48;
@@ -73,6 +73,10 @@ impl fmt::Debug for TwoLevelStateStorage {
 }
 
 impl MapStateStorage for TwoLevelStateStorage {
+    fn log_mappable_bytes(&self) -> u8 {
+        LOG_MAPPABLE_BYTES as u8
+    }
+
     fn get_state(&self, chunk: Address) -> MapState {
         let Some(slab) = self.slab_table(chunk) else {
             return MapState::Unmapped;

@@ -70,6 +70,9 @@ impl std::fmt::Display for ChunkRange {
 /// The back-end storage of [`ChunkStateMmapper`].  It is responsible for holding the states of each
 /// chunk (eagerly or lazily) and transitioning the states in bulk.
 trait MapStateStorage {
+    /// The logarithm of the address space size this `MapStateStorage` can handle.
+    fn log_mappable_bytes(&self) -> u8;
+
     /// Return the state of a given `chunk` (must be aligned).
     ///
     /// Note that all chunks are logically `MapState::Unmapped` before the states are stored.  They
@@ -127,6 +130,10 @@ impl ChunkStateMmapper {
 impl Mmapper for ChunkStateMmapper {
     fn log_granularity(&self) -> u8 {
         LOG_BYTES_IN_CHUNK as u8
+    }
+
+    fn log_mappable_bytes(&self) -> u8 {
+        self.storage.log_mappable_bytes()
     }
 
     fn eagerly_mmap_all_spaces(&self, _space_map: &[Address]) {
