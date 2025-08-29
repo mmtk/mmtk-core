@@ -99,7 +99,7 @@ impl MapStateStorage for TwoLevelStateStorage {
         });
     }
 
-    fn bulk_transition_state<F>(&self, range: ChunkRange, mut transformer: F) -> Result<()>
+    fn bulk_transition_state<F>(&self, range: ChunkRange, mut update_fn: F) -> Result<()>
     where
         F: FnMut(ChunkRange, MapState) -> Result<Option<MapState>>,
     {
@@ -113,7 +113,7 @@ impl MapStateStorage for TwoLevelStateStorage {
             let slot = &slab[Self::in_slab_index(addr)];
 
             let old_state = slot.load(Ordering::Relaxed);
-            if let Some(new_state) = transformer(range, old_state)? {
+            if let Some(new_state) = update_fn(range, old_state)? {
                 slot.store(new_state, Ordering::Relaxed);
             };
 
@@ -142,7 +142,7 @@ impl MapStateStorage for TwoLevelStateStorage {
             let group_bytes = group.len << LOG_BYTES_IN_CHUNK;
             let group_range = ChunkRange::new_aligned(group_start, group_bytes);
 
-            if let Some(new_state) = transformer(group_range, state)? {
+            if let Some(new_state) = update_fn(group_range, state)? {
                 for slot in group {
                     slot.store(new_state, Ordering::Relaxed);
                 }

@@ -50,7 +50,7 @@ impl MapStateStorage for ByteMapStateStorage {
         }
     }
 
-    fn bulk_transition_state<F>(&self, range: ChunkRange, mut transformer: F) -> Result<()>
+    fn bulk_transition_state<F>(&self, range: ChunkRange, mut update_fn: F) -> Result<()>
     where
         F: FnMut(ChunkRange, MapState) -> Result<Option<MapState>>,
     {
@@ -63,7 +63,7 @@ impl MapStateStorage for ByteMapStateStorage {
             let index = chunk >> LOG_BYTES_IN_CHUNK;
             let slot: &Atomic<MapState> = &self.mapped[index];
             let state = slot.load(Ordering::Relaxed);
-            if let Some(new_state) = transformer(range, state)? {
+            if let Some(new_state) = update_fn(range, state)? {
                 slot.store(new_state, Ordering::Relaxed);
             }
             return Ok(());
@@ -83,7 +83,7 @@ impl MapStateStorage for ByteMapStateStorage {
                 unsafe { Address::from_usize(group_start << LOG_BYTES_IN_CHUNK) };
             let group_bytes = group.len << LOG_BYTES_IN_CHUNK;
             let group_range = ChunkRange::new_aligned(group_start_addr, group_bytes);
-            if let Some(new_state) = transformer(group_range, state)? {
+            if let Some(new_state) = update_fn(group_range, state)? {
                 for index in group_start..group_end {
                     self.mapped[index].store(new_state, Ordering::Relaxed);
                 }
