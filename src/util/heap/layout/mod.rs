@@ -3,9 +3,6 @@ pub mod vm_layout;
 
 mod mmapper;
 pub use self::mmapper::Mmapper;
-mod byte_map_mmapper;
-#[cfg(target_pointer_width = "64")]
-mod two_level_mmapper;
 
 mod map;
 pub(crate) use self::map::CreateFreeListResult;
@@ -29,15 +26,12 @@ pub fn create_vm_map() -> Box<dyn VMMap + Send + Sync> {
     }
 }
 
-#[cfg(target_pointer_width = "32")]
-pub fn create_mmapper() -> Box<dyn Mmapper + Send + Sync> {
-    Box::new(byte_map_mmapper::ByteMapMmapper::new())
-}
+pub fn create_mmapper() -> Box<dyn Mmapper> {
+    // TODO: Select a MapStateStorage based on the actuall address space size.
+    // For example, choose ByteMapStateStorage for 39-bit or less virtual space.
 
-#[cfg(target_pointer_width = "64")]
-pub fn create_mmapper() -> Box<dyn Mmapper + Send + Sync> {
-    // TODO: ByteMapMmapper for 39-bit or less virtual space
-    Box::new(two_level_mmapper::TwoLevelMmapper::new())
+    use crate::util::heap::layout::mmapper::csm::ChunkStateMmapper;
+    Box::new(ChunkStateMmapper::new())
 }
 
 use crate::util::Address;
