@@ -107,52 +107,42 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             "The requested pages is larger than the max heap size. Is will_go_oom_on_acquire used before acquring memory?"
         );
 
-        // Should we poll to attempt to GC?
-        // - If tls is collector, we cannot attempt a GC.
-        // - If gc is disabled, we cannot attempt a GC.
-        // - If overcommit is allowed, we don't attempt a GC.
-        let should_poll = VM::VMActivePlan::is_mutator(tls)
-            && VM::VMCollection::is_collection_enabled()
-            && !alloc_options.on_fail.allow_overcommit();
-        // Is a GC allowed here? If we should poll but are not allowed to poll, we will panic.
-        // initialize_collection() has to be called so we know GC is initialized.
-        let allow_gc = should_poll
-            && self.common().global_state.is_initialized()
-            && alloc_options.on_fail.allow_gc();
-
         trace!("Reserving pages");
         let pr = self.get_page_resource();
         let pages_reserved = pr.reserve_pages(pages);
         trace!("Pages reserved");
         trace!("Polling ..");
 
-        if should_poll && self.get_gc_trigger().poll(false, Some(self.as_space())) {
-            // Clear the request
-            pr.clear_request(pages_reserved);
+        // Whether we have triggered GC.  There are two places in this function that can trigger GC.
+        let mut gc_triggered = false;
 
-            // If we do not want GC on fail, just return zero.
-            if !alloc_options.on_fail.allow_gc() {
-                return Address::ZERO;
-            }
+        let is_mutator = VM::VMActivePlan::is_mutator(tls);
+        let is_collection_enabled = VM::VMCollection::is_collection_enabled();
+        let allow_overcommit = alloc_options.on_fail.allow_overcommit();
 
-            // Otherwise do GC here
-            debug!("Collection required");
-            assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
+        // In some cases, allocation failure cannot be tolerated.
+        // - Collector threads cannot fail when copying objects.
+        // - When GC is disabled, allocation failure will result in immediate panic.
+        let must_succeed = !is_mutator || !is_collection_enabled;
 
-            // Inform GC trigger about the pending allocation.
-            let meta_pages_reserved = self.estimate_side_meta_pages(pages_reserved);
-            let total_pages_reserved = pages_reserved + meta_pages_reserved;
-            self.get_gc_trigger()
-                .policy
-                .on_pending_allocation(total_pages_reserved);
+        // Is this allocation site allowed to trigger a GC?
+        // - If allocation failure cannot be tolerated, we won't trigger GC.
+        // - The `OnAllocationFail::OverCommit` case does not allow triggering GC.
+        //   TODO: We can allow it to trigger GC AND over-commit at the same time.
+        let allow_triggering_gc = !must_succeed && !allow_overcommit;
 
-            VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
+        if allow_triggering_gc {
+            gc_triggered = self.get_gc_trigger().poll(false, Some(self.as_space()));
+            debug!("Polled.  GC triggered? {gc_triggered}");
+        }
 
-            // Return zero -- the caller will handle re-attempting allocation
-            Address::ZERO
-        } else {
-            debug!("Collection not required");
+        // We should try to allocate if GC was not triggered.
+        // It includes the case that we didn't poll at all.
+        // TODO: If we allow triggering GC AND over-committing at the same time,
+        // we can still allocate even if polling triggers GC.
+        let should_try_to_allocate = !gc_triggered;
 
+        let attempted_allocation_and_failed = if should_try_to_allocate {
             // We need this lock: Othrewise, it is possible that one thread acquires pages in a new chunk, but not yet
             // set SFT for it (in grow_space()), and another thread acquires pages in the same chunk, which is not
             // a new chunk so grow_space() won't be called on it. The second thread could return a result in the chunk before
@@ -161,125 +151,147 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // See: https://github.com/mmtk/mmtk-core/issues/610
             let lock = self.common().acquire_lock.lock().unwrap();
 
-            match pr.get_new_pages(self.common().descriptor, pages_reserved, pages, tls) {
-                Ok(res) => {
-                    debug!(
-                        "Got new pages {} ({} pages) for {} in chunk {}, new_chunk? {}",
-                        res.start,
-                        res.pages,
-                        self.get_name(),
-                        conversions::chunk_align_down(res.start),
-                        res.new_chunk
-                    );
-                    let bytes = conversions::pages_to_bytes(res.pages);
+            if let Ok(res) = pr.get_new_pages(self.common().descriptor, pages_reserved, pages, tls)
+            {
+                debug!(
+                    "Got new pages {} ({} pages) for {} in chunk {}, new_chunk? {}",
+                    res.start,
+                    res.pages,
+                    self.get_name(),
+                    conversions::chunk_align_down(res.start),
+                    res.new_chunk
+                );
+                let bytes = conversions::pages_to_bytes(res.pages);
 
-                    let mmap = || {
-                        // Mmap the pages and the side metadata, and handle error. In case of any error,
-                        // we will either call back to the VM for OOM, or simply panic.
-                        if let Err(mmap_error) = self
-                            .common()
-                            .mmapper
-                            .ensure_mapped(
-                                res.start,
-                                res.pages,
-                                self.common().mmap_strategy(),
-                                &memory::MmapAnnotation::Space {
-                                    name: self.get_name(),
-                                },
-                            )
-                            .and(self.common().metadata.try_map_metadata_space(
-                                res.start,
-                                bytes,
-                                self.get_name(),
-                            ))
-                        {
-                            memory::handle_mmap_error::<VM>(mmap_error, tls, res.start, bytes);
-                        }
-                    };
-                    let grow_space = || {
-                        self.grow_space(res.start, bytes, res.new_chunk);
-                    };
-
-                    // The scope of the lock is important in terms of performance when we have many allocator threads.
-                    if SFT_MAP.get_side_metadata().is_some() {
-                        // If the SFT map uses side metadata, so we have to initialize side metadata first.
-                        mmap();
-                        // then grow space, which will use the side metadata we mapped above
-                        grow_space();
-                        // then we can drop the lock after grow_space()
-                        drop(lock);
-                    } else {
-                        // In normal cases, we can drop lock immediately after grow_space()
-                        grow_space();
-                        drop(lock);
-                        // and map side metadata without holding the lock
-                        mmap();
-                    }
-
-                    // TODO: Concurrent zeroing
-                    if self.common().zeroed {
-                        memory::zero(res.start, bytes);
-                    }
-
-                    // Some assertions
+                let mmap = || {
+                    // Mmap the pages and the side metadata, and handle error. In case of any error,
+                    // we will either call back to the VM for OOM, or simply panic.
+                    if let Err(mmap_error) = self
+                        .common()
+                        .mmapper
+                        .ensure_mapped(
+                            res.start,
+                            res.pages,
+                            self.common().mmap_strategy(),
+                            &memory::MmapAnnotation::Space {
+                                name: self.get_name(),
+                            },
+                        )
+                        .and(self.common().metadata.try_map_metadata_space(
+                            res.start,
+                            bytes,
+                            self.get_name(),
+                        ))
                     {
-                        // --- Assert the start of the allocated region ---
-                        // The start address SFT should be correct.
-                        debug_assert_eq!(SFT_MAP.get_checked(res.start).name(), self.get_name());
-                        // The start address is in our space.
-                        debug_assert!(self.address_in_space(res.start));
-                        // The descriptor should be correct.
-                        debug_assert_eq!(
-                            self.common().vm_map().get_descriptor_for_address(res.start),
-                            self.common().descriptor
-                        );
-
-                        // --- Assert the last byte in the allocated region ---
-                        let last_byte = res.start + bytes - 1;
-                        // The SFT for the last byte in the allocated memory should be correct.
-                        debug_assert_eq!(SFT_MAP.get_checked(last_byte).name(), self.get_name());
-                        // The last byte in the allocated memory should be in this space.
-                        debug_assert!(self.address_in_space(last_byte));
-                        // The descriptor for the last byte should be correct.
-                        debug_assert_eq!(
-                            self.common().vm_map().get_descriptor_for_address(last_byte),
-                            self.common().descriptor
-                        );
+                        memory::handle_mmap_error::<VM>(mmap_error, tls, res.start, bytes);
                     }
+                };
+                let grow_space = || {
+                    self.grow_space(res.start, bytes, res.new_chunk);
+                };
 
-                    debug!("Space.acquire(), returned = {}", res.start);
-                    res.start
+                // The scope of the lock is important in terms of performance when we have many allocator threads.
+                if SFT_MAP.get_side_metadata().is_some() {
+                    // If the SFT map uses side metadata, so we have to initialize side metadata first.
+                    mmap();
+                    // then grow space, which will use the side metadata we mapped above
+                    grow_space();
+                    // then we can drop the lock after grow_space()
+                    drop(lock);
+                } else {
+                    // In normal cases, we can drop lock immediately after grow_space()
+                    grow_space();
+                    drop(lock);
+                    // and map side metadata without holding the lock
+                    mmap();
                 }
-                Err(_) => {
-                    drop(lock); // drop the lock immediately
 
-                    // Clear the request
-                    pr.clear_request(pages_reserved);
+                // TODO: Concurrent zeroing
+                if self.common().zeroed {
+                    memory::zero(res.start, bytes);
+                }
 
-                    // If we do not want GC on fail, just return zero.
-                    if !alloc_options.on_fail.allow_gc() {
-                        return Address::ZERO;
-                    }
-
-                    // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
-                    assert!(
-                        allow_gc,
-                        "Physical allocation failed when GC is not allowed!"
+                // Some assertions
+                {
+                    // --- Assert the start of the allocated region ---
+                    // The start address SFT should be correct.
+                    debug_assert_eq!(SFT_MAP.get_checked(res.start).name(), self.get_name());
+                    // The start address is in our space.
+                    debug_assert!(self.address_in_space(res.start));
+                    // The descriptor should be correct.
+                    debug_assert_eq!(
+                        self.common().vm_map().get_descriptor_for_address(res.start),
+                        self.common().descriptor
                     );
 
-                    let gc_performed = self.get_gc_trigger().poll(true, Some(self.as_space()));
-                    debug_assert!(gc_performed, "GC not performed when forced.");
-
-                    // Inform GC trigger about the pending allocation.
-                    self.get_gc_trigger()
-                        .policy
-                        .on_pending_allocation(pages_reserved);
-
-                    VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
-                    Address::ZERO
+                    // --- Assert the last byte in the allocated region ---
+                    let last_byte = res.start + bytes - 1;
+                    // The SFT for the last byte in the allocated memory should be correct.
+                    debug_assert_eq!(SFT_MAP.get_checked(last_byte).name(), self.get_name());
+                    // The last byte in the allocated memory should be in this space.
+                    debug_assert!(self.address_in_space(last_byte));
+                    // The descriptor for the last byte should be correct.
+                    debug_assert_eq!(
+                        self.common().vm_map().get_descriptor_for_address(last_byte),
+                        self.common().descriptor
+                    );
                 }
+
+                debug!("Space.acquire(), returned = {}", res.start);
+                return res.start;
+            }
+
+            true
+        } else {
+            false
+        };
+
+        // We didn't successfully allocate memory.
+
+        // Clear the request
+        pr.clear_request(pages_reserved);
+
+        if must_succeed {
+            panic!("Failed to acquire pages.  is mutator? {is_mutator}, is collection enabled? {is_collection_enabled}");
+        }
+
+        if allow_triggering_gc {
+            if attempted_allocation_and_failed {
+                // If we reached here because we attempted allocation and failed,
+                // then we poll again with space_full=true.
+                // This time it must trigger GC.
+                gc_triggered = self.get_gc_trigger().poll(true, Some(self.as_space()));
+                debug_assert!(gc_triggered, "GC not performed when forced.");
+            }
+
+            // Are we allowed to block for GC?
+            // - If the MMTk instance is not initialized, there is no GC worker threads, and we can't block for GC.
+            // - If the on_fail option does not allow blocking for GC, we don't block.
+            // TODO: on_fail.allow_gc() really means whether it allows blocking for GC instead of whether we allow GC to happen.
+            let allow_blocking_for_gc = allow_triggering_gc
+                && self.common().global_state.is_initialized()
+                && alloc_options.on_fail.allow_gc();
+
+            if allow_blocking_for_gc {
+                assert!(
+                    gc_triggered,
+                    "Attempt to block for GC when GC is not triggered."
+                );
+
+                // Inform GC trigger about the pending allocation.
+                // Make sure we include side metadata.
+                let meta_pages_reserved = self.estimate_side_meta_pages(pages_reserved);
+                let total_pages_reserved = pages_reserved + meta_pages_reserved;
+                self.get_gc_trigger()
+                    .policy
+                    .on_pending_allocation(total_pages_reserved);
+
+                VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             }
         }
+
+        // Return zero -- the caller will handle re-attempting allocation
+        Address::ZERO
     }
 
     fn address_in_space(&self, start: Address) -> bool {
