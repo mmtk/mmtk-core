@@ -113,7 +113,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // - If the on_fail option does not allow polling, we shall not poll.
         let should_poll = VM::VMActivePlan::is_mutator(tls)
             && VM::VMCollection::is_collection_enabled()
-            && !alloc_options.on_fail.allow_polling();
+            && alloc_options.on_fail.allow_polling();
 
         // Can we continue to allocate even if GC is triggered?
         let allow_overcommit = alloc_options.on_fail.allow_overcommit();
