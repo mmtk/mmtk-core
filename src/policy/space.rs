@@ -108,17 +108,22 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         );
 
         // Should we poll to attempt to GC?
-        // - If tls is collector, we cannot attempt a GC.
-        // - If gc is disabled, we cannot attempt a GC.
-        // - If overcommit is allowed, we don't attempt a GC.
+        // - If tls is collector, we shall not poll.
+        // - If gc is disabled, we shall not poll.
+        // - If the on_fail option does not allow polling, we shall not poll.
         let should_poll = VM::VMActivePlan::is_mutator(tls)
             && VM::VMCollection::is_collection_enabled()
-            && !alloc_options.on_fail.allow_overcommit();
-        // Is a GC allowed here? If we should poll but are not allowed to poll, we will panic.
-        // initialize_collection() has to be called so we know GC is initialized.
-        let allow_gc = should_poll
+            && !alloc_options.on_fail.allow_polling();
+
+        // Can we continue to allocate even if GC is triggered?
+        let allow_overcommit = alloc_options.on_fail.allow_overcommit();
+
+        // Can we block for GC if polling triggers GC?
+        // - If the MMTk instance is not initialized, there is no GC workers, and we cannot block for GC.
+        // - If the on_fail option does not allow blocking, we do not block for GC, either.
+        let allow_blocking_for_gc = should_poll
             && self.common().global_state.is_initialized()
-            && alloc_options.on_fail.allow_gc();
+            && alloc_options.on_fail.allow_blocking_for_gc();
 
         trace!("Reserving pages");
         let pr = self.get_page_resource();
@@ -126,18 +131,26 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         trace!("Pages reserved");
         trace!("Polling ..");
 
-        if should_poll && self.get_gc_trigger().poll(false, Some(self.as_space())) {
+        // Whether we should try to allocate.  We should try to allocate if
+        // -   we shouldn't poll, or
+        // -   we polled, but GC was not triggered, or
+        // -   GC is triggered, but we allow over-committing.
+        let should_try_to_allocate = !should_poll
+            || !self.get_gc_trigger().poll(false, Some(self.as_space()))
+            || allow_overcommit;
+
+        if !should_try_to_allocate {
             // Clear the request
             pr.clear_request(pages_reserved);
 
             // If we do not want GC on fail, just return zero.
-            if !alloc_options.on_fail.allow_gc() {
+            if !allow_blocking_for_gc {
                 return Address::ZERO;
             }
 
             // Otherwise do GC here
             debug!("Collection required");
-            assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
+            assert!(allow_blocking_for_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
 
             // Inform GC trigger about the pending allocation.
             let meta_pages_reserved = self.estimate_side_meta_pages(pages_reserved);
@@ -257,13 +270,13 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     pr.clear_request(pages_reserved);
 
                     // If we do not want GC on fail, just return zero.
-                    if !alloc_options.on_fail.allow_gc() {
+                    if !allow_blocking_for_gc {
                         return Address::ZERO;
                     }
 
                     // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
                     assert!(
-                        allow_gc,
+                        allow_blocking_for_gc,
                         "Physical allocation failed when GC is not allowed!"
                     );
 
