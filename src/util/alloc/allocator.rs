@@ -41,7 +41,7 @@ pub enum OnAllocationFail {
     /// Request the GC.  But instead of blocking for GC, the allocating thread continues to
     /// allocate, overcommitting the memory.  GC will be scheduled asynchronously by the GC worker
     /// threads, and the current mutator may stop at a safepoint as soon as possible.
-    RequestAndOverCommit,
+    OverCommit,
 }
 
 impl OnAllocationFail {
@@ -49,7 +49,7 @@ impl OnAllocationFail {
         *self == Self::RequestGC
     }
     pub(crate) fn allow_overcommit(&self) -> bool {
-        *self == Self::RequestAndOverCommit
+        *self == Self::OverCommit
     }
     pub(crate) fn allow_blocking_for_gc(&self) -> bool {
         *self == Self::RequestGC
