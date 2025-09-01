@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["MMAP_NUM_CHUNKS","VERBOSE"],"struct":["ByteMapMmapper"]};

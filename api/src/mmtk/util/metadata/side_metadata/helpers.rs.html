@@ -723,7 +723,9 @@
 <a href="#722" id="722">722</a>
 <a href="#723" id="723">723</a>
 <a href="#724" id="724">724</a>
-<a href="#725" id="725">725</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::ranges::BitOffset;
+<a href="#725" id="725">725</a>
+<a href="#726" id="726">726</a>
+<a href="#727" id="727">727</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::ranges::BitOffset;
 <span class="kw">use </span><span class="kw">super</span>::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
@@ -977,12 +979,14 @@
     meta_end: Address,
 ) -&gt; FindMetaBitResult {
     <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_ADDRESS;
-    <span class="kw">use </span><span class="kw">crate</span>::util::heap::vm_layout::MMAP_CHUNK_BYTES;
+
+    <span class="kw">let </span>mmap_granularity = MMAPPER.granularity();
 
     <span class="kw">let </span><span class="kw-2">mut </span>cur = meta_end;
-    <span class="comment">// We need to check if metadata address is mapped or not. But we only check at chunk granularity.
-    // This records the start of a chunk that is tested to be mapped.
-    </span><span class="kw">let </span><span class="kw-2">mut </span>mapped_chunk = Address::MAX;
+    <span class="comment">// We need to check if metadata address is mapped or not.  But we make use of the granularity of
+    // the `Mmapper` to reduce the number of checks.  This records the start of a grain that is
+    // tested to be mapped.
+    </span><span class="kw">let </span><span class="kw-2">mut </span>mapped_grain = Address::MAX;
     <span class="kw">while </span>cur &gt; meta_start {
         <span class="comment">// If we can check the whole word, set step to word size. Otherwise, the step is 1 (byte) and we check byte.
         </span><span class="kw">let </span>step = <span class="kw">if </span>cur.is_aligned_to(BYTES_IN_ADDRESS) &amp;&amp; cur - BYTES_IN_ADDRESS &gt;= meta_start {
@@ -1002,10 +1006,10 @@
         );
 
         <span class="comment">// If we are looking at an address that is not in a mapped chunk, we need to check if the chunk if mapped.
-        </span><span class="kw">if </span>cur &lt; mapped_chunk {
+        </span><span class="kw">if </span>cur &lt; mapped_grain {
             <span class="kw">if </span>cur.is_mapped() {
                 <span class="comment">// This is mapped. No need to check for this chunk.
-                </span>mapped_chunk = cur.align_down(MMAP_CHUNK_BYTES);
+                </span>mapped_grain = cur.align_down(mmap_granularity);
             } <span class="kw">else </span>{
                 <span class="kw">return </span>FindMetaBitResult::UnmappedMetadata;
             }

@@ -136,17 +136,7 @@
 <a href="#135" id="135">135</a>
 <a href="#136" id="136">136</a>
 <a href="#137" id="137">137</a>
-<a href="#138" id="138">138</a>
-<a href="#139" id="139">139</a>
-<a href="#140" id="140">140</a>
-<a href="#141" id="141">141</a>
-<a href="#142" id="142">142</a>
-<a href="#143" id="143">143</a>
-<a href="#144" id="144">144</a>
-<a href="#145" id="145">145</a>
-<a href="#146" id="146">146</a>
-<a href="#147" id="147">147</a>
-<a href="#148" id="148">148</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
+<a href="#138" id="138">138</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
@@ -173,16 +163,6 @@
 <span class="doccomment">/// Align down an address to the nearest chunk.
 </span><span class="kw">pub const fn </span>chunk_align_down(addr: Address) -&gt; Address {
     addr.align_down(BYTES_IN_CHUNK)
-}
-
-<span class="doccomment">/// Align up an address to the nearest chunk at which granularity we mmap memory.
-</span><span class="kw">pub const fn </span>mmap_chunk_align_up(addr: Address) -&gt; Address {
-    addr.align_up(MMAP_CHUNK_BYTES)
-}
-
-<span class="doccomment">/// Align down an address to the nearest chunk at which granularity we mmap memory.
-</span><span class="kw">pub const fn </span>mmap_chunk_align_down(addr: Address) -&gt; Address {
-    addr.align_down(MMAP_CHUNK_BYTES)
 }
 
 <span class="doccomment">/// Convert size in bytes to the number of chunks (aligned up).

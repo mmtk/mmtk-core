@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["MapState"],"mod":["byte_map_storage","two_level_storage"],"struct":["ChunkRange","ChunkStateMmapper"],"trait":["MapStateStorage"],"type":["ChosenMapStateStorage"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["MapState"],"trait":["Mmapper"]};
+window.SIDEBAR_ITEMS = {"mod":["csm"],"trait":["Mmapper"]};

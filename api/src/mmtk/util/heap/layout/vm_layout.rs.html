@@ -195,7 +195,13 @@
 <a href="#194" id="194">194</a>
 <a href="#195" id="195">195</a>
 <a href="#196" id="196">196</a>
-<a href="#197" id="197">197</a></pre></div><pre class="rust"><code><span class="doccomment">//! The module defines virutal memory layout parameters.
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a></pre></div><pre class="rust"><code><span class="doccomment">//! The module defines virutal memory layout parameters.
 
 </span><span class="kw">use </span>std::ptr::addr_of;
 <span class="kw">use </span>std::sync::atomic::AtomicBool;
@@ -216,10 +222,6 @@
 </span><span class="kw">pub const </span>CHUNK_MASK: usize = (<span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_CHUNK) - <span class="number">1</span>;
 <span class="doccomment">/// Coarsest unit of address space allocation, in pages
 </span><span class="kw">pub const </span>PAGES_IN_CHUNK: usize = <span class="number">1 </span>&lt;&lt; (LOG_BYTES_IN_CHUNK - LOG_BYTES_IN_PAGE <span class="kw">as </span>usize);
-<span class="doccomment">/// log_2 of the granularity at which we map and unmap virtual address space in the heap
-</span><span class="kw">pub const </span>LOG_MMAP_CHUNK_BYTES: usize = LOG_BYTES_IN_CHUNK;
-<span class="doccomment">/// Granularity at which we map and unmap virtual address space in the heap
-</span><span class="kw">pub const </span>MMAP_CHUNK_BYTES: usize = <span class="number">1 </span>&lt;&lt; LOG_MMAP_CHUNK_BYTES;
 
 <span class="doccomment">/// Runtime-initialized virtual memory constants
 </span><span class="attr">#[derive(Clone, Debug)]
@@ -315,6 +317,16 @@
             <span class="macro">assert!</span>(<span class="self">self</span>.log_space_extent &lt;= (<span class="self">self</span>.log_address_space - LOG_MAX_SPACES));
             <span class="macro">assert!</span>(<span class="self">self</span>.heap_start.is_aligned_to(<span class="self">self</span>.max_space_extent()));
         }
+    }
+
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>validate_address_space(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span>log_mappable_bytes = <span class="kw">crate</span>::mmtk::MMAPPER.log_mappable_bytes();
+        <span class="macro">assert!</span>(
+            <span class="self">self</span>.log_address_space &lt;= log_mappable_bytes <span class="kw">as </span>usize,
+            <span class="string">"log_address_space is {log_address_space}, but \
+            the MMAPPER can only handle up to {log_mappable_bytes} bits"</span>,
+            log_address_space = <span class="self">self</span>.log_address_space,
+        );
     }
 }
 

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["BYTES_IN_CHUNK","CHUNK_MASK","LOG_BYTES_IN_CHUNK","LOG_MMAP_CHUNK_BYTES","MMAP_CHUNK_BYTES","PAGES_IN_CHUNK"],"fn":["vm_layout"],"static":["VM_LAYOUT","VM_LAYOUT_FETCHED"],"struct":["VMLayout"]};
+window.SIDEBAR_ITEMS = {"constant":["BYTES_IN_CHUNK","CHUNK_MASK","LOG_BYTES_IN_CHUNK","PAGES_IN_CHUNK"],"fn":["vm_layout"],"static":["VM_LAYOUT","VM_LAYOUT_FETCHED"],"struct":["VMLayout"]};

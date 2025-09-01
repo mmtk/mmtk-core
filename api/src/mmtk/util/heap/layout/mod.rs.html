@@ -50,20 +50,11 @@
 <a href="#49" id="49">49</a>
 <a href="#50" id="50">50</a>
 <a href="#51" id="51">51</a>
-<a href="#52" id="52">52</a>
-<a href="#53" id="53">53</a>
-<a href="#54" id="54">54</a>
-<a href="#55" id="55">55</a>
-<a href="#56" id="56">56</a>
-<a href="#57" id="57">57</a>
-<a href="#58" id="58">58</a></pre></div><pre class="rust"><code><span class="kw">pub mod </span>heap_parameters;
+<a href="#52" id="52">52</a></pre></div><pre class="rust"><code><span class="kw">pub mod </span>heap_parameters;
 <span class="kw">pub mod </span>vm_layout;
 
 <span class="kw">mod </span>mmapper;
 <span class="kw">pub use </span><span class="self">self</span>::mmapper::Mmapper;
-<span class="kw">mod </span>byte_map_mmapper;
-<span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
-</span><span class="kw">mod </span>two_level_mmapper;
 
 <span class="kw">mod </span>map;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span><span class="self">self</span>::map::CreateFreeListResult;
@@ -87,15 +78,12 @@
     }
 }
 
-<span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
-</span><span class="kw">pub fn </span>create_mmapper() -&gt; Box&lt;<span class="kw">dyn </span>Mmapper + Send + Sync&gt; {
-    Box::new(byte_map_mmapper::ByteMapMmapper::new())
-}
+<span class="kw">pub fn </span>create_mmapper() -&gt; Box&lt;<span class="kw">dyn </span>Mmapper&gt; {
+    <span class="comment">// TODO: Select a MapStateStorage based on the actuall address space size.
+    // For example, choose ByteMapStateStorage for 39-bit or less virtual space.
 
-<span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
-</span><span class="kw">pub fn </span>create_mmapper() -&gt; Box&lt;<span class="kw">dyn </span>Mmapper + Send + Sync&gt; {
-    <span class="comment">// TODO: ByteMapMmapper for 39-bit or less virtual space
-    </span>Box::new(two_level_mmapper::TwoLevelMmapper::new())
+    </span><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::mmapper::csm::ChunkStateMmapper;
+    Box::new(ChunkStateMmapper::new())
 }
 
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
