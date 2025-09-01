@@ -15,10 +15,10 @@ pub mod csm;
 /// [`Mmapper::granularity()`].  Methods that take memory ranges as arguments will round the range
 /// to the overlapping chunks.
 ///
-/// Memory ranges managed by `Mmapper` has three states: Unmapped, Quarantined, and Mapped.  The
-/// state transition graph is:
+/// From the perspective of the `Mmapper`, each memory range can be in one of the three states:
+/// Unmapped, Quarantined, and Mapped.  The state transition graph is:
 ///
-/// ```
+/// ```text
 /// ┌────────┐  ensure_mapped / mark_as_mapped    ┌──────┐
 /// │Unmapped├────────────────────────────────────►Mapped│
 /// └───┬────┘                                    └───▲──┘
@@ -26,6 +26,13 @@ pub mod csm;
 ///     └───────────────►Quarantined├─────────────────┘
 ///         quarantine  └───────────┘  ensure_mapped
 /// ```
+///
+/// -   **Unmapped** means the memory is not mapped by the `Mmapper`, and may be mapped by other
+///     components of the process.
+/// -   **Quarantined** means the `Mmapper` has reserved the memory for MMTk, usually by using
+///     `mmap` with `PROT_NONE`.
+/// -   **Mapped** means `Mmapper` has mapped the memory, and the memory can be read and written by
+///     MMTk.
 pub trait Mmapper: Sync {
     /// The logarithm of granularity of this `Mmapper`, in bytes.  Must be at least
     /// [`LOG_BYTES_IN_PAGE`].
