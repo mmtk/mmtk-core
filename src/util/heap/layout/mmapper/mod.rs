@@ -14,6 +14,25 @@ pub mod csm;
 /// For the efficiency of implementation, an `Mmapper` operates at the granularity of
 /// [`Mmapper::granularity()`].  Methods that take memory ranges as arguments will round the range
 /// to the overlapping chunks.
+///
+/// From the perspective of the `Mmapper`, each memory range can be in one of the three states:
+/// Unmapped, Quarantined, and Mapped.  The state transition graph is:
+///
+/// ```text
+/// ┌────────┐  ensure_mapped / mark_as_mapped    ┌──────┐
+/// │Unmapped├────────────────────────────────────►Mapped│
+/// └───┬────┘                                    └───▲──┘
+///     │               ┌───────────┐                 │
+///     └───────────────►Quarantined├─────────────────┘
+///         quarantine  └───────────┘  ensure_mapped
+/// ```
+///
+/// -   **Unmapped** means the memory is not mapped by the `Mmapper`, and may be mapped by other
+///     components of the process.
+/// -   **Quarantined** means the `Mmapper` has reserved the memory for MMTk, usually by using
+///     `mmap` with `PROT_NONE`.
+/// -   **Mapped** means `Mmapper` has mapped the memory, and the memory can be read and written by
+///     MMTk.
 pub trait Mmapper: Sync {
     /// The logarithm of granularity of this `Mmapper`, in bytes.  Must be at least
     /// [`LOG_BYTES_IN_PAGE`].
@@ -34,14 +53,6 @@ pub trait Mmapper: Sync {
     fn granularity(&self) -> usize {
         1 << self.log_granularity()
     }
-
-    /// Given an address array describing the regions of virtual memory to be used
-    /// by MMTk, demand zero map all of them if they are not already mapped.
-    ///
-    /// Arguments:
-    /// * `spaceMap`: An address array containing a pairs of start and end
-    ///   addresses for each of the regions to be mapped
-    fn eagerly_mmap_all_spaces(&self, _space_map: &[Address]);
 
     /// Mark a number of pages as mapped, without making any
     /// request to the operating system.  Used to mark pages
@@ -96,11 +107,4 @@ pub trait Mmapper: Sync {
     /// Arguments:
     /// * `addr`: Address in question
     fn is_mapped_address(&self, addr: Address) -> bool;
-
-    /// Mark a number of pages as inaccessible.
-    ///
-    /// Arguments:
-    /// * `start`: Address of the first page to be protected
-    /// * `pages`: Number of pages to be protected
-    fn protect(&self, start: Address, pages: usize);
 }
