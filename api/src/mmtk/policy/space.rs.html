@@ -756,23 +756,7 @@
 <a href="#755" id="755">755</a>
 <a href="#756" id="756">756</a>
 <a href="#757" id="757">757</a>
-<a href="#758" id="758">758</a>
-<a href="#759" id="759">759</a>
-<a href="#760" id="760">760</a>
-<a href="#761" id="761">761</a>
-<a href="#762" id="762">762</a>
-<a href="#763" id="763">763</a>
-<a href="#764" id="764">764</a>
-<a href="#765" id="765">765</a>
-<a href="#766" id="766">766</a>
-<a href="#767" id="767">767</a>
-<a href="#768" id="768">768</a>
-<a href="#769" id="769">769</a>
-<a href="#770" id="770">770</a>
-<a href="#771" id="771">771</a>
-<a href="#772" id="772">772</a>
-<a href="#773" id="773">773</a>
-<a href="#774" id="774">774</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
+<a href="#758" id="758">758</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::<span class="kw-2">*</span>;
@@ -1111,22 +1095,6 @@
         <span class="kw">if </span>new_chunk {
             <span class="kw">unsafe </span>{ SFT_MAP.update(<span class="self">self</span>.as_sft(), start, bytes) };
         }
-    }
-
-    <span class="doccomment">/// Ensure this space is marked as mapped -- used when the space is already
-    /// mapped (e.g. for a vm image which is externally mmapped.)
-    </span><span class="kw">fn </span>ensure_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.common()
-            .metadata
-            .try_map_metadata_space(<span class="self">self</span>.common().start, <span class="self">self</span>.common().extent, <span class="self">self</span>.get_name())
-            .unwrap_or_else(|e| {
-                <span class="comment">// TODO(Javad): handle meta space allocation failure
-                </span><span class="macro">panic!</span>(<span class="string">"failed to mmap meta memory: {e}"</span>);
-            });
-
-        <span class="self">self</span>.common()
-            .mmapper
-            .mark_as_mapped(<span class="self">self</span>.common().start, <span class="self">self</span>.common().extent);
     }
 
     <span class="doccomment">/// Estimate the amount of side metadata memory needed for a give data memory size in pages. The

@@ -389,9 +389,7 @@
 <a href="#388" id="388">388</a>
 <a href="#389" id="389">389</a>
 <a href="#390" id="390">390</a>
-<a href="#391" id="391">391</a>
-<a href="#392" id="392">392</a>
-<a href="#393" id="393">393</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::{Mutex, MutexGuard};
+<a href="#391" id="391">391</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::{Mutex, MutexGuard};
 
 <span class="kw">use </span><span class="kw">super</span>::layout::vm_layout::PAGES_IN_CHUNK;
 <span class="kw">use </span><span class="kw">super</span>::layout::VMMap;
@@ -612,9 +610,7 @@
         // &gt; (e.g., read versus read/write protection) exceeding the
         // &gt; allowed maximum.
         </span><span class="macro">assert!</span>(<span class="self">self</span>.protect_memory_on_release.is_some());
-        <span class="comment">// We are not using mmapper.protect(). mmapper.protect() protects the whole chunk and
-        // may protect memory that is still in use.
-        </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = memory::mprotect(start, conversions::pages_to_bytes(pages)) {
+        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = memory::mprotect(start, conversions::pages_to_bytes(pages)) {
             <span class="macro">panic!</span>(
                 <span class="string">"Failed at protecting memory (starting at {}): {:?}"</span>,
                 start, e

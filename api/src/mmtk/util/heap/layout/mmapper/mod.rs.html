@@ -104,7 +104,11 @@
 <a href="#103" id="103">103</a>
 <a href="#104" id="104">104</a>
 <a href="#105" id="105">105</a>
-<a href="#106" id="106">106</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::{
+<a href="#106" id="106">106</a>
+<a href="#107" id="107">107</a>
+<a href="#108" id="108">108</a>
+<a href="#109" id="109">109</a>
+<a href="#110" id="110">110</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::{
     memory::{MmapAnnotation, MmapStrategy},
     Address,
 };
@@ -120,6 +124,25 @@
 /// For the efficiency of implementation, an `Mmapper` operates at the granularity of
 /// [`Mmapper::granularity()`].  Methods that take memory ranges as arguments will round the range
 /// to the overlapping chunks.
+///
+/// From the perspective of the `Mmapper`, each memory range can be in one of the three states:
+/// Unmapped, Quarantined, and Mapped.  The state transition graph is:
+///
+/// ```text
+/// ┌────────┐  ensure_mapped / mark_as_mapped    ┌──────┐
+/// │Unmapped├────────────────────────────────────►Mapped│
+/// └───┬────┘                                    └───▲──┘
+///     │               ┌───────────┐                 │
+///     └───────────────►Quarantined├─────────────────┘
+///         quarantine  └───────────┘  ensure_mapped
+/// ```
+///
+/// -   **Unmapped** means the memory is not mapped by the `Mmapper`, and may be mapped by other
+///     components of the process.
+/// -   **Quarantined** means the `Mmapper` has reserved the memory for MMTk, usually by using
+///     `mmap` with `PROT_NONE`.
+/// -   **Mapped** means `Mmapper` has mapped the memory, and the memory can be read and written by
+///     MMTk.
 </span><span class="kw">pub trait </span>Mmapper: Sync {
     <span class="doccomment">/// The logarithm of granularity of this `Mmapper`, in bytes.  Must be at least
     /// [`LOG_BYTES_IN_PAGE`].
@@ -140,14 +163,6 @@
     </span><span class="kw">fn </span>granularity(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="number">1 </span>&lt;&lt; <span class="self">self</span>.log_granularity()
     }
-
-    <span class="doccomment">/// Given an address array describing the regions of virtual memory to be used
-    /// by MMTk, demand zero map all of them if they are not already mapped.
-    ///
-    /// Arguments:
-    /// * `spaceMap`: An address array containing a pairs of start and end
-    ///   addresses for each of the regions to be mapped
-    </span><span class="kw">fn </span>eagerly_mmap_all_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>, _space_map: <span class="kw-2">&amp;</span>[Address]);
 
     <span class="doccomment">/// Mark a number of pages as mapped, without making any
     /// request to the operating system.  Used to mark pages
@@ -202,12 +217,5 @@
     /// Arguments:
     /// * `addr`: Address in question
     </span><span class="kw">fn </span>is_mapped_address(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool;
-
-    <span class="doccomment">/// Mark a number of pages as inaccessible.
-    ///
-    /// Arguments:
-    /// * `start`: Address of the first page to be protected
-    /// * `pages`: Number of pages to be protected
-    </span><span class="kw">fn </span>protect(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, pages: usize);
 }
 </code></pre></div></section></main></body></html>
