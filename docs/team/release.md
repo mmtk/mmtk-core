@@ -72,6 +72,14 @@ Once the PRs are merged, we can tag releases on Github.
 5. Tick 'Set as a pre-release'.
 6. Click 'Publish release'.
 
+#### OpenJDK Binary Release
+
+The OpenJDK binding release should also include the compiled binary packaged as a tarball.
+This tarball is used for the canary build in the performance CI. See [Regression Test Canary](https://github.com/mmtk/mmtk-core/blob/master/docs/team/ci.md#regression-test-canary).
+
+You can generate the tarball using OpenJDK’s `make product-bundles` command (with MMTk).
+Among the generated files, the one with the `*_bin.tar.gz` suffix should be included in the release.
+
 ### Post release checklist
 
 1. Keep an eye on the badges in [README](https://github.com/mmtk/mmtk-core#mmtk)
