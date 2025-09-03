@@ -139,26 +139,18 @@ jobs:
           ref: "0.8.3"
           path: ci-perf-kit
           submodules: true
-      # checkout canary versions.
-      - name: Checkout MMTk Core (canary)
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.CANARY_VERSION }}
-          path: canary/mmtk-core
-      - name: Checkout OpenJDK Binding (canary)
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.CANARY_VERSION }}
-          repository: mmtk/mmtk-openjdk
-          path: canary/mmtk-openjdk
-      - name: Checkout OpenJDK (canary)
-        working-directory: canary/mmtk-openjdk
+      # download canary build -- assume we have build.zip for the canary version in mmtk-openjdk
+      # build.zip should include all the directories of a build dir, and should be extracted to a list of directories like bin, conf, include, etc.
+      - name: Download canary build
         run: |
-          ./.github/scripts/ci-checkout.sh
+          mkdir -p ./canary
+          gh release download ${{ env.CANARY_VERSION }} --repo mmtk/mmtk-openjdk --pattern "build.zip" --dir ./canary
+          unzip ./canary/build.zip -d ./canary
+          rm ./canary/build.zip
       # setup
       - name: Setup directory structures
         run: |
-          for BASE_DIR in ./latest ./canary; do
+          for BASE_DIR in ./latest; do
             pushd $BASE_DIR
               # replace dependency
               # Note that ci-replace-mmtk-dep.sh will apply `realpath()` to the `--mmtk-core-path` option.
@@ -183,7 +175,7 @@ jobs:
           export FROM_DATE=2020-07-10
           ./ci-perf-kit/scripts/openjdk-history-run.sh \
             ./latest/mmtk-openjdk \
-            ./canary/mmtk-openjdk \
+            ./canary \
             ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
       - name: Deploy to Github Page
