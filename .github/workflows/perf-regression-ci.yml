@@ -116,6 +116,9 @@ jobs:
       # available.  Then we may change to another release version and mark the change of canary on
       # the timeline, or introduce a mechanism to dynamically choose the canary version.
       CANARY_VERSION: "v0.28.0"
+      CANARY_RELEASE_BINARY_NAME: "jdk-11.0.19-internal+0_linux-x64_bin.tar.gz"
+      CANARY_JDK_NAME: "jdk-11.0.19"
+      CANARY_DIR: "canary"
     steps:
       # checkout latest versions
       - name: Checkout MMTk Core (latest)
@@ -139,16 +142,19 @@ jobs:
           ref: "use-canary-binary"
           path: ci-perf-kit
           submodules: true
-      # download canary build -- assume we have build.zip for the canary version in mmtk-openjdk
-      # build.zip should include all the directories of a build dir, and should be extracted to a list of directories like bin, conf, include, etc.
+      # download canary build
+      # The tar ball should be the standard release tar ball from `make product-bundles`.
       - name: Download canary build
         env:
           GH_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
         run: |
-          mkdir -p ./canary
-          gh release download ${{ env.CANARY_VERSION }} --repo mmtk/mmtk-openjdk --pattern "build.zip" --dir ./canary
-          unzip ./canary/build.zip -d ./canary
-          rm ./canary/build.zip
+          rm -rf ${{ env.CANARY_DIR }}
+          mkdir -p ${{ env.CANARY_DIR }}
+          gh release download ${{ env.CANARY_VERSION }} --repo mmtk/mmtk-openjdk --pattern "${{ env.CANARY_RELEASE_BINARY_NAME }}" --dir ${{ env.CANARY_DIR }}/images
+          cd ${{ env.CANARY_DIR}}/images
+          tar -xvzf ${{ env.CANARY_RELEASE_BINARY_NAME }}
+          mv ${{ env.CANARY_JDK_NAME }} jdk
+          rm ${{ env.CANARY_RELEASE_BINARY_NAME }}
       # setup
       - name: Setup directory structures
         run: |
@@ -177,7 +183,7 @@ jobs:
           export FROM_DATE=2020-07-10
           ./ci-perf-kit/scripts/openjdk-history-run.sh \
             ./latest/mmtk-openjdk \
-            ./canary \
+            ${{ env.CANARY_DIR }} \
             ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
       - name: Deploy to Github Page
