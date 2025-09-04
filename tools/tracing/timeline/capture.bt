@@ -124,6 +124,18 @@ usdt:$MMTK:mmtk:sweep_chunk {
     }
 }
 
+usdt:$MMTK:mmtk:concurrent_trace_objects {
+        printf("concurrent_trace_objects,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
+}
+
+usdt:$MMTK:mmtk:gcrequester_request {
+        printf("gcrequester_request,i,%d,%lu\n", tid, nsecs);
+}
+
+usdt:$MMTK:mmtk:add_schedule_collection_packet {
+        printf("add_schedule_collection_packet,i,%d,%lu\n", tid, nsecs);
+}
+
 usdt:$MMTK:mmtk:finalization {
     if (@enable_print) {
         printf("finalization,meta,%d,%lu,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2, arg3);

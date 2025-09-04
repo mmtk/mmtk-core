@@ -1,10 +1,12 @@
 //! This module contains code useful for tracing,
 //! i.e. visiting the reachable objects by traversing all or part of an object graph.
 
+use std::marker::PhantomData;
+
 use crate::scheduler::gc_work::{ProcessEdgesWork, SlotOf};
 use crate::scheduler::{GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
-use crate::util::ObjectReference;
-use crate::vm::SlotVisitor;
+use crate::util::{ObjectReference, VMThread, VMWorkerThread};
+use crate::vm::{Scanning, SlotVisitor, VMBinding};
 
 /// This trait represents an object queue to enqueue objects during tracing.
 pub trait ObjectQueue {
@@ -62,6 +64,16 @@ impl<T> VectorQueue<T> {
             self.buffer.reserve(Self::CAPACITY);
         }
         self.buffer.push(v);
+    }
+
+    /// Return the len of the queue
+    pub fn len(&self) -> usize {
+        self.buffer.len()
+    }
+
+    /// Empty the queue
+    pub fn clear(&mut self) {
+        self.buffer.clear()
     }
 }
 
@@ -132,5 +144,31 @@ impl<E: ProcessEdgesWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'_, E> {
 impl<E: ProcessEdgesWork> Drop for ObjectsClosure<'_, E> {
     fn drop(&mut self) {
         self.flush();
+    }
+}
+
+/// For iterating over the slots of an object.
+pub struct SlotIterator<VM: VMBinding, F: FnMut(VM::VMSlot)> {
+    f: F,
+    _p: PhantomData<VM>,
+}
+
+impl<VM: VMBinding, F: FnMut(VM::VMSlot)> SlotVisitor<VM::VMSlot> for SlotIterator<VM, F> {
+    fn visit_slot(&mut self, slot: VM::VMSlot) {
+        (self.f)(slot);
+    }
+}
+
+impl<VM: VMBinding, F: FnMut(VM::VMSlot)> SlotIterator<VM, F> {
+    /// Iterate over the slots of an object by applying a function to each slot.
+    pub fn iterate_fields(o: ObjectReference, _tls: VMThread, f: F) {
+        let mut x = SlotIterator::<VM, _> { f, _p: PhantomData };
+        <VM::VMScanning as Scanning<VM>>::scan_object(
+            // FIXME: We should use tls from the arguments.
+            // See https://github.com/mmtk/mmtk-core/issues/1375
+            VMWorkerThread(VMThread::UNINITIALIZED),
+            o,
+            &mut x,
+        );
     }
 }
