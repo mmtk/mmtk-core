@@ -360,9 +360,16 @@ pub enum AffinityKind {
 impl AffinityKind {
     /// Returns an AffinityKind or String containing error. Expects the list of cores to be
     /// formatted as numbers separated by commas, including ranges. There should be no spaces
-    /// between the cores in the list. For example: 0,5,8-11 specifies that the cores 0,5,8,9,10,11
-    /// should be used for pinning threads. Performs de-duplication of specified cores. Note that
-    /// the core list is sorted as a side-effect whenever a new core is added to the set.
+    /// between the cores in the list. Optionally can provide an affinity kind before the list
+    /// of cores.
+    ///
+    /// Performs de-duplication of specified cores. Note that the core list is sorted as a
+    /// side-effect whenever a new core is added to the set.
+    ///
+    /// For example:
+    ///  - "`0,5,8-11`" specifies that the cores 0,5,8,9,10,11 should be used for pinning threads.
+    ///  - "`AllInSet:0,5`" specifies that the cores 0,5 should be used for pinning threads using the
+    ///    [`AffinityKind::AllInSet`] method.
     fn parse_cpulist(cpulist: &str) -> Result<AffinityKind, String> {
         let mut cpuset = vec![];
 
@@ -370,6 +377,10 @@ impl AffinityKind {
             return Ok(AffinityKind::OsDefault);
         }
 
+        // Trying to parse strings such as "RoundRobin:0,1-3"
+        // First split on ":" to check if an affinity kind has been specified.
+        // Check if it is one of the legal affinity kinds. If no affinity kind
+        // has been specified then use `RoundRobin`.
         let mut all_in_set = false;
         let kind_split: Vec<&str> = cpulist.splitn(2, ':').collect();
         if kind_split.len() == 2 {
@@ -918,21 +929,21 @@ options! {
     ///  2. "all in set", wherein each GC thread is allocated all the cores in the provided
     ///     CPU set.
     ///
-    /// The method can selected by specifying "`RoundRobin:<core ids>`" or "`AllInSet:<core ids>`"
+    /// The method can be selected by specifying "`RoundRobin:<core ids>`" or "`AllInSet:<core ids>`".
     /// By default, if no kind is specified in the option, then it will use the round-robin
     /// method.
     ///
-    /// The core ids should match the ones reported by /proc/cpuinfo. Core ids are separated by
+    /// The core ids should match the ones reported by /proc/cpuinfo. Core IDs are separated by
     /// commas and may include ranges. There should be no spaces in the core list. For example:
     /// 0,5,8-11 specifies that cores 0,5,8,9,10,11 should be used for pinning threads.
     ///
     /// Note that in the case the program has only been allocated a certain number of cores using
-    /// `taskset`, the core ids in the list should be specified by their perceived index as using
-    /// `taskset` will essentially re-label the core ids. For example, running the program with
+    /// `taskset`, the core IDs in the list should be specified by their perceived index as using
+    /// `taskset` will essentially re-label the core IDs. For example, running the program with
     /// `MMTK_THREAD_AFFINITY="0-4" taskset -c 6-12 <program>` means that the cores 6,7,8,9,10 will
-    /// be used to pin threads even though we specified the core ids "0,1,2,3,4".
+    /// be used to pin threads even though we specified the core IDs "0,1,2,3,4".
     /// `MMTK_THREAD_AFFINITY="12" taskset -c 6-12 <program>` will not work, on the other hand, as
-    /// there is no core with (perceived) id 12.
+    /// there is no core with (perceived) ID 12.
     // XXX: This option is currently only supported on Linux.
     thread_affinity:        AffinityKind            [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
     /// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
