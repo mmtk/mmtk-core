@@ -33,6 +33,11 @@ impl AffinityKind {
     pub fn resolve_affinity(&self, thread: ThreadId) {
         match self {
             AffinityKind::OsDefault => {}
+            AffinityKind::AllInSet(cpuset) => {
+                // Bind the current thread to all the cores in the set
+                debug!("Set affinity for thread {} to cpuset {:?}", thread, cpuset);
+                bind_current_thread_to_cpuset(cpuset.as_slice());
+            }
             AffinityKind::RoundRobin(cpuset) => {
                 let cpu = cpuset[thread % cpuset.len()];
                 debug!("Set affinity for thread {} to core {}", thread, cpu);
@@ -57,5 +62,25 @@ fn bind_current_thread_to_core(cpu: CoreId) {
 #[cfg(not(target_os = "linux"))]
 /// Bind the current thread to the specified core.
 fn bind_current_thread_to_core(_cpu: CoreId) {
+    unimplemented!()
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+/// Bind the current thread to the specified core.
+fn bind_current_thread_to_cpuset(cpuset: &[CoreId]) {
+    use std::mem::MaybeUninit;
+    unsafe {
+        let mut cs = MaybeUninit::zeroed().assume_init();
+        CPU_ZERO(&mut cs);
+        for cpu in cpuset {
+            CPU_SET(*cpu as usize, &mut cs);
+        }
+        sched_setaffinity(0, std::mem::size_of::<cpu_set_t>(), &cs);
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+/// Bind the current thread to the specified core.
+fn bind_current_thread_to_cpuset(_cpuset: &[CoreId]) {
     unimplemented!()
 }
