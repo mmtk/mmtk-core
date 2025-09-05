@@ -1292,10 +1292,7 @@ mod tests {
     fn test_thread_affinity_bad_affinity_kind() {
         serial_test(|| {
             let affinity = "AllIn:0,1".parse::<AffinityKind>();
-            assert_eq!(
-                affinity,
-                Err("Unknown affinity kind: AllIn".to_string())
-            );
+            assert_eq!(affinity, Err("Unknown affinity kind: AllIn".to_string()));
         })
     }
 
