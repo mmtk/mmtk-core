@@ -194,9 +194,25 @@
 <a href="#193" id="193">193</a>
 <a href="#194" id="194">194</a>
 <a href="#195" id="195">195</a>
-<a href="#196" id="196">196</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::policy::compressor::GC_MARK_BIT_MASK;
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::policy::compressor::GC_MARK_BIT_MASK;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_WORD;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::MonotonePageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::{Region, RegionIterator};
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::{COMPRESSOR_MARK, COMPRESSOR_OFFSET_VECTOR};
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
@@ -206,6 +222,25 @@
 <span class="kw">use </span>atomic::Ordering;
 <span class="kw">use </span>std::marker::PhantomData;
 <span class="kw">use </span>std::sync::atomic::AtomicBool;
+
+<span class="doccomment">/// A [`CompressorRegion`] is the granularity at which [`super::CompressorSpace`]
+/// compacts the heap. Objects are allocated inside one region, and are only ever
+/// moved *within* that region.
+</span><span class="attr">#[derive(Copy, Clone, PartialEq, PartialOrd)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>CompressorRegion(Address);
+<span class="kw">impl </span>Region <span class="kw">for </span>CompressorRegion {
+    <span class="kw">const </span>LOG_BYTES: usize = <span class="number">20</span>; <span class="comment">// 1 MiB
+    </span><span class="kw">fn </span>from_aligned_address(address: Address) -&gt; <span class="self">Self </span>{
+        <span class="macro">assert!</span>(
+            address.is_aligned_to(<span class="self">Self</span>::BYTES),
+            <span class="string">"{address} is not aligned"
+        </span>);
+        CompressorRegion(address)
+    }
+    <span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
+        <span class="self">self</span>.<span class="number">0
+    </span>}
+}
 
 <span class="doccomment">/// A finite-state machine which visits the positions of marked bits in
 /// the mark bitmap, and accumulates the size of live data that it has
@@ -217,8 +252,9 @@
 /// using [`Transducer::decode`].
 </span><span class="attr">#[derive(Debug)]
 </span><span class="kw">struct </span>Transducer {
-    <span class="doccomment">/// The total live data visited by the transducer.
-    </span>live: usize,
+    <span class="doccomment">/// The address for the next object to be copied to, following preceding
+    /// objects which were visited by the transducer.
+    </span>to: Address,
     <span class="doccomment">/// The address of the last mark bit which the transducer visited.
     </span>last_bit_visited: Address,
     <span class="doccomment">/// Whether or not the transducer is currently inside an object
@@ -226,9 +262,9 @@
     </span>in_object: bool,
 }
 <span class="kw">impl </span>Transducer {
-    <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new(to: Address) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
-            live: <span class="number">0</span>,
+            to,
             last_bit_visited: Address::ZERO,
             in_object: <span class="bool-val">false</span>,
         }
@@ -243,7 +279,7 @@
             </span><span class="kw">let </span>first_word = <span class="self">self</span>.last_bit_visited;
             <span class="kw">let </span>last_word = address;
             <span class="kw">let </span>size = last_word - first_word + BYTES_IN_WORD;
-            <span class="self">self</span>.live += size;
+            <span class="self">self</span>.to += size;
         }
         <span class="self">self</span>.in_object = !<span class="self">self</span>.in_object;
         <span class="self">self</span>.last_bit_visited = address;
@@ -254,15 +290,15 @@
             <span class="comment">// We count the space between the last mark bit and
             // the current address as live when we stop in the
             // middle of an object.
-            </span><span class="self">self</span>.live + (current_position - <span class="self">self</span>.last_bit_visited) + <span class="number">1
+            </span><span class="self">self</span>.to.as_usize() + (current_position - <span class="self">self</span>.last_bit_visited) + <span class="number">1
         </span>} <span class="kw">else </span>{
-            <span class="self">self</span>.live
+            <span class="self">self</span>.to.as_usize()
         }
     }
 
     <span class="kw">pub fn </span>decode(offset: usize, current_position: Address) -&gt; <span class="self">Self </span>{
         Transducer {
-            live: offset &amp; !<span class="number">1</span>,
+            to: <span class="kw">unsafe </span>{ Address::from_usize(offset &amp; !<span class="number">1</span>) },
             last_bit_visited: current_position,
             in_object: (offset &amp; <span class="number">1</span>) == <span class="number">1</span>,
         }
@@ -270,7 +306,6 @@
 }
 
 <span class="kw">pub struct </span>ForwardingMetadata&lt;VM: VMBinding&gt; {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) first_address: Address,
     calculated: AtomicBool,
     vm: PhantomData&lt;VM&gt;,
 }
@@ -295,9 +330,8 @@
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>OFFSET_VECTOR_SPEC: SideMetadataSpec = COMPRESSOR_OFFSET_VECTOR;
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; ForwardingMetadata&lt;VM&gt; {
-    <span class="kw">pub fn </span>new(start: Address) -&gt; ForwardingMetadata&lt;VM&gt; {
+    <span class="kw">pub fn </span>new() -&gt; ForwardingMetadata&lt;VM&gt; {
         ForwardingMetadata {
-            first_address: start,
             calculated: AtomicBool::new(<span class="bool-val">false</span>),
             vm: PhantomData,
         }
@@ -326,10 +360,10 @@
         MARK_SPEC.fetch_or_atomic(last_word_of_object, GC_MARK_BIT_MASK, Ordering::SeqCst);
     }
 
-    <span class="kw">pub fn </span>calculate_offset_vector(<span class="kw-2">&amp;</span><span class="self">self</span>, pr: <span class="kw-2">&amp;</span>MonotonePageResource&lt;VM&gt;) {
-        <span class="kw">let </span><span class="kw-2">mut </span>state = Transducer::new();
-        <span class="kw">let </span>first_block = Block::from_aligned_address(<span class="self">self</span>.first_address);
-        <span class="kw">let </span>last_block = Block::from_aligned_address(pr.cursor());
+    <span class="kw">pub fn </span>calculate_offset_vector(<span class="kw-2">&amp;</span><span class="self">self</span>, region: CompressorRegion, cursor: Address) {
+        <span class="kw">let </span><span class="kw-2">mut </span>state = Transducer::new(region.start());
+        <span class="kw">let </span>first_block = Block::from_aligned_address(region.start());
+        <span class="kw">let </span>last_block = Block::from_aligned_address(cursor);
         <span class="kw">for </span>block <span class="kw">in </span>RegionIterator::&lt;Block&gt;::new(first_block, last_block) {
             OFFSET_VECTOR_SPEC.store_atomic::&lt;usize&gt;(
                 block.start(),
@@ -361,13 +395,13 @@
             OFFSET_VECTOR_SPEC.load_atomic::&lt;usize&gt;(block.start(), Ordering::Relaxed),
             block.start(),
         );
-        <span class="comment">// The transducer in this implementation computes the offset
-        // relative to the start of the heap; whereas Total-Live-Data in
-        // the paper computes the offset relative to the start of the block.
+        <span class="comment">// The transducer in this implementation computes the final
+        // address of an object; whereas Total-Live-Data in the paper computes
+        // the distance of the object from the start of the block.
         </span>MARK_SPEC.scan_non_zero_values::&lt;u8&gt;(block.start(), address, <span class="kw-2">&amp;mut </span>|addr: Address| {
             state.visit_mark_bit(addr)
         });
-        <span class="self">self</span>.first_address + state.live
+        state.to
     }
 
     <span class="kw">pub fn </span>scan_marked_objects(

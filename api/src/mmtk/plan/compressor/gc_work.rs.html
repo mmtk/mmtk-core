@@ -108,39 +108,36 @@
 <a href="#107" id="107">107</a>
 <a href="#108" id="108">108</a>
 <a href="#109" id="109">109</a>
-<a href="#110" id="110">110</a>
-<a href="#111" id="111">111</a>
-<a href="#112" id="112">112</a>
-<a href="#113" id="113">113</a>
-<a href="#114" id="114">114</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::global::Compressor;
-<span class="kw">use </span><span class="kw">crate</span>::policy::compressor::CompressorSpace;
-<span class="kw">use </span><span class="kw">crate</span>::policy::compressor::{TRACE_KIND_FORWARD_ROOT, TRACE_KIND_MARK};
+<a href="#110" id="110">110</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::global::Compressor;
+<span class="kw">use </span><span class="kw">crate</span>::policy::compressor::{CompressorSpace, TRACE_KIND_FORWARD_ROOT, TRACE_KIND_MARK};
 <span class="kw">use </span><span class="kw">crate</span>::policy::largeobjectspace::LargeObjectSpace;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::PlanProcessEdges;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWork;
-<span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
-<span class="kw">use </span><span class="kw">crate</span>::scheduler::WorkBucketStage;
-<span class="kw">use </span><span class="kw">crate</span>::vm::ActivePlan;
-<span class="kw">use </span><span class="kw">crate</span>::vm::Scanning;
-<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::{GCWork, GCWorker, WorkBucketStage};
+<span class="kw">use </span><span class="kw">crate</span>::vm::{ActivePlan, Scanning, VMBinding};
 <span class="kw">use </span><span class="kw">crate</span>::MMTK;
-<span class="kw">use </span>std::marker::PhantomData;
+<span class="kw">use </span>std::marker::{PhantomData, Send};
 
-<span class="doccomment">/// Iterate through the heap and calculate the new location of live objects.
-</span><span class="kw">pub struct </span>CalculateForwardingAddress&lt;VM: VMBinding&gt; {
+<span class="doccomment">/// Generate more packets by calling a method on [`CompressorSpace`].
+</span><span class="kw">pub struct </span>GenerateWork&lt;VM: VMBinding, F: Fn(<span class="kw-2">&amp;</span><span class="lifetime">'static </span>CompressorSpace&lt;VM&gt;) + Send + <span class="lifetime">'static</span>&gt; {
     compressor_space: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>CompressorSpace&lt;VM&gt;,
+    f: F,
 }
 
-<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>CalculateForwardingAddress&lt;VM&gt; {
+<span class="kw">impl</span>&lt;VM: VMBinding, F: Fn(<span class="kw-2">&amp;</span><span class="lifetime">'static </span>CompressorSpace&lt;VM&gt;) + Send + <span class="lifetime">'static</span>&gt; GCWork&lt;VM&gt;
+    <span class="kw">for </span>GenerateWork&lt;VM, F&gt;
+{
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-        <span class="self">self</span>.compressor_space.calculate_offset_vector();
+        (<span class="self">self</span>.f)(<span class="self">self</span>.compressor_space);
     }
 }
 
-<span class="kw">impl</span>&lt;VM: VMBinding&gt; CalculateForwardingAddress&lt;VM&gt; {
-    <span class="kw">pub fn </span>new(compressor_space: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>CompressorSpace&lt;VM&gt;) -&gt; <span class="self">Self </span>{
-        <span class="self">Self </span>{ compressor_space }
+<span class="kw">impl</span>&lt;VM: VMBinding, F: Fn(<span class="kw-2">&amp;</span><span class="lifetime">'static </span>CompressorSpace&lt;VM&gt;) + Send + <span class="lifetime">'static</span>&gt; GenerateWork&lt;VM, F&gt; {
+    <span class="kw">pub fn </span>new(compressor_space: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>CompressorSpace&lt;VM&gt;, f: F) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            compressor_space,
+            f,
+        }
     }
 }
 
@@ -160,11 +157,6 @@
         <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
         </span>mmtk.slot_logger.reset();
 
-        <span class="comment">// We do two passes of transitive closures. We clear the live bytes from the first pass.
-        </span>mmtk.scheduler
-            .worker_group
-            .get_and_clear_worker_live_bytes();
-
         <span class="kw">for </span>mutator <span class="kw">in </span>VM::VMActivePlan::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots].add(ScanMutatorRoots::&lt;
                 CompressorForwardingWorkContext&lt;VM&gt;,
@@ -182,19 +174,19 @@
     }
 }
 
-<span class="doccomment">/// Compact live objects based on the previously-calculated forwarding pointers.
-</span><span class="kw">pub struct </span>Compact&lt;VM: VMBinding&gt; {
+<span class="doccomment">/// Reset the allocator and update references in large object space.
+</span><span class="kw">pub struct </span>AfterCompact&lt;VM: VMBinding&gt; {
     compressor_space: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>CompressorSpace&lt;VM&gt;,
     los: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>LargeObjectSpace&lt;VM&gt;,
 }
 
-<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>Compact&lt;VM&gt; {
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>AfterCompact&lt;VM&gt; {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-        <span class="self">self</span>.compressor_space.compact(worker, <span class="self">self</span>.los);
+        <span class="self">self</span>.compressor_space.after_compact(worker, <span class="self">self</span>.los);
     }
 }
 
-<span class="kw">impl</span>&lt;VM: VMBinding&gt; Compact&lt;VM&gt; {
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; AfterCompact&lt;VM&gt; {
     <span class="kw">pub fn </span>new(
         compressor_space: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>CompressorSpace&lt;VM&gt;,
         los: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>LargeObjectSpace&lt;VM&gt;,

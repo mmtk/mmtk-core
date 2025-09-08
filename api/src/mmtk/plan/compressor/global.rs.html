@@ -197,24 +197,25 @@
 <a href="#196" id="196">196</a>
 <a href="#197" id="197">197</a>
 <a href="#198" id="198">198</a>
-<a href="#199" id="199">199</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::CompressorWorkContext;
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::CompressorWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::{
-    CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
-    UpdateReferences,
+    AfterCompact, ForwardingProcessEdges, GenerateWork, MarkingProcessEdges, UpdateReferences,
 };
 <span class="kw">use </span><span class="kw">crate</span>::plan::compressor::mutator::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::{BasePlan, CommonPlan};
 <span class="kw">use </span><span class="kw">crate</span>::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN;
-<span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
-<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
-<span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
+<span class="kw">use </span><span class="kw">crate</span>::plan::{AllocationSemantics, Plan, PlanConstraints};
 <span class="kw">use </span><span class="kw">crate</span>::policy::compressor::CompressorSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
-<span class="kw">use </span><span class="kw">crate</span>::scheduler::WorkBucketStage;
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::{GCWorkScheduler, WorkBucketStage};
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::SpaceStats;
 <span class="attr">#[allow(unused_imports)]
@@ -225,7 +226,7 @@
 <span class="kw">use </span>enum_map::EnumMap;
 <span class="kw">use </span>mmtk_macros::{HasSpaces, PlanTraceObject};
 
-<span class="doccomment">/// Compressor implements a stop-the-world and serial implementation of
+<span class="doccomment">/// [`Compressor`] implements a stop-the-world and parallel implementation of
 /// the Compressor, as described in Kermany and Petrank,
 /// [The Compressor: concurrent, incremental, and parallel compaction](https://dl.acm.org/doi/10.1145/1133255.1134023).
 </span><span class="attr">#[derive(HasSpaces, PlanTraceObject)]
@@ -296,13 +297,22 @@
         </span>scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::&lt;CompressorWorkContext&lt;VM&gt;&gt;::new(<span class="self">self</span>));
 
-        scheduler.work_buckets[WorkBucketStage::CalculateForwarding].add(
-            CalculateForwardingAddress::&lt;VM&gt;::new(<span class="kw-2">&amp;</span><span class="self">self</span>.compressor_space),
-        );
-        <span class="comment">// do another trace to update references
+        scheduler.work_buckets[WorkBucketStage::CalculateForwarding].add(GenerateWork::new(
+            <span class="kw-2">&amp;</span><span class="self">self</span>.compressor_space,
+            CompressorSpace::&lt;VM&gt;::add_offset_vector_tasks,
+        ));
+
+        <span class="comment">// scan roots to update their references
         </span>scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::&lt;VM&gt;::new());
-        scheduler.work_buckets[WorkBucketStage::Compact]
-            .add(Compact::&lt;VM&gt;::new(<span class="kw-2">&amp;</span><span class="self">self</span>.compressor_space, <span class="kw-2">&amp;</span><span class="self">self</span>.common.los));
+
+        scheduler.work_buckets[WorkBucketStage::Compact].add(GenerateWork::new(
+            <span class="kw-2">&amp;</span><span class="self">self</span>.compressor_space,
+            CompressorSpace::&lt;VM&gt;::add_compact_tasks,
+        ));
+
+        scheduler.work_buckets[WorkBucketStage::Compact].set_sentinel(Box::new(
+            AfterCompact::&lt;VM&gt;::new(<span class="kw-2">&amp;</span><span class="self">self</span>.compressor_space, <span class="kw-2">&amp;</span><span class="self">self</span>.common.los),
+        ));
 
         <span class="comment">// Release global/collectors/mutators
         </span>scheduler.work_buckets[WorkBucketStage::Release]

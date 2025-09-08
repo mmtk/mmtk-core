@@ -362,16 +362,116 @@
 <a href="#361" id="361">361</a>
 <a href="#362" id="362">362</a>
 <a href="#363" id="363">363</a>
-<a href="#364" id="364">364</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
+<a href="#387" id="387">387</a>
+<a href="#388" id="388">388</a>
+<a href="#389" id="389">389</a>
+<a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
+<a href="#410" id="410">410</a>
+<a href="#411" id="411">411</a>
+<a href="#412" id="412">412</a>
+<a href="#413" id="413">413</a>
+<a href="#414" id="414">414</a>
+<a href="#415" id="415">415</a>
+<a href="#416" id="416">416</a>
+<a href="#417" id="417">417</a>
+<a href="#418" id="418">418</a>
+<a href="#419" id="419">419</a>
+<a href="#420" id="420">420</a>
+<a href="#421" id="421">421</a>
+<a href="#422" id="422">422</a>
+<a href="#423" id="423">423</a>
+<a href="#424" id="424">424</a>
+<a href="#425" id="425">425</a>
+<a href="#426" id="426">426</a>
+<a href="#427" id="427">427</a>
+<a href="#428" id="428">428</a>
+<a href="#429" id="429">429</a>
+<a href="#430" id="430">430</a>
+<a href="#431" id="431">431</a>
+<a href="#432" id="432">432</a>
+<a href="#433" id="433">433</a>
+<a href="#434" id="434">434</a>
+<a href="#435" id="435">435</a>
+<a href="#436" id="436">436</a>
+<a href="#437" id="437">437</a>
+<a href="#438" id="438">438</a>
+<a href="#439" id="439">439</a>
+<a href="#440" id="440">440</a>
+<a href="#441" id="441">441</a>
+<a href="#442" id="442">442</a>
+<a href="#443" id="443">443</a>
+<a href="#444" id="444">444</a>
+<a href="#445" id="445">445</a>
+<a href="#446" id="446">446</a>
+<a href="#447" id="447">447</a>
+<a href="#448" id="448">448</a>
+<a href="#449" id="449">449</a>
+<a href="#450" id="450">450</a>
+<a href="#451" id="451">451</a>
+<a href="#452" id="452">452</a>
+<a href="#453" id="453">453</a>
+<a href="#454" id="454">454</a>
+<a href="#455" id="455">455</a>
+<a href="#456" id="456">456</a>
+<a href="#457" id="457">457</a>
+<a href="#458" id="458">458</a>
+<a href="#459" id="459">459</a>
+<a href="#460" id="460">460</a>
+<a href="#461" id="461">461</a>
+<a href="#462" id="462">462</a>
+<a href="#463" id="463">463</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::policy::compressor::forwarding;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 <span class="kw">use </span><span class="kw">crate</span>::policy::largeobjectspace::LargeObjectSpace;
-<span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
-<span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
+<span class="kw">use </span><span class="kw">crate</span>::policy::sft::{GCWorkerMutRef, SFT};
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{CommonSpace, Space};
-<span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::{GCWork, GCWorkScheduler, GCWorker, WorkBucketStage};
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::CopySemantics;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::{MonotonePageResource, PageResource};
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::regionpageresource::AllocatedRegion;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::{PageResource, RegionPageResource};
+<span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::extract_side_metadata;
 <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::metadata::vo_bit;
@@ -379,19 +479,36 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::object_enum::{<span class="self">self</span>, ObjectEnumerator};
 <span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
 <span class="kw">use </span><span class="kw">crate</span>::vm::slot::Slot;
+<span class="kw">use </span><span class="kw">crate</span>::MMTK;
 <span class="kw">use crate</span>::{vm::<span class="kw-2">*</span>, ObjectQueue};
 <span class="kw">use </span>atomic::Ordering;
+<span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>TRACE_KIND_MARK: TraceKind = <span class="number">0</span>;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>TRACE_KIND_FORWARD_ROOT: TraceKind = <span class="number">1</span>;
 
-<span class="doccomment">/// CompressorSpace is a stop-the-world and serial implementation of
+<span class="doccomment">/// [`CompressorSpace`] is a stop-the-world implementation of
 /// the Compressor, as described in Kermany and Petrank,
 /// [The Compressor: concurrent, incremental, and parallel compaction](https://dl.acm.org/doi/10.1145/1133255.1134023).
+///
+/// [`CompressorSpace`] makes two main diversions from the paper
+/// (aside from [`CompressorSpace`] being stop-the-world):
+/// - The heap is structured into regions ([`forwarding::CompressorRegion`])
+///   which the collector compacts separately.
+/// - The collector compacts each region in-place, instead of using two virtual
+///   spaces as in Kermany and Petrank. The virtual spaces side-step a race which
+///   would occur if multiple threads attempted to compact one heap in place: one thread
+///   could move an object to the location of another object which has yet to be moved by
+///   another thread. Kermany and Petrank move objects between from- and to- virtual spaces,
+///   preventing the old objects from being overwritten. (They reclaim memory by unmapping
+///   pages of the from-virtual space after moving all objects out of said pages.)
+///   We instead side-step this race by assigning only a single thread to each region, and
+///   running multiple single-threaded Compressors at once.
 </span><span class="kw">pub struct </span>CompressorSpace&lt;VM: VMBinding&gt; {
     common: CommonSpace&lt;VM&gt;,
-    pr: MonotonePageResource&lt;VM&gt;,
+    pr: RegionPageResource&lt;VM, forwarding::CompressorRegion&gt;,
     forwarding: forwarding::ForwardingMetadata&lt;VM&gt;,
+    scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
 }
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>GC_MARK_BIT_MASK: u8 = <span class="number">1</span>;
@@ -469,11 +586,12 @@
     ) -&gt; ObjectReference {
         <span class="comment">// We should not use trace_object for compressor space.
         // Depending on which trace it is, we should manually call either trace_mark or trace_forward.
-        </span><span class="macro">panic!</span>(<span class="string">"sft_trace_object() cannot be used with Compressor space"</span>)
+        </span><span class="macro">panic!</span>(<span class="string">"sft_trace_object() cannot be used with CompressorSpace"</span>)
     }
 
     <span class="kw">fn </span>debug_print_object_info(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
         <span class="macro">println!</span>(<span class="string">"marked = {}"</span>, CompressorSpace::&lt;VM&gt;::is_marked(object));
+        <span class="macro">println!</span>(<span class="string">"forwarding = {:?}"</span>, <span class="self">self</span>.get_forwarded_object(object));
         <span class="self">self</span>.common.debug_print_object_global_info(object);
     }
 }
@@ -508,7 +626,7 @@
     }
 
     <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
-        object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, <span class="kw-2">&amp;</span><span class="self">self</span>.pr);
+        <span class="self">self</span>.pr.enumerate(enumerator);
     }
 
     <span class="kw">fn </span>clear_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
@@ -555,10 +673,6 @@
     <span class="kw">pub fn </span>new(args: <span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>vm_map = args.vm_map;
         <span class="macro">assert!</span>(
-            !args.vmrequest.is_discontiguous(),
-            <span class="string">"The Compressor requires a contiguous heap"
-        </span>);
-        <span class="macro">assert!</span>(
             VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS,
             <span class="string">"The Compressor requires a unified object reference address model"
         </span>);
@@ -566,19 +680,27 @@
             MetadataSpec::OnSide(forwarding::MARK_SPEC),
             MetadataSpec::OnSide(forwarding::OFFSET_VECTOR_SPEC),
         ]);
+        <span class="kw">let </span>is_discontiguous = args.vmrequest.is_discontiguous();
+        <span class="kw">let </span>scheduler = args.scheduler.clone();
         <span class="kw">let </span>common = CommonSpace::new(args.into_policy_args(<span class="bool-val">true</span>, <span class="bool-val">false</span>, local_specs));
-
         CompressorSpace {
-            pr: MonotonePageResource::new_contiguous(common.start, common.extent, vm_map),
-            forwarding: forwarding::ForwardingMetadata::new(common.start),
+            pr: <span class="kw">if </span>is_discontiguous {
+                RegionPageResource::new_discontiguous(vm_map)
+            } <span class="kw">else </span>{
+                RegionPageResource::new_contiguous(common.start, common.extent, vm_map)
+            },
+            forwarding: forwarding::ForwardingMetadata::new(),
             common,
+            scheduler,
         }
     }
 
     <span class="kw">pub fn </span>prepare(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">for </span>(from_start, size) <span class="kw">in </span><span class="self">self</span>.pr.iterate_allocated_regions() {
-            forwarding::MARK_SPEC.bzero_metadata(from_start, size);
-        }
+        <span class="self">self</span>.pr
+            .enumerate_regions(<span class="kw-2">&amp;mut </span>|r: <span class="kw-2">&amp;</span>AllocatedRegion&lt;forwarding::CompressorRegion&gt;| {
+                forwarding::MARK_SPEC
+                    .bzero_metadata(r.region.start(), r.region.end() - r.region.start());
+            });
     }
 
     <span class="kw">pub fn </span>release(<span class="kw-2">&amp;</span><span class="self">self</span>) {
@@ -627,19 +749,43 @@
         mark_bit != <span class="number">0
     </span>}
 
-    <span class="kw">pub fn </span>calculate_offset_vector(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.forwarding.calculate_offset_vector(<span class="kw-2">&amp;</span><span class="self">self</span>.pr);
+    <span class="kw">fn </span>generate_tasks(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        f: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>FnMut(<span class="kw-2">&amp;</span>AllocatedRegion&lt;forwarding::CompressorRegion&gt;, usize) -&gt; Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;,
+    ) -&gt; Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>packets = <span class="macro">vec!</span>[];
+        <span class="kw">let </span><span class="kw-2">mut </span>index = <span class="number">0</span>;
+        <span class="self">self</span>.pr.enumerate_regions(<span class="kw-2">&amp;mut </span>|r| {
+            packets.push(f(r, index));
+            index += <span class="number">1</span>;
+        });
+        packets
+    }
+
+    <span class="kw">pub fn </span>add_offset_vector_tasks(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>) {
+        <span class="kw">let </span>offset_vector_packets: Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; = <span class="self">self</span>.generate_tasks(<span class="kw-2">&amp;mut </span>|r, <span class="kw">_</span>| {
+            Box::new(CalculateOffsetVector::&lt;VM&gt;::new(<span class="self">self</span>, r.region, r.cursor()))
+        });
+        <span class="self">self</span>.scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
+            .bulk_add(offset_vector_packets);
+    }
+
+    <span class="kw">pub fn </span>calculate_offset_vector_for_region(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        region: forwarding::CompressorRegion,
+        cursor: Address,
+    ) {
+        <span class="self">self</span>.forwarding.calculate_offset_vector(region, cursor);
     }
 
     <span class="kw">pub fn </span>forward(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, _vo_bit_valid: bool) -&gt; ObjectReference {
         <span class="kw">if </span>!<span class="self">self</span>.in_space(object) {
             <span class="kw">return </span>object;
         }
-        <span class="comment">// We can't expect the VO bit to be valid whilst in the compaction loop.
-        // If we are fixing a reference to an object which precedes the referent
-        // the VO bit will have been cleared already.
-        // Thus the assertion really only is any good whilst we are fixing
-        // the roots.
+        <span class="comment">// We can't expect the VO bit to be valid whilst compacting the heap.
+        // If we are fixing a reference to an object which was moved before the referent,
+        // the relevant VO bit will have been cleared, and this assertion would fail.
+        // Thus we can only ever expect the VO bit to be valid whilst fixing the roots.
         </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
         </span><span class="kw">if </span>_vo_bit_valid {
             <span class="macro">debug_assert!</span>(
@@ -651,79 +797,131 @@
         ObjectReference::from_raw_address(<span class="self">self</span>.forwarding.forward(object.to_raw_address())).unwrap()
     }
 
-    <span class="kw">fn </span>heap_span(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (Address, Address) {
-        (<span class="self">self</span>.forwarding.first_address, <span class="self">self</span>.pr.cursor())
+    <span class="kw">fn </span>update_references(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, object: ObjectReference) {
+        <span class="kw">if </span>VM::VMScanning::support_slot_enqueuing(worker.tls, object) {
+            VM::VMScanning::scan_object(worker.tls, object, <span class="kw-2">&amp;mut </span>|s: VM::VMSlot| {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(o) = s.load() {
+                    s.store(<span class="self">self</span>.forward(o, <span class="bool-val">false</span>));
+                }
+            });
+        } <span class="kw">else </span>{
+            VM::VMScanning::scan_object_and_trace_edges(worker.tls, object, <span class="kw-2">&amp;mut </span>|o| {
+                <span class="self">self</span>.forward(o, <span class="bool-val">false</span>)
+            });
+        }
     }
 
-    <span class="kw">pub fn </span>compact(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, los: <span class="kw-2">&amp;</span>LargeObjectSpace&lt;VM&gt;) {
-        <span class="kw">let </span><span class="kw-2">mut </span>to = Address::ZERO;
-        <span class="comment">// The allocator will never cause an object to span multiple regions,
-        // but the Compressor may move an object to span multiple regions.
-        // Thus we must treat all regions as one contiguous space when
-        // walking the mark bitmap.
-        </span><span class="kw">let </span>(start, end) = <span class="self">self</span>.heap_span();
-        <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-        </span>{
-            <span class="attr">#[cfg(debug_assertions)]
-            </span><span class="self">self</span>.forwarding
-                .scan_marked_objects(start, end, <span class="kw-2">&amp;mut </span>|object: ObjectReference| {
+    <span class="kw">pub fn </span>add_compact_tasks(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>) {
+        <span class="kw">let </span>compact_packets: Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; =
+            <span class="self">self</span>.generate_tasks(<span class="kw-2">&amp;mut </span>|<span class="kw">_</span>, i| Box::new(Compact::&lt;VM&gt;::new(<span class="self">self</span>, i)));
+        <span class="self">self</span>.scheduler.work_buckets[WorkBucketStage::Compact].bulk_add(compact_packets);
+    }
+
+    <span class="kw">pub fn </span>compact_region(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, index: usize) {
+        <span class="self">self</span>.pr.with_regions(<span class="kw-2">&amp;mut </span>|regions| {
+            <span class="kw">let </span>r = <span class="kw-2">&amp;</span>regions[index];
+            <span class="kw">let </span>start = r.region.start();
+            <span class="kw">let </span>end = r.cursor();
+            <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+            </span>{
+                <span class="attr">#[cfg(debug_assertions)]
+                </span><span class="self">self</span>.forwarding
+                    .scan_marked_objects(start, end, <span class="kw-2">&amp;mut </span>|object: ObjectReference| {
+                        <span class="macro">debug_assert!</span>(
+                            <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set(object),
+                            <span class="string">"{:x}: VO bit not set"</span>,
+                            object
+                        );
+                    });
+                <span class="kw">crate</span>::util::metadata::vo_bit::bzero_vo_bit(start, end - start);
+            }
+            <span class="kw">let </span><span class="kw-2">mut </span>to = start;
+            <span class="self">self</span>.forwarding
+                .scan_marked_objects(start, end, <span class="kw-2">&amp;mut </span>|obj: ObjectReference| {
+                    <span class="comment">// We set the end bits based on the sizes of objects when they are
+                    // marked, and we compute the live data and thus the forwarding
+                    // addresses based on those sizes. The forwarding addresses would be
+                    // incorrect if the sizes of objects were to change.
+                    </span><span class="kw">let </span>copied_size = VM::VMObjectModel::get_size_when_copied(obj);
+                    <span class="macro">debug_assert!</span>(copied_size == VM::VMObjectModel::get_current_size(obj));
+                    <span class="kw">let </span>new_object = <span class="self">self</span>.forward(obj, <span class="bool-val">false</span>);
                     <span class="macro">debug_assert!</span>(
-                        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set(object),
-                        <span class="string">"{:x}: VO bit not set"</span>,
-                        object
+                        new_object.to_raw_address() &gt;= to,
+                        <span class="string">"whilst forwarding {obj}, the new address {0} should be after the end of the last object {to}"</span>,
+                        new_object.to_raw_address()
                     );
+                    <span class="comment">// copy object
+                    </span><span class="macro">trace!</span>(<span class="string">" copy from {} to {}"</span>, obj, new_object);
+                    <span class="kw">let </span>end_of_new_object =
+                        VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
+                    <span class="comment">// update VO bit
+                    </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+                    </span>vo_bit::set_vo_bit(new_object);
+                    to = new_object.to_object_start::&lt;VM&gt;() + copied_size;
+                    <span class="macro">debug_assert_eq!</span>(end_of_new_object, to);
+                    <span class="self">self</span>.update_references(worker, new_object);
                 });
-            <span class="kw">for </span>(region_start, size) <span class="kw">in </span><span class="self">self</span>.pr.iterate_allocated_regions() {
-                <span class="kw">crate</span>::util::metadata::vo_bit::bzero_vo_bit(region_start, size);
-            }
-        }
+            <span class="self">self</span>.pr.reset_cursor(r, to);
+        });
+    }
 
-        <span class="kw">let </span>update_references = <span class="kw-2">&amp;mut </span>|object: ObjectReference| {
-            <span class="kw">if </span>VM::VMScanning::support_slot_enqueuing(worker.tls, object) {
-                VM::VMScanning::scan_object(worker.tls, object, <span class="kw-2">&amp;mut </span>|s: VM::VMSlot| {
-                    <span class="kw">if let </span><span class="prelude-val">Some</span>(o) = s.load() {
-                        s.store(<span class="self">self</span>.forward(o, <span class="bool-val">false</span>));
-                    }
-                });
-            } <span class="kw">else </span>{
-                VM::VMScanning::scan_object_and_trace_edges(worker.tls, object, <span class="kw-2">&amp;mut </span>|o| {
-                    <span class="self">self</span>.forward(o, <span class="bool-val">false</span>)
-                });
-            }
-        };
-
-        <span class="self">self</span>.forwarding
-            .scan_marked_objects(start, end, <span class="kw-2">&amp;mut </span>|obj: ObjectReference| {
-                <span class="comment">// We set the end bits based on the sizes of objects when they are
-                // marked, and we compute the live data and thus the forwarding
-                // addresses based on those sizes. The forwarding addresses would be
-                // incorrect if the sizes of objects were to change.
-                </span><span class="kw">let </span>copied_size = VM::VMObjectModel::get_size_when_copied(obj);
-                <span class="macro">debug_assert!</span>(copied_size == VM::VMObjectModel::get_current_size(obj));
-                <span class="kw">let </span>new_object = <span class="self">self</span>.forward(obj, <span class="bool-val">false</span>);
-                <span class="macro">debug_assert!</span>(
-                    new_object.to_raw_address() &gt;= to,
-                    <span class="string">"{0} &lt; {to}"</span>,
-                    new_object.to_raw_address()
-                );
-                <span class="comment">// copy object
-                </span><span class="macro">trace!</span>(<span class="string">" copy from {} to {}"</span>, obj, new_object);
-                <span class="kw">let </span>end_of_new_object = VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
-                <span class="comment">// update VO bit
-                </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-                </span>vo_bit::set_vo_bit(new_object);
-                to = new_object.to_object_start::&lt;VM&gt;() + copied_size;
-                <span class="macro">debug_assert_eq!</span>(end_of_new_object, to);
-                update_references(new_object);
-            });
+    <span class="kw">pub fn </span>after_compact(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, los: <span class="kw-2">&amp;</span>LargeObjectSpace&lt;VM&gt;) {
+        <span class="self">self</span>.pr.reset_allocator();
         <span class="comment">// Update references from the LOS to Compressor too.
         </span>los.enumerate_objects(<span class="kw-2">&amp;mut </span>object_enum::ClosureObjectEnumerator::&lt;<span class="kw">_</span>, VM&gt;::new(
-            update_references,
+            <span class="kw-2">&amp;mut </span>|o: ObjectReference| {
+                <span class="self">self</span>.update_references(worker, o);
+            },
         ));
+    }
+}
 
-        <span class="macro">debug!</span>(<span class="string">"Compact end: to = {}"</span>, to);
-        <span class="comment">// reset the bump pointer
-        </span><span class="self">self</span>.pr.reset_cursor(to);
+<span class="doccomment">/// Calculate the offset vector for a region.
+</span><span class="kw">pub struct </span>CalculateOffsetVector&lt;VM: VMBinding&gt; {
+    compressor_space: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>CompressorSpace&lt;VM&gt;,
+    region: forwarding::CompressorRegion,
+    cursor: Address,
+}
+
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>CalculateOffsetVector&lt;VM&gt; {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        <span class="self">self</span>.compressor_space
+            .calculate_offset_vector_for_region(<span class="self">self</span>.region, <span class="self">self</span>.cursor);
+    }
+}
+
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; CalculateOffsetVector&lt;VM&gt; {
+    <span class="kw">pub fn </span>new(
+        compressor_space: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>CompressorSpace&lt;VM&gt;,
+        region: forwarding::CompressorRegion,
+        cursor: Address,
+    ) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            compressor_space,
+            region,
+            cursor,
+        }
+    }
+}
+
+<span class="doccomment">/// Compact live objects in a region.
+</span><span class="kw">pub struct </span>Compact&lt;VM: VMBinding&gt; {
+    compressor_space: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>CompressorSpace&lt;VM&gt;,
+    index: usize,
+}
+
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>Compact&lt;VM&gt; {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        <span class="self">self</span>.compressor_space.compact_region(worker, <span class="self">self</span>.index);
+    }
+}
+
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; Compact&lt;VM&gt; {
+    <span class="kw">pub fn </span>new(compressor_space: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>CompressorSpace&lt;VM&gt;, index: usize) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            compressor_space,
+            index,
+        }
     }
 }
 </code></pre></div></section></main></body></html>

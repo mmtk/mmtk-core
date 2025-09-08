@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["CalculateForwardingAddress","Compact","CompressorForwardingWorkContext","CompressorWorkContext","UpdateReferences"],"type":["ForwardingProcessEdges","MarkingProcessEdges"]};
+window.SIDEBAR_ITEMS = {"struct":["AfterCompact","CompressorForwardingWorkContext","CompressorWorkContext","GenerateWork","UpdateReferences"],"type":["ForwardingProcessEdges","MarkingProcessEdges"]};

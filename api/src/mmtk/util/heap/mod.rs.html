@@ -22,7 +22,9 @@
 <a href="#21" id="21">21</a>
 <a href="#22" id="22">22</a>
 <a href="#23" id="23">23</a>
-<a href="#24" id="24">24</a></pre></div><pre class="rust"><code><span class="kw">mod </span>accounting;
+<a href="#24" id="24">24</a>
+<a href="#25" id="25">25</a>
+<a href="#26" id="26">26</a></pre></div><pre class="rust"><code><span class="kw">mod </span>accounting;
 <span class="attr">#[macro_use]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>layout;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>blockpageresource;
@@ -33,6 +35,7 @@
 <span class="kw">mod </span>heap_meta;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>monotonepageresource;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>pageresource;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>regionpageresource;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>space_descriptor;
 <span class="kw">mod </span>vmrequest;
 
@@ -45,5 +48,6 @@
 <span class="kw">pub use </span><span class="self">self</span>::layout::vm_layout;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span><span class="self">self</span>::monotonepageresource::MonotonePageResource;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span><span class="self">self</span>::pageresource::PageResource;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span><span class="self">self</span>::regionpageresource::RegionPageResource;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span><span class="self">self</span>::vmrequest::VMRequest;
 </code></pre></div></section></main></body></html>
