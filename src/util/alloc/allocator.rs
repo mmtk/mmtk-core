@@ -32,13 +32,15 @@ pub enum AllocationError {
 #[repr(u8)]
 #[derive(Copy, Clone, Default, PartialEq, bytemuck::NoUninit, Debug)]
 pub enum OnAllocationFail {
-    /// Request the GC. This is the default behavior.
+    /// Request the GC and block until GC finishes. This is the default behavior.
     #[default]
     RequestGC,
-    /// Instead of requesting GC, the allocation request returns with a failure value.
+    /// Request the GC.  But instead of blocking for GC, the allocation request returns with a
+    /// failure value.
     ReturnFailure,
-    /// Instead of requesting GC, the allocation request simply overcommits the memory,
-    /// and return a valid result at its best efforts.
+    /// Request the GC.  But instead of blocking for GC, the allocating thread continues to
+    /// allocate, overcommitting the memory.  GC will be scheduled asynchronously by the GC worker
+    /// threads, and the current mutator may stop at a safepoint as soon as possible.
     OverCommit,
 }
 
@@ -46,11 +48,11 @@ impl OnAllocationFail {
     pub(crate) fn allow_oom_call(&self) -> bool {
         *self == Self::RequestGC
     }
-    pub(crate) fn allow_gc(&self) -> bool {
-        *self == Self::RequestGC
-    }
     pub(crate) fn allow_overcommit(&self) -> bool {
         *self == Self::OverCommit
+    }
+    pub(crate) fn allow_blocking_for_gc(&self) -> bool {
+        *self == Self::RequestGC
     }
 }
 
