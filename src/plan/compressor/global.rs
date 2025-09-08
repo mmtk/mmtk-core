@@ -1,21 +1,17 @@
 use super::gc_work::CompressorWorkContext;
 use super::gc_work::{
-    CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
-    UpdateReferences,
+    AfterCompact, ForwardingProcessEdges, GenerateWork, MarkingProcessEdges, UpdateReferences,
 };
 use crate::plan::compressor::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::{BasePlan, CommonPlan};
 use crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN;
-use crate::plan::AllocationSemantics;
-use crate::plan::Plan;
-use crate::plan::PlanConstraints;
+use crate::plan::{AllocationSemantics, Plan, PlanConstraints};
 use crate::policy::compressor::CompressorSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::GCWorkScheduler;
-use crate::scheduler::WorkBucketStage;
+use crate::scheduler::{GCWorkScheduler, WorkBucketStage};
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::gc_trigger::SpaceStats;
 #[allow(unused_imports)]
@@ -26,7 +22,7 @@ use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
-/// Compressor implements a stop-the-world and serial implementation of
+/// [`Compressor`] implements a stop-the-world and parallel implementation of
 /// the Compressor, as described in Kermany and Petrank,
 /// [The Compressor: concurrent, incremental, and parallel compaction](https://dl.acm.org/doi/10.1145/1133255.1134023).
 #[derive(HasSpaces, PlanTraceObject)]
@@ -97,13 +93,22 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<CompressorWorkContext<VM>>::new(self));
 
-        scheduler.work_buckets[WorkBucketStage::CalculateForwarding].add(
-            CalculateForwardingAddress::<VM>::new(&self.compressor_space),
-        );
-        // do another trace to update references
+        scheduler.work_buckets[WorkBucketStage::CalculateForwarding].add(GenerateWork::new(
+            &self.compressor_space,
+            CompressorSpace::<VM>::add_offset_vector_tasks,
+        ));
+
+        // scan roots to update their references
         scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new());
-        scheduler.work_buckets[WorkBucketStage::Compact]
-            .add(Compact::<VM>::new(&self.compressor_space, &self.common.los));
+
+        scheduler.work_buckets[WorkBucketStage::Compact].add(GenerateWork::new(
+            &self.compressor_space,
+            CompressorSpace::<VM>::add_compact_tasks,
+        ));
+
+        scheduler.work_buckets[WorkBucketStage::Compact].set_sentinel(Box::new(
+            AfterCompact::<VM>::new(&self.compressor_space, &self.common.los),
+        ));
 
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
