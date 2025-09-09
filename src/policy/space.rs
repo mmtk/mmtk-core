@@ -340,22 +340,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         }
     }
 
-    /// Ensure this space is marked as mapped -- used when the space is already
-    /// mapped (e.g. for a vm image which is externally mmapped.)
-    fn ensure_mapped(&self) {
-        self.common()
-            .metadata
-            .try_map_metadata_space(self.common().start, self.common().extent, self.get_name())
-            .unwrap_or_else(|e| {
-                // TODO(Javad): handle meta space allocation failure
-                panic!("failed to mmap meta memory: {e}");
-            });
-
-        self.common()
-            .mmapper
-            .mark_as_mapped(self.common().start, self.common().extent);
-    }
-
     /// Estimate the amount of side metadata memory needed for a give data memory size in pages. The
     /// result will over-estimate the amount of metadata pages needed, with at least one page per
     /// side metadata.  This relatively accurately describes the number of side metadata pages the

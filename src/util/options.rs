@@ -354,20 +354,56 @@ pub enum AffinityKind {
     /// core.
     // XXX: Maybe using a u128 bitvector with each bit representing a core is more performant?
     RoundRobin(Vec<CoreId>),
+    /// Assign all the cores specified in the set to all the GC threads. This allows to have core
+    /// exclusivity for GC threads without us caring about which core it gets scheduled on.
+    AllInSet(Vec<CoreId>),
 }
 
 impl AffinityKind {
     /// Returns an AffinityKind or String containing error. Expects the list of cores to be
     /// formatted as numbers separated by commas, including ranges. There should be no spaces
-    /// between the cores in the list. For example: 0,5,8-11 specifies that the cores 0,5,8,9,10,11
-    /// should be used for pinning threads. Performs de-duplication of specified cores. Note that
-    /// the core list is sorted as a side-effect whenever a new core is added to the set.
+    /// between the cores in the list. Optionally can provide an affinity kind before the list
+    /// of cores.
+    ///
+    /// Performs de-duplication of specified cores. Note that the core list is sorted as a
+    /// side-effect whenever a new core is added to the set.
+    ///
+    /// For example:
+    ///  - "`0,5,8-11`" specifies that the cores 0,5,8,9,10,11 should be used for pinning threads.
+    ///  - "`AllInSet:0,5`" specifies that the cores 0,5 should be used for pinning threads using the
+    ///    [`AffinityKind::AllInSet`] method.
     fn parse_cpulist(cpulist: &str) -> Result<AffinityKind, String> {
         let mut cpuset = vec![];
 
         if cpulist.is_empty() {
             return Ok(AffinityKind::OsDefault);
         }
+
+        // Trying to parse strings such as "RoundRobin:0,1-3"
+        // First split on ":" to check if an affinity kind has been specified.
+        // Check if it is one of the legal affinity kinds. If no affinity kind
+        // has been specified then use `RoundRobin`.
+        let mut all_in_set = false;
+        let kind_split: Vec<&str> = cpulist.splitn(2, ':').collect();
+        if kind_split.len() == 2 {
+            match kind_split[0] {
+                "RoundRobin" => {
+                    all_in_set = false;
+                }
+                "AllInSet" => {
+                    all_in_set = true;
+                }
+                _ => {
+                    return Err(format!("Unknown affinity kind: {}", kind_split[0]));
+                }
+            }
+        }
+
+        let cpulist = if kind_split.len() == 2 {
+            kind_split[1]
+        } else {
+            kind_split[0]
+        };
 
         // Split on ',' first and then split on '-' if there is a range
         for split in cpulist.split(',') {
@@ -408,7 +444,11 @@ impl AffinityKind {
             return Err("Core ids have been incorrectly specified".to_string());
         }
 
-        Ok(AffinityKind::RoundRobin(cpuset))
+        if all_in_set {
+            Ok(AffinityKind::AllInSet(cpuset))
+        } else {
+            Ok(AffinityKind::RoundRobin(cpuset))
+        }
     }
 
     /// Return true if the affinity is either OsDefault or the cores in the list do not exceed the
@@ -883,17 +923,29 @@ options! {
     /// Only set this option if you know the implications of excluding the kernel!
     perf_exclude_kernel:    bool                    [|_| cfg!(feature = "perf_counter")] = false,
     /// Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS
-    /// scheduler. If a list of cores are specified, cores are allocated to threads in a round-robin
-    /// fashion. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
-    /// separated by commas and may include ranges. There should be no spaces in the core list. For
-    /// example: 0,5,8-11 specifies that cores 0,5,8,9,10,11 should be used for pinning threads.
+    /// scheduler.
+    ///
+    /// There are two ways cores can be allocated to threads:
+    ///  1. round-robin, wherein each GC thread is allocated exactly one core to run
+    ///     on in a round-robin fashion; and
+    ///  2. "all in set", wherein each GC thread is allocated all the cores in the provided
+    ///     CPU set.
+    ///
+    /// The method can be selected by specifying "`RoundRobin:<core ids>`" or "`AllInSet:<core ids>`".
+    /// By default, if no kind is specified in the option, then it will use the round-robin
+    /// method.
+    ///
+    /// The core ids should match the ones reported by /proc/cpuinfo. Core IDs are separated by
+    /// commas and may include ranges. There should be no spaces in the core list. For example:
+    /// 0,5,8-11 specifies that cores 0,5,8,9,10,11 should be used for pinning threads.
+    ///
     /// Note that in the case the program has only been allocated a certain number of cores using
-    /// `taskset`, the core ids in the list should be specified by their perceived index as using
-    /// `taskset` will essentially re-label the core ids. For example, running the program with
+    /// `taskset`, the core IDs in the list should be specified by their perceived index as using
+    /// `taskset` will essentially re-label the core IDs. For example, running the program with
     /// `MMTK_THREAD_AFFINITY="0-4" taskset -c 6-12 <program>` means that the cores 6,7,8,9,10 will
-    /// be used to pin threads even though we specified the core ids "0,1,2,3,4".
+    /// be used to pin threads even though we specified the core IDs "0,1,2,3,4".
     /// `MMTK_THREAD_AFFINITY="12" taskset -c 6-12 <program>` will not work, on the other hand, as
-    /// there is no core with (perceived) id 12.
+    /// there is no core with (perceived) ID 12.
     // XXX: This option is currently only supported on Linux.
     thread_affinity:        AffinityKind            [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
     /// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
@@ -1238,6 +1290,22 @@ mod tests {
                 affinity,
                 Err("Core ids have been incorrectly specified".to_string())
             );
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_allinset() {
+        serial_test(|| {
+            let affinity = "AllInSet:0,1".parse::<AffinityKind>();
+            assert_eq!(affinity, Ok(AffinityKind::AllInSet(vec![0_u16, 1_u16])));
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_bad_affinity_kind() {
+        serial_test(|| {
+            let affinity = "AllIn:0,1".parse::<AffinityKind>();
+            assert_eq!(affinity, Err("Unknown affinity kind: AllIn".to_string()));
         })
     }
 

@@ -1,8 +1,11 @@
 pub use criterion::Criterion;
 
 use mmtk::{
-    memory_manager,
-    util::{test_util::fixtures::*, Address},
+    memory_manager, mmap_anno_test,
+    util::{
+        constants::BYTES_IN_PAGE, memory::MmapStrategy, test_private::MMAPPER,
+        test_util::fixtures::*, Address,
+    },
 };
 
 pub fn bench(c: &mut Criterion) {
@@ -67,6 +70,16 @@ pub fn bench(c: &mut Criterion) {
                 let addr = unsafe { Address::from_usize(addr_usize) };
                 let _is_mapped = addr.is_mapped();
             }
+        })
+    });
+
+    c.bench_function("ensure_mapped_regular", |b| {
+        let start = regular.align_down(BYTES_IN_PAGE);
+        assert!(start.is_mapped());
+        let strategy = MmapStrategy::new(false, mmtk::util::memory::MmapProtection::ReadWrite);
+        let anno = mmap_anno_test!();
+        b.iter(|| {
+            MMAPPER.ensure_mapped(start, 1, strategy, anno).unwrap();
         })
     });
 }
