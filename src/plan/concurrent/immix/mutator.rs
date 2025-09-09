@@ -17,6 +17,11 @@ use crate::vm::VMBinding;
 use crate::MMTK;
 use enum_map::EnumMap;
 
+type BarrierSemanticsType<VM> =
+    SATBBarrierSemantics<VM, ConcurrentImmix<VM>, { crate::policy::immix::TRACE_KIND_FAST }>;
+
+type BarrierType<VM> = SATBBarrier<BarrierSemanticsType<VM>>;
+
 pub fn concurrent_immix_mutator_release<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     _tls: VMWorkerThread,
@@ -37,7 +42,11 @@ pub fn concurrent_immix_mutator_release<VM: VMBinding>(
     // Deactivate SATB
     if current_pause == Pause::Full || current_pause == Pause::FinalMark {
         debug!("Deactivate SATB barrier active for {:?}", mutator as *mut _);
-        mutator.barrier.set_active(false);
+        mutator
+            .barrier
+            .downcast_mut::<BarrierType<VM>>()
+            .unwrap()
+            .set_weak_ref_barrier_enabled(false);
     }
 }
 
@@ -61,7 +70,11 @@ pub fn concurent_immix_mutator_prepare<VM: VMBinding>(
     // Activate SATB
     if current_pause == Pause::InitialMark {
         debug!("Activate SATB barrier active for {:?}", mutator as *mut _);
-        mutator.barrier.set_active(true);
+        mutator
+            .barrier
+            .downcast_mut::<BarrierType<VM>>()
+            .unwrap()
+            .set_weak_ref_barrier_enabled(true);
     }
 }
 
@@ -100,17 +113,18 @@ pub fn create_concurrent_immix_mutator<VM: VMBinding>(
 
     let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
     let mut mutator = builder
-        .barrier(Box::new(SATBBarrier::new(SATBBarrierSemantics::<
-            VM,
-            ConcurrentImmix<VM>,
-            { crate::policy::immix::TRACE_KIND_FAST },
-        >::new(mmtk, mutator_tls))))
+        .barrier(Box::new(SATBBarrier::new(BarrierSemanticsType::<VM>::new(
+            mmtk,
+            mutator_tls,
+        ))))
         .build();
 
     // Set barrier active, based on whether concurrent marking is in progress
     mutator
         .barrier
-        .set_active(immix.is_concurrent_marking_active());
+        .downcast_mut::<BarrierType<VM>>()
+        .unwrap()
+        .set_weak_ref_barrier_enabled(immix.is_concurrent_marking_active());
 
     mutator
 }

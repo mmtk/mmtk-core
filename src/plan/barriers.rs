@@ -46,16 +46,6 @@ impl BarrierSelector {
 /// As a performance optimization, the binding may also choose to port the fast-path to the VM side,
 /// and call the slow-path (`object_reference_write_slow`) only if necessary.
 pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
-    /// Check if the barrier is active. For barriers that are always active, this always returns true.
-    fn is_active(&self) -> bool {
-        true
-    }
-
-    /// Set the barrier active or inactive. For barriers that are always active, this should not be called.
-    fn set_active(&mut self, _val: bool) {
-        unreachable!()
-    }
-
     /// Flush thread-local states like buffers or remembered sets.
     fn flush(&mut self) {}
 
@@ -284,8 +274,7 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
 /// A SATB (Snapshot-At-The-Beginning) barrier implementation.
 /// This barrier is basically a pre-write object barrier with a weak reference loading barrier.
 pub struct SATBBarrier<S: BarrierSemantics> {
-    /// This only affects the weak reference load barrier.
-    active: bool,
+    weak_ref_barrier_enabled: bool,
     semantics: S,
 }
 
@@ -293,9 +282,13 @@ impl<S: BarrierSemantics> SATBBarrier<S> {
     /// Create a new SATBBarrier with the given semantics.
     pub fn new(semantics: S) -> Self {
         Self {
-            active: false,
+            weak_ref_barrier_enabled: false,
             semantics,
         }
+    }
+
+    pub(crate) fn set_weak_ref_barrier_enabled(&mut self, value: bool) {
+        self.weak_ref_barrier_enabled = value;
     }
 
     fn object_is_unlogged(&self, object: ObjectReference) -> bool {
@@ -305,20 +298,12 @@ impl<S: BarrierSemantics> SATBBarrier<S> {
 }
 
 impl<S: BarrierSemantics> Barrier<S::VM> for SATBBarrier<S> {
-    fn set_active(&mut self, val: bool) {
-        self.active = val;
-    }
-
-    fn is_active(&self) -> bool {
-        self.active
-    }
-
     fn flush(&mut self) {
         self.semantics.flush();
     }
 
     fn load_weak_reference(&mut self, o: ObjectReference) {
-        if self.active {
+        if self.weak_ref_barrier_enabled {
             self.semantics.load_weak_reference(o)
         }
     }
