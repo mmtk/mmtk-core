@@ -7,7 +7,7 @@ use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::allocator::get_maximum_aligned_size;
 use crate::util::alloc::Allocator;
-use crate::util::linear_scan::Region;
+use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::opaque_pointer::VMThread;
 use crate::util::rust_util::unlikely;
 use crate::util::Address;
@@ -267,18 +267,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                 };
                 // mark objects if concurrent marking is active
                 if self.immix_space().should_allocate_as_live() {
-                    let state = self
-                        .space
-                        .line_mark_state
-                        .load(std::sync::atomic::Ordering::Acquire);
-
-                    for line in
-                        crate::util::linear_scan::RegionIterator::<Line>::new(start_line, end_line)
-                    {
-                        line.mark(state);
-                    }
-
-                    Line::initialize_mark_table_as_marked::<VM>(start_line..end_line);
+                    self.eager_mark_lines(start_line, end_line);
                 }
                 return true;
             } else {
@@ -322,17 +311,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     .bzero_metadata(block.start(), crate::policy::immix::block::Block::BYTES);
                 // mark objects if concurrent marking is active
                 if self.immix_space().should_allocate_as_live() {
-                    let state = self
-                        .space
-                        .line_mark_state
-                        .load(std::sync::atomic::Ordering::Acquire);
-                    for line in block.lines() {
-                        line.mark(state);
-                    }
-
-                    Line::initialize_mark_table_as_marked::<VM>(
-                        block.start_line()..block.end_line(),
-                    );
+                    self.eager_mark_lines(block.start_line(), block.end_line());
                 }
                 if self.request_for_large {
                     self.large_bump_pointer.cursor = block.start();
@@ -344,6 +323,26 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                 self.alloc(size, align, offset)
             }
         }
+    }
+
+    /// Eagerly mark mark all line mark states and all side mark bits in the gap.
+    ///
+    /// This is useful during concurrent marking. By doing this, the GC workers running concurrently
+    /// will conservatively consider all objects that will be bump-allocated in the gap as live, and
+    /// the mutator doesn't need to explicitly mark bump-allocated objects in the fast path.
+    fn eager_mark_lines(&mut self, start_line: Line, end_line: Line) {
+        debug_assert!(self.immix_space().should_allocate_as_live());
+
+        let state = self
+            .space
+            .line_mark_state
+            .load(std::sync::atomic::Ordering::Acquire);
+
+        for line in RegionIterator::<Line>::new(start_line, end_line) {
+            line.mark(state);
+        }
+
+        Line::initialize_mark_table_as_marked::<VM>(start_line..end_line);
     }
 
     /// Return whether the TLAB has been exhausted and we need to acquire a new block. Assumes that
