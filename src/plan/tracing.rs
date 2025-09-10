@@ -148,27 +148,23 @@ impl<E: ProcessEdgesWork> Drop for ObjectsClosure<'_, E> {
 }
 
 /// For iterating over the slots of an object.
-pub struct SlotIterator<VM: VMBinding, F: FnMut(VM::VMSlot)> {
-    f: F,
+///
+/// FIXME: This type iterates slots, but all of its current use cases only care about the values in the slots.
+/// And it currently only works if the object supports slot enqueuing (i.e. `Scanning::scan_object` is implemented).
+/// We may refactor the interface according to https://github.com/mmtk/mmtk-core/issues/1375
+pub(crate) struct SlotIterator<VM: VMBinding> {
     _p: PhantomData<VM>,
 }
 
-impl<VM: VMBinding, F: FnMut(VM::VMSlot)> SlotVisitor<VM::VMSlot> for SlotIterator<VM, F> {
-    fn visit_slot(&mut self, slot: VM::VMSlot) {
-        (self.f)(slot);
-    }
-}
-
-impl<VM: VMBinding, F: FnMut(VM::VMSlot)> SlotIterator<VM, F> {
+impl<VM: VMBinding> SlotIterator<VM> {
     /// Iterate over the slots of an object by applying a function to each slot.
-    pub fn iterate_fields(o: ObjectReference, _tls: VMThread, f: F) {
-        let mut x = SlotIterator::<VM, _> { f, _p: PhantomData };
-        <VM::VMScanning as Scanning<VM>>::scan_object(
-            // FIXME: We should use tls from the arguments.
-            // See https://github.com/mmtk/mmtk-core/issues/1375
-            VMWorkerThread(VMThread::UNINITIALIZED),
-            o,
-            &mut x,
-        );
+    pub fn iterate_fields<F: FnMut(VM::VMSlot)>(object: ObjectReference, _tls: VMThread, mut f: F) {
+        // FIXME: We should use tls from the arguments.
+        // See https://github.com/mmtk/mmtk-core/issues/1375
+        let fake_tls = VMWorkerThread(VMThread::UNINITIALIZED);
+        if !<VM::VMScanning as Scanning<VM>>::support_slot_enqueuing(fake_tls, object) {
+            panic!("SlotIterator::iterate_fields cannot be used on objects that don't support slot-enqueuing");
+        }
+        <VM::VMScanning as Scanning<VM>>::scan_object(fake_tls, object, &mut f);
     }
 }
