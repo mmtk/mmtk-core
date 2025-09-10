@@ -148,10 +148,9 @@ impl<E: ProcessEdgesWork> Drop for ObjectsClosure<'_, E> {
 }
 
 /// For iterating over the slots of an object.
-///
-/// FIXME: This type iterates slots, but all of its current use cases only care about the values in the slots.
-/// And it currently only works if the object supports slot enqueuing (i.e. `Scanning::scan_object` is implemented).
-/// We may refactor the interface according to https://github.com/mmtk/mmtk-core/issues/1375
+// FIXME: This type iterates slots, but all of its current use cases only care about the values in the slots.
+// And it currently only works if the object supports slot enqueuing (i.e. `Scanning::scan_object` is implemented).
+// We may refactor the interface according to <https://github.com/mmtk/mmtk-core/issues/1375>
 pub(crate) struct SlotIterator<VM: VMBinding> {
     _p: PhantomData<VM>,
 }
