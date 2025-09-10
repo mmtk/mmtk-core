@@ -32,7 +32,6 @@ extern crate static_assertions;
 extern crate probe;
 
 mod mmtk;
-
 pub use mmtk::MMTKBuilder;
 pub(crate) use mmtk::MMAPPER;
 pub use mmtk::MMTK;
