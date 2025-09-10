@@ -668,8 +668,4 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             false
         }
     }
-
-    pub fn wakeup_all_concurrent_workers(&self) {
-        self.worker_monitor.notify_work_available(true);
-    }
 }
