@@ -136,6 +136,10 @@ usdt:$MMTK:mmtk:add_schedule_collection_packet {
         printf("add_schedule_collection_packet,i,%d,%lu\n", tid, nsecs);
 }
 
+usdt:$MMTK:mmtk:concurrent_pause_determined {
+        printf("concurrent_pause_determined,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+}
+
 usdt:$MMTK:mmtk:finalization {
     if (@enable_print) {
         printf("finalization,meta,%d,%lu,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2, arg3);

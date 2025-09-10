@@ -134,6 +134,8 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
 
         self.current_pause.store(Some(pause), Ordering::SeqCst);
 
+        probe!(mmtk, concurrent_pause_determined, pause as usize);
+
         match pause {
             Pause::Full => {
                 // Ref closure buckets is disabled by initial mark, and needs to be re-enabled for full GC before

@@ -22,6 +22,11 @@ class Semantics(Enum):
     WEAK = 1
     PHANTOM = 2
 
+class Pause(Enum):
+    FULL = 1
+    INITIAL_MARK = 2
+    FINAL_MARK = 3
+
 def get_args():
     parser = argparse.ArgumentParser(
             description="""
@@ -273,6 +278,17 @@ class LogProcessor:
                             "total_objects": total_objects,
                             "iterations": iterations,
                         }
+                    }
+
+                case "concurrent_pause_determined":
+                    pause_int = int(args[0])
+                    if pause_int in Pause:
+                        pause = Pause(pause_int).name
+                    else:
+                        pause = f"(Unknown:{pause_int})"
+
+                    gc["args"] |= {
+                        "pause": pause,
                     }
 
                 case "sweep_chunk":
