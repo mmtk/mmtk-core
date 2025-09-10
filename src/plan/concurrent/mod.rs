@@ -12,8 +12,14 @@ use bytemuck::NoUninit;
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone, NoUninit)]
 pub enum Pause {
+    /// A whole GC (including root scanning, closure, releasing, etc.) happening in a single pause.
+    ///
+    /// Don't be confused with "full-heap" GC in generational collectors.  `Pause::Full` can also
+    /// refer to a nursery GC that happens in a single pause.
     Full = 1,
+    /// The initial pause before concurrent marking.
     InitialMark,
+    /// The pause after concurrent marking.
     FinalMark,
 }
 

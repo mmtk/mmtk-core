@@ -236,7 +236,6 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
             }
         });
         trace!("stop_all_mutators end");
-        // mmtk.scheduler.set_in_gc_pause(true);
         mmtk.get_plan().notify_mutators_paused(&mmtk.scheduler);
         mmtk.scheduler.notify_mutators_paused(mmtk);
         mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanVMSpecificRoots::<C>::new());
