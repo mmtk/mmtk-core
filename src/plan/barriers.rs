@@ -19,7 +19,7 @@ use downcast_rs::Downcast;
 pub enum BarrierSelector {
     /// No barrier is used.
     NoBarrier,
-    /// Object remembering psot-write barrier is used.
+    /// Object remembering post-write barrier is used.
     ObjectBarrier,
     /// Object remembering pre-write barrier with weak reference loading barrier.
     // TODO: We might be able to generalize this to object remembering pre-write barrier.
@@ -177,6 +177,7 @@ pub trait BarrierSemantics: 'static + Send {
     /// Object will probably be modified
     fn object_probable_write_slow(&mut self, _obj: ObjectReference) {}
 
+    /// Loading from a weak reference field
     fn load_weak_reference(&mut self, _o: ObjectReference) {}
 }
 
@@ -292,7 +293,6 @@ impl<S: BarrierSemantics> SATBBarrier<S> {
     }
 
     fn object_is_unlogged(&self, object: ObjectReference) -> bool {
-        // unsafe { S::UNLOG_BIT_SPEC.load::<S::VM, u8>(object, None) != 0 }
         S::UNLOG_BIT_SPEC.load_atomic::<S::VM, u8>(object, None, Ordering::SeqCst) != 0
     }
 }
