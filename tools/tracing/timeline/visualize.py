@@ -164,12 +164,6 @@ class LogProcessor:
             case "gcrequester_request":
                 result["tid"] = 1
 
-            case "num_concurrent_tracing_packets_change":
-                result["name"] = "Concurrent tracing packets"
-                result["args"] |= {
-                    "number": int(args[0]),
-                }
-
             case _:
                 if self.enrich_event_extra is not None:
                     # Call ``enrich_event_extra`` in the extension script if defined.
