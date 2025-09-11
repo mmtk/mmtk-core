@@ -291,8 +291,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     pub fn set_side_log_bits(&self) {
-        debug_assert!(self.treadmill.is_from_space_empty());
-        debug_assert!(self.treadmill.is_nursery_empty());
         let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         });

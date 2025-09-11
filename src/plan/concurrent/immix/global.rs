@@ -11,6 +11,7 @@ use crate::plan::immix::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::immix::defrag::StatsForDefrag;
 use crate::policy::immix::ImmixSpaceArgs;
 use crate::policy::immix::TRACE_KIND_DEFRAG;
 use crate::policy::immix::TRACE_KIND_FAST;
@@ -23,6 +24,7 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
+use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
@@ -163,20 +165,23 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
                 self.common.prepare(tls, true);
                 self.immix_space.prepare(
                     true,
-                    Some(crate::policy::immix::defrag::StatsForDefrag::new(self)),
+                    Some(StatsForDefrag::new(self)),
+                    // Ignore unlog bits in full GCs because unlog bits should be all 0.
+                    UnlogBitsOperation::NoOp,
                 );
             }
             Pause::InitialMark => {
-                // Bulk set log bits so SATB barrier will be triggered on the existing objects.
-                if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
-                    self.common.set_side_log_bits();
-                    self.immix_space.set_side_log_bits();
-                }
-                self.common.prepare(tls, true);
                 self.immix_space.prepare(
                     true,
-                    Some(crate::policy::immix::defrag::StatsForDefrag::new(self)),
+                    Some(StatsForDefrag::new(self)),
+                    // Bulk set log bits so SATB barrier will be triggered on the existing objects.
+                    UnlogBitsOperation::BulkSet,
                 );
+
+                self.common.prepare(tls, true);
+                // Bulk set log bits so SATB barrier will be triggered on the existing objects.
+                self.common
+                    .schedule_unlog_bits_op(UnlogBitsOperation::BulkSet);
             }
             Pause::FinalMark => (),
         }
@@ -187,13 +192,25 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         match pause {
             Pause::InitialMark => (),
             Pause::Full | Pause::FinalMark => {
-                // Bulk clear log bits so SATB barrier will not be triggered.
-                if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
-                    self.immix_space.clear_side_log_bits();
-                    self.common.clear_side_log_bits();
-                }
+                self.immix_space.release(
+                    true,
+                    // Bulk clear log bits so SATB barrier will not be triggered.
+                    UnlogBitsOperation::BulkClear,
+                );
+
                 self.common.release(tls, true);
-                self.immix_space.release(true);
+
+                if pause == Pause::FinalMark {
+                    // Bulk clear log bits so SATB barrier will not be triggered.
+                    self.common
+                        .schedule_unlog_bits_op(UnlogBitsOperation::BulkClear);
+                } else {
+                    // Full pauses didn't set unlog bits in the first place,
+                    // so there is no need to clear them.
+                    // TODO: Currently InitialMark must be followed by a FinalMark.
+                    // If we allow upgrading a concurrent GC to a full STW GC,
+                    // we will need to clear the unlog bits at an appropriate place.
+                }
             }
         }
     }

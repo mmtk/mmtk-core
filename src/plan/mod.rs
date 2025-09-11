@@ -18,6 +18,8 @@ pub use barriers::BarrierSelector;
 
 pub(crate) mod gc_requester;
 
+mod gc_work;
+
 mod global;
 pub(crate) use global::create_gc_worker_context;
 pub(crate) use global::create_mutator;

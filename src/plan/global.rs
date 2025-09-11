@@ -3,6 +3,7 @@
 use super::PlanConstraints;
 use crate::global_state::GlobalState;
 use crate::mmtk::MMTK;
+use crate::plan::gc_work::{ClearCommonPlanUnlogBits, SetCommonPlanUnlogBits};
 use crate::plan::tracing::ObjectQueue;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
@@ -19,6 +20,7 @@ use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
+use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::Options;
@@ -753,6 +755,25 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.release(tls, full_heap)
     }
 
+    pub(crate) fn schedule_unlog_bits_op(&mut self, unlog_bits_op: UnlogBitsOperation) {
+        if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
+            // # Safety: CommonPlan reference is always valid within this collection cycle.
+            let common_plan = unsafe { &*(self as *const CommonPlan<VM>) };
+
+            match unlog_bits_op {
+                UnlogBitsOperation::NoOp => {}
+                UnlogBitsOperation::BulkSet => {
+                    self.base.scheduler.work_buckets[WorkBucketStage::Prepare]
+                        .add(SetCommonPlanUnlogBits { common_plan });
+                }
+                UnlogBitsOperation::BulkClear => {
+                    self.base.scheduler.work_buckets[WorkBucketStage::Release]
+                        .add(ClearCommonPlanUnlogBits { common_plan });
+                }
+            }
+        }
+    }
+
     pub fn clear_side_log_bits(&self) {
         self.immortal.clear_side_log_bits();
         self.los.clear_side_log_bits();
@@ -807,7 +828,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             } else if #[cfg(feature = "marksweep_as_nonmoving")] {
                 self.nonmoving.prepare(_full_heap);
             } else {
-                self.nonmoving.prepare(_full_heap, None);
+                self.nonmoving.prepare(_full_heap, None, UnlogBitsOperation::NoOp);
             }
         }
     }
@@ -819,7 +840,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             } else if #[cfg(feature = "marksweep_as_nonmoving")] {
                 self.nonmoving.prepare(_full_heap);
             } else {
-                self.nonmoving.release(_full_heap);
+                self.nonmoving.release(_full_heap, UnlogBitsOperation::NoOp);
             }
         }
     }
