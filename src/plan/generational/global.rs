@@ -74,9 +74,6 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     /// Release Gen. This should be called by a single thread in GC release work.
     pub fn release(&mut self, tls: VMWorkerThread) {
         let full_heap = !self.is_current_gc_nursery();
-        if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
-            self.nursery.clear_side_log_bits();
-        }
         self.common.release(tls, full_heap);
         self.nursery.release();
     }
