@@ -527,20 +527,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         did_defrag
     }
 
-    pub fn clear_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        for chunk in self.chunk_map.all_chunks() {
-            log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
-        }
-    }
-
-    pub fn set_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        for chunk in self.chunk_map.all_chunks() {
-            log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
-        }
-    }
-
     /// Generate chunk sweep tasks
     fn generate_sweep_tasks(&self) -> Vec<Box<dyn GCWork<VM>>> {
         self.defrag.mark_histograms.lock().clear();
