@@ -433,20 +433,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             .bulk_add(work_packets);
     }
 
-    pub fn clear_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        for chunk in self.chunk_map.all_chunks() {
-            log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
-        }
-    }
-
-    pub fn set_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        for chunk in self.chunk_map.all_chunks() {
-            log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
-        }
-    }
-
     pub fn release(&mut self) {
         let num_mutators = VM::VMActivePlan::number_of_mutators();
         // all ReleaseMutator work packets plus the ReleaseMarkSweepSpace packet

@@ -223,8 +223,6 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     }
 
     fn set_side_log_bits(&self) {
-        debug_assert!(self.treadmill.is_from_space_empty());
-        debug_assert!(self.treadmill.is_nursery_empty());
         let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         });
@@ -281,20 +279,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             treadmill: TreadMill::new(),
             clear_log_bit_on_sweep,
         }
-    }
-
-    pub fn clear_side_log_bits(&self) {
-        let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
-        });
-        self.treadmill.enumerate_objects(&mut enumator);
-    }
-
-    pub fn set_side_log_bits(&self) {
-        let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
-        });
-        self.treadmill.enumerate_objects(&mut enumator);
     }
 
     pub fn prepare(&mut self, full_heap: bool) {
