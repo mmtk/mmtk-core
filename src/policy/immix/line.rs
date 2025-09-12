@@ -84,6 +84,11 @@ impl Line {
         marked_lines
     }
 
+    /// Bulk set the local mark bits of a line range.
+    ///
+    /// This is useful during concurrent marking. By doing this, the GC workers running concurrently
+    /// will conservatively consider all objects that will be bump-allocated in the gap as live, and
+    /// the mutator doesn't need to explicitly mark bump-allocated objects in the fast path.
     pub fn initialize_mark_table_as_marked<VM: VMBinding>(lines: Range<Line>) {
         let meta = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec();
         let start = lines.start.start();
@@ -92,16 +97,14 @@ impl Line {
         meta.bset_metadata(start, size);
     }
 
-    /// Eagerly mark mark all line mark states and all side mark bits in the gap.
+    /// Eagerly mark all line mark states and all side mark bits in the gap.
     ///
-    /// This is useful during concurrent marking. By doing this, the GC workers running concurrently
-    /// will conservatively consider all objects that will be bump-allocated in the gap as live, and
-    /// the mutator doesn't need to explicitly mark bump-allocated objects in the fast path.
-    pub fn eager_mark_lines<VM: VMBinding>(line_mark_state: u8, start_line: Line, end_line: Line) {
-        for line in RegionIterator::<Line>::new(start_line, end_line) {
+    /// Useful during concurrent marking.
+    pub fn eager_mark_lines<VM: VMBinding>(line_mark_state: u8, lines: Range<Line>) {
+        for line in RegionIterator::<Line>::new(lines.start, lines.end) {
             line.mark(line_mark_state);
         }
 
-        Line::initialize_mark_table_as_marked::<VM>(start_line..end_line);
+        Line::initialize_mark_table_as_marked::<VM>(lines);
     }
 }
