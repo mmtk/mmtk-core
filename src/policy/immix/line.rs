@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use super::block::Block;
 use crate::util::linear_scan::{Region, RegionIterator};
-use crate::util::metadata::side_metadata::{address_to_meta_address, SideMetadataSpec};
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::{
     util::{Address, ObjectReference},
     vm::*,
@@ -86,12 +86,10 @@ impl Line {
 
     pub fn initialize_mark_table_as_marked<VM: VMBinding>(lines: Range<Line>) {
         let meta = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec();
-        let start: *mut u8 = address_to_meta_address(meta, lines.start.start()).to_mut_ptr();
-        let limit: *mut u8 = address_to_meta_address(meta, lines.end.start()).to_mut_ptr();
-        unsafe {
-            let bytes = limit.offset_from(start) as usize;
-            std::ptr::write_bytes(start, 0xffu8, bytes);
-        }
+        let start = lines.start.start();
+        let limit = lines.end.start();
+        let size = limit - start;
+        meta.bset_metadata(start, size);
     }
 
     /// Eagerly mark mark all line mark states and all side mark bits in the gap.
