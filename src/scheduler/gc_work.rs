@@ -191,11 +191,31 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseCollector {
 ///
 /// TODO: Smaller work granularity
 #[derive(Default)]
-pub struct StopMutators<C: GCWorkContext>(PhantomData<C>);
+pub struct StopMutators<C: GCWorkContext> {
+    /// If this is true, we skip creating [`ScanMutatorRoots`] work packets for mutators.
+    /// By default, this is false.
+    skip_mutator_roots: bool,
+    /// Flush mutators once they are stopped. By default this is false. [`ScanMutatorRoots`] will flush mutators.
+    flush_mutator: bool,
+    phantom: PhantomData<C>,
+}
 
 impl<C: GCWorkContext> StopMutators<C> {
     pub fn new() -> Self {
-        Self(PhantomData)
+        Self {
+            skip_mutator_roots: false,
+            flush_mutator: false,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Create a `StopMutators` work packet that does not create `ScanMutatorRoots` work packets for mutators, and will simply flush mutators.
+    pub fn new_no_scan_roots() -> Self {
+        Self {
+            skip_mutator_roots: true,
+            flush_mutator: true,
+            phantom: PhantomData,
+        }
     }
 }
 
@@ -206,10 +226,17 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
         <C::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
             // TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
             // Should we push to Unconstrained instead?
-            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                .add(ScanMutatorRoots::<C>(mutator));
+
+            if self.flush_mutator {
+                mutator.flush();
+            }
+            if !self.skip_mutator_roots {
+                mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+                    .add(ScanMutatorRoots::<C>(mutator));
+            }
         });
         trace!("stop_all_mutators end");
+        mmtk.get_plan().notify_mutators_paused(&mmtk.scheduler);
         mmtk.scheduler.notify_mutators_paused(mmtk);
         mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanVMSpecificRoots::<C>::new());
     }

@@ -14,6 +14,7 @@ use crate::util::heap::chunk_map::*;
 use crate::util::heap::BlockPageResource;
 use crate::util::heap::PageResource;
 use crate::util::linear_scan::{Region, RegionIterator};
+use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
@@ -197,6 +198,9 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
 
     fn clear_side_log_bits(&self) {
+        // Remove the following warning if we have a legitimate use case.
+        warn!("ImmixSpace::clear_side_log_bits is single-treaded.  Consider clearing side metadata in per-chunk work packets.");
+
         let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
         for chunk in self.chunk_map.all_chunks() {
             log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
@@ -204,6 +208,9 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
 
     fn set_side_log_bits(&self) {
+        // Remove the following warning if we have a legitimate use case.
+        warn!("ImmixSpace::set_side_log_bits is single-treaded.  Consider setting side metadata in per-chunk work packets.");
+
         let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
         for chunk in self.chunk_map.all_chunks() {
             log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
@@ -417,7 +424,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self.scheduler
     }
 
-    pub fn prepare(&mut self, major_gc: bool, plan_stats: Option<StatsForDefrag>) {
+    pub(crate) fn prepare(
+        &mut self,
+        major_gc: bool,
+        plan_stats: Option<StatsForDefrag>,
+        unlog_bits_op: UnlogBitsOperation,
+    ) {
         if major_gc {
             // Update mark_state
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
@@ -445,6 +457,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     } else {
                         None
                     },
+                    unlog_bits_op,
                 })
             });
             self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
@@ -496,7 +509,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Release for the immix space.
-    pub fn release(&mut self, major_gc: bool) {
+    pub(crate) fn release(&mut self, major_gc: bool, unlog_bits_op: UnlogBitsOperation) {
         if major_gc {
             // Update line_unavail_state for hole searching after this GC.
             if !super::BLOCK_ONLY {
@@ -511,7 +524,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.reusable_blocks.reset();
         }
         // Sweep chunks and blocks
-        let work_packets = self.generate_sweep_tasks();
+        let work_packets = self.generate_sweep_tasks(unlog_bits_op);
         self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
 
         self.lines_consumed.store(0, Ordering::Relaxed);
@@ -528,7 +541,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Generate chunk sweep tasks
-    fn generate_sweep_tasks(&self) -> Vec<Box<dyn GCWork<VM>>> {
+    fn generate_sweep_tasks(&self, unlog_bits_op: UnlogBitsOperation) -> Vec<Box<dyn GCWork<VM>>> {
         self.defrag.mark_histograms.lock().clear();
         // # Safety: ImmixSpace reference is always valid within this collection cycle.
         let space = unsafe { &*(self as *const Self) };
@@ -540,6 +553,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             Box::new(SweepChunk {
                 space,
                 chunk,
+                unlog_bits_op,
                 epilogue: epilogue.clone(),
             })
         });
@@ -909,6 +923,7 @@ pub struct PrepareBlockState<VM: VMBinding> {
     pub space: &'static ImmixSpace<VM>,
     pub chunk: Chunk,
     pub defrag_threshold: Option<usize>,
+    pub unlog_bits_op: UnlogBitsOperation,
 }
 
 impl<VM: VMBinding> PrepareBlockState<VM> {
@@ -953,6 +968,9 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             debug_assert!(!block.get_state().is_reusable());
             debug_assert_ne!(block.get_state(), BlockState::Marked);
         }
+
+        self.unlog_bits_op
+            .execute::<VM>(self.chunk.start(), Chunk::BYTES);
     }
 }
 
@@ -960,6 +978,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
 struct SweepChunk<VM: VMBinding> {
     space: &'static ImmixSpace<VM>,
     chunk: Chunk,
+    unlog_bits_op: UnlogBitsOperation,
     /// A destructor invoked when all `SweepChunk` packets are finished.
     epilogue: Arc<FlushPageResource<VM>>,
 }
@@ -1020,6 +1039,10 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             self.space.chunk_map.set_allocated(self.chunk, false)
         }
         self.space.defrag.add_completed_mark_histogram(histogram);
+
+        self.unlog_bits_op
+            .execute::<VM>(self.chunk.start(), Chunk::BYTES);
+
         self.epilogue.finish_one_work_packet();
     }
 }

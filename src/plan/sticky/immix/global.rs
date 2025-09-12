@@ -6,6 +6,7 @@ use crate::plan::immix;
 use crate::plan::PlanConstraints;
 use crate::policy::gc_work::TraceKind;
 use crate::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
+use crate::policy::immix::defrag::StatsForDefrag;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::immix::TRACE_KIND_FAST;
 use crate::policy::sft::SFT;
@@ -14,6 +15,7 @@ use crate::util::copy::CopyConfig;
 use crate::util::copy::CopySelector;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::gc_trigger::SpaceStats;
+use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::statistics::counter::EventCounter;
 use crate::vm::ObjectModel;
@@ -118,24 +120,37 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             // Prepare both large object space and immix space
             self.immix.immix_space.prepare(
                 false,
-                Some(crate::policy::immix::defrag::StatsForDefrag::new(self)),
+                Some(StatsForDefrag::new(self)),
+                // We don't do anything special to unlog bits during nursery GC
+                // because ProcessModBuf will set the unlog bits back.
+                UnlogBitsOperation::NoOp,
             );
             self.immix.common.los.prepare(false);
         } else {
             self.full_heap_gc_count.lock().unwrap().inc();
-            if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
-                self.immix.immix_space.clear_side_log_bits();
-            }
-            self.immix.prepare(tls);
+            self.immix.prepare_inner(
+                tls,
+                // We will reconstruct unlog bits during tracing.
+                UnlogBitsOperation::BulkClear,
+            );
         }
     }
 
     fn release(&mut self, tls: crate::util::VMWorkerThread) {
         if self.is_current_gc_nursery() {
-            self.immix.immix_space.release(false);
+            self.immix.immix_space.release(
+                false,
+                // We don't do anything special to unlog bits during nursery GC
+                // because ProcessModBuf has set the unlog bits back.
+                UnlogBitsOperation::NoOp,
+            );
             self.immix.common.los.release(false);
         } else {
-            self.immix.release(tls);
+            self.immix.release_inner(
+                tls,
+                // We reconstructred unlog bits during tracing.  Keep them.
+                UnlogBitsOperation::NoOp,
+            );
         }
     }
 
