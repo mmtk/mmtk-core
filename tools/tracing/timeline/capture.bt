@@ -2,6 +2,7 @@ BEGIN {
     @harness = $HARNESS;
 
     @gc_count = 0;
+    @is_initial_mark = 0;
 
     if (!@harness) {
         //always collect data
@@ -30,7 +31,6 @@ usdt:$MMTK:mmtk:harness_end {
 
 usdt:$MMTK:mmtk:gc_start {
     printf("GC,B,%d,%lu\n", tid, nsecs);
-    @gc_count += 1;
     // bpftrace warns that signed `%` operator may have undefiend behavior.
     if ((uint64)@gc_count % $EVERY == 0 && @stats_enabled) {
         @enable_print = 1;
@@ -41,6 +41,14 @@ usdt:$MMTK:mmtk:gc_start {
 
 usdt:$MMTK:mmtk:gc_end {
     printf("GC,E,%d,%lu\n", tid, nsecs);
+
+    // We don't increment the GC count so that we always visualize both InitialMark and FinalMark or neither.
+    // FIXME: mmtk-core should emit distinct events for GC end and pause end.
+    if (!@is_initial_mark) {
+        @gc_count += 1;
+    }
+
+    @is_initial_mark = 0;
 }
 
 usdt:$MMTK:mmtk:bucket_opened {
@@ -125,19 +133,24 @@ usdt:$MMTK:mmtk:sweep_chunk {
 }
 
 usdt:$MMTK:mmtk:concurrent_trace_objects {
+    if (@enable_print) {
         printf("concurrent_trace_objects,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
+    }
 }
 
 usdt:$MMTK:mmtk:gcrequester_request {
-        printf("gcrequester_request,i,%d,%lu\n", tid, nsecs);
+    printf("gcrequester_request,i,%d,%lu\n", tid, nsecs);
 }
 
 usdt:$MMTK:mmtk:add_schedule_collection_packet {
-        printf("add_schedule_collection_packet,i,%d,%lu\n", tid, nsecs);
+    printf("add_schedule_collection_packet,i,%d,%lu\n", tid, nsecs);
 }
 
 usdt:$MMTK:mmtk:concurrent_pause_determined {
-        printf("concurrent_pause_determined,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+    printf("concurrent_pause_determined,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+    if (arg0 == 2) { // InitialMark
+        @is_initial_mark = 1;
+    }
 }
 
 usdt:$MMTK:mmtk:finalization {
