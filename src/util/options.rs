@@ -44,7 +44,7 @@ pub enum PlanSelector {
     PageProtect,
     /// A mark-region collector that allows an opportunistic defragmentation mechanism.
     Immix,
-    /// A mark-compact collector that marks objects and performs Cheney-style copying.
+    /// A mark-compact collector that implements the Lisp-2 compaction algorithm.
     MarkCompact,
     /// A mark-compact collector that uses Compressor-style bitmaps.
     Compressor,
@@ -487,7 +487,7 @@ pub enum NurserySize {
         /// The upper bound of the nursery size in bytes. Default to [`DEFAULT_MAX_NURSERY`].
         max: usize,
     },
-    /// A bounded nursery that is porportional to the current heap size.
+    /// A bounded nursery that is proportional to the current heap size.
     ProportionalBounded {
         /// The lower bound of the nursery size as a proportion of the current heap size. Default to [`DEFAULT_PROPORTIONAL_MIN_NURSERY`].
         min: f64,
@@ -656,12 +656,12 @@ mod nursery_size_parsing_tests {
 /// Select a GC trigger for MMTk.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum GCTriggerSelector {
-    /// GC is triggered when a fix-sized heap is full. The value specifies the fixed heap size in bytes.
+    /// GC is triggered when a fixed-size heap is full. The value specifies the fixed heap size in bytes.
     FixedHeapSize(usize),
-    /// GC is triggered by internal herusticis, and the heap size is varying between the two given values.
+    /// GC is triggered by internal heuristics, and the heap size is varying between the two given values.
     /// The two values are the lower and the upper bound of the heap size.
     DynamicHeapSize(usize, usize),
-    /// Delegate the GC triggering to the binding. This is not supported at the moment.
+    /// Delegate the GC triggering to the binding.
     Delegated,
 }
 
@@ -715,7 +715,7 @@ impl GCTriggerSelector {
         }
     }
 
-    /// Return true if the gc trigger is valid
+    /// Return true if the GC trigger is valid
     fn validate(&self) -> bool {
         match self {
             Self::FixedHeapSize(size) => *size > 0,
