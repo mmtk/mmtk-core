@@ -1435,7 +1435,7 @@
     </span>PageProtect,
     <span class="doccomment">/// A mark-region collector that allows an opportunistic defragmentation mechanism.
     </span>Immix,
-    <span class="doccomment">/// A mark-compact collector that marks objects and performs Cheney-style copying.
+    <span class="doccomment">/// A mark-compact collector that implements the Lisp-2 compaction algorithm.
     </span>MarkCompact,
     <span class="doccomment">/// A mark-compact collector that uses Compressor-style bitmaps.
     </span>Compressor,
@@ -1878,7 +1878,7 @@
         <span class="doccomment">/// The upper bound of the nursery size in bytes. Default to [`DEFAULT_MAX_NURSERY`].
         </span>max: usize,
     },
-    <span class="doccomment">/// A bounded nursery that is porportional to the current heap size.
+    <span class="doccomment">/// A bounded nursery that is proportional to the current heap size.
     </span>ProportionalBounded {
         <span class="doccomment">/// The lower bound of the nursery size as a proportion of the current heap size. Default to [`DEFAULT_PROPORTIONAL_MIN_NURSERY`].
         </span>min: f64,
@@ -2047,12 +2047,12 @@
 <span class="doccomment">/// Select a GC trigger for MMTk.
 </span><span class="attr">#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 </span><span class="kw">pub enum </span>GCTriggerSelector {
-    <span class="doccomment">/// GC is triggered when a fix-sized heap is full. The value specifies the fixed heap size in bytes.
+    <span class="doccomment">/// GC is triggered when a fixed-size heap is full. The value specifies the fixed heap size in bytes.
     </span>FixedHeapSize(usize),
-    <span class="doccomment">/// GC is triggered by internal herusticis, and the heap size is varying between the two given values.
+    <span class="doccomment">/// GC is triggered by internal heuristics, and the heap size is varying between the two given values.
     /// The two values are the lower and the upper bound of the heap size.
     </span>DynamicHeapSize(usize, usize),
-    <span class="doccomment">/// Delegate the GC triggering to the binding. This is not supported at the moment.
+    <span class="doccomment">/// Delegate the GC triggering to the binding.
     </span>Delegated,
 }
 
@@ -2106,7 +2106,7 @@
         }
     }
 
-    <span class="doccomment">/// Return true if the gc trigger is valid
+    <span class="doccomment">/// Return true if the GC trigger is valid
     </span><span class="kw">fn </span>validate(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw">match </span><span class="self">self </span>{
             <span class="self">Self</span>::FixedHeapSize(size) =&gt; <span class="kw-2">*</span>size &gt; <span class="number">0</span>,
