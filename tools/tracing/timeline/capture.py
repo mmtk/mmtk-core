@@ -54,6 +54,9 @@ def delete_lines_between(lines, begin, end):
         raise Exception(f"Cannot find {begin} and {end} in the script. {begin_index} {end_index}")
     del lines[begin_index:end_index + 1]
 
+def eprint(*args, **kwargs):
+    print(*args, **kwargs, file=sys.stderr)
+
 def main():
     args = get_args()
     here = Path(__file__).parent.resolve()
@@ -84,7 +87,7 @@ def main():
             MMTK=mmtk_bin,
             TMP_FILE=tmp.name)
         if args.print_script:
-            print(content)
+            eprint(content)
         tmp.write(content)
         tmp.flush()
 
@@ -94,9 +97,14 @@ def main():
 
         command_line = ["sudo", args.bpftrace] + extra_options + ["--unsafe", tmp.name]
 
+        if args.every % 2 == 0:
+            eprint(f"""\
+WARNING! The value of the --every option is {args.every} which is an even number.
+You may observe misleading results due to stroboscopic effect.  See README.md""")
+
         if args.dry_run:
-            print("Dry run.  Command to execute:")
-            print(" ".join(f"'{c}'" for c in command_line))
+            eprint("Dry run.  Command to execute:")
+            eprint(" ".join(f"'{c}'" for c in command_line))
             # tempfile will be deleted at the end of `with`.
         else:
             # We use execvp to replace the current process instead of creating
