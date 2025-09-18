@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["RESERVED_ALLOCATORS"],"fn":["concurent_immix_mutator_prepare","concurrent_immix_mutator_release","create_concurrent_immix_mutator"],"struct":["ALLOCATOR_MAPPING"],"type":["BarrierSemanticsType","BarrierType"]};

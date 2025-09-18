@@ -209,7 +209,29 @@
 <a href="#208" id="208">208</a>
 <a href="#209" id="209">209</a>
 <a href="#210" id="210">210</a>
-<a href="#211" id="211">211</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::ImmixGCWorkContext;
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+<a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
+<a href="#229" id="229">229</a>
+<a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
+<a href="#233" id="233">233</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::ImmixGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::BasePlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
@@ -226,6 +248,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::SpaceStats;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::log_bit::UnlogBitsOperation;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use crate</span>::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
@@ -295,17 +318,11 @@
     }
 
     <span class="kw">fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
-        <span class="self">self</span>.common.prepare(tls, <span class="bool-val">true</span>);
-        <span class="self">self</span>.immix_space.prepare(
-            <span class="bool-val">true</span>,
-            <span class="prelude-val">Some</span>(<span class="kw">crate</span>::policy::immix::defrag::StatsForDefrag::new(<span class="self">self</span>)),
-        );
+        <span class="self">self</span>.prepare_inner(tls, UnlogBitsOperation::NoOp)
     }
 
     <span class="kw">fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
-        <span class="self">self</span>.common.release(tls, <span class="bool-val">true</span>);
-        <span class="comment">// release the collected region
-        </span><span class="self">self</span>.immix_space.release(<span class="bool-val">true</span>);
+        <span class="self">self</span>.release_inner(tls, UnlogBitsOperation::NoOp);
     }
 
     <span class="kw">fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
@@ -418,6 +435,33 @@
 
     <span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plan) <span class="kw">fn </span>set_last_gc_was_defrag(<span class="kw-2">&amp;</span><span class="self">self</span>, defrag: bool, order: Ordering) {
         <span class="self">self</span>.last_gc_was_defrag.store(defrag, order)
+    }
+
+    <span class="doccomment">/// Prepare with unlog-bit operation.
+    /// Some Immix-derived plans may need to set/clear unlog bits when preparing.
+    </span><span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plan) <span class="kw">fn </span>prepare_inner(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        tls: VMWorkerThread,
+        unlog_bits_op: UnlogBitsOperation,
+    ) {
+        <span class="self">self</span>.common.prepare(tls, <span class="bool-val">true</span>);
+        <span class="self">self</span>.immix_space.prepare(
+            <span class="bool-val">true</span>,
+            <span class="prelude-val">Some</span>(<span class="kw">crate</span>::policy::immix::defrag::StatsForDefrag::new(<span class="self">self</span>)),
+            unlog_bits_op,
+        );
+    }
+
+    <span class="doccomment">/// Release with unlog-bit operation.
+    /// Some Immix-derived plans may need to set/clear unlog bits when releasing.
+    </span><span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plan) <span class="kw">fn </span>release_inner(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        tls: VMWorkerThread,
+        unlog_bits_op: UnlogBitsOperation,
+    ) {
+        <span class="self">self</span>.common.release(tls, <span class="bool-val">true</span>);
+        <span class="comment">// release the collected region
+        </span><span class="self">self</span>.immix_space.release(<span class="bool-val">true</span>, unlog_bits_op);
     }
 }
 </code></pre></div></section></main></body></html>

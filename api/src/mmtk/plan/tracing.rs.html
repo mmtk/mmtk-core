@@ -134,13 +134,48 @@
 <a href="#133" id="133">133</a>
 <a href="#134" id="134">134</a>
 <a href="#135" id="135">135</a>
-<a href="#136" id="136">136</a></pre></div><pre class="rust"><code><span class="doccomment">//! This module contains code useful for tracing,
+<a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a></pre></div><pre class="rust"><code><span class="doccomment">//! This module contains code useful for tracing,
 //! i.e. visiting the reachable objects by traversing all or part of an object graph.
 
-</span><span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::{ProcessEdgesWork, SlotOf};
+</span><span class="kw">use </span>std::marker::PhantomData;
+
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::{ProcessEdgesWork, SlotOf};
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::{GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
-<span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
-<span class="kw">use </span><span class="kw">crate</span>::vm::SlotVisitor;
+<span class="kw">use </span><span class="kw">crate</span>::util::{ObjectReference, VMThread, VMWorkerThread};
+<span class="kw">use </span><span class="kw">crate</span>::vm::{Scanning, SlotVisitor, VMBinding};
 
 <span class="doccomment">/// This trait represents an object queue to enqueue objects during tracing.
 </span><span class="kw">pub trait </span>ObjectQueue {
@@ -198,6 +233,16 @@
             <span class="self">self</span>.buffer.reserve(<span class="self">Self</span>::CAPACITY);
         }
         <span class="self">self</span>.buffer.push(v);
+    }
+
+    <span class="doccomment">/// Return the len of the queue
+    </span><span class="kw">pub fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.buffer.len()
+    }
+
+    <span class="doccomment">/// Empty the queue
+    </span><span class="kw">pub fn </span>clear(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.buffer.clear()
     }
 }
 
@@ -268,6 +313,27 @@
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; Drop <span class="kw">for </span>ObjectsClosure&lt;<span class="lifetime">'_</span>, E&gt; {
     <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="self">self</span>.flush();
+    }
+}
+
+<span class="doccomment">/// For iterating over the slots of an object.
+</span><span class="comment">// FIXME: This type iterates slots, but all of its current use cases only care about the values in the slots.
+// And it currently only works if the object supports slot enqueuing (i.e. `Scanning::scan_object` is implemented).
+// We may refactor the interface according to &lt;https://github.com/mmtk/mmtk-core/issues/1375&gt;
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>SlotIterator&lt;VM: VMBinding&gt; {
+    _p: PhantomData&lt;VM&gt;,
+}
+
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; SlotIterator&lt;VM&gt; {
+    <span class="doccomment">/// Iterate over the slots of an object by applying a function to each slot.
+    </span><span class="kw">pub fn </span>iterate_fields&lt;F: FnMut(VM::VMSlot)&gt;(object: ObjectReference, _tls: VMThread, <span class="kw-2">mut </span>f: F) {
+        <span class="comment">// FIXME: We should use tls from the arguments.
+        // See https://github.com/mmtk/mmtk-core/issues/1375
+        </span><span class="kw">let </span>fake_tls = VMWorkerThread(VMThread::UNINITIALIZED);
+        <span class="kw">if </span>!&lt;VM::VMScanning <span class="kw">as </span>Scanning&lt;VM&gt;&gt;::support_slot_enqueuing(fake_tls, object) {
+            <span class="macro">panic!</span>(<span class="string">"SlotIterator::iterate_fields cannot be used on objects that don't support slot-enqueuing"</span>);
+        }
+        &lt;VM::VMScanning <span class="kw">as </span>Scanning&lt;VM&gt;&gt;::scan_object(fake_tls, object, <span class="kw-2">&amp;mut </span>f);
     }
 }
 </code></pre></div></section></main></body></html>

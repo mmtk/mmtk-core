@@ -279,7 +279,19 @@
 <a href="#278" id="278">278</a>
 <a href="#279" id="279">279</a>
 <a href="#280" id="280">280</a>
-<a href="#281" id="281">281</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext;
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixNurseryGCWorkContext;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::CommonGenPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
@@ -291,6 +303,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TraceKind;
+<span class="kw">use </span><span class="kw">crate</span>::policy::immix::defrag::StatsForDefrag;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::ImmixSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::ImmixSpaceArgs;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
@@ -301,6 +314,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::SpaceStats;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::log_bit::UnlogBitsOperation;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::util::VMWorkerThread;
@@ -410,22 +424,32 @@
         <span class="kw">let </span>full_heap = !<span class="self">self</span>.gen.is_current_gc_nursery();
         <span class="self">self</span>.gen.prepare(tls);
         <span class="kw">if </span>full_heap {
-            <span class="kw">if </span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
-                <span class="self">self</span>.immix_space.clear_side_log_bits();
-            }
             <span class="self">self</span>.immix_space.prepare(
                 full_heap,
-                <span class="prelude-val">Some</span>(<span class="kw">crate</span>::policy::immix::defrag::StatsForDefrag::new(<span class="self">self</span>)),
+                <span class="prelude-val">Some</span>(StatsForDefrag::new(<span class="self">self</span>)),
+                <span class="comment">// Bulk clear unlog bits so that we will reconstruct them.
+                </span>UnlogBitsOperation::BulkClear,
             );
-        }
+        } <span class="kw">else </span>{
+            <span class="comment">// We don't do anything special to unlog bits during nursery GC
+            // because ProcessModBuf will set the unlog bits back.
+        </span>}
     }
 
     <span class="kw">fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
         <span class="kw">let </span>full_heap = !<span class="self">self</span>.gen.is_current_gc_nursery();
         <span class="self">self</span>.gen.release(tls);
         <span class="kw">if </span>full_heap {
-            <span class="self">self</span>.immix_space.release(full_heap);
-        }
+            <span class="self">self</span>.immix_space.release(
+                full_heap,
+                <span class="comment">// We reconstructred unlog bits during tracing.  Keep them.
+                </span>UnlogBitsOperation::NoOp,
+            );
+        } <span class="kw">else </span>{
+            <span class="comment">// We don't do anything special to unlog bits during nursery GC
+            // because ProcessModBuf has set the unlog bits back.
+        </span>}
+
         <span class="self">self</span>.last_gc_was_full_heap
             .store(full_heap, Ordering::Relaxed);
     }

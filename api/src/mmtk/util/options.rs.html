@@ -1389,7 +1389,9 @@
 <a href="#1388" id="1388">1388</a>
 <a href="#1389" id="1389">1389</a>
 <a href="#1390" id="1390">1390</a>
-<a href="#1391" id="1391">1391</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
+<a href="#1391" id="1391">1391</a>
+<a href="#1392" id="1392">1392</a>
+<a href="#1393" id="1393">1393</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>std::default::Default;
@@ -1441,6 +1443,8 @@
     </span>Compressor,
     <span class="doccomment">/// An Immix collector that uses a sticky mark bit to allow generational behaviors without a copying nursery.
     </span>StickyImmix,
+    <span class="doccomment">/// Concurrent non-moving immix using SATB
+    </span>ConcurrentImmix,
 }
 
 <span class="doccomment">/// MMTk option for perf events

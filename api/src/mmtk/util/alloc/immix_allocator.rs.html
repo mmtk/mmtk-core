@@ -407,7 +407,19 @@
 <a href="#406" id="406">406</a>
 <a href="#407" id="407">407</a>
 <a href="#408" id="408">408</a>
-<a href="#409" id="409">409</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
+<a href="#409" id="409">409</a>
+<a href="#410" id="410">410</a>
+<a href="#411" id="411">411</a>
+<a href="#412" id="412">412</a>
+<a href="#413" id="413">413</a>
+<a href="#414" id="414">414</a>
+<a href="#415" id="415">415</a>
+<a href="#416" id="416">416</a>
+<a href="#417" id="417">417</a>
+<a href="#418" id="418">418</a>
+<a href="#419" id="419">419</a>
+<a href="#420" id="420">420</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::atomic::Ordering;
+<span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span><span class="kw">super</span>::allocator::{align_allocation_no_fill, fill_alignment_gap, AllocatorContext};
 <span class="kw">use </span><span class="kw">super</span>::BumpPointer;
@@ -674,6 +686,11 @@
                     <span class="comment">// Update the hole-searching cursor to None.
                     </span><span class="prelude-val">Some</span>(end_line)
                 };
+                <span class="comment">// mark objects if concurrent marking is active
+                </span><span class="kw">if </span><span class="self">self</span>.immix_space().should_allocate_as_live() {
+                    <span class="kw">let </span>state = <span class="self">self</span>.space.line_mark_state.load(Ordering::Acquire);
+                    Line::eager_mark_lines::&lt;VM&gt;(state, start_line..end_line);
+                }
                 <span class="kw">return </span><span class="bool-val">true</span>;
             } <span class="kw">else </span>{
                 <span class="comment">// No more recyclable lines. Set the hole-searching cursor to None.
@@ -714,6 +731,11 @@
                 <span class="comment">// Bulk clear stale line mark state
                 </span>Line::MARK_TABLE
                     .bzero_metadata(block.start(), <span class="kw">crate</span>::policy::immix::block::Block::BYTES);
+                <span class="comment">// mark objects if concurrent marking is active
+                </span><span class="kw">if </span><span class="self">self</span>.immix_space().should_allocate_as_live() {
+                    <span class="kw">let </span>state = <span class="self">self</span>.space.line_mark_state.load(Ordering::Acquire);
+                    Line::eager_mark_lines::&lt;VM&gt;(state, block.start_line()..block.end_line());
+                }
                 <span class="kw">if </span><span class="self">self</span>.request_for_large {
                     <span class="self">self</span>.large_bump_pointer.cursor = block.start();
                     <span class="self">self</span>.large_bump_pointer.limit = block.end();

@@ -615,7 +615,12 @@
 <a href="#614" id="614">614</a>
 <a href="#615" id="615">615</a>
 <a href="#616" id="616">616</a>
-<a href="#617" id="617">617</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
+<a href="#617" id="617">617</a>
+<a href="#618" id="618">618</a>
+<a href="#619" id="619">619</a>
+<a href="#620" id="620">620</a>
+<a href="#621" id="621">621</a>
+<a href="#622" id="622">622</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
 <span class="kw">use </span>std::sync::atomic::AtomicBool;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 <span class="kw">use </span>std::sync::Mutex;
@@ -869,6 +874,11 @@
 
     <span class="doccomment">/// Inform the binding to enqueue the weak references whose referents were cleared in this GC.
     </span><span class="kw">pub fn </span>enqueue&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMWorkerThread) {
+        <span class="comment">// We will acquire a lock below. If anyone tries to insert new weak refs which will acquire the same lock, a deadlock will occur.
+        // This does happen for OpenJDK with ConcurrentImmix where a write barrier is triggered during the enqueueing of weak references,
+        // and the write barrier scans the objects and attempts to add new weak references.
+        // Disallow new candidates to prevent the deadlock.
+        </span><span class="self">self</span>.disallow_new_candidate();
         <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
 
         <span class="comment">// This is the end of a GC. We do some assertions here to make sure our reference tables are correct.

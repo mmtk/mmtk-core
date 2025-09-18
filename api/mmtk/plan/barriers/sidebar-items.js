@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["BarrierSelector"],"struct":["NoBarrier","ObjectBarrier"],"trait":["Barrier","BarrierSemantics"]};
+window.SIDEBAR_ITEMS = {"enum":["BarrierSelector"],"struct":["NoBarrier","ObjectBarrier","SATBBarrier"],"trait":["Barrier","BarrierSemantics"]};

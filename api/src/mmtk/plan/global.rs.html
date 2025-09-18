@@ -916,11 +916,52 @@
 <a href="#915" id="915">915</a>
 <a href="#916" id="916">916</a>
 <a href="#917" id="917">917</a>
-<a href="#918" id="918">918</a></pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
+<a href="#918" id="918">918</a>
+<a href="#919" id="919">919</a>
+<a href="#920" id="920">920</a>
+<a href="#921" id="921">921</a>
+<a href="#922" id="922">922</a>
+<a href="#923" id="923">923</a>
+<a href="#924" id="924">924</a>
+<a href="#925" id="925">925</a>
+<a href="#926" id="926">926</a>
+<a href="#927" id="927">927</a>
+<a href="#928" id="928">928</a>
+<a href="#929" id="929">929</a>
+<a href="#930" id="930">930</a>
+<a href="#931" id="931">931</a>
+<a href="#932" id="932">932</a>
+<a href="#933" id="933">933</a>
+<a href="#934" id="934">934</a>
+<a href="#935" id="935">935</a>
+<a href="#936" id="936">936</a>
+<a href="#937" id="937">937</a>
+<a href="#938" id="938">938</a>
+<a href="#939" id="939">939</a>
+<a href="#940" id="940">940</a>
+<a href="#941" id="941">941</a>
+<a href="#942" id="942">942</a>
+<a href="#943" id="943">943</a>
+<a href="#944" id="944">944</a>
+<a href="#945" id="945">945</a>
+<a href="#946" id="946">946</a>
+<a href="#947" id="947">947</a>
+<a href="#948" id="948">948</a>
+<a href="#949" id="949">949</a>
+<a href="#950" id="950">950</a>
+<a href="#951" id="951">951</a>
+<a href="#952" id="952">952</a>
+<a href="#953" id="953">953</a>
+<a href="#954" id="954">954</a>
+<a href="#955" id="955">955</a>
+<a href="#956" id="956">956</a>
+<a href="#957" id="957">957</a>
+<a href="#958" id="958">958</a></pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::MMTK;
+<span class="kw">use </span><span class="kw">crate</span>::plan::gc_work::{ClearCommonPlanUnlogBits, SetCommonPlanUnlogBits};
 <span class="kw">use </span><span class="kw">crate</span>::plan::tracing::ObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::plan::Mutator;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immortalspace::ImmortalSpace;
@@ -937,6 +978,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::HeapMeta;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::log_bit::UnlogBitsOperation;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::options::Options;
@@ -976,6 +1018,9 @@
         PlanSelector::StickyImmix =&gt; {
             <span class="kw">crate</span>::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
         }
+        PlanSelector::ConcurrentImmix =&gt; {
+            <span class="kw">crate</span>::plan::concurrent::immix::mutator::create_concurrent_immix_mutator(tls, mmtk)
+        }
         PlanSelector::Compressor =&gt; {
             <span class="kw">crate</span>::plan::compressor::mutator::create_compressor_mutator(tls, mmtk)
         }
@@ -1011,6 +1056,10 @@
         }
         PlanSelector::StickyImmix =&gt; {
             Box::new(<span class="kw">crate</span>::plan::sticky::immix::StickyImmix::new(args)) <span class="kw">as </span>Box&lt;<span class="kw">dyn </span>Plan&lt;VM = VM&gt;&gt;
+        }
+        PlanSelector::ConcurrentImmix =&gt; {
+            Box::new(<span class="kw">crate</span>::plan::concurrent::immix::ConcurrentImmix::new(args))
+                <span class="kw">as </span>Box&lt;<span class="kw">dyn </span>Plan&lt;VM = VM&gt;&gt;
         }
         PlanSelector::Compressor =&gt; {
             Box::new(<span class="kw">crate</span>::plan::compressor::Compressor::new(args)) <span class="kw">as </span>Box&lt;<span class="kw">dyn </span>Plan&lt;VM = VM&gt;&gt;
@@ -1097,6 +1146,14 @@
         <span class="prelude-val">None
     </span>}
 
+    <span class="doccomment">/// Return a reference to `ConcurrentPlan` to allow
+    /// access methods specific to concurrent plans if the plan is a concurrent plan.
+    </span><span class="kw">fn </span>concurrent(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span><span class="kw">crate</span>::plan::concurrent::global::ConcurrentPlan&lt;VM = <span class="self">Self</span>::VM&gt;&gt; {
+        <span class="prelude-val">None
+    </span>}
+
     <span class="doccomment">/// Get the current run time options.
     </span><span class="kw">fn </span>options(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Options {
         <span class="kw-2">&amp;</span><span class="self">self</span>.base().options
@@ -1105,6 +1162,9 @@
     <span class="doccomment">/// Get the allocator mapping between [`crate::AllocationSemantics`] and [`crate::util::alloc::AllocatorSelector`].
     /// This defines what space this plan will allocate objects into for different semantics.
     </span><span class="kw">fn </span>get_allocator_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>EnumMap&lt;AllocationSemantics, AllocatorSelector&gt;;
+
+    <span class="doccomment">/// Called when all mutators are paused. This is called before prepare.
+    </span><span class="kw">fn </span>notify_mutators_paused(<span class="kw-2">&amp;</span><span class="self">self</span>, _scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;<span class="self">Self</span>::VM&gt;) {}
 
     <span class="doccomment">/// Prepare the plan before a GC. This is invoked in an initial step in the GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
@@ -1121,6 +1181,7 @@
 
     <span class="doccomment">/// Inform the plan about the end of a GC. It is guaranteed that there is no further work for this GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
+    </span><span class="comment">// TODO: This is actually called at the end of a pause/STW, rather than the end of a GC. It should be renamed.
     </span><span class="kw">fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _tls: VMWorkerThread);
 
     <span class="doccomment">/// Notify the plan that an emergency collection will happen. The plan should try to free as much memory as possible.
@@ -1652,6 +1713,25 @@ CommonPlan is for representing state and features used by _many_ plans, but that
         <span class="self">self</span>.base.release(tls, full_heap)
     }
 
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>schedule_unlog_bits_op(<span class="kw-2">&amp;mut </span><span class="self">self</span>, unlog_bits_op: UnlogBitsOperation) {
+        <span class="kw">if </span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
+            <span class="comment">// # Safety: CommonPlan reference is always valid within this collection cycle.
+            </span><span class="kw">let </span>common_plan = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span>(<span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span>CommonPlan&lt;VM&gt;) };
+
+            <span class="kw">match </span>unlog_bits_op {
+                UnlogBitsOperation::NoOp =&gt; {}
+                UnlogBitsOperation::BulkSet =&gt; {
+                    <span class="self">self</span>.base.scheduler.work_buckets[WorkBucketStage::Prepare]
+                        .add(SetCommonPlanUnlogBits { common_plan });
+                }
+                UnlogBitsOperation::BulkClear =&gt; {
+                    <span class="self">self</span>.base.scheduler.work_buckets[WorkBucketStage::Release]
+                        .add(ClearCommonPlanUnlogBits { common_plan });
+                }
+            }
+        }
+    }
+
     <span class="kw">pub fn </span>clear_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="self">self</span>.immortal.clear_side_log_bits();
         <span class="self">self</span>.los.clear_side_log_bits();
@@ -1706,7 +1786,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
             } <span class="kw">else if </span><span class="attr">#[cfg(feature = <span class="string">"marksweep_as_nonmoving"</span>)] </span>{
                 <span class="self">self</span>.nonmoving.prepare(_full_heap);
             } <span class="kw">else </span>{
-                <span class="self">self</span>.nonmoving.prepare(_full_heap, <span class="prelude-val">None</span>);
+                <span class="self">self</span>.nonmoving.prepare(_full_heap, <span class="prelude-val">None</span>, UnlogBitsOperation::NoOp);
             }
         }
     }
@@ -1718,7 +1798,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
             } <span class="kw">else if </span><span class="attr">#[cfg(feature = <span class="string">"marksweep_as_nonmoving"</span>)] </span>{
                 <span class="self">self</span>.nonmoving.prepare(_full_heap);
             } <span class="kw">else </span>{
-                <span class="self">self</span>.nonmoving.release(_full_heap);
+                <span class="self">self</span>.nonmoving.release(_full_heap, UnlogBitsOperation::NoOp);
             }
         }
     }

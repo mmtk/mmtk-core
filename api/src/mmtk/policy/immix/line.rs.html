@@ -82,7 +82,39 @@
 <a href="#81" id="81">81</a>
 <a href="#82" id="82">82</a>
 <a href="#83" id="83">83</a>
-<a href="#84" id="84">84</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::block::Block;
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
+<a href="#106" id="106">106</a>
+<a href="#107" id="107">107</a>
+<a href="#108" id="108">108</a>
+<a href="#109" id="109">109</a>
+<a href="#110" id="110">110</a>
+<a href="#111" id="111">111</a>
+<a href="#112" id="112">112</a>
+<a href="#113" id="113">113</a>
+<a href="#114" id="114">114</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::ops::Range;
+
+<span class="kw">use </span><span class="kw">super</span>::block::Block;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::{Region, RegionIterator};
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
 <span class="kw">use crate</span>::{
@@ -164,6 +196,34 @@
             line.mark(state)
         }
         marked_lines
+    }
+
+    <span class="doccomment">/// Bulk set the local mark bits of a line range.
+    ///
+    /// This is useful during concurrent marking. By doing this, concurrent marking will
+    /// conservatively consider all objects allocated in the line range as live, and the mutator
+    /// doesn't need to explicitly mark bump-allocated objects in the fast path.
+    </span><span class="kw">pub fn </span>initialize_mark_table_as_marked&lt;VM: VMBinding&gt;(lines: Range&lt;Line&gt;) {
+        <span class="kw">let </span>meta = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec();
+        <span class="kw">let </span>start = lines.start.start();
+        <span class="kw">let </span>limit = lines.end.start();
+        <span class="kw">let </span>size = limit - start;
+        meta.bset_metadata(start, size);
+    }
+
+    <span class="doccomment">/// Bulk set line mark states.
+    </span><span class="kw">pub fn </span>bulk_set_line_mark_states(line_mark_state: u8, lines: Range&lt;Line&gt;) {
+        <span class="kw">for </span>line <span class="kw">in </span>RegionIterator::&lt;Line&gt;::new(lines.start, lines.end) {
+            line.mark(line_mark_state);
+        }
+    }
+
+    <span class="doccomment">/// Eagerly mark all line mark states and all side mark bits in the gap.
+    ///
+    /// Useful during concurrent marking.
+    </span><span class="kw">pub fn </span>eager_mark_lines&lt;VM: VMBinding&gt;(line_mark_state: u8, lines: Range&lt;Line&gt;) {
+        <span class="self">Self</span>::bulk_set_line_mark_states(line_mark_state, lines.clone());
+        <span class="self">Self</span>::initialize_mark_table_as_marked::&lt;VM&gt;(lines);
     }
 }
 </code></pre></div></section></main></body></html>

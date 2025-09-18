@@ -635,7 +635,41 @@
 <a href="#634" id="634">634</a>
 <a href="#635" id="635">635</a>
 <a href="#636" id="636">636</a>
-<a href="#637" id="637">637</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="self">self</span>::worker::PollResult;
+<a href="#637" id="637">637</a>
+<a href="#638" id="638">638</a>
+<a href="#639" id="639">639</a>
+<a href="#640" id="640">640</a>
+<a href="#641" id="641">641</a>
+<a href="#642" id="642">642</a>
+<a href="#643" id="643">643</a>
+<a href="#644" id="644">644</a>
+<a href="#645" id="645">645</a>
+<a href="#646" id="646">646</a>
+<a href="#647" id="647">647</a>
+<a href="#648" id="648">648</a>
+<a href="#649" id="649">649</a>
+<a href="#650" id="650">650</a>
+<a href="#651" id="651">651</a>
+<a href="#652" id="652">652</a>
+<a href="#653" id="653">653</a>
+<a href="#654" id="654">654</a>
+<a href="#655" id="655">655</a>
+<a href="#656" id="656">656</a>
+<a href="#657" id="657">657</a>
+<a href="#658" id="658">658</a>
+<a href="#659" id="659">659</a>
+<a href="#660" id="660">660</a>
+<a href="#661" id="661">661</a>
+<a href="#662" id="662">662</a>
+<a href="#663" id="663">663</a>
+<a href="#664" id="664">664</a>
+<a href="#665" id="665">665</a>
+<a href="#666" id="666">666</a>
+<a href="#667" id="667">667</a>
+<a href="#668" id="668">668</a>
+<a href="#669" id="669">669</a>
+<a href="#670" id="670">670</a>
+<a href="#671" id="671">671</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="self">self</span>::worker::PollResult;
 
 <span class="kw">use </span><span class="kw">super</span>::gc_work::ScheduleCollection;
 <span class="kw">use </span><span class="kw">super</span>::stat::SchedulerStat;
@@ -768,7 +802,8 @@
     <span class="doccomment">/// Add the `ScheduleCollection` packet.  Called by the last parked worker.
     </span><span class="kw">fn </span>add_schedule_collection_packet(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="comment">// We are still holding the mutex `WorkerMonitor::sync`.  Do not notify now.
-        </span><span class="self">self</span>.work_buckets[WorkBucketStage::Unconstrained].add_no_notify(ScheduleCollection);
+        </span><span class="macro">probe!</span>(mmtk, add_schedule_collection_packet);
+        <span class="self">self</span>.work_buckets[WorkBucketStage::Unconstrained].add_no_notify(ScheduleCollection);
     }
 
     <span class="doccomment">/// Schedule all the common work packets
@@ -909,6 +944,7 @@
     ///
     /// Return true if there're any non-empty buckets updated.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>update_buckets(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="macro">debug!</span>(<span class="string">"update_buckets"</span>);
         <span class="kw">let </span><span class="kw-2">mut </span>buckets_updated = <span class="bool-val">false</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>new_packets = <span class="bool-val">false</span>;
         <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..WorkBucketStage::LENGTH {
@@ -1094,11 +1130,20 @@
                     LastParkedResult::WakeAll
                 } <span class="kw">else </span>{
                     <span class="comment">// GC finished.
-                    </span><span class="self">self</span>.on_gc_finished(worker);
+                    </span><span class="kw">let </span>concurrent_work_scheduled = <span class="self">self</span>.on_gc_finished(worker);
 
                     <span class="comment">// Clear the current goal
                     </span>goals.on_current_goal_completed();
-                    <span class="self">self</span>.respond_to_requests(worker, goals)
+
+                    <span class="kw">if </span>concurrent_work_scheduled {
+                        <span class="comment">// It was the initial mark pause and scheduled concurrent work.
+                        // Wake up all GC workers to do concurrent work.
+                        </span>LastParkedResult::WakeAll
+                    } <span class="kw">else </span>{
+                        <span class="comment">// It was an STW GC or the final mark pause of a concurrent GC.
+                        // Respond to another goal.
+                        </span><span class="self">self</span>.respond_to_requests(worker, goals)
+                    }
                 }
             }
             WorkerGoal::StopForFork =&gt; {
@@ -1171,7 +1216,9 @@
     </span>}
 
     <span class="doccomment">/// Called when GC has finished, i.e. when all work packets have been executed.
-    </span><span class="kw">fn </span>on_gc_finished(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) {
+    ///
+    /// Return `true` if any concurrent work packets have been scheduled.
+    </span><span class="kw">fn </span>on_gc_finished(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) -&gt; bool {
         <span class="comment">// All GC workers must have parked by now.
         </span><span class="macro">debug_assert!</span>(!<span class="self">self</span>.worker_group.has_designated_work());
         <span class="self">self</span>.debug_assert_all_stw_buckets_empty();
@@ -1227,6 +1274,9 @@
             }
         }
 
+        mmtk.state
+            .set_used_pages_after_last_gc(mmtk.get_plan().get_used_pages());
+
         <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
         </span><span class="kw">if </span><span class="kw">crate</span>::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {
             <span class="comment">// reset the logging info at the end of each GC
@@ -1236,9 +1286,14 @@
         <span class="comment">// Reset the triggering information.
         </span>mmtk.state.reset_collection_trigger();
 
+        <span class="kw">let </span>concurrent_work_scheduled = <span class="self">self</span>.schedule_concurrent_packets();
+        <span class="self">self</span>.debug_assert_all_stw_buckets_closed();
+
         <span class="comment">// Set to NotInGC after everything, and right before resuming mutators.
         </span>mmtk.set_gc_status(GcStatus::NotInGC);
         &lt;VM <span class="kw">as </span>VMBinding&gt;::VMCollection::resume_mutators(worker.tls);
+
+        concurrent_work_scheduled
     }
 
     <span class="kw">pub fn </span>enable_stat(<span class="kw-2">&amp;</span><span class="self">self</span>) {
@@ -1270,6 +1325,19 @@
         // of work buckets to make the synchronization more robust,
         </span>first_stw_bucket.open();
         <span class="self">self</span>.worker_monitor.notify_work_available(<span class="bool-val">true</span>);
+    }
+
+    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>schedule_concurrent_packets(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">let </span>concurrent_bucket = <span class="kw-2">&amp;</span><span class="self">self</span>.work_buckets[WorkBucketStage::Concurrent];
+        <span class="kw">if </span>!concurrent_bucket.is_empty() {
+            concurrent_bucket.set_enabled(<span class="bool-val">true</span>);
+            concurrent_bucket.open();
+            <span class="bool-val">true
+        </span>} <span class="kw">else </span>{
+            concurrent_bucket.set_enabled(<span class="bool-val">false</span>);
+            concurrent_bucket.close();
+            <span class="bool-val">false
+        </span>}
     }
 }
 </code></pre></div></section></main></body></html>
