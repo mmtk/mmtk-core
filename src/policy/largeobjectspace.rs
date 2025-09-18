@@ -61,6 +61,24 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
+        if self.should_allocate_as_live() {
+            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::<VM, u8>(
+                object,
+                self.mark_state,
+                None,
+                Ordering::SeqCst,
+            );
+            debug_assert!(
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.load_atomic::<VM, u8>(
+                    object,
+                    None,
+                    Ordering::Acquire
+                ) == 0
+            );
+
+            self.treadmill.add_to_treadmill(object, false);
+            return;
+        }
         let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
             object,
             None,
@@ -205,8 +223,6 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     }
 
     fn set_side_log_bits(&self) {
-        debug_assert!(self.treadmill.is_from_space_empty());
-        debug_assert!(self.treadmill.is_nursery_empty());
         let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         });
@@ -267,7 +283,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     pub fn prepare(&mut self, full_heap: bool) {
         if full_heap {
-            debug_assert!(self.treadmill.is_from_space_empty());
             self.mark_state = MARK_BIT - self.mark_state;
         }
         self.treadmill.flip(full_heap);
@@ -281,6 +296,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             self.sweep_large_pages(false);
         }
     }
+
     // Allow nested-if for this function to make it clear that test_and_mark() is only executed
     // for the outer condition is met.
     #[allow(clippy::collapsible_if)]
@@ -412,6 +428,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             Ordering::Relaxed,
         ) & NURSERY_BIT
             == NURSERY_BIT
+    }
+
+    pub fn is_marked(&self, object: ObjectReference) -> bool {
+        self.test_mark_bit(object, self.mark_state)
     }
 }
 
