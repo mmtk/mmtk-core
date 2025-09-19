@@ -86,6 +86,13 @@ pub trait SFT {
     ) -> Option<ObjectReference>;
 
     /// Initialize object metadata (in the header, or in the side metadata).
+    ///
+    /// Arguments:
+    ///
+    /// * `object`: The object to initialize metadata.
+    /// * `alloc`: `true` if this method is called in `post_alloc` when a mutator is allocating new
+    ///   object using an MMTk allocator. `false` when initializing metadata for objects in the VM
+    ///   space.
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
 
     /// Trace objects through SFT. This along with [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges)

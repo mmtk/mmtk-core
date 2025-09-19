@@ -60,46 +60,14 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
+
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
-        if self.should_allocate_as_live() {
-            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::<VM, u8>(
-                object,
-                self.mark_state,
-                None,
-                Ordering::SeqCst,
-            );
-            debug_assert!(
-                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.load_atomic::<VM, u8>(
-                    object,
-                    None,
-                    Ordering::Acquire
-                ) == 0
-            );
-
-            self.treadmill.add_to_treadmill(object, false);
-            return;
-        }
-        let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
-            object,
-            None,
-            Ordering::SeqCst,
-        );
-        let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
-        if alloc {
-            new_value |= NURSERY_BIT;
-        }
-        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::<VM, u8>(
-            object,
-            new_value,
-            None,
-            Ordering::SeqCst,
+        debug_assert!(
+            alloc,
+            "Objects can only be allocated into the LargeObjectSpace by mutators."
         );
 
-        // If this object is freshly allocated, we do not set it as unlogged
-        if !alloc && self.common.unlog_allocated_object {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
-        }
-
+        // VO bit: Set for all objects.
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(object);
         #[cfg(all(feature = "is_mmtk_object", debug_assertions))]
@@ -113,8 +81,52 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             );
         }
 
-        self.treadmill.add_to_treadmill(object, alloc);
+        let allocate_as_live = self.should_allocate_as_live();
+        let into_nursery = !allocate_as_live;
+
+        // mark/nursery bits: Set mark state plus optionally nursery bit.
+        {
+            let mark_nursery_state = if into_nursery {
+                self.mark_state | NURSERY_BIT
+            } else {
+                self.mark_state
+            };
+
+            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::<VM, u8>(
+                object,
+                mark_nursery_state,
+                None,
+                Ordering::SeqCst,
+            );
+        }
+
+        // global unlog bit: Set if `unlog_allocated_object`.  Ensure it is not set otherwise.
+        if self.common.unlog_allocated_object {
+            debug_assert!(self.common.needs_log_bit);
+            debug_assert!(
+                !allocate_as_live,
+                "Currently only ConcurrentImmix can allocate as live, and it doesn't unlog allocated objects in LOS."
+            );
+
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+        } else {
+            #[cfg(debug_assertions)]
+            if self.common.needs_log_bit {
+                debug_assert_eq!(
+                    VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.load_atomic::<VM, u8>(
+                        object,
+                        None,
+                        Ordering::Acquire
+                    ),
+                    0
+                );
+            }
+        }
+
+        // Add to the treadmill.  Nursery and mature objects need to be added to different sets.
+        self.treadmill.add_to_treadmill(object, into_nursery);
     }
+
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
         crate::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
