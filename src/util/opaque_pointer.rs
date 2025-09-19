@@ -20,7 +20,7 @@ impl Default for OpaquePointer {
 
 impl OpaquePointer {
     /// Represents an uninitialized value for [`OpaquePointer`].
-    pub const UNINITIALIZED: Self = Self(0 as *mut c_void);
+    pub const UNINITIALIZED: Self = Self(std::ptr::null_mut::<c_void>());
 
     /// Cast an [`Address`] type to an [`OpaquePointer`].
     pub fn from_address(addr: Address) -> Self {
