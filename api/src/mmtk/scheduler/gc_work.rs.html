@@ -1221,7 +1221,8 @@
 <a href="#1220" id="1220">1220</a>
 <a href="#1221" id="1221">1221</a>
 <a href="#1222" id="1222">1222</a>
-<a href="#1223" id="1223">1223</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
+<a href="#1223" id="1223">1223</a>
+<a href="#1224" id="1224">1224</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::global_state::GcStatus;
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectsClosure;
@@ -1913,6 +1914,7 @@
 /// performance overheads for using this general trace type. In such cases, they implement their
 /// specific [`ProcessEdgesWork`] instances.
 </span><span class="comment">// TODO: This is not used any more. Should we remove it?
+</span><span class="attr">#[allow(dead_code)]
 </span><span class="kw">pub struct </span>SFTProcessEdges&lt;VM: VMBinding&gt; {
     <span class="kw">pub </span>base: ProcessEdgesBase&lt;VM&gt;,
 }

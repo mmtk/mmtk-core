@@ -87,7 +87,7 @@
 
 <span class="kw">impl </span>OpaquePointer {
     <span class="doccomment">/// Represents an uninitialized value for [`OpaquePointer`].
-    </span><span class="kw">pub const </span>UNINITIALIZED: <span class="self">Self </span>= <span class="self">Self</span>(<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*mut </span>c_void);
+    </span><span class="kw">pub const </span>UNINITIALIZED: <span class="self">Self </span>= <span class="self">Self</span>(std::ptr::null_mut::&lt;c_void&gt;());
 
     <span class="doccomment">/// Cast an [`Address`] type to an [`OpaquePointer`].
     </span><span class="kw">pub fn </span>from_address(addr: Address) -&gt; <span class="self">Self </span>{
