@@ -61,12 +61,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         true
     }
 
-    fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
-        debug_assert!(
-            alloc,
-            "Objects can only be allocated into the LargeObjectSpace by mutators."
-        );
-
+    fn initialize_object_metadata(&self, object: ObjectReference) {
         // VO bit: Set for all objects.
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(object);
