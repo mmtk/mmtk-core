@@ -428,7 +428,7 @@
         !<span class="self">self</span>.is_from_space()
     }
 
-    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference, _alloc: bool) {
+    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) {
         <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
         </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit(_object);
     }

@@ -268,7 +268,7 @@
     </span><span class="kw">fn </span>is_sane(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="bool-val">true
     </span>}
-    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, _alloc: bool) {
+    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
         <span class="self">self</span>.mark_state
             .on_object_metadata_initialization::&lt;VM&gt;(object);
         <span class="kw">if </span><span class="self">self</span>.common.unlog_allocated_object {

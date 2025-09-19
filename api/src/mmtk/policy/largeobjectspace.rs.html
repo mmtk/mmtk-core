@@ -438,7 +438,14 @@
 <a href="#437" id="437">437</a>
 <a href="#438" id="438">438</a>
 <a href="#439" id="439">439</a>
-<a href="#440" id="440">440</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
+<a href="#440" id="440">440</a>
+<a href="#441" id="441">441</a>
+<a href="#442" id="442">442</a>
+<a href="#443" id="443">443</a>
+<a href="#444" id="444">444</a>
+<a href="#445" id="445">445</a>
+<a href="#446" id="446">446</a>
+<a href="#447" id="447">447</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
@@ -500,47 +507,10 @@
     </span><span class="kw">fn </span>is_sane(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="bool-val">true
     </span>}
-    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, alloc: bool) {
-        <span class="kw">if </span><span class="self">self</span>.should_allocate_as_live() {
-            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::&lt;VM, u8&gt;(
-                object,
-                <span class="self">self</span>.mark_state,
-                <span class="prelude-val">None</span>,
-                Ordering::SeqCst,
-            );
-            <span class="macro">debug_assert!</span>(
-                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.load_atomic::&lt;VM, u8&gt;(
-                    object,
-                    <span class="prelude-val">None</span>,
-                    Ordering::Acquire
-                ) == <span class="number">0
-            </span>);
 
-            <span class="self">self</span>.treadmill.add_to_treadmill(object, <span class="bool-val">false</span>);
-            <span class="kw">return</span>;
-        }
-        <span class="kw">let </span>old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::&lt;VM, u8&gt;(
-            object,
-            <span class="prelude-val">None</span>,
-            Ordering::SeqCst,
-        );
-        <span class="kw">let </span><span class="kw-2">mut </span>new_value = (old_value &amp; (!LOS_BIT_MASK)) | <span class="self">self</span>.mark_state;
-        <span class="kw">if </span>alloc {
-            new_value |= NURSERY_BIT;
-        }
-        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::&lt;VM, u8&gt;(
-            object,
-            new_value,
-            <span class="prelude-val">None</span>,
-            Ordering::SeqCst,
-        );
-
-        <span class="comment">// If this object is freshly allocated, we do not set it as unlogged
-        </span><span class="kw">if </span>!alloc &amp;&amp; <span class="self">self</span>.common.unlog_allocated_object {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::&lt;VM&gt;(object, Ordering::SeqCst);
-        }
-
-        <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
+        <span class="comment">// VO bit: Set for all objects.
+        </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
         </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit(object);
         <span class="attr">#[cfg(all(feature = <span class="string">"is_mmtk_object"</span>, debug_assertions))]
         </span>{
@@ -553,8 +523,52 @@
             </span>);
         }
 
-        <span class="self">self</span>.treadmill.add_to_treadmill(object, alloc);
+        <span class="kw">let </span>allocate_as_live = <span class="self">self</span>.should_allocate_as_live();
+        <span class="kw">let </span>into_nursery = !allocate_as_live;
+
+        <span class="comment">// mark/nursery bits: Set mark state plus optionally nursery bit.
+        </span>{
+            <span class="kw">let </span>mark_nursery_state = <span class="kw">if </span>into_nursery {
+                <span class="self">self</span>.mark_state | NURSERY_BIT
+            } <span class="kw">else </span>{
+                <span class="self">self</span>.mark_state
+            };
+
+            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::&lt;VM, u8&gt;(
+                object,
+                mark_nursery_state,
+                <span class="prelude-val">None</span>,
+                Ordering::SeqCst,
+            );
+        }
+
+        <span class="comment">// global unlog bit: Set if `unlog_allocated_object`.  Ensure it is not set otherwise.
+        </span><span class="kw">if </span><span class="self">self</span>.common.unlog_allocated_object {
+            <span class="macro">debug_assert!</span>(<span class="self">self</span>.common.needs_log_bit);
+            <span class="macro">debug_assert!</span>(
+                !allocate_as_live,
+                <span class="string">"Currently only ConcurrentImmix can allocate as live, and it doesn't unlog allocated objects in LOS."
+            </span>);
+
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::&lt;VM&gt;(object, Ordering::SeqCst);
+        } <span class="kw">else </span>{
+            <span class="attr">#[cfg(debug_assertions)]
+            </span><span class="kw">if </span><span class="self">self</span>.common.needs_log_bit {
+                <span class="macro">debug_assert_eq!</span>(
+                    VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.load_atomic::&lt;VM, u8&gt;(
+                        object,
+                        <span class="prelude-val">None</span>,
+                        Ordering::Acquire
+                    ),
+                    <span class="number">0
+                </span>);
+            }
+        }
+
+        <span class="comment">// Add to the treadmill.  Nursery and mature objects need to be added to different sets.
+        </span><span class="self">self</span>.treadmill.add_to_treadmill(object, into_nursery);
     }
+
     <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
     </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
         <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)

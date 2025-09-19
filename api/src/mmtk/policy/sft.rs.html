@@ -199,7 +199,13 @@
 <a href="#198" id="198">198</a>
 <a href="#199" id="199">199</a>
 <a href="#200" id="200">200</a>
-<a href="#201" id="201">201</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
 <span class="kw">use </span><span class="kw">crate</span>::util::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -287,7 +293,13 @@
     ) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;;
 
     <span class="doccomment">/// Initialize object metadata (in the header, or in the side metadata).
-    </span><span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, alloc: bool);
+    ///
+    /// This method is called after an object is allocated.  Specifically,
+    /// -   The VM binding calls [`crate::MMTK::initialize_vm_space_object`] which calls this method
+    ///     to set the metadata for the VM space.
+    /// -   Objects in other spaces are allocated by mutators using an MMTk allocator.
+    ///     `Mutator::post_alloc` will call this method after allocation.
+    </span><span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference);
 
     <span class="doccomment">/// Trace objects through SFT. This along with [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges)
     /// provides an easy way for most plans to trace objects without the need to implement any plan-specific
@@ -380,7 +392,7 @@
         <span class="prelude-val">None
     </span>}
 
-    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, _alloc: bool) {
+    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
         <span class="macro">panic!</span>(
             <span class="string">"Called initialize_object_metadata() on {:x}, which maps to an empty space"</span>,
             object

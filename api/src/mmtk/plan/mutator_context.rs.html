@@ -946,7 +946,7 @@
                 .get_allocator_mut(<span class="self">self</span>.config.allocator_mapping[allocator])
         }
         .get_space()
-        .initialize_object_metadata(refer, <span class="bool-val">true</span>)
+        .initialize_object_metadata(refer)
     }
 
     <span class="kw">fn </span>get_tls(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; VMMutatorThread {
