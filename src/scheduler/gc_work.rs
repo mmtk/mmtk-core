@@ -690,6 +690,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
 /// performance overheads for using this general trace type. In such cases, they implement their
 /// specific [`ProcessEdgesWork`] instances.
 // TODO: This is not used any more. Should we remove it?
+#[allow(dead_code)]
 pub struct SFTProcessEdges<VM: VMBinding> {
     pub base: ProcessEdgesBase<VM>,
 }
