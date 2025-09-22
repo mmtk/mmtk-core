@@ -31,9 +31,9 @@ should consider setting the `BPFTRACE_PERF_RB_PAGES` environment variable.  See 
 `bpftrace`.)  We choose a large prime number, such as 47, because some GCs may exhibit periodic
 behaviors under certain workloads.  For example, generational GCs may alternate between nursery and
 full-heap GC.  If we capture every 50th GC, we will only observe even or odd GCs.  This is an
-instance of [stroboscopic effect].
+instance of [aliasing effect].
 
-[stroboscopic effect]: https://en.wikipedia.org/wiki/Stroboscopic_effect
+[aliasing effect]: https://en.wikipedia.org/wiki/Aliasing
 
 `--no-root-nodes` skips the `process_root_nodes` USDT which does not exist in `libmmtk_openjdk.so`.
 

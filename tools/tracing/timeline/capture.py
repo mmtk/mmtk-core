@@ -100,7 +100,7 @@ def main():
         if args.every % 2 == 0:
             eprint(f"""\
 WARNING! The value of the --every option is {args.every} which is an even number.
-You may observe misleading results due to stroboscopic effect.  See README.md""")
+You may observe misleading results due to aliasing effect.  See README.md""")
 
         if args.dry_run:
             eprint("Dry run.  Command to execute:")
