@@ -96,6 +96,11 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 plan.get_reserved_pages(),
                 plan.get_total_pages(),
             );
+
+            if !plan.constraints().collects_garbage {
+                panic!("User ran out of space and the plan does not support collecting garbage.");
+            }
+
             self.gc_requester.request();
             return true;
         }
