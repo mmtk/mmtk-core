@@ -1,0 +1,346 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Traverse Object Graph with a Debugger - MMTk User Guide</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="The guide describes the usage of MMTk for GC and language runtime developers.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../../favicon.svg">
+        <link rel="shortcut icon" href="../../favicon.png">
+        <link rel="stylesheet" href="../../css/variables.css">
+        <link rel="stylesheet" href="../../css/general.css">
+        <link rel="stylesheet" href="../../css/chrome.css">
+        <link rel="stylesheet" href="../../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../../assets/css/api-migration-details.css">
+        <link rel="stylesheet" href="../../assets/css/mdbook-admonish.css">
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../../searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../../toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">MMTk User Guide</h1>
+
+                    <div class="right-buttons">
+                        <a href="../../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/mmtk/mmtk-core/tree/master/docs/userguide" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/mmtk/mmtk-core/edit/master/docs/userguide/src/portingguide/debugging/traverse_object_graph.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="traverse-object-graph-with-a-debugger"><a class="header" href="#traverse-object-graph-with-a-debugger">Traverse Object Graph with a Debugger</a></h1>
+<p>Tracing through an object graph with a debugger can be tricky in MMTk.
+Garbage collection in MMTk is executed in units called work packets. These include packets that trace slots and packets that scan objects.
+When scanning an object, MMTk may not carry context about the slot from which the object reference was loaded.</p>
+<p>This section demonstrates how to use <a href="https://rr-project.org/">rr</a> to traverse the object graph.
+Suppose a program segfaults during GC while scanning a corrupted object (e.g. <code>0x725a62eb60f0</code>). Our goal is to determine:</p>
+<ul>
+<li>Which slot loaded this object reference.</li>
+<li>Which object that slot belongs to.</li>
+</ul>
+<p>Note: Traversing the entire object graph is rarely the best debugging strategy. Graphs can be large, and resolving
+object → slot → object → slot → … repeatedly is time-consuming and error-prone. Prefer simpler approaches if possible.
+Object-graph reversal should be considered a last resort.</p>
+<h2 id="step-1-set-breakpoints-at-gc-boundaries"><a class="header" href="#step-1-set-breakpoints-at-gc-boundaries">Step 1: Set Breakpoints at GC Boundaries</a></h2>
+<p>First, replay the execution to the point of the segfault.
+Then, to ensure you know which GC cycle you’re in, set breakpoints at the start and end of each GC:</p>
+<pre><code class="language-gdb">(rr) b stop_all_mutators
+(rr) b resume_mutators
+</code></pre>
+<p>These breakpoints help you detect if replay takes you into a different GC than the one that crashed.</p>
+<h2 id="step-2-identify-the-slot-that-loaded-the-object"><a class="header" href="#step-2-identify-the-slot-that-loaded-the-object">Step 2: Identify the Slot that Loaded the Object</a></h2>
+<p>Object references are usually loaded from slots in <a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html#method.process_slot"><code>ProcessEdgesWork::process_slot</code></a>.
+Most MMTk plans use <a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html#method.process_slot"><code>PlanProcessEdges</code> which implements this method like this</a>:</p>
+<pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn process_slot(&amp;mut self, slot: SlotOf&lt;Self&gt;) {
+    let Some(object) = slot.load() else {
+        return;
+    };
+    let new_object = self.trace_object(object); // Assume this is line 978 in your version
+    if P::may_move_objects::&lt;KIND&gt;() &amp;&amp; new_object != object {
+        slot.store(new_object);
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>At line 978, the variable object is the reference of interest.
+To catch the corrupted object (<code>0x725a62eb60f0</code>), set a conditional breakpoint here.</p>
+<p>Conditions can be expressed in different ways, such as <code>if object.as_raw_address().as_usize() == 0x725a62eb60f0</code> (Rust),
+<code>if (uintptr_t)object == 0x725a62eb60f0</code> (C), and <code>if $rsi == 0x725a62eb60f0</code>.</p>
+<p>Using registers seem to work more reliably when
+the execution keeps switching between Rust and C. You can find which register holds the value <code>0x725a62eb60f0</code> (using <code>info registers</code>)
+and use that as the condition. If the value <code>0x725a62eb60f0</code> does not appear in any register, you can <code>step</code> forward through one or more statements,
+until you see the value appears. Set the breakpoint at that line.</p>
+<h3 id="automating-with-a-temporary-breakpoint"><a class="header" href="#automating-with-a-temporary-breakpoint">Automating with a Temporary Breakpoint</a></h3>
+<p>Since we only need the breakpoint once, a temporary breakpoint is convenient.
+We can also set up a GDB command, as we will likely do this step repeatedly to traverse the object.</p>
+<p>Define a helper GDB command.
+You need to change the example below to match your recorded trace:</p>
+<ol>
+<li>The file path.</li>
+<li>The line number of the breakpoint.</li>
+<li>The register that holds the value <code>object</code>.</li>
+</ol>
+<pre><code class="language-gdb">(rr) define find_slot
+&gt;tbreak /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/scheduler/gc_work.rs:978 if $rsi == $arg0
+&gt;reverse-cont
+&gt;end
+</code></pre>
+<p>Usage:</p>
+<pre><code class="language-gdb">(rr) find_slot 0x725a62eb60f0
+Temporary breakpoint 1 at 0x725a7d4dc2de: /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/scheduler/gc_work.rs:978. (14 locations)
+</code></pre>
+<p>If the breakpoint hits (it may take a while), you’ll see something like:</p>
+<pre><code class="language-gdb">Thread 2 hit Temporary breakpoint 1, mmtk::scheduler::gc_work::{impl#39}::process_slot&lt;mmtk_julia::JuliaVM, mmtk::plan::immix::global::Immix&lt;mmtk_julia::JuliaVM&gt;, 1&gt; (self=0x725a64001850, slot=...) at /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/scheduler/gc_work.rs:978
+978             let new_object = self.trace_object(object);
+</code></pre>
+<p>Then:</p>
+<pre><code class="language-gdb">(rr) p/x slot
+$2 = mmtk_julia::slots::JuliaVMSlot::Simple(mmtk::vm::slot::SimpleSlot {slot_addr: 0x725a62eb6168})
+</code></pre>
+<p>Here we learn that object <code>0x725a62eb60f0</code> was loaded from slot <code>0x725a62eb6168</code>.</p>
+<p>If instead you hit <code>stop_all_mutators</code>, it means the object wasn’t processed through <code>PlanProcessEdges</code> (our conditional breakpoint) in this GC. It could have been enqueued by another <code>ProcessEdgesWork</code>, by node enqueueing, or it may be a root. Similar techniques apply: set breakpoints in other relevant paths until you find where the object comes from.</p>
+<h3 id="step-3-identify-the-object-that-owns-the-slot"><a class="header" href="#step-3-identify-the-object-that-owns-the-slot">Step 3: Identify the Object that Owns the Slot</a></h3>
+<p>Now that we know slot <code>0x725a62eb6168</code> contains the object <code>0x725a62eb60f0</code>, we need to determine which object this slot belongs to.
+Slots are enqueued when bindings scan an object, via <a href="https://docs.mmtk.io/api/mmtk/vm/trait.SlotVisitor.html#tymethod.visit_slot"><code>SlotVisitor::visit_slot</code></a>.
+We can set a conditional breakpoint at the implementation of <code>visit_slot</code> to capture where the slot is enqueue'd to MMTk.</p>
+<p>Define another helper command:</p>
+<pre><code class="language-gdb">(rr) define find_object
+&gt;tbreak /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/plan/tracing.rs:61 if $rcx == $arg0
+&gt;reverse-cont
+&gt;end
+</code></pre>
+<p>Usage:</p>
+<pre><code class="language-gdb">(rr) find_object 0x725a62eb6168
+Temporary breakpoint 2 at 0x725a7d57a363: /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/plan/tracing.rs:61. (3 locations)
+</code></pre>
+<p>When the breakpoint hits:</p>
+<pre><code class="language-gdb">Thread 2 hit Temporary breakpoint 2, mmtk::plan::tracing::VectorQueue&lt;mmtk_julia::slots::JuliaVMSlot&gt;::push&lt;mmtk_julia::slots::JuliaVMSlot&gt; (self=0x725a695fafe0, v=...) at /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/plan/tracing.rs:61
+61              if self.buffer.is_empty() {
+</code></pre>
+<p>From the stack, you can walk upward to find the object that is being scanned.</p>
+<pre><code class="language-gdb">(rr) up
+#1  0x0000725a7d578050 in mmtk::plan::tracing::{impl#4}::visit_slot&lt;mmtk::scheduler::gc_work::PlanProcessEdges&lt;mmtk_julia::JuliaVM, mmtk::plan::immix::global::Immix&lt;mmtk_julia::JuliaVM&gt;, 1&gt;&gt; (self=0x725a695fafe0, slot=...)
+    at /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/plan/tracing.rs:125
+125             self.buffer.push(slot);
+(rr) up
+#2  0x0000725a7d536dbb in mmtk_julia::julia_scanning::process_slot&lt;mmtk::plan::tracing::ObjectsClosure&lt;mmtk::scheduler::gc_work::PlanProcessEdges&lt;mmtk_julia::JuliaVM, mmtk::plan::immix::global::Immix&lt;mmtk_julia::JuliaVM&gt;, 1&gt;&gt;&gt; (closure=0x725a695fafe0, slot=...)
+    at src/julia_scanning.rs:720
+720         closure.visit_slot(JuliaVMSlot::Simple(simple_slot));
+(rr) up
+#3  mmtk_julia::julia_scanning::scan_julia_obj_n&lt;u8, mmtk::plan::tracing::ObjectsClosure&lt;mmtk::scheduler::gc_work::PlanProcessEdges&lt;mmtk_julia::JuliaVM, mmtk::plan::immix::global::Immix&lt;mmtk_julia::JuliaVM&gt;, 1&gt;&gt;&gt; (obj=..., begin=..., end=..., closure=0x725a695fafe0)
+    at src/julia_scanning.rs:111
+111             process_slot(closure, slot);
+(rr) p/x obj
+$1 = mmtk::util::address::Address (0x725a62eb6130)
+</code></pre>
+<p>By repeating Step 2 (finding the slot that loaded an object) and Step 3 (finding the object that owns that slot), you can walk backward through the object graph. Continue this process until you reach a point of interest -- such as the root object, or an object that errornously enqueues a slot.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../../portingguide/debugging/immix.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../../portingguide/perf_tuning/prefix.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../../portingguide/debugging/immix.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../../portingguide/perf_tuning/prefix.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../../elasticlunr.min.js"></script>
+        <script src="../../mark.min.js"></script>
+        <script src="../../searcher.js"></script>
+
+        <script src="../../clipboard.min.js"></script>
+        <script src="../../highlight.js"></script>
+        <script src="../../book.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../../assets/js/api-migration-details.js"></script>
+
+
+
+    </div>
+    </body>
+</html>
