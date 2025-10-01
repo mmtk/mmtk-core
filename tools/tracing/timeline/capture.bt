@@ -170,5 +170,3 @@ usdt:$MMTK:mmtk:reference_retained {
         printf("reference_retained,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
     }
 }
-
-// vim: ft=bpftrace ts=4 sw=4 sts=4 et
