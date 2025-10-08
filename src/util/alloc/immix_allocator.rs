@@ -1,3 +1,4 @@
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap, AllocatorContext};
@@ -265,6 +266,11 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     // Update the hole-searching cursor to None.
                     Some(end_line)
                 };
+                // mark objects if concurrent marking is active
+                if self.immix_space().should_allocate_as_live() {
+                    let state = self.space.line_mark_state.load(Ordering::Acquire);
+                    Line::eager_mark_lines::<VM>(state, start_line..end_line);
+                }
                 return true;
             } else {
                 // No more recyclable lines. Set the hole-searching cursor to None.
@@ -289,7 +295,11 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 
     // Get a clean block from ImmixSpace.
     fn acquire_clean_block(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        match self.immix_space().get_clean_block(self.tls, self.copy) {
+        match self.immix_space().get_clean_block(
+            self.tls,
+            self.copy,
+            self.get_context().get_alloc_options(),
+        ) {
             None => Address::ZERO,
             Some(block) => {
                 trace!(
@@ -301,6 +311,11 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                 // Bulk clear stale line mark state
                 Line::MARK_TABLE
                     .bzero_metadata(block.start(), crate::policy::immix::block::Block::BYTES);
+                // mark objects if concurrent marking is active
+                if self.immix_space().should_allocate_as_live() {
+                    let state = self.space.line_mark_state.load(Ordering::Acquire);
+                    Line::eager_mark_lines::<VM>(state, block.start_line()..block.end_line());
+                }
                 if self.request_for_large {
                     self.large_bump_pointer.cursor = block.start();
                     self.large_bump_pointer.limit = block.end();

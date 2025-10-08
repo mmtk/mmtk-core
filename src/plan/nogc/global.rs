@@ -66,6 +66,10 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         unreachable!()
     }
 
+    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
+        unreachable!()
+    }
+
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
         &ALLOCATOR_MAPPING
     }
@@ -95,19 +99,19 @@ impl<VM: VMBinding> NoGC<VM> {
         };
 
         let res = NoGC {
-            nogc_space: NoGCImmortalSpace::new(plan_args.get_space_args(
+            nogc_space: NoGCImmortalSpace::new(plan_args.get_normal_space_args(
                 "nogc_space",
                 cfg!(not(feature = "nogc_no_zeroing")),
                 false,
                 VMRequest::discontiguous(),
             )),
-            immortal: ImmortalSpace::new(plan_args.get_space_args(
+            immortal: ImmortalSpace::new(plan_args.get_normal_space_args(
                 "immortal",
                 true,
                 false,
                 VMRequest::discontiguous(),
             )),
-            los: ImmortalSpace::new(plan_args.get_space_args(
+            los: ImmortalSpace::new(plan_args.get_normal_space_args(
                 "los",
                 true,
                 false,

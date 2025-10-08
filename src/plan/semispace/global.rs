@@ -40,7 +40,6 @@ pub const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     max_non_los_default_alloc_bytes:
         crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
-    needs_prepare_mutator: false,
     ..PlanConstraints::default()
 };
 
@@ -96,6 +95,10 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.fromspace().release();
     }
 
+    fn end_of_gc(&mut self, tls: VMWorkerThread) {
+        self.common.end_of_gc(tls)
+    }
+
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
         self.base().collection_required(self, space_full)
     }
@@ -143,11 +146,21 @@ impl<VM: VMBinding> SemiSpace<VM> {
         let res = SemiSpace {
             hi: AtomicBool::new(false),
             copyspace0: CopySpace::new(
-                plan_args.get_space_args("copyspace0", true, false, VMRequest::discontiguous()),
+                plan_args.get_normal_space_args(
+                    "copyspace0",
+                    true,
+                    false,
+                    VMRequest::discontiguous(),
+                ),
                 false,
             ),
             copyspace1: CopySpace::new(
-                plan_args.get_space_args("copyspace1", true, false, VMRequest::discontiguous()),
+                plan_args.get_normal_space_args(
+                    "copyspace1",
+                    true,
+                    false,
+                    VMRequest::discontiguous(),
+                ),
                 true,
             ),
             common: CommonPlan::new(plan_args),

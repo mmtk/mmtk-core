@@ -3,6 +3,7 @@
 use super::PlanConstraints;
 use crate::global_state::GlobalState;
 use crate::mmtk::MMTK;
+use crate::plan::gc_work::{ClearCommonPlanUnlogBits, SetCommonPlanUnlogBits};
 use crate::plan::tracing::ObjectQueue;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
@@ -19,6 +20,7 @@ use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
+use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::Options;
@@ -58,6 +60,12 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::StickyImmix => {
             crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
         }
+        PlanSelector::ConcurrentImmix => {
+            crate::plan::concurrent::immix::mutator::create_concurrent_immix_mutator(tls, mmtk)
+        }
+        PlanSelector::Compressor => {
+            crate::plan::compressor::mutator::create_compressor_mutator(tls, mmtk)
+        }
     })
 }
 
@@ -90,6 +98,13 @@ pub fn create_plan<VM: VMBinding>(
         }
         PlanSelector::StickyImmix => {
             Box::new(crate::plan::sticky::immix::StickyImmix::new(args)) as Box<dyn Plan<VM = VM>>
+        }
+        PlanSelector::ConcurrentImmix => {
+            Box::new(crate::plan::concurrent::immix::ConcurrentImmix::new(args))
+                as Box<dyn Plan<VM = VM>>
+        }
+        PlanSelector::Compressor => {
+            Box::new(crate::plan::compressor::Compressor::new(args)) as Box<dyn Plan<VM = VM>>
         }
     };
 
@@ -175,6 +190,14 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         None
     }
 
+    /// Return a reference to `ConcurrentPlan` to allow
+    /// access methods specific to concurrent plans if the plan is a concurrent plan.
+    fn concurrent(
+        &self,
+    ) -> Option<&dyn crate::plan::concurrent::global::ConcurrentPlan<VM = Self::VM>> {
+        None
+    }
+
     /// Get the current run time options.
     fn options(&self) -> &Options {
         &self.base().options
@@ -183,6 +206,9 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// Get the allocator mapping between [`crate::AllocationSemantics`] and [`crate::util::alloc::AllocatorSelector`].
     /// This defines what space this plan will allocate objects into for different semantics.
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
+
+    /// Called when all mutators are paused. This is called before prepare.
+    fn notify_mutators_paused(&self, _scheduler: &GCWorkScheduler<Self::VM>) {}
 
     /// Prepare the plan before a GC. This is invoked in an initial step in the GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
@@ -199,7 +225,8 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
 
     /// Inform the plan about the end of a GC. It is guaranteed that there is no further work for this GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
-    fn end_of_gc(&mut self, _tls: VMWorkerThread) {}
+    // TODO: This is actually called at the end of a pause/STW, rather than the end of a GC. It should be renamed.
+    fn end_of_gc(&mut self, _tls: VMWorkerThread);
 
     /// Notify the plan that an emergency collection will happen. The plan should try to free as much memory as possible.
     /// The default implementation will force a full heap collection for generational plans.
@@ -345,6 +372,7 @@ pub struct BasePlan<VM: VMBinding> {
     pub(crate) global_state: Arc<GlobalState>,
     pub options: Arc<Options>,
     pub gc_trigger: Arc<GCTrigger<VM>>,
+    pub scheduler: Arc<GCWorkScheduler<VM>>,
 
     // Spaces in base plan
     #[cfg(feature = "code_space")]
@@ -400,18 +428,22 @@ pub struct CreateSpecificPlanArgs<'a, VM: VMBinding> {
 
 impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
     /// Get a PlanCreateSpaceArgs that can be used to create a space
-    pub fn get_space_args(
+    pub fn _get_space_args(
         &mut self,
         name: &'static str,
         zeroed: bool,
         permission_exec: bool,
+        unlog_allocated_object: bool,
+        unlog_traced_object: bool,
         vmrequest: VMRequest,
-    ) -> PlanCreateSpaceArgs<VM> {
+    ) -> PlanCreateSpaceArgs<'_, VM> {
         PlanCreateSpaceArgs {
             name,
             zeroed,
             permission_exec,
             vmrequest,
+            unlog_allocated_object,
+            unlog_traced_object,
             global_side_metadata_specs: self.global_side_metadata_specs.clone(),
             vm_map: self.global_args.vm_map,
             mmapper: self.global_args.mmapper,
@@ -423,44 +455,127 @@ impl<VM: VMBinding> CreateSpecificPlanArgs<'_, VM> {
             global_state: self.global_args.state.clone(),
         }
     }
+
+    // The following are some convenience methods for common presets.
+    // These are not an exhaustive list -- it is just common presets that are used by most plans.
+
+    /// Get a preset for a nursery space (where young objects are located).
+    pub fn get_nursery_space_args(
+        &mut self,
+        name: &'static str,
+        zeroed: bool,
+        permission_exec: bool,
+        vmrequest: VMRequest,
+    ) -> PlanCreateSpaceArgs<'_, VM> {
+        // Objects are allocatd as young, and when traced, they stay young. If they are copied out of the nursery space, they will be moved to a mature space,
+        // and log bits will be set in that case by the mature space.
+        self._get_space_args(name, zeroed, permission_exec, false, false, vmrequest)
+    }
+
+    /// Get a preset for a mature space (where mature objects are located).
+    pub fn get_mature_space_args(
+        &mut self,
+        name: &'static str,
+        zeroed: bool,
+        permission_exec: bool,
+        vmrequest: VMRequest,
+    ) -> PlanCreateSpaceArgs<'_, VM> {
+        // Objects are allocated as mature (pre-tenured), and when traced, they stay mature.
+        // If an object gets copied into a mature space, the object is also mature,
+        self._get_space_args(name, zeroed, permission_exec, true, true, vmrequest)
+    }
+
+    // Get a preset for a mixed age space (where both young and mature objects are located).
+    pub fn get_mixed_age_space_args(
+        &mut self,
+        name: &'static str,
+        zeroed: bool,
+        permission_exec: bool,
+        vmrequest: VMRequest,
+    ) -> PlanCreateSpaceArgs<'_, VM> {
+        // Objects are allocated as young, and when traced, they become mature objects.
+        self._get_space_args(name, zeroed, permission_exec, false, true, vmrequest)
+    }
+
+    /// Get a preset for spaces in a non-generational plan.
+    pub fn get_normal_space_args(
+        &mut self,
+        name: &'static str,
+        zeroed: bool,
+        permission_exec: bool,
+        vmrequest: VMRequest,
+    ) -> PlanCreateSpaceArgs<'_, VM> {
+        // Non generational plan: we do not use any of the flags about log bits.
+        self._get_space_args(name, zeroed, permission_exec, false, false, vmrequest)
+    }
+
+    /// Get a preset for spaces in [`crate::plan::global::CommonPlan`].
+    /// Spaces like LOS which may include both young and mature objects should not use this method.
+    pub fn get_common_space_args(
+        &mut self,
+        generational: bool,
+        name: &'static str,
+    ) -> PlanCreateSpaceArgs<'_, VM> {
+        self.get_base_space_args(
+            generational,
+            name,
+            false, // Common spaces are not executable.
+        )
+    }
+
+    /// Get a preset for spaces in [`crate::plan::global::BasePlan`].
+    pub fn get_base_space_args(
+        &mut self,
+        generational: bool,
+        name: &'static str,
+        permission_exec: bool,
+    ) -> PlanCreateSpaceArgs<'_, VM> {
+        if generational {
+            // In generational plans, common/base spaces behave like a mature space:
+            // * the objects in these spaces are not traced in a nursery GC
+            // * the log bits for the objects are maintained exactly the same as a mature space.
+            // Thus we consider them as mature spaces.
+            self.get_mature_space_args(name, true, permission_exec, VMRequest::discontiguous())
+        } else {
+            self.get_normal_space_args(name, true, permission_exec, VMRequest::discontiguous())
+        }
+    }
 }
 
 impl<VM: VMBinding> BasePlan<VM> {
     #[allow(unused_mut)] // 'args' only needs to be mutable for certain features
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> BasePlan<VM> {
+        let _generational = args.constraints.generational;
         BasePlan {
             #[cfg(feature = "code_space")]
-            code_space: ImmortalSpace::new(args.get_space_args(
+            code_space: ImmortalSpace::new(args.get_base_space_args(
+                _generational,
                 "code_space",
                 true,
-                true,
-                VMRequest::discontiguous(),
             )),
             #[cfg(feature = "code_space")]
-            code_lo_space: ImmortalSpace::new(args.get_space_args(
+            code_lo_space: ImmortalSpace::new(args.get_base_space_args(
+                _generational,
                 "code_lo_space",
                 true,
-                true,
-                VMRequest::discontiguous(),
             )),
             #[cfg(feature = "ro_space")]
-            ro_space: ImmortalSpace::new(args.get_space_args(
+            ro_space: ImmortalSpace::new(args.get_base_space_args(
+                _generational,
                 "ro_space",
-                true,
                 false,
-                VMRequest::discontiguous(),
             )),
             #[cfg(feature = "vm_space")]
-            vm_space: VMSpace::new(args.get_space_args(
+            vm_space: VMSpace::new(args.get_base_space_args(
+                _generational,
                 "vm_space",
-                false,
                 false, // it doesn't matter -- we are not mmapping for VM space.
-                VMRequest::discontiguous(),
             )),
 
             global_state: args.global_args.state.clone(),
             gc_trigger: args.global_args.gc_trigger,
             options: args.global_args.options,
+            scheduler: args.global_args.scheduler,
         }
     }
 
@@ -491,39 +606,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         pages
     }
 
-    pub fn trace_object<Q: ObjectQueue>(
-        &self,
-        queue: &mut Q,
-        object: ObjectReference,
-        worker: &mut GCWorker<VM>,
-    ) -> ObjectReference {
-        #[cfg(feature = "code_space")]
-        if self.code_space.in_space(object) {
-            trace!("trace_object: object in code space");
-            return self.code_space.trace_object::<Q>(queue, object);
-        }
-
-        #[cfg(feature = "code_space")]
-        if self.code_lo_space.in_space(object) {
-            trace!("trace_object: object in large code space");
-            return self.code_lo_space.trace_object::<Q>(queue, object);
-        }
-
-        #[cfg(feature = "ro_space")]
-        if self.ro_space.in_space(object) {
-            trace!("trace_object: object in ro_space space");
-            return self.ro_space.trace_object(queue, object);
-        }
-
-        #[cfg(feature = "vm_space")]
-        if self.vm_space.in_space(object) {
-            trace!("trace_object: object in boot space");
-            return self.vm_space.trace_object(queue, object);
-        }
-
-        VM::VMActivePlan::vm_trace_object::<Q>(queue, object, worker)
-    }
-
     pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
         self.code_space.prepare();
@@ -544,6 +626,32 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.ro_space.release();
         #[cfg(feature = "vm_space")]
         self.vm_space.release();
+    }
+
+    pub fn clear_side_log_bits(&self) {
+        #[cfg(feature = "code_space")]
+        self.code_space.clear_side_log_bits();
+        #[cfg(feature = "code_space")]
+        self.code_lo_space.clear_side_log_bits();
+        #[cfg(feature = "ro_space")]
+        self.ro_space.clear_side_log_bits();
+        #[cfg(feature = "vm_space")]
+        self.vm_space.clear_side_log_bits();
+    }
+
+    pub fn set_side_log_bits(&self) {
+        #[cfg(feature = "code_space")]
+        self.code_space.set_side_log_bits();
+        #[cfg(feature = "code_space")]
+        self.code_lo_space.set_side_log_bits();
+        #[cfg(feature = "ro_space")]
+        self.ro_space.set_side_log_bits();
+        #[cfg(feature = "vm_space")]
+        self.vm_space.set_side_log_bits();
+    }
+
+    pub fn end_of_gc(&mut self, _tls: VMWorkerThread) {
+        // Do nothing here. None of the spaces needs end_of_gc.
     }
 
     pub(crate) fn collection_required<P: Plan>(&self, plan: &P, space_full: bool) -> bool {
@@ -577,6 +685,17 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 }
 
+cfg_if::cfg_if! {
+    // Use immortal or mark sweep as the non moving space if the features are enabled. Otherwise use Immix.
+    if #[cfg(feature = "immortal_as_nonmoving")] {
+        pub type NonMovingSpace<VM> = crate::policy::immortalspace::ImmortalSpace<VM>;
+    } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+        pub type NonMovingSpace<VM> = crate::policy::marksweepspace::native_ms::MarkSweepSpace<VM>;
+    } else {
+        pub type NonMovingSpace<VM> = crate::policy::immix::ImmixSpace<VM>;
+    }
+}
+
 /**
 CommonPlan is for representing state and features used by _many_ plans, but that are not fundamental to _all_ plans.  Examples include the Large Object Space and an Immortal space.  Features that are fundamental to _all_ plans must be included in BasePlan.
 */
@@ -586,32 +705,33 @@ pub struct CommonPlan<VM: VMBinding> {
     pub immortal: ImmortalSpace<VM>,
     #[space]
     pub los: LargeObjectSpace<VM>,
-    // TODO: We should use a marksweep space for nonmoving.
     #[space]
-    pub nonmoving: ImmortalSpace<VM>,
+    #[cfg_attr(
+        not(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving")),
+        post_scan
+    )] // Immix space needs post_scan
+    pub nonmoving: NonMovingSpace<VM>,
     #[parent]
     pub base: BasePlan<VM>,
 }
 
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> CommonPlan<VM> {
+        let needs_log_bit = args.constraints.needs_log_bit;
+        let generational = args.constraints.generational;
         CommonPlan {
-            immortal: ImmortalSpace::new(args.get_space_args(
-                "immortal",
-                true,
-                false,
-                VMRequest::discontiguous(),
-            )),
+            immortal: ImmortalSpace::new(args.get_common_space_args(generational, "immortal")),
             los: LargeObjectSpace::new(
-                args.get_space_args("los", true, false, VMRequest::discontiguous()),
+                // LOS is a bit special, as it is a mixed age space. It has a logical nursery.
+                if generational {
+                    args.get_mixed_age_space_args("los", true, false, VMRequest::discontiguous())
+                } else {
+                    args.get_normal_space_args("los", true, false, VMRequest::discontiguous())
+                },
                 false,
+                needs_log_bit,
             ),
-            nonmoving: ImmortalSpace::new(args.get_space_args(
-                "nonmoving",
-                true,
-                false,
-                VMRequest::discontiguous(),
-            )),
+            nonmoving: Self::new_nonmoving_space(&mut args),
             base: BasePlan::new(args),
         }
     }
@@ -623,39 +743,54 @@ impl<VM: VMBinding> CommonPlan<VM> {
             + self.base.get_used_pages()
     }
 
-    pub fn trace_object<Q: ObjectQueue>(
-        &self,
-        queue: &mut Q,
-        object: ObjectReference,
-        worker: &mut GCWorker<VM>,
-    ) -> ObjectReference {
-        if self.immortal.in_space(object) {
-            trace!("trace_object: object in immortal space");
-            return self.immortal.trace_object(queue, object);
-        }
-        if self.los.in_space(object) {
-            trace!("trace_object: object in los");
-            return self.los.trace_object(queue, object);
-        }
-        if self.nonmoving.in_space(object) {
-            trace!("trace_object: object in nonmoving space");
-            return self.nonmoving.trace_object(queue, object);
-        }
-        self.base.trace_object::<Q>(queue, object, worker)
-    }
-
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.prepare();
         self.los.prepare(full_heap);
-        self.nonmoving.prepare();
+        self.prepare_nonmoving_space(full_heap);
         self.base.prepare(tls, full_heap)
     }
 
     pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.release();
         self.los.release(full_heap);
-        self.nonmoving.release();
+        self.release_nonmoving_space(full_heap);
         self.base.release(tls, full_heap)
+    }
+
+    pub(crate) fn schedule_unlog_bits_op(&mut self, unlog_bits_op: UnlogBitsOperation) {
+        if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
+            // # Safety: CommonPlan reference is always valid within this collection cycle.
+            let common_plan = unsafe { &*(self as *const CommonPlan<VM>) };
+
+            match unlog_bits_op {
+                UnlogBitsOperation::NoOp => {}
+                UnlogBitsOperation::BulkSet => {
+                    self.base.scheduler.work_buckets[WorkBucketStage::Prepare]
+                        .add(SetCommonPlanUnlogBits { common_plan });
+                }
+                UnlogBitsOperation::BulkClear => {
+                    self.base.scheduler.work_buckets[WorkBucketStage::Release]
+                        .add(ClearCommonPlanUnlogBits { common_plan });
+                }
+            }
+        }
+    }
+
+    pub fn clear_side_log_bits(&self) {
+        self.immortal.clear_side_log_bits();
+        self.los.clear_side_log_bits();
+        self.base.clear_side_log_bits();
+    }
+
+    pub fn set_side_log_bits(&self) {
+        self.immortal.set_side_log_bits();
+        self.los.set_side_log_bits();
+        self.base.set_side_log_bits();
+    }
+
+    pub fn end_of_gc(&mut self, tls: VMWorkerThread) {
+        self.end_of_gc_nonmoving_space();
+        self.base.end_of_gc(tls);
     }
 
     pub fn get_immortal(&self) -> &ImmortalSpace<VM> {
@@ -666,8 +801,62 @@ impl<VM: VMBinding> CommonPlan<VM> {
         &self.los
     }
 
-    pub fn get_nonmoving(&self) -> &ImmortalSpace<VM> {
+    pub fn get_nonmoving(&self) -> &NonMovingSpace<VM> {
         &self.nonmoving
+    }
+
+    fn new_nonmoving_space(args: &mut CreateSpecificPlanArgs<VM>) -> NonMovingSpace<VM> {
+        let space_args = args.get_common_space_args(args.constraints.generational, "nonmoving");
+        cfg_if::cfg_if! {
+            if #[cfg(any(feature = "immortal_as_nonmoving", feature = "marksweep_as_nonmoving"))] {
+                NonMovingSpace::new(space_args)
+            } else {
+                // Immix requires extra args.
+                NonMovingSpace::new(
+                    space_args,
+                    crate::policy::immix::ImmixSpaceArgs {
+                        mixed_age: false,
+                        never_move_objects: true,
+                    },
+                )
+            }
+        }
+    }
+
+    fn prepare_nonmoving_space(&mut self, _full_heap: bool) {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "immortal_as_nonmoving")] {
+                self.nonmoving.prepare();
+            } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+                self.nonmoving.prepare(_full_heap);
+            } else {
+                self.nonmoving.prepare(_full_heap, None, UnlogBitsOperation::NoOp);
+            }
+        }
+    }
+
+    fn release_nonmoving_space(&mut self, _full_heap: bool) {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "immortal_as_nonmoving")] {
+                self.nonmoving.release();
+            } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+                self.nonmoving.prepare(_full_heap);
+            } else {
+                self.nonmoving.release(_full_heap, UnlogBitsOperation::NoOp);
+            }
+        }
+    }
+
+    fn end_of_gc_nonmoving_space(&mut self) {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "immortal_as_nonmoving")] {
+                // Nothing we need to do for immortal space.
+            } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+                self.nonmoving.end_of_gc();
+            } else {
+                self.nonmoving.end_of_gc();
+            }
+        }
     }
 }
 

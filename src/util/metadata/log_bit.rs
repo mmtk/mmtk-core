@@ -1,4 +1,6 @@
+use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::vm::VMGlobalLogBitSpec;
 use std::sync::atomic::Ordering;
@@ -6,6 +8,11 @@ use std::sync::atomic::Ordering;
 use super::MetadataSpec;
 
 impl VMGlobalLogBitSpec {
+    /// Clear the unlog bit to log object (0 means logged)
+    pub fn clear<VM: VMBinding>(&self, object: ObjectReference, order: Ordering) {
+        self.store_atomic::<VM, u8>(object, 0, None, order)
+    }
+
     /// Mark the log bit as unlogged (1 means unlogged)
     pub fn mark_as_unlogged<VM: VMBinding>(&self, object: ObjectReference, order: Ordering) {
         self.store_atomic::<VM, u8>(object, 1, None, order)
@@ -31,5 +38,33 @@ impl VMGlobalLogBitSpec {
     /// Check if the log bit represents the unlogged state (the bit is 1).
     pub fn is_unlogged<VM: VMBinding>(&self, object: ObjectReference, order: Ordering) -> bool {
         self.load_atomic::<VM, u8>(object, None, order) == 1
+    }
+}
+
+/// This specifies what to do to the global side unlog bits in various functions or work packets.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UnlogBitsOperation {
+    /// Do nothing.
+    NoOp,
+    /// Bulk set unlog bits to all 1s.
+    BulkSet,
+    /// Bulk clear unlog bits to all 0s.
+    BulkClear,
+}
+
+impl UnlogBitsOperation {
+    /// Run the specified operation on the address range from `start` to `start + size`.
+    pub(crate) fn execute<VM: VMBinding>(&self, start: Address, size: usize) {
+        if let MetadataSpec::OnSide(ref unlog_bits) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+            match self {
+                UnlogBitsOperation::NoOp => {}
+                UnlogBitsOperation::BulkSet => {
+                    unlog_bits.bset_metadata(start, size);
+                }
+                UnlogBitsOperation::BulkClear => {
+                    unlog_bits.bzero_metadata(start, size);
+                }
+            }
+        }
     }
 }

@@ -24,6 +24,7 @@ use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
@@ -190,7 +191,7 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
         true
     }
 
-    fn initialize_object_metadata(&self, _object: crate::util::ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, _object: crate::util::ObjectReference) {
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(_object);
     }
@@ -253,6 +254,20 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_chunk_map::<Block>(enumerator, &self.chunk_map);
     }
+
+    fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
+        }
+    }
+
+    fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
+        }
+    }
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepSpace<VM> {
@@ -288,7 +303,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         let vm_map = args.vm_map;
         let is_discontiguous = args.vmrequest.is_discontiguous();
         let local_specs = {
-            metadata::extract_side_metadata(&vec![
+            metadata::extract_side_metadata(&[
                 MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
                 MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
                 MetadataSpec::OnSide(Block::FREE_LIST_TABLE),
@@ -300,11 +315,11 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
                 MetadataSpec::OnSide(Block::TLS_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
-                MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             ])
         };
         let common = CommonSpace::new(args.into_policy_args(false, false, local_specs));
+        let space_index = common.descriptor.get_index();
         MarkSweepSpace {
             pr: if is_discontiguous {
                 BlockPageResource::new_discontiguous(
@@ -322,7 +337,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 )
             },
             common,
-            chunk_map: ChunkMap::new(),
+            chunk_map: ChunkMap::new(space_index),
             scheduler,
             abandoned: Mutex::new(AbandonedBlockLists::new()),
             abandoned_in_gc: Mutex::new(AbandonedBlockLists::new()),
@@ -402,10 +417,10 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     pub fn record_new_block(&self, block: Block) {
         block.init();
-        self.chunk_map.set(block.chunk(), ChunkState::Allocated);
+        self.chunk_map.set_allocated(block.chunk(), true);
     }
 
-    pub fn prepare(&mut self) {
+    pub fn prepare(&mut self, _full_heap: bool) {
         #[cfg(debug_assertions)]
         self.abandoned_in_gc.lock().unwrap().assert_empty();
 
@@ -454,7 +469,13 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         crate::util::metadata::vo_bit::bzero_vo_bit(block.start(), Block::BYTES);
     }
 
-    pub fn acquire_block(&self, tls: VMThread, size: usize, align: usize) -> BlockAcquireResult {
+    pub fn acquire_block(
+        &self,
+        tls: VMThread,
+        size: usize,
+        align: usize,
+        alloc_options: AllocationOptions,
+    ) -> BlockAcquireResult {
         {
             let mut abandoned = self.abandoned.lock().unwrap();
             let bin = mi_bin::<VM>(size, align);
@@ -476,7 +497,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             }
         }
 
-        let acquired = self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE);
+        let acquired = self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE, alloc_options);
         if acquired.is_zero() {
             BlockAcquireResult::Exhausted
         } else {
@@ -559,7 +580,7 @@ struct PrepareChunkMap<VM: VMBinding> {
 
 impl<VM: VMBinding> GCWork<VM> for PrepareChunkMap<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        debug_assert!(self.space.chunk_map.get(self.chunk) == ChunkState::Allocated);
+        debug_assert!(self.space.chunk_map.get(self.chunk).unwrap().is_allocated());
         // number of allocated blocks.
         let mut n_occupied_blocks = 0;
         self.chunk
@@ -573,7 +594,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareChunkMap<VM> {
             });
         if n_occupied_blocks == 0 {
             // Set this chunk as free if there is no live blocks.
-            self.space.chunk_map.set(self.chunk, ChunkState::Free)
+            self.space.chunk_map.set_allocated(self.chunk, false)
         } else {
             // Otherwise this chunk is occupied, and we reset the mark bit if it is on the side.
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
@@ -609,7 +630,7 @@ struct SweepChunk<VM: VMBinding> {
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        assert_eq!(self.space.chunk_map.get(self.chunk), ChunkState::Allocated);
+        assert!(self.space.chunk_map.get(self.chunk).unwrap().is_allocated());
 
         // number of allocated blocks.
         let mut allocated_blocks = 0;
@@ -628,7 +649,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
         probe!(mmtk, sweep_chunk, allocated_blocks);
         // Set this chunk as free if there is not live blocks.
         if allocated_blocks == 0 {
-            self.space.chunk_map.set(self.chunk, ChunkState::Free)
+            self.space.chunk_map.set_allocated(self.chunk, false);
         }
         self.epilogue.finish_one_work_packet();
     }

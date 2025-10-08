@@ -8,6 +8,7 @@ use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
 
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::conversions;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::vm_layout;
@@ -71,7 +72,7 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     fn is_sane(&self) -> bool {
         unimplemented!()
     }
-    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, _object: ObjectReference) {
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(_object);
     }
@@ -140,7 +141,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         data_pages + meta_pages
     }
 
-    fn acquire(&self, _tls: VMThread, pages: usize) -> Address {
+    fn acquire(&self, _tls: VMThread, pages: usize, alloc_options: AllocationOptions) -> Address {
         trace!("LockFreeImmortalSpace::acquire");
         let bytes = conversions::pages_to_bytes(pages);
         let start = self
@@ -150,7 +151,11 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             })
             .expect("update cursor failed");
         if start + bytes > self.limit {
-            panic!("OutOfMemory")
+            if alloc_options.on_fail.allow_oom_call() {
+                panic!("OutOfMemory");
+            } else {
+                return Address::ZERO;
+            }
         }
         if self.slow_path_zeroing {
             crate::util::memory::zero(start, bytes);
@@ -175,6 +180,14 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         enumerator.visit_address_range(self.start, self.start + self.total_bytes);
+    }
+
+    fn clear_side_log_bits(&self) {
+        unimplemented!()
+    }
+
+    fn set_side_log_bits(&self) {
+        unimplemented!()
     }
 }
 

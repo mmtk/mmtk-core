@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.8.2"
+          ref: "0.8.4"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
@@ -116,6 +116,9 @@ jobs:
       # available.  Then we may change to another release version and mark the change of canary on
       # the timeline, or introduce a mechanism to dynamically choose the canary version.
       CANARY_VERSION: "v0.28.0"
+      CANARY_RELEASE_BINARY_NAME: "jdk-11.0.19-internal+0_linux-x64_bin.tar.gz"
+      CANARY_JDK_NAME: "jdk-11.0.19"
+      CANARY_DIR: "canary"
     steps:
       # checkout latest versions
       - name: Checkout MMTk Core (latest)
@@ -136,29 +139,26 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.8.2"
+          ref: "0.8.4"
           path: ci-perf-kit
           submodules: true
-      # checkout canary versions.
-      - name: Checkout MMTk Core (canary)
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.CANARY_VERSION }}
-          path: canary/mmtk-core
-      - name: Checkout OpenJDK Binding (canary)
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.CANARY_VERSION }}
-          repository: mmtk/mmtk-openjdk
-          path: canary/mmtk-openjdk
-      - name: Checkout OpenJDK (canary)
-        working-directory: canary/mmtk-openjdk
+      # download canary build
+      # The tarball should be the standard product tarball from `make product-bundles` (see docs/team/release.md).
+      - name: Download canary build
+        env:
+          GH_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
         run: |
-          ./.github/scripts/ci-checkout.sh
+          rm -rf ${{ env.CANARY_DIR }}
+          mkdir -p ${{ env.CANARY_DIR }}
+          gh release download ${{ env.CANARY_VERSION }} --repo mmtk/mmtk-openjdk --pattern "${{ env.CANARY_RELEASE_BINARY_NAME }}" --dir ${{ env.CANARY_DIR }}/images
+          cd ${{ env.CANARY_DIR}}/images
+          tar -xvzf ${{ env.CANARY_RELEASE_BINARY_NAME }}
+          mv ${{ env.CANARY_JDK_NAME }} jdk
+          rm ${{ env.CANARY_RELEASE_BINARY_NAME }}
       # setup
       - name: Setup directory structures
         run: |
-          for BASE_DIR in ./latest ./canary; do
+          for BASE_DIR in ./latest; do
             pushd $BASE_DIR
               # replace dependency
               # Note that ci-replace-mmtk-dep.sh will apply `realpath()` to the `--mmtk-core-path` option.
@@ -183,7 +183,7 @@ jobs:
           export FROM_DATE=2020-07-10
           ./ci-perf-kit/scripts/openjdk-history-run.sh \
             ./latest/mmtk-openjdk \
-            ./canary/mmtk-openjdk \
+            ${{ env.CANARY_DIR }} \
             ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
       - name: Deploy to Github Page
@@ -230,7 +230,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.8.2"
+          ref: "0.8.4"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true

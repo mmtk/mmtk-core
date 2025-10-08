@@ -13,6 +13,10 @@ fi
 
 ALL_PLANS=$(sed -n '/enum PlanSelector/,/}/p' src/util/options.rs | sed -e 's;//.*;;g' -e '/^$/d' -e 's/,//g' | xargs | grep -o '{.*}' | grep -o '\w\+')
 
+# At the moment, the Compressor does not work with the mock VM tests.
+# So we skip testing the Compressor entirely.
+ALL_PLANS=$(echo -n "$ALL_PLANS" | sed '/Compressor/d')
+
 # Test with mock VM:
 # - Find all the files that start with mock_test_
 # - Run each file separately with cargo test, with the feature 'mock_test'
@@ -22,7 +26,7 @@ find ./src ./tests -type f -name "mock_test_*" | while read -r file; do
     # Get the required plans.
     # Some tests need to be run with multiple plans because
     # some bugs can only be reproduced in some plans but not others.
-    PLANS=$(sed -n 's/^\/\/ *GITHUB-CI: *MMTK_PLAN=//p' $file)
+    PLANS=$(sed -n 's/^\/\/ *GITHUB-CI: *MMTK_PLAN=//p' $file | tr ',' '\n')
     if [[ $PLANS == 'all' ]]; then
         PLANS=$ALL_PLANS
     elif [[ -z $PLANS ]]; then

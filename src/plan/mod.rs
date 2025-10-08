@@ -18,6 +18,8 @@ pub use barriers::BarrierSelector;
 
 pub(crate) mod gc_requester;
 
+mod gc_work;
+
 mod global;
 pub(crate) use global::create_gc_worker_context;
 pub(crate) use global::create_mutator;
@@ -44,6 +46,8 @@ mod generational;
 /// Sticky plans (using sticky marks for generational behaviors without a copying nursery)
 mod sticky;
 
+mod compressor;
+mod concurrent;
 mod immix;
 mod markcompact;
 mod marksweep;

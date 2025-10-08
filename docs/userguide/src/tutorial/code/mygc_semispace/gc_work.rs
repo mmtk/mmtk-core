@@ -73,7 +73,9 @@ impl<VM: VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
                 worker,
             )
         } else {
-            self.plan.common.trace_object(queue, object, worker)
+            use crate::plan::PlanTraceObject;
+            use crate::policy::gc_work::DEFAULT_TRACE;
+            self.plan.common.trace_object::<_, DEFAULT_TRACE>(queue, object, worker)
         }
     }
 

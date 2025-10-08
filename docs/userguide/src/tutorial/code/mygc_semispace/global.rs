@@ -128,6 +128,12 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     }
     // ANCHOR_END: release
 
+    // ANCHOR: end_of_gc
+    fn end_of_gc(&mut self, tls: VMWorkerThread) {
+        self.common.end_of_gc(tls);
+    }
+    // ANCHOR_END: end_of_gc
+
     // Modify
     // ANCHOR: plan_get_collection_reserve
     fn get_collection_reserved_pages(&self) -> usize {
@@ -175,9 +181,9 @@ impl<VM: VMBinding> MyGC<VM> {
         let res = MyGC {
             hi: AtomicBool::new(false),
             // ANCHOR: copyspace_new
-            copyspace0: CopySpace::new(plan_args.get_space_args("copyspace0", true, false, VMRequest::discontiguous()), false),
+            copyspace0: CopySpace::new(plan_args.get_normal_space_args("copyspace0", true, false, VMRequest::discontiguous()), false),
             // ANCHOR_END: copyspace_new
-            copyspace1: CopySpace::new(plan_args.get_space_args("copyspace1", true, false, VMRequest::discontiguous()), true),
+            copyspace1: CopySpace::new(plan_args.get_normal_space_args("copyspace1", true, false, VMRequest::discontiguous()), true),
             common: CommonPlan::new(plan_args),
         };
 

@@ -1,20 +1,21 @@
 use super::SemiSpace;
-use crate::plan::barriers::NoBarrier;
-use crate::plan::mutator_context::unreachable_prepare_func;
+use crate::plan::mutator_context::common_prepare_func;
+use crate::plan::mutator_context::common_release_func;
 use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::{
     create_allocator_mapping, create_space_mapping, ReservedAllocators,
 };
 use crate::plan::AllocationSemantics;
-use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::alloc::BumpAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use crate::MMTK;
 use enum_map::EnumMap;
 
-pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
     // rebind the allocation bump pointer to the appropriate semispace
     let bump_allocator = unsafe {
         mutator
@@ -30,6 +31,8 @@ pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWork
             .unwrap()
             .tospace(),
     );
+
+    common_release_func(mutator, tls);
 }
 
 const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
@@ -57,15 +60,10 @@ pub fn create_ss_mutator<VM: VMBinding>(
             vec.push((AllocatorSelector::BumpPointer(0), ss.tospace()));
             vec
         }),
-        prepare_func: &unreachable_prepare_func,
+        prepare_func: &common_prepare_func,
         release_func: &ss_mutator_release,
     };
 
-    Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
-        barrier: Box::new(NoBarrier),
-        mutator_tls,
-        config,
-        plan: ss,
-    }
+    let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
+    builder.build()
 }

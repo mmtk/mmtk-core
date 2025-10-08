@@ -2,6 +2,7 @@
 //! functionalities that we may expect the Rust programming language and its standard libraries
 //! to provide.
 
+pub mod atomic_box;
 pub mod rev_group;
 pub mod zeroed_alloc;
 
@@ -104,29 +105,6 @@ impl<T> std::ops::Deref for InitializeOnce<T> {
 }
 
 unsafe impl<T> Sync for InitializeOnce<T> {}
-
-/// This implements `std::array::from_fn` introduced in Rust 1.63.
-/// We should replace this with the standard counterpart after bumping MSRV,
-/// but we also need to evaluate whether it would use too much stack space (see code comments).
-pub(crate) fn array_from_fn<T, const N: usize, F>(mut cb: F) -> [T; N]
-where
-    F: FnMut(usize) -> T,
-{
-    // Note on unsafety: An alternative to the unsafe implementation below is creating a fixed
-    // array of `[0, 1, 2, ..., N-1]` and using the `.map(cb)` method to create the result.
-    // However, the `array::map` method implemented in the standard library consumes a surprisingly
-    // large amount of stack space.  For VMs that run on confined stacks, such as JikesRVM, that
-    // would cause stack overflow.  Therefore we implement it manually using unsafe primitives.
-    let mut result_array: MaybeUninit<[T; N]> = MaybeUninit::zeroed();
-    let array_ptr = result_array.as_mut_ptr();
-    for index in 0..N {
-        let item = cb(index);
-        unsafe {
-            std::ptr::addr_of_mut!((*array_ptr)[index]).write(item);
-        }
-    }
-    unsafe { result_array.assume_init() }
-}
 
 /// Create a formatted string that makes the best effort idenfying the current process and thread.
 pub fn debug_process_thread_id() -> String {

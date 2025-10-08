@@ -41,8 +41,9 @@ pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: false,
     max_non_los_default_alloc_bytes: MAX_OBJECT_SIZE,
     may_trace_duplicate_edges: true,
-    needs_prepare_mutator: !cfg!(feature = "malloc_mark_sweep")
-        && !cfg!(feature = "eager_sweeping"),
+    needs_prepare_mutator: (!cfg!(feature = "malloc_mark_sweep")
+        && !cfg!(feature = "eager_sweeping"))
+        || PlanConstraints::default().needs_prepare_mutator,
     ..PlanConstraints::default()
 };
 
@@ -57,7 +58,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        self.ms.prepare();
+        self.ms.prepare(true);
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
@@ -65,8 +66,9 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         self.common.release(tls, true);
     }
 
-    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
+    fn end_of_gc(&mut self, tls: VMWorkerThread) {
         self.ms.end_of_gc();
+        self.common.end_of_gc(tls);
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
@@ -110,7 +112,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
         };
 
         let res = MarkSweep {
-            ms: MarkSweepSpace::new(plan_args.get_space_args(
+            ms: MarkSweepSpace::new(plan_args.get_normal_space_args(
                 "ms",
                 true,
                 false,

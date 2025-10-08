@@ -71,15 +71,17 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
         let bytes = VM::VMObjectModel::get_current_size(object);
         // Get the space index from descriptor
         let space_descriptor = VM_MAP.get_descriptor_for_address(object.to_raw_address());
-        let space_index = space_descriptor.get_index();
-        debug_assert!(
-            space_index < MAX_SPACES,
-            "Space index {} is not in the range of [0, {})",
-            space_index,
-            MAX_SPACES
-        );
-        // Accumulate the live bytes for the index
-        live_bytes_per_space[space_index] += bytes;
+        if space_descriptor != crate::util::heap::space_descriptor::SpaceDescriptor::UNINITIALIZED {
+            let space_index = space_descriptor.get_index();
+            debug_assert!(
+                space_index < MAX_SPACES,
+                "Space index {} is not in the range of [0, {})",
+                space_index,
+                MAX_SPACES
+            );
+            // Accumulate the live bytes for the index
+            live_bytes_per_space[space_index] += bytes;
+        }
     }
 }
 
@@ -109,11 +111,11 @@ const STAT_BORROWED_MSG: &str = "GCWorkerShared.stat is already borrowed.  This 
     the mutator calls harness_begin or harness_end while the GC is running.";
 
 impl<VM: VMBinding> GCWorkerShared<VM> {
-    pub fn borrow_stat(&self) -> AtomicRef<WorkerLocalStat<VM>> {
+    pub fn borrow_stat(&self) -> AtomicRef<'_, WorkerLocalStat<VM>> {
         self.stat.try_borrow().expect(STAT_BORROWED_MSG)
     }
 
-    pub fn borrow_stat_mut(&self) -> AtomicRefMut<WorkerLocalStat<VM>> {
+    pub fn borrow_stat_mut(&self) -> AtomicRefMut<'_, WorkerLocalStat<VM>> {
         self.stat.try_borrow_mut().expect(STAT_BORROWED_MSG)
     }
 }
@@ -152,10 +154,10 @@ impl<VM: VMBinding> GCWorker<VM> {
     const LOCALLY_CACHED_WORK_PACKETS: usize = 16;
 
     /// Add a work packet to the work queue and mark it with a higher priority.
-    /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
+    /// If the bucket is open, the packet will be pushed to the local queue, otherwise it will be
     /// pushed to the global bucket with a higher priority.
     pub fn add_work_prioritized(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
-        if !self.scheduler().work_buckets[bucket].is_activated()
+        if !self.scheduler().work_buckets[bucket].is_open()
             || self.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS
         {
             self.scheduler.work_buckets[bucket].add_prioritized(Box::new(work));
@@ -165,10 +167,10 @@ impl<VM: VMBinding> GCWorker<VM> {
     }
 
     /// Add a work packet to the work queue.
-    /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
+    /// If the bucket is open, the packet will be pushed to the local queue, otherwise it will be
     /// pushed to the global bucket.
     pub fn add_work(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
-        if !self.scheduler().work_buckets[bucket].is_activated()
+        if !self.scheduler().work_buckets[bucket].is_open()
             || self.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS
         {
             self.scheduler.work_buckets[bucket].add(work);
@@ -191,7 +193,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     ///
     /// 1. Any packet that should be processed only by this worker.
     /// 2. Poll from the local work queue.
-    /// 3. Poll from activated global work-buckets
+    /// 3. Poll from open global work-buckets
     /// 4. Steal from other workers
     fn poll(&mut self) -> PollResult<VM> {
         if let Some(work) = self.shared.designated_work.pop() {

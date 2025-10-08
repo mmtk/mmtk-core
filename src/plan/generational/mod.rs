@@ -45,12 +45,12 @@ pub const FULL_NURSERY_GC: bool = false;
 pub const GEN_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     needs_log_bit: ACTIVE_BARRIER.equals(BarrierSelector::ObjectBarrier),
+    generational: true,
     barrier: ACTIVE_BARRIER,
     // We may trace duplicate edges in sticky immix (or any plan that uses object remembering barrier). See https://github.com/mmtk/mmtk-core/issues/743.
     may_trace_duplicate_edges: ACTIVE_BARRIER.equals(BarrierSelector::ObjectBarrier),
     max_non_los_default_alloc_bytes:
         crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
-    needs_prepare_mutator: false,
     ..PlanConstraints::default()
 };
 

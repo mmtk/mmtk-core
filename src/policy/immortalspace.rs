@@ -22,8 +22,6 @@ pub struct ImmortalSpace<VM: VMBinding> {
     mark_state: MarkState,
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
-    /// Is this used as VM space? If this is used as VM space, we never allocate into this space, but we trace objects normally.
-    vm_space: bool,
 }
 
 impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
@@ -55,10 +53,10 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, object: ObjectReference) {
         self.mark_state
             .on_object_metadata_initialization::<VM>(object);
-        if self.common.needs_log_bit {
+        if self.common.unlog_allocated_object {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
         #[cfg(feature = "vo_bit")]
@@ -117,6 +115,20 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, &self.pr);
     }
+
+    fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            log_bit.bzero_metadata(start, size);
+        }
+    }
+
+    fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            log_bit.bset_metadata(start, size);
+        }
+    }
 }
 
 use crate::scheduler::GCWorker;
@@ -154,46 +166,20 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
-            vm_space: false,
-        }
-    }
-
-    #[cfg(feature = "vm_space")]
-    pub fn new_vm_space(
-        args: crate::policy::space::PlanCreateSpaceArgs<VM>,
-        start: Address,
-        size: usize,
-    ) -> Self {
-        assert!(!args.vmrequest.is_discontiguous());
-        ImmortalSpace {
-            mark_state: MarkState::new(),
-            pr: MonotonePageResource::new_contiguous(start, size, args.vm_map),
-            common: CommonSpace::new(args.into_policy_args(
-                false,
-                true,
-                metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]),
-            )),
-            vm_space: true,
         }
     }
 
     pub fn prepare(&mut self) {
         self.mark_state.on_global_prepare::<VM>();
-        if self.vm_space {
-            // If this is VM space, we never allocate into it, and we should reset the mark bit for the entire space.
-            self.mark_state
-                .on_block_reset::<VM>(self.common.start, self.common.extent)
-        } else {
-            // Otherwise, we reset the mark bit for the allocated regions.
-            for (addr, size) in self.pr.iterate_allocated_regions() {
-                debug!(
-                    "{:?}: reset mark bit from {} to {}",
-                    self.name(),
-                    addr,
-                    addr + size
-                );
-                self.mark_state.on_block_reset::<VM>(addr, size);
-            }
+        // Reset the mark bit for the allocated regions.
+        for (addr, size) in self.pr.iterate_allocated_regions() {
+            debug!(
+                "{:?}: reset mark bit from {} to {}",
+                self.name(),
+                addr,
+                addr + size
+            );
+            self.mark_state.on_block_reset::<VM>(addr, size);
         }
     }
 
@@ -213,6 +199,15 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
             object
         );
         if self.mark_state.test_and_mark::<VM>(object) {
+            // Set the unlog bit if required
+            if self.common.unlog_traced_object {
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
+                    object,
+                    1,
+                    None,
+                    Ordering::SeqCst,
+                );
+            }
             queue.enqueue(object);
         }
         object

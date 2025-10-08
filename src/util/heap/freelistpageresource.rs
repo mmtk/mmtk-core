@@ -227,8 +227,6 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         // > (e.g., read versus read/write protection) exceeding the
         // > allowed maximum.
         assert!(self.protect_memory_on_release.is_some());
-        // We are not using mmapper.protect(). mmapper.protect() protects the whole chunk and
-        // may protect memory that is still in use.
         if let Err(e) = memory::mprotect(start, conversions::pages_to_bytes(pages)) {
             panic!(
                 "Failed at protecting memory (starting at {}): {:?}",

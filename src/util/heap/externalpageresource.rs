@@ -81,7 +81,7 @@ impl<VM: VMBinding> ExternalPageResource<VM> {
         lock.push(pages);
     }
 
-    pub fn get_external_pages(&self) -> MutexGuard<Vec<ExternalPages>> {
+    pub fn get_external_pages(&self) -> MutexGuard<'_, Vec<ExternalPages>> {
         self.ranges.lock().unwrap()
     }
 }

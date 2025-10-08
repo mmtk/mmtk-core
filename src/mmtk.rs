@@ -13,7 +13,7 @@ use crate::util::analysis::AnalysisManager;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::heap_parameters::MAX_SPACES;
-use crate::util::heap::layout::vm_layout::VMLayout;
+use crate::util::heap::layout::vm_layout::{vm_layout, VMLayout};
 use crate::util::heap::layout::{self, Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::opaque_pointer::*;
@@ -29,7 +29,9 @@ use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::default::Default;
-use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(feature = "sanity")]
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -46,7 +48,7 @@ lazy_static! {
     pub static ref VM_MAP: Box<dyn VMMap + Send + Sync> = layout::create_vm_map();
 
     /// A global Mmapper for mmaping and protection of virtual memory.
-    pub static ref MMAPPER: Box<dyn Mmapper + Send + Sync> = layout::create_mmapper();
+    pub static ref MMAPPER: Box<dyn Mmapper> = layout::create_mmapper();
 }
 
 use crate::util::rust_util::InitializeOnce;
@@ -79,13 +81,13 @@ impl MMTKBuilder {
 
     /// Set an option.
     pub fn set_option(&mut self, name: &str, val: &str) -> bool {
-        self.options.set_from_command_line(name, val)
+        self.options.set_from_string(name, val)
     }
 
     /// Set multiple options by a string. The string should be key-value pairs separated by white spaces,
     /// such as `threads=1 stress_factor=4096`.
     pub fn set_options_bulk_by_str(&mut self, options: &str) -> bool {
-        self.options.set_bulk_from_command_line(options)
+        self.options.set_bulk_from_string(options)
     }
 
     /// Custom VM layout constants. VM bindings may use this function for compressed or 39-bit heap support.
@@ -123,7 +125,6 @@ pub struct MMTK<VM: VMBinding> {
     pub(crate) gc_trigger: Arc<GCTrigger<VM>>,
     pub(crate) gc_requester: Arc<GCRequester<VM>>,
     pub(crate) stats: Arc<Stats>,
-    inside_harness: AtomicBool,
     #[cfg(feature = "sanity")]
     inside_sanity: AtomicBool,
     /// Analysis counters. The feature analysis allows us to periodically stop the world and collect some statistics.
@@ -137,6 +138,9 @@ unsafe impl<VM: VMBinding> Send for MMTK<VM> {}
 impl<VM: VMBinding> MMTK<VM> {
     /// Create an MMTK instance. This is not public. Bindings should use [`MMTKBuilder::build`].
     pub(crate) fn new(options: Arc<Options>) -> Self {
+        // Verify the Mmapper can handle the required address space size.
+        vm_layout().validate_address_space();
+
         // Initialize SFT first in case we need to use this in the constructor.
         // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
         crate::policy::sft_map::SFTRefStorage::pre_use_check();
@@ -220,7 +224,6 @@ impl<VM: VMBinding> MMTK<VM> {
             sanity_checker: Mutex::new(SanityChecker::new()),
             #[cfg(feature = "sanity")]
             inside_sanity: AtomicBool::new(false),
-            inside_harness: AtomicBool::new(false),
             #[cfg(feature = "extreme_assertions")]
             slot_logger: SlotLogger::new(),
             #[cfg(feature = "analysis")]
@@ -324,7 +327,7 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn harness_begin(&self, tls: VMMutatorThread) {
         probe!(mmtk, harness_begin);
         self.handle_user_collection_request(tls, true, true);
-        self.inside_harness.store(true, Ordering::SeqCst);
+        self.state.inside_harness.store(true, Ordering::SeqCst);
         self.stats.start_all();
         self.scheduler.enable_stat();
     }
@@ -334,7 +337,7 @@ impl<VM: VMBinding> MMTK<VM> {
     /// This is usually called by the benchmark harness right after the actual benchmark.
     pub fn harness_end(&'static self) {
         self.stats.stop_all(self);
-        self.inside_harness.store(false, Ordering::SeqCst);
+        self.state.inside_harness.store(false, Ordering::SeqCst);
         probe!(mmtk, harness_end);
     }
 
@@ -382,13 +385,13 @@ impl<VM: VMBinding> MMTK<VM> {
     /// Return true if the current GC is an emergency GC.
     ///
     /// An emergency GC happens when a normal GC cannot reclaim enough memory to satisfy allocation
-    /// requests.  Plans may do full-heap GC, defragmentation, etc. during emergency in order to
+    /// requests.  Plans may do full-heap GC, defragmentation, etc. during emergency GCs in order to
     /// free up more memory.
     ///
     /// VM bindings can call this function during GC to check if the current GC is an emergency GC.
     /// If it is, the VM binding is recommended to retain fewer objects than normal GCs, to the
-    /// extent allowed by the specification of the VM or langauge.  For example, the VM binding may
-    /// choose not to retain objects used for caching.  Specifically, for Java virtual machines,
+    /// extent allowed by the specification of the VM or the language.  For example, the VM binding
+    /// may choose not to retain objects used for caching.  Specifically, for Java virtual machines,
     /// that means not retaining referents of [`SoftReference`][java-soft-ref] which is primarily
     /// designed for implementing memory-sensitive caches.
     ///
@@ -568,7 +571,7 @@ impl<VM: VMBinding> MMTK<VM> {
     /// Arguments:
     /// *   `out`: the place to print the VM maps.
     /// *   `space_name`: If `None`, print all spaces;
-    ///                   if `Some(n)`, only print the space whose name is `n`.
+    ///     if `Some(n)`, only print the space whose name is `n`.
     pub fn debug_print_vm_maps(
         &self,
         out: &mut impl std::fmt::Write,
@@ -594,6 +597,35 @@ impl<VM: VMBinding> MMTK<VM> {
         self.get_plan()
             .base()
             .vm_space
-            .initialize_object_metadata(object, false)
+            .initialize_object_metadata(object)
     }
+}
+
+/// A non-mangled function to print object information for debugging purposes. This function can be directly
+/// called from a debugger.
+#[no_mangle]
+pub fn mmtk_debug_print_object(object: crate::util::ObjectReference) {
+    // If the address is unmapped, we cannot access its metadata. Just quit.
+    if !object.to_raw_address().is_mapped() {
+        println!("{} is not mapped in MMTk", object);
+        return;
+    }
+
+    // If the address is not aligned to the object reference size, it is not an object reference.
+    if !object
+        .to_raw_address()
+        .is_aligned_to(crate::util::ObjectReference::ALIGNMENT)
+    {
+        println!(
+            "{} is not properly aligned. It is not an object reference.",
+            object
+        );
+    }
+
+    // Forward to the space
+    let sft = SFT_MAP.get_checked(object.to_raw_address());
+    // Print the space name
+    println!("In {}:", sft.name());
+    // Print object information
+    sft.debug_print_object_info(object);
 }

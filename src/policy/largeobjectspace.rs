@@ -5,9 +5,11 @@ use crate::plan::VectorObjectQueue;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::{FreeListPageResource, PageResource};
 use crate::util::metadata;
+use crate::util::object_enum::ClosureObjectEnumerator;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
 use crate::util::track::track_free;
@@ -30,6 +32,7 @@ pub struct LargeObjectSpace<VM: VMBinding> {
     mark_state: u8,
     in_nursery_gc: bool,
     treadmill: TreadMill,
+    clear_log_bit_on_sweep: bool,
 }
 
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
@@ -58,28 +61,9 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
-        let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
-            object,
-            None,
-            Ordering::SeqCst,
-        );
-        let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
-        if alloc {
-            new_value |= NURSERY_BIT;
-        }
-        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::<VM, u8>(
-            object,
-            new_value,
-            None,
-            Ordering::SeqCst,
-        );
 
-        // If this object is freshly allocated, we do not set it as unlogged
-        if !alloc && self.common.needs_log_bit {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
-        }
-
+    fn initialize_object_metadata(&self, object: ObjectReference) {
+        // VO bit: Set for all objects.
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(object);
         #[cfg(all(feature = "is_mmtk_object", debug_assertions))]
@@ -93,8 +77,52 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             );
         }
 
-        self.treadmill.add_to_treadmill(object, alloc);
+        let allocate_as_live = self.should_allocate_as_live();
+        let into_nursery = !allocate_as_live;
+
+        // mark/nursery bits: Set mark state plus optionally nursery bit.
+        {
+            let mark_nursery_state = if into_nursery {
+                self.mark_state | NURSERY_BIT
+            } else {
+                self.mark_state
+            };
+
+            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::<VM, u8>(
+                object,
+                mark_nursery_state,
+                None,
+                Ordering::SeqCst,
+            );
+        }
+
+        // global unlog bit: Set if `unlog_allocated_object`.  Ensure it is not set otherwise.
+        if self.common.unlog_allocated_object {
+            debug_assert!(self.common.needs_log_bit);
+            debug_assert!(
+                !allocate_as_live,
+                "Currently only ConcurrentImmix can allocate as live, and it doesn't unlog allocated objects in LOS."
+            );
+
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+        } else {
+            #[cfg(debug_assertions)]
+            if self.common.needs_log_bit {
+                debug_assert_eq!(
+                    VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.load_atomic::<VM, u8>(
+                        object,
+                        None,
+                        Ordering::Acquire
+                    ),
+                    0
+                );
+            }
+        }
+
+        // Add to the treadmill.  Nursery and mature objects need to be added to different sets.
+        self.treadmill.add_to_treadmill(object, into_nursery);
     }
+
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
         crate::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
@@ -105,16 +133,28 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         ptr: Address,
         max_search_bytes: usize,
     ) -> Option<ObjectReference> {
-        use crate::util::metadata::vo_bit;
+        use crate::{util::metadata::vo_bit, MMAPPER};
+
+        let mmap_granularity = MMAPPER.granularity();
+
+        // We need to check if metadata address is mapped or not.  But we make use of the granularity of
+        // the `Mmapper` to reduce the number of checks.  This records the start of a grain that is
+        // tested to be mapped.
+        let mut mapped_grain = Address::MAX;
+
         // For large object space, it is a bit special. We only need to check VO bit for each page.
         let mut cur_page = ptr.align_down(BYTES_IN_PAGE);
         let low_page = ptr
             .saturating_sub(max_search_bytes)
             .align_down(BYTES_IN_PAGE);
         while cur_page >= low_page {
-            // If the page start is not mapped, there can't be an object in it.
-            if !cur_page.is_mapped() {
-                return None;
+            if cur_page < mapped_grain {
+                if !cur_page.is_mapped() {
+                    // If the page start is not mapped, there can't be an object in it.
+                    return None;
+                }
+                // This is mapped. No need to check for this chunk.
+                mapped_grain = cur_page.align_down(mmap_granularity);
             }
             // For performance, we only check the first word which maps to the first 512 bytes in the page.
             // In almost all the cases, it should be sufficient.
@@ -144,6 +184,12 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
         self.trace_object(queue, object)
+    }
+
+    fn debug_print_object_info(&self, object: ObjectReference) {
+        println!("marked = {}", self.test_mark_bit(object, self.mark_state));
+        println!("nursery = {}", self.is_in_nursery(object));
+        self.common.debug_print_object_global_info(object);
     }
 }
 
@@ -176,6 +222,20 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         self.treadmill.enumerate_objects(enumerator);
     }
+
+    fn clear_side_log_bits(&self) {
+        let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
+        });
+        self.treadmill.enumerate_objects(&mut enumator);
+    }
+
+    fn set_side_log_bits(&self) {
+        let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+        });
+        self.treadmill.enumerate_objects(&mut enumator);
+    }
 }
 
 use crate::scheduler::GCWorker;
@@ -200,6 +260,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     pub fn new(
         args: crate::policy::space::PlanCreateSpaceArgs<VM>,
         protect_memory_on_release: bool,
+        clear_log_bit_on_sweep: bool,
     ) -> Self {
         let is_discontiguous = args.vmrequest.is_discontiguous();
         let vm_map = args.vm_map;
@@ -224,12 +285,12 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             mark_state: 0,
             in_nursery_gc: false,
             treadmill: TreadMill::new(),
+            clear_log_bit_on_sweep,
         }
     }
 
     pub fn prepare(&mut self, full_heap: bool) {
         if full_heap {
-            debug_assert!(self.treadmill.is_from_space_empty());
             self.mark_state = MARK_BIT - self.mark_state;
         }
         self.treadmill.flip(full_heap);
@@ -243,6 +304,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             self.sweep_large_pages(false);
         }
     }
+
     // Allow nested-if for this function to make it clear that test_and_mark() is only executed
     // for the outer condition is met.
     #[allow(clippy::collapsible_if)]
@@ -270,7 +332,9 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 trace!("LOS object {} is being marked now", object);
                 self.treadmill.copy(object, nursery_object);
                 // We just moved the object out of the logical nursery, mark it as unlogged.
-                if nursery_object && self.common.needs_log_bit {
+                // We also unlog mature objects as their unlog bit may have been unset before the
+                // full-heap GC
+                if self.common.unlog_traced_object {
                     VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
                         .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
                 }
@@ -289,7 +353,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         let sweep = |object: ObjectReference| {
             #[cfg(feature = "vo_bit")]
             crate::util::metadata::vo_bit::unset_vo_bit(object);
-            track_free(object.to_object_start::<VM>(), 0 /* TODO: Size */);
+            track_free(object.to_object_start::<VM>(), 0 /* TODO: Size */);            
             self.pr
                 .release_pages(get_super_page(object.to_object_start::<VM>()));
         };
@@ -305,8 +369,13 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     /// Allocate an object
-    pub fn allocate_pages(&self, tls: VMThread, pages: usize) -> Address {
-        self.acquire(tls, pages)
+    pub fn allocate_pages(
+        &self,
+        tls: VMThread,
+        pages: usize,
+        alloc_options: AllocationOptions,
+    ) -> Address {
+        self.acquire(tls, pages, alloc_options)
     }
 
     /// Test if the object's mark bit is the same as the given value. If it is not the same,
@@ -364,6 +433,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             Ordering::Relaxed,
         ) & NURSERY_BIT
             == NURSERY_BIT
+    }
+
+    pub fn is_marked(&self, object: ObjectReference) -> bool {
+        self.test_mark_bit(object, self.mark_state)
     }
 }
 

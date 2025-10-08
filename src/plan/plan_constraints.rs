@@ -45,6 +45,8 @@ pub struct PlanConstraints {
     /// `MutatorConfig::prepare_func`).  Those plans can set this to `false` so that the
     /// `PrepareMutator` work packets will not be created at all.
     pub needs_prepare_mutator: bool,
+    /// Is this plan generational?
+    pub generational: bool,
 }
 
 impl PlanConstraints {
@@ -56,22 +58,25 @@ impl PlanConstraints {
             max_non_los_default_alloc_bytes: MAX_INT,
             max_non_los_copy_bytes: MAX_INT,
             // As `LAZY_SWEEP` is true, needs_linear_scan is true for all the plans. This is strange.
-            // https://github.com/mmtk/mmtk-core/issues/1027 trackes the issue.
+            // https://github.com/mmtk/mmtk-core/issues/1027 tracks the issue.
             needs_linear_scan: crate::util::constants::SUPPORT_CARD_SCANNING
                 || crate::util::constants::LAZY_SWEEP,
             needs_concurrent_workers: false,
-            may_trace_duplicate_edges: false,
+            // We may trace duplicate edges in mark sweep. If we use mark sweep as the non moving policy, it will be included in every
+            may_trace_duplicate_edges: cfg!(feature = "marksweep_as_nonmoving"),
             needs_forward_after_liveness: false,
             needs_log_bit: false,
             barrier: BarrierSelector::NoBarrier,
-            needs_prepare_mutator: true,
+            // If we use mark sweep as non moving space, we need to prepare mutator. See [`common_prepare_func`].
+            needs_prepare_mutator: cfg!(feature = "marksweep_as_nonmoving"),
+            generational: false,
         }
     }
 }
 
-/// The default plan constraints. Each plan should define their own plan contraints.
+/// The default plan constraints. Each plan should define their own plan constraints.
 /// They can start from the default constraints and explicitly set some of the fields.
 pub(crate) const DEFAULT_PLAN_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
 
-// Use 16 pages as the size limit for non-LOS objects to avoid copying large objects
-pub const MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN: usize = 16 << LOG_BYTES_IN_PAGE;
+// Use two pages as the size limit for non-LOS objects to avoid copying large objects
+pub const MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN: usize = 2 << LOG_BYTES_IN_PAGE;

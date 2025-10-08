@@ -45,7 +45,6 @@ impl Defrag {
     const NUM_BINS: usize = (Block::LINES >> 1) + 1;
     const DEFRAG_LINE_REUSE_RATIO: f32 = 0.99;
     const MIN_SPILL_THRESHOLD: usize = 2;
-    const DEFRAG_HEADROOM_PERCENT: usize = super::DEFRAG_HEADROOM_PERCENT;
 
     /// Allocate a new local histogram.
     pub const fn new_histogram(&self) -> Histogram {
@@ -63,20 +62,23 @@ impl Defrag {
     }
 
     /// Determine whether the current GC should do defragmentation.
+    #[allow(clippy::too_many_arguments)]
     pub fn decide_whether_to_defrag(
         &self,
+        defrag_enabled: bool,
         emergency_collection: bool,
         collect_whole_heap: bool,
         collection_attempts: usize,
         user_triggered: bool,
         exhausted_reusable_space: bool,
         full_heap_system_gc: bool,
+        stress_defrag: bool,
     ) {
-        let in_defrag = super::DEFRAG
+        let in_defrag = defrag_enabled
             && (emergency_collection
                 || (collection_attempts > 1)
                 || !exhausted_reusable_space
-                || super::STRESS_DEFRAG
+                || stress_defrag
                 || (collect_whole_heap && user_triggered && full_heap_system_gc));
         info!("Defrag: {}", in_defrag);
         probe!(mmtk, immix_defrag, in_defrag);
@@ -86,7 +88,9 @@ impl Defrag {
 
     /// Get the number of defrag headroom pages.
     pub fn defrag_headroom_pages<VM: VMBinding>(&self, space: &ImmixSpace<VM>) -> usize {
-        space.get_page_resource().reserved_pages() * Self::DEFRAG_HEADROOM_PERCENT / 100
+        space.get_page_resource().reserved_pages()
+            * (*space.common().options.immix_defrag_headroom_percent)
+            / 100
     }
 
     /// Check if the defrag space is exhausted.
@@ -116,9 +120,8 @@ impl Defrag {
     }
 
     /// Prepare work. Should be called in ImmixSpace::prepare.
-    #[allow(clippy::assertions_on_constants)]
     pub fn prepare<VM: VMBinding>(&self, space: &ImmixSpace<VM>, plan_stats: StatsForDefrag) {
-        debug_assert!(super::DEFRAG);
+        debug_assert!(space.is_defrag_enabled());
         self.defrag_space_exhausted.store(false, Ordering::Release);
 
         // Calculate available free space for defragmentation.
@@ -207,9 +210,7 @@ impl Defrag {
     }
 
     /// Reset the in-defrag state.
-    #[allow(clippy::assertions_on_constants)]
     pub fn reset_in_defrag(&self) {
-        debug_assert!(super::DEFRAG);
         self.in_defrag_collection.store(false, Ordering::Release);
     }
 }

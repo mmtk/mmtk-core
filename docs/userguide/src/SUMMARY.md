@@ -2,6 +2,8 @@
 
 [Introduction](README.md)
 
+[Glossary](glossary.md)
+
 # For GC Developers
 
 - [Tutorial: Add a new GC plan to MMTk](tutorial/prefix.md)
@@ -32,10 +34,16 @@
         - [NoGC](portingguide/howto/nogc.md)
         - [Next Steps](portingguide/howto/next_steps.md)
     - [Debugging Tips](portingguide/debugging/prefix.md)
-        - [Enabling Debug Assertions](portingguide/debugging/assertions.md)
+        - [Enable Debug Assertions](portingguide/debugging/assertions.md)
+        - [Print Object Info](portingguide/debugging/print_obj_info.md)
+        - [Copying in Immix](portingguide/debugging/immix.md)
+        - [Traverse Object Graph with a Debugger](portingguide/debugging/traverse_object_graph.md)
     - [Performance Tuning](portingguide/perf_tuning/prefix.md)
         - [Link Time Optimization](portingguide/perf_tuning/lto.md)
         - [Optimizing Allocation](portingguide/perf_tuning/alloc.md)
+    - [VM-specific Concerns](portingguide/concerns/prefix.md)
+        - [Finalizers and Weak References](portingguide/concerns/weakref.md)
+        - [Address-based Hashing](portingguide/concerns/address-based-hashing.md)
 - [API Migration Guide](migration/prefix.md)
     - [Template (for mmtk-core developers)](migration/template.md)
 

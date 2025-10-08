@@ -30,6 +30,64 @@ Notes for the mmtk-core developers:
 
 <!-- Insert new versions here -->
 
+## 0.32.0
+
+### Removed the notion of "mmap chunk"
+
+```admonish tldr
+Constants such as `MMAP_CHUNK_BYTES` were related to the implementation details of the memory
+mapper, and should not have been exposed.
+```
+
+API changes:
+
+-   module `util::conversions`
+    +   `mmap_chunk_align_down`: Removed.
+    +   `mmap_chunk_align_up`: Removed.
+-   module `util::heap::vm_layout`
+    +   `LOG_MMAP_CHUNK_BYTES`: Removed.
+    +   `MMAP_CHUNK_BYTES`: Removed.
+
+### `Options` no longer differentiates between environment variables and command line arguments.
+
+```admonish tldr
+We replaced both `Options::set_from_command_line` and `Options::set_from_env_var` with
+`Options::set_from_string` because all options can now be set via either environment variable or
+command line arguments.
+```
+
+API changes:
+
+-   module `util::options`
+    +   `Options::set_from_command_line`: Removed.
+        *   Use `Options::set_from_string` instead.
+    +   `Options::set_from_env_var`: Removed.
+        *   Use `Options::set_from_string` instead.
+    +   `Options::set_bulk_from_command_line`: Removed.
+        *   Use `Options::set_bulk_from_string` instead.
+    +   All `<T>` in `MMTKOption<T>` now must implement `FromStr`.
+        *   This means you can parse a string into `T` when setting an `MMTKOption<T>`.  For
+            example, `options.plan.set(user_input.parse()?);`.
+
+### The feature `immix_stress_copying` is removed.
+
+```admonish tldr
+The feature `immix_stress_copying` is removed. Bindings can use MMTk options with the following values
+to achieve the same behavior as before: `immix_always_defrag=true,immix_defrag_every_block=true,immix_defrag_headroom_percent=50`
+```
+
+API changes:
+
+-   The feature `immix_stress_copying` is removed.
+-   module `util::options`
+    +   `Options` includes `immix_always_defrag`, which defaults to `false`.
+    +   `Options` includes `immix_defrag_every_block`, which defaults to `false`.
+    +   `Options` includes `immix_defrag_headroom_percent`, which defaults to `2`.
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/pull/1324>
+
 ## 0.30.0
 
 ### `live_bytes_in_last_gc` becomes a runtime option, and returns a map for live bytes in each space

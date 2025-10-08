@@ -131,6 +131,15 @@ impl SideMetadataSpec {
         );
     }
 
+    #[cfg(debug_assertions)]
+    pub(crate) fn are_different_metadata_bits(&self, addr1: Address, addr2: Address) -> bool {
+        let a1 = address_to_meta_address(self, addr1);
+        let a2 = address_to_meta_address(self, addr2);
+        let s1 = meta_byte_lshift(self, addr1);
+        let s2 = meta_byte_lshift(self, addr2);
+        (a1, s1) != (a2, s2)
+    }
+
     /// Used only for debugging.
     /// * Assert if the given MetadataValue type matches the spec.
     /// * Assert if the provided value is valid in the spec.
@@ -1234,7 +1243,7 @@ impl SideMetadataSpec {
             start_meta_shift,
             end_meta_addr,
             end_meta_shift,
-            false,
+            true,
             &mut visitor,
         );
     }
@@ -1344,6 +1353,11 @@ impl SideMetadataContext {
                 ret.push(*spec);
             }
         }
+
+        // Any plan that uses the chunk map needs to reserve the chunk map table.
+        // As we use either the mark sweep or (non moving) immix as the non moving space,
+        // and both policies use the chunk map, we just add the chunk map table globally.
+        ret.push(crate::util::heap::chunk_map::ChunkMap::ALLOC_TABLE);
 
         ret.extend_from_slice(specs);
         ret

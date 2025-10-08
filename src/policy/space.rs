@@ -23,6 +23,7 @@ use crate::mmtk::SFT_MAP;
 #[cfg(debug_assertions)]
 use crate::policy::sft::EMPTY_SFT_NAME;
 use crate::policy::sft::SFT;
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::copy::*;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
@@ -34,6 +35,7 @@ use crate::util::memory::{self, HugePageSupport, MmapProtection, MmapStrategy};
 use crate::vm::VMBinding;
 
 use std::marker::PhantomData;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -68,35 +70,57 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// avoid arithmatic overflow. If we have to do computation in the allocation fastpath and
     /// overflow happens there, there is nothing we can do about it.
     /// Return a boolean to indicate if we will be out of memory, determined by the check.
-    fn will_oom_on_acquire(&self, tls: VMThread, size: usize) -> bool {
+    fn will_oom_on_acquire(&self, size: usize) -> bool {
         let max_pages = self.get_gc_trigger().policy.get_max_heap_size_in_pages();
         let requested_pages = size >> LOG_BYTES_IN_PAGE;
-        if requested_pages > max_pages {
-            VM::VMCollection::out_of_memory(
-                tls,
-                crate::util::alloc::AllocationError::HeapOutOfMemory,
-            );
+        requested_pages > max_pages
+    }
+
+    /// Check if the requested `size` is an obvious out-of-memory case using
+    /// [`Self::will_oom_on_acquire`] and, if it is, call `Collection::out_of_memory`.  Return the
+    /// result of `will_oom_on_acquire`.
+    fn handle_obvious_oom_request(
+        &self,
+        tls: VMThread,
+        size: usize,
+        alloc_options: AllocationOptions,
+    ) -> bool {
+        if self.will_oom_on_acquire(size) {
+            if alloc_options.on_fail.allow_oom_call() {
+                VM::VMCollection::out_of_memory(
+                    tls,
+                    crate::util::alloc::AllocationError::HeapOutOfMemory,
+                );
+            }
             return true;
         }
         false
     }
 
-    fn acquire(&self, tls: VMThread, pages: usize) -> Address {
-        trace!("Space.acquire, tls={:?}", tls);
+    fn acquire(&self, tls: VMThread, pages: usize, alloc_options: AllocationOptions) -> Address {
+        trace!(
+            "Space.acquire, tls={:?}, alloc_options={:?}",
+            tls,
+            alloc_options
+        );
 
         debug_assert!(
-            !self.will_oom_on_acquire(tls, pages << LOG_BYTES_IN_PAGE),
+            !self.will_oom_on_acquire(pages << LOG_BYTES_IN_PAGE),
             "The requested pages is larger than the max heap size. Is will_go_oom_on_acquire used before acquring memory?"
         );
 
         // Should we poll to attempt to GC?
         // - If tls is collector, we cannot attempt a GC.
         // - If gc is disabled, we cannot attempt a GC.
-        let should_poll =
-            VM::VMActivePlan::is_mutator(tls) && VM::VMCollection::is_collection_enabled();
+        // - If overcommit is allowed, we don't attempt a GC.
+        let should_poll = VM::VMActivePlan::is_mutator(tls)
+            && VM::VMCollection::is_collection_enabled()
+            && !alloc_options.on_fail.allow_overcommit();
         // Is a GC allowed here? If we should poll but are not allowed to poll, we will panic.
         // initialize_collection() has to be called so we know GC is initialized.
-        let allow_gc = should_poll && self.common().global_state.is_initialized();
+        let allow_gc = should_poll
+            && self.common().global_state.is_initialized()
+            && alloc_options.on_fail.allow_gc();
 
         trace!("Reserving pages");
         let pr = self.get_page_resource();
@@ -105,12 +129,19 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         trace!("Polling ..");
 
         if should_poll && self.get_gc_trigger().poll(false, Some(self.as_space())) {
+            // Clear the request
+            pr.clear_request(pages_reserved);
+
+            // If we do not want GC on fail, just return zero.
+            if !alloc_options.on_fail.allow_gc() {
+                return Address::ZERO;
+            }
+
+            // Otherwise do GC here
             debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
 
-            // Clear the request, and inform GC trigger about the pending allocation.
-            pr.clear_request(pages_reserved);
-
+            // Inform GC trigger about the pending allocation.
             let meta_pages_reserved = self.estimate_side_meta_pages(pages_reserved);
             let total_pages_reserved = pages_reserved + meta_pages_reserved;
             self.get_gc_trigger()
@@ -118,7 +149,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 .on_pending_allocation(total_pages_reserved);
 
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
-            unsafe { Address::zero() }
+
+            // Return zero -- the caller will handle re-attempting allocation
+            Address::ZERO
         } else {
             debug!("Collection not required");
 
@@ -221,6 +254,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 Err(_) => {
                     drop(lock); // drop the lock immediately
 
+                    // Clear the request
+                    pr.clear_request(pages_reserved);
+
+                    // If we do not want GC on fail, just return zero.
+                    if !alloc_options.on_fail.allow_gc() {
+                        return Address::ZERO;
+                    }
+
                     // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
                     assert!(
                         allow_gc,
@@ -230,14 +271,13 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     let gc_performed = self.get_gc_trigger().poll(true, Some(self.as_space()));
                     debug_assert!(gc_performed, "GC not performed when forced.");
 
-                    // Clear the request, and inform GC trigger about the pending allocation.
-                    pr.clear_request(pages_reserved);
+                    // Inform GC trigger about the pending allocation.
                     self.get_gc_trigger()
                         .policy
                         .on_pending_allocation(pages_reserved);
 
                     VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
-                    unsafe { Address::zero() }
+                    Address::ZERO
                 }
             }
         }
@@ -298,22 +338,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         if new_chunk {
             unsafe { SFT_MAP.update(self.as_sft(), start, bytes) };
         }
-    }
-
-    /// Ensure this space is marked as mapped -- used when the space is already
-    /// mapped (e.g. for a vm image which is externally mmapped.)
-    fn ensure_mapped(&self) {
-        self.common()
-            .metadata
-            .try_map_metadata_space(self.common().start, self.common().extent, self.get_name())
-            .unwrap_or_else(|e| {
-                // TODO(Javad): handle meta space allocation failure
-                panic!("failed to mmap meta memory: {e}");
-            });
-
-        self.common()
-            .mmapper
-            .mark_as_mapped(self.common().start, self.common().extent);
     }
 
     /// Estimate the amount of side metadata memory needed for a give data memory size in pages. The
@@ -394,6 +418,26 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// the execution time.  For LOS, it will be cheaper to enumerate individual objects than
     /// scanning VO bits because it is sparse.
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator);
+
+    fn set_allocate_as_live(&self, live: bool) {
+        self.common()
+            .allocate_as_live
+            .store(live, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    fn should_allocate_as_live(&self) -> bool {
+        self.common()
+            .allocate_as_live
+            .load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    /// Clear the side log bits for allocated regions in this space.
+    /// This method is only called if the plan knows the log bits are side metadata.
+    fn clear_side_log_bits(&self);
+
+    /// Set the side log bits for allocated regions in this space.
+    /// This method is only called if the plan knows the log bits are side metadata.
+    fn set_side_log_bits(&self);
 }
 
 /// Print the VM map for a space.
@@ -485,6 +529,8 @@ pub struct CommonSpace<VM: VMBinding> {
     /// This field equals to needs_log_bit in the plan constraints.
     // TODO: This should be a constant for performance.
     pub needs_log_bit: bool,
+    pub unlog_allocated_object: bool,
+    pub unlog_traced_object: bool,
 
     /// A lock used during acquire() to make sure only one thread can allocate.
     pub acquire_lock: Mutex<()>,
@@ -492,6 +538,8 @@ pub struct CommonSpace<VM: VMBinding> {
     pub gc_trigger: Arc<GCTrigger<VM>>,
     pub global_state: Arc<GlobalState>,
     pub options: Arc<Options>,
+
+    pub allocate_as_live: AtomicBool,
 
     p: PhantomData<VM>,
 }
@@ -509,6 +557,8 @@ pub struct PlanCreateSpaceArgs<'a, VM: VMBinding> {
     pub name: &'static str,
     pub zeroed: bool,
     pub permission_exec: bool,
+    pub unlog_allocated_object: bool,
+    pub unlog_traced_object: bool,
     pub vmrequest: VMRequest,
     pub global_side_metadata_specs: Vec<SideMetadataSpec>,
     pub vm_map: &'static dyn VMMap,
@@ -555,6 +605,8 @@ impl<VM: VMBinding> CommonSpace<VM> {
             vm_map: args.plan_args.vm_map,
             mmapper: args.plan_args.mmapper,
             needs_log_bit: args.plan_args.constraints.needs_log_bit,
+            unlog_allocated_object: args.plan_args.unlog_allocated_object,
+            unlog_traced_object: args.plan_args.unlog_traced_object,
             gc_trigger: args.plan_args.gc_trigger,
             metadata: SideMetadataContext {
                 global: args.plan_args.global_side_metadata_specs,
@@ -563,6 +615,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             acquire_lock: Mutex::new(()),
             global_state: args.plan_args.global_state,
             options: args.plan_args.options.clone(),
+            allocate_as_live: AtomicBool::new(false),
             p: PhantomData,
         };
 
@@ -682,6 +735,22 @@ impl<VM: VMBinding> CommonSpace<VM> {
             } else {
                 MmapProtection::ReadWrite
             },
+        }
+    }
+
+    pub(crate) fn debug_print_object_global_info(&self, object: ObjectReference) {
+        #[cfg(feature = "vo_bit")]
+        println!(
+            "vo bit = {}",
+            crate::util::metadata::vo_bit::is_vo_bit_set(object)
+        );
+        if self.needs_log_bit {
+            use crate::vm::object_model::ObjectModel;
+            use std::sync::atomic::Ordering;
+            println!(
+                "log bit = {}",
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::Relaxed),
+            );
         }
     }
 }

@@ -355,12 +355,18 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
                 } else {
                     let start = self.discontiguous_start;
                     self.discontiguous_start = self.pr.vm_map().get_next_contiguous_region(start);
-                    // If the current cursor is within the current discontiguous region (i.e. chunk),
-                    // then return the size till the cursor
-                    let size = if self.pr.cursor().chunk_index() == start.chunk_index() {
-                        self.pr.cursor() - start
+
+                    let contiguous_region_size = self.pr.vm_map().get_contiguous_region_size(start);
+                    let cursor = self.pr.cursor();
+                    let size = if start < cursor && cursor < start + contiguous_region_size {
+                        // If the current cursor is within the current discontiguous region,
+                        // then return the size till the cursor.
+                        // This is sufficient for sweeping the memory and clearing side metadata.
+                        // Note that if cursor == start,
+                        // it means the cursor is at the end of the previous chunk.
+                        cursor - start
                     } else {
-                        self.pr.vm_map().get_contiguous_region_size(start)
+                        contiguous_region_size
                     };
                     Some((start, size))
                 }
