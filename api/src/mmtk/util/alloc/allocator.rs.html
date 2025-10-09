@@ -552,18 +552,7 @@
 <a href="#551" id="551">551</a>
 <a href="#552" id="552">552</a>
 <a href="#553" id="553">553</a>
-<a href="#554" id="554">554</a>
-<a href="#555" id="555">555</a>
-<a href="#556" id="556">556</a>
-<a href="#557" id="557">557</a>
-<a href="#558" id="558">558</a>
-<a href="#559" id="559">559</a>
-<a href="#560" id="560">560</a>
-<a href="#561" id="561">561</a>
-<a href="#562" id="562">562</a>
-<a href="#563" id="563">563</a>
-<a href="#564" id="564">564</a>
-<a href="#565" id="565">565</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
+<a href="#554" id="554">554</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="attr">#[cfg(feature = <span class="string">"analysis"</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::analysis::AnalysisManager;
@@ -691,22 +680,11 @@
 }
 
 <span class="doccomment">/// Fill the specified region with the alignment value.
-</span><span class="kw">pub fn </span>fill_alignment_gap&lt;VM: VMBinding&gt;(immut_start: Address, end: Address) {
-    <span class="kw">let </span><span class="kw-2">mut </span>start = immut_start;
-
-    <span class="kw">if </span>VM::MAX_ALIGNMENT - VM::MIN_ALIGNMENT == BYTES_IN_INT {
-        <span class="comment">// At most a single hole
-        </span><span class="kw">if </span>end - start != <span class="number">0 </span>{
-            <span class="kw">unsafe </span>{
-                start.store(VM::ALIGNMENT_VALUE);
-            }
-        }
-    } <span class="kw">else </span>{
-        <span class="kw">while </span>start &lt; end {
-            <span class="kw">unsafe </span>{
-                start.store(VM::ALIGNMENT_VALUE);
-            }
-            start += BYTES_IN_INT;
+</span><span class="kw">pub fn </span>fill_alignment_gap&lt;VM: VMBinding&gt;(start: Address, end: Address) {
+    <span class="kw">if </span>VM::ALIGNMENT_VALUE != <span class="number">0 </span>{
+        <span class="kw">let </span>start_ptr = start.to_mut_ptr::&lt;u8&gt;();
+        <span class="kw">unsafe </span>{
+            std::ptr::write_bytes(start_ptr, VM::ALIGNMENT_VALUE, end - start);
         }
     }
 }

@@ -145,8 +145,8 @@
     <span class="doccomment">/// The type of heap memory slice in this VM.
     </span><span class="kw">type </span>VMMemorySlice: slot::MemorySlice&lt;SlotType = <span class="self">Self</span>::VMSlot&gt;;
 
-    <span class="doccomment">/// A value to fill in alignment gaps. This value can be used for debugging.
-    </span><span class="kw">const </span>ALIGNMENT_VALUE: usize = <span class="number">0xdead_beef</span>;
+    <span class="doccomment">/// A value to fill in alignment gaps. This value can be used for debugging. Set this value to 0 to skip filling alignment gaps.
+    </span><span class="kw">const </span>ALIGNMENT_VALUE: u8 = <span class="number">0xab</span>;
     <span class="doccomment">/// Allowed minimal alignment in bytes.
     </span><span class="kw">const </span>MIN_ALIGNMENT: usize = <span class="number">1 </span>&lt;&lt; DEFAULT_LOG_MIN_ALIGNMENT;
     <span class="doccomment">/// Allowed maximum alignment in bytes.
