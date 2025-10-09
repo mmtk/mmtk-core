@@ -1,10 +1,12 @@
 //! This module contains code useful for tracing,
 //! i.e. visiting the reachable objects by traversing all or part of an object graph.
 
+use std::marker::PhantomData;
+
 use crate::scheduler::gc_work::{ProcessEdgesWork, SlotOf};
 use crate::scheduler::{GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
-use crate::util::ObjectReference;
-use crate::vm::SlotVisitor;
+use crate::util::{ObjectReference, VMThread, VMWorkerThread};
+use crate::vm::{Scanning, SlotVisitor, VMBinding};
 
 /// This trait represents an object queue to enqueue objects during tracing.
 pub trait ObjectQueue {
@@ -62,6 +64,16 @@ impl<T> VectorQueue<T> {
             self.buffer.reserve(Self::CAPACITY);
         }
         self.buffer.push(v);
+    }
+
+    /// Return the len of the queue
+    pub fn len(&self) -> usize {
+        self.buffer.len()
+    }
+
+    /// Empty the queue
+    pub fn clear(&mut self) {
+        self.buffer.clear()
     }
 }
 
@@ -132,5 +144,26 @@ impl<E: ProcessEdgesWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'_, E> {
 impl<E: ProcessEdgesWork> Drop for ObjectsClosure<'_, E> {
     fn drop(&mut self) {
         self.flush();
+    }
+}
+
+/// For iterating over the slots of an object.
+// FIXME: This type iterates slots, but all of its current use cases only care about the values in the slots.
+// And it currently only works if the object supports slot enqueuing (i.e. `Scanning::scan_object` is implemented).
+// We may refactor the interface according to <https://github.com/mmtk/mmtk-core/issues/1375>
+pub(crate) struct SlotIterator<VM: VMBinding> {
+    _p: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> SlotIterator<VM> {
+    /// Iterate over the slots of an object by applying a function to each slot.
+    pub fn iterate_fields<F: FnMut(VM::VMSlot)>(object: ObjectReference, _tls: VMThread, mut f: F) {
+        // FIXME: We should use tls from the arguments.
+        // See https://github.com/mmtk/mmtk-core/issues/1375
+        let fake_tls = VMWorkerThread(VMThread::UNINITIALIZED);
+        if !<VM::VMScanning as Scanning<VM>>::support_slot_enqueuing(fake_tls, object) {
+            panic!("SlotIterator::iterate_fields cannot be used on objects that don't support slot-enqueuing");
+        }
+        <VM::VMScanning as Scanning<VM>>::scan_object(fake_tls, object, &mut f);
     }
 }

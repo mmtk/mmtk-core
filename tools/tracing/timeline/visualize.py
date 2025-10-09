@@ -22,6 +22,11 @@ class Semantics(Enum):
     WEAK = 1
     PHANTOM = 2
 
+class Pause(Enum):
+    FULL = 1
+    INITIAL_MARK = 2
+    FINAL_MARK = 3
+
 def get_args():
     parser = argparse.ArgumentParser(
             description="""
@@ -156,6 +161,9 @@ class LogProcessor:
                     "stage": int(args[0]),
                 }
 
+            case "gcrequester_request":
+                result["tid"] = 1
+
             case _:
                 if self.enrich_event_extra is not None:
                     # Call ``enrich_event_extra`` in the extension script if defined.
@@ -196,6 +204,17 @@ class LogProcessor:
                 case "immix_defrag":
                     gc["args"] |= {
                         "immix_is_defrag_gc": bool(int(args[0])),
+                    }
+
+                case "concurrent_pause_determined":
+                    pause_int = int(args[0])
+                    try:
+                        pause = Pause(pause_int).name   # will raise ValueError if not valid
+                    except ValueError:
+                        pause = f"(Unknown:{pause_int})"
+
+                    gc["args"] |= {
+                        "pause": pause,
                     }
 
                 case _:
@@ -248,6 +267,21 @@ class LogProcessor:
                             "total_scanned": total_scanned,
                             "scan_for_slots": scan_for_slots,
                             "scan_and_trace": scan_and_trace,
+                        }
+                    }
+
+                case "concurrent_trace_objects":
+                    objects = int(args[0])
+                    next_objects = int(args[1])
+                    iterations = int(args[2])
+                    total_objects = objects + next_objects
+                    wp["args"] |= {
+                        # Put args in a group.  See comments in "process_slots".
+                        "scan_objects": {
+                            "objects": objects,
+                            "next_objects": next_objects,
+                            "total_objects": total_objects,
+                            "iterations": iterations,
                         }
                     }
 

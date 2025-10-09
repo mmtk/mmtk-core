@@ -131,6 +131,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Add the `ScheduleCollection` packet.  Called by the last parked worker.
     fn add_schedule_collection_packet(&self) {
         // We are still holding the mutex `WorkerMonitor::sync`.  Do not notify now.
+        probe!(mmtk, add_schedule_collection_packet);
         self.work_buckets[WorkBucketStage::Unconstrained].add_no_notify(ScheduleCollection);
     }
 
@@ -272,6 +273,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     ///
     /// Return true if there're any non-empty buckets updated.
     pub(crate) fn update_buckets(&self) -> bool {
+        debug!("update_buckets");
         let mut buckets_updated = false;
         let mut new_packets = false;
         for i in 0..WorkBucketStage::LENGTH {
@@ -457,11 +459,20 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     LastParkedResult::WakeAll
                 } else {
                     // GC finished.
-                    self.on_gc_finished(worker);
+                    let concurrent_work_scheduled = self.on_gc_finished(worker);
 
                     // Clear the current goal
                     goals.on_current_goal_completed();
-                    self.respond_to_requests(worker, goals)
+
+                    if concurrent_work_scheduled {
+                        // It was the initial mark pause and scheduled concurrent work.
+                        // Wake up all GC workers to do concurrent work.
+                        LastParkedResult::WakeAll
+                    } else {
+                        // It was an STW GC or the final mark pause of a concurrent GC.
+                        // Respond to another goal.
+                        self.respond_to_requests(worker, goals)
+                    }
                 }
             }
             WorkerGoal::StopForFork => {
@@ -534,7 +545,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Called when GC has finished, i.e. when all work packets have been executed.
-    fn on_gc_finished(&self, worker: &GCWorker<VM>) {
+    ///
+    /// Return `true` if any concurrent work packets have been scheduled.
+    fn on_gc_finished(&self, worker: &GCWorker<VM>) -> bool {
         // All GC workers must have parked by now.
         debug_assert!(!self.worker_group.has_designated_work());
         self.debug_assert_all_stw_buckets_empty();
@@ -590,6 +603,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             }
         }
 
+        mmtk.state
+            .set_used_pages_after_last_gc(mmtk.get_plan().get_used_pages());
+
         #[cfg(feature = "extreme_assertions")]
         if crate::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {
             // reset the logging info at the end of each GC
@@ -599,9 +615,14 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // Reset the triggering information.
         mmtk.state.reset_collection_trigger();
 
+        let concurrent_work_scheduled = self.schedule_concurrent_packets();
+        self.debug_assert_all_stw_buckets_closed();
+
         // Set to NotInGC after everything, and right before resuming mutators.
         mmtk.set_gc_status(GcStatus::NotInGC);
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
+
+        concurrent_work_scheduled
     }
 
     pub fn enable_stat(&self) {
@@ -633,5 +654,18 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // of work buckets to make the synchronization more robust,
         first_stw_bucket.open();
         self.worker_monitor.notify_work_available(true);
+    }
+
+    pub(super) fn schedule_concurrent_packets(&self) -> bool {
+        let concurrent_bucket = &self.work_buckets[WorkBucketStage::Concurrent];
+        if !concurrent_bucket.is_empty() {
+            concurrent_bucket.set_enabled(true);
+            concurrent_bucket.open();
+            true
+        } else {
+            concurrent_bucket.set_enabled(false);
+            concurrent_bucket.close();
+            false
+        }
     }
 }

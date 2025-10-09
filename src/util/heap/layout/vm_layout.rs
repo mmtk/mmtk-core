@@ -19,10 +19,6 @@ pub const BYTES_IN_CHUNK: usize = 1 << LOG_BYTES_IN_CHUNK;
 pub const CHUNK_MASK: usize = (1 << LOG_BYTES_IN_CHUNK) - 1;
 /// Coarsest unit of address space allocation, in pages
 pub const PAGES_IN_CHUNK: usize = 1 << (LOG_BYTES_IN_CHUNK - LOG_BYTES_IN_PAGE as usize);
-/// log_2 of the granularity at which we map and unmap virtual address space in the heap
-pub const LOG_MMAP_CHUNK_BYTES: usize = LOG_BYTES_IN_CHUNK;
-/// Granularity at which we map and unmap virtual address space in the heap
-pub const MMAP_CHUNK_BYTES: usize = 1 << LOG_MMAP_CHUNK_BYTES;
 
 /// Runtime-initialized virtual memory constants
 #[derive(Clone, Debug)]
@@ -118,6 +114,16 @@ impl VMLayout {
             assert!(self.log_space_extent <= (self.log_address_space - LOG_MAX_SPACES));
             assert!(self.heap_start.is_aligned_to(self.max_space_extent()));
         }
+    }
+
+    pub(crate) fn validate_address_space(&self) {
+        let log_mappable_bytes = crate::mmtk::MMAPPER.log_mappable_bytes();
+        assert!(
+            self.log_address_space <= log_mappable_bytes as usize,
+            "log_address_space is {log_address_space}, but \
+            the MMAPPER can only handle up to {log_mappable_bytes} bits",
+            log_address_space = self.log_address_space,
+        );
     }
 }
 

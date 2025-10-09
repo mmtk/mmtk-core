@@ -34,6 +34,7 @@ use crate::util::memory::{self, HugePageSupport, MmapProtection, MmapStrategy};
 use crate::vm::VMBinding;
 
 use std::marker::PhantomData;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -351,22 +352,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         }
     }
 
-    /// Ensure this space is marked as mapped -- used when the space is already
-    /// mapped (e.g. for a vm image which is externally mmapped.)
-    fn ensure_mapped(&self) {
-        self.common()
-            .metadata
-            .try_map_metadata_space(self.common().start, self.common().extent, self.get_name())
-            .unwrap_or_else(|e| {
-                // TODO(Javad): handle meta space allocation failure
-                panic!("failed to mmap meta memory: {e}");
-            });
-
-        self.common()
-            .mmapper
-            .mark_as_mapped(self.common().start, self.common().extent);
-    }
-
     /// Estimate the amount of side metadata memory needed for a give data memory size in pages. The
     /// result will over-estimate the amount of metadata pages needed, with at least one page per
     /// side metadata.  This relatively accurately describes the number of side metadata pages the
@@ -445,6 +430,18 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// the execution time.  For LOS, it will be cheaper to enumerate individual objects than
     /// scanning VO bits because it is sparse.
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator);
+
+    fn set_allocate_as_live(&self, live: bool) {
+        self.common()
+            .allocate_as_live
+            .store(live, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    fn should_allocate_as_live(&self) -> bool {
+        self.common()
+            .allocate_as_live
+            .load(std::sync::atomic::Ordering::Acquire)
+    }
 
     /// Clear the side log bits for allocated regions in this space.
     /// This method is only called if the plan knows the log bits are side metadata.
@@ -554,6 +551,8 @@ pub struct CommonSpace<VM: VMBinding> {
     pub global_state: Arc<GlobalState>,
     pub options: Arc<Options>,
 
+    pub allocate_as_live: AtomicBool,
+
     p: PhantomData<VM>,
 }
 
@@ -628,6 +627,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             acquire_lock: Mutex::new(()),
             global_state: args.plan_args.global_state,
             options: args.plan_args.options.clone(),
+            allocate_as_live: AtomicBool::new(false),
             p: PhantomData,
         };
 
