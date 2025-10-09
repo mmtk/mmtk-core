@@ -108,6 +108,19 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             "The requested pages is larger than the max heap size. Is will_go_oom_on_acquire used before acquring memory?"
         );
 
+        // Should we poll to attempt to GC?
+        // - If tls is collector, we cannot attempt a GC.
+        // - If gc is disabled, we cannot attempt a GC.
+        // - If overcommit is allowed, we don't attempt a GC.
+        let should_poll = VM::VMActivePlan::is_mutator(tls)
+            && VM::VMCollection::is_collection_enabled()
+            && !alloc_options.on_fail.allow_overcommit();
+        // Is a GC allowed here? If we should poll but are not allowed to poll, we will panic.
+        // initialize_collection() has to be called so we know GC is initialized.
+        let allow_gc = should_poll
+            && self.common().global_state.is_initialized()
+            && alloc_options.on_fail.allow_gc();
+
         trace!("Reserving pages");
         let pr = self.get_page_resource();
         let pages_reserved = pr.reserve_pages(pages);
@@ -117,22 +130,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // Whether we have triggered GC.  There are two places in this function that can trigger GC.
         let mut gc_triggered = false;
 
-        let is_mutator = VM::VMActivePlan::is_mutator(tls);
-        let is_collection_enabled = VM::VMCollection::is_collection_enabled();
-        let allow_overcommit = alloc_options.on_fail.allow_overcommit();
-
-        // In some cases, allocation failure cannot be tolerated.
-        // - Collector threads cannot fail when copying objects.
-        // - When GC is disabled, allocation failure will result in immediate panic.
-        let must_succeed = !is_mutator || !is_collection_enabled;
-
-        // Is this allocation site allowed to trigger a GC?
-        // - If allocation failure cannot be tolerated, we won't trigger GC.
-        // - The `OnAllocationFail::OverCommit` case does not allow triggering GC.
-        //   TODO: We can allow it to trigger GC AND over-commit at the same time.
-        let allow_triggering_gc = !must_succeed && !allow_overcommit;
-
-        if allow_triggering_gc {
+        if should_poll {
             gc_triggered = self.get_gc_trigger().poll(false, Some(self.as_space()));
             debug!("Polled.  GC triggered? {gc_triggered}");
         }
@@ -252,44 +250,35 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // Clear the request
         pr.clear_request(pages_reserved);
 
-        if must_succeed {
-            panic!("Failed to acquire pages.  is mutator? {is_mutator}, is collection enabled? {is_collection_enabled}");
+        // If we do not want GC on fail, just return zero.
+        if !alloc_options.on_fail.allow_gc() {
+            return Address::ZERO;
         }
 
-        if allow_triggering_gc {
+        // Otherwise do GC here
+        assert!(
+            allow_gc,
+            "{}",
             if attempted_allocation_and_failed {
-                // If we reached here because we attempted allocation and failed,
-                // then we poll again with space_full=true.
-                // This time it must trigger GC.
-                gc_triggered = self.get_gc_trigger().poll(true, Some(self.as_space()));
-                debug_assert!(gc_triggered, "GC not performed when forced.");
+                // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
+                "Physical allocation failed when GC is not allowed!"
+            } else {
+                "GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."
             }
+        );
 
-            // Are we allowed to block for GC?
-            // - If the MMTk instance is not initialized, there is no GC worker threads, and we can't block for GC.
-            // - If the on_fail option does not allow blocking for GC, we don't block.
-            // TODO: on_fail.allow_gc() really means whether it allows blocking for GC instead of whether we allow GC to happen.
-            let allow_blocking_for_gc = allow_triggering_gc
-                && self.common().global_state.is_initialized()
-                && alloc_options.on_fail.allow_gc();
-
-            if allow_blocking_for_gc {
-                assert!(
-                    gc_triggered,
-                    "Attempt to block for GC when GC is not triggered."
-                );
-
-                // Inform GC trigger about the pending allocation.
-                // Make sure we include side metadata.
-                let meta_pages_reserved = self.estimate_side_meta_pages(pages_reserved);
-                let total_pages_reserved = pages_reserved + meta_pages_reserved;
-                self.get_gc_trigger()
-                    .policy
-                    .on_pending_allocation(total_pages_reserved);
-
-                VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
-            }
+        if attempted_allocation_and_failed {
+            let gc_performed = self.get_gc_trigger().poll(true, Some(self.as_space()));
+            debug_assert!(gc_performed, "GC not performed when forced.");
         }
+        // Inform GC trigger about the pending allocation.
+        let meta_pages_reserved = self.estimate_side_meta_pages(pages_reserved);
+        let total_pages_reserved = pages_reserved + meta_pages_reserved;
+        self.get_gc_trigger()
+            .policy
+            .on_pending_allocation(total_pages_reserved);
+
+        VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
 
         // Return zero -- the caller will handle re-attempting allocation
         Address::ZERO
