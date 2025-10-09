@@ -126,22 +126,11 @@ pub fn align_allocation_inner<VM: VMBinding>(
 }
 
 /// Fill the specified region with the alignment value.
-pub fn fill_alignment_gap<VM: VMBinding>(immut_start: Address, end: Address) {
-    let mut start = immut_start;
-
-    if VM::MAX_ALIGNMENT - VM::MIN_ALIGNMENT == BYTES_IN_INT {
-        // At most a single hole
-        if end - start != 0 {
-            unsafe {
-                start.store(VM::ALIGNMENT_VALUE);
-            }
-        }
-    } else {
-        while start < end {
-            unsafe {
-                start.store(VM::ALIGNMENT_VALUE);
-            }
-            start += BYTES_IN_INT;
+pub fn fill_alignment_gap<VM: VMBinding>(start: Address, end: Address) {
+    if VM::ALIGNMENT_VALUE != 0 {
+        let start_ptr = start.to_mut_ptr::<u8>();
+        unsafe {
+            std::ptr::write_bytes(start_ptr, VM::ALIGNMENT_VALUE, end - start);
         }
     }
 }

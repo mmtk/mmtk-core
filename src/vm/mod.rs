@@ -63,8 +63,8 @@ where
     /// The type of heap memory slice in this VM.
     type VMMemorySlice: slot::MemorySlice<SlotType = Self::VMSlot>;
 
-    /// A value to fill in alignment gaps. This value can be used for debugging.
-    const ALIGNMENT_VALUE: usize = 0xdead_beef;
+    /// A value to fill in alignment gaps. This value can be used for debugging. Set this value to 0 to skip filling alignment gaps.
+    const ALIGNMENT_VALUE: u8 = 0xab;
     /// Allowed minimal alignment in bytes.
     const MIN_ALIGNMENT: usize = 1 << DEFAULT_LOG_MIN_ALIGNMENT;
     /// Allowed maximum alignment in bytes.
