@@ -268,8 +268,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         );
 
         if attempted_allocation_and_failed {
-            let gc_performed = self.get_gc_trigger().poll(true, Some(self.as_space()));
-            debug_assert!(gc_performed, "GC not performed when forced.");
+            let gc_triggered = self.get_gc_trigger().poll(true, Some(self.as_space()));
+            debug!("Polled.  GC triggered? {gc_triggered}");
+            debug_assert!(gc_triggered, "GC not triggered when forced.");
         }
         // Inform GC trigger about the pending allocation.
         let meta_pages_reserved = self.estimate_side_meta_pages(pages_reserved);
