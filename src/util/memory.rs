@@ -353,6 +353,21 @@ pub fn handle_mmap_error<VM: VMBinding>(
 /// This function is currently left empty for non-linux, and should be implemented in the future.
 /// As the function is only used for assertions, MMTk will still run even if we never panic.
 pub(crate) fn panic_if_unmapped(_start: Address, _size: usize, _anno: &MmapAnnotation) {
+    #[cfg(feature = "crabgrind")]
+    {
+        use crabgrind::memcheck::Error;
+        let result = crabgrind::memcheck::is_defined(_start.to_mut_ptr(), _size);
+        match result {
+            Ok(_) => panic!("{} of size {} is not mapped", _start, _size),
+            Err(err) => match err {
+                Error::NotAddressable(addr) => {
+                    panic!("Address {addr:x} is not addressable, start={_start}");
+                }
+
+                _ => (),
+            },
+        }
+    }
     #[cfg(target_os = "linux")]
     {
         let flags = MMAP_FLAGS;

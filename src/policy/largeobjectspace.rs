@@ -12,6 +12,7 @@ use crate::util::metadata;
 use crate::util::object_enum::ClosureObjectEnumerator;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
+use crate::util::track::track_free;
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
@@ -352,10 +353,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         let sweep = |object: ObjectReference| {
             #[cfg(feature = "vo_bit")]
             crate::util::metadata::vo_bit::unset_vo_bit(object);
-            // Clear log bits for dead objects to prevent a new nursery object having the unlog bit set
-            if self.clear_log_bit_on_sweep {
-                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
-            }
+            track_free(object.to_object_start::<VM>(), 0 /* TODO: Size */);            
             self.pr
                 .release_pages(get_super_page(object.to_object_start::<VM>()));
         };

@@ -6,6 +6,7 @@ use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
 use crate::util::object_enum::ObjectEnumerator;
+use crate::util::track::track_mempool_alloc;
 use crate::util::Address;
 use crate::util::ObjectReference;
 
@@ -247,7 +248,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                             self.common().descriptor
                         );
                     }
-
                     debug!("Space.acquire(), returned = {}", res.start);
                     res.start
                 }

@@ -2,7 +2,8 @@ use super::layout::vm_layout::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
 use crate::policy::space::required_chunks;
 use crate::util::address::Address;
 use crate::util::constants::BYTES_IN_PAGE;
-use crate::util::conversions::*;
+use crate::util::conversions::{self, *};
+use crate::util::track::{track_mempool, track_mempool_alloc};
 use std::ops::Range;
 use std::sync::{Mutex, MutexGuard};
 
@@ -45,6 +46,10 @@ pub enum MonotonePageResourceConditional {
     Discontiguous,
 }
 impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
+    fn track(&self) {
+        track_mempool(self, 0, true);
+    }
+
     fn common(&self) -> &CommonPageResource {
         &self.common
     }
@@ -149,7 +154,7 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
                 sync.current_chunk = chunk_align_down(sync.cursor);
             }
             self.commit_pages(reserved_pages, required_pages, tls);
-
+            track_mempool_alloc(self, rtn, conversions::pages_to_bytes(required_pages));
             Result::Ok(PRAllocResult {
                 start: rtn,
                 pages: required_pages,

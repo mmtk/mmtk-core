@@ -10,6 +10,9 @@ use crate::util::heap::PageAccounting;
 use crate::vm::VMBinding;
 
 pub trait PageResource<VM: VMBinding>: 'static {
+    /// Track this page resource for memory tools like Valgrind.
+    fn track(&self);
+
     /// Allocate pages from this resource.
     /// Simply bump the cursor, and fail if we hit the sentinel.
     /// Return The start of the first page if successful, zero on failure.

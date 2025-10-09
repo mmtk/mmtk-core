@@ -6,6 +6,7 @@ use crate::policy::marksweepspace::native_ms::*;
 use crate::util::alloc::allocator;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
+use crate::util::track::track_malloc;
 use crate::util::Address;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
@@ -76,6 +77,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
                         size, align, offset, cell, cell_size, res + size, cell + cell_size
                     );
                 }
+
                 return res;
             }
         }
@@ -178,6 +180,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 cursor += crate::util::constants::BYTES_IN_ADDRESS;
             }
         }
+
+        track_malloc(cell, cell_size, true);
 
         cell
     }

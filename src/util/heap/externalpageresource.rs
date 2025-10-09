@@ -28,6 +28,10 @@ pub struct ExternalPages {
 }
 
 impl<VM: VMBinding> PageResource<VM> for ExternalPageResource<VM> {
+    fn track(&self) {
+        /* cannot track external pages reliably? */
+    }
+
     fn common(&self) -> &CommonPageResource {
         &self.common
     }

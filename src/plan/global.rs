@@ -115,6 +115,8 @@ pub fn create_plan<VM: VMBinding>(
     plan.for_each_space(&mut |s| {
         sft_map.notify_space_creation(s.as_sft());
         s.initialize_sft(sft_map);
+        // after SFT is initialized, we can also initialize mempool tracking
+        s.get_page_resource().track();
     });
 
     plan

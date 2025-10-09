@@ -29,6 +29,7 @@ use crate::{
     util::{
         linear_scan::Region,
         metadata::{vo_bit, MetadataSpec},
+        track::{track_free, tracking_enabled},
         ObjectReference,
     },
     vm::{ObjectModel, VMBinding},
@@ -184,6 +185,18 @@ pub(crate) fn on_object_forwarded<VM: VMBinding>(new_object: ObjectReference) {
 }
 
 pub(crate) fn on_region_swept<VM: VMBinding, R: Region>(region: &R, is_occupied: bool) {
+    if tracking_enabled() {
+        let mut cursor = region.start();
+        while cursor < region.end() {
+            if let Some(object) = vo_bit::is_vo_bit_set_for_addr(cursor) {
+                if object.is_live() {
+                    track_free(object.to_object_start::<VM>(), 0);
+                }
+            }
+            cursor += VM::MIN_ALIGNMENT;
+        }
+    }
+
     match strategy::<VM>() {
         VOBitUpdateStrategy::ClearAndReconstruct => {
             // Do nothing.  The VO bit metadata is already reconstructed.
