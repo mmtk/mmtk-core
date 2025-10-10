@@ -129,7 +129,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // Clear the request
             pr.clear_request(pages_reserved);
 
-            // If we do not want GC on fail, just return zero.
+            // If we do not want GC on fail, just return.
             if !alloc_options.on_fail.allow_gc() {
                 return;
             }
@@ -160,7 +160,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 .on_pending_allocation(total_pages_reserved);
 
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
-                                                                  // Return zero -- the caller will handle re-attempting allocation
         };
 
         // The actual decision tree.
