@@ -1,6 +1,6 @@
 use super::mock_test_prelude::*;
 
-use crate::util::alloc::allocator::{AllocationOptions, OnAllocationFail};
+use crate::util::alloc::allocator::{AllocationOptions};
 use crate::AllocationSemantics;
 
 /// This test will allocate an object that is larger than the heap size. The call will fail.
@@ -21,7 +21,8 @@ pub fn allocate_no_gc_oom_on_acquire() {
                 0,
                 AllocationSemantics::Default,
                 AllocationOptions {
-                    on_fail: OnAllocationFail::ReturnFailure,
+                    at_safepoint: false,
+                    ..Default::default()
                 },
             );
             // We should get zero.

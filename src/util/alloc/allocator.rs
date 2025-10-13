@@ -28,44 +28,74 @@ pub enum AllocationError {
     MmapOutOfMemory,
 }
 
-/// Behavior when an allocation fails, and a GC is expected.
-#[repr(u8)]
-#[derive(Copy, Clone, Default, PartialEq, bytemuck::NoUninit, Debug)]
-pub enum OnAllocationFail {
-    /// Request the GC. This is the default behavior.
-    #[default]
-    RequestGC,
-    /// Instead of requesting GC, the allocation request returns with a failure value.
-    ReturnFailure,
-    /// Instead of requesting GC, the allocation request simply overcommits the memory,
-    /// and return a valid result at its best efforts.
-    OverCommit,
-}
-
-impl OnAllocationFail {
-    pub(crate) fn allow_oom_call(&self) -> bool {
-        *self == Self::RequestGC
-    }
-    pub(crate) fn allow_gc(&self) -> bool {
-        *self == Self::RequestGC
-    }
-    pub(crate) fn allow_overcommit(&self) -> bool {
-        *self == Self::OverCommit
-    }
-}
-
 /// Allow specifying different behaviors with [`Allocator::alloc_with_options`].
 #[repr(C)]
-#[derive(Copy, Clone, Default, PartialEq, bytemuck::NoUninit, Debug)]
+#[derive(Copy, Clone, PartialEq, bytemuck::NoUninit, Debug)]
 pub struct AllocationOptions {
-    /// When the allocation fails and a GC is originally expected, on_fail
-    /// allows a different behavior to avoid the GC.
-    pub on_fail: OnAllocationFail,
+    /// Should we poll *before* trying to acquire more pages from the page resource?
+    ///
+    /// **The default is `true`**.
+    ///
+    /// If `true`, the allocation will let the GC trigger poll before acquiring pages from the page
+    /// resource, giving the GC trigger a chance to schedule a collection.
+    ///
+    /// If `false`, the allocation will not notify the GC trigger *before* acquiring pages from the
+    /// page resource.  Note that if the allocation is at a safepoint (i.e. [`Self::at_safepoint`]
+    /// is true), it will still poll and force a GC *after* failing to get pages from the page
+    /// resource due to physical memory exhaustion.
+    pub eager_polling: bool,
+
+    /// Whether over-committing is allowed at this allocation site.
+    ///
+    /// **The default is `false`**.
+    ///
+    /// This option is only meaningful if [`Self::eager_polling`] is true.  It has no effect if
+    /// `eager_polling == false`.
+    ///
+    /// If `true`, the allocation will still try to acquire pages from page resources even
+    /// if the eager polling triggers a GC.
+    ///
+    /// If `false` the allocation will not try to get pages from page resource as long as GC
+    /// is triggered.
+    pub allow_overcommit: bool,
+
+    /// Whether the allocation is at a safepoint.
+    ///
+    /// **The default is `true`**.
+    ///
+    /// If `true`, the allocation attempt will block for GC if GC is triggered.  It will also force
+    /// triggering GC and block after failing to get pages from the page resource due to physical
+    /// memory exhaustion.  It will also call [`Collection::out_of_memory`] when out of memory.
+    ///
+    /// If `false`, the allocation attempt will immediately return a null address if the allocation
+    /// cannot be satisfied without a GC.  It will never block for GC, never force a GC, and never
+    /// call [`Collection::out_of_memory`].  Note that the VM can always force a GC by calling
+    /// [`crate::MMTK::handle_user_collection_request`] with the argument `force` being `true`.
+    pub at_safepoint: bool,
+}
+
+/// The default value for `AllocationOptions` has the same semantics as calling [`Allocator::alloc`]
+/// directly.
+impl Default for AllocationOptions {
+    fn default() -> Self {
+        Self {
+            eager_polling: true,
+            allow_overcommit: false,
+            at_safepoint: true,
+        }
+    }
 }
 
 impl AllocationOptions {
     pub(crate) fn is_default(&self) -> bool {
         *self == AllocationOptions::default()
+    }
+
+    /// Whether this allocation allows calling [`Collection::out_of_memory`].
+    ///
+    /// It is allowed if and only if the allocation is at safepoint.
+    pub(crate) fn allow_oom_call(&self) -> bool {
+        self.at_safepoint
     }
 }
 
@@ -367,9 +397,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 return result;
             }
 
-            if result.is_zero()
-                && self.get_context().get_alloc_options().on_fail == OnAllocationFail::ReturnFailure
-            {
+            if result.is_zero() && !self.get_context().get_alloc_options().allow_oom_call() {
                 return result;
             }
 
