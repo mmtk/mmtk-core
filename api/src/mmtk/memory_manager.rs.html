@@ -980,7 +980,9 @@
 <a href="#979" id="979">979</a>
 <a href="#980" id="980">980</a>
 <a href="#981" id="981">981</a>
-<a href="#982" id="982">982</a></pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
+<a href="#982" id="982">982</a>
+<a href="#983" id="983">983</a>
+<a href="#984" id="984">984</a></pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
 //! We expect the VM binding to inherit and extend this API by:
@@ -1527,7 +1529,9 @@
 
     <span class="kw">if </span>VM::VMCollection::is_collection_enabled() &amp;&amp; mmtk.gc_trigger.poll(<span class="bool-val">false</span>, <span class="prelude-val">None</span>) {
         <span class="macro">debug!</span>(<span class="string">"Collection required"</span>);
-        <span class="macro">assert!</span>(mmtk.state.is_initialized(), <span class="string">"GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."</span>);
+        <span class="kw">if </span>!mmtk.state.is_initialized() {
+            <span class="macro">panic!</span>(<span class="string">"GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."</span>);
+        }
         VM::VMCollection::block_for_gc(tls);
     }
 }
