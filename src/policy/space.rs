@@ -131,7 +131,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         } else {
             debug!("Collection not required");
 
-            if let Some(addr) = self.get_new_pages_and_initialize(pr, pages_reserved, pages, tls) {
+            if let Some(addr) = self.get_new_pages_and_initialize(tls, pages, pr, pages_reserved) {
                 addr
             } else {
                 self.not_acquiring(tls, alloc_options, pr, pages_reserved, true);
@@ -150,10 +150,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// `pr.clear_request`.
     fn get_new_pages_and_initialize(
         &self,
+        tls: VMThread,
+        pages: usize,
         pr: &dyn PageResource<VM>,
         pages_reserved: usize,
-        pages: usize,
-        tls: VMThread,
     ) -> Option<Address> {
         // We need this lock: Othrewise, it is possible that one thread acquires pages in a new chunk, but not yet
         // set SFT for it (in grow_space()), and another thread acquires pages in the same chunk, which is not
