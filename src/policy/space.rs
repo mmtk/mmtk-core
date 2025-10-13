@@ -124,47 +124,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         trace!("Pages reserved");
         trace!("Polling ..");
 
-        // Handle the case that GC is required.
-        let on_gc_required = |attempted_allocation_and_failed: bool| {
-            // Clear the request
-            pr.clear_request(pages_reserved);
-
-            // If we do not want GC on fail, just return.
-            if !alloc_options.on_fail.allow_gc() {
-                return;
-            }
-
-            debug!("Collection required");
-
-            if !self.common().global_state.is_initialized() {
-                // Otherwise do GC here
-                panic!(
-                    "GC is not allowed here: collection is not initialized \
-                        (did you call initialize_collection()?).  \
-                        Out of physical memory: {phy}",
-                    phy = attempted_allocation_and_failed
-                );
-            }
-
-            if attempted_allocation_and_failed {
-                // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
-                let gc_performed = self.get_gc_trigger().poll(true, Some(self.as_space()));
-                debug_assert!(gc_performed, "GC not performed when forced.");
-            }
-
-            // Inform GC trigger about the pending allocation.
-            let meta_pages_reserved = self.estimate_side_meta_pages(pages_reserved);
-            let total_pages_reserved = pages_reserved + meta_pages_reserved;
-            self.get_gc_trigger()
-                .policy
-                .on_pending_allocation(total_pages_reserved);
-
-            VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
-        };
-
         // The actual decision tree.
         if should_poll && self.get_gc_trigger().poll(false, Some(self.as_space())) {
-            on_gc_required(false);
+            self.not_acquiring(tls, alloc_options, pr, pages_reserved, false);
             Address::ZERO
         } else {
             debug!("Collection not required");
@@ -172,7 +134,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             if let Some(addr) = self.get_new_pages_and_initialize(pr, pages_reserved, pages, tls) {
                 addr
             } else {
-                on_gc_required(true);
+                self.not_acquiring(tls, alloc_options, pr, pages_reserved, true);
                 Address::ZERO
             }
         }
@@ -291,6 +253,55 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
         debug!("Space.acquire(), returned = {}", res.start);
         Some(res.start)
+    }
+
+    /// Handle the case where [`Space::acquire`] will not or can not acquire pages from the page
+    /// resource.  This may happen when
+    /// -   GC is triggered and the allocation does not allow over-committing, or
+    /// -   the allocation tried to acquire pages from the page resource but ran out of physical
+    ///     memory.
+    fn not_acquiring(
+        &self,
+        tls: VMThread,
+        alloc_options: AllocationOptions,
+        pr: &dyn PageResource<VM>,
+        pages_reserved: usize,
+        attempted_allocation_and_failed: bool,
+    ) {
+        // Clear the request
+        pr.clear_request(pages_reserved);
+
+        // If we do not want GC on fail, just return.
+        if !alloc_options.on_fail.allow_gc() {
+            return;
+        }
+
+        debug!("Collection required");
+
+        if !self.common().global_state.is_initialized() {
+            // Otherwise do GC here
+            panic!(
+                "GC is not allowed here: collection is not initialized \
+                    (did you call initialize_collection()?).  \
+                    Out of physical memory: {phy}",
+                phy = attempted_allocation_and_failed
+            );
+        }
+
+        if attempted_allocation_and_failed {
+            // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
+            let gc_performed = self.get_gc_trigger().poll(true, Some(self.as_space()));
+            debug_assert!(gc_performed, "GC not performed when forced.");
+        }
+
+        // Inform GC trigger about the pending allocation.
+        let meta_pages_reserved = self.estimate_side_meta_pages(pages_reserved);
+        let total_pages_reserved = pages_reserved + meta_pages_reserved;
+        self.get_gc_trigger()
+            .policy
+            .on_pending_allocation(total_pages_reserved);
+
+        VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
     }
 
     fn address_in_space(&self, start: Address) -> bool {
