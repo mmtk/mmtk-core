@@ -1,4 +1,4 @@
-// GITHUB-CI: MMTK_PLAN=NoGC
+// GITHUB-CI: MMTK_PLAN=all
 
 use super::mock_test_prelude::*;
 
