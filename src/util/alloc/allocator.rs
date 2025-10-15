@@ -32,44 +32,37 @@ pub enum AllocationError {
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct AllocationOptions {
-    /// Should we poll *before* trying to acquire more pages from the page resource?
-    ///
-    /// **The default is `true`**.
-    ///
-    /// If `true`, the allocation will let the GC trigger poll before acquiring pages from the page
-    /// resource, giving the GC trigger a chance to schedule a collection.
-    ///
-    /// If `false`, the allocation will not notify the GC trigger *before* acquiring pages from the
-    /// page resource.  Note that if the allocation is at a safepoint (i.e. [`Self::at_safepoint`]
-    /// is true), it will still poll and force a GC *after* failing to get pages from the page
-    /// resource due to physical memory exhaustion.
-    pub eager_polling: bool,
-
     /// Whether over-committing is allowed at this allocation site.
     ///
     /// **The default is `false`**.
     ///
-    /// This option is only meaningful if [`Self::eager_polling`] is true.  It has no effect if
-    /// `eager_polling == false`.
+    /// If `true`, the allocation will still try to acquire pages from page resources even when a GC
+    /// is triggered by the polling.
     ///
-    /// If `true`, the allocation will still try to acquire pages from page resources even
-    /// if the eager polling triggers a GC.
+    /// If `false` the allocation will not try to get pages from page resource as long as GC is
+    /// triggered.
     ///
-    /// If `false` the allocation will not try to get pages from page resource as long as GC
-    /// is triggered.
+    /// Note that MMTk lets the GC trigger poll before trying to acquire pages from the page
+    /// resource.  This gives the GC trigger a chance to trigger GC if needed.  `allow_overcommit`
+    /// does not disable polling, but only controls whether to try acquiring pages when GC is
+    /// triggered.
     pub allow_overcommit: bool,
 
     /// Whether the allocation is at a safepoint.
     ///
     /// **The default is `true`**.
     ///
-    /// If `true`, the allocation attempt will block for GC if GC is triggered.  It will also force
-    /// triggering GC and block after failing to get pages from the page resource due to physical
-    /// memory exhaustion.  It will also call [`Collection::out_of_memory`] when out of memory.
+    /// If `true`, the allocation is allowed to block for GC, and call [`Collection::out_of_memory`]
+    /// when out of memory.  Specifically, it may block for GC if any of the following happens:
     ///
-    /// If `false`, the allocation attempt will immediately return a null address if the allocation
-    /// cannot be satisfied without a GC.  It will never block for GC, never force a GC, and never
-    /// call [`Collection::out_of_memory`].  Note that the VM can always force a GC by calling
+    /// -   The GC trigger polled and triggered a GC before the allocation tries to get more pages
+    ///     from the page resource, and the allocation does not allow over-committing.
+    /// -   The allocation tried to get more pages from the page resource, but failed.  In this
+    ///     case, it will force a GC.
+    ///
+    /// If `false`, the allocation will immediately return a null address if the allocation cannot
+    /// be satisfied without a GC.  It will never block for GC, never force a GC, and never call
+    /// [`Collection::out_of_memory`].  Note that the VM can always force a GC by calling
     /// [`crate::MMTK::handle_user_collection_request`] with the argument `force` being `true`.
     pub at_safepoint: bool,
 }
@@ -79,7 +72,6 @@ pub struct AllocationOptions {
 impl Default for AllocationOptions {
     fn default() -> Self {
         Self {
-            eager_polling: true,
             allow_overcommit: false,
             at_safepoint: true,
         }
