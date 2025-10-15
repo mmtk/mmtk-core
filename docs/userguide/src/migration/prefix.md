@@ -32,6 +32,38 @@ Notes for the mmtk-core developers:
 
 ## 0.32.0
 
+### Allocation options changed
+
+```admonish tldr
+`AllocationOptions` now has multiple boolean fields instead of one `OnAllocationFail` field.  Now
+polling cannot be disabled.  Instead we can now poll and over-commit in one allocation.
+```
+
+API changes:
+
+-   module `util::alloc::allocator`
+    +   `OnAllocationFail`: Removed.
+    +   `AllocationOptions`: It now has two boolean fields:
+        *   `allow_overcommit`
+        *   `at_safepoint`
+
+Variants of the old `enum OnAllocationFail` should be migrated to the new API according to the
+following table:
+
+| variant         | `allow_overcommit` | `at_safepoint` |
+|-----------------|--------------------|----------------|
+| `RequestGC`     | `false`            | `true`         |
+| `ReturnFailure` | `false`            | `false`        |
+| `OverCommit`    | `true`             | `false`        |
+
+Note that MMTk now always polls before trying to get more pages from the page resource, and it may
+trigger GC.  The old `OnAllocationFail::OverCommit` used to prevent polling, but it is no longer
+possible.
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/pull/1400>
+
 ### Removed the notion of "mmap chunk"
 
 ```admonish tldr
