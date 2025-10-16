@@ -46,18 +46,10 @@ pub struct AllocationOptions {
     ///
     /// **The default is `true`**.
     ///
-    /// If `true`, the allocation is allowed to block for GC, and call [`Collection::out_of_memory`]
-    /// when out of memory.  Specifically, it may block for GC if any of the following happens:
-    ///
-    /// -   The GC trigger polled and triggered a GC before the allocation tries to get more pages
-    ///     from the page resource, and the allocation does not allow over-committing.
-    /// -   The allocation tried to get more pages from the page resource, but failed.  In this
-    ///     case, it will force a GC.
+    /// If `true`, the allocation is allowed to block for GC.
     ///
     /// If `false`, the allocation will immediately return a null address if the allocation cannot
-    /// be satisfied without a GC.  It will never block for GC, never force a GC, and never call
-    /// [`Collection::out_of_memory`].  Note that the VM can always force a GC by calling
-    /// [`crate::MMTK::handle_user_collection_request`] with the argument `force` being `true`.
+    /// be satisfied without a GC.
     pub at_safepoint: bool,
 }
 
