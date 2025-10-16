@@ -46,15 +46,16 @@ API changes:
     +   `AllocationOptions`: It now has two boolean fields:
         *   `allow_overcommit`
         *   `at_safepoint`
+        *   `allow_oom_call`
 
 Variants of the old `enum OnAllocationFail` should be migrated to the new API according to the
 following table:
 
-| variant         | `allow_overcommit` | `at_safepoint` |
-|-----------------|--------------------|----------------|
-| `RequestGC`     | `false`            | `true`         |
-| `ReturnFailure` | `false`            | `false`        |
-| `OverCommit`    | `true`             | `false`        |
+| variant         | `allow_overcommit` | `at_safepoint` | `allow_oom_call` |
+|-----------------|--------------------|----------------|------------------|
+| `RequestGC`     | `false`            | `true`         | `true`           |
+| `ReturnFailure` | `false`            | `false`        | `false`          |
+| `OverCommit`    | `true`             | `false`        | `false`          |
 
 Note that MMTk now always polls before trying to get more pages from the page resource, and it may
 trigger GC.  The old `OnAllocationFail::OverCommit` used to prevent polling, but it is no longer
