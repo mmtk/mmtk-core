@@ -424,10 +424,6 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 return result;
             }
 
-            if result.is_zero() && !self.get_context().get_alloc_options().allow_oom_call() {
-                return result;
-            }
-
             if !result.is_zero() {
                 // Report allocation success to assist OutOfMemory handling.
                 if !self
@@ -480,6 +476,17 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 }
 
                 return result;
+            }
+
+            // From here on, we handle the case that alloc_once failed.
+            assert!(result.is_zero());
+
+            if !self.get_context().get_alloc_options().at_safepoint {
+                // If the allocation is not at safepoint, it will not be able to block for GC.  But
+                // the code beyond this point tests OOM conditions and, if not OOM, try to allocate
+                // again.  Since we didn't block for GC, the allocation will fail again if we try
+                // again. So we return null immediately.
+                return Address::ZERO;
             }
 
             // It is possible to have cases where a thread is blocked for another GC (non emergency)
