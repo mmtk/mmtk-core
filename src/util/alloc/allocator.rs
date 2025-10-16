@@ -51,6 +51,16 @@ pub struct AllocationOptions {
     /// If `false`, the allocation will immediately return a null address if the allocation cannot
     /// be satisfied without a GC.
     pub at_safepoint: bool,
+
+    /// Whether the allocation is allowed to call [`Collection::out_of_memory`].
+    ///
+    /// **The default is `true`**.
+    ///
+    /// If `true`, the allocation will call [`Collection::out_of_memory`] when out of memory and
+    /// return null.
+    ///
+    /// If `fasle`, the allocation will return null immediately when out of memory.
+    pub allow_oom_call: bool,
 }
 
 /// The default value for `AllocationOptions` has the same semantics as calling [`Allocator::alloc`]
@@ -60,6 +70,7 @@ impl Default for AllocationOptions {
         Self {
             allow_overcommit: false,
             at_safepoint: true,
+            allow_oom_call: true,
         }
     }
 }
@@ -67,13 +78,6 @@ impl Default for AllocationOptions {
 impl AllocationOptions {
     pub(crate) fn is_default(&self) -> bool {
         *self == AllocationOptions::default()
-    }
-
-    /// Whether this allocation allows calling [`Collection::out_of_memory`].
-    ///
-    /// It is allowed if and only if the allocation is at safepoint.
-    pub(crate) fn allow_oom_call(&self) -> bool {
-        self.at_safepoint
     }
 }
 

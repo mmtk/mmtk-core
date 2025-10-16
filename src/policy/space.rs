@@ -85,7 +85,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         alloc_options: AllocationOptions,
     ) -> bool {
         if self.will_oom_on_acquire(size) {
-            if alloc_options.allow_oom_call() {
+            if alloc_options.allow_oom_call {
                 VM::VMCollection::out_of_memory(
                     tls,
                     crate::util::alloc::AllocationError::HeapOutOfMemory,
