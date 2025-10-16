@@ -32,20 +32,14 @@ pub enum AllocationError {
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct AllocationOptions {
-    /// Whether over-committing is allowed at this allocation site.
+    /// Whether over-committing is allowed at this allocation site.  Over-committing means the
+    /// allocation is allowed to go beyond the current heap size.  But it is not guaranteed to
+    /// succeed.
     ///
     /// **The default is `false`**.
     ///
-    /// If `true`, the allocation will still try to acquire pages from page resources even when a GC
-    /// is triggered by the polling.
-    ///
-    /// If `false` the allocation will not try to get pages from page resource as long as GC is
-    /// triggered.
-    ///
-    /// Note that MMTk lets the GC trigger poll before trying to acquire pages from the page
-    /// resource.  This gives the GC trigger a chance to trigger GC if needed.  `allow_overcommit`
-    /// does not disable polling, but only controls whether to try acquiring pages when GC is
-    /// triggered.
+    /// Note that regardless of the value of `allow_overcommit`, the allocation may trigger GC if
+    /// the GC trigger considers it needed.
     pub allow_overcommit: bool,
 
     /// Whether the allocation is at a safepoint.
