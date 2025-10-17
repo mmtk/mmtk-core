@@ -552,7 +552,73 @@
 <a href="#551" id="551">551</a>
 <a href="#552" id="552">552</a>
 <a href="#553" id="553">553</a>
-<a href="#554" id="554">554</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
+<a href="#554" id="554">554</a>
+<a href="#555" id="555">555</a>
+<a href="#556" id="556">556</a>
+<a href="#557" id="557">557</a>
+<a href="#558" id="558">558</a>
+<a href="#559" id="559">559</a>
+<a href="#560" id="560">560</a>
+<a href="#561" id="561">561</a>
+<a href="#562" id="562">562</a>
+<a href="#563" id="563">563</a>
+<a href="#564" id="564">564</a>
+<a href="#565" id="565">565</a>
+<a href="#566" id="566">566</a>
+<a href="#567" id="567">567</a>
+<a href="#568" id="568">568</a>
+<a href="#569" id="569">569</a>
+<a href="#570" id="570">570</a>
+<a href="#571" id="571">571</a>
+<a href="#572" id="572">572</a>
+<a href="#573" id="573">573</a>
+<a href="#574" id="574">574</a>
+<a href="#575" id="575">575</a>
+<a href="#576" id="576">576</a>
+<a href="#577" id="577">577</a>
+<a href="#578" id="578">578</a>
+<a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
+<a href="#603" id="603">603</a>
+<a href="#604" id="604">604</a>
+<a href="#605" id="605">605</a>
+<a href="#606" id="606">606</a>
+<a href="#607" id="607">607</a>
+<a href="#608" id="608">608</a>
+<a href="#609" id="609">609</a>
+<a href="#610" id="610">610</a>
+<a href="#611" id="611">611</a>
+<a href="#612" id="612">612</a>
+<a href="#613" id="613">613</a>
+<a href="#614" id="614">614</a>
+<a href="#615" id="615">615</a>
+<a href="#616" id="616">616</a>
+<a href="#617" id="617">617</a>
+<a href="#618" id="618">618</a>
+<a href="#619" id="619">619</a>
+<a href="#620" id="620">620</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="attr">#[cfg(feature = <span class="string">"analysis"</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::analysis::AnalysisManager;
@@ -560,7 +626,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::options::Options;
 <span class="kw">use </span><span class="kw">crate</span>::MMTK;
 
-<span class="kw">use </span>atomic::Atomic;
+<span class="kw">use </span>std::cell::RefCell;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 <span class="kw">use </span>std::sync::Arc;
 
@@ -582,44 +648,106 @@
     </span>MmapOutOfMemory,
 }
 
-<span class="doccomment">/// Behavior when an allocation fails, and a GC is expected.
-</span><span class="attr">#[repr(u8)]
-#[derive(Copy, Clone, Default, PartialEq, bytemuck::NoUninit, Debug)]
-</span><span class="kw">pub enum </span>OnAllocationFail {
-    <span class="doccomment">/// Request the GC. This is the default behavior.
-    </span><span class="attr">#[default]
-    </span>RequestGC,
-    <span class="doccomment">/// Instead of requesting GC, the allocation request returns with a failure value.
-    </span>ReturnFailure,
-    <span class="doccomment">/// Instead of requesting GC, the allocation request simply overcommits the memory,
-    /// and return a valid result at its best efforts.
-    </span>OverCommit,
-}
-
-<span class="kw">impl </span>OnAllocationFail {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>allow_oom_call(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="kw-2">*</span><span class="self">self </span>== <span class="self">Self</span>::RequestGC
-    }
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>allow_gc(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="kw-2">*</span><span class="self">self </span>== <span class="self">Self</span>::RequestGC
-    }
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>allow_overcommit(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="kw-2">*</span><span class="self">self </span>== <span class="self">Self</span>::OverCommit
-    }
-}
-
 <span class="doccomment">/// Allow specifying different behaviors with [`Allocator::alloc_with_options`].
 </span><span class="attr">#[repr(C)]
-#[derive(Copy, Clone, Default, PartialEq, bytemuck::NoUninit, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 </span><span class="kw">pub struct </span>AllocationOptions {
-    <span class="doccomment">/// When the allocation fails and a GC is originally expected, on_fail
-    /// allows a different behavior to avoid the GC.
-    </span><span class="kw">pub </span>on_fail: OnAllocationFail,
+    <span class="doccomment">/// Whether over-committing is allowed at this allocation site.  Over-committing means the
+    /// allocation is allowed to go beyond the current heap size.  But it is not guaranteed to
+    /// succeed.
+    ///
+    /// **The default is `false`**.
+    ///
+    /// Note that regardless of the value of `allow_overcommit`, the allocation may trigger GC if
+    /// the GC trigger considers it needed.
+    </span><span class="kw">pub </span>allow_overcommit: bool,
+
+    <span class="doccomment">/// Whether the allocation is at a safepoint.
+    ///
+    /// **The default is `true`**.
+    ///
+    /// If `true`, the allocation is allowed to block for GC.
+    ///
+    /// If `false`, the allocation will immediately return a null address if the allocation cannot
+    /// be satisfied without a GC.
+    </span><span class="kw">pub </span>at_safepoint: bool,
+
+    <span class="doccomment">/// Whether the allocation is allowed to call [`Collection::out_of_memory`].
+    ///
+    /// **The default is `true`**.
+    ///
+    /// If `true`, the allocation will call [`Collection::out_of_memory`] when out of memory and
+    /// return null.
+    ///
+    /// If `fasle`, the allocation will return null immediately when out of memory.
+    </span><span class="kw">pub </span>allow_oom_call: bool,
+}
+
+<span class="doccomment">/// The default value for `AllocationOptions` has the same semantics as calling [`Allocator::alloc`]
+/// directly.
+</span><span class="kw">impl </span>Default <span class="kw">for </span>AllocationOptions {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            allow_overcommit: <span class="bool-val">false</span>,
+            at_safepoint: <span class="bool-val">true</span>,
+            allow_oom_call: <span class="bool-val">true</span>,
+        }
+    }
 }
 
 <span class="kw">impl </span>AllocationOptions {
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_default(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw-2">*</span><span class="self">self </span>== AllocationOptions::default()
+    }
+}
+
+<span class="doccomment">/// A wrapper for [`AllocatorContext`] to hold a [`AllocationOptions`] that can be modified by the
+/// same mutator thread.
+///
+/// All [`Allocator`] instances in `Allocators` share one `AllocationOptions` instance, and it will
+/// only be accessed by the mutator (via `Mutator::allocators`) or the GC worker (via
+/// `GCWorker::copy`) that owns it.  Rust doesn't like multiple mutable references pointing to a
+/// shared data structure.  We cannot use [`atomic::Atomic`] because `AllocationOptions` has
+/// multiple fields. We wrap it in a `RefCell` to make it internally mutable.
+///
+/// Note: The allocation option is called every time [`Allocator::alloc_with_options`] is called.
+/// Because API functions should only be called on allocation slow paths, we believe that `RefCell`
+/// should be good enough for performance.  If this is too slow, we may consider `UnsafeCell`.  If
+/// that's still too slow, we should consider changing the API to make the allocation options a
+/// persistent per-mutator value, and allow the VM binding set its value via a new API function.
+</span><span class="kw">struct </span>AllocationOptionsHolder {
+    alloc_options: RefCell&lt;AllocationOptions&gt;,
+}
+
+<span class="doccomment">/// Strictly speaking, `AllocationOptionsHolder` isn't `Sync`.  Two threads cannot set or clear the
+/// same `AllocationOptionsHolder` at the same time.  However, both `Mutator` and `GCWorker` are
+/// `Send`, and both of which own `Allocators` and require its field `Arc&lt;AllocationContext&gt;` to be
+/// `Send`, which requires `AllocationContext` to be `Sync`, which requires
+/// `AllocationOptionsHolder` to be `Sync`.  (Note that `Arc&lt;T&gt;` can be cloned and given to another
+/// thread, and Rust expects `T` to be `Sync`, too.  But we never share `AllocationContext` between
+/// threads, but only between multiple `Allocator` instances within the same `Allocators` instance.
+/// Rust can't figure this out.)
+</span><span class="kw">unsafe impl </span>Sync <span class="kw">for </span>AllocationOptionsHolder {}
+
+<span class="kw">impl </span>AllocationOptionsHolder {
+    <span class="kw">pub fn </span>new(alloc_options: AllocationOptions) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            alloc_options: RefCell::new(alloc_options),
+        }
+    }
+    <span class="kw">pub fn </span>set_alloc_options(<span class="kw-2">&amp;</span><span class="self">self</span>, options: AllocationOptions) {
+        <span class="kw">let </span><span class="kw-2">mut </span>alloc_options = <span class="self">self</span>.alloc_options.borrow_mut();
+        <span class="kw-2">*</span>alloc_options = options;
+    }
+
+    <span class="kw">pub fn </span>clear_alloc_options(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span><span class="kw-2">mut </span>alloc_options = <span class="self">self</span>.alloc_options.borrow_mut();
+        <span class="kw-2">*</span>alloc_options = AllocationOptions::default();
+    }
+
+    <span class="kw">pub fn </span>get_alloc_options(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AllocationOptions {
+        <span class="kw">let </span>alloc_options = <span class="self">self</span>.alloc_options.borrow();
+        <span class="kw-2">*</span>alloc_options
     }
 }
 
@@ -734,7 +862,7 @@
 
 <span class="doccomment">/// The context an allocator needs to access in order to perform allocation.
 </span><span class="kw">pub struct </span>AllocatorContext&lt;VM: VMBinding&gt; {
-    <span class="kw">pub </span>alloc_options: Atomic&lt;AllocationOptions&gt;,
+    alloc_options: AllocationOptionsHolder,
     <span class="kw">pub </span>state: Arc&lt;GlobalState&gt;,
     <span class="kw">pub </span>options: Arc&lt;Options&gt;,
     <span class="kw">pub </span>gc_trigger: Arc&lt;GCTrigger&lt;VM&gt;&gt;,
@@ -745,7 +873,7 @@
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; AllocatorContext&lt;VM&gt; {
     <span class="kw">pub fn </span>new(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
-            alloc_options: Atomic::new(AllocationOptions::default()),
+            alloc_options: AllocationOptionsHolder::new(AllocationOptions::default()),
             state: mmtk.state.clone(),
             options: mmtk.options.clone(),
             gc_trigger: mmtk.gc_trigger.clone(),
@@ -755,16 +883,15 @@
     }
 
     <span class="kw">pub fn </span>set_alloc_options(<span class="kw-2">&amp;</span><span class="self">self</span>, options: AllocationOptions) {
-        <span class="self">self</span>.alloc_options.store(options, Ordering::Relaxed);
+        <span class="self">self</span>.alloc_options.set_alloc_options(options);
     }
 
     <span class="kw">pub fn </span>clear_alloc_options(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.alloc_options
-            .store(AllocationOptions::default(), Ordering::Relaxed);
+        <span class="self">self</span>.alloc_options.clear_alloc_options();
     }
 
     <span class="kw">pub fn </span>get_alloc_options(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AllocationOptions {
-        <span class="self">self</span>.alloc_options.load(Ordering::Relaxed)
+        <span class="self">self</span>.alloc_options.get_alloc_options()
     }
 }
 
@@ -921,12 +1048,6 @@
                 <span class="kw">return </span>result;
             }
 
-            <span class="kw">if </span>result.is_zero()
-                &amp;&amp; <span class="self">self</span>.get_context().get_alloc_options().on_fail == OnAllocationFail::ReturnFailure
-            {
-                <span class="kw">return </span>result;
-            }
-
             <span class="kw">if </span>!result.is_zero() {
                 <span class="comment">// Report allocation success to assist OutOfMemory handling.
                 </span><span class="kw">if </span>!<span class="self">self
@@ -979,6 +1100,17 @@
                 }
 
                 <span class="kw">return </span>result;
+            }
+
+            <span class="comment">// From here on, we handle the case that alloc_once failed.
+            </span><span class="macro">assert!</span>(result.is_zero());
+
+            <span class="kw">if </span>!<span class="self">self</span>.get_context().get_alloc_options().at_safepoint {
+                <span class="comment">// If the allocation is not at safepoint, it will not be able to block for GC.  But
+                // the code beyond this point tests OOM conditions and, if not OOM, try to allocate
+                // again.  Since we didn't block for GC, the allocation will fail again if we try
+                // again. So we return null immediately.
+                </span><span class="kw">return </span>Address::ZERO;
             }
 
             <span class="comment">// It is possible to have cases where a thread is blocked for another GC (non emergency)

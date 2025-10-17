@@ -432,7 +432,7 @@
             })
             .expect(<span class="string">"update cursor failed"</span>);
         <span class="kw">if </span>start + bytes &gt; <span class="self">self</span>.limit {
-            <span class="kw">if </span>alloc_options.on_fail.allow_oom_call() {
+            <span class="kw">if </span>alloc_options.allow_oom_call {
                 <span class="macro">panic!</span>(<span class="string">"OutOfMemory"</span>);
             } <span class="kw">else </span>{
                 <span class="kw">return </span>Address::ZERO;
