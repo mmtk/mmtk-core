@@ -1,5 +1,5 @@
 //! MMTk instance.
-use crate::global_state::{GcStatus, GlobalState};
+use crate::global_state::{GlobalState, PauseState};
 use crate::plan::gc_requester::GCRequester;
 use crate::plan::CreateGeneralPlanArgs;
 use crate::plan::Plan;
@@ -356,30 +356,27 @@ impl<VM: VMBinding> MMTK<VM> {
         self.inside_sanity.load(Ordering::Relaxed)
     }
 
-    pub(crate) fn set_gc_status(&self, s: GcStatus) {
-        let mut gc_status = self.state.gc_status.lock().unwrap();
-        if *gc_status == GcStatus::NotInGC {
+    /// This function is called when changing the pause state.  The GC statistics module will be
+    /// notified when entering or leaving STW pause.
+    pub(crate) fn pause_state_transition(&self, new_state: PauseState) {
+        let old_state = {
+            let mut pause_state = self.state.pause_state.lock().unwrap();
+            std::mem::replace(&mut *pause_state, new_state)
+        };
+
+        assert_ne!(
+            old_state, new_state,
+            "Setting to the same pause state.  old_state: {old_state:?}, new_state: {new_state:?}"
+        );
+
+        if old_state == PauseState::NotInPause {
+            // FIXME: This seems out of place.  We should move it to ScheduleCollection or another
+            // work packet related to stack root scanning.
             self.state.stacks_prepared.store(false, Ordering::SeqCst);
-            // FIXME stats
-            self.stats.start_gc();
+            self.stats.start_pause();
+        } else if new_state == PauseState::NotInPause {
+            self.stats.end_pause();
         }
-        *gc_status = s;
-        if *gc_status == GcStatus::NotInGC {
-            // FIXME stats
-            if self.stats.get_gathering_stats() {
-                self.stats.end_gc();
-            }
-        }
-    }
-
-    /// Return true if a collection is in progress.
-    pub fn gc_in_progress(&self) -> bool {
-        *self.state.gc_status.lock().unwrap() != GcStatus::NotInGC
-    }
-
-    /// Return true if a collection is in progress and past the preparatory stage.
-    pub fn gc_in_progress_proper(&self) -> bool {
-        *self.state.gc_status.lock().unwrap() == GcStatus::GcProper
     }
 
     /// Return true if the current GC is an emergency GC.

@@ -7,7 +7,7 @@ use super::worker::{GCWorker, ThreadId, WorkerGroup};
 use super::worker_goals::{WorkerGoal, WorkerGoals};
 use super::worker_monitor::{LastParkedResult, WorkerMonitor};
 use super::*;
-use crate::global_state::GcStatus;
+use crate::global_state::PauseState;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
@@ -506,7 +506,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 probe!(mmtk, gc_start);
 
                 {
-                    let mut gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
+                    let mut gc_start_time = worker.mmtk.state.pause_start_time.borrow_mut();
                     assert!(gc_start_time.is_none(), "GC already started?");
                     *gc_start_time = Some(Instant::now());
                 }
@@ -569,7 +569,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
         // Compute the elapsed time of the GC.
         let start_time = {
-            let mut gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
+            let mut gc_start_time = worker.mmtk.state.pause_start_time.borrow_mut();
             gc_start_time.take().expect("GC not started yet?")
         };
         let elapsed = start_time.elapsed();
@@ -619,7 +619,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.debug_assert_all_stw_buckets_closed();
 
         // Set to NotInGC after everything, and right before resuming mutators.
-        mmtk.set_gc_status(GcStatus::NotInGC);
+        mmtk.pause_state_transition(PauseState::NotInPause);
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
 
         concurrent_work_scheduled

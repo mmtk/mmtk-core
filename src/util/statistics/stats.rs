@@ -41,10 +41,12 @@ impl SharedStats {
 
 /// GC statistics
 ///
-/// The struct holds basic GC statistics, like the GC count,
+/// The struct holds basic GC statistics, like the pause count,
 /// and an array of counters.
 pub struct Stats {
-    gc_count: AtomicUsize,
+    /// The number of stop-the-world (STW) pauses since statistics begins.
+    pause_count: AtomicUsize,
+    /// A reference to the time counter.  Can be used to print the total time.
     total_time: Arc<Mutex<Timer>>,
     // crate `pfm` uses libpfm4 under the hood for parsing perf event names
     // Initialization of libpfm4 is required before we can use `PerfEvent` types
@@ -92,7 +94,7 @@ impl Stats {
             ))));
         }
         Stats {
-            gc_count: AtomicUsize::new(0),
+            pause_count: AtomicUsize::new(0),
             total_time: t,
             #[cfg(feature = "perf_counter")]
             perfmon,
@@ -147,8 +149,8 @@ impl Stats {
         counter
     }
 
-    pub fn start_gc(&self) {
-        self.gc_count.fetch_add(1, Ordering::SeqCst);
+    pub fn start_pause(&self) {
+        self.pause_count.fetch_add(1, Ordering::SeqCst);
         if !self.get_gathering_stats() {
             return;
         }
@@ -159,7 +161,7 @@ impl Stats {
         self.shared.increment_phase();
     }
 
-    pub fn end_gc(&self) {
+    pub fn end_pause(&self) {
         if !self.get_gathering_stats() {
             return;
         }
@@ -200,7 +202,7 @@ impl Stats {
     }
 
     pub fn print_column_names(&self, scheduler_stat: &HashMap<String, String>) {
-        print!("GC\t");
+        print!("pauses\t");
         let counter = self.counters.lock().unwrap();
         for iter in &(*counter) {
             let c = iter.lock().unwrap();

@@ -1,6 +1,6 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
-use crate::global_state::GcStatus;
+use crate::global_state::PauseState;
 use crate::plan::ObjectsClosure;
 use crate::plan::VectorObjectQueue;
 use crate::util::*;
@@ -26,7 +26,7 @@ impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
             mmtk.get_plan().notify_emergency_collection();
         }
         // Set to GcPrepare
-        mmtk.set_gc_status(GcStatus::GcPrepare);
+        mmtk.pause_state_transition(PauseState::PauseTriggered);
 
         // Let the plan to schedule collection work
         mmtk.get_plan().schedule_collection(worker.scheduler());
@@ -444,7 +444,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
             <C::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
                 false, worker.tls,
             );
-            mmtk.set_gc_status(GcStatus::GcProper);
+            mmtk.pause_state_transition(PauseState::MutatorsStopped);
         }
     }
 }
