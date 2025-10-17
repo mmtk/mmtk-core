@@ -19,6 +19,7 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_work::Release;
 use crate::scheduler::gc_work::StopMutators;
 use crate::scheduler::gc_work::UnsupportedProcessEdges;
+use crate::scheduler::gc_work::VMProcessWeakRefs;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
@@ -400,6 +401,9 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             scheduler.work_buckets[WorkBucketStage::FinalRefClosure]
                 .add(Finalization::<RefProcessingEdges<VM>>::new());
         }
+
+        scheduler.work_buckets[WorkBucketStage::VMRefClosure]
+            .set_sentinel(Box::new(VMProcessWeakRefs::<RefProcessingEdges<VM>>::new()));
     }
 
     pub fn concurrent_marking_in_progress(&self) -> bool {
