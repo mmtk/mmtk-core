@@ -151,7 +151,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             })
             .expect("update cursor failed");
         if start + bytes > self.limit {
-            if alloc_options.on_fail.allow_oom_call() {
+            if alloc_options.allow_oom_call {
                 panic!("OutOfMemory");
             } else {
                 return Address::ZERO;

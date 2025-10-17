@@ -85,7 +85,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         alloc_options: AllocationOptions,
     ) -> bool {
         if self.will_oom_on_acquire(size) {
-            if alloc_options.on_fail.allow_oom_call() {
+            if alloc_options.allow_oom_call {
                 VM::VMCollection::out_of_memory(
                     tls,
                     crate::util::alloc::AllocationError::HeapOutOfMemory,
@@ -108,35 +108,42 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             "The requested pages is larger than the max heap size. Is will_go_oom_on_acquire used before acquring memory?"
         );
 
-        // Should we poll to attempt to GC?
-        // - If tls is collector, we cannot attempt a GC.
-        // - If gc is disabled, we cannot attempt a GC.
-        // - If overcommit is allowed, we don't attempt a GC.
-        // FIXME: We should allow polling while also allowing over-committing.
-        // We should change the allocation interface.
-        let should_poll = VM::VMActivePlan::is_mutator(tls)
-            && VM::VMCollection::is_collection_enabled()
-            && !alloc_options.on_fail.allow_overcommit();
-
         trace!("Reserving pages");
         let pr = self.get_page_resource();
         let pages_reserved = pr.reserve_pages(pages);
         trace!("Pages reserved");
-        trace!("Polling ..");
 
-        // The actual decision tree.
-        if should_poll && self.get_gc_trigger().poll(false, Some(self.as_space())) {
-            self.not_acquiring(tls, alloc_options, pr, pages_reserved, false);
-            Address::ZERO
-        } else {
-            debug!("Collection not required");
+        // Should we poll before acquring pages from page resources so that it can trigger a GC?
+        // - If tls is collector, we cannot attempt a GC.
+        // - If gc is disabled, we cannot attempt a GC.
+        let should_poll =
+            VM::VMActivePlan::is_mutator(tls) && VM::VMCollection::is_collection_enabled();
 
+        // If we should poll, do it now.  Record if it has triggered a GC.
+        // If we should not poll, GC is not triggered.
+        let gc_triggered = should_poll && {
+            trace!("Polling ..");
+            self.get_gc_trigger().poll(false, Some(self.as_space()))
+        };
+
+        // We can try to get pages if
+        // - GC is not triggered, or
+        // - GC is triggered, but we allow over-committing.
+        let should_get_pages = !gc_triggered || alloc_options.allow_overcommit;
+
+        // Get new pages if we should. If we didn't get new pages from the page resource for any
+        // reason (if we decided not to, or if we tried and failed), this function shall return a
+        // null address.
+        if should_get_pages {
             if let Some(addr) = self.get_new_pages_and_initialize(tls, pages, pr, pages_reserved) {
                 addr
             } else {
-                self.not_acquiring(tls, alloc_options, pr, pages_reserved, true);
+                self.not_acquiring(tls, alloc_options, pr, pages_reserved, false);
                 Address::ZERO
             }
+        } else {
+            self.not_acquiring(tls, alloc_options, pr, pages_reserved, true);
+            Address::ZERO
         }
     }
 
@@ -268,11 +275,17 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         pages_reserved: usize,
         attempted_allocation_and_failed: bool,
     ) {
+        assert!(
+            VM::VMActivePlan::is_mutator(tls),
+            "A non-mutator thread failed to get pages from page resource.  \
+            Copying GC plans should compute the copying headroom carefully to prevent this."
+        );
+
         // Clear the request
         pr.clear_request(pages_reserved);
 
-        // If we do not want GC on fail, just return.
-        if !alloc_options.on_fail.allow_gc() {
+        // If we are not at a safepoint, return immediately.
+        if !alloc_options.at_safepoint {
             return;
         }
 

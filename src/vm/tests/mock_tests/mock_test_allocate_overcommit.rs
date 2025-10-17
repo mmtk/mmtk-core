@@ -1,6 +1,8 @@
+// GITHUB-CI: MMTK_PLAN=all
+
 use super::mock_test_prelude::*;
 
-use crate::util::alloc::allocator::{AllocationOptions, OnAllocationFail};
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::AllocationSemantics;
 
 /// This test will do alloc_with_options in a loop, and evetually fill up the heap.
@@ -26,7 +28,8 @@ pub fn allocate_overcommit() {
                     0,
                     AllocationSemantics::Default,
                     AllocationOptions {
-                        on_fail: OnAllocationFail::ReturnFailure,
+                        allow_overcommit: true,
+                        ..Default::default()
                     },
                 );
                 assert!(!last_result.is_zero());

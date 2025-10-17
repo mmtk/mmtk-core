@@ -6,7 +6,7 @@ use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::options::Options;
 use crate::MMTK;
 
-use atomic::Atomic;
+use std::cell::RefCell;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -28,44 +28,106 @@ pub enum AllocationError {
     MmapOutOfMemory,
 }
 
-/// Behavior when an allocation fails, and a GC is expected.
-#[repr(u8)]
-#[derive(Copy, Clone, Default, PartialEq, bytemuck::NoUninit, Debug)]
-pub enum OnAllocationFail {
-    /// Request the GC. This is the default behavior.
-    #[default]
-    RequestGC,
-    /// Instead of requesting GC, the allocation request returns with a failure value.
-    ReturnFailure,
-    /// Instead of requesting GC, the allocation request simply overcommits the memory,
-    /// and return a valid result at its best efforts.
-    OverCommit,
-}
-
-impl OnAllocationFail {
-    pub(crate) fn allow_oom_call(&self) -> bool {
-        *self == Self::RequestGC
-    }
-    pub(crate) fn allow_gc(&self) -> bool {
-        *self == Self::RequestGC
-    }
-    pub(crate) fn allow_overcommit(&self) -> bool {
-        *self == Self::OverCommit
-    }
-}
-
 /// Allow specifying different behaviors with [`Allocator::alloc_with_options`].
 #[repr(C)]
-#[derive(Copy, Clone, Default, PartialEq, bytemuck::NoUninit, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct AllocationOptions {
-    /// When the allocation fails and a GC is originally expected, on_fail
-    /// allows a different behavior to avoid the GC.
-    pub on_fail: OnAllocationFail,
+    /// Whether over-committing is allowed at this allocation site.  Over-committing means the
+    /// allocation is allowed to go beyond the current heap size.  But it is not guaranteed to
+    /// succeed.
+    ///
+    /// **The default is `false`**.
+    ///
+    /// Note that regardless of the value of `allow_overcommit`, the allocation may trigger GC if
+    /// the GC trigger considers it needed.
+    pub allow_overcommit: bool,
+
+    /// Whether the allocation is at a safepoint.
+    ///
+    /// **The default is `true`**.
+    ///
+    /// If `true`, the allocation is allowed to block for GC.
+    ///
+    /// If `false`, the allocation will immediately return a null address if the allocation cannot
+    /// be satisfied without a GC.
+    pub at_safepoint: bool,
+
+    /// Whether the allocation is allowed to call [`Collection::out_of_memory`].
+    ///
+    /// **The default is `true`**.
+    ///
+    /// If `true`, the allocation will call [`Collection::out_of_memory`] when out of memory and
+    /// return null.
+    ///
+    /// If `fasle`, the allocation will return null immediately when out of memory.
+    pub allow_oom_call: bool,
+}
+
+/// The default value for `AllocationOptions` has the same semantics as calling [`Allocator::alloc`]
+/// directly.
+impl Default for AllocationOptions {
+    fn default() -> Self {
+        Self {
+            allow_overcommit: false,
+            at_safepoint: true,
+            allow_oom_call: true,
+        }
+    }
 }
 
 impl AllocationOptions {
     pub(crate) fn is_default(&self) -> bool {
         *self == AllocationOptions::default()
+    }
+}
+
+/// A wrapper for [`AllocatorContext`] to hold a [`AllocationOptions`] that can be modified by the
+/// same mutator thread.
+///
+/// All [`Allocator`] instances in `Allocators` share one `AllocationOptions` instance, and it will
+/// only be accessed by the mutator (via `Mutator::allocators`) or the GC worker (via
+/// `GCWorker::copy`) that owns it.  Rust doesn't like multiple mutable references pointing to a
+/// shared data structure.  We cannot use [`atomic::Atomic`] because `AllocationOptions` has
+/// multiple fields. We wrap it in a `RefCell` to make it internally mutable.
+///
+/// Note: The allocation option is called every time [`Allocator::alloc_with_options`] is called.
+/// Because API functions should only be called on allocation slow paths, we believe that `RefCell`
+/// should be good enough for performance.  If this is too slow, we may consider `UnsafeCell`.  If
+/// that's still too slow, we should consider changing the API to make the allocation options a
+/// persistent per-mutator value, and allow the VM binding set its value via a new API function.
+struct AllocationOptionsHolder {
+    alloc_options: RefCell<AllocationOptions>,
+}
+
+/// Strictly speaking, `AllocationOptionsHolder` isn't `Sync`.  Two threads cannot set or clear the
+/// same `AllocationOptionsHolder` at the same time.  However, both `Mutator` and `GCWorker` are
+/// `Send`, and both of which own `Allocators` and require its field `Arc<AllocationContext>` to be
+/// `Send`, which requires `AllocationContext` to be `Sync`, which requires
+/// `AllocationOptionsHolder` to be `Sync`.  (Note that `Arc<T>` can be cloned and given to another
+/// thread, and Rust expects `T` to be `Sync`, too.  But we never share `AllocationContext` between
+/// threads, but only between multiple `Allocator` instances within the same `Allocators` instance.
+/// Rust can't figure this out.)
+unsafe impl Sync for AllocationOptionsHolder {}
+
+impl AllocationOptionsHolder {
+    pub fn new(alloc_options: AllocationOptions) -> Self {
+        Self {
+            alloc_options: RefCell::new(alloc_options),
+        }
+    }
+    pub fn set_alloc_options(&self, options: AllocationOptions) {
+        let mut alloc_options = self.alloc_options.borrow_mut();
+        *alloc_options = options;
+    }
+
+    pub fn clear_alloc_options(&self) {
+        let mut alloc_options = self.alloc_options.borrow_mut();
+        *alloc_options = AllocationOptions::default();
+    }
+
+    pub fn get_alloc_options(&self) -> AllocationOptions {
+        let alloc_options = self.alloc_options.borrow();
+        *alloc_options
     }
 }
 
@@ -180,7 +242,7 @@ pub(crate) fn assert_allocation_args<VM: VMBinding>(size: usize, align: usize, o
 
 /// The context an allocator needs to access in order to perform allocation.
 pub struct AllocatorContext<VM: VMBinding> {
-    pub alloc_options: Atomic<AllocationOptions>,
+    alloc_options: AllocationOptionsHolder,
     pub state: Arc<GlobalState>,
     pub options: Arc<Options>,
     pub gc_trigger: Arc<GCTrigger<VM>>,
@@ -191,7 +253,7 @@ pub struct AllocatorContext<VM: VMBinding> {
 impl<VM: VMBinding> AllocatorContext<VM> {
     pub fn new(mmtk: &MMTK<VM>) -> Self {
         Self {
-            alloc_options: Atomic::new(AllocationOptions::default()),
+            alloc_options: AllocationOptionsHolder::new(AllocationOptions::default()),
             state: mmtk.state.clone(),
             options: mmtk.options.clone(),
             gc_trigger: mmtk.gc_trigger.clone(),
@@ -201,16 +263,15 @@ impl<VM: VMBinding> AllocatorContext<VM> {
     }
 
     pub fn set_alloc_options(&self, options: AllocationOptions) {
-        self.alloc_options.store(options, Ordering::Relaxed);
+        self.alloc_options.set_alloc_options(options);
     }
 
     pub fn clear_alloc_options(&self) {
-        self.alloc_options
-            .store(AllocationOptions::default(), Ordering::Relaxed);
+        self.alloc_options.clear_alloc_options();
     }
 
     pub fn get_alloc_options(&self) -> AllocationOptions {
-        self.alloc_options.load(Ordering::Relaxed)
+        self.alloc_options.get_alloc_options()
     }
 }
 
@@ -367,12 +428,6 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 return result;
             }
 
-            if result.is_zero()
-                && self.get_context().get_alloc_options().on_fail == OnAllocationFail::ReturnFailure
-            {
-                return result;
-            }
-
             if !result.is_zero() {
                 // Report allocation success to assist OutOfMemory handling.
                 if !self
@@ -425,6 +480,17 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 }
 
                 return result;
+            }
+
+            // From here on, we handle the case that alloc_once failed.
+            assert!(result.is_zero());
+
+            if !self.get_context().get_alloc_options().at_safepoint {
+                // If the allocation is not at safepoint, it will not be able to block for GC.  But
+                // the code beyond this point tests OOM conditions and, if not OOM, try to allocate
+                // again.  Since we didn't block for GC, the allocation will fail again if we try
+                // again. So we return null immediately.
+                return Address::ZERO;
             }
 
             // It is possible to have cases where a thread is blocked for another GC (non emergency)

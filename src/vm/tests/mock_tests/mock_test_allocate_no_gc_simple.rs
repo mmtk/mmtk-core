@@ -1,6 +1,6 @@
 use super::mock_test_prelude::*;
 
-use crate::util::alloc::allocator::{AllocationOptions, OnAllocationFail};
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::AllocationSemantics;
 
 /// This test will do alloc_with_options in a loop, and evetually fill up the heap.
@@ -26,7 +26,8 @@ pub fn allocate_no_gc_simple() {
                     0,
                     AllocationSemantics::Default,
                     AllocationOptions {
-                        on_fail: OnAllocationFail::ReturnFailure,
+                        at_safepoint: false,
+                        ..Default::default()
                     },
                 );
                 if last_result.is_zero() {
