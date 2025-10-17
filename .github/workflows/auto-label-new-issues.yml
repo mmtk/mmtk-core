@@ -1,0 +1,16 @@
+name: Auto Label New Issues
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  automate-issues-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add F-triage for new issues if there is no priority label assigned.
+        uses: matthamil/labeler@main
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          required-label-prefixes: 'P-'
+          default-labels: 'F-triage'
