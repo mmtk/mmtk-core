@@ -17,9 +17,9 @@ pub struct GlobalState {
     /// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
     pub(crate) initialized: AtomicBool,
     /// The current GC status.
-    pub(crate) gc_status: Mutex<GcStatus>,
+    pub(crate) pause_state: Mutex<PauseState>,
     /// When did the last GC start? Only accessed by the last parked worker.
-    pub(crate) gc_start_time: AtomicRefCell<Option<Instant>>,
+    pub(crate) pause_start_time: AtomicRefCell<Option<Instant>>,
     /// Is the current GC an emergency collection? Emergency means we may run out of memory soon, and we should
     /// attempt to collect as much as we can.
     pub(crate) emergency_collection: AtomicBool,
@@ -201,8 +201,8 @@ impl Default for GlobalState {
     fn default() -> Self {
         Self {
             initialized: AtomicBool::new(false),
-            gc_status: Mutex::new(GcStatus::NotInGC),
-            gc_start_time: AtomicRefCell::new(None),
+            pause_state: Mutex::new(PauseState::NotInPause),
+            pause_start_time: AtomicRefCell::new(None),
             stacks_prepared: AtomicBool::new(false),
             emergency_collection: AtomicBool::new(false),
             user_triggered_collection: AtomicBool::new(false),
@@ -222,11 +222,15 @@ impl Default for GlobalState {
     }
 }
 
-#[derive(PartialEq)]
-pub enum GcStatus {
-    NotInGC,
-    GcPrepare,
-    GcProper,
+/// The state of stop-the-world (STW) pauses.
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum PauseState {
+    /// STW pause is not triggered.  All mutators can run normally.
+    NotInPause,
+    /// STW pause is triggered, but some mutators may still be running.
+    PauseTriggered,
+    /// All mutators have come to a stop.
+    MutatorsStopped,
 }
 
 /// Statistics for the live bytes in the last GC. The statistics is per space.
