@@ -946,11 +946,11 @@
             <span class="kw">if let </span><span class="prelude-val">Some</span>(addr) = <span class="self">self</span>.get_new_pages_and_initialize(tls, pages, pr, pages_reserved) {
                 addr
             } <span class="kw">else </span>{
-                <span class="self">self</span>.not_acquiring(tls, alloc_options, pr, pages_reserved, <span class="bool-val">false</span>);
+                <span class="self">self</span>.not_acquiring(tls, alloc_options, pr, pages_reserved, <span class="bool-val">true</span>);
                 Address::ZERO
             }
         } <span class="kw">else </span>{
-            <span class="self">self</span>.not_acquiring(tls, alloc_options, pr, pages_reserved, <span class="bool-val">true</span>);
+            <span class="self">self</span>.not_acquiring(tls, alloc_options, pr, pages_reserved, <span class="bool-val">false</span>);
             Address::ZERO
         }
     }
