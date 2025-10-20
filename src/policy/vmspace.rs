@@ -99,6 +99,9 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
         self
     }
+    fn as_inspector(&self) -> &dyn crate::util::heap::inspection::SpaceInspector {
+        self
+    }
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
@@ -314,5 +317,26 @@ impl<VM: VMBinding> VMSpace<VM> {
             queue.enqueue(object);
         }
         object
+    }
+}
+
+mod inspector {
+    use super::*;
+    use crate::util::heap::inspection::{RegionInspector, SpaceInspector};
+
+    impl<VM: VMBinding> SpaceInspector for VMSpace<VM> {
+        fn list_top_regions(&self) -> Vec<Box<dyn RegionInspector>> {
+            let space = unsafe { &*(self as *const Self) };
+            vec![Box::new(crate::util::heap::inspection::SpaceAsRegion::new(
+                space,
+            ))]
+        }
+
+        fn list_sub_regions(
+            &self,
+            _parent_region: &dyn RegionInspector,
+        ) -> Vec<Box<dyn RegionInspector>> {
+            vec![]
+        }
     }
 }
