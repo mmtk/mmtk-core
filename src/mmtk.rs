@@ -1,6 +1,5 @@
 //! MMTk instance.
 use crate::global_state::{GcStatus, GlobalState};
-use crate::plan::gc_requester::GCRequester;
 use crate::plan::CreateGeneralPlanArgs;
 use crate::plan::Plan;
 use crate::policy::sft_map::{create_sft_map, SFTMap};
@@ -123,7 +122,6 @@ pub struct MMTK<VM: VMBinding> {
     #[cfg(feature = "extreme_assertions")]
     pub(crate) slot_logger: SlotLogger<VM::VMSlot>,
     pub(crate) gc_trigger: Arc<GCTrigger<VM>>,
-    pub(crate) gc_requester: Arc<GCRequester<VM>>,
     pub(crate) stats: Arc<Stats>,
     #[cfg(feature = "sanity")]
     inside_sanity: AtomicBool,
@@ -156,11 +154,9 @@ impl<VM: VMBinding> MMTK<VM> {
 
         let state = Arc::new(GlobalState::default());
 
-        let gc_requester = Arc::new(GCRequester::new(scheduler.clone()));
-
         let gc_trigger = Arc::new(GCTrigger::new(
             options.clone(),
-            gc_requester.clone(),
+            scheduler.clone(),
             state.clone(),
         ));
 
@@ -229,7 +225,6 @@ impl<VM: VMBinding> MMTK<VM> {
             #[cfg(feature = "analysis")]
             analysis_manager: Arc::new(AnalysisManager::new(stats.clone())),
             gc_trigger,
-            gc_requester,
             stats,
         }
     }
@@ -422,44 +417,22 @@ impl<VM: VMBinding> MMTK<VM> {
         force: bool,
         exhaustive: bool,
     ) -> bool {
-        use crate::vm::Collection;
-        if !self.get_plan().constraints().collects_garbage {
-            warn!("User attempted a collection request, but the plan can not do GC. The request is ignored.");
-            return false;
-        }
-
-        if force || !*self.options.ignore_system_gc && VM::VMCollection::is_collection_enabled() {
-            info!("User triggering collection");
-            if exhaustive {
-                if let Some(gen) = self.get_plan().generational() {
-                    gen.force_full_heap_collection();
-                }
-            }
-
-            self.state
-                .user_triggered_collection
-                .store(true, Ordering::Relaxed);
-            self.gc_requester.request();
+        if self
+            .gc_trigger
+            .handle_user_collection_request(force, exhaustive)
+        {
+            use crate::vm::Collection;
             VM::VMCollection::block_for_gc(tls);
-            return true;
+            true
+        } else {
+            false
         }
-
-        false
     }
 
     /// MMTK has requested stop-the-world activity (e.g., stw within a concurrent gc).
-    // This is not used, as we do not have a concurrent plan.
     #[allow(unused)]
     pub fn trigger_internal_collection_request(&self) {
-        self.state
-            .last_internal_triggered_collection
-            .store(true, Ordering::Relaxed);
-        self.state
-            .internal_triggered_collection
-            .store(true, Ordering::Relaxed);
-        // TODO: The current `GCRequester::request()` is probably incorrect for internally triggered GC.
-        // Consider removing functions related to "internal triggered collection".
-        self.gc_requester.request();
+        self.gc_trigger.trigger_internal_collection_request();
     }
 
     /// Get a reference to the plan.
