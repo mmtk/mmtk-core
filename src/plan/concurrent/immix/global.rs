@@ -402,6 +402,9 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
                 .add(Finalization::<RefProcessingEdges<VM>>::new());
         }
 
+        // VM-specific weak ref processing
+        // Note that ConcurrentImmix does not have a separate forwarding stage,
+        // so we don't schedule the `VMForwardWeakRefs` work packet.
         scheduler.work_buckets[WorkBucketStage::VMRefClosure]
             .set_sentinel(Box::new(VMProcessWeakRefs::<RefProcessingEdges<VM>>::new()));
     }
