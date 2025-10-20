@@ -138,11 +138,11 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             if let Some(addr) = self.get_new_pages_and_initialize(tls, pages, pr, pages_reserved) {
                 addr
             } else {
-                self.not_acquiring(tls, alloc_options, pr, pages_reserved, false);
+                self.not_acquiring(tls, alloc_options, pr, pages_reserved, true);
                 Address::ZERO
             }
         } else {
-            self.not_acquiring(tls, alloc_options, pr, pages_reserved, true);
+            self.not_acquiring(tls, alloc_options, pr, pages_reserved, false);
             Address::ZERO
         }
     }
