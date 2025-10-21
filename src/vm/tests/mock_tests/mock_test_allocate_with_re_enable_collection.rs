@@ -1,6 +1,5 @@
 use crate::memory_manager;
 use crate::util::test_util::fixtures::*;
-use crate::util::test_util::mock_method::*;
 use crate::util::test_util::mock_vm::*;
 use crate::AllocationSemantics;
 

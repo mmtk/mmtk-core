@@ -19,6 +19,8 @@ use crate::vm::RootsWorkFactory;
 use crate::vm::SlotVisitor;
 use crate::vm::VMBinding;
 use crate::Mutator;
+use crate::util::test_util;
+use crate::util::test_util::mock_vm::thread_park::ThreadPark;
 
 use super::mock_method::*;
 
@@ -102,12 +104,12 @@ where
     T: FnOnce() + std::panic::UnwindSafe,
     C: FnOnce(),
 {
-    super::serial_test(|| {
+    test_util::serial_test(|| {
         // Setup
         {
             write_mockvm(|mock| *mock = setup());
         }
-        super::with_cleanup(test, cleanup);
+        test_util::with_cleanup(test, cleanup);
     })
 }
 
@@ -263,6 +265,10 @@ pub struct MockVM {
     pub forward_weak_refs: Box<dyn MockAny>,
 }
 
+lazy_static! {
+    static ref THREAD_PARK: ThreadPark = ThreadPark::new();
+}
+
 impl Default for MockVM {
     fn default() -> Self {
         Self {
@@ -276,7 +282,9 @@ impl Default for MockVM {
 
             stop_all_mutators: MockMethod::new_unimplemented(),
             resume_mutators: MockMethod::new_unimplemented(),
-            block_for_gc: MockMethod::new_unimplemented(),
+            block_for_gc: MockMethod::new_fixed(Box::new(|_| {
+                THREAD_PARK.park();
+            })),
             spawn_gc_thread: MockMethod::new_default(),
             out_of_memory: MockMethod::new_fixed(Box::new(|(_, err)| {
                 panic!("Out of memory with {:?}!", err)
