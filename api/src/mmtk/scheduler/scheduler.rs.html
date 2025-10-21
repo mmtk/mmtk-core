@@ -793,7 +793,7 @@
         <span class="self">self</span>.affinity.resolve_affinity(thread);
     }
 
-    <span class="doccomment">/// Request a GC to be scheduled.  Called by mutator via `GCRequester`.
+    <span class="doccomment">/// Request a GC to be scheduled.  Called by mutator via `GCTrigger`.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>request_schedule_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="macro">debug!</span>(<span class="string">"A mutator is sending GC-scheduling request to workers..."</span>);
         <span class="self">self</span>.worker_monitor.make_request(WorkerGoal::Gc);
@@ -1313,7 +1313,7 @@
     }
 
     <span class="kw">pub fn </span>notify_mutators_paused(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-        mmtk.gc_requester.clear_request();
+        mmtk.gc_trigger.clear_request();
         <span class="kw">let </span>first_stw_bucket = <span class="kw-2">&amp;</span><span class="self">self</span>.work_buckets[WorkBucketStage::FIRST_STW_STAGE];
         <span class="macro">debug_assert!</span>(!first_stw_bucket.is_open());
         <span class="comment">// Note: This is the only place where a bucket is opened without having all workers parked.
