@@ -99,10 +99,6 @@ impl<VM: VMBinding> GCTrigger<VM> {
         self.request_flag.store(false, Ordering::Relaxed);
     }
 
-    fn get_plan(&self) -> &dyn Plan<VM = VM> {
-        unsafe { self.plan.assume_init() }
-    }
-
     /// This method is called periodically by the allocation subsystem
     /// (by default, each time a page is consumed), and provides the
     /// collector with an opportunity to collect.
@@ -115,7 +111,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
             return false;
         }
 
-        let plan = self.get_plan();
+        let plan = self.plan();
         if self
             .policy
             .is_gc_required(space_full, space.map(|s| SpaceStats::new(s)), plan)
@@ -144,7 +140,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// * `force`: If true, we force a collection regardless of the settings. If false, we only trigger a collection if the settings allow it.
     /// * `exhaustive`: If true, we try to make the collection exhaustive (e.g. full heap collection). If false, the collection kind is determined internally.
     pub fn handle_user_collection_request(&self, force: bool, exhaustive: bool) -> bool {
-        if !self.get_plan().constraints().collects_garbage {
+        if !self.plan().constraints().collects_garbage {
             warn!("User attempted a collection request, but the plan can not do GC. The request is ignored.");
             return false;
         }
@@ -153,7 +149,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
             info!("User triggering collection");
             // TODO: this may not work reliably. If a GC has been triggered, this will not force it to be a full heap GC.
             if exhaustive {
-                if let Some(gen) = self.get_plan().generational() {
+                if let Some(gen) = self.plan().generational() {
                     gen.force_full_heap_collection();
                 }
             }
