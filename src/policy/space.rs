@@ -115,9 +115,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
         // Should we poll before acquring pages from page resources so that it can trigger a GC?
         // - If tls is collector, we cannot attempt a GC.
-        // - If gc is disabled, we cannot attempt a GC.
-        let should_poll =
-            VM::VMActivePlan::is_mutator(tls) && VM::VMCollection::is_collection_enabled();
+        let should_poll = VM::VMActivePlan::is_mutator(tls);
 
         // If we should poll, do it now.  Record if it has triggered a GC.
         // If we should not poll, GC is not triggered.

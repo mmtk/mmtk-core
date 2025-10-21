@@ -122,7 +122,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.affinity.resolve_affinity(thread);
     }
 
-    /// Request a GC to be scheduled.  Called by mutator via `GCRequester`.
+    /// Request a GC to be scheduled.  Called by mutator via `GCTrigger`.
     pub(crate) fn request_schedule_collection(&self) {
         debug!("A mutator is sending GC-scheduling request to workers...");
         self.worker_monitor.make_request(WorkerGoal::Gc);
@@ -642,7 +642,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
-        mmtk.gc_requester.clear_request();
+        mmtk.gc_trigger.clear_request();
         let first_stw_bucket = &self.work_buckets[WorkBucketStage::FIRST_STW_STAGE];
         debug_assert!(!first_stw_bucket.is_open());
         // Note: This is the only place where a bucket is opened without having all workers parked.

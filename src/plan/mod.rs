@@ -16,8 +16,6 @@
 mod barriers;
 pub use barriers::BarrierSelector;
 
-pub(crate) mod gc_requester;
-
 mod gc_work;
 
 mod global;

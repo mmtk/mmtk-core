@@ -1,16 +1,17 @@
 use atomic::Ordering;
 
 use crate::global_state::GlobalState;
-use crate::plan::gc_requester::GCRequester;
 use crate::plan::Plan;
 use crate::policy::space::Space;
+use crate::scheduler::GCWorkScheduler;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions;
 use crate::util::options::{GCTriggerSelector, Options, DEFAULT_MAX_NURSERY, DEFAULT_MIN_NURSERY};
+use crate::vm::Collection;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::mem::MaybeUninit;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
 /// GCTrigger is responsible for triggering GCs based on the given policy.
@@ -23,7 +24,10 @@ pub struct GCTrigger<VM: VMBinding> {
     plan: MaybeUninit<&'static dyn Plan<VM = VM>>,
     /// The triggering policy.
     pub policy: Box<dyn GCTriggerPolicy<VM>>,
-    gc_requester: Arc<GCRequester<VM>>,
+    /// Set by mutators to trigger GC.  It is atomic so that mutators can check if GC has already
+    /// been requested efficiently in `poll` without acquiring any mutex.
+    request_flag: AtomicBool,
+    scheduler: Arc<GCWorkScheduler<VM>>,
     options: Arc<Options>,
     state: Arc<GlobalState>,
 }
@@ -31,7 +35,7 @@ pub struct GCTrigger<VM: VMBinding> {
 impl<VM: VMBinding> GCTrigger<VM> {
     pub fn new(
         options: Arc<Options>,
-        gc_requester: Arc<GCRequester<VM>>,
+        scheduler: Arc<GCWorkScheduler<VM>>,
         state: Arc<GlobalState>,
     ) -> Self {
         GCTrigger {
@@ -58,7 +62,8 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 }
             },
             options,
-            gc_requester,
+            request_flag: AtomicBool::new(false),
+            scheduler,
             state,
         }
     }
@@ -72,6 +77,28 @@ impl<VM: VMBinding> GCTrigger<VM> {
         unsafe { self.plan.assume_init() }
     }
 
+    /// Request a GC.  Called by mutators when polling (during allocation) and when handling user
+    /// GC requests (e.g. `System.gc();` in Java).
+    fn request(&self) {
+        if self.request_flag.load(Ordering::Relaxed) {
+            return;
+        }
+
+        if !self.request_flag.swap(true, Ordering::Relaxed) {
+            // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
+            // with GC workers, which is expensive for functions like `poll`.  We use the atomic
+            // flag `request_flag` to elide the need to acquire the mutex in subsequent calls.
+            probe!(mmtk, gc_requested);
+            self.scheduler.request_schedule_collection();
+        }
+    }
+
+    /// Clear the "GC requested" flag so that mutators can trigger the next GC.
+    /// Called by a GC worker when all mutators have come to a stop.
+    pub fn clear_request(&self) {
+        self.request_flag.store(false, Ordering::Relaxed);
+    }
+
     /// This method is called periodically by the allocation subsystem
     /// (by default, each time a page is consumed), and provides the
     /// collector with an opportunity to collect.
@@ -80,7 +107,11 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// * `space_full`: Space request failed, must recover pages within 'space'.
     /// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.
     pub fn poll(&self, space_full: bool, space: Option<&dyn Space<VM>>) -> bool {
-        let plan = unsafe { self.plan.assume_init() };
+        if !VM::VMCollection::is_collection_enabled() {
+            return false;
+        }
+
+        let plan = self.plan();
         if self
             .policy
             .is_gc_required(space_full, space.map(|s| SpaceStats::new(s)), plan)
@@ -96,10 +127,60 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 plan.get_reserved_pages(),
                 plan.get_total_pages(),
             );
-            self.gc_requester.request();
+            self.request();
             return true;
         }
         false
+    }
+
+    /// This method is called when the user manually requests a collection, such as `System.gc()` in Java.
+    /// Returns true if a collection is actually requested.
+    ///
+    /// # Arguments
+    /// * `force`: If true, we force a collection regardless of the settings. If false, we only trigger a collection if the settings allow it.
+    /// * `exhaustive`: If true, we try to make the collection exhaustive (e.g. full heap collection). If false, the collection kind is determined internally.
+    pub fn handle_user_collection_request(&self, force: bool, exhaustive: bool) -> bool {
+        if !self.plan().constraints().collects_garbage {
+            warn!("User attempted a collection request, but the plan can not do GC. The request is ignored.");
+            return false;
+        }
+
+        if force || !*self.options.ignore_system_gc && VM::VMCollection::is_collection_enabled() {
+            info!("User triggering collection");
+            // TODO: this may not work reliably. If a GC has been triggered, this will not force it to be a full heap GC.
+            if exhaustive {
+                if let Some(gen) = self.plan().generational() {
+                    gen.force_full_heap_collection();
+                }
+            }
+
+            self.state
+                .user_triggered_collection
+                .store(true, Ordering::Relaxed);
+            self.request();
+            return true;
+        }
+
+        false
+    }
+
+    /// MMTK has requested stop-the-world activity (e.g., stw within a concurrent gc).
+    // TODO: We should use this for concurrent GC. E.g. in concurrent Immix, when the initial mark is done, we
+    // can use this function to immediately trigger the final mark pause. The current implementation uses
+    // normal collection_required check, which may delay the final mark unnecessarily.
+    #[allow(unused)]
+    pub fn trigger_internal_collection_request(&self) {
+        self.state
+            .last_internal_triggered_collection
+            .store(true, Ordering::Relaxed);
+        self.state
+            .internal_triggered_collection
+            .store(true, Ordering::Relaxed);
+        // TODO: The current `request()` is probably incorrect for internally triggered GC.
+        // Consider removing functions related to "internal triggered collection".
+        self.request();
+        // TODO: Make sure this function works correctly for concurrent GC.
+        unimplemented!()
     }
 
     pub fn should_do_stress_gc(&self) -> bool {
