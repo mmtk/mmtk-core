@@ -122,7 +122,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.affinity.resolve_affinity(thread);
     }
 
-    /// Request a GC to be scheduled.  Called by mutator via `GCRequester`.
+    /// Request a GC to be scheduled.  Called by mutator via `GCTrigger`.
     pub(crate) fn request_schedule_collection(&self) {
         debug!("A mutator is sending GC-scheduling request to workers...");
         self.worker_monitor.make_request(WorkerGoal::Gc);

@@ -161,7 +161,7 @@ class LogProcessor:
                     "stage": int(args[0]),
                 }
 
-            case "gcrequester_request":
+            case "gc_requested":
                 result["tid"] = 1
 
             case _:

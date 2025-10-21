@@ -88,7 +88,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
             // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
             // with GC workers, which is expensive for functions like `poll`.  We use the atomic
             // flag `request_flag` to elide the need to acquire the mutex in subsequent calls.
-            probe!(mmtk, gcrequester_request);
+            probe!(mmtk, gc_requested);
             self.scheduler.request_schedule_collection();
         }
     }
@@ -176,7 +176,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
         self.state
             .internal_triggered_collection
             .store(true, Ordering::Relaxed);
-        // TODO: The current `GCRequester::request()` is probably incorrect for internally triggered GC.
+        // TODO: The current `request()` is probably incorrect for internally triggered GC.
         // Consider removing functions related to "internal triggered collection".
         self.request();
         // TODO: Make sure this function works correctly for concurrent GC.
