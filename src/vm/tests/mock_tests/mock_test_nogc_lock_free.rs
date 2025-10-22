@@ -19,7 +19,7 @@ pub fn nogc_lock_free_allocate() {
             while align <= max {
                 info!("Test allocation with alignment {}", align);
                 let addr = memory_manager::alloc(
-                    &mut fixture.mutator,
+                    fixture.mutator(),
                     8,
                     align,
                     0,

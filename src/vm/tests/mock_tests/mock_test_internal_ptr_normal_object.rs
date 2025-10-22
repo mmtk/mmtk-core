@@ -22,7 +22,7 @@ pub fn interior_pointer_in_normal_object() {
 
             let mut test_obj = || {
                 let addr = memory_manager::alloc(
-                    &mut fixture.mutator,
+                    fixture.mutator(),
                     OBJECT_SIZE,
                     8,
                     0,
@@ -38,7 +38,7 @@ pub fn interior_pointer_in_normal_object() {
                     obj,
                 );
                 memory_manager::post_alloc(
-                    &mut fixture.mutator,
+                    fixture.mutator(),
                     obj,
                     OBJECT_SIZE,
                     AllocationSemantics::Default,

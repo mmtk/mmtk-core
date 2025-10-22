@@ -16,7 +16,7 @@ pub fn allocate_no_gc_oom_on_acquire_no_oom_call() {
 
             // Attempt to allocate an object that is larger than the heap size.
             let addr = memory_manager::alloc_with_options(
-                &mut fixture.mutator,
+                fixture.mutator(),
                 1024 * 10,
                 8,
                 0,

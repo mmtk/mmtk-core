@@ -15,11 +15,11 @@ pub fn simple_gc() {
 
             // Normal alloc
             let addr =
-                memory_manager::alloc(&mut fixture.mutator, 16, 8, 0, AllocationSemantics::Default);
+                memory_manager::alloc(fixture.mutator(), 16, 8, 0, AllocationSemantics::Default);
             assert!(!addr.is_zero());
             info!("Allocated default at: {:#x}", addr);
 
-            memory_manager::handle_user_collection_request(&fixture.mmtk(), VMMutatorThread(VMThread::UNINITIALIZED));
+            memory_manager::handle_user_collection_request(&fixture.mmtk(), fixture.mutator_tls());
         },
         no_cleanup,
     )

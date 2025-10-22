@@ -20,7 +20,7 @@ pub fn allocate_with_initialize_collection() {
 
             // Allocate half MB. It should be fine.
             let addr = memory_manager::alloc(
-                &mut fixture.mutator,
+                fixture.mutator(),
                 MB >> 1,
                 8,
                 0,
@@ -30,7 +30,7 @@ pub fn allocate_with_initialize_collection() {
 
             // Fill up the heap
             let _ = memory_manager::alloc(
-                &mut fixture.mutator,
+                fixture.mutator(),
                 MB >> 1,
                 8,
                 0,
@@ -39,7 +39,7 @@ pub fn allocate_with_initialize_collection() {
 
             // Attempt another allocation. This will trigger GC.
             let addr =
-                memory_manager::alloc(&mut fixture.mutator, MB, 8, 0, AllocationSemantics::Default);
+                memory_manager::alloc(fixture.mutator(), MB, 8, 0, AllocationSemantics::Default);
             assert!(!addr.is_zero());
         },
         || {

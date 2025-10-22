@@ -22,7 +22,7 @@ pub fn allocate_alignment() {
                 while align <= max {
                     info!("Test allocation with alignment {}", align);
                     let addr = memory_manager::alloc(
-                        &mut fixture.mutator,
+                        fixture.mutator(),
                         8,
                         align,
                         0,
@@ -59,7 +59,7 @@ pub fn allocate_offset() {
                         align, OFFSET
                     );
                     let addr = memory_manager::alloc(
-                        &mut fixture.mutator,
+                        fixture.mutator(),
                         8,
                         align,
                         OFFSET,

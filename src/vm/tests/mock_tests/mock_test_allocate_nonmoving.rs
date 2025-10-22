@@ -19,13 +19,13 @@ pub fn allocate_nonmoving() {
 
             // Normal alloc
             let addr =
-                memory_manager::alloc(&mut fixture.mutator, 16, 8, 0, AllocationSemantics::Default);
+                memory_manager::alloc(fixture.mutator(), 16, 8, 0, AllocationSemantics::Default);
             assert!(!addr.is_zero());
             info!("Allocated default at: {:#x}", addr);
 
             // Non moving alloc
             let addr = memory_manager::alloc(
-                &mut fixture.mutator,
+                fixture.mutator(),
                 16,
                 8,
                 0,

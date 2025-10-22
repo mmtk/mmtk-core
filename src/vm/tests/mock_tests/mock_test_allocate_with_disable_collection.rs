@@ -22,7 +22,7 @@ pub fn allocate_with_disable_collection() {
 
             // Allocate half MB. It should be fine.
             let addr = memory_manager::alloc(
-                &mut fixture.mutator,
+                fixture.mutator(),
                 MB >> 1,
                 8,
                 0,
@@ -32,7 +32,7 @@ pub fn allocate_with_disable_collection() {
 
             // Allocate another MB. This exceeds the heap size. But as we have disabled GC, MMTk will not trigger a GC, and allow this allocation.
             let addr =
-                memory_manager::alloc(&mut fixture.mutator, MB, 8, 0, AllocationSemantics::Default);
+                memory_manager::alloc(fixture.mutator(), MB, 8, 0, AllocationSemantics::Default);
             assert!(!addr.is_zero());
         },
         no_cleanup,

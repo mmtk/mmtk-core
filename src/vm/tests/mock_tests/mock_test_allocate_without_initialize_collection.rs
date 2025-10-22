@@ -24,10 +24,7 @@ pub fn allocate_without_initialize_collection() {
             ); // Do not initialize collection
 
             // Build mutator
-            let mut mutator = memory_manager::bind_mutator(
-                fixture.get_mmtk(),
-                VMMutatorThread(VMThread::UNINITIALIZED),
-            );
+            let mut mutator = mock_api::bind_mutator().as_mock_mutator();
 
             // Allocate half MB. It should be fine.
             let addr =

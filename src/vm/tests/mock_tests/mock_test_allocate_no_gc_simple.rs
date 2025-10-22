@@ -20,7 +20,7 @@ pub fn allocate_no_gc_simple() {
             // Run a few more times to test if we set/unset no_gc_on_fail properly.
             for _ in 0..1100 {
                 last_result = memory_manager::alloc_with_options(
-                    &mut fixture.mutator,
+                    fixture.mutator(),
                     1024,
                     8,
                     0,

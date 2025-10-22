@@ -12,6 +12,8 @@ use crate::AllocationSemantics;
 use crate::MMTKBuilder;
 use crate::MMTK;
 
+use crate::util::test_util::mock_vm::mock_api;
+
 pub trait FixtureContent {
     fn create() -> Self;
 }
@@ -114,9 +116,7 @@ impl<T: FixtureContent> Default for SerialFixture<T> {
     }
 }
 
-pub struct MMTKFixture {
-    mmtk: *mut MMTK<MockVM>,
-}
+pub struct MMTKFixture;
 
 impl FixtureContent for MMTKFixture {
     fn create() -> Self {
@@ -143,28 +143,22 @@ impl MMTKFixture {
 
         let mmtk = memory_manager::mmtk_init(&builder);
         let mmtk_ptr = Box::into_raw(mmtk);
+        mock_api::set_singleton(mmtk_ptr);
 
         if initialize_collection {
             let mmtk_static: &'static MMTK<MockVM> = unsafe { &*mmtk_ptr };
             memory_manager::initialize_collection(mmtk_static, VMThread::UNINITIALIZED);
         }
 
-        MMTKFixture { mmtk: mmtk_ptr }
+        MMTKFixture
     }
 
     pub fn get_mmtk(&self) -> &'static MMTK<MockVM> {
-        unsafe { &*self.mmtk }
+        mock_api::singleton()
     }
 
     pub fn get_mmtk_mut(&mut self) -> &'static mut MMTK<MockVM> {
-        unsafe { &mut *self.mmtk }
-    }
-}
-
-impl Drop for MMTKFixture {
-    fn drop(&mut self) {
-        let mmtk_ptr: *const MMTK<MockVM> = self.mmtk as _;
-        let _ = unsafe { Box::from_raw(mmtk_ptr as *mut MMTK<MockVM>) };
+        mock_api::singleton_mut()
     }
 }
 
@@ -172,7 +166,7 @@ use crate::plan::Mutator;
 
 pub struct MutatorFixture {
     mmtk: MMTKFixture,
-    pub mutator: Box<Mutator<MockVM>>,
+    mutator: VMMutatorThread,
 }
 
 impl FixtureContent for MutatorFixture {
@@ -193,8 +187,7 @@ impl MutatorFixture {
             },
             true,
         );
-        let mutator =
-            memory_manager::bind_mutator(mmtk.get_mmtk(), VMMutatorThread(VMThread::UNINITIALIZED));
+        let mutator = mock_api::bind_mutator();
         Self { mmtk, mutator }
     }
 
@@ -203,13 +196,20 @@ impl MutatorFixture {
         F: FnOnce(&mut MMTKBuilder),
     {
         let mmtk = MMTKFixture::create_with_builder(with_builder, true);
-        let mutator =
-            memory_manager::bind_mutator(mmtk.get_mmtk(), VMMutatorThread(VMThread::UNINITIALIZED));
+        let mutator = mock_api::bind_mutator();
         Self { mmtk, mutator }
     }
 
     pub fn mmtk(&self) -> &'static MMTK<MockVM> {
         self.mmtk.get_mmtk()
+    }
+
+    pub fn mutator(&self) -> &'static mut Mutator<MockVM> {
+        self.mutator.as_mock_mutator()
+    }
+
+    pub fn mutator_tls(&self) -> VMMutatorThread {
+        self.mutator
     }
 }
 
@@ -228,11 +228,11 @@ impl FixtureContent for SingleObject {
         let size = 40;
         let semantics = AllocationSemantics::Default;
 
-        let addr = memory_manager::alloc(&mut mutator.mutator, size, 8, 0, semantics);
+        let addr = memory_manager::alloc(mutator.mutator(), size, 8, 0, semantics);
         assert!(!addr.is_zero());
 
         let objref = MockVM::object_start_to_ref(addr);
-        memory_manager::post_alloc(&mut mutator.mutator, objref, size, semantics);
+        memory_manager::post_alloc(mutator.mutator(), objref, size, semantics);
 
         SingleObject { objref, mutator }
     }
@@ -240,11 +240,11 @@ impl FixtureContent for SingleObject {
 
 impl SingleObject {
     pub fn mutator(&self) -> &Mutator<MockVM> {
-        &self.mutator.mutator
+        self.mutator.mutator()
     }
 
     pub fn mutator_mut(&mut self) -> &mut Mutator<MockVM> {
-        &mut self.mutator.mutator
+        self.mutator.mutator()
     }
 }
 
@@ -261,17 +261,17 @@ impl FixtureContent for TwoObjects {
         let size = 128;
         let semantics = AllocationSemantics::Default;
 
-        let addr1 = memory_manager::alloc(&mut mutator.mutator, size, 8, 0, semantics);
+        let addr1 = memory_manager::alloc(mutator.mutator(), size, 8, 0, semantics);
         assert!(!addr1.is_zero());
 
         let objref1 = MockVM::object_start_to_ref(addr1);
-        memory_manager::post_alloc(&mut mutator.mutator, objref1, size, semantics);
+        memory_manager::post_alloc(mutator.mutator(), objref1, size, semantics);
 
-        let addr2 = memory_manager::alloc(&mut mutator.mutator, size, 8, 0, semantics);
+        let addr2 = memory_manager::alloc(mutator.mutator(), size, 8, 0, semantics);
         assert!(!addr2.is_zero());
 
         let objref2 = MockVM::object_start_to_ref(addr2);
-        memory_manager::post_alloc(&mut mutator.mutator, objref2, size, semantics);
+        memory_manager::post_alloc(mutator.mutator(), objref2, size, semantics);
 
         TwoObjects {
             objref1,

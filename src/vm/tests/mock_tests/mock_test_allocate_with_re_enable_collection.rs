@@ -28,7 +28,7 @@ pub fn allocate_with_re_enable_collection() {
 
             // Allocate half MB. It should be fine.
             let addr = memory_manager::alloc(
-                &mut fixture.mutator,
+                fixture.mutator(),
                 MB >> 1,
                 8,
                 0,
@@ -39,11 +39,11 @@ pub fn allocate_with_re_enable_collection() {
             // In the next allocation GC is disabled. So we can keep allocate without triggering a GC.
             // Fill up the heap
             let _ =
-                memory_manager::alloc(&mut fixture.mutator, MB, 8, 0, AllocationSemantics::Default);
+                memory_manager::alloc(fixture.mutator(), MB, 8, 0, AllocationSemantics::Default);
 
             // Attempt another allocation. This will trigger GC since GC is enabled again.
             let addr =
-                memory_manager::alloc(&mut fixture.mutator, MB, 8, 0, AllocationSemantics::Default);
+                memory_manager::alloc(fixture.mutator(), MB, 8, 0, AllocationSemantics::Default);
             assert!(!addr.is_zero());
         },
         || {

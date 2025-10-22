@@ -20,6 +20,7 @@ pub(crate) mod mock_test_prelude {
     pub use crate::util::test_util::fixtures::*;
     pub use crate::util::test_util::mock_vm::*;
     pub use crate::vm::*;
+    pub use crate::util::test_util::mock_vm::mock_api;
 }
 
 mod mock_test_allocate_align_offset;

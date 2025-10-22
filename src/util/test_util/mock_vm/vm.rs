@@ -21,23 +21,23 @@ use crate::vm::VMBinding;
 use crate::Mutator;
 use crate::util::test_util;
 use crate::util::test_util::mock_vm::thread_park::ThreadPark;
+use crate::MMTK;
+use crate::MMTKBuilder;
 
+use crate::util::test_util::mock_vm::mock_api;
 use super::mock_method::*;
 
 use std::default::Default;
 use std::ops::Range;
 use std::sync::Mutex;
+use std::sync::RwLock;
 
 /// The offset between object reference and the allocation address if we use
 /// the default mock VM.
 pub const DEFAULT_OBJECT_REF_OFFSET: usize = crate::util::constants::BYTES_IN_ADDRESS;
 
 // To mock static methods, we have to create a static instance of `MockVM`.
-lazy_static! {
-    // The mutex may get poisoned any time. Accessing this mutex needs to deal with the poisoned case.
-    // One can use read/write_mockvm to access mock vm.
-    static ref MOCK_VM_INSTANCE: Mutex<MockVM> = Mutex::new(MockVM::default());
-}
+pub static mut MOCK_VM_INSTANCE: *mut MockVM = std::ptr::null_mut();
 
 // MockVM only allows mock methods with references of no lifetime or static lifetime.
 // If `VMBinding` methods has references of a specific lifetime,
@@ -68,25 +68,27 @@ macro_rules! mock_any {
     };
 }
 
+pub fn init_mockvm(mockvm: MockVM) {
+    unsafe {
+        // assert!(MOCK_VM_INSTANCE.is_null());
+        let boxed = Box::new(mockvm);
+        MOCK_VM_INSTANCE = Box::into_raw(boxed);
+    }
+}
+
 /// Read from the static MockVM instance. It deals with the case of a poisoned lock.
 pub fn read_mockvm<F, R>(func: F) -> R
 where
     F: FnOnce(&MockVM) -> R,
 {
-    let lock = MOCK_VM_INSTANCE
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    func(&lock)
+    func(unsafe { &*MOCK_VM_INSTANCE })
 }
 /// Write to the static MockVM instance. It deals with the case of a poisoned lock.
 pub fn write_mockvm<F, R>(func: F) -> R
 where
     F: FnOnce(&mut MockVM) -> R,
 {
-    let mut lock = MOCK_VM_INSTANCE
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    func(&mut lock)
+    func(unsafe { &mut *MOCK_VM_INSTANCE })
 }
 
 /// A test that uses `MockVM` should use this method to wrap the entire test
@@ -105,9 +107,20 @@ where
     C: FnOnce(),
 {
     test_util::serial_test(|| {
+        {
+            use std::panic;
+            let orig_hook = panic::take_hook();
+            panic::set_hook(Box::new(move |panic_info| {
+                // invoke the default handler and exit the process
+                error!("Panic occurred in test with MockVM:");
+                error!("{}", panic_info);
+                orig_hook(panic_info);
+                std::process::exit(1);
+            }));
+        }
         // Setup
         {
-            write_mockvm(|mock| *mock = setup());
+            init_mockvm(setup());
         }
         test_util::with_cleanup(test, cleanup);
     })
@@ -265,27 +278,85 @@ pub struct MockVM {
     pub forward_weak_refs: Box<dyn MockAny>,
 }
 
+use std::sync::atomic::AtomicUsize;
+use std::collections::HashMap;
+use std::sync::atomic::Ordering;
+
+#[derive(Clone)]
+pub struct MutatorHandle {
+    pub ptr: *mut Mutator<MockVM>,
+}
+
+impl MutatorHandle {
+    pub fn as_mutator(&self) -> &'static mut Mutator<MockVM> {
+        unsafe { &mut *self.ptr }
+    }
+}
+
+unsafe impl Sync for MutatorHandle {}
+unsafe impl Send for MutatorHandle {}
+
 lazy_static! {
-    static ref THREAD_PARK: ThreadPark = ThreadPark::new();
+    pub static ref MUTATOR_PARK: ThreadPark = ThreadPark::new();
 }
 
 impl Default for MockVM {
     fn default() -> Self {
         Self {
-            number_of_mutators: MockMethod::new_unimplemented(),
-            is_mutator: MockMethod::new_fixed(Box::new(|_| true)),
-            mutator: MockMethod::new_unimplemented(),
-            mutators: MockMethod::new_unimplemented(),
+            number_of_mutators: MockMethod::new_fixed(Box::new(|()| {
+                // Just return the number of registered mutator threads
+                MUTATOR_PARK.number_of_threads()
+            })),
+            is_mutator: MockMethod::new_fixed(Box::new(|tls: VMThread| MUTATOR_PARK.is_thread(VMMutatorThread(tls)))),
+            mutator: MockMethod::new_fixed(Box::new(|tls| {
+                tls.as_mock_mutator()
+            })),
+            mutators: MockMethod::new_fixed(Box::new(|()| {
+                // Just return an iterator over all registered mutators
+                let mutators: Vec<&'static mut Mutator<MockVM>> = MUTATOR_PARK
+                    .all_threads()
+                    .into_iter()
+                    .map(|tls| tls.as_mock_mutator())
+                    .collect();
+                Box::new(mutators.into_iter())
+            })),
             vm_trace_object: MockMethod::new_fixed(Box::new(|(_, object, _)| {
                 panic!("MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.", object)
             })),
 
-            stop_all_mutators: MockMethod::new_unimplemented(),
-            resume_mutators: MockMethod::new_unimplemented(),
-            block_for_gc: MockMethod::new_fixed(Box::new(|_| {
-                THREAD_PARK.park();
+            stop_all_mutators: MockMethod::new_fixed(Box::new(|(_tls, mut mutator_visitor)| {
+                info!("Waiting for all threads to park...");
+                MUTATOR_PARK.wait_all_parked();
+                info!("All threads are parked.");
+
+                MUTATOR_PARK
+                    .all_threads()
+                    .into_iter()
+                    .for_each(|tls| {
+                        mutator_visitor(tls.as_mock_mutator())
+                    });
             })),
-            spawn_gc_thread: MockMethod::new_default(),
+            resume_mutators: MockMethod::new_fixed(Box::new(|_tls| {
+                info!("Resuming all parked threads...");
+                MUTATOR_PARK.unpark_all();
+            })),
+            block_for_gc: MockMethod::new_fixed(Box::new(|tls| {
+                MUTATOR_PARK.park(tls);
+            })),
+            spawn_gc_thread: MockMethod::new_fixed(Box::new(|(_parent_tls, ctx)| {
+                        // Just drop the join handle. The thread will run until the process quits.
+                let _ = std::thread::Builder::new()
+                    .name("MMTk Worker".to_string())
+                    .spawn(move || {
+                        // Start the worker loop
+                        let worker_tls = VMWorkerThread(VMThread::UNINITIALIZED);
+                        match ctx {
+                            GCThreadContext::Worker(w) => {
+                                crate::memory_manager::start_worker(&mock_api::singleton(), worker_tls, w)
+                            }
+                        }
+                    });
+            })),
             out_of_memory: MockMethod::new_fixed(Box::new(|(_, err)| {
                 panic!("Out of memory with {:?}!", err)
             })),
@@ -351,7 +422,7 @@ impl Default for MockVM {
                 ),
                 (),
             >::new_unimplemented()),
-            notify_initial_thread_scan_complete: MockMethod::new_unimplemented(),
+            notify_initial_thread_scan_complete: MockMethod::new_fixed(Box::new(|(_, _)| {})),
             supports_return_barrier: MockMethod::new_unimplemented(),
             prepare_for_roots_re_scanning: MockMethod::new_unimplemented(),
             // Same here: the `MockMethod` is just a place holder. See the above comments.
@@ -584,17 +655,19 @@ impl crate::vm::Scanning<MockVM> for MockVM {
         mutator: &'static mut Mutator<Self>,
         factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
     ) {
-        mock_any!(scan_roots_in_mutator_thread(
-            tls,
-            mutator,
-            Box::new(factory)
-        ))
+        // mock_any!(scan_roots_in_mutator_thread(
+        //     tls,
+        //     mutator,
+        //     Box::new(factory)
+        // ))
+        warn!("scan_roots_in_mutator_thread is not properly mocked. The default implementation does nothing.");
     }
     fn scan_vm_specific_roots(
         tls: VMWorkerThread,
         factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
     ) {
-        mock_any!(scan_vm_specific_roots(tls, Box::new(factory)))
+        // mock_any!(scan_vm_specific_roots(tls, Box::new(factory)))
+        warn!("scan_vm_specific_roots is not properly mocked. The default implementation does nothing.");
     }
     fn notify_initial_thread_scan_complete(partial_scan: bool, tls: VMWorkerThread) {
         mock!(notify_initial_thread_scan_complete(partial_scan, tls))
@@ -609,15 +682,18 @@ impl crate::vm::Scanning<MockVM> for MockVM {
         worker: &mut GCWorker<Self>,
         tracer_context: impl ObjectTracerContext<Self>,
     ) -> bool {
-        let worker: &'static mut GCWorker<Self> = lifetime!(worker);
-        mock_any!(process_weak_refs(worker, tracer_context))
+        // let worker: &'static mut GCWorker<Self> = lifetime!(worker);
+        // mock_any!(process_weak_refs(worker, tracer_context))
+        warn!("process_weak_refs is not properly mocked. The default implementation does nothing.");
+        false
     }
     fn forward_weak_refs(
         worker: &mut GCWorker<Self>,
         tracer_context: impl ObjectTracerContext<Self>,
     ) {
-        let worker: &'static mut GCWorker<Self> = lifetime!(worker);
-        mock_any!(forward_weak_refs(worker, tracer_context))
+        // let worker: &'static mut GCWorker<Self> = lifetime!(worker);
+        // mock_any!(forward_weak_refs(worker, tracer_context))
+        warn!("forward_weak_refs is not properly mocked. The default implementation does nothing.");
     }
 }
 
