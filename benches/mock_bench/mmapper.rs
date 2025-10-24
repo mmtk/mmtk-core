@@ -12,7 +12,7 @@ pub fn bench(c: &mut Criterion) {
     let mut fixture = MutatorFixture::create_with_heapsize(1 << 30);
 
     let regular = memory_manager::alloc(
-        &mut fixture.mutator,
+        fixture.mutator(),
         40,
         0,
         0,
@@ -20,7 +20,7 @@ pub fn bench(c: &mut Criterion) {
     );
 
     let large = memory_manager::alloc(
-        &mut fixture.mutator,
+        fixture.mutator(),
         40,
         0,
         0,

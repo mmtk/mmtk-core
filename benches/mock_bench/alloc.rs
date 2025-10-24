@@ -23,7 +23,7 @@ pub fn bench(c: &mut Criterion) {
     c.bench_function("alloc", |b| {
         b.iter(|| {
             let _addr =
-                memory_manager::alloc(&mut fixture.mutator, 8, 8, 0, AllocationSemantics::Default);
+                memory_manager::alloc(fixture.mutator(), 8, 8, 0, AllocationSemantics::Default);
         })
     });
 }
