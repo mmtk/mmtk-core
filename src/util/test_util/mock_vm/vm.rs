@@ -21,16 +21,12 @@ use crate::vm::VMBinding;
 use crate::Mutator;
 use crate::util::test_util;
 use crate::util::test_util::mock_vm::thread_park::ThreadPark;
-use crate::MMTK;
-use crate::MMTKBuilder;
 
 use crate::util::test_util::mock_vm::mock_api;
 use super::mock_method::*;
 
 use std::default::Default;
 use std::ops::Range;
-use std::sync::Mutex;
-use std::sync::RwLock;
 
 /// The offset between object reference and the allocation address if we use
 /// the default mock VM.
@@ -113,8 +109,12 @@ where
             panic::set_hook(Box::new(move |panic_info| {
                 let current_tls = current_thread_tls();
                 if GC_THREADS.is_thread(current_tls) {
+                    use std::backtrace::Backtrace;
+                    let bt = Backtrace::force_capture();
+
                     // If this is a GC thread, we make the whole process abort.
                     error!("Panic occurred in GC thread with MockVM. Aborting the process. \n{}", panic_info);
+                    error!("Backtrace:\n{}", bt);
                     std::process::exit(1);
                 } else {
                     // invoke the default handler
@@ -282,10 +282,6 @@ pub struct MockVM {
     pub forward_weak_refs: Box<dyn MockAny>,
 }
 
-use std::sync::atomic::AtomicUsize;
-use std::collections::HashMap;
-use std::sync::atomic::Ordering;
-
 #[derive(Clone)]
 pub struct MutatorHandle {
     pub ptr: *mut Mutator<MockVM>,
@@ -358,7 +354,6 @@ impl Default for MockVM {
                 let _ = std::thread::Builder::new()
                     .name("MMTk Worker".to_string())
                     .spawn(move || {
-                        use thread_id;
                         // Start the worker loop
                         let worker_tls = VMWorkerThread(current_thread_tls());
                         GC_THREADS.register(worker_tls.0);
@@ -437,7 +432,9 @@ impl Default for MockVM {
             >::new_unimplemented()),
             notify_initial_thread_scan_complete: MockMethod::new_fixed(Box::new(|(_, _)| {})),
             supports_return_barrier: MockMethod::new_unimplemented(),
-            prepare_for_roots_re_scanning: MockMethod::new_unimplemented(),
+            prepare_for_roots_re_scanning: MockMethod::new_fixed(Box::new(|_| {
+                warn!("prepare_for_roots_re_scanning called on MockVM, it is empty at the moment.");
+            })),
             // Same here: the `MockMethod` is just a place holder. See the above comments.
             process_weak_refs: Box::new(MockMethod::<
                 (

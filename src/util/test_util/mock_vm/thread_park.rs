@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex};
-use std::thread::{self, ThreadId};
 use crate::util::VMThread;
 
 #[derive(Clone)]
@@ -33,7 +32,7 @@ impl ThreadPark {
 
     /// Register the current thread for coordination.
     pub fn register(&self, tid: VMThread) {
-        info!("Register {:?} to {}", tid, self.name);
+        debug!("Register {:?} to {}", tid, self.name);
         let mut state = self.inner.lock.lock().unwrap();
         state.parked.insert(tid, false);
     }

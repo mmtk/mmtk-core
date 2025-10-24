@@ -12,7 +12,7 @@ pub fn allocate_no_gc_oom_on_acquire_no_oom_call() {
         default_setup,
         || {
             const KB: usize = 1024;
-            let mut fixture = MutatorFixture::create_with_heapsize(KB);
+            let fixture = MutatorFixture::create_with_heapsize(KB);
 
             // Attempt to allocate an object that is larger than the heap size.
             let addr = memory_manager::alloc_with_options(

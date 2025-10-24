@@ -1,11 +1,8 @@
-use crate::{MMTKBuilder, MMTK};
+use crate::MMTK;
 use super::MockVM;
 use super::vm;
 use crate::Mutator;
 use crate::util::*;
-
-use std::sync::atomic::Ordering;
-use std::cell::UnsafeCell;
 
 pub static mut MMTK_SINGLETON: *mut MMTK<MockVM> = std::ptr::null_mut();
 

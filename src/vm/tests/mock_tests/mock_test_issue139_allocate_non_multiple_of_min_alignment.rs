@@ -7,7 +7,7 @@ pub fn issue139_alloc_non_multiple_of_min_alignment() {
     with_mockvm(
         default_setup,
         || {
-            let mut fixture = MutatorFixture::create();
+            let fixture = MutatorFixture::create();
 
             // Allocate 6 bytes with 8 bytes ailgnment required
             let addr =

@@ -15,7 +15,7 @@ pub fn allocate_nonmoving() {
         || {
             // 1MB heap
             const MB: usize = 1024 * 1024;
-            let mut fixture = MutatorFixture::create_with_heapsize(MB);
+            let fixture = MutatorFixture::create_with_heapsize(MB);
 
             // Normal alloc
             let addr =

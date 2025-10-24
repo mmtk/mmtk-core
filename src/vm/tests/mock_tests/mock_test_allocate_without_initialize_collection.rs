@@ -1,6 +1,5 @@
 use super::mock_test_prelude::*;
 
-use crate::util::opaque_pointer::*;
 use crate::AllocationSemantics;
 
 /// This test allocates without calling initialize_collection(). When we exceed the heap limit, a GC should be triggered by MMTk.
@@ -13,7 +12,7 @@ pub fn allocate_without_initialize_collection() {
         default_setup,
         || {
             const MB: usize = 1024 * 1024;
-            let fixture = MMTKFixture::create_with_builder(
+            let _fixture = MMTKFixture::create_with_builder(
                 |builder| {
                     builder
                         .options

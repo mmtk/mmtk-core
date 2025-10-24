@@ -24,7 +24,7 @@ pub fn allocate_with_re_enable_collection() {
         },
         || {
             const MB: usize = 1024 * 1024;
-            let mut fixture = MutatorFixture::create_with_heapsize(MB);
+            let fixture = MutatorFixture::create_with_heapsize(MB);
 
             if *fixture.mmtk().get_plan().options().plan == crate::util::options::PlanSelector::NoGC {
                 // The test triggers GC, which causes a different panic message for NoGC plan.
@@ -35,7 +35,7 @@ pub fn allocate_with_re_enable_collection() {
                     mock.is_collection_enabled.call(());
                     mock.is_collection_enabled.call(());
                     mock.is_collection_enabled.call(());
-                    mock.block_for_gc.call((VMMutatorThread(VMThread::UNINITIALIZED)));
+                    mock.block_for_gc.call(VMMutatorThread(VMThread::UNINITIALIZED));
                 });
             }
 

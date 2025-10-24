@@ -2,7 +2,6 @@
 
 use super::mock_test_prelude::*;
 use crate::plan::AllocationSemantics;
-use crate::util::{VMThread, VMMutatorThread};
 
 #[test]
 pub fn simple_gc() {
@@ -11,7 +10,7 @@ pub fn simple_gc() {
         || {
             // 1MB heap
             const MB: usize = 1024 * 1024;
-            let mut fixture = MutatorFixture::create_with_heapsize(MB);
+            let fixture = MutatorFixture::create_with_heapsize(MB);
 
             // Normal alloc
             let addr =

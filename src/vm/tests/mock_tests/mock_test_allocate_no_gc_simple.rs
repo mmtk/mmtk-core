@@ -12,7 +12,7 @@ pub fn allocate_no_gc_simple() {
         default_setup,
         || {
             const MB: usize = 1024 * 1024;
-            let mut fixture = MutatorFixture::create_with_heapsize(MB);
+            let fixture = MutatorFixture::create_with_heapsize(MB);
 
             if *fixture.mmtk().get_plan().options().plan == crate::util::options::PlanSelector::NoGC {
                 // The current thread won't be blocked. But GC will still be triggered. For NoGC plan, triggering GC causes panic.

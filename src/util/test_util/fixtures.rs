@@ -222,7 +222,7 @@ pub struct SingleObject {
 
 impl FixtureContent for SingleObject {
     fn create() -> Self {
-        let mut mutator = MutatorFixture::create();
+        let mutator = MutatorFixture::create();
 
         // A relatively small object, typical for Ruby.
         let size = 40;
@@ -256,7 +256,7 @@ pub struct TwoObjects {
 
 impl FixtureContent for TwoObjects {
     fn create() -> Self {
-        let mut mutator = MutatorFixture::create();
+        let mutator = MutatorFixture::create();
 
         let size = 128;
         let semantics = AllocationSemantics::Default;
