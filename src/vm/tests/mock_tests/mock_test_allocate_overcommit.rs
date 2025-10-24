@@ -16,6 +16,11 @@ pub fn allocate_overcommit() {
             const MB: usize = 1024 * 1024;
             let mut fixture = MutatorFixture::create_with_heapsize(MB);
 
+            if *fixture.mmtk().get_plan().options().plan == crate::util::options::PlanSelector::NoGC {
+                // Overcommit still triggers GC. For NoGC plan, triggering GC causes panic.
+                return;
+            }
+
             let mut last_result = crate::util::Address::MAX;
 
             // Attempt allocation: allocate 1024 bytes. We should fill up the heap by 1024 allocations or fewer (some plans reserves more memory, such as semispace and generational GCs)

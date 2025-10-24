@@ -723,6 +723,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             .try_map_metadata_address_range(rtn.start, rtn.extent, rtn.name)
             .unwrap_or_else(|e| {
                 // TODO(Javad): handle meta space allocation failure
+                warn!("{}", memory::get_process_memory_maps());
                 panic!("failed to mmap meta memory: {e}");
             });
 

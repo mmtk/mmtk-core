@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, ThreadId};
-use crate::util::VMMutatorThread;
+use crate::util::VMThread;
 
 #[derive(Clone)]
 pub struct ThreadPark {
+    name: &'static str,
     inner: Arc<Inner>,
 }
 
@@ -16,12 +17,13 @@ struct Inner {
 #[derive(Default)]
 struct State {
     /// All registered parked and whether they are currently parked.
-    parked: HashMap<VMMutatorThread, bool>,
+    parked: HashMap<VMThread, bool>,
 }
 
 impl ThreadPark {
-    pub fn new() -> Self {
+    pub fn new(name: &'static str) -> Self {
         Self {
+            name,
             inner: Arc::new(Inner {
                 lock: Mutex::new(State::default()),
                 cvar: Condvar::new(),
@@ -30,18 +32,18 @@ impl ThreadPark {
     }
 
     /// Register the current thread for coordination.
-    pub fn register(&self, tid: VMMutatorThread) {
-        info!("Register {:?} to ThreadPark", tid);
+    pub fn register(&self, tid: VMThread) {
+        info!("Register {:?} to {}", tid, self.name);
         let mut state = self.inner.lock.lock().unwrap();
         state.parked.insert(tid, false);
     }
 
-    pub fn unregister(&self, tid: VMMutatorThread) {
+    pub fn unregister(&self, tid: VMThread) {
         let mut state = self.inner.lock.lock().unwrap();
         state.parked.remove(&tid);
     }
 
-    pub fn is_thread(&self, tid: VMMutatorThread) -> bool {
+    pub fn is_thread(&self, tid: VMThread) -> bool {
         let state = self.inner.lock.lock().unwrap();
         state.parked.contains_key(&tid)
     }
@@ -51,20 +53,20 @@ impl ThreadPark {
         state.parked.len()
     }
 
-    pub fn all_threads(&self) -> Vec<VMMutatorThread> {
+    pub fn all_threads(&self) -> Vec<VMThread> {
         let state = self.inner.lock.lock().unwrap();
         state.parked.keys().cloned().collect()
     }
 
     /// Park the current thread (set its state = parked and wait for unpark_all()).
-    pub fn park(&self, tid: VMMutatorThread) {
+    pub fn park(&self, tid: VMThread) {
         let mut state = self.inner.lock.lock().unwrap();
 
         // Mark this thread as parked
         if let Some(entry) = state.parked.get_mut(&tid) {
             *entry = true;
         } else {
-            panic!("Thread {:?} not registered before park()", tid);
+            panic!("Thread {:?} not registered to {} before park() f", tid, self.name);
         }
 
         // Notify any waiter that one more thread has parked

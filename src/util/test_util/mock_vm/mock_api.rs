@@ -48,6 +48,6 @@ pub fn bind_mutator() -> VMMutatorThread {
 
     unsafe { (*mutator_handle_ptr).ptr = mutator_ptr; }
 
-    vm::MUTATOR_PARK.register(tls);
+    vm::MUTATOR_PARK.register(tls.0);
     tls
 }

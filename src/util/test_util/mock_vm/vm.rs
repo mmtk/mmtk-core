@@ -111,11 +111,15 @@ where
             use std::panic;
             let orig_hook = panic::take_hook();
             panic::set_hook(Box::new(move |panic_info| {
-                // invoke the default handler and exit the process
-                error!("Panic occurred in test with MockVM:");
-                error!("{}", panic_info);
-                orig_hook(panic_info);
-                std::process::exit(1);
+                let current_tls = current_thread_tls();
+                if GC_THREADS.is_thread(current_tls) {
+                    // If this is a GC thread, we make the whole process abort.
+                    error!("Panic occurred in GC thread with MockVM. Aborting the process. \n{}", panic_info);
+                    std::process::exit(1);
+                } else {
+                    // invoke the default handler
+                    orig_hook(panic_info);
+                }
             }));
         }
         // Setup
@@ -297,7 +301,13 @@ unsafe impl Sync for MutatorHandle {}
 unsafe impl Send for MutatorHandle {}
 
 lazy_static! {
-    pub static ref MUTATOR_PARK: ThreadPark = ThreadPark::new();
+    pub static ref MUTATOR_PARK: ThreadPark = ThreadPark::new("mutators");
+    // We never really park GC threads. We just reuse this struct to track GC threads.
+    pub static ref GC_THREADS: ThreadPark = ThreadPark::new("gc workers");
+}
+
+fn current_thread_tls() -> VMThread {
+    VMThread(OpaquePointer::from_address(unsafe { Address::from_usize(thread_id::get()) }))
 }
 
 impl Default for MockVM {
@@ -307,7 +317,7 @@ impl Default for MockVM {
                 // Just return the number of registered mutator threads
                 MUTATOR_PARK.number_of_threads()
             })),
-            is_mutator: MockMethod::new_fixed(Box::new(|tls: VMThread| MUTATOR_PARK.is_thread(VMMutatorThread(tls)))),
+            is_mutator: MockMethod::new_fixed(Box::new(|tls: VMThread| MUTATOR_PARK.is_thread(tls))),
             mutator: MockMethod::new_fixed(Box::new(|tls| {
                 tls.as_mock_mutator()
             })),
@@ -316,7 +326,7 @@ impl Default for MockVM {
                 let mutators: Vec<&'static mut Mutator<MockVM>> = MUTATOR_PARK
                     .all_threads()
                     .into_iter()
-                    .map(|tls| tls.as_mock_mutator())
+                    .map(|tls| VMMutatorThread(tls).as_mock_mutator())
                     .collect();
                 Box::new(mutators.into_iter())
             })),
@@ -333,7 +343,7 @@ impl Default for MockVM {
                     .all_threads()
                     .into_iter()
                     .for_each(|tls| {
-                        mutator_visitor(tls.as_mock_mutator())
+                        mutator_visitor(VMMutatorThread(tls).as_mock_mutator())
                     });
             })),
             resume_mutators: MockMethod::new_fixed(Box::new(|_tls| {
@@ -341,20 +351,23 @@ impl Default for MockVM {
                 MUTATOR_PARK.unpark_all();
             })),
             block_for_gc: MockMethod::new_fixed(Box::new(|tls| {
-                MUTATOR_PARK.park(tls);
+                MUTATOR_PARK.park(tls.0);
             })),
             spawn_gc_thread: MockMethod::new_fixed(Box::new(|(_parent_tls, ctx)| {
                         // Just drop the join handle. The thread will run until the process quits.
                 let _ = std::thread::Builder::new()
                     .name("MMTk Worker".to_string())
                     .spawn(move || {
+                        use thread_id;
                         // Start the worker loop
-                        let worker_tls = VMWorkerThread(VMThread::UNINITIALIZED);
+                        let worker_tls = VMWorkerThread(current_thread_tls());
+                        GC_THREADS.register(worker_tls.0);
                         match ctx {
                             GCThreadContext::Worker(w) => {
                                 crate::memory_manager::start_worker(&mock_api::singleton(), worker_tls, w)
                             }
                         }
+                        GC_THREADS.unregister(worker_tls.0);
                     });
             })),
             out_of_memory: MockMethod::new_fixed(Box::new(|(_, err)| {
@@ -541,15 +554,39 @@ impl crate::vm::Collection<MockVM> for MockVM {
     }
 }
 
+#[cfg(feature = "mock_test_header_metadata")]
+mod header_metadata {
+    use super::*;
+    pub const MOCK_VM_GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::in_header(0);
+    pub const MOCK_VM_LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec =
+        VMLocalForwardingBitsSpec::in_header(0);
+    pub const MOCK_VM_LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec = VMLocalMarkBitSpec::in_header(0);
+    pub const MOCK_VM_LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec =
+        VMLocalLOSMarkNurserySpec::in_header(0);
+}
+#[cfg(feature = "mock_test_header_metadata")]
+use header_metadata::*;
+
+#[cfg(feature = "mock_test_side_metadata")]
+mod side_metadata {
+    use super::*;
+    pub const MOCK_VM_GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::side_first();
+    pub const MOCK_VM_LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec =
+        VMLocalForwardingBitsSpec::side_first();
+    pub const MOCK_VM_LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec = VMLocalMarkBitSpec::side_after(&MOCK_VM_LOCAL_FORWARDING_BITS_SPEC.as_spec());
+    pub const MOCK_VM_LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec =
+        VMLocalLOSMarkNurserySpec::side_after(&MOCK_VM_LOCAL_MARK_BIT_SPEC.as_spec());
+}
+#[cfg(feature = "mock_test_side_metadata")]
+use side_metadata::*;
+
 impl crate::vm::ObjectModel<MockVM> for MockVM {
-    const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::in_header(0);
+    const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = MOCK_VM_GLOBAL_LOG_BIT_SPEC;
     const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec =
         VMLocalForwardingPointerSpec::in_header(0);
-    const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec =
-        VMLocalForwardingBitsSpec::in_header(0);
-    const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec = VMLocalMarkBitSpec::in_header(0);
-    const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec =
-        VMLocalLOSMarkNurserySpec::in_header(0);
+    const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec = MOCK_VM_LOCAL_FORWARDING_BITS_SPEC;
+    const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec = MOCK_VM_LOCAL_MARK_BIT_SPEC;
+    const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec = MOCK_VM_LOCAL_LOS_MARK_NURSERY_SPEC;
 
     #[cfg(feature = "object_pinning")]
     const LOCAL_PINNING_BIT_SPEC: VMLocalPinningBitSpec = VMLocalPinningBitSpec::in_header(0);
