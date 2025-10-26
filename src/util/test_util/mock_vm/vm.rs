@@ -10,6 +10,8 @@ use crate::util::alloc::AllocationError;
 use crate::util::copy::*;
 use crate::util::heap::gc_trigger::GCTriggerPolicy;
 use crate::util::opaque_pointer::*;
+use crate::util::test_util;
+use crate::util::test_util::mock_vm::thread_park::ThreadPark;
 use crate::util::{Address, ObjectReference};
 use crate::vm::object_model::specs::*;
 use crate::vm::GCThreadContext;
@@ -19,11 +21,9 @@ use crate::vm::RootsWorkFactory;
 use crate::vm::SlotVisitor;
 use crate::vm::VMBinding;
 use crate::Mutator;
-use crate::util::test_util;
-use crate::util::test_util::mock_vm::thread_park::ThreadPark;
 
-use crate::util::test_util::mock_vm::mock_api;
 use super::mock_method::*;
+use crate::util::test_util::mock_vm::mock_api;
 
 use std::default::Default;
 use std::ops::Range;
@@ -58,6 +58,7 @@ macro_rules! mock {
     };
 }
 /// Call `MockAny`.
+#[allow(unused_macros)] // This macro is unused for now.
 macro_rules! mock_any {
     ($fn: ident($($arg:expr),*)) => {
         *write_mockvm(|mock| mock.$fn.call_any(Box::new(($($arg),*)))).downcast().unwrap()
@@ -113,7 +114,10 @@ where
                     let bt = Backtrace::force_capture();
 
                     // If this is a GC thread, we make the whole process abort.
-                    error!("Panic occurred in GC thread with MockVM. Aborting the process. \n{}", panic_info);
+                    error!(
+                        "Panic occurred in GC thread with MockVM. Aborting the process. \n{}",
+                        panic_info
+                    );
                     error!("Backtrace:\n{}", bt);
                     std::process::exit(1);
                 } else {
@@ -303,7 +307,9 @@ lazy_static! {
 }
 
 fn current_thread_tls() -> VMThread {
-    VMThread(OpaquePointer::from_address(unsafe { Address::from_usize(thread_id::get()) }))
+    VMThread(OpaquePointer::from_address(unsafe {
+        Address::from_usize(thread_id::get())
+    }))
 }
 
 impl Default for MockVM {
@@ -313,10 +319,10 @@ impl Default for MockVM {
                 // Just return the number of registered mutator threads
                 MUTATOR_PARK.number_of_threads()
             })),
-            is_mutator: MockMethod::new_fixed(Box::new(|tls: VMThread| MUTATOR_PARK.is_thread(tls))),
-            mutator: MockMethod::new_fixed(Box::new(|tls| {
-                tls.as_mock_mutator()
+            is_mutator: MockMethod::new_fixed(Box::new(|tls: VMThread| {
+                MUTATOR_PARK.is_thread(tls)
             })),
+            mutator: MockMethod::new_fixed(Box::new(|tls| tls.as_mock_mutator())),
             mutators: MockMethod::new_fixed(Box::new(|()| {
                 // Just return an iterator over all registered mutators
                 let mutators: Vec<&'static mut Mutator<MockVM>> = MUTATOR_PARK
@@ -338,9 +344,7 @@ impl Default for MockVM {
                 MUTATOR_PARK
                     .all_threads()
                     .into_iter()
-                    .for_each(|tls| {
-                        mutator_visitor(VMMutatorThread(tls).as_mock_mutator())
-                    });
+                    .for_each(|tls| mutator_visitor(VMMutatorThread(tls).as_mock_mutator()));
             })),
             resume_mutators: MockMethod::new_fixed(Box::new(|_tls| {
                 info!("Resuming all parked threads...");
@@ -350,7 +354,7 @@ impl Default for MockVM {
                 MUTATOR_PARK.park(tls.0);
             })),
             spawn_gc_thread: MockMethod::new_fixed(Box::new(|(_parent_tls, ctx)| {
-                        // Just drop the join handle. The thread will run until the process quits.
+                // Just drop the join handle. The thread will run until the process quits.
                 let _ = std::thread::Builder::new()
                     .name("MMTk Worker".to_string())
                     .spawn(move || {
@@ -358,9 +362,11 @@ impl Default for MockVM {
                         let worker_tls = VMWorkerThread(current_thread_tls());
                         GC_THREADS.register(worker_tls.0);
                         match ctx {
-                            GCThreadContext::Worker(w) => {
-                                crate::memory_manager::start_worker(&mock_api::singleton(), worker_tls, w)
-                            }
+                            GCThreadContext::Worker(w) => crate::memory_manager::start_worker(
+                                mock_api::singleton(),
+                                worker_tls,
+                                w,
+                            ),
                         }
                         GC_THREADS.unregister(worker_tls.0);
                     });
@@ -570,9 +576,10 @@ mod side_metadata {
     pub const MOCK_VM_GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::side_first();
     pub const MOCK_VM_LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec =
         VMLocalForwardingBitsSpec::side_first();
-    pub const MOCK_VM_LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec = VMLocalMarkBitSpec::side_after(&MOCK_VM_LOCAL_FORWARDING_BITS_SPEC.as_spec());
+    pub const MOCK_VM_LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec =
+        VMLocalMarkBitSpec::side_after(MOCK_VM_LOCAL_FORWARDING_BITS_SPEC.as_spec());
     pub const MOCK_VM_LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec =
-        VMLocalLOSMarkNurserySpec::side_after(&MOCK_VM_LOCAL_MARK_BIT_SPEC.as_spec());
+        VMLocalLOSMarkNurserySpec::side_after(MOCK_VM_LOCAL_MARK_BIT_SPEC.as_spec());
 }
 #[cfg(feature = "mock_test_side_metadata")]
 use side_metadata::*;
@@ -581,9 +588,11 @@ impl crate::vm::ObjectModel<MockVM> for MockVM {
     const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = MOCK_VM_GLOBAL_LOG_BIT_SPEC;
     const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec =
         VMLocalForwardingPointerSpec::in_header(0);
-    const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec = MOCK_VM_LOCAL_FORWARDING_BITS_SPEC;
+    const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec =
+        MOCK_VM_LOCAL_FORWARDING_BITS_SPEC;
     const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec = MOCK_VM_LOCAL_MARK_BIT_SPEC;
-    const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec = MOCK_VM_LOCAL_LOS_MARK_NURSERY_SPEC;
+    const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec =
+        MOCK_VM_LOCAL_LOS_MARK_NURSERY_SPEC;
 
     #[cfg(feature = "object_pinning")]
     const LOCAL_PINNING_BIT_SPEC: VMLocalPinningBitSpec = VMLocalPinningBitSpec::in_header(0);
@@ -685,9 +694,9 @@ impl crate::vm::Scanning<MockVM> for MockVM {
         ))
     }
     fn scan_roots_in_mutator_thread(
-        tls: VMWorkerThread,
-        mutator: &'static mut Mutator<Self>,
-        factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
+        _tls: VMWorkerThread,
+        _mutator: &'static mut Mutator<Self>,
+        _factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
     ) {
         // mock_any!(scan_roots_in_mutator_thread(
         //     tls,
@@ -697,8 +706,8 @@ impl crate::vm::Scanning<MockVM> for MockVM {
         warn!("scan_roots_in_mutator_thread is not properly mocked. The default implementation does nothing.");
     }
     fn scan_vm_specific_roots(
-        tls: VMWorkerThread,
-        factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
+        _tls: VMWorkerThread,
+        _factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
     ) {
         // mock_any!(scan_vm_specific_roots(tls, Box::new(factory)))
         warn!("scan_vm_specific_roots is not properly mocked. The default implementation does nothing.");
@@ -713,8 +722,8 @@ impl crate::vm::Scanning<MockVM> for MockVM {
         mock!(prepare_for_roots_re_scanning())
     }
     fn process_weak_refs(
-        worker: &mut GCWorker<Self>,
-        tracer_context: impl ObjectTracerContext<Self>,
+        _worker: &mut GCWorker<Self>,
+        _tracer_context: impl ObjectTracerContext<Self>,
     ) -> bool {
         // let worker: &'static mut GCWorker<Self> = lifetime!(worker);
         // mock_any!(process_weak_refs(worker, tracer_context))
@@ -722,8 +731,8 @@ impl crate::vm::Scanning<MockVM> for MockVM {
         false
     }
     fn forward_weak_refs(
-        worker: &mut GCWorker<Self>,
-        tracer_context: impl ObjectTracerContext<Self>,
+        _worker: &mut GCWorker<Self>,
+        _tracer_context: impl ObjectTracerContext<Self>,
     ) {
         // let worker: &'static mut GCWorker<Self> = lifetime!(worker);
         // mock_any!(forward_weak_refs(worker, tracer_context))

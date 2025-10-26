@@ -39,9 +39,9 @@ else
     fi
 
     # mock tests
-    cargo clippy --features mock_test
-    cargo clippy --features mock_test --tests
-    cargo clippy --features mock_test --benches
+    cargo clippy --features mock_test,mock_test_side_metadata
+    cargo clippy --features mock_test,mock_test_side_metadata --tests
+    cargo clippy --features mock_test,mock_test_side_metadata --benches
 
     # non-mock benchmarks
     cargo clippy --features test_private --benches

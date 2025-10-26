@@ -18,13 +18,15 @@ pub fn allocate_with_initialize_collection() {
             const MB: usize = 1024 * 1024;
             let fixture = MutatorFixture::create_with_heapsize(MB);
 
-            if *fixture.mmtk().get_plan().options().plan == crate::util::options::PlanSelector::NoGC {
+            if *fixture.mmtk().get_plan().options().plan == crate::util::options::PlanSelector::NoGC
+            {
                 // The test triggers GC, which causes a different panic message for NoGC plan.
                 // We just mimic that block_for_gc is called for NoGC
                 write_mockvm(|mock| {
                     use crate::util::VMMutatorThread;
                     use crate::util::VMThread;
-                    mock.block_for_gc.call(VMMutatorThread(VMThread::UNINITIALIZED));
+                    mock.block_for_gc
+                        .call(VMMutatorThread(VMThread::UNINITIALIZED));
                 });
             }
 

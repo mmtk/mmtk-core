@@ -2,8 +2,7 @@ use criterion::Criterion;
 
 #[cfg(feature = "is_mmtk_object")]
 use mmtk::util::test_util::fixtures::*;
-use mmtk::util::test_util::mock_method::*;
-use mmtk::util::test_util::mock_vm::{write_mockvm, MockVM};
+use mmtk::util::test_util::mock_vm::*;
 
 pub fn bench(c: &mut Criterion) {
     // Setting a larger heap, although the GC should be disabled in the MockVM

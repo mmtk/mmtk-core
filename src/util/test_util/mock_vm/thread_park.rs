@@ -1,6 +1,6 @@
+use crate::util::VMThread;
 use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex};
-use crate::util::VMThread;
 
 #[derive(Clone)]
 pub struct ThreadPark {
@@ -65,7 +65,10 @@ impl ThreadPark {
         if let Some(entry) = state.parked.get_mut(&tid) {
             *entry = true;
         } else {
-            panic!("Thread {:?} not registered to {} before park() f", tid, self.name);
+            panic!(
+                "Thread {:?} not registered to {} before park() f",
+                tid, self.name
+            );
         }
 
         // Notify any waiter that one more thread has parked
@@ -93,8 +96,7 @@ impl ThreadPark {
     pub fn wait_all_parked(&self) {
         let mut state = self.inner.lock.lock().unwrap();
         loop {
-            let all_parked = !state.parked.is_empty()
-                && state.parked.values().all(|&v| v);
+            let all_parked = !state.parked.is_empty() && state.parked.values().all(|&v| v);
             if all_parked {
                 break;
             }

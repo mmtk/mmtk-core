@@ -24,13 +24,8 @@ pub fn allocate_nonmoving() {
             info!("Allocated default at: {:#x}", addr);
 
             // Non moving alloc
-            let addr = memory_manager::alloc(
-                fixture.mutator(),
-                16,
-                8,
-                0,
-                AllocationSemantics::NonMoving,
-            );
+            let addr =
+                memory_manager::alloc(fixture.mutator(), 16, 8, 0, AllocationSemantics::NonMoving);
             assert!(!addr.is_zero());
             info!("Allocated nonmoving at: {:#x}", addr);
         },

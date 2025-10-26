@@ -197,7 +197,8 @@ pub(super) fn try_mmap_metadata_chunk(
             memory::MmapStrategy::SIDE_METADATA,
             anno,
         )
-    }.map_err(|e| {
+    }
+    .map_err(|e| {
         warn!(
             "Failed to mmap per-chunk metadata: {} - {}",
             policy_meta_start,

@@ -154,8 +154,13 @@ pub(super) fn try_mmap_contiguous_metadata_space(
                 anno,
             )
         }
-        .map(|_| mmap_size).map_err(|e| {
-            warn!("Failed to mmap metadata space: {} - {}", mmap_start, mmap_start + mmap_size);
+        .map(|_| mmap_size)
+        .map_err(|e| {
+            warn!(
+                "Failed to mmap metadata space: {} - {}",
+                mmap_start,
+                mmap_start + mmap_size
+            );
             e
         })
     } else {
