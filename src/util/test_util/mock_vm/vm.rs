@@ -32,7 +32,7 @@ use std::ops::Range;
 /// the default mock VM.
 pub const DEFAULT_OBJECT_REF_OFFSET: usize = crate::util::constants::BYTES_IN_ADDRESS;
 
-// To mock static methods, we have to create a static instance of `MockVM`.
+/// To mock VMBinding methods, we have to create a static instance of `MockVM`.
 pub static mut MOCK_VM_INSTANCE: *mut MockVM = std::ptr::null_mut();
 
 // MockVM only allows mock methods with references of no lifetime or static lifetime.
@@ -65,9 +65,12 @@ macro_rules! mock_any {
     };
 }
 
+/// Initialize the static MockVM instance.
 pub fn init_mockvm(mockvm: MockVM) {
     unsafe {
-        // assert!(MOCK_VM_INSTANCE.is_null());
+        if !MOCK_VM_INSTANCE.is_null() {
+            warn!("MockVM is already initialized. Overwriting the existing instance. This may change the behavior of MockVM.");
+        }
         let boxed = Box::new(mockvm);
         MOCK_VM_INSTANCE = Box::into_raw(boxed);
     }
@@ -286,12 +289,36 @@ pub struct MockVM {
     pub forward_weak_refs: Box<dyn MockAny>,
 }
 
+/// This struct is used to hold a pointer to a `Mutator<MockVM>`.
+/// The pointer to this struct is used as the 'mutator tls' pointer for MMTK.
 #[derive(Clone)]
 pub struct MutatorHandle {
     pub ptr: *mut Mutator<MockVM>,
 }
 
 impl MutatorHandle {
+    pub fn bind() -> VMMutatorThread {
+        let mmtk = mock_api::singleton();
+
+        let mutator_handle = Box::new(MutatorHandle {
+            ptr: std::ptr::null_mut(),
+        });
+        let mutator_handle_ptr = Box::into_raw(mutator_handle);
+        let tls = VMMutatorThread(VMThread(OpaquePointer::from_address(
+            Address::from_mut_ptr(mutator_handle_ptr),
+        )));
+
+        let mutator = crate::memory_manager::bind_mutator(mmtk, tls);
+        let mutator_ptr = Box::into_raw(mutator);
+
+        unsafe {
+            (*mutator_handle_ptr).ptr = mutator_ptr;
+        }
+
+        MUTATOR_PARK.register(tls.0);
+        tls
+    }
+
     pub fn as_mutator(&self) -> &'static mut Mutator<MockVM> {
         unsafe { &mut *self.ptr }
     }
@@ -299,6 +326,13 @@ impl MutatorHandle {
 
 unsafe impl Sync for MutatorHandle {}
 unsafe impl Send for MutatorHandle {}
+
+impl VMMutatorThread {
+    /// Get a mutable reference to the underlying Mutator<MockVM>.
+    pub fn as_mock_mutator(self) -> &'static mut Mutator<MockVM> {
+        unsafe { &mut *(*self.0 .0.to_address().to_mut_ptr::<MutatorHandle>()).ptr }
+    }
+}
 
 lazy_static! {
     pub static ref MUTATOR_PARK: ThreadPark = ThreadPark::new("mutators");

@@ -23,12 +23,11 @@ pub(crate) mod mock_test_prelude {
     pub use crate::vm::*;
 }
 
-mod mock_test_allocate_align;
+mod mock_test_allocate_align_offset;
 mod mock_test_allocate_no_gc_oom_on_acquire_allow_oom_call;
 mod mock_test_allocate_no_gc_oom_on_acquire_no_oom_call;
 mod mock_test_allocate_no_gc_simple;
 mod mock_test_allocate_nonmoving;
-mod mock_test_allocate_offset;
 mod mock_test_allocate_overcommit;
 mod mock_test_allocate_with_disable_collection;
 mod mock_test_allocate_with_initialize_collection;
@@ -66,12 +65,7 @@ mod mock_test_malloc_ms;
 mod mock_test_mmtk_julia_pr_143;
 #[cfg(feature = "nogc_lock_free")]
 mod mock_test_nogc_lock_free;
-#[cfg(target_pointer_width = "64")]
-mod mock_test_slots_compressed;
-mod mock_test_slots_mixed;
-mod mock_test_slots_offset;
-mod mock_test_slots_simple;
-mod mock_test_slots_tagged;
+mod mock_test_slots;
 #[cfg(target_pointer_width = "64")]
 mod mock_test_vm_layout_compressed_pointer;
 mod mock_test_vm_layout_default;

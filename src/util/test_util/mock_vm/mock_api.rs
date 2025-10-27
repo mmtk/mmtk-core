@@ -1,11 +1,18 @@
+//! This module includes the MMTK singleton for MockVM, and some wrapped APIs that interact with MockVM.
+//! When this module provides a wrapped API, mock tests should use the wrapped API instead of
+//! the APIs from [`crate:memory_manager`]. For example, [`bind_mutator`] is provided here as a wrapped API
+//! which not only calls [`crate::memory_manager::bind_mutator`], but also registers the returned mutator
+//! to MockVM.
+
 use super::vm;
 use super::MockVM;
 use crate::util::*;
-use crate::Mutator;
 use crate::MMTK;
 
+/// A singleton MMTK instance for MockVM.
 pub static mut MMTK_SINGLETON: *mut MMTK<MockVM> = std::ptr::null_mut();
 
+/// Get the singleton MMTK instance for MockVM.
 pub fn singleton() -> &'static MMTK<MockVM> {
     unsafe {
         assert!(!MMTK_SINGLETON.is_null(), "MMTK singleton is not set");
@@ -13,6 +20,7 @@ pub fn singleton() -> &'static MMTK<MockVM> {
     }
 }
 
+/// Get a mutable reference to the singleton MMTK instance for MockVM.
 pub fn singleton_mut() -> &'static mut MMTK<MockVM> {
     unsafe {
         assert!(!MMTK_SINGLETON.is_null(), "MMTK singleton is not set");
@@ -20,35 +28,15 @@ pub fn singleton_mut() -> &'static mut MMTK<MockVM> {
     }
 }
 
+/// Set the singleton MMTK instance for MockVM. This method should only be called once.
 pub fn set_singleton(mmtk_ptr: *mut MMTK<MockVM>) {
     unsafe {
+        assert!(MMTK_SINGLETON.is_null(), "MMTK singleton is already set");
         MMTK_SINGLETON = mmtk_ptr;
     }
 }
 
-impl VMMutatorThread {
-    pub fn as_mock_mutator(self) -> &'static mut Mutator<MockVM> {
-        unsafe { &mut *(*self.0 .0.to_address().to_mut_ptr::<vm::MutatorHandle>()).ptr }
-    }
-}
-
+/// Bind a mutator thread to the MMTK singleton instance for MockVM.
 pub fn bind_mutator() -> VMMutatorThread {
-    let mmtk = singleton();
-    let mutator_handle = Box::new(vm::MutatorHandle {
-        ptr: std::ptr::null_mut(),
-    });
-    let mutator_handle_ptr = Box::into_raw(mutator_handle);
-    let tls = VMMutatorThread(VMThread(OpaquePointer::from_address(
-        Address::from_mut_ptr(mutator_handle_ptr),
-    )));
-
-    let mutator = crate::memory_manager::bind_mutator(mmtk, tls);
-    let mutator_ptr = Box::into_raw(mutator);
-
-    unsafe {
-        (*mutator_handle_ptr).ptr = mutator_ptr;
-    }
-
-    vm::MUTATOR_PARK.register(tls.0);
-    tls
+    vm::MutatorHandle::bind()
 }

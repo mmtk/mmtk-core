@@ -20,7 +20,7 @@ pub fn interior_pointer_in_large_object() {
             }
         },
         || {
-            let mut fixture = MutatorFixture::create_with_heapsize(10 * MB);
+            let fixture = MutatorFixture::create_with_heapsize(10 * MB);
 
             let addr = memory_manager::alloc(
                 fixture.mutator(),

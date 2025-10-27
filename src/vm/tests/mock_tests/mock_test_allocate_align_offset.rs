@@ -41,3 +41,40 @@ pub fn allocate_alignment() {
         no_cleanup,
     )
 }
+
+#[test]
+pub fn allocate_offset() {
+    with_mockvm(
+        default_setup,
+        || {
+            MUTATOR.with_fixture_mut(|fixture| {
+                const OFFSET: usize = 4;
+                let min = MockVM::MIN_ALIGNMENT;
+                let max = MockVM::MAX_ALIGNMENT;
+                info!("Allowed alignment between {} and {}", min, max);
+                let mut align = min;
+                while align <= max {
+                    info!(
+                        "Test allocation with alignment {} and offset {}",
+                        align, OFFSET
+                    );
+                    let addr = memory_manager::alloc(
+                        fixture.mutator(),
+                        8,
+                        align,
+                        OFFSET,
+                        AllocationSemantics::Default,
+                    );
+                    assert!(
+                        (addr + OFFSET).is_aligned_to(align),
+                        "Expected allocation alignment {}, returned address is {:?}",
+                        align,
+                        addr
+                    );
+                    align *= 2;
+                }
+            });
+        },
+        no_cleanup,
+    )
+}
