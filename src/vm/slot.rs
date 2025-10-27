@@ -11,44 +11,60 @@ use atomic::Atomic;
 use crate::util::constants::{BYTES_IN_ADDRESS, LOG_BYTES_IN_ADDRESS};
 use crate::util::{Address, ObjectReference};
 
-/// A `Slot` represents a slot in an object (a.k.a. a field), on the stack (i.e. a local variable)
-/// or any other places (such as global variables).  A slot may hold an object reference. We can
-/// load the object reference from it, and we can update the object reference in it after the GC
-/// moves the object.
+/// A `Slot` value *points to* a slot, and is intended for loading and updating the reference held
+/// in the slot.  Note that a `Slot` is not the slot itself.  It is a stateless data type that
+/// usually contains a pointer to the actual slot.  It can be [copied](std::marker::Copy), and the
+/// copied `Slot` instance points to the same slot.
 ///
-/// For some VMs, a slot may sometimes not hold an object reference.  For example, it can hold a
-/// special `NULL` pointer which does not point to any object, or it can hold a tagged
-/// non-reference value, such as small integers and special values such as `true`, `false`, `null`
-/// (a.k.a. "none", "nil", etc. for other VMs), `undefined`, etc.
+/// A slot can be in an object (a.k.a. a field), on the stack (i.e. a local variable) or any other
+/// places (such as global variables).  A slot may hold an object reference, but for some VMs, a
+/// slot may sometimes not hold an object reference.  For example, in JVM, a slot can hold a special
+/// `null` pointer which does not point to any object; in some VMs, including CRuby and some
+/// JavaScript engines, a slot can hold a tagged non-reference value, such as small integers and
+/// special values such as `true`, `false`, `null` (a.k.a. "none", "nil", etc.), `undefined`, etc.
 ///
-/// This intends to abstract out the differences of reference field representation among different
-/// VMs.  If the VM represent a reference field as a word that holds the pointer to the object, it
-/// can use the default `SimpleSlot` we provide.  In some cases, the VM need to implement its own
-/// `Slot` instances.
+/// The `Slot` trait is intended to abstract out the differences of reference field representation
+/// (compressed, tagged, offsetted, etc.) among different VMs.  From MMTk's point of view, MMTk only
+/// cares about the object reference held inside the slot, but not non-reference values.  When the
+/// slot is holding an object reference, we can load the object reference from it, and we can update
+/// the object reference in it after the GC moves the object.
+///
+/// # How to implement `Slot`?
+///
+/// If a reference field of a VM is just a word that holds the pointer to an object, and uses the 0
+/// word as the null pointer, it can use the default [`SimpleSlot`] we provide.  In other cases, the
+/// VM need to implement its own `Slot` instances.
 ///
 /// For example:
-/// -   The VM uses compressed pointer (Compressed OOP in OpenJDK's terminology), where the heap
-///     size is limited, and a 64-bit pointer is stored in a 32-bit slot.
-/// -   The VM uses tagged pointer, where some bits of a word are used as metadata while the rest
-///     are used as pointer.
-/// -   A field holds a pointer to the middle of an object (an object field, or an array element,
-///     or some arbitrary offset) for some reasons.
+/// -   The VM uses **compressed pointers** (Compressed OOPs in OpenJDK's terminology), where the
+///     heap size is limited, and a 64-bit pointer is stored in a 32-bit slot.
+/// -   The VM uses **tagged pointers**, where some bits of a word are used as metadata while the
+///     rest are used as pointer.
+/// -   The VM uses **offsetted pointers**, i.e. the value of the field is an address at an offset
+///     from the [`ObjectReference`] of the target object.  Such offsetted pointers are usually used
+///     to represent **interior pointers**, i.e. pointers to an object field, an array element, etc.
 ///
-/// When loading, `Slot::load` shall decode its internal representation to a "regular"
-/// `ObjectReference`.  The implementation can do this with any appropriate operations, usually
-/// shifting and masking bits or subtracting offset from the address.  By doing this conversion,
-/// MMTk can implement GC algorithms in a VM-neutral way, knowing only `ObjectReference`.
+/// When loading, `Slot::load` shall load the word (or words) from the slot and decode the words
+/// into a regular `ObjectReference` (note that MMTk has specific requirements for
+/// `ObjectReference`, such as being aligned, pointing inside an object, and cannot be null.  Read
+/// the doc comments of [`ObjectReference`] for details).  The decoding is VM-specific, but usually
+/// involves removing tag bits and/or adding an offset to the word, and (in the case of compressed
+/// pointers) extending the word size.  By doing this conversion, MMTk can implement GC algorithms
+/// in a VM-neutral way, knowing only `ObjectReference`.
 ///
 /// When GC moves object, `Slot::store` shall convert the updated `ObjectReference` back to the
 /// slot-specific representation.  Compressed pointers remain compressed; tagged pointers preserve
 /// their tag bits; and offsetted pointers keep their offsets.
 ///
-/// The methods of this trait are called on hot paths.  Please ensure they have high performance.
-/// Use inlining when appropriate.
+/// # Performance notes
 ///
-/// Note: this trait only concerns the representation (i.e. the shape) of the slot, not its
-/// semantics, such as whether it holds strong or weak references.  If a VM holds a weak reference
-/// in a word as a pointer, it can also use `SimpleSlot` for weak reference fields.
+/// The methods of this trait are called on hot paths.  Please ensure they have high performance.
+///
+/// # About weak references
+///
+/// This trait only concerns the representation (i.e. the shape) of the slot, not its semantics,
+/// such as whether it holds strong or weak references.  Therefore, one `Slot` implementation can be
+/// used for both slots that hold strong references and slots that hold weak references.
 pub trait Slot: Copy + Send + Debug + PartialEq + Eq + Hash {
     /// Load object reference from the slot.
     ///
