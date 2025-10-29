@@ -231,6 +231,12 @@ no_mmap_annotation = []
 # only be used if you understand how VO bit works internally. Use at your own risk.
 vo_bit_access = []
 
+# When a pointer points to the end of an object, it is not pointing inside an object and is usually not considered as an internal pointer.
+# However, some languages may have 0-size fields such as unit ().
+# When such fields appear as the last field of an object, an internal pointer to it would point directly to the end of the object,
+# and still needs to be considered as an internal pointer.
+object_end_internal_pointer = []
+
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --
 # Only one feature from each group can be provided. Otherwise build will fail.
