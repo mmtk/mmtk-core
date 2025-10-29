@@ -211,7 +211,11 @@ pub(crate) fn get_object_ref_for_vo_addr(vo_addr: Address) -> ObjectReference {
 fn is_internal_ptr<VM: VMBinding>(obj: ObjectReference, internal_ptr: Address) -> bool {
     let obj_start = obj.to_object_start::<VM>();
     let obj_size = VM::VMObjectModel::get_current_size(obj);
-    internal_ptr < obj_start + obj_size
+    if cfg!(feature = "object_end_internal_pointer") {
+        internal_ptr <= obj_start + obj_size
+    } else {
+        internal_ptr < obj_start + obj_size
+    }
 }
 
 /// Check if the address could be an internal pointer based on where VO bit is set.
