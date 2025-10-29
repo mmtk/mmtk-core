@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="A `Slot` represents a slot in an object (a.k.a. a field), on the stack (i.e. a local variable) or any other places (such as global variables).  A slot may hold an object reference. We can load the object reference from it, and we can update the object reference in it after the GC moves the object."><title>Slot in mmtk::vm::slot - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-b0742ba02757f159.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0 (90b35a623 2024-11-26)" data-channel="1.83.0" data-search-js="search-f0d225181b97f9a4.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc trait"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../mmtk/index.html">mmtk</a><span class="version">0.31.0-38b139164ccfa9b9eeff8f414358374c743c8e75</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Slot</a></h2><h3><a href="#required-methods">Required Methods</a></h3><ul class="block"><li><a href="#tymethod.load" title="load">load</a></li><li><a href="#tymethod.store" title="store">store</a></li></ul><h3><a href="#provided-methods">Provided Methods</a></h3><ul class="block"><li><a href="#method.prefetch_load" title="prefetch_load">prefetch_load</a></li><li><a href="#method.prefetch_store" title="prefetch_store">prefetch_store</a></li></ul><h3><a href="#object-safety">Object Safety</a></h3><h3><a href="#implementors">Implementors</a></h3></section><div id="rustdoc-modnav"><h2><a href="index.html">In mmtk::<wbr>vm::<wbr>slot</a></h2></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><span class="rustdoc-breadcrumbs"><a href="../../index.html">mmtk</a>::<wbr><a href="../index.html">vm</a>::<wbr><a href="index.html">slot</a></span><h1>Trait <span class="trait">Slot</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/mmtk/vm/slot.rs.html#52-89">source</a> </span></div><pre class="rust item-decl"><code>pub trait Slot:
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="`Slot` is an abstraction for MMTk to load and update object references in memory."><title>Slot in mmtk::vm::slot - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-b0742ba02757f159.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0 (90b35a623 2024-11-26)" data-channel="1.83.0" data-search-js="search-f0d225181b97f9a4.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc trait"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../mmtk/index.html">mmtk</a><span class="version">0.31.0-ba732176cb96d733885571481647d822f70576c8</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Slot</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#slots-and-the-slot-trait" title="Slots and the `Slot` trait">Slots and the <code>Slot</code> trait</a></li><li><a href="#the-slot-trait-has-pointer-semantics" title="The `Slot` trait has pointer semantics">The <code>Slot</code> trait has pointer semantics</a></li><li><a href="#how-to-implement-slot" title="How to implement `Slot`?">How to implement <code>Slot</code>?</a></li><li><a href="#performance-notes" title="Performance notes">Performance notes</a></li><li><a href="#about-weak-references" title="About weak references">About weak references</a></li></ul><h3><a href="#required-methods">Required Methods</a></h3><ul class="block"><li><a href="#tymethod.load" title="load">load</a></li><li><a href="#tymethod.store" title="store">store</a></li></ul><h3><a href="#provided-methods">Provided Methods</a></h3><ul class="block"><li><a href="#method.prefetch_load" title="prefetch_load">prefetch_load</a></li><li><a href="#method.prefetch_store" title="prefetch_store">prefetch_store</a></li></ul><h3><a href="#object-safety">Object Safety</a></h3><h3><a href="#implementors">Implementors</a></h3></section><div id="rustdoc-modnav"><h2><a href="index.html">In mmtk::<wbr>vm::<wbr>slot</a></h2></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><span class="rustdoc-breadcrumbs"><a href="../../index.html">mmtk</a>::<wbr><a href="../index.html">vm</a>::<wbr><a href="index.html">slot</a></span><h1>Trait <span class="trait">Slot</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/mmtk/vm/slot.rs.html#108-145">source</a> </span></div><pre class="rust item-decl"><code>pub trait Slot:
     <a class="trait" href="https://doc.rust-lang.org/1.83.0/core/marker/trait.Copy.html" title="trait core::marker::Copy">Copy</a>
     + <a class="trait" href="https://doc.rust-lang.org/1.83.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a>
     + <a class="trait" href="https://doc.rust-lang.org/1.83.0/core/fmt/trait.Debug.html" title="trait core::fmt::Debug">Debug</a>
@@ -12,46 +12,85 @@
     // Provided methods
     fn <a href="#method.prefetch_load" class="fn">prefetch_load</a>(&amp;self) { ... }
 <span class="item-spacer"></span>    fn <a href="#method.prefetch_store" class="fn">prefetch_store</a>(&amp;self) { ... }
-}</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>A <code>Slot</code> represents a slot in an object (a.k.a. a field), on the stack (i.e. a local variable)
-or any other places (such as global variables).  A slot may hold an object reference. We can
-load the object reference from it, and we can update the object reference in it after the GC
-moves the object.</p>
-<p>For some VMs, a slot may sometimes not hold an object reference.  For example, it can hold a
-special <code>NULL</code> pointer which does not point to any object, or it can hold a tagged
-non-reference value, such as small integers and special values such as <code>true</code>, <code>false</code>, <code>null</code>
-(a.k.a. “none”, “nil”, etc. for other VMs), <code>undefined</code>, etc.</p>
-<p>This intends to abstract out the differences of reference field representation among different
-VMs.  If the VM represent a reference field as a word that holds the pointer to the object, it
-can use the default <code>SimpleSlot</code> we provide.  In some cases, the VM need to implement its own
-<code>Slot</code> instances.</p>
+}</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p><code>Slot</code> is an abstraction for MMTk to load and update object references in memory.</p>
+<h2 id="slots-and-the-slot-trait"><a class="doc-anchor" href="#slots-and-the-slot-trait">§</a>Slots and the <code>Slot</code> trait</h2>
+<p>In a VM, a slot can contain an object reference or a non-reference value.  It can be in an
+object (a.k.a. a field), on the stack (i.e. a local variable) or in any other places (such as
+global variables).  It may have different representations in different VMs.  Some VMs put a
+direct pointer to an object into a slot, while others may use compressed pointers, tagged
+pointers, offsetted pointers, etc.  Some VMs (such as JVM) have null references, and others
+(such as CRuby and JavaScript engines) can also use tagged bits to represent non-reference
+values such as small integers, <code>true</code>, <code>false</code>, <code>null</code> (a.k.a. “none”, “nil”, etc.),
+<code>undefined</code>, etc.</p>
+<p>In MMTk, the <code>Slot</code> trait is intended to abstract out such different representations of
+reference fields (compressed, tagged, offsetted, etc.) among different VMs.  From MMTk’s point
+of view, <strong>MMTk only cares about the object reference held inside the slot, but not
+non-reference values</strong>, such as <code>null</code>, <code>true</code>, etc.  When the slot is holding an object
+reference, we can load the object reference from it, and we can update the object reference in
+it after the GC moves the object.</p>
+<h2 id="the-slot-trait-has-pointer-semantics"><a class="doc-anchor" href="#the-slot-trait-has-pointer-semantics">§</a>The <code>Slot</code> trait has pointer semantics</h2>
+<p>A <code>Slot</code> value <em>points to</em> a slot, and is not the slot itself.  In fact, the simplest
+implementation of the <code>Slot</code> trait (<a href="struct.SimpleSlot.html" title="struct mmtk::vm::slot::SimpleSlot"><code>SimpleSlot</code></a>, see below) can simply contain the address of
+the slot.</p>
+<p>A <code>Slot</code> can be <a href="https://doc.rust-lang.org/1.83.0/core/marker/trait.Copy.html" title="trait core::marker::Copy">copied</a>, and the copied <code>Slot</code> instance points to the same
+slot.</p>
+<h2 id="how-to-implement-slot"><a class="doc-anchor" href="#how-to-implement-slot">§</a>How to implement <code>Slot</code>?</h2>
+<p>If a reference field of a VM is word-sized and holds the raw pointer to an object, and uses the
+0 word as the null pointer, it can use the default <a href="struct.SimpleSlot.html" title="struct mmtk::vm::slot::SimpleSlot"><code>SimpleSlot</code></a> we provide.  It simply
+contains a pointer to a memory location that holds an address.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">pub struct </span>SimpleSlot {
+    slot_addr: <span class="kw-2">*mut </span>Atomic&lt;Address&gt;,
+}</code></pre></div>
+<p>In other cases, the VM need to implement its own <code>Slot</code> instances.</p>
 <p>For example:</p>
 <ul>
-<li>The VM uses compressed pointer (Compressed OOP in OpenJDK’s terminology), where the heap
-size is limited, and a 64-bit pointer is stored in a 32-bit slot.</li>
-<li>The VM uses tagged pointer, where some bits of a word are used as metadata while the rest
-are used as pointer.</li>
-<li>A field holds a pointer to the middle of an object (an object field, or an array element,
-or some arbitrary offset) for some reasons.</li>
+<li>The VM uses <strong>compressed pointers</strong> (Compressed OOPs in OpenJDK’s terminology), where the
+heap size is limited, and a 64-bit pointer is stored in a 32-bit slot.</li>
+<li>The VM uses <strong>tagged pointers</strong>, where some bits of a word are used as metadata while the
+rest are used as pointer.</li>
+<li>The VM uses <strong>offsetted pointers</strong>, i.e. the value of the field is an address at an offset
+from the <a href="../../util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference"><code>ObjectReference</code></a> of the target object.  Such offsetted pointers are usually used
+to represent <strong>interior pointers</strong>, i.e. pointers to an object field, an array element, etc.</li>
 </ul>
-<p>When loading, <code>Slot::load</code> shall decode its internal representation to a “regular”
-<code>ObjectReference</code>.  The implementation can do this with any appropriate operations, usually
-shifting and masking bits or subtracting offset from the address.  By doing this conversion,
-MMTk can implement GC algorithms in a VM-neutral way, knowing only <code>ObjectReference</code>.</p>
+<p>If needed, the implementation of <code>Slot</code> can contain not only the pointer, but also additional
+information. The <code>OffsetSlot</code> example below also contains an offset which can be used when
+decoding the pointer. See <code>src/vm/tests/mock_tests/mock_test_slots.rs</code> for more concrete
+examples, such as <code>CompressedOopSlot</code> and <code>TaggedSlot</code>.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">pub struct </span>OffsetSlot {
+    slot_addr: <span class="kw-2">*mut </span>Atomic&lt;Address&gt;,
+    offset: usize,
+}</code></pre></div>
+<p>When loading, <code>Slot::load</code> shall load the value from the slot and decode the value into a
+regular <code>ObjectReference</code> (note that MMTk has specific requirements for <code>ObjectReference</code>, such
+as being aligned, pointing inside an object, and cannot be null.  Please read the doc comments
+of <a href="../../util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference"><code>ObjectReference</code></a> for details).  The decoding is VM-specific, but usually involves removing
+tag bits and/or adding an offset to the word, and (in the case of compressed pointers) extending
+the word size.  By doing this conversion, MMTk can implement GC algorithms in a VM-neutral way,
+knowing only <code>ObjectReference</code>.</p>
 <p>When GC moves object, <code>Slot::store</code> shall convert the updated <code>ObjectReference</code> back to the
 slot-specific representation.  Compressed pointers remain compressed; tagged pointers preserve
 their tag bits; and offsetted pointers keep their offsets.</p>
-<p>The methods of this trait are called on hot paths.  Please ensure they have high performance.
-Use inlining when appropriate.</p>
-<p>Note: this trait only concerns the representation (i.e. the shape) of the slot, not its
-semantics, such as whether it holds strong or weak references.  If a VM holds a weak reference
-in a word as a pointer, it can also use <code>SimpleSlot</code> for weak reference fields.</p>
-</div></details><h2 id="required-methods" class="section-header">Required Methods<a href="#required-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="tymethod.load" class="method"><a class="src rightside" href="../../../src/mmtk/vm/slot.rs.html#61">source</a><h4 class="code-header">fn <a href="#tymethod.load" class="fn">load</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.83.0/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="struct" href="../../util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>&gt;</h4></section></summary><div class="docblock"><p>Load object reference from the slot.</p>
+<h2 id="performance-notes"><a class="doc-anchor" href="#performance-notes">§</a>Performance notes</h2>
+<p>The methods of this trait are called on hot paths.  Please ensure they have high performance.</p>
+<p>The size of the data structure of the <code>Slot</code> implementation may affect the performance as well.
+During GC, MMTk enqueues <code>Slot</code> instances, and its size affects the overhead of copying.  If
+your <code>Slot</code> implementation has multiple fields or uses <code>enum</code> for multiple kinds of slots, it
+may have extra cost when copying or decoding.  You should measure it.  If the cost is too much,
+you can implement <code>Slot</code> with a tagged word.  For example, the <a href="https://github.com/mmtk/mmtk-openjdk/blob/master/mmtk/src/slots.rs">mmtk-openjdk</a> binding uses the
+low order bit to encode whether the slot is compressed or not.</p>
+<h2 id="about-weak-references"><a class="doc-anchor" href="#about-weak-references">§</a>About weak references</h2>
+<p>This trait only concerns the representation (i.e. the shape) of the slot, not its semantics,
+such as whether it holds strong or weak references.  Therefore, one <code>Slot</code> implementation can be
+used for both slots that hold strong references and slots that hold weak references.</p>
+</div></details><h2 id="required-methods" class="section-header">Required Methods<a href="#required-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="tymethod.load" class="method"><a class="src rightside" href="../../../src/mmtk/vm/slot.rs.html#117">source</a><h4 class="code-header">fn <a href="#tymethod.load" class="fn">load</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.83.0/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="struct" href="../../util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>&gt;</h4></section></summary><div class="docblock"><p>Load object reference from the slot.</p>
 <p>If the slot is not holding an object reference (For example, if it is holding NULL or a
 tagged non-reference value.  See trait-level doc comment.), this method should return
 <code>None</code>.</p>
 <p>If the slot holds an object reference with tag bits, the returned value shall be the object
 reference with the tag bits removed.</p>
-</div></details><details class="toggle method-toggle" open><summary><section id="tymethod.store" class="method"><a class="src rightside" href="../../../src/mmtk/vm/slot.rs.html#78">source</a><h4 class="code-header">fn <a href="#tymethod.store" class="fn">store</a>(&amp;self, object: <a class="struct" href="../../util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>)</h4></section></summary><div class="docblock"><p>Store the object reference <code>object</code> into the slot.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="tymethod.store" class="method"><a class="src rightside" href="../../../src/mmtk/vm/slot.rs.html#134">source</a><h4 class="code-header">fn <a href="#tymethod.store" class="fn">store</a>(&amp;self, object: <a class="struct" href="../../util/address/struct.ObjectReference.html" title="struct mmtk::util::address::ObjectReference">ObjectReference</a>)</h4></section></summary><div class="docblock"><p>Store the object reference <code>object</code> into the slot.</p>
 <p>If the slot holds an object reference with tag bits, this method must preserve the tag
 bits while updating the object reference so that it points to the forwarded object given by
 the parameter <code>object</code>.</p>
@@ -63,9 +102,9 @@ barrier (<a href="../../memory_manager/fn.object_reference_write.html" title="fn
 operations have different semantics, and need to be implemented differently if the VM
 supports offsetted or tagged references.
 See: <a href="https://github.com/mmtk/mmtk-core/issues/1038">https://github.com/mmtk/mmtk-core/issues/1038</a></p>
-</div></details></div><h2 id="provided-methods" class="section-header">Provided Methods<a href="#provided-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="method.prefetch_load" class="method"><a class="src rightside" href="../../../src/mmtk/vm/slot.rs.html#81-83">source</a><h4 class="code-header">fn <a href="#method.prefetch_load" class="fn">prefetch_load</a>(&amp;self)</h4></section></summary><div class="docblock"><p>Prefetch the slot so that a subsequent <code>load</code> will be faster.</p>
-</div></details><details class="toggle method-toggle" open><summary><section id="method.prefetch_store" class="method"><a class="src rightside" href="../../../src/mmtk/vm/slot.rs.html#86-88">source</a><h4 class="code-header">fn <a href="#method.prefetch_store" class="fn">prefetch_store</a>(&amp;self)</h4></section></summary><div class="docblock"><p>Prefetch the slot so that a subsequent <code>store</code> will be faster.</p>
-</div></details></div><h2 id="object-safety" class="section-header">Object Safety<a href="#object-safety" class="anchor">§</a></h2><div class="object-safety-info">This trait is <b>not</b> <a href="https://doc.rust-lang.org/1.83.0/reference/items/traits.html#object-safety">object safe</a>.</div><h2 id="implementors" class="section-header">Implementors<a href="#implementors" class="anchor">§</a></h2><div id="implementors-list"><section id="impl-Slot-for-Address" class="impl"><a class="src rightside" href="../../../src/mmtk/vm/slot.rs.html#143-152">source</a><a href="#impl-Slot-for-Address" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="trait.Slot.html" title="trait mmtk::vm::slot::Slot">Slot</a> for <a class="struct" href="../../util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a></h3></section><div class="docblock"><p>For backword compatibility, we let <code>Address</code> implement <code>Slot</code> with the same semantics as
+</div></details></div><h2 id="provided-methods" class="section-header">Provided Methods<a href="#provided-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="method.prefetch_load" class="method"><a class="src rightside" href="../../../src/mmtk/vm/slot.rs.html#137-139">source</a><h4 class="code-header">fn <a href="#method.prefetch_load" class="fn">prefetch_load</a>(&amp;self)</h4></section></summary><div class="docblock"><p>Prefetch the slot so that a subsequent <code>load</code> will be faster.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.prefetch_store" class="method"><a class="src rightside" href="../../../src/mmtk/vm/slot.rs.html#142-144">source</a><h4 class="code-header">fn <a href="#method.prefetch_store" class="fn">prefetch_store</a>(&amp;self)</h4></section></summary><div class="docblock"><p>Prefetch the slot so that a subsequent <code>store</code> will be faster.</p>
+</div></details></div><h2 id="object-safety" class="section-header">Object Safety<a href="#object-safety" class="anchor">§</a></h2><div class="object-safety-info">This trait is <b>not</b> <a href="https://doc.rust-lang.org/1.83.0/reference/items/traits.html#object-safety">object safe</a>.</div><h2 id="implementors" class="section-header">Implementors<a href="#implementors" class="anchor">§</a></h2><div id="implementors-list"><section id="impl-Slot-for-Address" class="impl"><a class="src rightside" href="../../../src/mmtk/vm/slot.rs.html#199-208">source</a><a href="#impl-Slot-for-Address" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="trait.Slot.html" title="trait mmtk::vm::slot::Slot">Slot</a> for <a class="struct" href="../../util/address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a></h3></section><div class="docblock"><p>For backword compatibility, we let <code>Address</code> implement <code>Slot</code> with the same semantics as
 <a href="struct.SimpleSlot.html" title="struct mmtk::vm::slot::SimpleSlot"><code>SimpleSlot</code></a> so that existing bindings that use <code>Address</code> as <code>Slot</code> can continue to work.</p>
 <p>However, we should use <code>SimpleSlot</code> directly instead of using <code>Address</code>.  The purpose of the
 <code>Address</code> type is to represent an address in memory.  It is not directly related to fields
@@ -74,4 +113,4 @@ not indicate how many bytes to load or store, or how to interpret those bytes.  
 hand, <code>SimpleSlot</code> is all about how to access a field that holds a reference represented
 simply as an <code>ObjectReference</code>.  The intention and the semantics are clearer with
 <code>SimpleSlot</code>.</p>
-</div><section id="impl-Slot-for-SimpleSlot" class="impl"><a class="src rightside" href="../../../src/mmtk/vm/slot.rs.html#122-131">source</a><a href="#impl-Slot-for-SimpleSlot" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="trait.Slot.html" title="trait mmtk::vm::slot::Slot">Slot</a> for <a class="struct" href="struct.SimpleSlot.html" title="struct mmtk::vm::slot::SimpleSlot">SimpleSlot</a></h3></section></div><script src="../../../trait.impl/mmtk/vm/slot/trait.Slot.js" async></script></section></div></main></body></html>
+</div><section id="impl-Slot-for-SimpleSlot" class="impl"><a class="src rightside" href="../../../src/mmtk/vm/slot.rs.html#178-187">source</a><a href="#impl-Slot-for-SimpleSlot" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="trait.Slot.html" title="trait mmtk::vm::slot::Slot">Slot</a> for <a class="struct" href="struct.SimpleSlot.html" title="struct mmtk::vm::slot::SimpleSlot">SimpleSlot</a></h3></section></div><script src="../../../trait.impl/mmtk/vm/slot/trait.Slot.js" async></script></section></div></main></body></html>
