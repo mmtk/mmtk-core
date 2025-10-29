@@ -11,29 +11,48 @@ use atomic::Atomic;
 use crate::util::constants::{BYTES_IN_ADDRESS, LOG_BYTES_IN_ADDRESS};
 use crate::util::{Address, ObjectReference};
 
-/// A `Slot` value *points to* a slot, and is intended for loading and updating the reference held
-/// in the slot.  Note that a `Slot` is not the slot itself.  It is a stateless data type that
-/// usually contains a pointer to the actual slot.  It can be [copied](std::marker::Copy), and the
-/// copied `Slot` instance points to the same slot.
+/// `Slot` is an abstraction for MMTk to load and update object references in memory.
 ///
-/// A slot can be in an object (a.k.a. a field), on the stack (i.e. a local variable) or any other
-/// places (such as global variables).  A slot may hold an object reference, but for some VMs, a
-/// slot may sometimes not hold an object reference.  For example, in JVM, a slot can hold a special
-/// `null` pointer which does not point to any object; in some VMs, including CRuby and some
-/// JavaScript engines, a slot can hold a tagged non-reference value, such as small integers and
-/// special values such as `true`, `false`, `null` (a.k.a. "none", "nil", etc.), `undefined`, etc.
+/// # Slots and the `Slot` trait
 ///
-/// The `Slot` trait is intended to abstract out the differences of reference field representation
-/// (compressed, tagged, offsetted, etc.) among different VMs.  From MMTk's point of view, MMTk only
-/// cares about the object reference held inside the slot, but not non-reference values.  When the
-/// slot is holding an object reference, we can load the object reference from it, and we can update
-/// the object reference in it after the GC moves the object.
+/// In a VM, a slot can contain an object reference or a non-reference value.  It can be in an
+/// object (a.k.a. a field), on the stack (i.e. a local variable) or in any other places (such as
+/// global variables).  It may have different representations in different VMs.  Some VMs put a
+/// direct pointer to an object into a slot, while others may use compressed pointers, tagged
+/// pointers, offsetted pointers, etc.  Some VMs (such as JVM) have null references, and others
+/// (such as CRuby and JavaScript engines) can also use tagged bits to represent non-reference
+/// values such as small integers, `true`, `false`, `null` (a.k.a. "none", "nil", etc.),
+/// `undefined`, etc.
+///
+/// In MMTk, the `Slot` trait is intended to abstract out such different representations of
+/// reference fields (compressed, tagged, offsetted, etc.) among different VMs.  From MMTk's point
+/// of view, **MMTk only cares about the object reference held inside the slot, but not
+/// non-reference values**, such as `null`, `true`, etc.  When the slot is holding an object
+/// reference, we can load the object reference from it, and we can update the object reference in
+/// it after the GC moves the object.
+///
+/// # The `Slot` trait has pointer semantics
+///
+/// A `Slot` value *points to* a slot, and is not the slot itself.  In fact, the simplest
+/// implementation of the `Slot` trait ([`SimpleSlot`], see below) can simply contain the address of
+/// the slot.
+///
+/// A `Slot` can be [copied](std::marker::Copy), and the copied `Slot` instance points to the same
+/// slot.
 ///
 /// # How to implement `Slot`?
 ///
 /// If a reference field of a VM is just a word that holds the pointer to an object, and uses the 0
-/// word as the null pointer, it can use the default [`SimpleSlot`] we provide.  In other cases, the
-/// VM need to implement its own `Slot` instances.
+/// word as the null pointer, it can use the default [`SimpleSlot`] we provide.  It simply contains
+/// a pointer to a memory location that holds an address.
+///
+/// ```rust
+/// pub struct SimpleSlot {
+///     slot_addr: *mut Atomic<Address>,
+/// }
+/// ```
+///
+/// In other cases, the VM need to implement its own `Slot` instances.
 ///
 /// For example:
 /// -   The VM uses **compressed pointers** (Compressed OOPs in OpenJDK's terminology), where the
@@ -44,13 +63,25 @@ use crate::util::{Address, ObjectReference};
 ///     from the [`ObjectReference`] of the target object.  Such offsetted pointers are usually used
 ///     to represent **interior pointers**, i.e. pointers to an object field, an array element, etc.
 ///
-/// When loading, `Slot::load` shall load the word (or words) from the slot and decode the words
-/// into a regular `ObjectReference` (note that MMTk has specific requirements for
-/// `ObjectReference`, such as being aligned, pointing inside an object, and cannot be null.  Read
-/// the doc comments of [`ObjectReference`] for details).  The decoding is VM-specific, but usually
-/// involves removing tag bits and/or adding an offset to the word, and (in the case of compressed
-/// pointers) extending the word size.  By doing this conversion, MMTk can implement GC algorithms
-/// in a VM-neutral way, knowing only `ObjectReference`.
+/// If needed, the implementation of `Slot` can contain not only the pointer, but also additional
+/// information. The `OffsetSlot` example below also contains an offset which can be used when
+/// decoding the pointer. See `src/vm/tests/mock_tests/mock_test_slots.rs` for more concrete
+/// examples.
+///
+/// ```rust
+/// pub struct OffsetSlot {
+///     slot_addr: *mut Atomic<Address>,
+///     offset: usize,
+/// }
+/// ```
+///
+/// When loading, `Slot::load` shall load the value from the slot and decode the value into a
+/// regular `ObjectReference` (note that MMTk has specific requirements for `ObjectReference`, such
+/// as being aligned, pointing inside an object, and cannot be null.  Please read the doc comments
+/// of [`ObjectReference`] for details).  The decoding is VM-specific, but usually involves removing
+/// tag bits and/or adding an offset to the word, and (in the case of compressed pointers) extending
+/// the word size.  By doing this conversion, MMTk can implement GC algorithms in a VM-neutral way,
+/// knowing only `ObjectReference`.
 ///
 /// When GC moves object, `Slot::store` shall convert the updated `ObjectReference` back to the
 /// slot-specific representation.  Compressed pointers remain compressed; tagged pointers preserve
