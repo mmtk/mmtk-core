@@ -42,9 +42,9 @@ use crate::util::{Address, ObjectReference};
 ///
 /// # How to implement `Slot`?
 ///
-/// If a reference field of a VM is just a word that holds the pointer to an object, and uses the 0
-/// word as the null pointer, it can use the default [`SimpleSlot`] we provide.  It simply contains
-/// a pointer to a memory location that holds an address.
+/// If a reference field of a VM is word-sized and holds the raw pointer to an object, and uses the
+/// 0 word as the null pointer, it can use the default [`SimpleSlot`] we provide.  It simply
+/// contains a pointer to a memory location that holds an address.
 ///
 /// ```rust
 /// pub struct SimpleSlot {
@@ -66,7 +66,7 @@ use crate::util::{Address, ObjectReference};
 /// If needed, the implementation of `Slot` can contain not only the pointer, but also additional
 /// information. The `OffsetSlot` example below also contains an offset which can be used when
 /// decoding the pointer. See `src/vm/tests/mock_tests/mock_test_slots.rs` for more concrete
-/// examples.
+/// examples, such as `CompressedOopSlot` and `TaggedSlot`.
 ///
 /// ```rust
 /// pub struct OffsetSlot {
@@ -90,6 +90,15 @@ use crate::util::{Address, ObjectReference};
 /// # Performance notes
 ///
 /// The methods of this trait are called on hot paths.  Please ensure they have high performance.
+///
+/// The size of the data structure of the `Slot` implementation may affect the performance as well.
+/// During GC, MMTk enqueues `Slot` instances, and its size affects the overhead of copying.  If
+/// your `Slot` implementation has multiple fields or uses `enum` for multiple kinds of slots, it
+/// may have extra cost when copying or decoding.  You should measure it.  If the cost is too much,
+/// you can implement `Slot` with a tagged word.  For example, the [mmtk-openjdk] binding uses the
+/// low order bit to encode whether the slot is compressed or not.
+///
+/// [mmtk-openjdk]: https://github.com/mmtk/mmtk-openjdk/blob/master/mmtk/src/slots.rs
 ///
 /// # About weak references
 ///
