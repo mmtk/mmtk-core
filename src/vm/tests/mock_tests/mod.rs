@@ -42,6 +42,10 @@ mod mock_test_debug_get_object_info;
 mod mock_test_handle_mmap_conflict;
 mod mock_test_handle_mmap_oom;
 #[cfg(feature = "vo_bit")]
+mod mock_test_heap_inspector_all;
+#[cfg(feature = "vo_bit")]
+mod mock_test_heap_inspector_immix;
+#[cfg(feature = "vo_bit")]
 mod mock_test_heap_traversal;
 mod mock_test_init_fork;
 #[cfg(feature = "is_mmtk_object")]
