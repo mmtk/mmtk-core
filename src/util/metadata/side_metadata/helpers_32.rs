@@ -198,4 +198,12 @@ pub(super) fn try_mmap_metadata_chunk(
             anno,
         )
     }
+    .map_err(|e| {
+        warn!(
+            "Failed to mmap per-chunk metadata: {} - {}",
+            policy_meta_start,
+            policy_meta_start + local_per_chunk
+        );
+        e
+    })
 }

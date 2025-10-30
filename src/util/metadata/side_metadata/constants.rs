@@ -21,10 +21,15 @@ pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address = unsafe { Address::from_us
 // is less likely to overlap with any space.  But it does not solve the problem completely.
 // If there are more spaces, it will still overlap with some spaces.
 // See: https://github.com/mmtk/mmtk-core/issues/458
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(target_pointer_width = "64", not(feature = "mock_test")))]
 /// Global side metadata start address
 pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
     unsafe { Address::from_usize(0x0000_0c00_0000_0000usize) };
+
+#[cfg(all(target_pointer_width = "64", feature = "mock_test"))]
+/// Global side metadata start address
+pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
+    unsafe { Address::from_usize(0x0000_0100_0000_0000usize) };
 
 pub(crate) const GLOBAL_SIDE_METADATA_BASE_OFFSET: SideMetadataOffset =
     SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS);
