@@ -6,20 +6,38 @@ use crate::util::ObjectReference;
 
 use super::object_enum::ObjectEnumerator;
 
+/// A data structure for recording objects in the LOS.
+///
+/// It is divided into the nursery and the mature space, and each of them is further divided into
+/// the from-space and the to-space.
+///
+/// All operations are protected by a single mutex [`TreadMill::sync`].
 pub struct TreadMill {
-    from_space: Mutex<HashSet<ObjectReference>>,
-    to_space: Mutex<HashSet<ObjectReference>>,
-    collect_nursery: Mutex<HashSet<ObjectReference>>,
-    alloc_nursery: Mutex<HashSet<ObjectReference>>,
+    sync: Mutex<TreadMillSync>,
+}
+
+/// The synchronized part of [`TreadMill`]
+#[derive(Default)]
+struct TreadMillSync {
+    nursery: FromToSpace,
+    mature: FromToSpace,
+}
+
+/// A pair of from and two spaces.
+#[derive(Default)]
+struct FromToSpace {
+    from_space: HashSet<ObjectReference>,
+    to_space: HashSet<ObjectReference>,
 }
 
 impl std::fmt::Debug for TreadMill {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let sync = self.sync.lock().unwrap();
         f.debug_struct("TreadMill")
-            .field("from", &self.from_space.lock().unwrap())
-            .field("to", &self.to_space.lock().unwrap())
-            .field("collect_nursery", &self.collect_nursery.lock().unwrap())
-            .field("alloc_nursery", &self.alloc_nursery.lock().unwrap())
+            .field("nursery.from", &sync.nursery.from_space)
+            .field("nursery.to", &sync.nursery.to_space)
+            .field("mature.from", &sync.mature.from_space)
+            .field("mature.to", &sync.mature.to_space)
             .finish()
     }
 }
@@ -27,90 +45,128 @@ impl std::fmt::Debug for TreadMill {
 impl TreadMill {
     pub fn new() -> Self {
         TreadMill {
-            from_space: Mutex::new(HashSet::new()),
-            to_space: Mutex::new(HashSet::new()),
-            collect_nursery: Mutex::new(HashSet::new()),
-            alloc_nursery: Mutex::new(HashSet::new()),
+            sync: Mutex::new(Default::default()),
         }
     }
 
+    /// Add an object to the treadmill.
+    ///
+    /// New objects are normally added to `nursery.to_space`.  But when allocatin as live (e.g. when
+    /// concurrent marking is active), we directly add into `mature.to_space`.
     pub fn add_to_treadmill(&self, object: ObjectReference, nursery: bool) {
+        let mut sync = self.sync.lock().unwrap();
         if nursery {
-            trace!("Adding {} to nursery", object);
-            self.alloc_nursery.lock().unwrap().insert(object);
+            trace!("Adding {} to nursery.to_space", object);
+            sync.nursery.to_space.insert(object);
         } else {
-            trace!("Adding {} to to_space", object);
-            self.to_space.lock().unwrap().insert(object);
+            trace!("Adding {} to mature.to_space", object);
+            sync.mature.to_space.insert(object);
         }
     }
 
-    pub fn collect_nursery(&self) -> Vec<ObjectReference> {
-        let mut guard = self.collect_nursery.lock().unwrap();
-        let vals = guard.iter().copied().collect();
-        guard.clear();
-        drop(guard);
-        vals
+    /// Take all objects from the `nursery.from_space`.  This is called during sweeping at which time
+    /// all objects in the from space are unreachable.
+    pub fn collect_nursery(&self) -> impl IntoIterator<Item = ObjectReference> {
+        let mut sync = self.sync.lock().unwrap();
+        std::mem::take(&mut sync.nursery.from_space)
     }
 
-    pub fn collect(&self) -> Vec<ObjectReference> {
-        let mut guard = self.from_space.lock().unwrap();
-        let vals = guard.iter().copied().collect();
-        guard.clear();
-        drop(guard);
-        vals
+    /// Take all objects from the `mature.from_space`.  This is called during sweeping at which time
+    /// all objects in the from space are unreachable.
+    pub fn collect_mature(&self) -> impl IntoIterator<Item = ObjectReference> {
+        let mut sync = self.sync.lock().unwrap();
+        std::mem::take(&mut sync.mature.from_space)
     }
 
+    /// Move an object to `mature.to_space`.  Called when an object is determined to be reachable.
     pub fn copy(&self, object: ObjectReference, is_in_nursery: bool) {
+        let mut sync = self.sync.lock().unwrap();
         if is_in_nursery {
-            let mut guard = self.collect_nursery.lock().unwrap();
             debug_assert!(
-                guard.contains(&object),
-                "copy source object ({}) must be in collect_nursery",
+                sync.nursery.from_space.contains(&object),
+                "copy source object ({}) must be in nursery.from_space",
                 object
             );
-            guard.remove(&object);
+            sync.nursery.from_space.remove(&object);
         } else {
-            let mut guard = self.from_space.lock().unwrap();
             debug_assert!(
-                guard.contains(&object),
-                "copy source object ({}) must be in from_space",
+                sync.mature.from_space.contains(&object),
+                "copy source object ({}) must be in mature.from_space",
                 object
             );
-            guard.remove(&object);
+            sync.mature.from_space.remove(&object);
         }
-        self.to_space.lock().unwrap().insert(object);
+        sync.mature.to_space.insert(object);
     }
 
-    pub fn is_to_space_empty(&self) -> bool {
-        self.to_space.lock().unwrap().is_empty()
+    /// Return true if the nursery from-space is empty.
+    pub fn is_nursery_from_space_empty(&self) -> bool {
+        let sync = self.sync.lock().unwrap();
+        sync.nursery.from_space.is_empty()
     }
 
-    pub fn is_from_space_empty(&self) -> bool {
-        self.from_space.lock().unwrap().is_empty()
+    /// Return true if the nursery to-space is empty.
+    pub fn is_nursery_to_space_empty(&self) -> bool {
+        let sync = self.sync.lock().unwrap();
+        sync.nursery.to_space.is_empty()
     }
 
-    pub fn is_nursery_empty(&self) -> bool {
-        self.collect_nursery.lock().unwrap().is_empty()
+    /// Return true if the mature from-space is empty.
+    pub fn is_mature_from_space_empty(&self) -> bool {
+        let sync = self.sync.lock().unwrap();
+        sync.mature.from_space.is_empty()
     }
 
+    /// Flip the from and to spaces.
+    ///
+    /// `full_heap` is true during full-heap GC, or false during nursery GC.
     pub fn flip(&mut self, full_heap: bool) {
-        swap(&mut self.alloc_nursery, &mut self.collect_nursery);
-        trace!("Flipped alloc_nursery and collect_nursery");
+        let sync = self.sync.get_mut().unwrap();
+        swap(&mut sync.nursery.from_space, &mut sync.nursery.to_space);
+        trace!("Flipped nursery.from_space and nursery.to_space");
         if full_heap {
-            swap(&mut self.from_space, &mut self.to_space);
-            trace!("Flipped from_space and to_space");
+            swap(&mut sync.mature.from_space, &mut sync.mature.to_space);
+            trace!("Flipped mature.from_space and mature.to_space");
         }
     }
 
-    pub(crate) fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
-        let mut visit_objects = |set: &Mutex<HashSet<ObjectReference>>| {
-            let set = set.lock().unwrap();
+    /// Enumerate objects.
+    ///
+    /// `gc` is true if called as part of GC activity.  It will enumerate objects in both
+    /// from-spaces and to-spaces because we may have flipped the from/to spaces.
+    ///
+    /// `gc` is false if called by mutator.  It will only enumerate objects in to-spaces.
+    pub(crate) fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator, gc: bool) {
+        let sync = self.sync.lock().unwrap();
+        let mut enumerated = 0usize;
+        let mut visit_objects = |set: &HashSet<ObjectReference>| {
             for object in set.iter() {
                 enumerator.visit_object(*object);
+                enumerated += 1;
             }
         };
-        visit_objects(&self.alloc_nursery);
-        visit_objects(&self.to_space);
+        visit_objects(&sync.nursery.to_space);
+        visit_objects(&sync.mature.to_space);
+        if gc {
+            visit_objects(&sync.nursery.from_space);
+            visit_objects(&sync.mature.from_space);
+        } else {
+            // Note that during concurrent GC (e.g. in ConcurrentImmix), object have been moved to
+            // from-spaces, and GC workers are tracing objects concurrently, moving object to
+            // `mature.to_space`.  If a mutator calls `MMTK::enumerate_objects` during concurrent
+            // GC, the assertions below will fail.  That's expected because we currently disallow
+            // the VM binding to call `MMTK::enumerate_objects` during any GC activities, including
+            // concurrent GC.
+            assert!(
+                sync.nursery.from_space.is_empty(),
+                "nursery.from_space is not empty"
+            );
+            assert!(
+                sync.mature.from_space.is_empty(),
+                "mature.from_space is not empty"
+            );
+        }
+        debug!("Enumerated {enumerated} objects in LOS. gc={gc}");
     }
 }
 

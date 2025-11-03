@@ -219,21 +219,21 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     }
 
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
-        self.treadmill.enumerate_objects(enumerator);
+        self.treadmill.enumerate_objects(enumerator, false);
     }
 
     fn clear_side_log_bits(&self) {
         let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
         });
-        self.treadmill.enumerate_objects(&mut enumator);
+        self.treadmill.enumerate_objects(&mut enumator, true);
     }
 
     fn set_side_log_bits(&self) {
         let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         });
-        self.treadmill.enumerate_objects(&mut enumator);
+        self.treadmill.enumerate_objects(&mut enumator, true);
     }
 }
 
@@ -297,10 +297,16 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     pub fn release(&mut self, full_heap: bool) {
+        // We swapped the from/to spaces during Prepare, and the nursery to-space should have
+        // remained empty for the whole duration of the collection.
+        debug_assert!(self.treadmill.is_nursery_to_space_empty());
+
         self.sweep_large_pages(true);
-        debug_assert!(self.treadmill.is_nursery_empty());
+        debug_assert!(self.treadmill.is_nursery_from_space_empty());
+
         if full_heap {
             self.sweep_large_pages(false);
+            debug_assert!(self.treadmill.is_mature_from_space_empty());
         }
     }
 
@@ -364,7 +370,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 sweep(object);
             }
         } else {
-            for object in self.treadmill.collect() {
+            for object in self.treadmill.collect_mature() {
                 sweep(object)
             }
         }
