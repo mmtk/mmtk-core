@@ -223,17 +223,17 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     }
 
     fn clear_side_log_bits(&self) {
-        let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
+        let mut enumerator = ClosureObjectEnumerator::<_, VM>::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
         });
-        self.treadmill.enumerate_objects(&mut enumator, true);
+        self.treadmill.enumerate_objects(&mut enumerator, true);
     }
 
     fn set_side_log_bits(&self) {
-        let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
+        let mut enumerator = ClosureObjectEnumerator::<_, VM>::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         });
-        self.treadmill.enumerate_objects(&mut enumator, true);
+        self.treadmill.enumerate_objects(&mut enumerator, true);
     }
 }
 
