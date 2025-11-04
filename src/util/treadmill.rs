@@ -108,9 +108,10 @@ impl TreadMill {
         sync.from_space.is_empty()
     }
 
-    /// Flip the from- and to-spaces.
+    /// Flip the from-space and to-space.
     ///
-    /// `full_heap` is true during full-heap GC, or false during nursery GC.
+    /// `full_heap` is true during full-heap GC, or false during nursery GC.  It does nothing during
+    /// nursery GC.
     pub fn flip(&mut self, full_heap: bool) {
         let sync = self.sync.get_mut().unwrap();
         if full_heap {

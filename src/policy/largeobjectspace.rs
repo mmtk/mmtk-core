@@ -301,7 +301,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     pub fn release(&mut self, full_heap: bool) {
         self.sweep_large_pages(true);
         debug_assert!(self.treadmill.is_nursery_empty());
-
         if full_heap {
             self.sweep_large_pages(false);
             debug_assert!(self.treadmill.is_from_space_empty());
