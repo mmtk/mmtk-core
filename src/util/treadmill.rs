@@ -122,17 +122,13 @@ impl TreadMill {
 
     /// Enumerate objects.
     ///
-    /// Objects in the to-spaces are always enumerated.  If `all` is true, it will enumerate objects
-    /// in the nursery and from-spaces as well.
-    ///
-    /// If `assert_empty` is true, it will assert that spaces not enumerated are empty.  It is
-    /// useful for asserting that the nursery and the from-space are both empty when enumerating
-    /// objects for mutators.
+    /// Objects in the to-spaces are always enumerated.  `nursery` and `from` controls whether to
+    /// enumerate objects in the nursery and from-spaces, respectively.
     pub(crate) fn enumerate_objects(
         &self,
         enumerator: &mut dyn ObjectEnumerator,
-        all: bool,
-        assert_empty: bool,
+        nursery: bool,
+        from: bool,
     ) {
         let sync = self.sync.lock().unwrap();
         let mut enumerated = 0usize;
@@ -144,21 +140,15 @@ impl TreadMill {
         };
         visit_objects(&sync.to_space);
 
-        if all {
+        if nursery {
             visit_objects(&sync.nursery);
-            visit_objects(&sync.from_space);
-        } else if assert_empty {
-            // Note that during concurrent GC (e.g. in ConcurrentImmix), object have been moved to
-            // from-spaces, and GC workers are tracing objects concurrently, moving object to
-            // `mature.to_space`.  If a mutator calls `MMTK::enumerate_objects` during concurrent
-            // GC, the assertions below will fail.  That's expected because we currently disallow
-            // the VM binding to call `MMTK::enumerate_objects` during any GC activities, including
-            // concurrent GC.
-            assert!(sync.nursery.is_empty(), "nursery is not empty");
-            assert!(sync.from_space.is_empty(), "from_space is not empty");
         }
 
-        debug!("Enumerated {enumerated} objects in LOS.  all={all}, assert_empty={assert_empty}");
+        if from {
+            visit_objects(&sync.from_space);
+        }
+
+        debug!("Enumerated {enumerated} objects in LOS.  nursery: {nursery}, from: {from}");
     }
 }
 

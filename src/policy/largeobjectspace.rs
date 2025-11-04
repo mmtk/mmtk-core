@@ -219,23 +219,36 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     }
 
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
-        self.treadmill.enumerate_objects(enumerator, false, true);
+        // `MMTK::enumerate_objects` is not allowed during GC, so the from space must be empty. In
+        // `ConcurrentImmix`, mutators may run during GC and call `MMTK::enumerate_objects`.  It has
+        // undefined behavior according to the current API, so the assertion failure is expected.
+        assert!(
+            self.treadmill.is_from_space_empty(),
+            "From-space is not empty"
+        );
+
+        // Visit objects in the nursery and the to-space, which contain young and old objects,
+        // respectively, during mutator time.
+        self.treadmill.enumerate_objects(enumerator, true, false);
     }
 
     fn clear_side_log_bits(&self) {
         let mut enumerator = ClosureObjectEnumerator::<_, VM>::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
         });
+        // Visit all objects.  It can be ordered arbitrarily with `Self::Release` which sweeps dead
+        // objects (removing them from the treadmill) and clears their unlog bits, too.
         self.treadmill
-            .enumerate_objects(&mut enumerator, true, false);
+            .enumerate_objects(&mut enumerator, true, true);
     }
 
     fn set_side_log_bits(&self) {
         let mut enumerator = ClosureObjectEnumerator::<_, VM>::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         });
+        // Visit all objects.
         self.treadmill
-            .enumerate_objects(&mut enumerator, true, false);
+            .enumerate_objects(&mut enumerator, true, true);
     }
 }
 
@@ -375,6 +388,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     /// Enumerate objects for forwarding references.  Used by certain mark-compact plans.
     pub(crate) fn enumerate_objects_for_forwarding(&self, enumerator: &mut dyn ObjectEnumerator) {
+        // Only visit the `to_space` which should contain all objects determined to be live.
         self.treadmill.enumerate_objects(enumerator, false, false);
     }
 
