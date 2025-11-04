@@ -28,7 +28,14 @@
 <a href="#27" id="27">27</a>
 <a href="#28" id="28">28</a>
 <a href="#29" id="29">29</a>
-<a href="#30" id="30">30</a></pre></div><pre class="rust"><code><span class="doccomment">//! MMTk uses [`crate::vm::VMBinding`], which allows us to call into bindings
+<a href="#30" id="30">30</a>
+<a href="#31" id="31">31</a>
+<a href="#32" id="32">32</a>
+<a href="#33" id="33">33</a>
+<a href="#34" id="34">34</a>
+<a href="#35" id="35">35</a>
+<a href="#36" id="36">36</a>
+<a href="#37" id="37">37</a></pre></div><pre class="rust"><code><span class="doccomment">//! MMTk uses [`crate::vm::VMBinding`], which allows us to call into bindings
 //! with little overhead. As a result, some types in MMTk are generic types with a type parameter `&lt;VM&gt;`.
 //! However, in some cases, using generic types is not allowed. For example, in an object-safe trait,
 //! the methods cannot be generic, thus the method's parameters cannot be generic types.
@@ -51,7 +58,14 @@
                 <span class="self">Self</span>(worker_as_usize, PhantomData)
             }
             <span class="kw">pub fn </span>into_mut&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw-2">mut </span><span class="macro-nonterminal">$orig_type </span>{
-                <span class="kw">unsafe </span>{ std::mem::transmute(<span class="self">self</span>.<span class="number">0</span>) }
+                <span class="comment">// Provenance-related APIs were stabilized in Rust 1.84.
+                // Rust 1.91 introduced the warn-by-default lint `integer_to_ptr_transmutes`.
+                // Since our MSRV is still 1.74.1, we can't fix it until bumping MSRV.
+                </span><span class="attr">#[allow(unknown_lints)]
+                #[allow(integer_to_ptr_transmutes)]
+                </span><span class="kw">unsafe </span>{
+                    std::mem::transmute(<span class="self">self</span>.<span class="number">0</span>)
+                }
             }
         }
     };

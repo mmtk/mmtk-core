@@ -27,12 +27,7 @@
 <a href="#26" id="26">26</a>
 <a href="#27" id="27">27</a>
 <a href="#28" id="28">28</a>
-<a href="#29" id="29">29</a>
-<a href="#30" id="30">30</a>
-<a href="#31" id="31">31</a>
-<a href="#32" id="32">32</a>
-<a href="#33" id="33">33</a>
-<a href="#34" id="34">34</a></pre></div><pre class="rust"><code><span class="kw">pub mod </span>barrier;
+<a href="#29" id="29">29</a></pre></div><pre class="rust"><code><span class="kw">pub mod </span>barrier;
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">mod </span>concurrent_marking_work;
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">mod </span>global;
 
@@ -44,12 +39,13 @@
 </span><span class="comment">// TODO: This is probably not be general enough for all the concurrent plans.
 // TODO: We could consider moving this to specific plans later.
 </span><span class="attr">#[repr(u8)]
-#[derive(Debug, PartialEq, Eq, Copy, Clone, NoUninit)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, NoUninit, Default)]
 </span><span class="kw">pub enum </span>Pause {
     <span class="doccomment">/// A whole GC (including root scanning, closure, releasing, etc.) happening in a single pause.
     ///
     /// Don't be confused with "full-heap" GC in generational collectors.  `Pause::Full` can also
     /// refer to a nursery GC that happens in a single pause.
+    </span><span class="attr">#[default]
     </span>Full = <span class="number">1</span>,
     <span class="doccomment">/// The initial pause before concurrent marking.
     </span>InitialMark,
@@ -60,10 +56,4 @@
 <span class="kw">unsafe impl </span>bytemuck::ZeroableInOption <span class="kw">for </span>Pause {}
 
 <span class="kw">unsafe impl </span>bytemuck::PodInOption <span class="kw">for </span>Pause {}
-
-<span class="kw">impl </span>Default <span class="kw">for </span>Pause {
-    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
-        <span class="self">Self</span>::Full
-    }
-}
 </code></pre></div></section></main></body></html>
