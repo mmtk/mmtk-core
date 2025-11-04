@@ -28,22 +28,6 @@ struct TreadMillSync {
     to_space: HashSet<ObjectReference>,
 }
 
-/// Used by [`TreadMill::enumerate_objects`] to determine what to do to objects in the from-spaces.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) enum FromSpacePolicy {
-    /// Also enumerate objects in the from-spaces.  Useful when setting object metadata during
-    /// `Prepare`, at which time we may have swapped the from- and to-spaces.
-    Include,
-    /// Silently skip objects in the from-spaces.  Useful when enumerating live objects after the
-    /// liveness of objects is determined and live objects have been moved to the to-spaces.  One
-    /// use case is for forwarding references in some mark-compact GC algorithms.
-    Skip,
-    /// Assert that from-spaces must be empty.  Useful when the mutator calls
-    /// `MMTK::enumerate_objects`, at which time GC must not be in progress and the from-spaces must
-    /// be empty.
-    ExpectEmpty,
-}
-
 impl std::fmt::Debug for TreadMill {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let sync = self.sync.lock().unwrap();
@@ -137,12 +121,17 @@ impl TreadMill {
 
     /// Enumerate objects.
     ///
-    /// Objects in the to-spaces are always enumerated.  `from_space_policy` determines the action
-    /// for objects in the nursery and mature from-spaces.
+    /// Objects in the to-spaces are always enumerated.  If `all` is true, it will enumerate objects
+    /// in the nursery and from-spaces as well.
+    ///
+    /// If `assert_empty` is true, it will assert that spaces not enumerated are empty.  It is
+    /// useful for asserting that the nursery and the from-space are both empty when enumerating
+    /// objects for mutators.
     pub(crate) fn enumerate_objects(
         &self,
         enumerator: &mut dyn ObjectEnumerator,
-        from_space_policy: FromSpacePolicy,
+        all: bool,
+        assert_empty: bool,
     ) {
         let sync = self.sync.lock().unwrap();
         let mut enumerated = 0usize;
@@ -154,26 +143,21 @@ impl TreadMill {
         };
         visit_objects(&sync.to_space);
 
-        match from_space_policy {
-            FromSpacePolicy::Include => {
-                visit_objects(&sync.nursery);
-                visit_objects(&sync.from_space);
-            }
-            FromSpacePolicy::Skip => {
-                // Do nothing.
-            }
-            FromSpacePolicy::ExpectEmpty => {
-                // Note that during concurrent GC (e.g. in ConcurrentImmix), object have been moved
-                // to from-spaces, and GC workers are tracing objects concurrently, moving object to
-                // `mature.to_space`.  If a mutator calls `MMTK::enumerate_objects` during
-                // concurrent GC, the assertions below will fail.  That's expected because we
-                // currently disallow the VM binding to call `MMTK::enumerate_objects` during any GC
-                // activities, including concurrent GC.
-                assert!(sync.nursery.is_empty(), "nursery is not empty");
-                assert!(sync.from_space.is_empty(), "from_space is not empty");
-            }
+        if all {
+            visit_objects(&sync.nursery);
+            visit_objects(&sync.from_space);
+        } else if assert_empty {
+            // Note that during concurrent GC (e.g. in ConcurrentImmix), object have been moved to
+            // from-spaces, and GC workers are tracing objects concurrently, moving object to
+            // `mature.to_space`.  If a mutator calls `MMTK::enumerate_objects` during concurrent
+            // GC, the assertions below will fail.  That's expected because we currently disallow
+            // the VM binding to call `MMTK::enumerate_objects` during any GC activities, including
+            // concurrent GC.
+            assert!(sync.nursery.is_empty(), "nursery is not empty");
+            assert!(sync.from_space.is_empty(), "from_space is not empty");
         }
-        debug!("Enumerated {enumerated} objects in LOS.  from_space_policy={from_space_policy:?}");
+
+        debug!("Enumerated {enumerated} objects in LOS.  all={all}, assert_empty={assert_empty}");
     }
 }
 
