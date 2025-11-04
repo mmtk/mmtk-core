@@ -19,13 +19,13 @@ pub struct TreadMill {
 /// The synchronized part of [`TreadMill`]
 #[derive(Default)]
 struct TreadMillSync {
-    nursery: FromToSpace,
-    mature: FromToSpace,
+    nursery: SpacePair,
+    mature: SpacePair,
 }
 
 /// A pair of from and two spaces.
 #[derive(Default)]
-struct FromToSpace {
+struct SpacePair {
     from_space: HashSet<ObjectReference>,
     to_space: HashSet<ObjectReference>,
 }
