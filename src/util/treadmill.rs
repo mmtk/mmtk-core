@@ -81,14 +81,14 @@ impl TreadMill {
     }
 
     /// Take all objects from the `nursery.from_space`.  This is called during sweeping at which time
-    /// all objects in the from space are unreachable.
+    /// all objects in the from-space are unreachable.
     pub fn collect_nursery(&self) -> impl IntoIterator<Item = ObjectReference> {
         let mut sync = self.sync.lock().unwrap();
         std::mem::take(&mut sync.nursery.from_space)
     }
 
     /// Take all objects from the `mature.from_space`.  This is called during sweeping at which time
-    /// all objects in the from space are unreachable.
+    /// all objects in the from-space are unreachable.
     pub fn collect_mature(&self) -> impl IntoIterator<Item = ObjectReference> {
         let mut sync = self.sync.lock().unwrap();
         std::mem::take(&mut sync.mature.from_space)
@@ -133,7 +133,7 @@ impl TreadMill {
         sync.mature.from_space.is_empty()
     }
 
-    /// Flip the from and to spaces.
+    /// Flip the from- and to-spaces.
     ///
     /// `full_heap` is true during full-heap GC, or false during nursery GC.
     pub fn flip(&mut self, full_heap: bool) {
