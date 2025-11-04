@@ -119,7 +119,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         }
 
         // Add to the treadmill.  Nursery and mature objects need to be added to different sets.
-        self.treadmill.add_to_treadmill(object, allocate_as_live);
+        self.treadmill.add_to_treadmill(object, into_nursery);
     }
 
     #[cfg(feature = "is_mmtk_object")]
@@ -219,17 +219,22 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     }
 
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
-        // `MMTK::enumerate_objects` is not allowed during GC, so the from space must be empty. In
-        // `ConcurrentImmix`, mutators may run during GC and call `MMTK::enumerate_objects`.  It has
-        // undefined behavior according to the current API, so the assertion failure is expected.
+        // `MMTK::enumerate_objects` is not allowed during GC, so the collection nursery and the
+        // from space must be empty.  In `ConcurrentImmix`, mutators may run during GC and call
+        // `MMTK::enumerate_objects`.  It has undefined behavior according to the current API, so
+        // the assertion failure is expected.
+        assert!(
+            self.treadmill.is_collect_nursery_empty(),
+            "Collection nursery is not empty"
+        );
         assert!(
             self.treadmill.is_from_space_empty(),
             "From-space is not empty"
         );
 
-        // Visit objects in the nursery and the to-space, which contain young and old objects,
-        // respectively, during mutator time.
-        self.treadmill.enumerate_objects(enumerator, true, false);
+        // Visit objects in the allocation nursery and the to-space, which contain young and old
+        // objects, respectively, during mutator time.
+        self.treadmill.enumerate_objects(enumerator, false);
     }
 
     fn clear_side_log_bits(&self) {
@@ -238,8 +243,7 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
         });
         // Visit all objects.  It can be ordered arbitrarily with `Self::Release` which sweeps dead
         // objects (removing them from the treadmill) and clears their unlog bits, too.
-        self.treadmill
-            .enumerate_objects(&mut enumerator, true, true);
+        self.treadmill.enumerate_objects(&mut enumerator, true);
     }
 
     fn set_side_log_bits(&self) {
@@ -247,8 +251,7 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         });
         // Visit all objects.
-        self.treadmill
-            .enumerate_objects(&mut enumerator, true, true);
+        self.treadmill.enumerate_objects(&mut enumerator, true);
     }
 }
 
@@ -312,8 +315,13 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     pub fn release(&mut self, full_heap: bool) {
+        // We swapped the allocation nursery and the collection nursery when GC starts, and we don't
+        // add objects to the allocation nursery during GC.  It should have remained empty during
+        // the whole GC.
+        debug_assert!(self.treadmill.is_alloc_nursery_empty());
+
         self.sweep_large_pages(true);
-        debug_assert!(self.treadmill.is_nursery_empty());
+        debug_assert!(self.treadmill.is_collect_nursery_empty());
         if full_heap {
             self.sweep_large_pages(false);
             debug_assert!(self.treadmill.is_from_space_empty());
@@ -388,8 +396,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     /// Enumerate objects for forwarding references.  Used by certain mark-compact plans.
     pub(crate) fn enumerate_objects_for_forwarding(&self, enumerator: &mut dyn ObjectEnumerator) {
-        // Only visit the `to_space` which should contain all objects determined to be live.
-        self.treadmill.enumerate_objects(enumerator, false, false);
+        // The alloc nursery should have remained empty during the GC.
+        debug_assert!(self.treadmill.is_alloc_nursery_empty());
+        // We only need to visit the to_space, which contains all objects determined to be live.
+        self.treadmill.enumerate_objects(enumerator, false);
     }
 
     /// Allocate an object
