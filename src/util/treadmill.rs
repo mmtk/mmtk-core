@@ -8,9 +8,6 @@ use super::object_enum::ObjectEnumerator;
 
 /// A data structure for recording objects in the LOS.
 ///
-/// It is divided into the nursery and the mature space, and each of them is further divided into
-/// the from-space and the to-space.
-///
 /// All operations are protected by a single mutex [`TreadMill::sync`].
 pub struct TreadMill {
     sync: Mutex<TreadMillSync>,
@@ -19,14 +16,15 @@ pub struct TreadMill {
 /// The synchronized part of [`TreadMill`]
 #[derive(Default)]
 struct TreadMillSync {
-    nursery: SpacePair,
-    mature: SpacePair,
-}
-
-/// A pair of from and two spaces.
-#[derive(Default)]
-struct SpacePair {
+    /// The nursery.  During mutator time, newly allocated objects are added to the nursery.  After
+    /// a GC, the nursery will be evacuated.
+    nursery: HashSet<ObjectReference>,
+    /// The from-space.  During GC, old objects whose liveness are not yet determined are kept in
+    /// the from-space.  After GC, the from-space will be evacuated.
     from_space: HashSet<ObjectReference>,
+    /// The to-space.  It holds old objects during mutator time.  Objects in the to-space are moved
+    /// to the from-space at the beginning of GC, and objects are moved to the to-space once they
+    /// are determined to be live.
     to_space: HashSet<ObjectReference>,
 }
 
@@ -50,10 +48,9 @@ impl std::fmt::Debug for TreadMill {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let sync = self.sync.lock().unwrap();
         f.debug_struct("TreadMill")
-            .field("nursery.from", &sync.nursery.from_space)
-            .field("nursery.to", &sync.nursery.to_space)
-            .field("mature.from", &sync.mature.from_space)
-            .field("mature.to", &sync.mature.to_space)
+            .field("nursery", &sync.nursery)
+            .field("from", &sync.from_space)
+            .field("to", &sync.to_space)
             .finish()
     }
 }
@@ -67,70 +64,64 @@ impl TreadMill {
 
     /// Add an object to the treadmill.
     ///
-    /// New objects are normally added to `nursery.to_space`.  But when allocatin as live (e.g. when
-    /// concurrent marking is active), we directly add into `mature.to_space`.
-    pub fn add_to_treadmill(&self, object: ObjectReference, nursery: bool) {
+    /// New objects are normally added to `nursery.to_space`.  But when allocating as live (e.g.
+    /// when concurrent marking is active), we directly add into the `to_space`.
+    pub fn add_to_treadmill(&self, object: ObjectReference, allocate_as_live: bool) {
         let mut sync = self.sync.lock().unwrap();
-        if nursery {
-            trace!("Adding {} to nursery.to_space", object);
-            sync.nursery.to_space.insert(object);
+        if allocate_as_live {
+            trace!("Adding {} to to_space", object);
+            sync.to_space.insert(object);
         } else {
-            trace!("Adding {} to mature.to_space", object);
-            sync.mature.to_space.insert(object);
+            trace!("Adding {} to nursery", object);
+            sync.nursery.insert(object);
         }
     }
 
-    /// Take all objects from the `nursery.from_space`.  This is called during sweeping at which time
-    /// all objects in the from-space are unreachable.
+    /// Take all objects from the `nursery`.  This is called during sweeping at which time all
+    /// objects in the nursery are unreachable.
     pub fn collect_nursery(&self) -> impl IntoIterator<Item = ObjectReference> {
         let mut sync = self.sync.lock().unwrap();
-        std::mem::take(&mut sync.nursery.from_space)
+        std::mem::take(&mut sync.nursery)
     }
 
-    /// Take all objects from the `mature.from_space`.  This is called during sweeping at which time
-    /// all objects in the from-space are unreachable.
+    /// Take all objects from the `from_space`.  This is called during sweeping at which time all
+    /// objects in the from-space are unreachable.
     pub fn collect_mature(&self) -> impl IntoIterator<Item = ObjectReference> {
         let mut sync = self.sync.lock().unwrap();
-        std::mem::take(&mut sync.mature.from_space)
+        std::mem::take(&mut sync.from_space)
     }
 
-    /// Move an object to `mature.to_space`.  Called when an object is determined to be reachable.
+    /// Move an object to `to_space`.  Called when an object is determined to be reachable.
     pub fn copy(&self, object: ObjectReference, is_in_nursery: bool) {
         let mut sync = self.sync.lock().unwrap();
         if is_in_nursery {
             debug_assert!(
-                sync.nursery.from_space.contains(&object),
-                "copy source object ({}) must be in nursery.from_space",
+                sync.nursery.contains(&object),
+                "copy source object ({}) must be in nursery",
                 object
             );
-            sync.nursery.from_space.remove(&object);
+            sync.nursery.remove(&object);
         } else {
             debug_assert!(
-                sync.mature.from_space.contains(&object),
-                "copy source object ({}) must be in mature.from_space",
+                sync.from_space.contains(&object),
+                "copy source object ({}) must be in from_space",
                 object
             );
-            sync.mature.from_space.remove(&object);
+            sync.from_space.remove(&object);
         }
-        sync.mature.to_space.insert(object);
+        sync.to_space.insert(object);
     }
 
-    /// Return true if the nursery from-space is empty.
-    pub fn is_nursery_from_space_empty(&self) -> bool {
+    /// Return true if the nursery is empty.
+    pub fn is_nursery_empty(&self) -> bool {
         let sync = self.sync.lock().unwrap();
-        sync.nursery.from_space.is_empty()
+        sync.nursery.is_empty()
     }
 
-    /// Return true if the nursery to-space is empty.
-    pub fn is_nursery_to_space_empty(&self) -> bool {
+    /// Return true if the from-space is empty.
+    pub fn is_from_space_empty(&self) -> bool {
         let sync = self.sync.lock().unwrap();
-        sync.nursery.to_space.is_empty()
-    }
-
-    /// Return true if the mature from-space is empty.
-    pub fn is_mature_from_space_empty(&self) -> bool {
-        let sync = self.sync.lock().unwrap();
-        sync.mature.from_space.is_empty()
+        sync.from_space.is_empty()
     }
 
     /// Flip the from- and to-spaces.
@@ -138,11 +129,9 @@ impl TreadMill {
     /// `full_heap` is true during full-heap GC, or false during nursery GC.
     pub fn flip(&mut self, full_heap: bool) {
         let sync = self.sync.get_mut().unwrap();
-        swap(&mut sync.nursery.from_space, &mut sync.nursery.to_space);
-        trace!("Flipped nursery.from_space and nursery.to_space");
         if full_heap {
-            swap(&mut sync.mature.from_space, &mut sync.mature.to_space);
-            trace!("Flipped mature.from_space and mature.to_space");
+            swap(&mut sync.from_space, &mut sync.to_space);
+            trace!("Flipped from_space and to_space");
         }
     }
 
@@ -163,13 +152,12 @@ impl TreadMill {
                 enumerated += 1;
             }
         };
-        visit_objects(&sync.nursery.to_space);
-        visit_objects(&sync.mature.to_space);
+        visit_objects(&sync.to_space);
 
         match from_space_policy {
             FromSpacePolicy::Include => {
-                visit_objects(&sync.nursery.from_space);
-                visit_objects(&sync.mature.from_space);
+                visit_objects(&sync.nursery);
+                visit_objects(&sync.from_space);
             }
             FromSpacePolicy::Skip => {
                 // Do nothing.
@@ -181,14 +169,8 @@ impl TreadMill {
                 // concurrent GC, the assertions below will fail.  That's expected because we
                 // currently disallow the VM binding to call `MMTK::enumerate_objects` during any GC
                 // activities, including concurrent GC.
-                assert!(
-                    sync.nursery.from_space.is_empty(),
-                    "nursery.from_space is not empty"
-                );
-                assert!(
-                    sync.mature.from_space.is_empty(),
-                    "mature.from_space is not empty"
-                );
+                assert!(sync.nursery.is_empty(), "nursery is not empty");
+                assert!(sync.from_space.is_empty(), "from_space is not empty");
             }
         }
         debug!("Enumerated {enumerated} objects in LOS.  from_space_policy={from_space_policy:?}");

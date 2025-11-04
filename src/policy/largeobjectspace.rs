@@ -120,7 +120,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         }
 
         // Add to the treadmill.  Nursery and mature objects need to be added to different sets.
-        self.treadmill.add_to_treadmill(object, into_nursery);
+        self.treadmill.add_to_treadmill(object, allocate_as_live);
     }
 
     #[cfg(feature = "is_mmtk_object")]
@@ -301,16 +301,12 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     pub fn release(&mut self, full_heap: bool) {
-        // We swapped the from/to spaces during Prepare, and the nursery to-space should have
-        // remained empty for the whole duration of the collection.
-        debug_assert!(self.treadmill.is_nursery_to_space_empty());
-
         self.sweep_large_pages(true);
-        debug_assert!(self.treadmill.is_nursery_from_space_empty());
+        debug_assert!(self.treadmill.is_nursery_empty());
 
         if full_heap {
             self.sweep_large_pages(false);
-            debug_assert!(self.treadmill.is_mature_from_space_empty());
+            debug_assert!(self.treadmill.is_from_space_empty());
         }
     }
 
