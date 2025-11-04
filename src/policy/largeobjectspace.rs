@@ -12,6 +12,7 @@ use crate::util::metadata;
 use crate::util::object_enum::ClosureObjectEnumerator;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
+use crate::util::treadmill::FromSpacePolicy;
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
@@ -219,21 +220,24 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     }
 
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
-        self.treadmill.enumerate_objects(enumerator, false);
+        self.treadmill
+            .enumerate_objects(enumerator, FromSpacePolicy::ExpectEmpty);
     }
 
     fn clear_side_log_bits(&self) {
         let mut enumerator = ClosureObjectEnumerator::<_, VM>::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
         });
-        self.treadmill.enumerate_objects(&mut enumerator, true);
+        self.treadmill
+            .enumerate_objects(&mut enumerator, FromSpacePolicy::Include);
     }
 
     fn set_side_log_bits(&self) {
         let mut enumerator = ClosureObjectEnumerator::<_, VM>::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         });
-        self.treadmill.enumerate_objects(&mut enumerator, true);
+        self.treadmill
+            .enumerate_objects(&mut enumerator, FromSpacePolicy::Include);
     }
 }
 
@@ -374,6 +378,12 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 sweep(object)
             }
         }
+    }
+
+    /// Enumerate objects for forwarding references.  Used by certain mark-compact plans.
+    pub(crate) fn enumerate_objects_for_forwarding(&self, enumerator: &mut dyn ObjectEnumerator) {
+        self.treadmill
+            .enumerate_objects(enumerator, FromSpacePolicy::Skip);
     }
 
     /// Allocate an object

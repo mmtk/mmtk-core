@@ -30,6 +30,22 @@ struct SpacePair {
     to_space: HashSet<ObjectReference>,
 }
 
+/// Used by [`TreadMill::enumerate_objects`] to determine what to do to objects in the from-spaces.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum FromSpacePolicy {
+    /// Also enumerate objects in the from-spaces.  Useful when setting object metadata during
+    /// `Prepare`, at which time we may have swapped the from- and to-spaces.
+    Include,
+    /// Silently skip objects in the from-spaces.  Useful when enumerating live objects after the
+    /// liveness of objects is determined and live objects have been moved to the to-spaces.  One
+    /// use case is for forwarding references in some mark-compact GC algorithms.
+    Skip,
+    /// Assert that from-spaces must be empty.  Useful when the mutator calls
+    /// `MMTK::enumerate_objects`, at which time GC must not be in progress and the from-spaces must
+    /// be empty.
+    ExpectEmpty,
+}
+
 impl std::fmt::Debug for TreadMill {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let sync = self.sync.lock().unwrap();
@@ -132,11 +148,13 @@ impl TreadMill {
 
     /// Enumerate objects.
     ///
-    /// `gc` is true if called as part of GC activity.  It will enumerate objects in both
-    /// from-spaces and to-spaces because we may have flipped the from/to spaces.
-    ///
-    /// `gc` is false if called by mutator.  It will only enumerate objects in to-spaces.
-    pub(crate) fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator, gc: bool) {
+    /// Objects in the to-spaces are always enumerated.  `from_space_policy` determines the action
+    /// for objects in the nursery and mature from-spaces.
+    pub(crate) fn enumerate_objects(
+        &self,
+        enumerator: &mut dyn ObjectEnumerator,
+        from_space_policy: FromSpacePolicy,
+    ) {
         let sync = self.sync.lock().unwrap();
         let mut enumerated = 0usize;
         let mut visit_objects = |set: &HashSet<ObjectReference>| {
@@ -147,26 +165,33 @@ impl TreadMill {
         };
         visit_objects(&sync.nursery.to_space);
         visit_objects(&sync.mature.to_space);
-        if gc {
-            visit_objects(&sync.nursery.from_space);
-            visit_objects(&sync.mature.from_space);
-        } else {
-            // Note that during concurrent GC (e.g. in ConcurrentImmix), object have been moved to
-            // from-spaces, and GC workers are tracing objects concurrently, moving object to
-            // `mature.to_space`.  If a mutator calls `MMTK::enumerate_objects` during concurrent
-            // GC, the assertions below will fail.  That's expected because we currently disallow
-            // the VM binding to call `MMTK::enumerate_objects` during any GC activities, including
-            // concurrent GC.
-            assert!(
-                sync.nursery.from_space.is_empty(),
-                "nursery.from_space is not empty"
-            );
-            assert!(
-                sync.mature.from_space.is_empty(),
-                "mature.from_space is not empty"
-            );
+
+        match from_space_policy {
+            FromSpacePolicy::Include => {
+                visit_objects(&sync.nursery.from_space);
+                visit_objects(&sync.mature.from_space);
+            }
+            FromSpacePolicy::Skip => {
+                // Do nothing.
+            }
+            FromSpacePolicy::ExpectEmpty => {
+                // Note that during concurrent GC (e.g. in ConcurrentImmix), object have been moved
+                // to from-spaces, and GC workers are tracing objects concurrently, moving object to
+                // `mature.to_space`.  If a mutator calls `MMTK::enumerate_objects` during
+                // concurrent GC, the assertions below will fail.  That's expected because we
+                // currently disallow the VM binding to call `MMTK::enumerate_objects` during any GC
+                // activities, including concurrent GC.
+                assert!(
+                    sync.nursery.from_space.is_empty(),
+                    "nursery.from_space is not empty"
+                );
+                assert!(
+                    sync.mature.from_space.is_empty(),
+                    "mature.from_space is not empty"
+                );
+            }
         }
-        debug!("Enumerated {enumerated} objects in LOS. gc={gc}");
+        debug!("Enumerated {enumerated} objects in LOS.  from_space_policy={from_space_policy:?}");
     }
 }
 
