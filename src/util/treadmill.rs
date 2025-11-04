@@ -16,18 +16,15 @@ pub struct TreadMill {
 /// The synchronized part of [`TreadMill`]
 #[derive(Default)]
 struct TreadMillSync {
-    /// The from-space.  During GC, old objects whose liveness are not yet determined are kept in
-    /// the from-space.  After GC, the from-space will be evacuated.
+    /// The from-space.  During GC, it contains old objects with unknown liveness.
     from_space: HashSet<ObjectReference>,
-    /// The to-space.  It holds old objects during mutator time.  Objects in the to-space are moved
-    /// to the from-space at the beginning of GC, and objects are moved to the to-space once they
-    /// are determined to be live.
+    /// The to-space.  During mutator time, it contains old objects; during GC, it contains objects
+    /// determined to be live.
     to_space: HashSet<ObjectReference>,
-    /// The collection nursery.  During GC, young objects whose liveness are not yet determined are
-    /// kept in the collection nursery.  After GC, the collection nursery will be evacuated.
+    /// The collection nursery.  During GC, it contains young objects with unknown liveness.
     collect_nursery: HashSet<ObjectReference>,
-    /// The allocation nursery.  It holds newly allocated objects during mutator time.  Objects in
-    /// the allocation nursery are moved to the collection nursery at the beginning of a GC.
+    /// The allocation nursery.  During mutator time, it contains young objects; during GC, it
+    /// remains empty.
     alloc_nursery: HashSet<ObjectReference>,
 }
 
@@ -52,8 +49,8 @@ impl TreadMill {
 
     /// Add an object to the treadmill.
     ///
-    /// New objects are normally added to `nursery.to_space`.  But when allocating as live (e.g.
-    /// when concurrent marking is active), we directly add into the `to_space`.
+    /// New objects are normally added to `alloc_nursery`.  But when allocating as live (e.g. when
+    /// concurrent marking is active), we directly add into the `to_space`.
     pub fn add_to_treadmill(&self, object: ObjectReference, nursery: bool) {
         let mut sync = self.sync.lock().unwrap();
         if nursery {
@@ -66,14 +63,14 @@ impl TreadMill {
     }
 
     /// Take all objects from the `collect_nursery`.  This is called during sweeping at which time
-    /// all objects in the collection nursery are unreachable.
+    /// all unreachable young objects are in the collection nursery.
     pub fn collect_nursery(&self) -> impl IntoIterator<Item = ObjectReference> {
         let mut sync = self.sync.lock().unwrap();
         std::mem::take(&mut sync.collect_nursery)
     }
 
     /// Take all objects from the `from_space`.  This is called during sweeping at which time all
-    /// objects in the from-space are unreachable.
+    /// unreachable old objects are in the from-space.
     pub fn collect_mature(&self) -> impl IntoIterator<Item = ObjectReference> {
         let mut sync = self.sync.lock().unwrap();
         std::mem::take(&mut sync.from_space)
@@ -141,8 +138,8 @@ impl TreadMill {
 
     /// Enumerate objects.
     ///
-    /// Objects in the allocation nursery and the to-spaces are always enumerated.  They include
-    /// live objects during mutator time, and objects determined to be live during a GC.
+    /// Objects in the allocation nursery and the to-spaces are always enumerated.  They include all
+    /// objects during mutator time, and objects determined to be live during a GC.
     ///
     /// If `all` is true, it will enumerate the collection nursery and the from-space, too.
     pub(crate) fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator, all: bool) {
