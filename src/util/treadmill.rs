@@ -159,7 +159,12 @@ impl TreadMill {
             visit_objects(&sync.from_space);
         }
 
-        debug!("Enumerated {enumerated} objects in LOS.  all: {all}");
+        debug!("Enumerated {enumerated} objects in LOS.  all: {all}.  from_space: {fs}, to_space: {ts}, collect_nursery: {cn}, alloc_nursery: {an}",
+            fs=sync.from_space.len(),
+            ts=sync.to_space.len(),
+            cn=sync.collect_nursery.len(),
+            an=sync.alloc_nursery.len(),
+        );
     }
 }
 
