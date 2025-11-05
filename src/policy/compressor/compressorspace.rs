@@ -405,11 +405,11 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     pub fn after_compact(&self, worker: &mut GCWorker<VM>, los: &LargeObjectSpace<VM>) {
         self.pr.reset_allocator();
         // Update references from the LOS to Compressor too.
-        los.enumerate_objects_for_forwarding(
-            &mut object_enum::ClosureObjectEnumerator::<_, VM>::new(&mut |o: ObjectReference| {
+        los.enumerate_to_space_objects(&mut object_enum::ClosureObjectEnumerator::<_, VM>::new(
+            &mut |o: ObjectReference| {
                 self.update_references(worker, o);
-            }),
-        );
+            },
+        ));
     }
 }
 

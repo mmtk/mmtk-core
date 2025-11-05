@@ -394,8 +394,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
-    /// Enumerate objects for forwarding references.  Used by certain mark-compact plans.
-    pub(crate) fn enumerate_objects_for_forwarding(&self, enumerator: &mut dyn ObjectEnumerator) {
+    /// Enumerate objects in the to-space.  It is a workaround for Compressor which currently needs
+    /// to enumerate reachable objects for during reference forwarding.
+    pub(crate) fn enumerate_to_space_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
+        // This function is intended to enumerate objects in the to-space.
         // The alloc nursery should have remained empty during the GC.
         debug_assert!(self.treadmill.is_alloc_nursery_empty());
         // We only need to visit the to_space, which contains all objects determined to be live.
