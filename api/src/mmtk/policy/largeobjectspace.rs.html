@@ -445,7 +445,41 @@
 <a href="#444" id="444">444</a>
 <a href="#445" id="445">445</a>
 <a href="#446" id="446">446</a>
-<a href="#447" id="447">447</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
+<a href="#447" id="447">447</a>
+<a href="#448" id="448">448</a>
+<a href="#449" id="449">449</a>
+<a href="#450" id="450">450</a>
+<a href="#451" id="451">451</a>
+<a href="#452" id="452">452</a>
+<a href="#453" id="453">453</a>
+<a href="#454" id="454">454</a>
+<a href="#455" id="455">455</a>
+<a href="#456" id="456">456</a>
+<a href="#457" id="457">457</a>
+<a href="#458" id="458">458</a>
+<a href="#459" id="459">459</a>
+<a href="#460" id="460">460</a>
+<a href="#461" id="461">461</a>
+<a href="#462" id="462">462</a>
+<a href="#463" id="463">463</a>
+<a href="#464" id="464">464</a>
+<a href="#465" id="465">465</a>
+<a href="#466" id="466">466</a>
+<a href="#467" id="467">467</a>
+<a href="#468" id="468">468</a>
+<a href="#469" id="469">469</a>
+<a href="#470" id="470">470</a>
+<a href="#471" id="471">471</a>
+<a href="#472" id="472">472</a>
+<a href="#473" id="473">473</a>
+<a href="#474" id="474">474</a>
+<a href="#475" id="475">475</a>
+<a href="#476" id="476">476</a>
+<a href="#477" id="477">477</a>
+<a href="#478" id="478">478</a>
+<a href="#479" id="479">479</a>
+<a href="#480" id="480">480</a>
+<a href="#481" id="481">481</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
@@ -666,21 +700,39 @@
     }
 
     <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
-        <span class="self">self</span>.treadmill.enumerate_objects(enumerator);
+        <span class="comment">// `MMTK::enumerate_objects` is not allowed during GC, so the collection nursery and the
+        // from space must be empty.  In `ConcurrentImmix`, mutators may run during GC and call
+        // `MMTK::enumerate_objects`.  It has undefined behavior according to the current API, so
+        // the assertion failure is expected.
+        </span><span class="macro">assert!</span>(
+            <span class="self">self</span>.treadmill.is_collect_nursery_empty(),
+            <span class="string">"Collection nursery is not empty"
+        </span>);
+        <span class="macro">assert!</span>(
+            <span class="self">self</span>.treadmill.is_from_space_empty(),
+            <span class="string">"From-space is not empty"
+        </span>);
+
+        <span class="comment">// Visit objects in the allocation nursery and the to-space, which contain young and old
+        // objects, respectively, during mutator time.
+        </span><span class="self">self</span>.treadmill.enumerate_objects(enumerator, <span class="bool-val">false</span>);
     }
 
     <span class="kw">fn </span>clear_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">let </span><span class="kw-2">mut </span>enumator = ClosureObjectEnumerator::&lt;<span class="kw">_</span>, VM&gt;::new(|object| {
+        <span class="kw">let </span><span class="kw-2">mut </span>enumerator = ClosureObjectEnumerator::&lt;<span class="kw">_</span>, VM&gt;::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::&lt;VM&gt;(object, Ordering::SeqCst);
         });
-        <span class="self">self</span>.treadmill.enumerate_objects(<span class="kw-2">&amp;mut </span>enumator);
+        <span class="comment">// Visit all objects.  It can be ordered arbitrarily with `Self::Release` which sweeps dead
+        // objects (removing them from the treadmill) and clears their unlog bits, too.
+        </span><span class="self">self</span>.treadmill.enumerate_objects(<span class="kw-2">&amp;mut </span>enumerator, <span class="bool-val">true</span>);
     }
 
     <span class="kw">fn </span>set_side_log_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">let </span><span class="kw-2">mut </span>enumator = ClosureObjectEnumerator::&lt;<span class="kw">_</span>, VM&gt;::new(|object| {
+        <span class="kw">let </span><span class="kw-2">mut </span>enumerator = ClosureObjectEnumerator::&lt;<span class="kw">_</span>, VM&gt;::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::&lt;VM&gt;(object, Ordering::SeqCst);
         });
-        <span class="self">self</span>.treadmill.enumerate_objects(<span class="kw-2">&amp;mut </span>enumator);
+        <span class="comment">// Visit all objects.
+        </span><span class="self">self</span>.treadmill.enumerate_objects(<span class="kw-2">&amp;mut </span>enumerator, <span class="bool-val">true</span>);
     }
 }
 
@@ -744,10 +796,16 @@
     }
 
     <span class="kw">pub fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, full_heap: bool) {
+        <span class="comment">// We swapped the allocation nursery and the collection nursery when GC starts, and we don't
+        // add objects to the allocation nursery during GC.  It should have remained empty during
+        // the whole GC.
+        </span><span class="macro">debug_assert!</span>(<span class="self">self</span>.treadmill.is_alloc_nursery_empty());
+
         <span class="self">self</span>.sweep_large_pages(<span class="bool-val">true</span>);
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.treadmill.is_nursery_empty());
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.treadmill.is_collect_nursery_empty());
         <span class="kw">if </span>full_heap {
             <span class="self">self</span>.sweep_large_pages(<span class="bool-val">false</span>);
+            <span class="macro">debug_assert!</span>(<span class="self">self</span>.treadmill.is_from_space_empty());
         }
     }
 
@@ -811,10 +869,20 @@
                 sweep(object);
             }
         } <span class="kw">else </span>{
-            <span class="kw">for </span>object <span class="kw">in </span><span class="self">self</span>.treadmill.collect() {
+            <span class="kw">for </span>object <span class="kw">in </span><span class="self">self</span>.treadmill.collect_mature() {
                 sweep(object)
             }
         }
+    }
+
+    <span class="doccomment">/// Enumerate objects in the to-space.  It is a workaround for Compressor which currently needs
+    /// to enumerate reachable objects for during reference forwarding.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>enumerate_to_space_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
+        <span class="comment">// This function is intended to enumerate objects in the to-space.
+        // The alloc nursery should have remained empty during the GC.
+        </span><span class="macro">debug_assert!</span>(<span class="self">self</span>.treadmill.is_alloc_nursery_empty());
+        <span class="comment">// We only need to visit the to_space, which contains all objects determined to be live.
+        </span><span class="self">self</span>.treadmill.enumerate_objects(enumerator, <span class="bool-val">false</span>);
     }
 
     <span class="doccomment">/// Allocate an object

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["TreadMill"]};
+window.SIDEBAR_ITEMS = {"struct":["TreadMill","TreadMillSync"]};

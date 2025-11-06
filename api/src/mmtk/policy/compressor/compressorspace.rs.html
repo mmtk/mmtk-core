@@ -868,7 +868,7 @@
     <span class="kw">pub fn </span>after_compact(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, los: <span class="kw-2">&amp;</span>LargeObjectSpace&lt;VM&gt;) {
         <span class="self">self</span>.pr.reset_allocator();
         <span class="comment">// Update references from the LOS to Compressor too.
-        </span>los.enumerate_objects(<span class="kw-2">&amp;mut </span>object_enum::ClosureObjectEnumerator::&lt;<span class="kw">_</span>, VM&gt;::new(
+        </span>los.enumerate_to_space_objects(<span class="kw-2">&amp;mut </span>object_enum::ClosureObjectEnumerator::&lt;<span class="kw">_</span>, VM&gt;::new(
             <span class="kw-2">&amp;mut </span>|o: ObjectReference| {
                 <span class="self">self</span>.update_references(worker, o);
             },

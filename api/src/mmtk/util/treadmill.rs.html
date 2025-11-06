@@ -119,7 +119,61 @@
 <a href="#118" id="118">118</a>
 <a href="#119" id="119">119</a>
 <a href="#120" id="120">120</a>
-<a href="#121" id="121">121</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
 <span class="kw">use </span>std::mem::swap;
 <span class="kw">use </span>std::sync::Mutex;
 
@@ -127,20 +181,36 @@
 
 <span class="kw">use </span><span class="kw">super</span>::object_enum::ObjectEnumerator;
 
-<span class="kw">pub struct </span>TreadMill {
-    from_space: Mutex&lt;HashSet&lt;ObjectReference&gt;&gt;,
-    to_space: Mutex&lt;HashSet&lt;ObjectReference&gt;&gt;,
-    collect_nursery: Mutex&lt;HashSet&lt;ObjectReference&gt;&gt;,
-    alloc_nursery: Mutex&lt;HashSet&lt;ObjectReference&gt;&gt;,
+<span class="doccomment">/// A data structure for recording objects in the LOS.
+///
+/// All operations are protected by a single mutex [`TreadMill::sync`].
+</span><span class="kw">pub struct </span>TreadMill {
+    sync: Mutex&lt;TreadMillSync&gt;,
+}
+
+<span class="doccomment">/// The synchronized part of [`TreadMill`]
+</span><span class="attr">#[derive(Default)]
+</span><span class="kw">struct </span>TreadMillSync {
+    <span class="doccomment">/// The from-space.  During GC, it contains old objects with unknown liveness.
+    </span>from_space: HashSet&lt;ObjectReference&gt;,
+    <span class="doccomment">/// The to-space.  During mutator time, it contains old objects; during GC, it contains objects
+    /// determined to be live.
+    </span>to_space: HashSet&lt;ObjectReference&gt;,
+    <span class="doccomment">/// The collection nursery.  During GC, it contains young objects with unknown liveness.
+    </span>collect_nursery: HashSet&lt;ObjectReference&gt;,
+    <span class="doccomment">/// The allocation nursery.  During mutator time, it contains young objects; during GC, it
+    /// remains empty.
+    </span>alloc_nursery: HashSet&lt;ObjectReference&gt;,
 }
 
 <span class="kw">impl </span>std::fmt::Debug <span class="kw">for </span>TreadMill {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">'_</span>&gt;) -&gt; std::fmt::Result {
+        <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
         f.debug_struct(<span class="string">"TreadMill"</span>)
-            .field(<span class="string">"from"</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.from_space.lock().unwrap())
-            .field(<span class="string">"to"</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.to_space.lock().unwrap())
-            .field(<span class="string">"collect_nursery"</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.collect_nursery.lock().unwrap())
-            .field(<span class="string">"alloc_nursery"</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.alloc_nursery.lock().unwrap())
+            .field(<span class="string">"from_space"</span>, <span class="kw-2">&amp;</span>sync.from_space)
+            .field(<span class="string">"to_space"</span>, <span class="kw-2">&amp;</span>sync.to_space)
+            .field(<span class="string">"collect_nursery"</span>, <span class="kw-2">&amp;</span>sync.collect_nursery)
+            .field(<span class="string">"alloc_nursery"</span>, <span class="kw-2">&amp;</span>sync.alloc_nursery)
             .finish()
     }
 }
@@ -148,90 +218,128 @@
 <span class="kw">impl </span>TreadMill {
     <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
         TreadMill {
-            from_space: Mutex::new(HashSet::new()),
-            to_space: Mutex::new(HashSet::new()),
-            collect_nursery: Mutex::new(HashSet::new()),
-            alloc_nursery: Mutex::new(HashSet::new()),
+            sync: Mutex::new(Default::default()),
         }
     }
 
-    <span class="kw">pub fn </span>add_to_treadmill(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, nursery: bool) {
+    <span class="doccomment">/// Add an object to the treadmill.
+    ///
+    /// New objects are normally added to `alloc_nursery`.  But when allocating as live (e.g. when
+    /// concurrent marking is active), we directly add into the `to_space`.
+    </span><span class="kw">pub fn </span>add_to_treadmill(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, nursery: bool) {
+        <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
         <span class="kw">if </span>nursery {
-            <span class="macro">trace!</span>(<span class="string">"Adding {} to nursery"</span>, object);
-            <span class="self">self</span>.alloc_nursery.lock().unwrap().insert(object);
+            <span class="macro">trace!</span>(<span class="string">"Adding {} to alloc_nursery"</span>, object);
+            sync.alloc_nursery.insert(object);
         } <span class="kw">else </span>{
             <span class="macro">trace!</span>(<span class="string">"Adding {} to to_space"</span>, object);
-            <span class="self">self</span>.to_space.lock().unwrap().insert(object);
+            sync.to_space.insert(object);
         }
     }
 
-    <span class="kw">pub fn </span>collect_nursery(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;ObjectReference&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>guard = <span class="self">self</span>.collect_nursery.lock().unwrap();
-        <span class="kw">let </span>vals = guard.iter().copied().collect();
-        guard.clear();
-        drop(guard);
-        vals
+    <span class="doccomment">/// Take all objects from the `collect_nursery`.  This is called during sweeping at which time
+    /// all unreachable young objects are in the collection nursery.
+    </span><span class="kw">pub fn </span>collect_nursery(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>IntoIterator&lt;Item = ObjectReference&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
+        std::mem::take(<span class="kw-2">&amp;mut </span>sync.collect_nursery)
     }
 
-    <span class="kw">pub fn </span>collect(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;ObjectReference&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>guard = <span class="self">self</span>.from_space.lock().unwrap();
-        <span class="kw">let </span>vals = guard.iter().copied().collect();
-        guard.clear();
-        drop(guard);
-        vals
+    <span class="doccomment">/// Take all objects from the `from_space`.  This is called during sweeping at which time all
+    /// unreachable old objects are in the from-space.
+    </span><span class="kw">pub fn </span>collect_mature(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>IntoIterator&lt;Item = ObjectReference&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
+        std::mem::take(<span class="kw-2">&amp;mut </span>sync.from_space)
     }
 
-    <span class="kw">pub fn </span>copy(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, is_in_nursery: bool) {
+    <span class="doccomment">/// Move an object to `to_space`.  Called when an object is determined to be reachable.
+    </span><span class="kw">pub fn </span>copy(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, is_in_nursery: bool) {
+        <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
         <span class="kw">if </span>is_in_nursery {
-            <span class="kw">let </span><span class="kw-2">mut </span>guard = <span class="self">self</span>.collect_nursery.lock().unwrap();
             <span class="macro">debug_assert!</span>(
-                guard.contains(<span class="kw-2">&amp;</span>object),
+                sync.collect_nursery.contains(<span class="kw-2">&amp;</span>object),
                 <span class="string">"copy source object ({}) must be in collect_nursery"</span>,
                 object
             );
-            guard.remove(<span class="kw-2">&amp;</span>object);
+            sync.collect_nursery.remove(<span class="kw-2">&amp;</span>object);
         } <span class="kw">else </span>{
-            <span class="kw">let </span><span class="kw-2">mut </span>guard = <span class="self">self</span>.from_space.lock().unwrap();
             <span class="macro">debug_assert!</span>(
-                guard.contains(<span class="kw-2">&amp;</span>object),
+                sync.from_space.contains(<span class="kw-2">&amp;</span>object),
                 <span class="string">"copy source object ({}) must be in from_space"</span>,
                 object
             );
-            guard.remove(<span class="kw-2">&amp;</span>object);
+            sync.from_space.remove(<span class="kw-2">&amp;</span>object);
         }
-        <span class="self">self</span>.to_space.lock().unwrap().insert(object);
+        sync.to_space.insert(object);
     }
 
-    <span class="kw">pub fn </span>is_to_space_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.to_space.lock().unwrap().is_empty()
+    <span class="doccomment">/// Return true if the to-space is empty.
+    </span><span class="kw">pub fn </span>is_to_space_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
+        sync.to_space.is_empty()
     }
 
-    <span class="kw">pub fn </span>is_from_space_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.from_space.lock().unwrap().is_empty()
+    <span class="doccomment">/// Return true if the from-space is empty.
+    </span><span class="kw">pub fn </span>is_from_space_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
+        sync.from_space.is_empty()
     }
 
-    <span class="kw">pub fn </span>is_nursery_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.collect_nursery.lock().unwrap().is_empty()
+    <span class="doccomment">/// Return true if the allocation nursery is empty.
+    </span><span class="kw">pub fn </span>is_alloc_nursery_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
+        sync.alloc_nursery.is_empty()
     }
 
-    <span class="kw">pub fn </span>flip(<span class="kw-2">&amp;mut </span><span class="self">self</span>, full_heap: bool) {
-        swap(<span class="kw-2">&amp;mut </span><span class="self">self</span>.alloc_nursery, <span class="kw-2">&amp;mut </span><span class="self">self</span>.collect_nursery);
+    <span class="doccomment">/// Return true if the collection nursery is empty.
+    </span><span class="kw">pub fn </span>is_collect_nursery_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
+        sync.collect_nursery.is_empty()
+    }
+
+    <span class="doccomment">/// Flip object sets.
+    ///
+    /// It will flip the allocation nursery and the collection nursery.
+    ///
+    /// If `full_heap` is true, it will also flip the from-space and the to-space.
+    </span><span class="kw">pub fn </span>flip(<span class="kw-2">&amp;mut </span><span class="self">self</span>, full_heap: bool) {
+        <span class="kw">let </span>sync = <span class="self">self</span>.sync.get_mut().unwrap();
+        swap(<span class="kw-2">&amp;mut </span>sync.alloc_nursery, <span class="kw-2">&amp;mut </span>sync.collect_nursery);
         <span class="macro">trace!</span>(<span class="string">"Flipped alloc_nursery and collect_nursery"</span>);
         <span class="kw">if </span>full_heap {
-            swap(<span class="kw-2">&amp;mut </span><span class="self">self</span>.from_space, <span class="kw-2">&amp;mut </span><span class="self">self</span>.to_space);
+            swap(<span class="kw-2">&amp;mut </span>sync.from_space, <span class="kw-2">&amp;mut </span>sync.to_space);
             <span class="macro">trace!</span>(<span class="string">"Flipped from_space and to_space"</span>);
         }
     }
 
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
-        <span class="kw">let </span><span class="kw-2">mut </span>visit_objects = |set: <span class="kw-2">&amp;</span>Mutex&lt;HashSet&lt;ObjectReference&gt;&gt;| {
-            <span class="kw">let </span>set = set.lock().unwrap();
+    <span class="doccomment">/// Enumerate objects.
+    ///
+    /// Objects in the allocation nursery and the to-spaces are always enumerated.  They include all
+    /// objects during mutator time, and objects determined to be live during a GC.
+    ///
+    /// If `all` is true, it will enumerate the collection nursery and the from-space, too.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator, all: bool) {
+        <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
+        <span class="kw">let </span><span class="kw-2">mut </span>enumerated = <span class="number">0usize</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>visit_objects = |set: <span class="kw-2">&amp;</span>HashSet&lt;ObjectReference&gt;| {
             <span class="kw">for </span>object <span class="kw">in </span>set.iter() {
                 enumerator.visit_object(<span class="kw-2">*</span>object);
+                enumerated += <span class="number">1</span>;
             }
         };
-        visit_objects(<span class="kw-2">&amp;</span><span class="self">self</span>.alloc_nursery);
-        visit_objects(<span class="kw-2">&amp;</span><span class="self">self</span>.to_space);
+        visit_objects(<span class="kw-2">&amp;</span>sync.alloc_nursery);
+        visit_objects(<span class="kw-2">&amp;</span>sync.to_space);
+
+        <span class="kw">if </span>all {
+            visit_objects(<span class="kw-2">&amp;</span>sync.collect_nursery);
+            visit_objects(<span class="kw-2">&amp;</span>sync.from_space);
+        }
+
+        <span class="macro">debug!</span>(<span class="string">"Enumerated {enumerated} objects in LOS.  all: {all}.  from_space: {fs}, to_space: {ts}, collect_nursery: {cn}, alloc_nursery: {an}"</span>,
+            fs=sync.from_space.len(),
+            ts=sync.to_space.len(),
+            cn=sync.collect_nursery.len(),
+            an=sync.alloc_nursery.len(),
+        );
     }
 }
 
