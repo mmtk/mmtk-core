@@ -35,7 +35,7 @@ itertools = "0.14.0"
 jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
 lazy_static = "1.1"
 libc = "0.2"
-log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
+log = { version = "0.4", features = ["max_level_trace"] }
 memoffset = "0.9"
 mimalloc-sys = { version = "0.1.6", optional = true }
 # MMTk macros - we have to specify a version here in order to publish the crate, even though we use the dependency from a local path.
@@ -100,7 +100,7 @@ name = "main"
 harness = false
 
 [features]
-default = ["builtin_env_logger"]
+default = ["builtin_env_logger", "log/release_max_level_off"]
 
 # Built-in env_logger.  This feature is enabled by default.
 # The user can disable this default feature to remove `env_logger` from the dependencies.
