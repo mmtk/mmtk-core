@@ -109,7 +109,7 @@ MMTk uses Rust's testing framework for unit tests. For example, you can use the 
 $ cargo test
 ```
 
-A full list of all the unit tests we run in our CI can be found [here](.github/scripts/ci-test.sh).
+A full list of all the unit tests we run in our CI can be found [here](.github/scripts/ci-test.sh)?
 
 ### VM binding tests
 
