@@ -69,7 +69,7 @@ pub enum MmapProtection {
 }
 
 impl MmapProtection {
-    /// Turn the protection enum into the native flags
+    /// Turn the protection enum into the native flags on non-Windows platforms
     #[cfg(not(target_os = "windows"))]
     pub fn into_native_flags(self) -> libc::c_int {
         match self {
@@ -79,6 +79,7 @@ impl MmapProtection {
         }
     }
 
+    /// Turn the protection enum into the native flags on Windows platforms
     #[cfg(target_os = "windows")]
     pub fn into_native_flags(self) -> u32 {
         use windows_sys::Win32::System::Memory::*;
@@ -383,10 +384,7 @@ fn mmap_fixed(
                 }
                 _ => {
                     // Should not happen
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "Unexpected memory state",
-                    ));
+                    return Err(std::io::Error::other("Unexpected memory state"));
                 }
             }
         };
