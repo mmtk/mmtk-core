@@ -470,7 +470,18 @@ pub fn handle_mmap_error<VM: VMBinding>(
         ErrorKind::AlreadyExists => {
             panic!("Failed to mmap, the address is already mapped. Should MMTk quarantine the address range first?");
         }
-        _ => {}
+        _ => {
+            #[cfg(target_os = "windows")]
+            if let Some(os_errno) = error.raw_os_error() {
+                // If it is invalid address, we provide a more specific panic message.
+                if os_errno == 487 {
+                    // ERROR_INVALID_ADDRESS
+                    trace!("Signal MmapOutOfMemory!");
+                    VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
+                    unreachable!()
+                }
+            }
+        }
     }
     panic!("Unexpected mmap failure: {:?}", error)
 }
