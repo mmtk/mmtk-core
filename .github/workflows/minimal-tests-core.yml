@@ -37,10 +37,15 @@ jobs:
           - { os: ubuntu-22.04, triple: x86_64-unknown-linux-gnu }
           - { os: ubuntu-22.04, triple: i686-unknown-linux-gnu }
           - { os: macos-15, triple: x86_64-apple-darwin }
+          - { os: windows-latest, triple: x86_64-pc-windows-msvc }
         rust: ${{ fromJson(needs.setup-test-matrix.outputs.rust )}}
 
     name: minimal-tests-core/${{ matrix.target.triple }}/${{ matrix.rust }}
     runs-on: ${{ matrix.target.os }}
+
+    defaults:
+      run:
+        shell: bash
 
     env:
       # This determines the default target which cargo-build, cargo-test, etc. use.
@@ -69,6 +74,7 @@ jobs:
 
       # Setup Environments
       - name: Setup Environments
+        if: runner.os != 'Windows'
         run: ./.github/scripts/ci-setup-${{ matrix.target.triple }}.sh
 
       # Build
@@ -88,10 +94,15 @@ jobs:
           - { os: ubuntu-22.04, triple: x86_64-unknown-linux-gnu }
           - { os: ubuntu-22.04, triple: i686-unknown-linux-gnu }
           - { os: macos-15, triple: x86_64-apple-darwin }
+          - { os: windows-latest, triple: x86_64-pc-windows-msvc }
         rust: ${{ fromJson(needs.setup-test-matrix.outputs.rust )}}
 
     name: style-check/${{ matrix.target.triple }}/${{ matrix.rust }}
     runs-on: ${{ matrix.target.os }}
+
+    defaults:
+      run:
+        shell: bash
 
     env:
       # This determines the default target which cargo-build, cargo-test, etc. use.
@@ -120,6 +131,7 @@ jobs:
 
       # Setup Environments
       - name: Setup Environments
+        if: runner.os != 'Windows'
         run: ./.github/scripts/ci-setup-${{ matrix.target.triple }}.sh
 
       # Style checks
