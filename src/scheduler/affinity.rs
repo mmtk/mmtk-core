@@ -20,7 +20,17 @@ pub fn get_total_num_cpus() -> u16 {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
+/// Return the total number of cores allocated to the program.
+pub fn get_total_num_cpus() -> u16 {
+    unsafe {
+        windows_sys::Win32::System::Threading::GetActiveProcessorCount(
+            windows_sys::Win32::System::Threading::ALL_PROCESSOR_GROUPS,
+        ) as u16
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 /// Return the total number of cores allocated to the program.
 pub fn get_total_num_cpus() -> u16 {
     unimplemented!()
@@ -59,7 +69,18 @@ fn bind_current_thread_to_core(cpu: CoreId) {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
+/// Bind the current thread to the specified core.
+fn bind_current_thread_to_core(cpu: CoreId) {
+    unsafe {
+        windows_sys::Win32::System::Threading::SetThreadAffinityMask(
+            windows_sys::Win32::System::Threading::GetCurrentThread(),
+            1 << cpu,
+        );
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 /// Bind the current thread to the specified core.
 fn bind_current_thread_to_core(_cpu: CoreId) {
     unimplemented!()
@@ -79,7 +100,22 @@ fn bind_current_thread_to_cpuset(cpuset: &[CoreId]) {
     }
 }
 
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
+#[cfg(target_os = "windows")]
+/// Bind the current thread to the specified core.
+fn bind_current_thread_to_cpuset(cpuset: &[CoreId]) {
+    let mut mask = 0;
+    for cpu in cpuset {
+        mask |= 1 << cpu;
+    }
+    unsafe {
+        windows_sys::Win32::System::Threading::SetThreadAffinityMask(
+            windows_sys::Win32::System::Threading::GetCurrentThread(),
+            mask,
+        );
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "android", target_os = "windows")))]
 /// Bind the current thread to the specified core.
 fn bind_current_thread_to_cpuset(_cpuset: &[CoreId]) {
     unimplemented!()

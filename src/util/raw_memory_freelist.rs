@@ -222,9 +222,7 @@ impl Drop for RawMemoryFreeList {
     fn drop(&mut self) {
         let len = self.high_water - self.base;
         if len != 0 {
-            unsafe {
-                ::libc::munmap(self.base.as_usize() as _, len);
-            }
+            let _ = crate::util::memory::munmap(self.base, len);
         }
     }
 }
