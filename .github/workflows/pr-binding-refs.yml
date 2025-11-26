@@ -122,7 +122,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       OPENJDK_BINDING_REPO_DEFAULT: mmtk/mmtk-openjdk
-      OPENJDK_BINDING_REF_DEFAULT: master
+      OPENJDK_BINDING_REF_DEFAULT: jdk-21
       JIKESRVM_BINDING_REPO_DEFAULT: mmtk/mmtk-jikesrvm
       JIKESRVM_BINDING_REF_DEFAULT: master
       V8_BINDING_REPO_DEFAULT: mmtk/mmtk-v8
