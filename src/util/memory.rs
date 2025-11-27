@@ -184,7 +184,8 @@ pub(crate) fn result_is_mapped(result: Result<()>) -> bool {
         Ok(_) => false,
         Err(err) => {
             // ERROR_INVALID_ADDRESS may be returned if the address is already mapped or invalid
-            err.raw_os_error().unwrap() == 487 // ERROR_INVALID_ADDRESS
+            err.raw_os_error().unwrap()
+                == windows_sys::Win32::Foundation::ERROR_INVALID_ADDRESS as i32
         }
     }
 }
@@ -339,60 +340,99 @@ fn mmap_fixed(
 
     #[cfg(target_os = "windows")]
     {
-        use windows_sys::Win32::System::Memory::*;
+        use std::io;
+        use windows_sys::Win32::System::Memory::{
+            VirtualAlloc, VirtualQuery, MEMORY_BASIC_INFORMATION, MEM_COMMIT, MEM_FREE, MEM_RESERVE,
+        };
 
-        let ptr = start.to_mut_ptr();
+        let ptr: *mut u8 = start.to_mut_ptr();
         let prot = strategy.prot.into_native_flags();
+
+        // Has to COMMIT inmediately if:
+        // - not MAP_NORESERVE
+        // - and protection is not NoAccess
         let commit =
             (flags & MAP_NORESERVE) == 0 && !matches!(strategy.prot, MmapProtection::NoAccess);
 
-        // Query the state of the memory region
-        let mut mbi: MEMORY_BASIC_INFORMATION = unsafe { std::mem::zeroed() };
-        let query_res = unsafe {
-            VirtualQuery(
-                ptr,
-                &mut mbi,
-                std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
-            )
-        };
-        if query_res == 0 {
-            return Err(std::io::Error::last_os_error());
-        }
+        // Scan the region [ptr, ptr + size) to understand its current state
+        unsafe {
+            let mut addr = ptr;
+            let end = ptr.add(size);
 
-        let res = unsafe {
-            match mbi.State {
-                MEM_FREE => {
-                    let mut allocation_type = MEM_RESERVE;
-                    if commit {
-                        allocation_type |= MEM_COMMIT;
+            let mut saw_free = false;
+            let mut saw_reserved = false;
+            let mut saw_committed = false;
+
+            while addr < end {
+                let mut mbi: MEMORY_BASIC_INFORMATION = std::mem::zeroed();
+                let q = VirtualQuery(
+                    addr as *const _,
+                    &mut mbi,
+                    std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
+                );
+                if q == 0 {
+                    return Err(io::Error::last_os_error());
+                }
+
+                let region_base = mbi.BaseAddress as *mut u8;
+                let region_size = mbi.RegionSize;
+                let region_end = region_base.add(region_size);
+
+                // Calculate the intersection of [addr, end) and [region_base, region_end)
+                let _sub_begin = if addr > region_base {
+                    addr
+                } else {
+                    region_base
+                };
+                let _sub_end = if end < region_end { end } else { region_end };
+
+                match mbi.State {
+                    MEM_FREE => saw_free = true,
+                    MEM_RESERVE => saw_reserved = true,
+                    MEM_COMMIT => saw_committed = true,
+                    _ => {
+                        return Err(io::Error::other("Unexpected memory state in mmap_fixed"));
                     }
-                    VirtualAlloc(ptr, size, allocation_type, prot)
                 }
-                MEM_RESERVE => {
-                    if commit {
-                        VirtualAlloc(ptr, size, MEM_COMMIT, prot)
-                    } else {
-                        // Already reserved, nothing to do
-                        ptr
-                    }
-                }
-                MEM_COMMIT => {
-                    // Already committed, just return success.
-                    // We could change protection here if needed, but VirtualAlloc returns success
-                    // if the memory is already committed.
-                    ptr
-                }
-                _ => {
-                    // Should not happen
-                    return Err(std::io::Error::other("Unexpected memory state"));
-                }
+
+                // Jump to the next region (VirtualQuery always returns "continuous regions with the same attributes")
+                addr = region_end;
             }
-        };
 
-        if res.is_null() {
-            Err(std::io::Error::last_os_error())
-        } else {
-            Ok(())
+            // 1. All FREE: make a new mapping in the region
+            // 2. All RESERVE/COMMIT: treat as an existing mapping, can just COMMIT or succeed directly
+            // 3. MIX of FREE + others: not allowed (semantically similar to MAP_FIXED_NOREPLACE)
+            if saw_free && (saw_reserved || saw_committed) {
+                return Err(io::Error::from_raw_os_error(
+                    windows_sys::Win32::Foundation::ERROR_INVALID_ADDRESS as i32,
+                ));
+            }
+
+            if saw_free && !saw_reserved && !saw_committed {
+                // All FREE: make a new mapping in the region
+                let mut allocation_type = MEM_RESERVE;
+                if commit {
+                    allocation_type |= MEM_COMMIT;
+                }
+
+                let res = VirtualAlloc(ptr as *mut _, size, allocation_type, prot);
+                if res.is_null() {
+                    return Err(io::Error::last_os_error());
+                }
+
+                Ok(())
+            } else {
+                // This behavior is similar to mmap with MAP_FIXED on Linux.
+                // If the region is already mapped, we just ensure the required commitment.
+                // If commit is not needed, we just return Ok.
+                if commit {
+                    let res = VirtualAlloc(ptr as *mut _, size, MEM_COMMIT, prot);
+                    if res.is_null() {
+                        return Err(io::Error::last_os_error());
+                    }
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -459,7 +499,7 @@ pub fn handle_mmap_error<VM: VMBinding>(
                     unreachable!()
                 }
                 #[cfg(target_os = "windows")]
-                if os_errno == 8 {
+                if os_errno == windows_sys::Win32::Foundation::ERROR_NOT_ENOUGH_MEMORY as i32 {
                     // ERROR_NOT_ENOUGH_MEMORY
                     trace!("Signal MmapOutOfMemory!");
                     VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
@@ -474,7 +514,7 @@ pub fn handle_mmap_error<VM: VMBinding>(
             #[cfg(target_os = "windows")]
             if let Some(os_errno) = error.raw_os_error() {
                 // If it is invalid address, we provide a more specific panic message.
-                if os_errno == 487 {
+                if os_errno == windows_sys::Win32::Foundation::ERROR_INVALID_ADDRESS as i32 {
                     // ERROR_INVALID_ADDRESS
                     trace!("Signal MmapOutOfMemory!");
                     VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);

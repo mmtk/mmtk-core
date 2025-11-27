@@ -4,6 +4,8 @@ use crate::util::Address;
 use crate::vm::VMBinding;
 
 /// Allocate with alignment. This also guarantees the memory is zero initialized.
+/// This uses posix_memalign, which is not available on Windows.
+/// This would somehow affect `MallocMarkSweep` performance on Windows.
 #[cfg(all(
     not(target_os = "windows"),
     not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc"))
@@ -86,6 +88,10 @@ pub fn alloc<VM: VMBinding>(size: usize, align: usize, offset: usize) -> (Addres
             not(target_os = "windows"),
             not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc"))
         ))]
+        // On non-Windows platforms with posix_memalign, we can use align_alloc for alignments > 16
+        // However, on Windows, there is no equivalent function.
+        // The memory alloc by `align_alloc` may not be freed correctly by `free`.
+        // So we use offset allocation for all alignments > 16 on Windows.
         (a, 0) if a > 16 => {
             address = align_alloc(size, align);
             debug_assert!(

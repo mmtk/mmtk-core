@@ -74,7 +74,6 @@ jobs:
 
       # Setup Environments
       - name: Setup Environments
-        if: runner.os != 'Windows'
         run: ./.github/scripts/ci-setup-${{ matrix.target.triple }}.sh
 
       # Build
@@ -131,7 +130,6 @@ jobs:
 
       # Setup Environments
       - name: Setup Environments
-        if: runner.os != 'Windows'
         run: ./.github/scripts/ci-setup-${{ matrix.target.triple }}.sh
 
       # Style checks
