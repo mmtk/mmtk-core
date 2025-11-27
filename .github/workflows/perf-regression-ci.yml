@@ -129,8 +129,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
-          # We use the actively maintained branch of `mmtk/mmtk-openjdk`, which is `jdk-21` for now.
-          ref: jdk-21
+          # TODO: We currently use OpenJDK 11 for performance comparison.
+          # We should switch to OpenJDK 21 when we are ready, and start a new epoch.
+          ref: jdk-11
           path: latest/mmtk-openjdk
       - name: Checkout OpenJDK (latest)
         working-directory: latest/mmtk-openjdk
