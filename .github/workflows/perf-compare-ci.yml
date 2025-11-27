@@ -200,8 +200,10 @@ jobs:
             - name: Checkout OpenJDK Binding Branch
               uses: actions/checkout@v4
               with:
-                repository: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
-                ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
+                # TODO: We currently use OpenJDK 11 for performance comparison.
+                # We should switch to OpenJDK 21 when we are ready, and start a new epoch.
+                repository: ${{ needs.binding-refs.outputs.openjdk11_binding_repo }}
+                ref: ${{ needs.binding-refs.outputs.openjdk11_binding_ref }}
                 path: mmtk-openjdk-branch
             - name: Checkout OpenJDK for Branch
               working-directory: mmtk-openjdk-branch
