@@ -804,7 +804,8 @@
 <a href="#803" id="803">803</a>
 <a href="#804" id="804">804</a>
 <a href="#805" id="805">805</a>
-<a href="#806" id="806">806</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
+<a href="#806" id="806">806</a>
+<a href="#807" id="807">807</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::<span class="kw-2">*</span>;
@@ -1590,6 +1591,7 @@
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::&lt;VM&gt;(object, Ordering::Relaxed),
             );
         }
+        <span class="macro">println!</span>(<span class="string">"is live = {}"</span>, object.is_live());
     }
 }
 

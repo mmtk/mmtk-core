@@ -213,7 +213,11 @@
 <a href="#212" id="212">212</a>
 <a href="#213" id="213">213</a>
 <a href="#214" id="214">214</a>
-<a href="#215" id="215">215</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a></pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{CommonSpace, Space};
@@ -299,6 +303,10 @@
         _worker: GCWorkerMutRef,
     ) -&gt; ObjectReference {
         <span class="self">self</span>.trace_object(queue, object)
+    }
+    <span class="kw">fn </span>debug_print_object_info(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
+        <span class="macro">println!</span>(<span class="string">"marked = {}"</span>, <span class="self">self</span>.mark_state.is_marked::&lt;VM&gt;(object));
+        <span class="self">self</span>.common.debug_print_object_global_info(object);
     }
 }
 
