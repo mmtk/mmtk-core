@@ -62,13 +62,22 @@ jobs:
   #         .github/scripts/ci-test.sh
   #         .github/scripts/ci-style.sh
 
-  extended-tests-openjdk:
+  extended-tests-openjdk11:
     needs: binding-refs
     if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
     uses: ./.github/workflows/binding-tests-openjdk.yml
     with:
-      repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
-      ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
+      repo: ${{ needs.binding-refs.outputs.openjdk11_binding_repo }}
+      ref: ${{ needs.binding-refs.outputs.openjdk11_binding_ref }}
+      test-script: ci-test-extended.sh
+
+  extended-tests-openjdk21:
+    needs: binding-refs
+    if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
+    uses: ./.github/workflows/binding-tests-openjdk.yml
+    with:
+      repo: ${{ needs.binding-refs.outputs.openjdk21_binding_repo }}
+      ref: ${{ needs.binding-refs.outputs.openjdk21_binding_ref }}
       test-script: ci-test-extended.sh
 
   extended-tests-jikesrvm:

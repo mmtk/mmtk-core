@@ -27,6 +27,9 @@ jobs:
         uses: qinsoon/comment-env-vars@1.1.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          # TODO: If we plan to resurrect micro-bm, we need to get the trunk name from a unique .yml
+          # file so that all GitHub Actions scripts agree upon which branch is the trunk (e.g.
+          # jdk-11, jdk-21, ...).
           default_env: 'OPENJDK_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,OPENJDK_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
       # Trunk
       # - binding

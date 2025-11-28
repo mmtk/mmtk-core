@@ -31,14 +31,26 @@ jobs:
     with:
       pull_request: ${{ needs.get-merged-pr.outputs.pr }}
 
-  check-merge-openjdk-pr:
+  check-merge-openjdk11-pr:
     uses: ./.github/workflows/auto-merge-inner.yml
     needs: [get-merged-pr, binding-refs]
     with:
-      repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
-      base_repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo_default }}
-      ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
-      base_ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref_default }}
+      repo: ${{ needs.binding-refs.outputs.openjdk11_binding_repo }}
+      base_repo: ${{ needs.binding-refs.outputs.openjdk11_binding_repo_default }}
+      ref: ${{ needs.binding-refs.outputs.openjdk11_binding_ref }}
+      base_ref: ${{ needs.binding-refs.outputs.openjdk11_binding_ref_default }}
+      core_commit: ${{ needs.get-merged-pr.outputs.commit }}
+      update_lockfile: cargo build
+    secrets: inherit
+
+  check-merge-openjdk21-pr:
+    uses: ./.github/workflows/auto-merge-inner.yml
+    needs: [get-merged-pr, binding-refs]
+    with:
+      repo: ${{ needs.binding-refs.outputs.openjdk21_binding_repo }}
+      base_repo: ${{ needs.binding-refs.outputs.openjdk21_binding_repo_default }}
+      ref: ${{ needs.binding-refs.outputs.openjdk21_binding_ref }}
+      base_ref: ${{ needs.binding-refs.outputs.openjdk21_binding_ref_default }}
       core_commit: ${{ needs.get-merged-pr.outputs.commit }}
       update_lockfile: cargo build
     secrets: inherit

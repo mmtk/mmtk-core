@@ -39,10 +39,18 @@ jobs:
     with:
       pull_request: ${{ needs.grace-period.outputs.pr-number }}
 
-  minimal-tests-openjdk:
+  minimal-tests-openjdk11:
     needs: binding-refs
     uses: ./.github/workflows/binding-tests-openjdk.yml
     with:
-      repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
-      ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
+      repo: ${{ needs.binding-refs.outputs.openjdk11_binding_repo }}
+      ref: ${{ needs.binding-refs.outputs.openjdk11_binding_ref }}
+      test-script: ci-test-minimal.sh
+
+  minimal-tests-openjdk21:
+    needs: binding-refs
+    uses: ./.github/workflows/binding-tests-openjdk.yml
+    with:
+      repo: ${{ needs.binding-refs.outputs.openjdk21_binding_repo }}
+      ref: ${{ needs.binding-refs.outputs.openjdk21_binding_ref }}
       test-script: ci-test-minimal.sh
