@@ -54,6 +54,15 @@ strum = "0.27.1"
 strum_macros = "0.27.1"
 sysinfo = "0.33.1"
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_Memory",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_System_Diagnostics_Debug",
+] }
+
 [dev-dependencies]
 paste = "1.0.8"
 rand = "0.9.0"
