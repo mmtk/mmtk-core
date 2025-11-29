@@ -18,7 +18,7 @@
 pub(crate) mod mock_test_prelude {
     pub use crate::memory_manager;
     pub use crate::util::test_util::fixtures::*;
-    pub use crate::util::test_util::mock_method::*;
+    pub use crate::util::test_util::mock_vm::mock_api;
     pub use crate::util::test_util::mock_vm::*;
     pub use crate::vm::*;
 }
@@ -38,6 +38,7 @@ mod mock_test_barrier_slow_path_assertion;
 #[cfg(feature = "is_mmtk_object")]
 mod mock_test_conservatism;
 mod mock_test_debug_get_object_info;
+mod mock_test_gc;
 #[cfg(target_os = "linux")]
 mod mock_test_handle_mmap_conflict;
 mod mock_test_handle_mmap_oom;

@@ -53,6 +53,7 @@ static_assertions = "1.1.0"
 strum = "0.27.1"
 strum_macros = "0.27.1"
 sysinfo = "0.33.1"
+thread-id = { version = "5.0.0", optional = true } # Only used by mock VM
 
 [dev-dependencies]
 paste = "1.0.8"
@@ -116,7 +117,9 @@ perf_counter = ["dep:pfm"]
 
 # This feature is only used for tests with MockVM.
 # CI scripts run those tests with this feature.
-mock_test = ["test_private"]
+mock_test = ["test_private", "dep:thread-id"]
+mock_test_header_metadata = ["mock_test"]
+mock_test_side_metadata = ["mock_test"]
 
 # This feature will expose some private functions for testings or benchmarking.
 test_private = []
