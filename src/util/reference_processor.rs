@@ -5,13 +5,13 @@ use std::sync::Mutex;
 use std::vec::Vec;
 
 use crate::plan::is_nursery_gc;
+use crate::plan::Plan;
 use crate::scheduler::ProcessEdgesWork;
 use crate::scheduler::WorkBucketStage;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
-use crate::plan::Plan;
 
 /// Holds all reference processors for each weak reference Semantics.
 /// Currently this is based on Java's weak reference semantics (soft/weak/phantom).
@@ -23,7 +23,7 @@ pub struct ReferenceProcessors<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> ReferenceProcessors<VM> {
-    pub fn new(plan: &'static dyn Plan<VM=VM>) -> Self {
+    pub fn new(plan: &'static dyn Plan<VM = VM>) -> Self {
         ReferenceProcessors {
             soft: ReferenceProcessor::new(plan, Semantics::SOFT),
             weak: ReferenceProcessor::new(plan, Semantics::WEAK),
@@ -166,7 +166,7 @@ struct ReferenceProcessorSync {
 }
 
 impl<VM: VMBinding> ReferenceProcessor<VM> {
-    pub fn new(plan: &'static dyn Plan<VM=VM>, semantics: Semantics) -> Self {
+    pub fn new(plan: &'static dyn Plan<VM = VM>, semantics: Semantics) -> Self {
         ReferenceProcessor {
             plan,
             sync: Mutex::new(ReferenceProcessorSync {
@@ -303,9 +303,7 @@ impl<VM: VMBinding> ReferenceProcessor<VM> {
             );
         }
 
-        if let Some(old_referent) =
-            <E::VM as VMBinding>::VMReferenceGlue::get_referent(reference)
-        {
+        if let Some(old_referent) = <E::VM as VMBinding>::VMReferenceGlue::get_referent(reference) {
             let new_referent = Self::trace_forward_object(trace, old_referent);
             <E::VM as VMBinding>::VMReferenceGlue::set_referent(reference, new_referent);
 

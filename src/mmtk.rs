@@ -113,8 +113,7 @@ pub struct MMTK<VM: VMBinding> {
     pub(crate) state: Arc<GlobalState>,
     pub(crate) plan: UnsafeCell<Box<dyn Plan<VM = VM>>>,
     pub(crate) reference_processors: ReferenceProcessors<VM>,
-    pub(crate) finalizable_processor:
-        Mutex<FinalizableProcessor<VM>>,
+    pub(crate) finalizable_processor: Mutex<FinalizableProcessor<VM>>,
     pub(crate) scheduler: Arc<GCWorkScheduler<VM>>,
     #[cfg(feature = "sanity")]
     pub(crate) sanity_checker: Mutex<SanityChecker<VM::VMSlot>>,

@@ -5,7 +5,7 @@ use crate::util::reference_processor::RescanReferences;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::Finalizable;
-use crate::vm::{Collection, VMBinding, ReferenceGlue};
+use crate::vm::{Collection, ReferenceGlue, VMBinding};
 use crate::MMTK;
 use std::marker::PhantomData;
 
@@ -15,7 +15,7 @@ type F<VM> = <<VM as VMBinding>::VMReferenceGlue as ReferenceGlue<VM>>::Finaliza
 // TODO: we should consider if we want to merge FinalizableProcessor with ReferenceProcessor,
 // and treat final reference as a special reference type in ReferenceProcessor.
 pub struct FinalizableProcessor<VM: VMBinding> {
-    plan: &'static dyn crate::plan::Plan<VM=VM>,
+    plan: &'static dyn crate::plan::Plan<VM = VM>,
     /// Candidate objects that has finalizers with them
     candidates: Vec<F<VM>>,
     /// Index into candidates to record where we are up to in the last scan of the candidates.
@@ -27,7 +27,7 @@ pub struct FinalizableProcessor<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> FinalizableProcessor<VM> {
-    pub fn new(plan: &'static dyn crate::plan::Plan<VM=VM>) -> Self {
+    pub fn new(plan: &'static dyn crate::plan::Plan<VM = VM>) -> Self {
         Self {
             plan,
             candidates: vec![],
@@ -44,7 +44,12 @@ impl<VM: VMBinding> FinalizableProcessor<VM> {
         finalizable.keep_alive::<E>(e);
     }
 
-    pub fn scan<E: ProcessEdgesWork<VM=VM>>(&mut self, tls: VMWorkerThread, e: &mut E, nursery: bool) {
+    pub fn scan<E: ProcessEdgesWork<VM = VM>>(
+        &mut self,
+        tls: VMWorkerThread,
+        e: &mut E,
+        nursery: bool,
+    ) {
         let start = if nursery { self.nursery_index } else { 0 };
 
         // We should go through ready_for_finalize objects and keep them alive.
@@ -82,14 +87,14 @@ impl<VM: VMBinding> FinalizableProcessor<VM> {
         <<E as ProcessEdgesWork>::VM as VMBinding>::VMCollection::schedule_finalization(tls);
     }
 
-    pub fn forward_candidate<E: ProcessEdgesWork<VM=VM>>(&mut self, e: &mut E, _nursery: bool) {
+    pub fn forward_candidate<E: ProcessEdgesWork<VM = VM>>(&mut self, e: &mut E, _nursery: bool) {
         self.candidates
             .iter_mut()
             .for_each(|f| FinalizableProcessor::<VM>::forward_finalizable_reference(e, f));
         e.flush();
     }
 
-    pub fn forward_finalizable<E: ProcessEdgesWork<VM=VM>>(&mut self, e: &mut E, _nursery: bool) {
+    pub fn forward_finalizable<E: ProcessEdgesWork<VM = VM>>(&mut self, e: &mut E, _nursery: bool) {
         self.ready_for_finalize
             .iter_mut()
             .for_each(|f| FinalizableProcessor::<VM>::forward_finalizable_reference(e, f));
