@@ -11,6 +11,7 @@ use crate::policy::immix::ImmixSpace;
 use crate::policy::immix::TRACE_KIND_FAST;
 use crate::policy::sft::SFT;
 use crate::policy::space::Space;
+use crate::util::ObjectReference;
 use crate::util::copy::CopyConfig;
 use crate::util::copy::CopySelector;
 use crate::util::copy::CopySemantics;
@@ -223,6 +224,22 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             }
         }
         true
+    }
+
+    fn is_live_object(&self, object: ObjectReference) -> bool {
+        use crate::policy::sft::SFT;
+        if self.is_current_gc_nursery() {
+            if self.immix.immix_space.in_space(object) {
+                self.immix.immix_space.is_live(object)
+            } else if self.immix.common().get_los().in_space(object) {
+                self.immix.common().get_los().is_live(object)
+            } else {
+                true
+            }
+        } else {
+            let sft = unsafe { crate::mmtk::SFT_MAP.get_unchecked(object.to_raw_address()) };
+            sft.is_live(object)
+        }
     }
 }
 

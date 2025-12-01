@@ -209,6 +209,10 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     fn generational(&self) -> Option<&dyn GenerationalPlan<VM = VM>> {
         Some(self)
     }
+
+    fn is_live_object(&self, object: ObjectReference) -> bool {
+        self.gen.is_live_object(object)
+    }
 }
 
 impl<VM: VMBinding> GenerationalPlan for GenImmix<VM> {

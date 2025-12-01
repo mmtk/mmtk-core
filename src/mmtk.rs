@@ -23,7 +23,6 @@ use crate::util::sanity::sanity_checker::SanityChecker;
 #[cfg(feature = "extreme_assertions")]
 use crate::util::slot_logger::SlotLogger;
 use crate::util::statistics::stats::Stats;
-use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
@@ -113,9 +112,9 @@ pub struct MMTK<VM: VMBinding> {
     pub(crate) options: Arc<Options>,
     pub(crate) state: Arc<GlobalState>,
     pub(crate) plan: UnsafeCell<Box<dyn Plan<VM = VM>>>,
-    pub(crate) reference_processors: ReferenceProcessors,
+    pub(crate) reference_processors: ReferenceProcessors<VM>,
     pub(crate) finalizable_processor:
-        Mutex<FinalizableProcessor<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType>>,
+        Mutex<FinalizableProcessor<VM>>,
     pub(crate) scheduler: Arc<GCWorkScheduler<VM>>,
     #[cfg(feature = "sanity")]
     pub(crate) sanity_checker: Mutex<SanityChecker<VM::VMSlot>>,
@@ -207,14 +206,14 @@ impl<VM: VMBinding> MMTK<VM> {
             },
         );
 
+        let static_plan: &'static dyn Plan<VM = VM> = unsafe { &*(&*plan as *const _) };
+
         MMTK {
             options,
             state,
             plan: UnsafeCell::new(plan),
-            reference_processors: ReferenceProcessors::new(),
-            finalizable_processor: Mutex::new(FinalizableProcessor::<
-                <VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType,
-            >::new()),
+            reference_processors: ReferenceProcessors::new(static_plan),
+            finalizable_processor: Mutex::new(FinalizableProcessor::new(static_plan)),
             scheduler,
             #[cfg(feature = "sanity")]
             sanity_checker: Mutex::new(SanityChecker::new()),
