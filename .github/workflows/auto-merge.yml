@@ -19,8 +19,22 @@ jobs:
         run: echo "commit=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
       - id: get-pr
         run: |
-          PR_NUMBER=$(gh pr list --search "${GITHUB_SHA}" --state merged --repo mmtk/mmtk-core --json number --jq '.[0].number')
-          echo "pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          for n in {1..5}; do
+              echo "Wait 30s then try get the pull request number"
+              sleep 30
+
+              PR_NUMBER=$(gh pr list --search "${GITHUB_SHA}" --state merged --repo mmtk/mmtk-core --json number --jq '.[0].number')
+
+              if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
+                echo "Found PR: $PR_NUMBER"
+                echo "pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+
+              echo "PR not found, retrying..."
+          done
+          echo "We can't find the merged PR for ${GITHUB_SHA}"
+          exit 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
