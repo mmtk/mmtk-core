@@ -17,6 +17,13 @@ jobs:
     steps:
       - id: get-commit-hash
         run: echo "commit=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - name: Check commit hash and PR
+        run: |
+          echo "Commit hash: ${GITHUB_SHA}"
+          echo "Pull request for the commit is below:"
+          gh pr list --search "${GITHUB_SHA}" --state merged --repo mmtk/mmtk-core
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - id: get-pr
         run: |
           for n in {1..5}; do
@@ -28,6 +35,7 @@ jobs:
               if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
                 echo "Found PR: $PR_NUMBER"
                 echo "pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+                echo "Output pr = $PR_NUMBER"
                 exit 0
               fi
 
