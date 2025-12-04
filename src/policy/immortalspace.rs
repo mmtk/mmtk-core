@@ -85,6 +85,10 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     ) -> ObjectReference {
         self.trace_object(queue, object)
     }
+    fn debug_print_object_info(&self, object: ObjectReference) {
+        println!("marked = {}", self.mark_state.is_marked::<VM>(object));
+        self.common.debug_print_object_global_info(object);
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {

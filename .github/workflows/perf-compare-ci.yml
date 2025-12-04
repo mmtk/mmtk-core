@@ -177,13 +177,15 @@ jobs:
         needs: [binding-refs, mmtk-refs]
         timeout-minutes: 1440
         steps:
-            # Trunk - we always use master from the mmtk org
+            # Trunk - we use the default repo and branch as specified in pr-binding-refs.
+            # TODO: We currently use OpenJDK 11 for performance comparison.
+            # We should switch to OpenJDK 21 when we are ready, and start a new epoch.
             # - binding
             - name: Checkout OpenJDK Binding Trunk
               uses: actions/checkout@v4
               with:
-                repository: mmtk/mmtk-openjdk
-                ref: master
+                repository: ${{ needs.binding-refs.outputs.openjdk11_binding_repo_default }}
+                ref: ${{ needs.binding-refs.outputs.openjdk11_binding_ref_default }}
                 path: mmtk-openjdk-trunk
             - name: Checkout OpenJDK for Trunk
               working-directory: mmtk-openjdk-trunk
@@ -200,8 +202,10 @@ jobs:
             - name: Checkout OpenJDK Binding Branch
               uses: actions/checkout@v4
               with:
-                repository: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
-                ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
+                # TODO: We currently use OpenJDK 11 for performance comparison.
+                # We should switch to OpenJDK 21 when we are ready, and start a new epoch.
+                repository: ${{ needs.binding-refs.outputs.openjdk11_binding_repo }}
+                ref: ${{ needs.binding-refs.outputs.openjdk11_binding_ref }}
                 path: mmtk-openjdk-branch
             - name: Checkout OpenJDK for Branch
               working-directory: mmtk-openjdk-branch
