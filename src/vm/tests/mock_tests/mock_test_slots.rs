@@ -353,7 +353,7 @@ mod mixed {
     pub enum DummyVMSlot {
         Simple(SimpleSlot),
         #[cfg(target_pointer_width = "64")]
-        Compressed(compressed_oop::CompressedOopSlot),
+        Compressed(CompressedOopSlot),
         Offset(OffsetSlot),
         Tagged(TaggedSlot),
     }

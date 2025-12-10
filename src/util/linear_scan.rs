@@ -51,6 +51,10 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool> std
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
         while self.cursor < self.end {
+            if !self.cursor.is_aligned_to(ObjectReference::ALIGNMENT) {
+                self.cursor += VM::MIN_ALIGNMENT;
+                continue;
+            }
             let is_object = if ATOMIC_LOAD_VO_BIT {
                 vo_bit::is_vo_bit_set_for_addr(self.cursor)
             } else {

@@ -9,23 +9,17 @@ use mmtk::{
 };
 
 pub fn bench(c: &mut Criterion) {
-    let mut fixture = MutatorFixture::create_with_heapsize(1 << 30);
+    let fixture = MutatorFixture::create_with_heapsize(1 << 30);
 
     let regular = memory_manager::alloc(
-        &mut fixture.mutator,
+        fixture.mutator(),
         40,
         0,
         0,
         mmtk::AllocationSemantics::Default,
     );
 
-    let large = memory_manager::alloc(
-        &mut fixture.mutator,
-        40,
-        0,
-        0,
-        mmtk::AllocationSemantics::Los,
-    );
+    let large = memory_manager::alloc(fixture.mutator(), 40, 0, 0, mmtk::AllocationSemantics::Los);
 
     let low = unsafe { Address::from_usize(42usize) };
     let high = unsafe { Address::from_usize(usize::MAX - 1024usize) };
