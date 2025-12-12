@@ -56,7 +56,10 @@ macro_rules! lifetime {
 /// Call `MockMethod`.
 macro_rules! mock {
     ($fn: ident($($arg:expr),*)) => {
-        write_mockvm(|mock| mock.$fn.call(($($arg),*)))
+        {
+            let arg_tuple = ($($arg),*);
+            write_mockvm(|mock| mock.$fn.call(arg_tuple))
+        }
     };
 }
 /// Call `MockAny`.
