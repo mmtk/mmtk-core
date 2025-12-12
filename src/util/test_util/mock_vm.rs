@@ -65,7 +65,10 @@ macro_rules! mock {
 /// Call `MockAny`.
 macro_rules! mock_any {
     ($fn: ident($($arg:expr),*)) => {
-        *write_mockvm(|mock| mock.$fn.call_any(Box::new(($($arg),*)))).downcast().unwrap()
+        {
+            let arg_tuple = ($($arg),*);
+            *write_mockvm(|mock| mock.$fn.call_any(Box::new(arg_tuple))).downcast().unwrap()
+        }
     };
 }
 
