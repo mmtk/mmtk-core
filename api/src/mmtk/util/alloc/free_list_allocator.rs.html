@@ -476,7 +476,8 @@
 <a href="#475" id="475">475</a>
 <a href="#476" id="476">476</a>
 <a href="#477" id="477">477</a>
-<a href="#478" id="478">478</a></pre></div><pre class="rust"><code><span class="comment">// This is a free list allocator written based on Microsoft's mimalloc allocator https://www.microsoft.com/en-us/research/publication/mimalloc-free-list-sharding-in-action/
+<a href="#478" id="478">478</a>
+<a href="#479" id="479">479</a></pre></div><pre class="rust"><code><span class="comment">// This is a free list allocator written based on Microsoft's mimalloc allocator https://www.microsoft.com/en-us/research/publication/mimalloc-free-list-sharding-in-action/
 
 </span><span class="kw">use </span>std::sync::Arc;
 
@@ -900,7 +901,8 @@
             <span class="kw">let </span>unswept = <span class="self">self</span>.unswept_blocks.get_mut(bin).unwrap();
 
             <span class="comment">// If we do eager sweeping, we should have no unswept blocks.
-            </span><span class="macro">debug_assert!</span>(!<span class="macro">cfg!</span>(feature = <span class="string">"eager_sweeping"</span>) || unswept.is_empty());
+            </span><span class="attr">#[cfg(feature = <span class="string">"eager_sweeping"</span>)]
+            </span><span class="macro">debug_assert!</span>(unswept.is_empty());
 
             <span class="kw">let </span><span class="kw-2">mut </span>sweep_later = |list: <span class="kw-2">&amp;mut </span>BlockList| {
                 list.release_blocks(<span class="self">self</span>.space);
