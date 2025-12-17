@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use crate::scheduler::gc_work::{ProcessEdgesWork, SlotOf};
 use crate::scheduler::{GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
 use crate::util::{ObjectReference, VMThread, VMWorkerThread};
-use crate::vm::{Scanning, SlotVisitor, VMBinding};
+use crate::vm::{RefScanPolicy, Scanning, SlotVisitor, VMBinding};
 
 /// This trait represents an object queue to enqueue objects during tracing.
 pub trait ObjectQueue {
@@ -157,13 +157,18 @@ pub(crate) struct SlotIterator<VM: VMBinding> {
 
 impl<VM: VMBinding> SlotIterator<VM> {
     /// Iterate over the slots of an object by applying a function to each slot.
-    pub fn iterate_fields<F: FnMut(VM::VMSlot)>(object: ObjectReference, _tls: VMThread, mut f: F) {
+    pub fn iterate_fields<F: FnMut(VM::VMSlot)>(
+        object: ObjectReference,
+        policy: RefScanPolicy,
+        _tls: VMThread,
+        mut f: F,
+    ) {
         // FIXME: We should use tls from the arguments.
         // See https://github.com/mmtk/mmtk-core/issues/1375
         let fake_tls = VMWorkerThread(VMThread::UNINITIALIZED);
         if !<VM::VMScanning as Scanning<VM>>::support_slot_enqueuing(fake_tls, object) {
             panic!("SlotIterator::iterate_fields cannot be used on objects that don't support slot-enqueuing");
         }
-        <VM::VMScanning as Scanning<VM>>::scan_object(fake_tls, object, &mut f);
+        <VM::VMScanning as Scanning<VM>>::scan_object(fake_tls, object, policy, &mut f);
     }
 }

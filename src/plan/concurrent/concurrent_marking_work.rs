@@ -76,6 +76,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     fn scan_and_enqueue(&mut self, object: ObjectReference) {
         crate::plan::tracing::SlotIterator::<VM>::iterate_fields(
             object,
+            RefScanPolicy::StrongClosure,
             self.worker().tls.0,
             |s| {
                 let Some(t) = s.load() else {

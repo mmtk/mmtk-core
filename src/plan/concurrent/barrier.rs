@@ -4,6 +4,7 @@ use super::{concurrent_marking_work::ProcessModBufSATB, Pause};
 use crate::plan::global::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
 use crate::util::VMMutatorThread;
+use crate::vm::RefScanPolicy;
 use crate::{
     plan::{barriers::BarrierSemantics, concurrent::global::ConcurrentPlan, VectorQueue},
     scheduler::WorkBucketStage,
@@ -156,7 +157,11 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 
     fn object_probable_write_slow(&mut self, obj: ObjectReference) {
-        crate::plan::tracing::SlotIterator::<VM>::iterate_fields(obj, self.tls.0, |s| {
+        // Note: the SATB barrier happens during strong closure computation, so it is a chance for
+        // the VM binding to discover weak references.  The VM may choose to conservatively treat
+        // weak references as strong during concurrent GC, which is allowed by MMTk.
+        let policy: RefScanPolicy = RefScanPolicy::StrongClosure;
+        crate::plan::tracing::SlotIterator::<VM>::iterate_fields(obj, policy, self.tls.0, |s| {
             self.enqueue_node(Some(obj), s, None);
         });
     }
