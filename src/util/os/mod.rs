@@ -9,6 +9,9 @@ pub(crate) mod linux;
 #[cfg(target_os = "windows")]
 pub(crate) mod windows;
 
+#[cfg(target_os = "windows")]
+pub use windows::Windows as OS;
+
 pub trait OperatingSystem {
   type OSMemory: memory::Memory;
   type OSProcess: process::Process;

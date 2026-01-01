@@ -15,7 +15,7 @@ pub trait Memory {
     fn dzmmap(start: Address, size: usize, strategy: MmapStrategy, annotation: &MmapAnnotation<'_>) -> Result<Address>;
     fn munmap(start: Address, size: usize) -> Result<()>;
     fn mprotect(start: Address, size: usize) -> Result<()>;
-    fn munprotect(start: Address, size: usize) -> Result<()>;
+    fn munprotect(start: Address, size: usize, prot: MmapProtection) -> Result<()>;
 }
 
 /// Strategy for performing mmap
