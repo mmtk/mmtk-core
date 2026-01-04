@@ -1,7 +1,9 @@
 use bytemuck::NoUninit;
 use std::io::Result;
 
-use crate::util::address::Address;
+use crate::{util::{VMThread, address::Address}, vm::VMBinding};
+use crate::util::os::*;
+use crate::vm::*;
 
 pub trait Memory {
     fn zero(start: Address, len: usize) {
@@ -13,6 +15,55 @@ pub trait Memory {
         }
     }
     fn dzmmap(start: Address, size: usize, strategy: MmapStrategy, annotation: &MmapAnnotation<'_>) -> Result<Address>;
+
+    fn handle_mmap_error<VM: VMBinding>(
+        error: std::io::Error,
+        tls: VMThread,
+        addr: Address,
+        bytes: usize,
+    ) {
+        use std::io::ErrorKind;
+        use crate::util::alloc::AllocationError;
+
+        eprintln!("Failed to mmap {}, size {}", addr, bytes);
+        eprintln!("{}", OSProcess::get_process_memory_maps().unwrap());
+
+        let call_binding_oom = || {
+            // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
+            trace!("Signal MmapOutOfMemory!");
+            VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
+            unreachable!()
+        };
+
+        match error.kind() {
+            // From Rust nightly 2021-05-12, we started to see Rust added this ErrorKind.
+            ErrorKind::OutOfMemory => {
+                call_binding_oom();
+            }
+            // Before Rust had ErrorKind::OutOfMemory, this is how we capture OOM from OS calls.
+            // TODO: We may be able to remove this now.
+            ErrorKind::Other => {
+                // further check the error
+                if let Some(os_errno) = error.raw_os_error() {
+                    if OSMemory::is_mmap_oom(os_errno) {
+                        call_binding_oom();
+                    }
+                }
+            }
+            ErrorKind::AlreadyExists => {
+                panic!("Failed to mmap, the address is already mapped. Should MMTk quarantine the address range first?");
+            }
+            _ => {
+                if let Some(os_errno) = error.raw_os_error() {
+                    if OSMemory::is_mmap_oom(os_errno) {
+                        call_binding_oom();
+                    }
+                }
+            }
+        }
+        panic!("Unexpected mmap failure: {:?}", error)
+    }
+
     fn is_mmap_oom(os_errno: i32) -> bool;
     fn munmap(start: Address, size: usize) -> Result<()>;
     fn mprotect(start: Address, size: usize) -> Result<()>;
@@ -151,9 +202,9 @@ pub enum MmapAnnotation<'a> {
 
 /// Construct an `MmapAnnotation::Test` with the current file name and line number.
 #[macro_export]
-macro_rules! mmap_anno_test_2 {
+macro_rules! mmap_anno_test {
     () => {
-        &$crate::util::os::memory::MmapAnnotation::Test {
+        &$crate::util::os::MmapAnnotation::Test {
             file: file!(),
             line: line!(),
         }
@@ -161,7 +212,7 @@ macro_rules! mmap_anno_test_2 {
 }
 
 // Export this to external crates
-pub use mmap_anno_test_2;
+pub use mmap_anno_test;
 
 impl std::fmt::Display for MmapAnnotation<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

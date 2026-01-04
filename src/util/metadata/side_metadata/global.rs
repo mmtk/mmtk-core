@@ -1662,7 +1662,7 @@ mod tests {
 
     use crate::util::heap::layout::vm_layout;
     use crate::util::test_util::{serial_test, with_cleanup};
-    use memory::MmapStrategy;
+    use crate::util::os::*;
     use paste::paste;
 
     const TEST_LOG_BYTES_IN_REGION: usize = 12;

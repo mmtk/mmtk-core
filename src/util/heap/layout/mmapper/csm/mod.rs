@@ -235,7 +235,7 @@ mod tests {
     use super::*;
     use crate::mmap_anno_test;
     use crate::util::constants::LOG_BYTES_IN_PAGE;
-    use crate::util::os::memory;
+    use crate::util::os::*;
     use crate::util::test_util::CHUNK_STATE_MMAPPER_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
     use crate::util::{conversions, Address};
@@ -275,7 +275,7 @@ mod tests {
                     }
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
+                    OSMemory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
                 },
             )
         })
@@ -303,7 +303,7 @@ mod tests {
                     }
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
+                    OSMemory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
                 },
             )
         })
@@ -332,7 +332,7 @@ mod tests {
                     }
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
+                    OSMemory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
                 },
             )
         })

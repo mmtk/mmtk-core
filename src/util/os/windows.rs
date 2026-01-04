@@ -171,9 +171,6 @@ pub struct WindowsProcessImpl;
 impl Process for WindowsProcessImpl {
     fn get_process_memory_maps() -> Result<String> {
         // Windows-specific implementation to get process memory maps
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "get_process_memory_maps not implemented for Windows",
-        ))
+        Ok("get_process_memory_maps not implemented for Windows".to_string())
     }
 }

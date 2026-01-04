@@ -221,7 +221,7 @@ impl Drop for RawMemoryFreeList {
     fn drop(&mut self) {
         let len = self.high_water - self.base;
         if len != 0 {
-            let _ = os::memory::munmap(self.base, len);
+            let _ = OSMemory::munmap(self.base, len);
         }
     }
 }

@@ -148,9 +148,9 @@ pub enum MmapAnnotation<'a> {
 
 /// Construct an `MmapAnnotation::Test` with the current file name and line number.
 #[macro_export]
-macro_rules! mmap_anno_test {
+macro_rules! mmap_anno_test_unused {
     () => {
-        &$crate::util::os::memory::MmapAnnotation::Test {
+        &$crate::util::os::MmapAnnotation::Test {
             file: file!(),
             line: line!(),
         }
@@ -158,7 +158,7 @@ macro_rules! mmap_anno_test {
 }
 
 // Export this to external crates
-pub use mmap_anno_test;
+pub use mmap_anno_test_unused;
 
 impl std::fmt::Display for MmapAnnotation<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -683,7 +683,8 @@ pub(crate) fn get_system_total_memory() -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::util::os::*;
+    use crate::util::Address;
     use crate::util::constants::BYTES_IN_PAGE;
     use crate::util::test_util::MEMORY_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
@@ -697,17 +698,17 @@ mod tests {
             with_cleanup(
                 || {
                     let res = unsafe {
-                        dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
+                        OSMemory::dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
                     };
                     assert!(res.is_ok());
                     // We can overwrite with dzmmap
                     let res = unsafe {
-                        dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
+                        OSMemory::dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
                     };
                     assert!(res.is_ok());
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
+                    assert!(OSMemory::munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             );
         });
@@ -718,18 +719,21 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let res = dzmmap_noreplace(
+                    let res = OSMemory::dzmmap(
                         START,
                         BYTES_IN_PAGE,
-                        MmapStrategy::TEST,
+                        MmapStrategy {
+                            replace: false,
+                            ..MmapStrategy::TEST
+                        },
                         mmap_anno_test!(),
                     );
                     assert!(res.is_ok());
-                    let res = munmap(START, BYTES_IN_PAGE);
+                    let res = OSMemory::munmap(START, BYTES_IN_PAGE);
                     assert!(res.is_ok());
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
+                    assert!(OSMemory::munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -743,14 +747,17 @@ mod tests {
                 || {
                     // Make sure we mmapped the memory
                     let res = unsafe {
-                        dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
+                        OSMemory::dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
                     };
                     assert!(res.is_ok());
                     // Use dzmmap_noreplace will fail
                     let res = dzmmap_noreplace(
                         START,
                         BYTES_IN_PAGE,
-                        MmapStrategy::TEST,
+                        MmapStrategy {
+                            replace: false,
+                            ..MmapStrategy::TEST
+                        },                        
                         mmap_anno_test!(),
                     );
                     assert!(res.is_err());
@@ -768,16 +775,16 @@ mod tests {
             with_cleanup(
                 || {
                     let res =
-                        mmap_noreserve(START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!());
+                        OSMemory::dzmmap(START, BYTES_IN_PAGE, MmapStrategy { reserve: false, ..MmapStrategy::TEST }, mmap_anno_test!());
                     assert!(res.is_ok());
                     // Try reserve it
                     let res = unsafe {
-                        dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
+                        OSMemory::dzmmap(START, BYTES_IN_PAGE, MmapStrategy { replace: true, ..MmapStrategy::TEST }, mmap_anno_test!())
                     };
                     assert!(res.is_ok());
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
+                    assert!(OSMemory::munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -791,10 +798,10 @@ mod tests {
             with_cleanup(
                 || {
                     // We expect this call to panic
-                    panic_if_unmapped(START, BYTES_IN_PAGE, mmap_anno_test!());
+                    OSMemory::panic_if_unmapped(START, BYTES_IN_PAGE, mmap_anno_test!());
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
+                    assert!(OSMemory::munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -805,17 +812,17 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    assert!(dzmmap_noreplace(
+                    assert!(OSMemory::dzmmap(
                         START,
                         BYTES_IN_PAGE,
                         MmapStrategy::TEST,
                         mmap_anno_test!()
                     )
                     .is_ok());
-                    panic_if_unmapped(START, BYTES_IN_PAGE, mmap_anno_test!());
+                    OSMemory::panic_if_unmapped(START, BYTES_IN_PAGE, mmap_anno_test!());
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
+                    assert!(OSMemory::munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -829,7 +836,7 @@ mod tests {
             with_cleanup(
                 || {
                     // map 1 page from START
-                    assert!(dzmmap_noreplace(
+                    assert!(OSMemory::dzmmap(
                         START,
                         BYTES_IN_PAGE,
                         MmapStrategy::TEST,
@@ -838,10 +845,10 @@ mod tests {
                     .is_ok());
 
                     // check if the next page is mapped - which should panic
-                    panic_if_unmapped(START + BYTES_IN_PAGE, BYTES_IN_PAGE, mmap_anno_test!());
+                    OSMemory::panic_if_unmapped(START + BYTES_IN_PAGE, BYTES_IN_PAGE, mmap_anno_test!());
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE * 2).is_ok());
+                    assert!(OSMemory::munmap(START, BYTES_IN_PAGE * 2).is_ok());
                 },
             )
         })
@@ -857,7 +864,7 @@ mod tests {
             with_cleanup(
                 || {
                     // map 1 page from START
-                    assert!(dzmmap_noreplace(
+                    assert!(OSMemory::dzmmap(
                         START,
                         BYTES_IN_PAGE,
                         MmapStrategy::TEST,
@@ -866,10 +873,10 @@ mod tests {
                     .is_ok());
 
                     // check if the 2 pages from START are mapped. The second page is unmapped, so it should panic.
-                    panic_if_unmapped(START, BYTES_IN_PAGE * 2, mmap_anno_test!());
+                    OSMemory::panic_if_unmapped(START, BYTES_IN_PAGE * 2, mmap_anno_test!());
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE * 2).is_ok());
+                    assert!(OSMemory::munmap(START, BYTES_IN_PAGE * 2).is_ok());
                 },
             )
         })
@@ -877,7 +884,7 @@ mod tests {
 
     #[test]
     fn test_get_system_total_memory() {
-        let total = get_system_total_memory();
+        let total = OSMemory::get_system_total_memory().unwrap();
         println!("Total memory: {:?}", total);
     }
 }
