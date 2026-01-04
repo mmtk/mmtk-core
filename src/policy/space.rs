@@ -30,7 +30,7 @@ use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
-use crate::util::memory::{self, HugePageSupport, MmapProtection, MmapStrategy};
+use crate::util::os::*;
 use crate::vm::VMBinding;
 
 use std::marker::PhantomData;
@@ -192,7 +192,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     res.start,
                     res.pages,
                     self.common().mmap_strategy(),
-                    &memory::MmapAnnotation::Space {
+                    &MmapAnnotation::Space {
                         name: self.get_name(),
                     },
                 )
@@ -202,7 +202,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     self.get_name(),
                 ))
             {
-                memory::handle_mmap_error::<VM>(mmap_error, tls, res.start, bytes);
+                handle_space_mmap_error::<VM>(mmap_error, tls, res.start, bytes);
             }
         };
         let grow_space = || {
@@ -227,7 +227,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
         // TODO: Concurrent zeroing
         if self.common().zeroed {
-            memory::zero(res.start, bytes);
+            OSMemory::zero(res.start, bytes);
         }
 
         // Some assertions
@@ -532,6 +532,54 @@ pub(crate) fn print_vm_map<VM: VMBinding>(
     Ok(())
 }
 
+fn handle_space_mmap_error<VM: VMBinding>(
+    error: std::io::Error,
+    tls: VMThread,
+    addr: Address,
+    bytes: usize,
+) {
+    use std::io::ErrorKind;
+    use crate::util::alloc::AllocationError;
+
+    eprintln!("Failed to mmap {}, size {}", addr, bytes);
+    eprintln!("{}", OSProcess::get_process_memory_maps().unwrap());
+
+    let call_binding_oom = || {
+        // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
+        trace!("Signal MmapOutOfMemory!");
+        VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
+        unreachable!()
+    };
+
+    match error.kind() {
+        // From Rust nightly 2021-05-12, we started to see Rust added this ErrorKind.
+        ErrorKind::OutOfMemory => {
+            call_binding_oom();
+        }
+        // Before Rust had ErrorKind::OutOfMemory, this is how we capture OOM from OS calls.
+        // TODO: We may be able to remove this now.
+        ErrorKind::Other => {
+            // further check the error
+            if let Some(os_errno) = error.raw_os_error() {
+                if OSMemory::is_mmap_oom(os_errno) {
+                    call_binding_oom();
+                }
+            }
+        }
+        ErrorKind::AlreadyExists => {
+            panic!("Failed to mmap, the address is already mapped. Should MMTk quarantine the address range first?");
+        }
+        _ => {
+            if let Some(os_errno) = error.raw_os_error() {
+                if OSMemory::is_mmap_oom(os_errno) {
+                    call_binding_oom();
+                }
+            }
+        }
+    }
+    panic!("Unexpected mmap failure: {:?}", error)
+}
+
 impl_downcast!(Space<VM> where VM: VMBinding);
 
 pub struct CommonSpace<VM: VMBinding> {
@@ -767,6 +815,8 @@ impl<VM: VMBinding> CommonSpace<VM> {
             } else {
                 MmapProtection::ReadWrite
             },
+            replace: false,
+            reserve: true,
         }
     }
 

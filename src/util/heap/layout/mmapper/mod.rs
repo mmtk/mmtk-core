@@ -1,5 +1,5 @@
 use crate::util::{
-    memory::{MmapAnnotation, MmapStrategy},
+    os::*,
     Address,
 };
 use std::io::Result;

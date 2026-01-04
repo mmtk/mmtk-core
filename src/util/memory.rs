@@ -150,7 +150,7 @@ pub enum MmapAnnotation<'a> {
 #[macro_export]
 macro_rules! mmap_anno_test {
     () => {
-        &$crate::util::memory::MmapAnnotation::Test {
+        &$crate::util::os::memory::MmapAnnotation::Test {
             file: file!(),
             line: line!(),
         }

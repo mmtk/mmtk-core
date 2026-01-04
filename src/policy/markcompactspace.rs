@@ -13,6 +13,7 @@ use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::{extract_side_metadata, vo_bit};
 use crate::util::object_enum::{self, ObjectEnumerator};
 use crate::util::{Address, ObjectReference};
+use crate::util::os::*;
 use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
 
@@ -225,7 +226,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
     // Clear header forwarding pointer for an object
     fn clear_header_forwarding_pointer(object: ObjectReference) {
-        crate::util::memory::zero(
+        OSMemory::zero(
             Self::header_forwarding_pointer_address(object),
             GC_EXTRA_HEADER_BYTES,
         );

@@ -1,5 +1,7 @@
-pub mod memory;
-pub mod process;
+mod memory;
+pub use memory::*;
+mod process;
+pub use process::*;
 
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "android"))]
 pub(crate) mod posix_common;
@@ -10,9 +12,11 @@ pub(crate) mod linux;
 pub(crate) mod windows;
 
 #[cfg(target_os = "windows")]
-pub use windows::Windows as OS;
+pub use windows::WindowsMemoryImpl as OSMemory;
+#[cfg(target_os = "windows")]
+pub use windows::WindowsProcessImpl as OSProcess;
 
-pub trait OperatingSystem {
-  type OSMemory: memory::Memory;
-  type OSProcess: process::Process;
-}
+// pub trait OperatingSystem {
+//   type OSMemory: memory::Memory;
+//   type OSProcess: process::Process;
+// }

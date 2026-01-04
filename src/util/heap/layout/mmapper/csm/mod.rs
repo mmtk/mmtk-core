@@ -2,7 +2,7 @@ use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::conversions::raw_is_aligned;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::layout::Mmapper;
-use crate::util::memory::*;
+use crate::util::os::*;
 use crate::util::Address;
 use bytemuck::NoUninit;
 use std::{io::Result, sync::Mutex};
@@ -146,7 +146,7 @@ impl Mmapper for ChunkStateMmapper {
         &self,
         start: Address,
         pages: usize,
-        strategy: MmapStrategy,
+        mut strategy: MmapStrategy,
         anno: &MmapAnnotation,
     ) -> Result<()> {
         let _guard = self.transition_lock.lock().unwrap();
@@ -162,7 +162,8 @@ impl Mmapper for ChunkStateMmapper {
                 match state {
                     MapState::Unmapped => {
                         trace!("Trying to quarantine {group_range}");
-                        mmap_noreserve(group_start, group_bytes, strategy, anno)?;
+                        strategy.reserve = false;
+                        OSMemory::dzmmap(group_start, group_bytes, strategy, anno)?;
                         Ok(Some(MapState::Quarantined))
                     }
                     MapState::Quarantined => {
@@ -181,7 +182,7 @@ impl Mmapper for ChunkStateMmapper {
         &self,
         start: Address,
         pages: usize,
-        strategy: MmapStrategy,
+        mut strategy: MmapStrategy,
         anno: &MmapAnnotation,
     ) -> Result<()> {
         let _guard = self.transition_lock.lock().unwrap();
@@ -196,11 +197,14 @@ impl Mmapper for ChunkStateMmapper {
 
                 match state {
                     MapState::Unmapped => {
-                        dzmmap_noreplace(group_start, group_bytes, strategy, anno)?;
+                        strategy.replace = false;
+                        OSMemory::dzmmap(group_start, group_bytes, strategy, anno)?;
                         Ok(Some(MapState::Mapped))
                     }
                     MapState::Quarantined => {
-                        unsafe { dzmmap(group_start, group_bytes, strategy, anno) }?;
+                        strategy.replace = true;
+                        strategy.reserve = true;
+                        OSMemory::dzmmap(group_start, group_bytes, strategy, anno)?;
                         Ok(Some(MapState::Mapped))
                     }
                     MapState::Mapped => Ok(None),
@@ -231,7 +235,7 @@ mod tests {
     use super::*;
     use crate::mmap_anno_test;
     use crate::util::constants::LOG_BYTES_IN_PAGE;
-    use crate::util::memory;
+    use crate::util::os::memory;
     use crate::util::test_util::CHUNK_STATE_MMAPPER_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
     use crate::util::{conversions, Address};

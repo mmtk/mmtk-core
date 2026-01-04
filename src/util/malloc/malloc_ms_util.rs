@@ -18,7 +18,7 @@ pub fn align_alloc(size: usize, align: usize) -> Address {
         return Address::ZERO;
     }
     let address = Address::from_mut_ptr(ptr);
-    crate::util::memory::zero(address, size);
+    crate::util::os::memory::zero(address, size);
     address
 }
 

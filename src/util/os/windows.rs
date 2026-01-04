@@ -1,17 +1,11 @@
-use crate::util::os::{OperatingSystem, memory::*};
+use crate::util::os::memory::*;
 use crate::util::address::Address;
 use std::io::Result;
-
-pub struct Windows;
-impl OperatingSystem for Windows {
-    type OSMemory = WindowsMemoryImpl;
-    type OSProcess = WindowsProcessImpl;
-}
 
 pub struct WindowsMemoryImpl;
 
 impl Memory for WindowsMemoryImpl {
-    fn dzmmap(start: Address, size: usize, strategy: MmapStrategy, annotation: &MmapAnnotation<'_>) -> Result<Address> {
+    fn dzmmap(start: Address, size: usize, strategy: MmapStrategy, _annotation: &MmapAnnotation<'_>) -> Result<Address> {
         use std::io;
         use windows_sys::Win32::System::Memory::{
             VirtualAlloc, VirtualQuery, MEMORY_BASIC_INFORMATION, MEM_COMMIT, MEM_FREE, MEM_RESERVE,
@@ -148,6 +142,14 @@ impl Memory for WindowsMemoryImpl {
         } else {
             Ok(())
         }
+    }
+
+    fn panic_if_unmapped(start: Address, size: usize, _annotation: &MmapAnnotation<'_>) {
+        warn!("Check if {} of size {} is mapped is ignored on Windows", start, size);
+    }
+
+    fn is_mmap_oom(os_errno: i32) -> bool {
+        os_errno == windows_sys::Win32::Foundation::ERROR_NOT_ENOUGH_MEMORY as i32 || os_errno == windows_sys::Win32::Foundation::ERROR_INVALID_ADDRESS as i32
     }
 }
 

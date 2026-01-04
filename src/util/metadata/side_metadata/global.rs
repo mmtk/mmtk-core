@@ -2,7 +2,7 @@ use super::*;
 use crate::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
 use crate::util::conversions::raw_align_up;
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
-use crate::util::memory::{self, MmapAnnotation};
+use crate::util::os::*;
 use crate::util::metadata::metadata_val_traits::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
@@ -122,7 +122,7 @@ impl SideMetadataSpec {
             meta_start
         );
 
-        memory::panic_if_unmapped(
+        OSMemory::panic_if_unmapped(
             meta_start,
             BYTES_IN_PAGE,
             &MmapAnnotation::Misc {
@@ -180,7 +180,7 @@ impl SideMetadataSpec {
         let mut visitor = |range| {
             match range {
                 BitByteRange::Bytes { start, end } => {
-                    memory::zero(start, end - start);
+                    OSMemory::zero(start, end - start);
                     false
                 }
                 BitByteRange::BitsInByte {
@@ -217,7 +217,7 @@ impl SideMetadataSpec {
         let mut visitor = |range| {
             match range {
                 BitByteRange::Bytes { start, end } => {
-                    memory::set(start, 0xff, end - start);
+                    OSMemory::set(start, 0xff, end - start);
                     false
                 }
                 BitByteRange::BitsInByte {

@@ -7,6 +7,7 @@ use crate::scheduler::{gc_work::*, GCWork, GCWorker, WorkBucketStage};
 use crate::util::ObjectReference;
 use crate::vm::slot::{MemorySlice, Slot};
 use crate::vm::*;
+use crate::util::os::*;
 use crate::MMTK;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
@@ -117,7 +118,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
                     !gen.is_object_in_nursery(*obj),
                     "{} was logged but is not mature. Dumping process memory maps:\n{}",
                     *obj,
-                    crate::util::memory::get_process_memory_maps(),
+                    OSProcess::get_process_memory_maps().unwrap(),
                 );
                 <E::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<E::VM, u8>(
                     *obj,

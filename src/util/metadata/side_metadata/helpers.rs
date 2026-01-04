@@ -4,7 +4,7 @@ use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 use crate::util::conversions::rshift_align_up;
 use crate::util::heap::layout::vm_layout::VMLayout;
-use crate::util::memory::{MmapAnnotation, MmapStrategy};
+use crate::util::os::*;
 #[cfg(target_pointer_width = "32")]
 use crate::util::metadata::side_metadata::address_to_chunked_meta_address;
 use crate::util::Address;
@@ -93,7 +93,7 @@ pub(super) fn align_metadata_address(
 /// Unmaps the specified metadata range, or panics.
 #[cfg(test)]
 pub(crate) fn ensure_munmap_metadata(start: Address, size: usize) {
-    use crate::util::memory;
+    use crate::util::os::memory;
     trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
 
     assert!(memory::munmap(start, size).is_ok())

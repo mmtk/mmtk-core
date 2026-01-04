@@ -12,6 +12,7 @@ use crate::util::object_enum::ObjectEnumerator;
 use crate::util::object_forwarding;
 use crate::util::{copy::*, object_enum};
 use crate::util::{Address, ObjectReference};
+use crate::util::os::*;
 use crate::vm::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -292,7 +293,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         }
         let start = self.common().start;
         let extent = self.common().extent;
-        if let Err(e) = crate::util::memory::mprotect(start, extent) {
+        if let Err(e) = crate::util::os::OSMemory::mprotect(start, extent) {
             panic!("Failed to protect memory: {:?}", e);
         }
         trace!("Protect {:x} {:x}", start, start + extent);
@@ -307,10 +308,10 @@ impl<VM: VMBinding> CopySpace<VM> {
         }
         let start = self.common().start;
         let extent = self.common().extent;
-        if let Err(e) = crate::util::memory::munprotect(
+        if let Err(e) = crate::util::os::OSMemory::munprotect(
             start,
             extent,
-            crate::util::memory::MmapProtection::ReadWriteExec,
+            crate::util::os::MmapProtection::ReadWriteExec,
         ) {
             panic!("Failed to unprotect memory: {:?}", e);
         }

@@ -1,6 +1,6 @@
 use super::mock_test_prelude::*;
 
-use crate::util::memory;
+use crate::util::os::memory;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 

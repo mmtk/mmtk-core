@@ -58,6 +58,29 @@ pub fn posix_mmap(start: Address, size: usize, strategy: MmapStrategy, annotatio
     }
 }
 
+pub fn posix_panic_if_unmapped(start: Address, size: usize, anno: &MmapAnnotation) {
+    let flags = MMAP_FLAGS;
+    match mmap_fixed(
+        _start,
+        _size,
+        flags,
+        MmapStrategy {
+            huge_page: HugePageSupport::No,
+            prot: MmapProtection::ReadWrite,
+        },
+        _anno,
+    ) {
+        Ok(_) => panic!("{} of size {} is not mapped", _start, _size),
+        Err(e) => {
+            assert!(
+                e.kind() == std::io::ErrorKind::AlreadyExists,
+                "Failed to check mapped: {:?}",
+                e
+            );
+        }
+    }
+}
+
 fn wrap_libc_call<T: PartialEq>(f: &dyn Fn() -> T, expect: T) -> Result<()> {
     let ret = f();
     if ret == expect {

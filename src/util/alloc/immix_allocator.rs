@@ -12,6 +12,7 @@ use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::VMThread;
 use crate::util::rust_util::unlikely;
 use crate::util::Address;
+use crate::util::os::*;
 use crate::vm::*;
 
 /// Immix allocator
@@ -250,7 +251,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     end_line,
                     self.tls
                 );
-                crate::util::memory::zero(
+                OSMemory::zero(
                     self.bump_pointer.cursor,
                     self.bump_pointer.limit - self.bump_pointer.cursor,
                 );
