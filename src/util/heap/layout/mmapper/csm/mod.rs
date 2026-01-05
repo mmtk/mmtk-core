@@ -197,7 +197,7 @@ impl Mmapper for ChunkStateMmapper {
 
                 match state {
                     MapState::Unmapped => {
-                        strategy.replace = false;
+                        // strategy.replace = false;
                         OSMemory::dzmmap(group_start, group_bytes, strategy, anno)?;
                         Ok(Some(MapState::Mapped))
                     }

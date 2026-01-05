@@ -703,7 +703,7 @@ mod tests {
                     assert!(res.is_ok());
                     // We can overwrite with dzmmap
                     let res = unsafe {
-                        OSMemory::dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
+                        OSMemory::dzmmap(START, BYTES_IN_PAGE, MmapStrategy { replace: true, ..MmapStrategy::TEST }, mmap_anno_test!())
                     };
                     assert!(res.is_ok());
                 },
@@ -751,7 +751,7 @@ mod tests {
                     };
                     assert!(res.is_ok());
                     // Use dzmmap_noreplace will fail
-                    let res = dzmmap_noreplace(
+                    let res = OSMemory::dzmmap(
                         START,
                         BYTES_IN_PAGE,
                         MmapStrategy {
@@ -763,7 +763,7 @@ mod tests {
                     assert!(res.is_err());
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
+                    assert!(OSMemory::munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             )
         });
@@ -798,7 +798,7 @@ mod tests {
             with_cleanup(
                 || {
                     // We expect this call to panic
-                    OSMemory::panic_if_unmapped(START, BYTES_IN_PAGE, mmap_anno_test!());
+                    OSMemory::panic_if_unmapped(START, BYTES_IN_PAGE);
                 },
                 || {
                     assert!(OSMemory::munmap(START, BYTES_IN_PAGE).is_ok());
@@ -819,7 +819,7 @@ mod tests {
                         mmap_anno_test!()
                     )
                     .is_ok());
-                    OSMemory::panic_if_unmapped(START, BYTES_IN_PAGE, mmap_anno_test!());
+                    OSMemory::panic_if_unmapped(START, BYTES_IN_PAGE);
                 },
                 || {
                     assert!(OSMemory::munmap(START, BYTES_IN_PAGE).is_ok());
@@ -845,7 +845,7 @@ mod tests {
                     .is_ok());
 
                     // check if the next page is mapped - which should panic
-                    OSMemory::panic_if_unmapped(START + BYTES_IN_PAGE, BYTES_IN_PAGE, mmap_anno_test!());
+                    OSMemory::panic_if_unmapped(START + BYTES_IN_PAGE, BYTES_IN_PAGE);
                 },
                 || {
                     assert!(OSMemory::munmap(START, BYTES_IN_PAGE * 2).is_ok());
@@ -873,7 +873,7 @@ mod tests {
                     .is_ok());
 
                     // check if the 2 pages from START are mapped. The second page is unmapped, so it should panic.
-                    OSMemory::panic_if_unmapped(START, BYTES_IN_PAGE * 2, mmap_anno_test!());
+                    OSMemory::panic_if_unmapped(START, BYTES_IN_PAGE * 2);
                 },
                 || {
                     assert!(OSMemory::munmap(START, BYTES_IN_PAGE * 2).is_ok());

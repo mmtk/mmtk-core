@@ -16,6 +16,11 @@ pub use windows::WindowsMemoryImpl as OSMemory;
 #[cfg(target_os = "windows")]
 pub use windows::WindowsProcessImpl as OSProcess;
 
+#[cfg(target_os = "linux")]
+pub use linux::LinuxMemoryImpl as OSMemory;
+#[cfg(target_os = "linux")]
+pub use linux::LinuxProcessImpl as OSProcess;
+
 // pub trait OperatingSystem {
 //   type OSMemory: memory::Memory;
 //   type OSProcess: process::Process;

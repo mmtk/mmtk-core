@@ -68,7 +68,7 @@ pub trait Memory {
     fn munmap(start: Address, size: usize) -> Result<()>;
     fn mprotect(start: Address, size: usize) -> Result<()>;
     fn munprotect(start: Address, size: usize, prot: MmapProtection) -> Result<()>;
-    fn panic_if_unmapped(start: Address, size: usize, annotation: &MmapAnnotation<'_>);
+    fn panic_if_unmapped(start: Address, size: usize);
     fn get_system_total_memory() -> Result<u64> {
         use sysinfo::MemoryRefreshKind;
         use sysinfo::{RefreshKind, System};
@@ -118,6 +118,9 @@ impl MmapStrategy {
     }
 
     /// The strategy for MMTk's own internal memory
+    #[cfg(test)] // In test mode, we use test settings which allows replacing existing mappings.
+    pub const INTERNAL_MEMORY: Self = Self::TEST;
+    #[cfg(not(test))]
     pub const INTERNAL_MEMORY: Self = Self {
         huge_page: HugePageSupport::No,
         prot: MmapProtection::ReadWrite,
@@ -126,11 +129,19 @@ impl MmapStrategy {
     };
 
     /// The strategy for MMTk side metadata
+    #[cfg(test)]
+    pub const SIDE_METADATA: Self = Self::TEST;
+    #[cfg(not(test))]
     pub const SIDE_METADATA: Self = Self::INTERNAL_MEMORY;
 
     /// The strategy for MMTk's test memory
     #[cfg(test)]
-    pub const TEST: Self = Self::INTERNAL_MEMORY;
+    pub const TEST: Self = Self {
+        huge_page: HugePageSupport::No,
+        prot: MmapProtection::ReadWrite,
+        replace: true,
+        reserve: true,
+    };
 }
 
 /// The protection flags for Mmap

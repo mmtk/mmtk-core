@@ -1,6 +1,7 @@
 use crate::util::constants::BYTES_IN_ADDRESS;
 use crate::util::malloc::library::*;
 use crate::util::Address;
+use crate::util::os::*;
 use crate::vm::VMBinding;
 
 /// Allocate with alignment. This also guarantees the memory is zero initialized.
@@ -18,7 +19,7 @@ pub fn align_alloc(size: usize, align: usize) -> Address {
         return Address::ZERO;
     }
     let address = Address::from_mut_ptr(ptr);
-    crate::util::os::memory::zero(address, size);
+    OSMemory::zero(address, size);
     address
 }
 

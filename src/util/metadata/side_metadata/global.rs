@@ -124,10 +124,7 @@ impl SideMetadataSpec {
 
         OSMemory::panic_if_unmapped(
             meta_start,
-            BYTES_IN_PAGE,
-            &MmapAnnotation::Misc {
-                name: "assert_metadata_mapped",
-            },
+            BYTES_IN_PAGE
         );
     }
 
@@ -1696,7 +1693,8 @@ mod tests {
                 || {
                     let mmap_result =
                         context.try_map_metadata_space(data_addr, BYTES_IN_PAGE, "test_space");
-                    assert!(mmap_result.is_ok());
+                    let _ = mmap_result.unwrap();
+                    // assert!(mmap_result.is_ok());
 
                     f(&spec, data_addr, meta_addr);
                 },
