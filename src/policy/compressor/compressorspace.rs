@@ -272,8 +272,8 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         forwarding::MARK_SPEC
             .fetch_update_atomic::<u8, _>(
                 object.to_raw_address(),
-                Ordering::Relaxed,
                 Ordering::SeqCst,
+                Ordering::Relaxed,
                 |v| {
                     if v == 0 {
                         Some(1)
