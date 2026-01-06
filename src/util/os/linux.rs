@@ -1,6 +1,7 @@
 use crate::util::os::*;
 use crate::util::os::posix_common;
 use crate::util::address::Address;
+
 use std::io::Result;
 
 pub struct LinuxMemoryImpl;
@@ -98,5 +99,25 @@ pub struct LinuxProcessImpl;
 impl Process for LinuxProcessImpl {
     fn get_process_memory_maps() -> Result<String> {
         posix_common::get_process_memory_maps()
+    }
+
+    fn get_process_id() -> Result<String> {
+        posix_common::get_process_id()
+    }
+
+    fn get_thread_id() -> Result<String> {
+        posix_common::get_thread_id()
+    }
+
+    fn get_total_num_cpus() -> CoreNum {
+        posix_common::get_total_num_cpus()
+    }
+
+    fn bind_current_thread_to_core(core_id: CoreId) {
+        posix_common::bind_current_thread_to_core(core_id)
+    }
+
+    fn bind_current_thread_to_cpuset(core_ids: &[CoreId]) {
+        posix_common::bind_current_thread_to_cpuset(core_ids)
     }
 }

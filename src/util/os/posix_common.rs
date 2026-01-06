@@ -1,6 +1,8 @@
-use crate::util::os::memory::*;
+use crate::util::os::*;
 use crate::util::address::Address;
 use std::io::Result;
+use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_COUNT, CPU_SET, CPU_ZERO};
+use std::mem::MaybeUninit;
 
 impl MmapProtection {
     fn into_native_flags(&self) -> i32 {
@@ -85,6 +87,47 @@ pub fn munprotect(start: Address, size: usize, prot: MmapProtection) -> Result<(
         &|| unsafe { libc::mprotect(start.to_mut_ptr(), size, prot.into_native_flags()) },
         0,
     )
+}
+
+pub fn get_process_id() -> Result<String> {
+    let pid = unsafe { libc::getpid() };
+    Ok(format!("{}", pid))
+}
+
+pub fn get_thread_id() -> Result<String> {
+    let tid = unsafe { libc::gettid() };
+    Ok(format!("{}", tid))
+}
+
+pub fn get_total_num_cpus() -> CoreNum {
+    unsafe {
+        let mut cs = MaybeUninit::zeroed().assume_init();
+        CPU_ZERO(&mut cs);
+        sched_getaffinity(0, std::mem::size_of::<cpu_set_t>(), &mut cs);
+        CPU_COUNT(&cs) as u16
+    }
+}
+
+pub fn bind_current_thread_to_core(core_id: CoreId) {
+    unsafe {
+        let mut cs = MaybeUninit::zeroed().assume_init();
+        CPU_ZERO(&mut cs);
+        CPU_SET(core_id as usize, &mut cs);
+        sched_setaffinity(0, std::mem::size_of::<cpu_set_t>(), &cs);
+    }
+}
+
+/// Bind the current thread to the specified core.
+pub fn bind_current_thread_to_cpuset(cpuset: &[CoreId]) {
+    use std::mem::MaybeUninit;
+    unsafe {
+        let mut cs = MaybeUninit::zeroed().assume_init();
+        CPU_ZERO(&mut cs);
+        for cpu in cpuset {
+            CPU_SET(*cpu as usize, &mut cs);
+        }
+        sched_setaffinity(0, std::mem::size_of::<cpu_set_t>(), &cs);
+    }
 }
 
 pub fn wrap_libc_call<T: PartialEq>(f: &dyn Fn() -> T, expect: T) -> Result<()> {

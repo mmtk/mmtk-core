@@ -108,26 +108,8 @@ unsafe impl<T> Sync for InitializeOnce<T> {}
 
 /// Create a formatted string that makes the best effort idenfying the current process and thread.
 pub fn debug_process_thread_id() -> String {
-    #[cfg(target_os = "linux")]
-    {
-        let pid = unsafe { libc::getpid() };
-        // `gettid()` is Linux-specific.
-        let tid = unsafe { libc::gettid() };
-        format!("PID: {}, TID: {}", pid, tid)
-    }
-    #[cfg(target_os = "windows")]
-    {
-        let pid = unsafe { windows_sys::Win32::System::Threading::GetCurrentProcessId() };
-        let tid = unsafe { windows_sys::Win32::System::Threading::GetCurrentThreadId() };
-        format!("PID: {}, TID: {}", pid, tid)
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-    {
-        let pid = unsafe { libc::getpid() };
-        // TODO: When we support other platforms, use platform-specific methods to get thread
-        // identifiers.
-        format!("PID: {}", pid)
-    }
+    use crate::util::os::*;
+    format!("PID: {}, TID: {}", OSProcess::get_process_id().unwrap_or_default(), OSProcess::get_thread_id().unwrap_or_default())
 }
 
 #[cfg(test)]

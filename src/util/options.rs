@@ -1,4 +1,3 @@
-use crate::scheduler::affinity::{get_total_num_cpus, CoreId};
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::Address;
 use crate::util::os::*;
@@ -456,7 +455,7 @@ impl AffinityKind {
     /// maximum number of cores allocated to the program. Assumes core ids on the system are
     /// 0-indexed.
     pub fn validate(&self) -> bool {
-        let num_cpu = get_total_num_cpus();
+        let num_cpu = OSProcess::get_total_num_cpus();
 
         if let AffinityKind::RoundRobin(cpuset) = self {
             for cpu in cpuset {
@@ -1211,7 +1210,7 @@ mod tests {
                 || {
                     let mut vec = vec![0_u16];
                     let mut cpu_list = String::new();
-                    let num_cpus = get_total_num_cpus();
+                    let num_cpus = OSProcess::get_total_num_cpus();
 
                     cpu_list.push('0');
                     for cpu in 1..num_cpus {

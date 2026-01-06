@@ -173,4 +173,44 @@ impl Process for WindowsProcessImpl {
         // Windows-specific implementation to get process memory maps
         Ok("get_process_memory_maps not implemented for Windows".to_string())
     }
+
+    fn get_process_id() -> Result<String> {
+        use windows_sys::Win32::System::Threading::GetCurrentProcessId;
+        Ok(format!("{}", unsafe { GetCurrentProcessId() }))
+    }
+
+    fn get_thread_id() -> Result<String> {
+        use windows_sys::Win32::System::Threading::GetCurrentThreadId;
+        Ok(format!("{}", unsafe { GetCurrentThreadId() }))
+    }
+
+    fn get_total_num_cpus() -> CoreNum {
+        unsafe {
+            windows_sys::Win32::System::Threading::GetActiveProcessorCount(
+                windows_sys::Win32::System::Threading::ALL_PROCESSOR_GROUPS,
+            ) as CoreNum
+        }
+    }
+
+    fn bind_current_thread_to_core(core_id: CoreId) {
+        unsafe {
+            windows_sys::Win32::System::Threading::SetThreadAffinityMask(
+                windows_sys::Win32::System::Threading::GetCurrentThread(),
+                1 << cpu,
+            );
+        }
+    }
+
+    fn bind_current_thread_to_cpuset(core_ids: &[CoreId]) {
+        let mut mask = 0;
+        for cpu in cpuset {
+            mask |= 1 << cpu;
+        }
+        unsafe {
+            windows_sys::Win32::System::Threading::SetThreadAffinityMask(
+                windows_sys::Win32::System::Threading::GetCurrentThread(),
+                mask,
+            );
+        }
+    }
 }
