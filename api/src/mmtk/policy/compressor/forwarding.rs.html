@@ -211,8 +211,8 @@
 <a href="#210" id="210">210</a>
 <a href="#211" id="211">211</a>
 <a href="#212" id="212">212</a>
-<a href="#213" id="213">213</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::policy::compressor::GC_MARK_BIT_MASK;
-<span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_WORD;
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_WORD;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::{Region, RegionIterator};
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::{COMPRESSOR_MARK, COMPRESSOR_OFFSET_VECTOR};
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
@@ -357,7 +357,9 @@
             </span>);
         }
 
-        MARK_SPEC.fetch_or_atomic(last_word_of_object, GC_MARK_BIT_MASK, Ordering::SeqCst);
+        <span class="comment">// We only mark the last word as input to computing forwarding
+        // information, so relaxed consistency is okay.
+        </span>MARK_SPEC.fetch_or_atomic::&lt;u8&gt;(last_word_of_object, <span class="number">1</span>, Ordering::Relaxed);
     }
 
     <span class="kw">pub fn </span>calculate_offset_vector(<span class="kw-2">&amp;</span><span class="self">self</span>, region: CompressorRegion, cursor: Address) {

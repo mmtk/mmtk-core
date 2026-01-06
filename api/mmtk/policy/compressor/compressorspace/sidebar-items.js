@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["GC_MARK_BIT_MASK","TRACE_KIND_FORWARD_ROOT","TRACE_KIND_MARK"],"struct":["CalculateOffsetVector","Compact","CompressorSpace"]};
+window.SIDEBAR_ITEMS = {"constant":["TRACE_KIND_FORWARD_ROOT","TRACE_KIND_MARK"],"struct":["CalculateOffsetVector","Compact","CompressorSpace"]};
