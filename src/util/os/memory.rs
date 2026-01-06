@@ -102,19 +102,53 @@ pub struct MmapStrategy {
     pub reserve: bool,
 }
 
+impl std::default::Default for MmapStrategy {
+    fn default() -> Self {
+        Self {
+            huge_page: HugePageSupport::No,
+            prot: MmapProtection::ReadWrite,
+            replace: false,
+            reserve: true,
+        }
+    }
+}
+
 impl MmapStrategy {
     /// Create a new strategy
-    pub fn new(transparent_hugepages: bool, prot: MmapProtection, replace: bool, reserve: bool) -> Self {
+    pub fn new(huge_page: HugePageSupport, prot: MmapProtection, replace: bool, reserve: bool) -> Self {
         Self {
-            huge_page: if transparent_hugepages {
-                HugePageSupport::TransparentHugePages
-            } else {
-                HugePageSupport::No
-            },
+            huge_page,
             prot,
             replace,
             reserve,
         }
+    }
+
+    // Builder methods
+
+    pub fn huge_page(self, huge_page: HugePageSupport) -> Self {
+        Self { huge_page, ..self }
+    }
+
+    pub fn transparent_hugepages(self, enable: bool) -> Self {
+        let huge_page = if enable {
+            HugePageSupport::TransparentHugePages
+        } else {
+            HugePageSupport::No
+        };
+        Self { huge_page, ..self }
+    }
+
+    pub fn prot(self, prot: MmapProtection) -> Self {
+        Self { prot, ..self }
+    }
+
+    pub fn replace(self, replace: bool) -> Self {
+        Self { replace, ..self }
+    }
+
+    pub fn reserve(self, reserve: bool) -> Self {
+        Self { reserve, ..self }
     }
 
     /// The strategy for MMTk's own internal memory

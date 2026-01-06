@@ -254,12 +254,8 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         };
 
         // Eagerly memory map the entire heap (also zero all the memory)
-        let strategy = MmapStrategy::new(
-            *args.options.transparent_hugepages,
-            crate::util::os::MmapProtection::ReadWrite,
-            false,
-            true,
-        );
+        let strategy = MmapStrategy::default().transparent_hugepages(*args.options.transparent_hugepages).prot(
+            crate::util::os::MmapProtection::ReadWrite).replace(false).reserve(true);
         crate::util::os::OSMemory::dzmmap(
             start,
             aligned_total_bytes,

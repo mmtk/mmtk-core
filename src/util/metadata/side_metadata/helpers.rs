@@ -143,14 +143,15 @@ pub(super) fn try_mmap_contiguous_metadata_space(
             MMAPPER.ensure_mapped(
                 mmap_start,
                 mmap_size >> LOG_BYTES_IN_PAGE,
-                MmapStrategy::SIDE_METADATA,
+                HugePageSupport::No,
+                MmapProtection::ReadWrite,
                 anno,
             )
         } else {
             MMAPPER.quarantine_address_range(
                 mmap_start,
                 mmap_size >> LOG_BYTES_IN_PAGE,
-                MmapStrategy::SIDE_METADATA,
+                HugePageSupport::No,
                 anno,
             )
         }

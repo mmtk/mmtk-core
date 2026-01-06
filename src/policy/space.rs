@@ -191,7 +191,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 .ensure_mapped(
                     res.start,
                     res.pages,
-                    self.common().mmap_strategy(),
+                    if *self.common().options.transparent_hugepages { HugePageSupport::TransparentHugePages } else { HugePageSupport::No },
+                    self.common().mmap_protection(),
                     &MmapAnnotation::Space {
                         name: self.get_name(),
                     },
@@ -755,20 +756,11 @@ impl<VM: VMBinding> CommonSpace<VM> {
         self.vm_map
     }
 
-    pub fn mmap_strategy(&self) -> MmapStrategy {
-        MmapStrategy {
-            huge_page: if *self.options.transparent_hugepages {
-                HugePageSupport::TransparentHugePages
-            } else {
-                HugePageSupport::No
-            },
-            prot: if self.permission_exec || cfg!(feature = "exec_permission_on_all_spaces") {
-                MmapProtection::ReadWriteExec
-            } else {
-                MmapProtection::ReadWrite
-            },
-            replace: false,
-            reserve: true,
+    pub fn mmap_protection(&self) -> MmapProtection {
+        if self.permission_exec || cfg!(feature = "exec_permission_on_all_spaces") {
+            MmapProtection::ReadWriteExec
+        } else {
+            MmapProtection::ReadWrite
         }
     }
 

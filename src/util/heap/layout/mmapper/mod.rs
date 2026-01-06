@@ -77,7 +77,7 @@ pub trait Mmapper: Sync {
         &self,
         start: Address,
         pages: usize,
-        strategy: MmapStrategy,
+        huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
     ) -> Result<()>;
 
@@ -97,7 +97,8 @@ pub trait Mmapper: Sync {
         &self,
         start: Address,
         pages: usize,
-        strategy: MmapStrategy,
+        huge_page_option: HugePageSupport,
+        prot: MmapProtection,
         anno: &MmapAnnotation,
     ) -> Result<()>;
 
