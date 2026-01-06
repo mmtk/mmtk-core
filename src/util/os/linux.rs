@@ -19,7 +19,8 @@ impl Memory for LinuxMemoryImpl {
         Self::set_hugepage(addr, size, strategy.huge_page)?;
         // println!("Set huge page done");
 
-        // Zero memory if needed
+        // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
+
         Ok(addr)
     }
 
@@ -78,7 +79,7 @@ impl LinuxMemoryImpl {
 }
 
 impl MmapStrategy {
-    pub fn get_mmap_flags(&self) -> i32 {
+    pub fn get_posix_mmap_flags(&self) -> i32 {
         let mut flags = libc::MAP_PRIVATE | libc::MAP_ANONYMOUS;
         if self.replace {
             flags |= libc::MAP_FIXED;

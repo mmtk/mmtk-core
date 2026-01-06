@@ -7,7 +7,8 @@ pub use process::*;
 pub(crate) mod posix_common;
 #[cfg(target_os = "linux")]
 pub(crate) mod linux;
-
+#[cfg(target_os = "macos")]
+pub(crate) mod macos;
 #[cfg(target_os = "windows")]
 pub(crate) mod windows;
 
@@ -20,6 +21,11 @@ pub use windows::WindowsProcessImpl as OSProcess;
 pub use linux::LinuxMemoryImpl as OSMemory;
 #[cfg(target_os = "linux")]
 pub use linux::LinuxProcessImpl as OSProcess;
+
+#[cfg(target_os = "macos")]
+pub use macos::MacOSMemoryImpl as OSMemory;
+#[cfg(target_os = "macos")]
+pub use macos::MacOSProcessImpl as OSProcess;
 
 // pub trait OperatingSystem {
 //   type OSMemory: memory::Memory;

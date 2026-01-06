@@ -16,7 +16,7 @@ impl MmapProtection {
 pub fn mmap(start: Address, size: usize, strategy: MmapStrategy) -> Result<Address> {
     let ptr = start.to_mut_ptr();
     let prot = strategy.prot.into_native_flags();
-    let flags = strategy.get_mmap_flags();
+    let flags = strategy.get_posix_mmap_flags();
     wrap_libc_call(
         &|| unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) },
         ptr,
