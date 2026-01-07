@@ -160,7 +160,7 @@ impl Memory for WindowsMemoryImpl {
         }
     }
 
-    fn panic_if_unmapped(start: Address, size: usize, _annotation: &MmapAnnotation<'_>) {
+    fn panic_if_unmapped(start: Address, size: usize) {
         warn!(
             "Check if {} of size {} is mapped is ignored on Windows",
             start, size
@@ -217,14 +217,14 @@ impl Process for WindowsProcessImpl {
         unsafe {
             windows_sys::Win32::System::Threading::SetThreadAffinityMask(
                 windows_sys::Win32::System::Threading::GetCurrentThread(),
-                1 << cpu,
+                1 << core_id,
             );
         }
     }
 
     fn bind_current_thread_to_cpuset(core_ids: &[CoreId]) {
         let mut mask = 0;
-        for cpu in cpuset {
+        for cpu in core_ids {
             mask |= 1 << cpu;
         }
         unsafe {
