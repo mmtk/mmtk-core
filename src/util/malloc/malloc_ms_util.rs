@@ -1,17 +1,18 @@
 use crate::util::constants::BYTES_IN_ADDRESS;
 use crate::util::malloc::library::*;
 use crate::util::Address;
-use crate::util::os::*;
 use crate::vm::VMBinding;
 
 /// Allocate with alignment. This also guarantees the memory is zero initialized.
 /// This uses posix_memalign, which is not available on Windows.
 /// This would somehow affect `MallocMarkSweep` performance on Windows.
-#[cfg(all(
-    not(target_os = "windows"),
-    not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc"))
-))]
+// #[cfg(all(
+//     not(target_os = "windows"),
+//     not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc"))
+// ))]
+#[cfg(not(target_os = "windows"))]
 pub fn align_alloc(size: usize, align: usize) -> Address {
+    use crate::util::os::*;
     let mut ptr = std::ptr::null_mut::<libc::c_void>();
     let ptr_ptr = std::ptr::addr_of_mut!(ptr);
     let result = unsafe { posix_memalign(ptr_ptr, align, size) };
@@ -85,10 +86,7 @@ pub fn alloc<VM: VMBinding>(size: usize, align: usize, offset: usize) -> (Addres
             address = Address::from_mut_ptr(raw);
             debug_assert!(address.is_aligned_to(align));
         }
-        #[cfg(all(
-            not(target_os = "windows"),
-            not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc"))
-        ))]
+        #[cfg(not(target_os = "windows"))]
         // On non-Windows platforms with posix_memalign, we can use align_alloc for alignments > 16
         // However, on Windows, there is no equivalent function.
         // The memory alloc by `align_alloc` may not be freed correctly by `free`.

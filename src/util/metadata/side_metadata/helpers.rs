@@ -4,9 +4,9 @@ use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 use crate::util::conversions::rshift_align_up;
 use crate::util::heap::layout::vm_layout::VMLayout;
-use crate::util::os::*;
 #[cfg(target_pointer_width = "32")]
 use crate::util::metadata::side_metadata::address_to_chunked_meta_address;
+use crate::util::os::*;
 use crate::util::Address;
 use crate::MMAPPER;
 use std::io::Result;

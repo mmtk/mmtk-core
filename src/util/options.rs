@@ -1,6 +1,6 @@
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
-use crate::util::Address;
 use crate::util::os::*;
+use crate::util::Address;
 use std::default::Default;
 use std::fmt::Debug;
 use std::str::FromStr;

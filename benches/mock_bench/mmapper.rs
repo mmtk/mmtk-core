@@ -3,8 +3,7 @@ pub use criterion::Criterion;
 use mmtk::{
     memory_manager, mmap_anno_test,
     util::{
-        constants::BYTES_IN_PAGE, memory::MmapStrategy, test_private::MMAPPER,
-        test_util::fixtures::*, Address,
+        constants::BYTES_IN_PAGE, os::*, test_private::MMAPPER, test_util::fixtures::*, Address,
     },
 };
 
@@ -76,10 +75,17 @@ pub fn bench(c: &mut Criterion) {
     c.bench_function("ensure_mapped_regular", |b| {
         let start = regular.align_down(BYTES_IN_PAGE);
         assert!(start.is_mapped());
-        let strategy = MmapStrategy::new(false, mmtk::util::memory::MmapProtection::ReadWrite);
         let anno = mmap_anno_test!();
         b.iter(|| {
-            MMAPPER.ensure_mapped(start, 1, strategy, anno).unwrap();
+            MMAPPER
+                .ensure_mapped(
+                    start,
+                    1,
+                    HugePageSupport::No,
+                    MmapProtection::ReadWrite,
+                    anno,
+                )
+                .unwrap();
         })
     });
 }

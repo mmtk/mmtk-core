@@ -12,8 +12,8 @@ use crate::util::copy::CopySemantics;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::{extract_side_metadata, vo_bit};
 use crate::util::object_enum::{self, ObjectEnumerator};
-use crate::util::{Address, ObjectReference};
 use crate::util::os::*;
+use crate::util::{Address, ObjectReference};
 use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
 

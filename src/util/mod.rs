@@ -28,8 +28,6 @@ pub mod is_mmtk_object;
 pub mod linear_scan;
 /// Various malloc implementations (conditionally compiled by features)
 pub mod malloc;
-/// Wrapper functions for memory syscalls such as mmap, mprotect, etc.
-pub mod memory;
 /// Metadata (OnSide or InHeader) implementation.
 pub mod metadata;
 /// Opaque pointers used in MMTk, e.g. VMThread.

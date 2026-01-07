@@ -2,10 +2,10 @@ use super::*;
 use crate::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
 use crate::util::conversions::raw_align_up;
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
-use crate::util::os::*;
 use crate::util::metadata::metadata_val_traits::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
+use crate::util::os::*;
 use crate::util::Address;
 use num_traits::FromPrimitive;
 use ranges::BitByteRange;
@@ -122,10 +122,7 @@ impl SideMetadataSpec {
             meta_start
         );
 
-        OSMemory::panic_if_unmapped(
-            meta_start,
-            BYTES_IN_PAGE
-        );
+        OSMemory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
     }
 
     #[cfg(debug_assertions)]
@@ -1659,7 +1656,6 @@ mod tests {
 
     use crate::util::heap::layout::vm_layout;
     use crate::util::test_util::{serial_test, with_cleanup};
-    use crate::util::os::*;
     use paste::paste;
 
     const TEST_LOG_BYTES_IN_REGION: usize = 12;
@@ -1686,15 +1682,20 @@ mod tests {
             let data_addr = vm_layout::vm_layout().heap_start;
             // Make sure the address is mapped.
             crate::MMAPPER
-                .ensure_mapped(data_addr, 1, HugePageSupport::No, MmapProtection::ReadWrite, mmap_anno_test!())
+                .ensure_mapped(
+                    data_addr,
+                    1,
+                    HugePageSupport::No,
+                    MmapProtection::ReadWrite,
+                    mmap_anno_test!(),
+                )
                 .unwrap();
             let meta_addr = address_to_meta_address(&spec, data_addr);
             with_cleanup(
                 || {
                     let mmap_result =
                         context.try_map_metadata_space(data_addr, BYTES_IN_PAGE, "test_space");
-                    let _ = mmap_result.unwrap();
-                    // assert!(mmap_result.is_ok());
+                    assert!(mmap_result.is_ok(), "{:?}", mmap_result);
 
                     f(&spec, data_addr, meta_addr);
                 },

@@ -2,15 +2,15 @@
 
 use std::sync::Arc;
 
+use super::allocator::AllocatorContext;
 use crate::policy::marksweepspace::native_ms::*;
 use crate::util::alloc::allocator;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
+use crate::util::os::*;
 use crate::util::Address;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
-use crate::util::os::*;
-use super::allocator::AllocatorContext;
 
 /// A MiMalloc free list allocator
 #[repr(C)]

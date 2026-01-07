@@ -1,12 +1,12 @@
-use crate::util::os::*;
 use crate::util::address::Address;
-use std::io::Result;
+use crate::util::os::*;
 use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_COUNT, CPU_SET, CPU_ZERO};
+use std::io::Result;
 use std::mem::MaybeUninit;
 
 impl MmapProtection {
-    fn into_native_flags(&self) -> i32 {
-        use libc::{PROT_NONE, PROT_READ, PROT_WRITE, PROT_EXEC};
+    fn get_native_flags(&self) -> i32 {
+        use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
         match self {
             Self::ReadWrite => PROT_READ | PROT_WRITE,
             Self::ReadWriteExec => PROT_READ | PROT_WRITE | PROT_EXEC,
@@ -17,7 +17,7 @@ impl MmapProtection {
 
 pub fn mmap(start: Address, size: usize, strategy: MmapStrategy) -> Result<Address> {
     let ptr = start.to_mut_ptr();
-    let prot = strategy.prot.into_native_flags();
+    let prot = strategy.prot.get_native_flags();
     let flags = strategy.get_posix_mmap_flags();
     wrap_libc_call(
         &|| unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) },
@@ -71,7 +71,7 @@ pub fn get_process_memory_maps() -> Result<String> {
 }
 
 pub fn munmap(start: Address, size: usize) -> Result<()> {
-    return wrap_libc_call(&|| unsafe { libc::munmap(start.to_mut_ptr(), size) }, 0);
+    wrap_libc_call(&|| unsafe { libc::munmap(start.to_mut_ptr(), size) }, 0)
 }
 
 pub fn mprotect(start: Address, size: usize) -> Result<()> {
@@ -84,7 +84,7 @@ pub fn mprotect(start: Address, size: usize) -> Result<()> {
 
 pub fn munprotect(start: Address, size: usize, prot: MmapProtection) -> Result<()> {
     wrap_libc_call(
-        &|| unsafe { libc::mprotect(start.to_mut_ptr(), size, prot.into_native_flags()) },
+        &|| unsafe { libc::mprotect(start.to_mut_ptr(), size, prot.get_native_flags()) },
         0,
     )
 }

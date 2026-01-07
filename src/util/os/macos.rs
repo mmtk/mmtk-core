@@ -1,12 +1,18 @@
-use crate::util::os::*;
-use crate::util::os::posix_common;
 use crate::util::address::Address;
+use crate::util::os::posix_common;
+use crate::util::os::*;
 use std::io::Result;
 
+/// MacOS implementation of the `Memory` trait.
 pub struct MacOSMemoryImpl;
 
 impl Memory for MacOSMemoryImpl {
-    fn dzmmap(start: Address, size: usize, strategy: MmapStrategy, _annotation: &MmapAnnotation<'_>) -> Result<Address> {
+    fn dzmmap(
+        start: Address,
+        size: usize,
+        strategy: MmapStrategy,
+        _annotation: &MmapAnnotation<'_>,
+    ) -> Result<Address> {
         let addr = posix_common::mmap(start, size, strategy)?;
 
         // Annotation is ignored on macOS
@@ -41,6 +47,7 @@ impl Memory for MacOSMemoryImpl {
 }
 
 impl MmapStrategy {
+    /// get the flags for POSIX mmap.
     pub fn get_posix_mmap_flags(&self) -> i32 {
         let mut flags = libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_FIXED;
         // replace is isgnored on macOS
@@ -51,6 +58,7 @@ impl MmapStrategy {
     }
 }
 
+/// MacOS implementation of the `Process` trait.
 pub struct MacOSProcessImpl;
 
 impl Process for MacOSProcessImpl {
@@ -72,9 +80,12 @@ impl Process for MacOSProcessImpl {
             Ok(output_str.to_string())
         } else {
             // Handle the error case
-            let error_message =
-                std::str::from_utf8(&output.stderr).expect("Failed to convert error message to string");
-            Err(std::io::Error::other(format!("Failed to get process memory map: {}", error_message)))
+            let error_message = std::str::from_utf8(&output.stderr)
+                .expect("Failed to convert error message to string");
+            Err(std::io::Error::other(format!(
+                "Failed to get process memory map: {}",
+                error_message
+            )))
         }
     }
 

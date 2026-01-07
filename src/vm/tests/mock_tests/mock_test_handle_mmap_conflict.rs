@@ -1,7 +1,7 @@
 use super::mock_test_prelude::*;
 
-use crate::util::os::*;
 use crate::util::opaque_pointer::*;
+use crate::util::os::*;
 use crate::util::Address;
 
 #[test]
@@ -11,12 +11,8 @@ pub fn test_handle_mmap_conflict() {
         || {
             let start = unsafe { Address::from_usize(0x100_0000) };
             let one_megabyte = 1000000;
-            let mmap1_res = OSMemory::dzmmap(
-                start,
-                one_megabyte,
-                MmapStrategy::TEST,
-                mmap_anno_test!(),
-            );
+            let mmap1_res =
+                OSMemory::dzmmap(start, one_megabyte, MmapStrategy::TEST, mmap_anno_test!());
             assert!(mmap1_res.is_ok());
 
             let panic_res = std::panic::catch_unwind(|| {

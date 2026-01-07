@@ -162,7 +162,11 @@ impl Mmapper for ChunkStateMmapper {
                 match state {
                     MapState::Unmapped => {
                         trace!("Trying to quarantine {group_range}");
-                        let mmap_strategy = MmapStrategy::default().huge_page(huge_page_option).prot(MmapProtection::NoAccess).reserve(false).replace(false);
+                        let mmap_strategy = MmapStrategy::default()
+                            .huge_page(huge_page_option)
+                            .prot(MmapProtection::NoAccess)
+                            .reserve(false)
+                            .replace(false);
                         OSMemory::dzmmap(group_start, group_bytes, mmap_strategy, anno)?;
                         Ok(Some(MapState::Quarantined))
                     }
@@ -191,7 +195,10 @@ impl Mmapper for ChunkStateMmapper {
         let bytes = pages << LOG_BYTES_IN_PAGE;
         let range = ChunkRange::new_unaligned(start, bytes);
 
-        let mmap_strategy = MmapStrategy::default().huge_page(huge_page_option).prot(prot).reserve(true);
+        let mmap_strategy = MmapStrategy::default()
+            .huge_page(huge_page_option)
+            .prot(prot)
+            .reserve(true);
 
         self.storage
             .bulk_transition_state(range, |group_range, state| {
@@ -200,11 +207,21 @@ impl Mmapper for ChunkStateMmapper {
 
                 match state {
                     MapState::Unmapped => {
-                        OSMemory::dzmmap(group_start, group_bytes, mmap_strategy.replace(false), anno)?;
+                        OSMemory::dzmmap(
+                            group_start,
+                            group_bytes,
+                            mmap_strategy.replace(false),
+                            anno,
+                        )?;
                         Ok(Some(MapState::Mapped))
                     }
                     MapState::Quarantined => {
-                        OSMemory::dzmmap(group_start, group_bytes, mmap_strategy.replace(true), anno)?;
+                        OSMemory::dzmmap(
+                            group_start,
+                            group_bytes,
+                            mmap_strategy.replace(true),
+                            anno,
+                        )?;
                         Ok(Some(MapState::Mapped))
                     }
                     MapState::Mapped => Ok(None),
@@ -235,7 +252,6 @@ mod tests {
     use super::*;
     use crate::mmap_anno_test;
     use crate::util::constants::LOG_BYTES_IN_PAGE;
-    use crate::util::os::*;
     use crate::util::test_util::CHUNK_STATE_MMAPPER_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
     use crate::util::{conversions, Address};
@@ -260,7 +276,13 @@ mod tests {
                 || {
                     let mmapper = ChunkStateMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, HugePageSupport::No, MmapProtection::ReadWrite, mmap_anno_test!())
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            pages,
+                            HugePageSupport::No,
+                            MmapProtection::ReadWrite,
+                            mmap_anno_test!(),
+                        )
                         .unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
@@ -288,7 +310,13 @@ mod tests {
                 || {
                     let mmapper = ChunkStateMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, HugePageSupport::No, MmapProtection::ReadWrite, mmap_anno_test!())
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            pages,
+                            HugePageSupport::No,
+                            MmapProtection::ReadWrite,
+                            mmap_anno_test!(),
+                        )
                         .unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
@@ -317,7 +345,13 @@ mod tests {
                 || {
                     let mmapper = ChunkStateMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, HugePageSupport::No, MmapProtection::ReadWrite, mmap_anno_test!())
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            pages,
+                            HugePageSupport::No,
+                            MmapProtection::ReadWrite,
+                            mmap_anno_test!(),
+                        )
                         .unwrap();
 
                     let chunks = pages_to_chunks_up(pages);

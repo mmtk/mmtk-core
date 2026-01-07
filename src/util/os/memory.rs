@@ -1,29 +1,46 @@
 use bytemuck::NoUninit;
 use std::io::Result;
 
-use crate::{util::{VMThread, address::Address}, vm::VMBinding};
 use crate::util::os::*;
 use crate::vm::*;
+use crate::{
+    util::{address::Address, VMThread},
+    vm::VMBinding,
+};
 
+/// Abstraction for OS memory operations.
 pub trait Memory {
+    /// Set a memory region to zero.
     fn zero(start: Address, len: usize) {
         Self::set(start, 0, len);
     }
+
+    /// Set a memory region to a specific value.
     fn set(start: Address, val: u8, len: usize) {
         unsafe {
             std::ptr::write_bytes::<u8>(start.to_mut_ptr(), val, len);
         }
     }
-    fn dzmmap(start: Address, size: usize, strategy: MmapStrategy, annotation: &MmapAnnotation<'_>) -> Result<Address>;
 
+    /// Perform a demand-zero mmap.
+    /// 
+    /// Falback: `annotation` is only used for debugging. For platforms that do not support mmap annotations, this parameter can be ignored.
+    fn dzmmap(
+        start: Address,
+        size: usize,
+        strategy: MmapStrategy,
+        annotation: &MmapAnnotation<'_>,
+    ) -> Result<Address>;
+
+    /// Handle mmap errors, possibly by signaling the VM about an out-of-memory condition.
     fn handle_mmap_error<VM: VMBinding>(
         error: std::io::Error,
         tls: VMThread,
         addr: Address,
         bytes: usize,
     ) {
-        use std::io::ErrorKind;
         use crate::util::alloc::AllocationError;
+        use std::io::ErrorKind;
 
         eprintln!("Failed to mmap {}, size {}", addr, bytes);
         eprintln!("{}", OSProcess::get_process_memory_maps().unwrap());
@@ -64,11 +81,27 @@ pub trait Memory {
         panic!("Unexpected mmap failure: {:?}", error)
     }
 
+    /// Check whether the given OS error number indicates an out-of-memory condition.
     fn is_mmap_oom(os_errno: i32) -> bool;
+
+    /// Unmap a memory region.
     fn munmap(start: Address, size: usize) -> Result<()>;
+
+    /// Change the protection of a memory region to no access to forbit any access to the memory region.
     fn mprotect(start: Address, size: usize) -> Result<()>;
+
+    /// Change the protection of a memory region to the specified protection.
     fn munprotect(start: Address, size: usize, prot: MmapProtection) -> Result<()>;
+
+    /// Checks if the memory has already been mapped. If not, we panic.
+    ///
+    /// Note that the checking may have a side effect that it will map the memory if it was unmapped. So we panic if it was unmapped.
+    /// Be very careful about using this function.
+    /// 
+    /// Fallback: As the function is only used for assertions, it can be a no-op, and MMTk will still run and never panics in this function.
     fn panic_if_unmapped(start: Address, size: usize);
+
+    /// Get the total memory of the system in bytes.
     fn get_system_total_memory() -> Result<u64> {
         use sysinfo::MemoryRefreshKind;
         use sysinfo::{RefreshKind, System};
@@ -94,11 +127,16 @@ pub trait Memory {
 /// Strategy for performing mmap
 #[derive(Debug, Copy, Clone)]
 pub struct MmapStrategy {
-    /// Do we support huge pages?
+    /// Whether we should use huge page for this mmapping.
+    /// Fallback: for platforms that do not support huge pages, this option can be ignored.
     pub huge_page: HugePageSupport,
-    /// The protection flags for mmap
+    /// The protection flags for mmap.
     pub prot: MmapProtection,
+    /// Whether this mmap allows replacing existing mappings.
+    /// Fallback: for platforms that cannot replace existing mappings, or always replace existing mappings, this option can be ignored.
     pub replace: bool,
+    /// Whether this mmap allows reserve/commit physical memory.
+    /// This has to be implemented properly for a platform. Otherwise, we will see huge unrealistic memory consumption.
     pub reserve: bool,
 }
 
@@ -115,7 +153,12 @@ impl std::default::Default for MmapStrategy {
 
 impl MmapStrategy {
     /// Create a new strategy
-    pub fn new(huge_page: HugePageSupport, prot: MmapProtection, replace: bool, reserve: bool) -> Self {
+    pub fn new(
+        huge_page: HugePageSupport,
+        prot: MmapProtection,
+        replace: bool,
+        reserve: bool,
+    ) -> Self {
         Self {
             huge_page,
             prot,
@@ -126,10 +169,12 @@ impl MmapStrategy {
 
     // Builder methods
 
+    /// Set huge page option.
     pub fn huge_page(self, huge_page: HugePageSupport) -> Self {
         Self { huge_page, ..self }
     }
 
+    /// Set huge page option by a boolean flag.
     pub fn transparent_hugepages(self, enable: bool) -> Self {
         let huge_page = if enable {
             HugePageSupport::TransparentHugePages
@@ -139,22 +184,26 @@ impl MmapStrategy {
         Self { huge_page, ..self }
     }
 
+    /// Set protection option.
     pub fn prot(self, prot: MmapProtection) -> Self {
         Self { prot, ..self }
     }
 
+    /// Set the replace flag.
     pub fn replace(self, replace: bool) -> Self {
         Self { replace, ..self }
     }
 
+    /// Set the reserve flag.
     pub fn reserve(self, reserve: bool) -> Self {
         Self { reserve, ..self }
     }
 
-    /// The strategy for MMTk's own internal memory
     #[cfg(test)] // In test mode, we use test settings which allows replacing existing mappings.
+    /// The strategy for MMTk's own internal memory (test)
     pub const INTERNAL_MEMORY: Self = Self::TEST;
     #[cfg(not(test))]
+    /// The strategy for MMTk's own internal memory
     pub const INTERNAL_MEMORY: Self = Self {
         huge_page: HugePageSupport::No,
         prot: MmapProtection::ReadWrite,
@@ -162,10 +211,11 @@ impl MmapStrategy {
         reserve: true,
     };
 
-    /// The strategy for MMTk side metadata
     #[cfg(test)]
+    /// The strategy for MMTk side metadata (test)
     pub const SIDE_METADATA: Self = Self::TEST;
     #[cfg(not(test))]
+    /// The strategy for MMTk side metadata
     pub const SIDE_METADATA: Self = Self::INTERNAL_MEMORY;
 
     /// The strategy for MMTk's test memory

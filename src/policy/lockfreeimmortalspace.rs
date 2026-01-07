@@ -14,11 +14,11 @@ use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
-use crate::util::os::*;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
+use crate::util::os::*;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 
@@ -254,8 +254,11 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         };
 
         // Eagerly memory map the entire heap (also zero all the memory)
-        let strategy = MmapStrategy::default().transparent_hugepages(*args.options.transparent_hugepages).prot(
-            crate::util::os::MmapProtection::ReadWrite).replace(false).reserve(true);
+        let strategy = MmapStrategy::default()
+            .transparent_hugepages(*args.options.transparent_hugepages)
+            .prot(crate::util::os::MmapProtection::ReadWrite)
+            .replace(false)
+            .reserve(true);
         crate::util::os::OSMemory::dzmmap(
             start,
             aligned_total_bytes,

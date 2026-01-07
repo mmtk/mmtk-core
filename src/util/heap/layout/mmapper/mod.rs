@@ -1,7 +1,4 @@
-use crate::util::{
-    os::*,
-    Address,
-};
+use crate::util::{os::*, Address};
 use std::io::Result;
 
 #[allow(unused)] // Used in doc comment.

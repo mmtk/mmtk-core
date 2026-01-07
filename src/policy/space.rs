@@ -191,7 +191,11 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 .ensure_mapped(
                     res.start,
                     res.pages,
-                    if *self.common().options.transparent_hugepages { HugePageSupport::TransparentHugePages } else { HugePageSupport::No },
+                    if *self.common().options.transparent_hugepages {
+                        HugePageSupport::TransparentHugePages
+                    } else {
+                        HugePageSupport::No
+                    },
                     self.common().mmap_protection(),
                     &MmapAnnotation::Space {
                         name: self.get_name(),

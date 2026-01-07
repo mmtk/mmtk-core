@@ -1,6 +1,6 @@
 use super::worker::ThreadId;
-use crate::util::os::*;
 use crate::util::options::AffinityKind;
+use crate::util::os::*;
 
 impl AffinityKind {
     /// Resolve affinity of GC thread. Has a side-effect of calling into the kernel to set the

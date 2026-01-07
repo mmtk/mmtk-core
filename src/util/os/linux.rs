@@ -1,19 +1,25 @@
-use crate::util::os::*;
-use crate::util::os::posix_common;
 use crate::util::address::Address;
+use crate::util::os::posix_common;
+use crate::util::os::*;
 
 use std::io::Result;
 
+/// Linux implementation of the `Memory` trait.
 pub struct LinuxMemoryImpl;
 
 impl Memory for LinuxMemoryImpl {
-    fn dzmmap(start: Address, size: usize, strategy: MmapStrategy, annotation: &MmapAnnotation<'_>) -> Result<Address> {
+    fn dzmmap(
+        start: Address,
+        size: usize,
+        strategy: MmapStrategy,
+        annotation: &MmapAnnotation<'_>,
+    ) -> Result<Address> {
         // println!("Mmap with strategy: {:?}", strategy);
         let addr = posix_common::mmap(start, size, strategy)?;
         // println!("Mmap done");
 
         if !cfg!(feature = "no_mmap_annotation") {
-            posix_common::set_vma_name(addr, size, annotation);            
+            posix_common::set_vma_name(addr, size, annotation);
             // println!("Set annotation done");
         }
 
@@ -48,11 +54,7 @@ impl Memory for LinuxMemoryImpl {
             replace: false,
             reserve: true,
         };
-        match posix_common::mmap(
-            start,
-            size,
-            strategy,
-        ) {
+        match posix_common::mmap(start, size, strategy) {
             Ok(_) => panic!("{} of size {} is not mapped", start, size),
             Err(e) => {
                 assert!(
@@ -66,20 +68,20 @@ impl Memory for LinuxMemoryImpl {
 }
 
 impl LinuxMemoryImpl {
+    /// Set huge page option for the given memory.
     pub fn set_hugepage(start: Address, size: usize, options: HugePageSupport) -> Result<()> {
         match options {
             HugePageSupport::No => Ok(()),
-            HugePageSupport::TransparentHugePages => {
-                    posix_common::wrap_libc_call(
-                        &|| unsafe { libc::madvise(start.to_mut_ptr(), size, libc::MADV_HUGEPAGE) },
-                        0,
-                    )
-            }
+            HugePageSupport::TransparentHugePages => posix_common::wrap_libc_call(
+                &|| unsafe { libc::madvise(start.to_mut_ptr(), size, libc::MADV_HUGEPAGE) },
+                0,
+            ),
         }
     }
 }
 
 impl MmapStrategy {
+    /// get the flags for POSIX mmap.
     pub fn get_posix_mmap_flags(&self) -> i32 {
         let mut flags = libc::MAP_PRIVATE | libc::MAP_ANONYMOUS;
         if self.replace {
@@ -94,6 +96,7 @@ impl MmapStrategy {
     }
 }
 
+/// Linux implementation of the `Process` trait.
 pub struct LinuxProcessImpl;
 
 impl Process for LinuxProcessImpl {

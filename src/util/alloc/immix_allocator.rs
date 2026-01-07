@@ -10,9 +10,9 @@ use crate::util::alloc::allocator::get_maximum_aligned_size;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::VMThread;
+use crate::util::os::*;
 use crate::util::rust_util::unlikely;
 use crate::util::Address;
-use crate::util::os::*;
 use crate::vm::*;
 
 /// Immix allocator
