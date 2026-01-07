@@ -41,8 +41,8 @@ impl Memory for MacOSMemoryImpl {
         posix_common::is_mmap_oom(os_errno)
     }
 
-    fn panic_if_unmapped(start: Address, size: usize) {
-        // Do nothing for now
+    fn panic_if_unmapped(_start: Address, _size: usize) {
+        // Unimplemented for now
     }
 }
 
@@ -98,14 +98,14 @@ impl Process for MacOSProcessImpl {
     }
 
     fn get_total_num_cpus() -> CoreNum {
-        posix_common::get_total_num_cpus()
+        unimplemented!()
     }
 
-    fn bind_current_thread_to_core(core_id: CoreId) {
-        posix_common::bind_current_thread_to_core(core_id)
+    fn bind_current_thread_to_core(_core_id: CoreId) {
+        unimplemented!()
     }
 
-    fn bind_current_thread_to_cpuset(core_ids: &[CoreId]) {
-        posix_common::bind_current_thread_to_cpuset(core_ids)
+    fn bind_current_thread_to_cpuset(_core_ids: &[CoreId]) {
+        unimplemented!()
     }
 }

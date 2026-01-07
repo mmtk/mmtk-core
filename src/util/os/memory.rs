@@ -23,7 +23,7 @@ pub trait Memory {
     }
 
     /// Perform a demand-zero mmap.
-    /// 
+    ///
     /// Falback: `annotation` is only used for debugging. For platforms that do not support mmap annotations, this parameter can be ignored.
     fn dzmmap(
         start: Address,
@@ -97,7 +97,7 @@ pub trait Memory {
     ///
     /// Note that the checking may have a side effect that it will map the memory if it was unmapped. So we panic if it was unmapped.
     /// Be very careful about using this function.
-    /// 
+    ///
     /// Fallback: As the function is only used for assertions, it can be a no-op, and MMTk will still run and never panics in this function.
     fn panic_if_unmapped(start: Address, size: usize);
 

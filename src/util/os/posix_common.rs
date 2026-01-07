@@ -1,8 +1,6 @@
 use crate::util::address::Address;
 use crate::util::os::*;
-use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_COUNT, CPU_SET, CPU_ZERO};
 use std::io::Result;
-use std::mem::MaybeUninit;
 
 impl MmapProtection {
     fn get_native_flags(&self) -> i32 {
@@ -95,11 +93,16 @@ pub fn get_process_id() -> Result<String> {
 }
 
 pub fn get_thread_id() -> Result<String> {
-    let tid = unsafe { libc::gettid() };
+    let tid = unsafe { libc::pthread_self() };
     Ok(format!("{}", tid))
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_COUNT, CPU_SET, CPU_ZERO};
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn get_total_num_cpus() -> CoreNum {
+    use std::mem::MaybeUninit;
     unsafe {
         let mut cs = MaybeUninit::zeroed().assume_init();
         CPU_ZERO(&mut cs);
@@ -108,7 +111,9 @@ pub fn get_total_num_cpus() -> CoreNum {
     }
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn bind_current_thread_to_core(core_id: CoreId) {
+    use std::mem::MaybeUninit;
     unsafe {
         let mut cs = MaybeUninit::zeroed().assume_init();
         CPU_ZERO(&mut cs);
@@ -117,7 +122,7 @@ pub fn bind_current_thread_to_core(core_id: CoreId) {
     }
 }
 
-/// Bind the current thread to the specified core.
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn bind_current_thread_to_cpuset(cpuset: &[CoreId]) {
     use std::mem::MaybeUninit;
     unsafe {
