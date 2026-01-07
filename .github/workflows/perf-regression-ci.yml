@@ -8,13 +8,13 @@ on:
   # READ BEFORE ENABLING THE TRIGGER BELOW
   # This trigger is only used when testing the scripts in a branch, and should be commented out in other cases.
   # If this trigger is used, please change the following env: RESULT_REPO_BRANCH -> 'test' (MUST), DEPLOY -> 'false' (optional)
-  # pull_request:
-  #   branches:
-  #     - master
+  pull_request:
+    branches:
+      - master
 
 env:
   # The branch to save run data and plot graph from. Use 'self-hosted' for master, use 'test' or anything else for testing in a branch.
-  RESULT_REPO_BRANCH: 'self-hosted'
+  RESULT_REPO_BRANCH: 'test'
   # Whether we deploy the generated page. Set to true for master.
   DEPLOY: true
   # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
@@ -25,6 +25,7 @@ jobs:
   # JikesRVM
   jikesrvm-perf-regression:
     runs-on: [self-hosted, Linux, freq-scaling-off]
+    if: false
     timeout-minutes: 1440
     steps:
       - name: Checkout MMTk Core
@@ -131,7 +132,7 @@ jobs:
           repository: mmtk/mmtk-openjdk
           # TODO: We currently use OpenJDK 11 for performance comparison.
           # We should switch to OpenJDK 21 when we are ready, and start a new epoch.
-          ref: jdk-11
+          ref: jdk-21
           path: latest/mmtk-openjdk
       - name: Checkout OpenJDK (latest)
         working-directory: latest/mmtk-openjdk
@@ -141,8 +142,8 @@ jobs:
       - name: Checkout Perf Kit
         uses: actions/checkout@v4
         with:
-          repository: mmtk/ci-perf-kit
-          ref: "0.8.4"
+          repository: wks/ci-perf-kit
+          ref: "f05e45786148390de21161944c3d75ebc4052629"
           path: ci-perf-kit
           submodules: true
       # download canary build
@@ -213,6 +214,7 @@ jobs:
 
   openjdk-mutator-perf:
     runs-on: [self-hosted, Linux, freq-scaling-off]
+    if: false
     timeout-minutes: 1440
     steps:
       - name: Checkout MMTk Core
