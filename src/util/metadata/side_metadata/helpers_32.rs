@@ -193,11 +193,6 @@ pub(super) fn try_mmap_metadata_chunk(
             anno,
         )
     } else {
-        MMAPPER.quarantine_address_range(
-            policy_meta_start,
-            pages,
-            HugePageSupport::No,
-            anno,
-        )
+        MMAPPER.quarantine_address_range(policy_meta_start, pages, HugePageSupport::No, anno)
     }
 }

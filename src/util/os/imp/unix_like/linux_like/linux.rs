@@ -1,5 +1,6 @@
 use crate::util::address::Address;
-use crate::util::os::posix_common;
+use crate::util::os::imp::unix_like::linux_like::linux_common;
+use crate::util::os::imp::unix_like::unix_common;
 use crate::util::os::*;
 
 use std::io::Result;
@@ -14,17 +15,13 @@ impl Memory for LinuxMemoryImpl {
         strategy: MmapStrategy,
         annotation: &MmapAnnotation<'_>,
     ) -> Result<Address> {
-        // println!("Mmap with strategy: {:?}", strategy);
-        let addr = posix_common::mmap(start, size, strategy)?;
-        // println!("Mmap done");
+        let addr = unix_common::mmap(start, size, strategy)?;
 
         if !cfg!(feature = "no_mmap_annotation") {
-            posix_common::set_vma_name(addr, size, annotation);
-            // println!("Set annotation done");
+            linux_common::set_vma_name(addr, size, annotation);
         }
 
-        Self::set_hugepage(addr, size, strategy.huge_page)?;
-        // println!("Set huge page done");
+        linux_common::set_hugepage(addr, size, strategy.huge_page)?;
 
         // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
 
@@ -32,19 +29,19 @@ impl Memory for LinuxMemoryImpl {
     }
 
     fn munmap(start: Address, size: usize) -> Result<()> {
-        posix_common::munmap(start, size)
+        unix_common::munmap(start, size)
     }
 
     fn mprotect(start: Address, size: usize) -> Result<()> {
-        posix_common::mprotect(start, size)
+        unix_common::mprotect(start, size)
     }
 
     fn munprotect(start: Address, size: usize, prot: MmapProtection) -> Result<()> {
-        posix_common::munprotect(start, size, prot)
+        unix_common::munprotect(start, size, prot)
     }
 
     fn is_mmap_oom(os_errno: i32) -> bool {
-        posix_common::is_mmap_oom(os_errno)
+        unix_common::is_mmap_oom(os_errno)
     }
 
     fn panic_if_unmapped(start: Address, size: usize) {
@@ -54,7 +51,7 @@ impl Memory for LinuxMemoryImpl {
             replace: false,
             reserve: true,
         };
-        match posix_common::mmap(start, size, strategy) {
+        match unix_common::mmap(start, size, strategy) {
             Ok(_) => panic!("{} of size {} is not mapped", start, size),
             Err(e) => {
                 assert!(
@@ -67,60 +64,31 @@ impl Memory for LinuxMemoryImpl {
     }
 }
 
-impl LinuxMemoryImpl {
-    /// Set huge page option for the given memory.
-    pub fn set_hugepage(start: Address, size: usize, options: HugePageSupport) -> Result<()> {
-        match options {
-            HugePageSupport::No => Ok(()),
-            HugePageSupport::TransparentHugePages => posix_common::wrap_libc_call(
-                &|| unsafe { libc::madvise(start.to_mut_ptr(), size, libc::MADV_HUGEPAGE) },
-                0,
-            ),
-        }
-    }
-}
-
-impl MmapStrategy {
-    /// get the flags for POSIX mmap.
-    pub fn get_posix_mmap_flags(&self) -> i32 {
-        let mut flags = libc::MAP_PRIVATE | libc::MAP_ANONYMOUS;
-        if self.replace {
-            flags |= libc::MAP_FIXED;
-        } else {
-            flags |= libc::MAP_FIXED_NOREPLACE
-        }
-        if !self.reserve {
-            flags |= libc::MAP_NORESERVE;
-        }
-        flags
-    }
-}
-
 /// Linux implementation of the `Process` trait.
 pub struct LinuxProcessImpl;
 
 impl Process for LinuxProcessImpl {
     fn get_process_memory_maps() -> Result<String> {
-        posix_common::get_process_memory_maps()
+        linux_common::get_process_memory_maps()
     }
 
     fn get_process_id() -> Result<String> {
-        posix_common::get_process_id()
+        unix_common::get_process_id()
     }
 
     fn get_thread_id() -> Result<String> {
-        posix_common::get_thread_id()
+        unix_common::get_thread_id()
     }
 
     fn get_total_num_cpus() -> CoreNum {
-        posix_common::get_total_num_cpus()
+        linux_common::get_total_num_cpus()
     }
 
     fn bind_current_thread_to_core(core_id: CoreId) {
-        posix_common::bind_current_thread_to_core(core_id)
+        linux_common::bind_current_thread_to_core(core_id)
     }
 
     fn bind_current_thread_to_cpuset(core_ids: &[CoreId]) {
-        posix_common::bind_current_thread_to_cpuset(core_ids)
+        linux_common::bind_current_thread_to_cpuset(core_ids)
     }
 }

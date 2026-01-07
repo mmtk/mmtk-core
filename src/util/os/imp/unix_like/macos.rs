@@ -1,5 +1,5 @@
 use crate::util::address::Address;
-use crate::util::os::posix_common;
+use crate::util::os::imp::unix_like::unix_common;
 use crate::util::os::*;
 use std::io::Result;
 
@@ -13,7 +13,7 @@ impl Memory for MacOSMemoryImpl {
         strategy: MmapStrategy,
         _annotation: &MmapAnnotation<'_>,
     ) -> Result<Address> {
-        let addr = posix_common::mmap(start, size, strategy)?;
+        let addr = unix_common::mmap(start, size, strategy)?;
 
         // Annotation is ignored on macOS
         // Huge page is ignored on macOS
@@ -26,19 +26,19 @@ impl Memory for MacOSMemoryImpl {
     }
 
     fn munmap(start: Address, size: usize) -> Result<()> {
-        posix_common::munmap(start, size)
+        unix_common::munmap(start, size)
     }
 
     fn mprotect(start: Address, size: usize) -> Result<()> {
-        posix_common::mprotect(start, size)
+        unix_common::mprotect(start, size)
     }
 
     fn munprotect(start: Address, size: usize, prot: MmapProtection) -> Result<()> {
-        posix_common::munprotect(start, size, prot)
+        unix_common::munprotect(start, size, prot)
     }
 
     fn is_mmap_oom(os_errno: i32) -> bool {
-        posix_common::is_mmap_oom(os_errno)
+        unix_common::is_mmap_oom(os_errno)
     }
 
     fn panic_if_unmapped(_start: Address, _size: usize) {
@@ -90,11 +90,11 @@ impl Process for MacOSProcessImpl {
     }
 
     fn get_process_id() -> Result<String> {
-        posix_common::get_process_id()
+        unix_common::get_process_id()
     }
 
     fn get_thread_id() -> Result<String> {
-        posix_common::get_thread_id()
+        unix_common::get_thread_id()
     }
 
     fn get_total_num_cpus() -> CoreNum {
