@@ -358,6 +358,11 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
             space.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         })
     }
+
+    fn is_live_object(&self, object: ObjectReference) -> bool {
+        let sft = unsafe { crate::mmtk::SFT_MAP.get_unchecked(object.to_raw_address()) };
+        sft.is_live(object)
+    }
 }
 
 impl_downcast!(Plan assoc VM);
