@@ -95,7 +95,8 @@ impl Transducer {
 pub struct ForwardingMetadata<VM: VMBinding> {
     calculated: AtomicBool,
     vm: PhantomData<VM>,
-    use_clmul: bool,
+    // This field is only used on x86_64.
+    _use_clmul: bool,
 }
 
 // A block in the Compressor is the granularity at which we cache
@@ -122,7 +123,7 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
         ForwardingMetadata {
             calculated: AtomicBool::new(false),
             vm: PhantomData,
-            use_clmul: *options.compressor_use_clmul,
+            _use_clmul: *options.compressor_use_clmul,
         }
     }
 
@@ -236,7 +237,7 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
             // XXX: how to derive this? It's s.t. the mark bits
             // for one block occupy at least one word.
             let blocks_large_enough = Block::LOG_BYTES >= 9;
-            if self.use_clmul && blocks_large_enough && processor_can_clmul() {
+            if self._use_clmul && blocks_large_enough && processor_can_clmul() {
                 unsafe {
                     // SAFETY: We checked the processor supports the
                     // necessary instructions.
@@ -300,6 +301,9 @@ fn processor_can_clmul() -> bool {
     is_x86_feature_detected!("pclmulqdq") && is_x86_feature_detected!("popcnt")
 }
 
+// This function is only used in a debug assertion for the x86_64-only
+// calculate_offset_vector_clmul.
+#[cfg(target_arch = "x86_64")]
 fn prefix_sum(x: usize) -> usize {
     // This function implements a bit-parallel version of the Hillis-Steele prefix sum algorithm:
     // https://en.wikipedia.org/wiki/Prefix_sum#Algorithm_1:_Shorter_span,_more_parallel
