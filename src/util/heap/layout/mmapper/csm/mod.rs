@@ -167,7 +167,7 @@ impl Mmapper for ChunkStateMmapper {
                             .prot(MmapProtection::NoAccess)
                             .reserve(false)
                             .replace(false);
-                        OSMemory::dzmmap(group_start, group_bytes, mmap_strategy, anno)?;
+                        OS::dzmmap(group_start, group_bytes, mmap_strategy, anno)?;
                         Ok(Some(MapState::Quarantined))
                     }
                     MapState::Quarantined => {
@@ -207,21 +207,11 @@ impl Mmapper for ChunkStateMmapper {
 
                 match state {
                     MapState::Unmapped => {
-                        OSMemory::dzmmap(
-                            group_start,
-                            group_bytes,
-                            mmap_strategy.replace(false),
-                            anno,
-                        )?;
+                        OS::dzmmap(group_start, group_bytes, mmap_strategy.replace(false), anno)?;
                         Ok(Some(MapState::Mapped))
                     }
                     MapState::Quarantined => {
-                        OSMemory::dzmmap(
-                            group_start,
-                            group_bytes,
-                            mmap_strategy.replace(true),
-                            anno,
-                        )?;
+                        OS::dzmmap(group_start, group_bytes, mmap_strategy.replace(true), anno)?;
                         Ok(Some(MapState::Mapped))
                     }
                     MapState::Mapped => Ok(None),
@@ -297,7 +287,7 @@ mod tests {
                     }
                 },
                 || {
-                    OSMemory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
+                    OS::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
                 },
             )
         })
@@ -331,7 +321,7 @@ mod tests {
                     }
                 },
                 || {
-                    OSMemory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
+                    OS::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
                 },
             )
         })
@@ -366,7 +356,7 @@ mod tests {
                     }
                 },
                 || {
-                    OSMemory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
+                    OS::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
                 },
             )
         })

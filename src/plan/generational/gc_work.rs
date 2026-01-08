@@ -118,7 +118,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
                     !gen.is_object_in_nursery(*obj),
                     "{} was logged but is not mature. Dumping process memory maps:\n{}",
                     *obj,
-                    OSProcess::get_process_memory_maps().unwrap(),
+                    OS::get_process_memory_maps().unwrap(),
                 );
                 <E::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<E::VM, u8>(
                     *obj,

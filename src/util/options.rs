@@ -455,7 +455,7 @@ impl AffinityKind {
     /// maximum number of cores allocated to the program. Assumes core ids on the system are
     /// 0-indexed.
     pub fn validate(&self) -> bool {
-        let num_cpu = OSProcess::get_total_num_cpus();
+        let num_cpu = OS::get_total_num_cpus();
 
         if let AffinityKind::RoundRobin(cpuset) = self {
             for cpu in cpuset {
@@ -950,7 +950,7 @@ options! {
     thread_affinity:        AffinityKind            [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
     /// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
     /// Default to a fixed heap size of 0.5x physical memory.
-    gc_trigger:             GCTriggerSelector       [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((OSMemory::get_system_total_memory().unwrap_or(4 * 1024 * 1024 * 1024) as f64 * 0.5f64) as usize),
+    gc_trigger:             GCTriggerSelector       [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((OS::get_system_total_memory().unwrap_or(4 * 1024 * 1024 * 1024) as f64 * 0.5f64) as usize),
     /// Enable transparent hugepage support for MMTk spaces via madvise (only Linux is supported)
     /// This only affects the memory for MMTk spaces.
     transparent_hugepages:  bool                    [|v: &bool| !v || cfg!(target_os = "linux")] = false,
@@ -1210,7 +1210,7 @@ mod tests {
                 || {
                     let mut vec = vec![0_u16];
                     let mut cpu_list = String::new();
-                    let num_cpus = OSProcess::get_total_num_cpus();
+                    let num_cpus = OS::get_total_num_cpus();
 
                     cpu_list.push('0');
                     for cpu in 1..num_cpus {

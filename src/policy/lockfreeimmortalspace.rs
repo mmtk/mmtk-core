@@ -157,7 +157,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             }
         }
         if self.slow_path_zeroing {
-            crate::util::os::OSMemory::zero(start, bytes);
+            crate::util::os::OS::memzero(start, bytes);
         }
         start
     }
@@ -259,7 +259,7 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             .prot(crate::util::os::MmapProtection::ReadWrite)
             .replace(false)
             .reserve(true);
-        crate::util::os::OSMemory::dzmmap(
+        crate::util::os::OS::dzmmap(
             start,
             aligned_total_bytes,
             strategy,

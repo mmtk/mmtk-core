@@ -6,7 +6,7 @@ pub type CoreId = u16;
 pub type CoreNum = u16;
 
 /// Abstraction for OS process operations.
-pub trait Process {
+pub trait OSProcess {
     /// Get the memory maps for the process. The returned string is a multi-line string.
     /// Fallback: This is only used for debugging. For unimplemented cases, this function can return a placeholder Ok value.
     fn get_process_memory_maps() -> Result<String>;

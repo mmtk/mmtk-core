@@ -12,12 +12,12 @@ impl AffinityKind {
             AffinityKind::AllInSet(cpuset) => {
                 // Bind the current thread to all the cores in the set
                 debug!("Set affinity for thread {} to cpuset {:?}", thread, cpuset);
-                OSProcess::bind_current_thread_to_cpuset(cpuset.as_slice());
+                OS::bind_current_thread_to_cpuset(cpuset.as_slice());
             }
             AffinityKind::RoundRobin(cpuset) => {
                 let cpu = cpuset[thread % cpuset.len()];
                 debug!("Set affinity for thread {} to core {}", thread, cpu);
-                OSProcess::bind_current_thread_to_core(cpu);
+                OS::bind_current_thread_to_core(cpu);
             }
         }
     }

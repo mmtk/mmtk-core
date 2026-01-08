@@ -122,7 +122,7 @@ impl SideMetadataSpec {
             meta_start
         );
 
-        OSMemory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
+        OS::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
     }
 
     #[cfg(debug_assertions)]
@@ -174,7 +174,7 @@ impl SideMetadataSpec {
         let mut visitor = |range| {
             match range {
                 BitByteRange::Bytes { start, end } => {
-                    OSMemory::zero(start, end - start);
+                    OS::memzero(start, end - start);
                     false
                 }
                 BitByteRange::BitsInByte {
@@ -211,7 +211,7 @@ impl SideMetadataSpec {
         let mut visitor = |range| {
             match range {
                 BitByteRange::Bytes { start, end } => {
-                    OSMemory::set(start, 0xff, end - start);
+                    OS::memset(start, 0xff, end - start);
                     false
                 }
                 BitByteRange::BitsInByte {

@@ -2,10 +2,10 @@ use crate::util::address::Address;
 use crate::util::os::memory::*;
 use std::io::Result;
 
-/// Windows implementation of the `Memory` trait.
-pub struct WindowsMemoryImpl;
+/// Windows implementation of the `OS` trait.
+pub struct Windows;
 
-impl Memory for WindowsMemoryImpl {
+impl OSMemory for Windows {
     fn dzmmap(
         start: Address,
         size: usize,
@@ -186,10 +186,7 @@ impl MmapProtection {
 
 use crate::util::os::process::*;
 
-/// Windows implementation of the `Process` trait.
-pub struct WindowsProcessImpl;
-
-impl Process for WindowsProcessImpl {
+impl OSProcess for Windows {
     fn get_process_memory_maps() -> Result<String> {
         // Windows-specific implementation to get process memory maps
         Ok("get_process_memory_maps not implemented for Windows".to_string())

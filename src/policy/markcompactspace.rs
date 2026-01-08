@@ -226,7 +226,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
     // Clear header forwarding pointer for an object
     fn clear_header_forwarding_pointer(object: ObjectReference) {
-        OSMemory::zero(
+        OS::memzero(
             Self::header_forwarding_pointer_address(object),
             GC_EXTRA_HEADER_BYTES,
         );

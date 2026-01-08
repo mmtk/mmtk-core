@@ -9,14 +9,14 @@ use crate::{
 };
 
 /// Abstraction for OS memory operations.
-pub trait Memory {
+pub trait OSMemory {
     /// Set a memory region to zero.
-    fn zero(start: Address, len: usize) {
-        Self::set(start, 0, len);
+    fn memzero(start: Address, len: usize) {
+        Self::memset(start, 0, len);
     }
 
     /// Set a memory region to a specific value.
-    fn set(start: Address, val: u8, len: usize) {
+    fn memset(start: Address, val: u8, len: usize) {
         unsafe {
             std::ptr::write_bytes::<u8>(start.to_mut_ptr(), val, len);
         }
@@ -43,7 +43,7 @@ pub trait Memory {
         use std::io::ErrorKind;
 
         eprintln!("Failed to mmap {}, size {}", addr, bytes);
-        eprintln!("{}", OSProcess::get_process_memory_maps().unwrap());
+        eprintln!("{}", OS::get_process_memory_maps().unwrap());
 
         let call_binding_oom = || {
             // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
@@ -62,7 +62,7 @@ pub trait Memory {
             ErrorKind::Other => {
                 // further check the error
                 if let Some(os_errno) = error.raw_os_error() {
-                    if OSMemory::is_mmap_oom(os_errno) {
+                    if OS::is_mmap_oom(os_errno) {
                         call_binding_oom();
                     }
                 }
@@ -72,7 +72,7 @@ pub trait Memory {
             }
             _ => {
                 if let Some(os_errno) = error.raw_os_error() {
-                    if OSMemory::is_mmap_oom(os_errno) {
+                    if OS::is_mmap_oom(os_errno) {
                         call_binding_oom();
                     }
                 }

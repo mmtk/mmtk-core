@@ -12,5 +12,6 @@ mod process;
 pub use process::*;
 
 mod imp;
-pub use imp::OSMemory;
-pub use imp::OSProcess;
+pub use imp::OS;
+
+trait OperatingSystem: OSMemory + OSProcess {}

@@ -5,10 +5,10 @@ use crate::util::os::*;
 
 use std::io::Result;
 
-/// Linux implementation of the `Memory` trait.
-pub struct LinuxMemoryImpl;
+/// Linux implementation of the `OS` trait.
+pub struct Linux;
 
-impl Memory for LinuxMemoryImpl {
+impl OSMemory for Linux {
     fn dzmmap(
         start: Address,
         size: usize,
@@ -64,10 +64,7 @@ impl Memory for LinuxMemoryImpl {
     }
 }
 
-/// Linux implementation of the `Process` trait.
-pub struct LinuxProcessImpl;
-
-impl Process for LinuxProcessImpl {
+impl OSProcess for Linux {
     fn get_process_memory_maps() -> Result<String> {
         linux_common::get_process_memory_maps()
     }

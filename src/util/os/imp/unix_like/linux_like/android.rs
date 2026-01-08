@@ -5,10 +5,10 @@ use crate::util::os::*;
 
 use std::io::Result;
 
-/// Android implementation of the `Memory` trait.
-pub struct AndroidMemoryImpl;
+/// Android implementation of the `OS` trait.
+pub struct Android;
 
-impl Memory for AndroidMemoryImpl {
+impl OSMemory for Android {
     fn dzmmap(
         start: Address,
         size: usize,
@@ -64,10 +64,7 @@ impl Memory for AndroidMemoryImpl {
     }
 }
 
-/// Android implementation of the `Process` trait.
-pub struct AndroidProcessImpl;
-
-impl Process for AndroidProcessImpl {
+impl OSProcess for Android {
     fn get_process_memory_maps() -> Result<String> {
         linux_common::get_process_memory_maps()
     }

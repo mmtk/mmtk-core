@@ -198,7 +198,7 @@ impl RawMemoryFreeList {
     }
 
     fn mmap(&self, start: Address, bytes: usize) {
-        let res = OSMemory::dzmmap(
+        let res = OS::dzmmap(
             start,
             bytes,
             self.strategy,
@@ -221,7 +221,7 @@ impl Drop for RawMemoryFreeList {
     fn drop(&mut self) {
         let len = self.high_water - self.base;
         if len != 0 {
-            let _ = OSMemory::munmap(self.base, len);
+            let _ = OS::munmap(self.base, len);
         }
     }
 }

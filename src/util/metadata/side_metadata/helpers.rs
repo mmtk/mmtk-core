@@ -96,7 +96,7 @@ pub(crate) fn ensure_munmap_metadata(start: Address, size: usize) {
     use crate::util::os::*;
     trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
 
-    assert!(OSMemory::munmap(start, size).is_ok())
+    assert!(OS::munmap(start, size).is_ok())
 }
 
 /// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)

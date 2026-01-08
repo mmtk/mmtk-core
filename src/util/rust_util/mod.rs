@@ -111,8 +111,8 @@ pub fn debug_process_thread_id() -> String {
     use crate::util::os::*;
     format!(
         "PID: {}, TID: {}",
-        OSProcess::get_process_id().unwrap_or_default(),
-        OSProcess::get_thread_id().unwrap_or_default()
+        OS::get_process_id().unwrap_or_default(),
+        OS::get_thread_id().unwrap_or_default()
     )
 }
 

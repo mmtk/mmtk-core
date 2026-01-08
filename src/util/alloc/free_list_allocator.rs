@@ -166,7 +166,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // Zeroing memory right before we return it.
         // If we move the zeroing to somewhere else, we need to clear the list link here: cell.store::<Address>(Address::ZERO)
         let cell_size = block.load_block_cell_size();
-        crate::util::os::OSMemory::zero(cell, cell_size);
+        crate::util::os::OS::memzero(cell, cell_size);
 
         // Make sure the memory is zeroed. This looks silly as we zero the cell right before this check.
         // But we would need to move the zeroing to somewhere so we can do zeroing at a coarser grainularity.

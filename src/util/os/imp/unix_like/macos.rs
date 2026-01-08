@@ -3,10 +3,10 @@ use crate::util::os::imp::unix_like::unix_common;
 use crate::util::os::*;
 use std::io::Result;
 
-/// MacOS implementation of the `Memory` trait.
-pub struct MacOSMemoryImpl;
+/// MacOS implementation of the `OS` trait.
+pub struct MacOS;
 
-impl Memory for MacOSMemoryImpl {
+impl OSMemory for MacOS {
     fn dzmmap(
         start: Address,
         size: usize,
@@ -58,10 +58,7 @@ impl MmapStrategy {
     }
 }
 
-/// MacOS implementation of the `Process` trait.
-pub struct MacOSProcessImpl;
-
-impl Process for MacOSProcessImpl {
+impl OSProcess for MacOS {
     fn get_process_memory_maps() -> Result<String> {
         // Get the current process ID (replace this with a specific PID if needed)
         let pid = std::process::id();

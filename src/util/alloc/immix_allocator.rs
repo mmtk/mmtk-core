@@ -251,7 +251,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     end_line,
                     self.tls
                 );
-                OSMemory::zero(
+                OS::memzero(
                     self.bump_pointer.cursor,
                     self.bump_pointer.limit - self.bump_pointer.cursor,
                 );

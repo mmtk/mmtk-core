@@ -11,12 +11,11 @@ pub fn test_handle_mmap_conflict() {
         || {
             let start = unsafe { Address::from_usize(0x100_0000) };
             let one_megabyte = 1000000;
-            let mmap1_res =
-                OSMemory::dzmmap(start, one_megabyte, MmapStrategy::TEST, mmap_anno_test!());
+            let mmap1_res = OS::dzmmap(start, one_megabyte, MmapStrategy::TEST, mmap_anno_test!());
             assert!(mmap1_res.is_ok());
 
             let panic_res = std::panic::catch_unwind(|| {
-                let mmap2_res = OSMemory::dzmmap(
+                let mmap2_res = OS::dzmmap(
                     start,
                     one_megabyte,
                     MmapStrategy {
@@ -26,7 +25,7 @@ pub fn test_handle_mmap_conflict() {
                     mmap_anno_test!(),
                 );
                 assert!(mmap2_res.is_err());
-                OSMemory::handle_mmap_error::<MockVM>(
+                OS::handle_mmap_error::<MockVM>(
                     mmap2_res.err().unwrap(),
                     VMThread::UNINITIALIZED,
                     start,

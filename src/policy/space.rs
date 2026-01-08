@@ -207,7 +207,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     self.get_name(),
                 ))
             {
-                OSMemory::handle_mmap_error::<VM>(mmap_error, tls, res.start, bytes);
+                OS::handle_mmap_error::<VM>(mmap_error, tls, res.start, bytes);
             }
         };
         let grow_space = || {
@@ -232,7 +232,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
         // TODO: Concurrent zeroing
         if self.common().zeroed {
-            OSMemory::zero(res.start, bytes);
+            OS::memzero(res.start, bytes);
         }
 
         // Some assertions

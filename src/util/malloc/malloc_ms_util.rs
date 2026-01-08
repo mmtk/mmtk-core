@@ -20,7 +20,7 @@ pub fn align_alloc(size: usize, align: usize) -> Address {
         return Address::ZERO;
     }
     let address = Address::from_mut_ptr(ptr);
-    OSMemory::zero(address, size);
+    OS::memzero(address, size);
     address
 }
 

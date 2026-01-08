@@ -293,7 +293,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         }
         let start = self.common().start;
         let extent = self.common().extent;
-        if let Err(e) = crate::util::os::OSMemory::mprotect(start, extent) {
+        if let Err(e) = crate::util::os::OS::mprotect(start, extent) {
             panic!("Failed to protect memory: {:?}", e);
         }
         trace!("Protect {:x} {:x}", start, start + extent);
@@ -308,7 +308,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         }
         let start = self.common().start;
         let extent = self.common().extent;
-        if let Err(e) = crate::util::os::OSMemory::munprotect(
+        if let Err(e) = crate::util::os::OS::munprotect(
             start,
             extent,
             crate::util::os::MmapProtection::ReadWriteExec,
