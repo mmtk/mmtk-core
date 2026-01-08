@@ -167,6 +167,39 @@ where
     }
 }
 
+pub enum ByteWordRange {
+    Bytes { start: Address, end: Address },
+    Words { start: Address, end: Address },
+}
+
+pub fn break_byte_range(
+    start_addr: Address,
+    end_addr: Address,
+    visitor: &mut impl FnMut(ByteWordRange),
+) {
+    use crate::util::constants::BYTES_IN_ADDRESS;
+    let start_word = start_addr.align_up(BYTES_IN_ADDRESS);
+    let end_word = end_addr.align_down(BYTES_IN_ADDRESS);
+    if start_word != start_addr {
+        visitor(ByteWordRange::Bytes {
+            start: start_addr,
+            end: start_word,
+        });
+    }
+    if start_word != end_word {
+        visitor(ByteWordRange::Words {
+            start: start_word,
+            end: end_word,
+        });
+    }
+    if end_word != end_addr {
+        visitor(ByteWordRange::Bytes {
+            start: end_word,
+            end: end_addr,
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::util::constants::BITS_IN_BYTE;

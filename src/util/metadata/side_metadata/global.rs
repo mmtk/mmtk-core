@@ -8,7 +8,7 @@ use crate::util::metadata::metadata_val_traits::*;
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::Address;
 use num_traits::FromPrimitive;
-use ranges::BitByteRange;
+use ranges::{BitByteRange, ByteWordRange};
 use std::fmt;
 use std::io::Result;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -1245,6 +1245,71 @@ impl SideMetadataSpec {
             end_meta_shift,
             true,
             &mut visitor,
+        );
+    }
+
+    pub fn scan_words<T: MetadataValue>(
+        &self,
+        data_start_addr: Address,
+        data_end_addr: Address,
+        visit_value: &mut impl FnMut(T, Address),
+        visit_byte: &mut impl FnMut(u8, Address),
+        visit_word: &mut impl FnMut(usize, Address),
+    ) {
+        assert!(self.uses_contiguous_side_metadata());
+        let start_meta_addr = address_to_contiguous_meta_address(self, data_start_addr);
+        let start_meta_shift = meta_byte_lshift(self, data_start_addr);
+        let end_meta_addr = address_to_contiguous_meta_address(self, data_end_addr);
+        let end_meta_shift = meta_byte_lshift(self, data_end_addr);
+
+        let mut visit_bytes = |start: Address, end: Address| {
+            ranges::break_byte_range(start, end, &mut |range| match range {
+                ByteWordRange::Bytes { start, end } => {
+                    for meta in start.iter_to(end, 1) {
+                        let addr = contiguous_meta_address_to_address(self, meta, 0);
+                        let byte = unsafe { meta.load::<u8>() };
+                        visit_byte(byte, addr);
+                    }
+                }
+                ByteWordRange::Words { start, end } => {
+                    for meta in start.iter_to(end, crate::util::constants::BYTES_IN_ADDRESS) {
+                        let addr = contiguous_meta_address_to_address(self, meta, 0);
+                        let word = unsafe { meta.load::<usize>() };
+                        visit_word(word, addr);
+                    }
+                }
+            });
+        };
+
+        ranges::break_bit_range(
+            start_meta_addr,
+            start_meta_shift,
+            end_meta_addr,
+            end_meta_shift,
+            true,
+            &mut |range| {
+                match range {
+                    BitByteRange::Bytes { start, end } => {
+                        visit_bytes(start, end);
+                    }
+                    BitByteRange::BitsInByte {
+                        addr,
+                        bit_start,
+                        bit_end,
+                    } => {
+                        let start = contiguous_meta_address_to_address(self, addr, bit_start);
+                        let end = contiguous_meta_address_to_address(self, addr, bit_end);
+                        let region_bytes = 1usize << self.log_bytes_in_region;
+                        let mut cursor = start;
+                        while cursor < end {
+                            let value = unsafe { self.load::<T>(cursor) };
+                            visit_value(value, cursor);
+                            cursor += region_bytes;
+                        }
+                    }
+                }
+                false
+            },
         );
     }
 }

@@ -24,6 +24,12 @@ use std::sync::Arc;
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
 pub(crate) const TRACE_KIND_FORWARD_ROOT: TraceKind = 1;
 
+/// The number of bytes of the heap that each CalculateOffsetVector
+/// work packet should process. Calculating the offset vector is very fast,
+/// and we are often swamped by scheduling overhead when we
+/// only process one region per work packet.
+const OFFSET_VECTOR_PACKET_BYTES: usize = 1 << 21;
+
 /// [`CompressorSpace`] is a stop-the-world implementation of
 /// the Compressor, as described in Kermany and Petrank,
 /// [The Compressor: concurrent, incremental, and parallel compaction](https://dl.acm.org/doi/10.1145/1133255.1134023).
@@ -224,7 +230,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
             } else {
                 RegionPageResource::new_contiguous(common.start, common.extent, vm_map)
             },
-            forwarding: forwarding::ForwardingMetadata::new(),
+            forwarding: forwarding::ForwardingMetadata::new(&common.options),
             common,
             scheduler,
         }
@@ -305,9 +311,16 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     }
 
     pub fn add_offset_vector_tasks(&'static self) {
-        let offset_vector_packets: Vec<Box<dyn GCWork<VM>>> = self.generate_tasks(&mut |r, _| {
-            Box::new(CalculateOffsetVector::<VM>::new(self, r.region, r.cursor()))
-        });
+        let offset_vector_packets: Vec<Box<dyn GCWork<VM>>> =
+            self.pr.with_regions(&mut |regions| {
+                regions
+                    .chunks(OFFSET_VECTOR_PACKET_BYTES / forwarding::CompressorRegion::BYTES)
+                    .map(|c| {
+                        let chunk = c.iter().map(|r| (r.region, r.cursor())).collect();
+                        Box::new(CalculateOffsetVector::<VM>::new(self, chunk)) as Box<dyn GCWork<VM>>
+                    })
+                    .collect()
+            });
         self.scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
             .bulk_add(offset_vector_packets);
     }
@@ -418,30 +431,29 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     }
 }
 
-/// Calculate the offset vector for a region.
+/// Calculate the offset vector for some regions.
 pub struct CalculateOffsetVector<VM: VMBinding> {
     compressor_space: &'static CompressorSpace<VM>,
-    region: forwarding::CompressorRegion,
-    cursor: Address,
+    regions: Vec<(forwarding::CompressorRegion, Address)>,
 }
 
 impl<VM: VMBinding> GCWork<VM> for CalculateOffsetVector<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.compressor_space
-            .calculate_offset_vector_for_region(self.region, self.cursor);
+        for (region, cursor) in self.regions.iter() {
+            self.compressor_space
+                .calculate_offset_vector_for_region(*region, *cursor);
+        }
     }
 }
 
 impl<VM: VMBinding> CalculateOffsetVector<VM> {
     pub fn new(
         compressor_space: &'static CompressorSpace<VM>,
-        region: forwarding::CompressorRegion,
-        cursor: Address,
+        regions: Vec<(forwarding::CompressorRegion, Address)>,
     ) -> Self {
         Self {
             compressor_space,
-            region,
-            cursor,
+            regions,
         }
     }
 }

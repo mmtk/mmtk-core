@@ -2,6 +2,7 @@ use crate::util::constants::BYTES_IN_WORD;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::spec_defs::{COMPRESSOR_MARK, COMPRESSOR_OFFSET_VECTOR};
 use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::options::Options;
 use crate::util::{Address, ObjectReference};
 use crate::vm::object_model::ObjectModel;
 use crate::vm::VMBinding;
@@ -15,7 +16,7 @@ use std::sync::atomic::AtomicBool;
 #[derive(Copy, Clone, PartialEq, PartialOrd)]
 pub(crate) struct CompressorRegion(Address);
 impl Region for CompressorRegion {
-    const LOG_BYTES: usize = 20; // 1 MiB
+    const LOG_BYTES: usize = 18; // 256 kiB
     fn from_aligned_address(address: Address) -> Self {
         assert!(
             address.is_aligned_to(Self::BYTES),
@@ -94,6 +95,7 @@ impl Transducer {
 pub struct ForwardingMetadata<VM: VMBinding> {
     calculated: AtomicBool,
     vm: PhantomData<VM>,
+    use_clmul: bool,
 }
 
 // A block in the Compressor is the granularity at which we cache
@@ -116,10 +118,11 @@ pub(crate) const MARK_SPEC: SideMetadataSpec = COMPRESSOR_MARK;
 pub(crate) const OFFSET_VECTOR_SPEC: SideMetadataSpec = COMPRESSOR_OFFSET_VECTOR;
 
 impl<VM: VMBinding> ForwardingMetadata<VM> {
-    pub fn new() -> ForwardingMetadata<VM> {
+    pub fn new(options: &Options) -> ForwardingMetadata<VM> {
         ForwardingMetadata {
             calculated: AtomicBool::new(false),
             vm: PhantomData,
+            use_clmul: *options.compressor_use_clmul,
         }
     }
 
@@ -148,7 +151,49 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
         MARK_SPEC.fetch_or_atomic::<u8>(last_word_of_object, 1, Ordering::Relaxed);
     }
 
-    pub fn calculate_offset_vector(&self, region: CompressorRegion, cursor: Address) {
+    // TODO: We could compute a prefix-sum by Hillis-Steele too, for which
+    // the same offset-vector algorithm works. Would it be faster than the
+    // branchy version?
+    
+    // SAFETY: Only call this function when the processor supports
+    // pclmulqdq and popcnt, i.e. when processor_can_clmul().
+    #[cfg(target_arch = "x86_64")]
+    unsafe fn calculate_offset_vector_clmul(&self, region: CompressorRegion, cursor: Address) {
+        debug_assert!(processor_can_clmul());
+        // We need a local function to use #[target_feature], which in turn
+        // allows rustc to generate the POPCNT and PCLMULQDQ instructions.
+        #[target_feature(enable = "pclmulqdq,popcnt")]
+        unsafe fn inner(to: &mut Address, in_object: &mut i64, word: usize, addr: Address) {
+            use std::arch::x86_64;
+            // encode state to offset vector
+            let encoded = (*to).as_usize() + ((*in_object as usize) >> 63);
+            if addr.is_aligned_to(Block::BYTES) {
+                OFFSET_VECTOR_SPEC.store_atomic::<usize>(addr, encoded, Ordering::Relaxed);
+            }
+            // update by clmul
+            let ones = unsafe { x86_64::_mm_set1_epi8(0xFFu8 as i8) };
+            let vector = unsafe { x86_64::_mm_set_epi64x(0, word as i64) };
+            let mask: i64 =
+                unsafe { x86_64::_mm_cvtsi128_si64(x86_64::_mm_clmulepi64_si128(vector, ones, 0)) };
+            let flipped = mask ^ *in_object;
+            *in_object = flipped >> 63;
+            *to += (((flipped as usize | word).count_ones()) * 8) as usize;
+        }
+
+        let mut to = region.start();
+        let mut in_object: i64 = 0;
+        MARK_SPEC.scan_words::<u8>(
+            region.start(),
+            cursor.align_up(Block::BYTES),
+            &mut |_, _| panic!("should be word aligned, got a bit instead"),
+            &mut |_, _| panic!("should be word aligned, got a byte instead"),
+            &mut |word: usize, addr: Address| {
+                inner(&mut to, &mut in_object, word, addr);
+            },
+        );
+    }
+
+    fn calculate_offset_vector_base(&self, region: CompressorRegion, cursor: Address) {
         let mut state = Transducer::new(region.start());
         let first_block = Block::from_aligned_address(region.start());
         let last_block = Block::from_aligned_address(cursor);
@@ -166,6 +211,26 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
                 },
             );
         }
+    }
+
+    pub fn calculate_offset_vector(&self, region: CompressorRegion, cursor: Address) {
+        #[cfg(target_arch = "x86_64")]
+        {
+            // XXX: how to derive this? It's s.t. the mark bits
+            // for one block occupy at least one word.
+            let blocks_large_enough = Block::LOG_BYTES >= 9;
+            if self.use_clmul && blocks_large_enough && processor_can_clmul() {
+                unsafe {
+                    // SAFETY: We checked the processor supports the
+                    // necessary instructions.
+                    self.calculate_offset_vector_clmul(region, cursor)
+                }
+            } else {
+                self.calculate_offset_vector_base(region, cursor)
+            }
+        }
+        #[cfg(not(target_arch = "x86_64"))]
+        self.calculate_offset_vector_base(region, cursor);
         self.calculated.store(true, Ordering::Relaxed);
     }
 
@@ -211,4 +276,9 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
     pub fn has_calculated_forwarding_addresses(&self) -> bool {
         self.calculated.load(Ordering::Relaxed)
     }
+}
+
+#[cfg(target_arch = "x86_64")]
+fn processor_can_clmul() -> bool {
+    is_x86_feature_detected!("pclmulqdq") && is_x86_feature_detected!("popcnt")
 }
