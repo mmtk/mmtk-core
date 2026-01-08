@@ -159,36 +159,53 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
     // pclmulqdq and popcnt, i.e. when processor_can_clmul().
     #[cfg(target_arch = "x86_64")]
     unsafe fn calculate_offset_vector_clmul(&self, region: CompressorRegion, cursor: Address) {
+        // This function implements Geoff Langdale's
+        // algorithm to find quote pairs using prefix sums:
+        // https://branchfree.org/2019/03/06/code-fragment-finding-quote-pairs-with-carry-less-multiply-pclmulqdq/
         debug_assert!(processor_can_clmul());
         // We need a local function to use #[target_feature], which in turn
         // allows rustc to generate the POPCNT and PCLMULQDQ instructions.
         #[target_feature(enable = "pclmulqdq,popcnt")]
-        unsafe fn inner(to: &mut Address, in_object: &mut i64, word: usize, addr: Address) {
+        unsafe fn inner(to: &mut Address, carry: &mut i64, word: usize, addr: Address) {
             use std::arch::x86_64;
-            // encode state to offset vector
-            let encoded = (*to).as_usize() + ((*in_object as usize) >> 63);
             if addr.is_aligned_to(Block::BYTES) {
+                // Write the state at the start of the block.
+                // The carry has all bits set the same way,
+                // so extract the least significant bit.
+                let in_object = (*carry as usize) & 1;
+                let encoded = (*to).as_usize() + in_object;
                 OFFSET_VECTOR_SPEC.store_atomic::<usize>(addr, encoded, Ordering::Relaxed);
             }
-            // update by clmul
+            // Compute the prefix sum of this word of mark bitmap.
             let ones = unsafe { x86_64::_mm_set1_epi8(0xFFu8 as i8) };
             let vector = unsafe { x86_64::_mm_set_epi64x(0, word as i64) };
-            let mask: i64 =
+            let sum: i64 =
                 unsafe { x86_64::_mm_cvtsi128_si64(x86_64::_mm_clmulepi64_si128(vector, ones, 0)) };
-            let flipped = mask ^ *in_object;
-            *in_object = flipped >> 63;
+            debug_assert_eq!(sum, prefix_sum(word) as i64);
+            // Carry-in from the last word. If the last word ended in the
+            // middle of an object, we need to invert the in/out-of-object
+            // states in this word.
+            let flipped = sum ^ *carry;
+            // Produce a carry-out for the next word. This shift will
+            // replicate the most significant bit to all bit positions.
+            *carry = flipped >> 63;
+            // Now count the in-object bits. The marked bits on either
+            // end of an object are both in an object, despite that the
+            // prefix sum for the bit at the end of an object will be zero,
+            // so we bitwise-or the original word with the prefix sum to
+            // find all in-object bits.
             *to += (((flipped as usize | word).count_ones()) * 8) as usize;
         }
 
         let mut to = region.start();
-        let mut in_object: i64 = 0;
+        let mut carry: i64 = 0;
         MARK_SPEC.scan_words::<u8>(
             region.start(),
             cursor.align_up(Block::BYTES),
             &mut |_, _| panic!("should be word aligned, got a bit instead"),
             &mut |_, _| panic!("should be word aligned, got a byte instead"),
             &mut |word: usize, addr: Address| {
-                inner(&mut to, &mut in_object, word, addr);
+                inner(&mut to, &mut carry, word, addr);
             },
         );
     }
@@ -281,4 +298,16 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
 #[cfg(target_arch = "x86_64")]
 fn processor_can_clmul() -> bool {
     is_x86_feature_detected!("pclmulqdq") && is_x86_feature_detected!("popcnt")
+}
+
+fn prefix_sum(x: usize) -> usize {
+    // This function implements a bit-parallel version of the Hillis-Steele prefix sum algorithm:
+    // https://en.wikipedia.org/wiki/Prefix_sum#Algorithm_1:_Shorter_span,_more_parallel
+    let mut result = x;
+    let mut n = 1;
+    while n < usize::BITS {
+        result ^= result << n;
+        n <<= 1;
+    }
+    result
 }
