@@ -180,8 +180,7 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
             // Compute the prefix sum of this word of mark bitmap.
             let ones = x86_64::_mm_set1_epi8(0xFFu8 as i8);
             let vector = x86_64::_mm_set_epi64x(0, word as i64);
-            let sum: i64 =
-                x86_64::_mm_cvtsi128_si64(x86_64::_mm_clmulepi64_si128(vector, ones, 0));
+            let sum: i64 = x86_64::_mm_cvtsi128_si64(x86_64::_mm_clmulepi64_si128(vector, ones, 0));
             debug_assert_eq!(sum, prefix_sum(word) as i64);
             // Carry-in from the last word. If the last word ended in the
             // middle of an object, we need to invert the in/out-of-object
