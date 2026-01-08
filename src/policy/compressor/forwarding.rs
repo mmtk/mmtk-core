@@ -154,7 +154,7 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
     // TODO: We could compute a prefix-sum by Hillis-Steele too, for which
     // the same offset-vector algorithm works. Would it be faster than the
     // branchy version?
-    
+
     // SAFETY: Only call this function when the processor supports
     // pclmulqdq and popcnt, i.e. when processor_can_clmul().
     #[cfg(target_arch = "x86_64")]

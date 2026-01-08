@@ -317,7 +317,8 @@ impl<VM: VMBinding> CompressorSpace<VM> {
                     .chunks(OFFSET_VECTOR_PACKET_BYTES / forwarding::CompressorRegion::BYTES)
                     .map(|c| {
                         let chunk = c.iter().map(|r| (r.region, r.cursor())).collect();
-                        Box::new(CalculateOffsetVector::<VM>::new(self, chunk)) as Box<dyn GCWork<VM>>
+                        Box::new(CalculateOffsetVector::<VM>::new(self, chunk))
+                            as Box<dyn GCWork<VM>>
                     })
                     .collect()
             });
