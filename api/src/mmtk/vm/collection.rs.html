@@ -1,331 +1,165 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/vm/collection.rs`."><title>collection.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-b0742ba02757f159.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0 (90b35a623 2024-11-26)" data-channel="1.83.0" data-search-js="search-f0d225181b97f9a4.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">mmtk/vm/</div>collection.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
-<a href="#1" id="1">1</a>
-<a href="#2" id="2">2</a>
-<a href="#3" id="3">3</a>
-<a href="#4" id="4">4</a>
-<a href="#5" id="5">5</a>
-<a href="#6" id="6">6</a>
-<a href="#7" id="7">7</a>
-<a href="#8" id="8">8</a>
-<a href="#9" id="9">9</a>
-<a href="#10" id="10">10</a>
-<a href="#11" id="11">11</a>
-<a href="#12" id="12">12</a>
-<a href="#13" id="13">13</a>
-<a href="#14" id="14">14</a>
-<a href="#15" id="15">15</a>
-<a href="#16" id="16">16</a>
-<a href="#17" id="17">17</a>
-<a href="#18" id="18">18</a>
-<a href="#19" id="19">19</a>
-<a href="#20" id="20">20</a>
-<a href="#21" id="21">21</a>
-<a href="#22" id="22">22</a>
-<a href="#23" id="23">23</a>
-<a href="#24" id="24">24</a>
-<a href="#25" id="25">25</a>
-<a href="#26" id="26">26</a>
-<a href="#27" id="27">27</a>
-<a href="#28" id="28">28</a>
-<a href="#29" id="29">29</a>
-<a href="#30" id="30">30</a>
-<a href="#31" id="31">31</a>
-<a href="#32" id="32">32</a>
-<a href="#33" id="33">33</a>
-<a href="#34" id="34">34</a>
-<a href="#35" id="35">35</a>
-<a href="#36" id="36">36</a>
-<a href="#37" id="37">37</a>
-<a href="#38" id="38">38</a>
-<a href="#39" id="39">39</a>
-<a href="#40" id="40">40</a>
-<a href="#41" id="41">41</a>
-<a href="#42" id="42">42</a>
-<a href="#43" id="43">43</a>
-<a href="#44" id="44">44</a>
-<a href="#45" id="45">45</a>
-<a href="#46" id="46">46</a>
-<a href="#47" id="47">47</a>
-<a href="#48" id="48">48</a>
-<a href="#49" id="49">49</a>
-<a href="#50" id="50">50</a>
-<a href="#51" id="51">51</a>
-<a href="#52" id="52">52</a>
-<a href="#53" id="53">53</a>
-<a href="#54" id="54">54</a>
-<a href="#55" id="55">55</a>
-<a href="#56" id="56">56</a>
-<a href="#57" id="57">57</a>
-<a href="#58" id="58">58</a>
-<a href="#59" id="59">59</a>
-<a href="#60" id="60">60</a>
-<a href="#61" id="61">61</a>
-<a href="#62" id="62">62</a>
-<a href="#63" id="63">63</a>
-<a href="#64" id="64">64</a>
-<a href="#65" id="65">65</a>
-<a href="#66" id="66">66</a>
-<a href="#67" id="67">67</a>
-<a href="#68" id="68">68</a>
-<a href="#69" id="69">69</a>
-<a href="#70" id="70">70</a>
-<a href="#71" id="71">71</a>
-<a href="#72" id="72">72</a>
-<a href="#73" id="73">73</a>
-<a href="#74" id="74">74</a>
-<a href="#75" id="75">75</a>
-<a href="#76" id="76">76</a>
-<a href="#77" id="77">77</a>
-<a href="#78" id="78">78</a>
-<a href="#79" id="79">79</a>
-<a href="#80" id="80">80</a>
-<a href="#81" id="81">81</a>
-<a href="#82" id="82">82</a>
-<a href="#83" id="83">83</a>
-<a href="#84" id="84">84</a>
-<a href="#85" id="85">85</a>
-<a href="#86" id="86">86</a>
-<a href="#87" id="87">87</a>
-<a href="#88" id="88">88</a>
-<a href="#89" id="89">89</a>
-<a href="#90" id="90">90</a>
-<a href="#91" id="91">91</a>
-<a href="#92" id="92">92</a>
-<a href="#93" id="93">93</a>
-<a href="#94" id="94">94</a>
-<a href="#95" id="95">95</a>
-<a href="#96" id="96">96</a>
-<a href="#97" id="97">97</a>
-<a href="#98" id="98">98</a>
-<a href="#99" id="99">99</a>
-<a href="#100" id="100">100</a>
-<a href="#101" id="101">101</a>
-<a href="#102" id="102">102</a>
-<a href="#103" id="103">103</a>
-<a href="#104" id="104">104</a>
-<a href="#105" id="105">105</a>
-<a href="#106" id="106">106</a>
-<a href="#107" id="107">107</a>
-<a href="#108" id="108">108</a>
-<a href="#109" id="109">109</a>
-<a href="#110" id="110">110</a>
-<a href="#111" id="111">111</a>
-<a href="#112" id="112">112</a>
-<a href="#113" id="113">113</a>
-<a href="#114" id="114">114</a>
-<a href="#115" id="115">115</a>
-<a href="#116" id="116">116</a>
-<a href="#117" id="117">117</a>
-<a href="#118" id="118">118</a>
-<a href="#119" id="119">119</a>
-<a href="#120" id="120">120</a>
-<a href="#121" id="121">121</a>
-<a href="#122" id="122">122</a>
-<a href="#123" id="123">123</a>
-<a href="#124" id="124">124</a>
-<a href="#125" id="125">125</a>
-<a href="#126" id="126">126</a>
-<a href="#127" id="127">127</a>
-<a href="#128" id="128">128</a>
-<a href="#129" id="129">129</a>
-<a href="#130" id="130">130</a>
-<a href="#131" id="131">131</a>
-<a href="#132" id="132">132</a>
-<a href="#133" id="133">133</a>
-<a href="#134" id="134">134</a>
-<a href="#135" id="135">135</a>
-<a href="#136" id="136">136</a>
-<a href="#137" id="137">137</a>
-<a href="#138" id="138">138</a>
-<a href="#139" id="139">139</a>
-<a href="#140" id="140">140</a>
-<a href="#141" id="141">141</a>
-<a href="#142" id="142">142</a>
-<a href="#143" id="143">143</a>
-<a href="#144" id="144">144</a>
-<a href="#145" id="145">145</a>
-<a href="#146" id="146">146</a>
-<a href="#147" id="147">147</a>
-<a href="#148" id="148">148</a>
-<a href="#149" id="149">149</a>
-<a href="#150" id="150">150</a>
-<a href="#151" id="151">151</a>
-<a href="#152" id="152">152</a>
-<a href="#153" id="153">153</a>
-<a href="#154" id="154">154</a>
-<a href="#155" id="155">155</a>
-<a href="#156" id="156">156</a>
-<a href="#157" id="157">157</a>
-<a href="#158" id="158">158</a>
-<a href="#159" id="159">159</a>
-<a href="#160" id="160">160</a>
-<a href="#161" id="161">161</a>
-<a href="#162" id="162">162</a>
-<a href="#163" id="163">163</a>
-<a href="#164" id="164">164</a>
-<a href="#165" id="165">165</a></pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocationError;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::GCTriggerPolicy;
-<span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
-<span class="kw">use crate</span>::{scheduler::<span class="kw-2">*</span>, Mutator};
-
-<span class="doccomment">/// Thread context for the spawned GC thread.  It is used by `spawn_gc_thread`.
-/// Currently, `GCWorker` is the only kind of thread that mmtk-core will create.
-</span><span class="kw">pub enum </span>GCThreadContext&lt;VM: VMBinding&gt; {
-    <span class="doccomment">/// The GC thread to spawn is a worker thread. There can be multiple worker threads.
-    </span>Worker(Box&lt;GCWorker&lt;VM&gt;&gt;),
-}
-
-<span class="doccomment">/// VM-specific methods for garbage collection.
-</span><span class="kw">pub trait </span>Collection&lt;VM: VMBinding&gt; {
-    <span class="doccomment">/// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a GC.
-    /// This method should not return until all the threads are yielded.
-    /// The actual thread synchronization mechanism is up to the VM, and MMTk does not make assumptions on that.
-    /// MMTk provides a callback function and expects the binding to use the callback for each mutator when it
-    /// is ready for stack scanning. Usually a stack can be scanned as soon as the thread stops in the yieldpoint.
-    ///
-    /// Arguments:
-    /// * `tls`: The thread pointer for the GC worker.
-    /// * `mutator_visitor`: A callback.  Call it with a mutator as argument to notify MMTk that the mutator is ready to be scanned.
-    </span><span class="kw">fn </span>stop_all_mutators&lt;F&gt;(tls: VMWorkerThread, mutator_visitor: F)
-    <span class="kw">where
-        </span>F: FnMut(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;);
-
-    <span class="doccomment">/// Resume all the mutator threads, the opposite of the above. When a GC is finished, MMTk calls this method.
-    ///
-    /// This method may not be called by the same GC thread that called `stop_all_mutators`.
-    ///
-    /// Arguments:
-    /// * `tls`: The thread pointer for the GC worker.
-    </span><span class="kw">fn </span>resume_mutators(tls: VMWorkerThread);
-
-    <span class="doccomment">/// Block the current thread for GC. This is called when an allocation request cannot be fulfilled and a GC
-    /// is needed. MMTk calls this method to inform the VM that the current thread needs to be blocked as a GC
-    /// is going to happen. Then MMTk starts a GC. For a stop-the-world GC, MMTk will then call `stop_all_mutators()`
-    /// before the GC, and call `resume_mutators()` after the GC.
-    ///
-    /// Arguments:
-    /// * `tls`: The current thread pointer that should be blocked. The VM can optionally check if the current thread matches `tls`.
-    </span><span class="kw">fn </span>block_for_gc(tls: VMMutatorThread);
-
-    <span class="doccomment">/// Ask the VM to spawn a GC thread for MMTk. A GC thread may later call into the VM through these VM traits. Some VMs
-    /// have assumptions that those calls needs to be within VM internal threads.
-    /// As a result, MMTk does not spawn GC threads itself to avoid breaking this kind of assumptions.
-    /// MMTk calls this method to spawn GC threads during [`crate::mmtk::MMTK::initialize_collection`]
-    /// and [`crate::mmtk::MMTK::after_fork`].
-    ///
-    /// Arguments:
-    /// * `tls`: The thread pointer for the parent thread that we spawn new threads from. This is the same `tls` when the VM
-    ///   calls `initialize_collection()` and passes as an argument.
-    /// * `ctx`: The context for the GC thread.
-    ///   * If [`GCThreadContext::Worker`] is passed, it means spawning a thread to run as a GC worker.
-    ///     The spawned thread shall call the entry point function `GCWorker::run`.
-    ///     Currently `Worker` is the only kind of thread which mmtk-core will create.
-    </span><span class="kw">fn </span>spawn_gc_thread(tls: VMThread, ctx: GCThreadContext&lt;VM&gt;);
-
-    <span class="doccomment">/// Inform the VM of an out-of-memory error. The binding should hook into the VM's error
-    /// routine for OOM. Note that there are two different categories of OOM:
-    ///  * Critical OOM: This is the case where the OS is unable to mmap or acquire more memory.
-    ///    MMTk expects the VM to abort immediately if such an error is thrown.
-    ///  * Heap OOM: This is the case where the specified heap size is insufficient to execute the
-    ///    application. MMTk expects the binding to notify the VM about this OOM. MMTk makes no
-    ///    assumptions about whether the VM will continue executing or abort immediately.
-    ///
-    /// See [`AllocationError`] for more information.
-    ///
-    /// Arguments:
-    /// * `tls`: The thread pointer for the mutator which failed the allocation and triggered the OOM.
-    /// * `err_kind`: The type of OOM error that was encountered.
-    </span><span class="kw">fn </span>out_of_memory(_tls: VMThread, err_kind: AllocationError) {
-        <span class="macro">panic!</span>(<span class="string">"Out of memory with {:?}!"</span>, err_kind);
-    }
-
-    <span class="doccomment">/// Inform the VM to schedule finalization threads.
-    ///
-    /// Arguments:
-    /// * `tls`: The thread pointer for the current GC thread.
-    </span><span class="kw">fn </span>schedule_finalization(_tls: VMWorkerThread) {}
-
-    <span class="doccomment">/// A hook for the VM to do work after forwarding objects.
-    ///
-    /// This function is called after all of the following have finished:
-    /// -   The life and death of objects are determined.  Objects determined to be live will not
-    ///     be reclaimed in this GC.
-    /// -   Live objects have been moved to their destinations. (copying GC only)
-    /// -   References in objects have been updated to point to new addresses. (copying GC only)
-    ///
-    /// And this function may run concurrently with the release work of GC, i.e. freeing the space
-    /// occupied by dead objects.
-    ///
-    /// It is safe for the VM to read and write object fields at this time, although GC has not
-    /// finished yet.  GC will be reclaiming spaces of dead objects, but will not damage live
-    /// objects.  However, the VM cannot allocate new objects at this time.
-    ///
-    /// One possible use of this hook is enqueuing `{Soft,Weak,Phantom}Reference` instances to
-    /// reference queues (for Java).  VMs (including JVM implementations) do not have to handle
-    /// weak references this way, but mmtk-core provides this opportunity.
-    ///
-    /// Arguments:
-    /// * `tls_worker`: The thread pointer for the worker thread performing this call.
-    </span><span class="kw">fn </span>post_forwarding(_tls: VMWorkerThread) {}
-
-    <span class="doccomment">/// Return the amount of memory (in bytes) which the VM allocated outside the MMTk heap but
-    /// wants to include into the current MMTk heap size.  MMTk core will consider the reported
-    /// memory as part of MMTk heap for the purpose of heap size accounting.
-    ///
-    /// This amount should include memory that is kept alive by heap objects and can be released by
-    /// executing finalizers (or other language-specific cleaning-up routines) that are executed
-    /// when the heap objects are dead.  For example, if a language implementation allocates array
-    /// headers in the MMTk heap, but allocates their underlying buffers that hold the actual
-    /// elements using `malloc`, then those buffers should be included in this amount.  When the GC
-    /// finds such an array dead, its finalizer shall `free` the buffer and reduce this amount.
-    ///
-    /// If possible, the VM should account off-heap memory in pages.  That is, count the number of
-    /// pages occupied by off-heap objects, and report the number of bytes of those whole pages
-    /// instead of individual objects.  Because the underlying operating system manages memory at
-    /// page granularity, the occupied pages (instead of individual objects) determine the memory
-    /// footprint of a process, and how much memory MMTk spaces can obtain from the OS.
-    ///
-    /// However, if the VM is incapable of accounting off-heap memory in pages (for example, if the
-    /// VM uses `malloc` and the implementation of `malloc` is opaque to the VM), the VM binding
-    /// can simply return the total number of bytes of those off-heap objects as an approximation.
-    ///
-    /// # Performance note
-    ///
-    /// This function will be called when MMTk polls for GC.  It happens every time the MMTk
-    /// allocators have allocated a certain amount of memory, usually one or a few blocks.  Because
-    /// this function is called very frequently, its implementation must be efficient.  If it is
-    /// too expensive to compute the exact amount, an approximate value should be sufficient for
-    /// MMTk to trigger GC promptly in order to release off-heap memory, and keep the memory
-    /// footprint under control.
-    </span><span class="kw">fn </span>vm_live_bytes() -&gt; usize {
-        <span class="comment">// By default, MMTk assumes the amount of memory the VM allocates off-heap is negligible.
-        </span><span class="number">0
-    </span>}
-
-    <span class="doccomment">/// Callback function to ask the VM whether GC is enabled or disabled, allowing or disallowing MMTk
-    /// to trigger garbage collection. When collection is disabled, you can still allocate through MMTk,
-    /// but MMTk will not trigger a GC even if the heap is full. In such a case, the allocation will
-    /// exceed MMTk's heap size (the soft heap limit). However, there is no guarantee that the physical
-    /// allocation will succeed, and if it succeeds, there is no guarantee that further allocation will
-    /// keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration
-    /// to make sure that the physical memory allows the amount of allocation. We highly recommend
-    /// to have GC always enabled (i.e. that this method always returns true). However, we support
-    /// this to accomodate some VMs that require this behavior. Note that
-    /// `handle_user_collection_request()` calls this function, too.  If this function returns
-    /// false, `handle_user_collection_request()` will not trigger GC, either. Note also that any synchronization
-    /// involving enabling and disabling collections by mutator threads should be implemented by the VM.
-    </span><span class="kw">fn </span>is_collection_enabled() -&gt; bool {
-        <span class="comment">// By default, MMTk assumes that collections are always enabled, and the binding should define
-        // this method if the VM supports disabling GC, or if the VM cannot safely trigger GC until some
-        // initialization is done, such as initializing class metadata for scanning objects.
-        </span><span class="bool-val">true
-    </span>}
-
-    <span class="doccomment">/// Ask the binding to create a [`GCTriggerPolicy`] if the option `gc_trigger` is set to
-    /// `crate::util::options::GCTriggerSelector::Delegated`.
-    </span><span class="kw">fn </span>create_gc_trigger() -&gt; Box&lt;<span class="kw">dyn </span>GCTriggerPolicy&lt;VM&gt;&gt; {
-        <span class="macro">unimplemented!</span>()
-    }
-}
-</code></pre></div></section></main></body></html>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/vm/collection.rs`."><title>collection.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.92.0 (ded5c06cf 2025-12-08)" data-channel="1.92.0" data-search-js="search-d69d8955.js" data-stringdex-js="stringdex-c3e638e9.js" data-settings-js="settings-c38705f0.js" ><script src="../../../static.files/storage-e2aeef58.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-ce535bd0.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">mmtk/vm/</div>collection.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocationError;
+<a href=#2 id=2 data-nosnippet>2</a><span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::GCTriggerPolicy;
+<a href=#3 id=3 data-nosnippet>3</a><span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
+<a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<a href=#5 id=5 data-nosnippet>5</a><span class="kw">use crate</span>::{scheduler::<span class="kw-2">*</span>, Mutator};
+<a href=#6 id=6 data-nosnippet>6</a>
+<a href=#7 id=7 data-nosnippet>7</a><span class="doccomment">/// Thread context for the spawned GC thread.  It is used by `spawn_gc_thread`.
+<a href=#8 id=8 data-nosnippet>8</a>/// Currently, `GCWorker` is the only kind of thread that mmtk-core will create.
+<a href=#9 id=9 data-nosnippet>9</a></span><span class="kw">pub enum </span>GCThreadContext&lt;VM: VMBinding&gt; {
+<a href=#10 id=10 data-nosnippet>10</a>    <span class="doccomment">/// The GC thread to spawn is a worker thread. There can be multiple worker threads.
+<a href=#11 id=11 data-nosnippet>11</a>    </span>Worker(Box&lt;GCWorker&lt;VM&gt;&gt;),
+<a href=#12 id=12 data-nosnippet>12</a>}
+<a href=#13 id=13 data-nosnippet>13</a>
+<a href=#14 id=14 data-nosnippet>14</a><span class="doccomment">/// VM-specific methods for garbage collection.
+<a href=#15 id=15 data-nosnippet>15</a></span><span class="kw">pub trait </span>Collection&lt;VM: VMBinding&gt; {
+<a href=#16 id=16 data-nosnippet>16</a>    <span class="doccomment">/// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a GC.
+<a href=#17 id=17 data-nosnippet>17</a>    /// This method should not return until all the threads are yielded.
+<a href=#18 id=18 data-nosnippet>18</a>    /// The actual thread synchronization mechanism is up to the VM, and MMTk does not make assumptions on that.
+<a href=#19 id=19 data-nosnippet>19</a>    /// MMTk provides a callback function and expects the binding to use the callback for each mutator when it
+<a href=#20 id=20 data-nosnippet>20</a>    /// is ready for stack scanning. Usually a stack can be scanned as soon as the thread stops in the yieldpoint.
+<a href=#21 id=21 data-nosnippet>21</a>    ///
+<a href=#22 id=22 data-nosnippet>22</a>    /// Arguments:
+<a href=#23 id=23 data-nosnippet>23</a>    /// * `tls`: The thread pointer for the GC worker.
+<a href=#24 id=24 data-nosnippet>24</a>    /// * `mutator_visitor`: A callback.  Call it with a mutator as argument to notify MMTk that the mutator is ready to be scanned.
+<a href=#25 id=25 data-nosnippet>25</a>    </span><span class="kw">fn </span>stop_all_mutators&lt;F&gt;(tls: VMWorkerThread, mutator_visitor: F)
+<a href=#26 id=26 data-nosnippet>26</a>    <span class="kw">where
+<a href=#27 id=27 data-nosnippet>27</a>        </span>F: FnMut(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;);
+<a href=#28 id=28 data-nosnippet>28</a>
+<a href=#29 id=29 data-nosnippet>29</a>    <span class="doccomment">/// Resume all the mutator threads, the opposite of the above. When a GC is finished, MMTk calls this method.
+<a href=#30 id=30 data-nosnippet>30</a>    ///
+<a href=#31 id=31 data-nosnippet>31</a>    /// This method may not be called by the same GC thread that called `stop_all_mutators`.
+<a href=#32 id=32 data-nosnippet>32</a>    ///
+<a href=#33 id=33 data-nosnippet>33</a>    /// Arguments:
+<a href=#34 id=34 data-nosnippet>34</a>    /// * `tls`: The thread pointer for the GC worker.
+<a href=#35 id=35 data-nosnippet>35</a>    </span><span class="kw">fn </span>resume_mutators(tls: VMWorkerThread);
+<a href=#36 id=36 data-nosnippet>36</a>
+<a href=#37 id=37 data-nosnippet>37</a>    <span class="doccomment">/// Block the current thread for GC. This is called when an allocation request cannot be fulfilled and a GC
+<a href=#38 id=38 data-nosnippet>38</a>    /// is needed. MMTk calls this method to inform the VM that the current thread needs to be blocked as a GC
+<a href=#39 id=39 data-nosnippet>39</a>    /// is going to happen. Then MMTk starts a GC. For a stop-the-world GC, MMTk will then call `stop_all_mutators()`
+<a href=#40 id=40 data-nosnippet>40</a>    /// before the GC, and call `resume_mutators()` after the GC.
+<a href=#41 id=41 data-nosnippet>41</a>    ///
+<a href=#42 id=42 data-nosnippet>42</a>    /// Arguments:
+<a href=#43 id=43 data-nosnippet>43</a>    /// * `tls`: The current thread pointer that should be blocked. The VM can optionally check if the current thread matches `tls`.
+<a href=#44 id=44 data-nosnippet>44</a>    </span><span class="kw">fn </span>block_for_gc(tls: VMMutatorThread);
+<a href=#45 id=45 data-nosnippet>45</a>
+<a href=#46 id=46 data-nosnippet>46</a>    <span class="doccomment">/// Ask the VM to spawn a GC thread for MMTk. A GC thread may later call into the VM through these VM traits. Some VMs
+<a href=#47 id=47 data-nosnippet>47</a>    /// have assumptions that those calls needs to be within VM internal threads.
+<a href=#48 id=48 data-nosnippet>48</a>    /// As a result, MMTk does not spawn GC threads itself to avoid breaking this kind of assumptions.
+<a href=#49 id=49 data-nosnippet>49</a>    /// MMTk calls this method to spawn GC threads during [`crate::mmtk::MMTK::initialize_collection`]
+<a href=#50 id=50 data-nosnippet>50</a>    /// and [`crate::mmtk::MMTK::after_fork`].
+<a href=#51 id=51 data-nosnippet>51</a>    ///
+<a href=#52 id=52 data-nosnippet>52</a>    /// Arguments:
+<a href=#53 id=53 data-nosnippet>53</a>    /// * `tls`: The thread pointer for the parent thread that we spawn new threads from. This is the same `tls` when the VM
+<a href=#54 id=54 data-nosnippet>54</a>    ///   calls `initialize_collection()` and passes as an argument.
+<a href=#55 id=55 data-nosnippet>55</a>    /// * `ctx`: The context for the GC thread.
+<a href=#56 id=56 data-nosnippet>56</a>    ///   * If [`GCThreadContext::Worker`] is passed, it means spawning a thread to run as a GC worker.
+<a href=#57 id=57 data-nosnippet>57</a>    ///     The spawned thread shall call the entry point function `GCWorker::run`.
+<a href=#58 id=58 data-nosnippet>58</a>    ///     Currently `Worker` is the only kind of thread which mmtk-core will create.
+<a href=#59 id=59 data-nosnippet>59</a>    </span><span class="kw">fn </span>spawn_gc_thread(tls: VMThread, ctx: GCThreadContext&lt;VM&gt;);
+<a href=#60 id=60 data-nosnippet>60</a>
+<a href=#61 id=61 data-nosnippet>61</a>    <span class="doccomment">/// Inform the VM of an out-of-memory error. The binding should hook into the VM's error
+<a href=#62 id=62 data-nosnippet>62</a>    /// routine for OOM. Note that there are two different categories of OOM:
+<a href=#63 id=63 data-nosnippet>63</a>    ///  * Critical OOM: This is the case where the OS is unable to mmap or acquire more memory.
+<a href=#64 id=64 data-nosnippet>64</a>    ///    MMTk expects the VM to abort immediately if such an error is thrown.
+<a href=#65 id=65 data-nosnippet>65</a>    ///  * Heap OOM: This is the case where the specified heap size is insufficient to execute the
+<a href=#66 id=66 data-nosnippet>66</a>    ///    application. MMTk expects the binding to notify the VM about this OOM. MMTk makes no
+<a href=#67 id=67 data-nosnippet>67</a>    ///    assumptions about whether the VM will continue executing or abort immediately.
+<a href=#68 id=68 data-nosnippet>68</a>    ///
+<a href=#69 id=69 data-nosnippet>69</a>    /// See [`AllocationError`] for more information.
+<a href=#70 id=70 data-nosnippet>70</a>    ///
+<a href=#71 id=71 data-nosnippet>71</a>    /// Arguments:
+<a href=#72 id=72 data-nosnippet>72</a>    /// * `tls`: The thread pointer for the mutator which failed the allocation and triggered the OOM.
+<a href=#73 id=73 data-nosnippet>73</a>    /// * `err_kind`: The type of OOM error that was encountered.
+<a href=#74 id=74 data-nosnippet>74</a>    </span><span class="kw">fn </span>out_of_memory(_tls: VMThread, err_kind: AllocationError) {
+<a href=#75 id=75 data-nosnippet>75</a>        <span class="macro">panic!</span>(<span class="string">"Out of memory with {:?}!"</span>, err_kind);
+<a href=#76 id=76 data-nosnippet>76</a>    }
+<a href=#77 id=77 data-nosnippet>77</a>
+<a href=#78 id=78 data-nosnippet>78</a>    <span class="doccomment">/// Inform the VM to schedule finalization threads.
+<a href=#79 id=79 data-nosnippet>79</a>    ///
+<a href=#80 id=80 data-nosnippet>80</a>    /// Arguments:
+<a href=#81 id=81 data-nosnippet>81</a>    /// * `tls`: The thread pointer for the current GC thread.
+<a href=#82 id=82 data-nosnippet>82</a>    </span><span class="kw">fn </span>schedule_finalization(_tls: VMWorkerThread) {}
+<a href=#83 id=83 data-nosnippet>83</a>
+<a href=#84 id=84 data-nosnippet>84</a>    <span class="doccomment">/// A hook for the VM to do work after forwarding objects.
+<a href=#85 id=85 data-nosnippet>85</a>    ///
+<a href=#86 id=86 data-nosnippet>86</a>    /// This function is called after all of the following have finished:
+<a href=#87 id=87 data-nosnippet>87</a>    /// -   The life and death of objects are determined.  Objects determined to be live will not
+<a href=#88 id=88 data-nosnippet>88</a>    ///     be reclaimed in this GC.
+<a href=#89 id=89 data-nosnippet>89</a>    /// -   Live objects have been moved to their destinations. (copying GC only)
+<a href=#90 id=90 data-nosnippet>90</a>    /// -   References in objects have been updated to point to new addresses. (copying GC only)
+<a href=#91 id=91 data-nosnippet>91</a>    ///
+<a href=#92 id=92 data-nosnippet>92</a>    /// And this function may run concurrently with the release work of GC, i.e. freeing the space
+<a href=#93 id=93 data-nosnippet>93</a>    /// occupied by dead objects.
+<a href=#94 id=94 data-nosnippet>94</a>    ///
+<a href=#95 id=95 data-nosnippet>95</a>    /// It is safe for the VM to read and write object fields at this time, although GC has not
+<a href=#96 id=96 data-nosnippet>96</a>    /// finished yet.  GC will be reclaiming spaces of dead objects, but will not damage live
+<a href=#97 id=97 data-nosnippet>97</a>    /// objects.  However, the VM cannot allocate new objects at this time.
+<a href=#98 id=98 data-nosnippet>98</a>    ///
+<a href=#99 id=99 data-nosnippet>99</a>    /// One possible use of this hook is enqueuing `{Soft,Weak,Phantom}Reference` instances to
+<a href=#100 id=100 data-nosnippet>100</a>    /// reference queues (for Java).  VMs (including JVM implementations) do not have to handle
+<a href=#101 id=101 data-nosnippet>101</a>    /// weak references this way, but mmtk-core provides this opportunity.
+<a href=#102 id=102 data-nosnippet>102</a>    ///
+<a href=#103 id=103 data-nosnippet>103</a>    /// Arguments:
+<a href=#104 id=104 data-nosnippet>104</a>    /// * `tls_worker`: The thread pointer for the worker thread performing this call.
+<a href=#105 id=105 data-nosnippet>105</a>    </span><span class="kw">fn </span>post_forwarding(_tls: VMWorkerThread) {}
+<a href=#106 id=106 data-nosnippet>106</a>
+<a href=#107 id=107 data-nosnippet>107</a>    <span class="doccomment">/// Return the amount of memory (in bytes) which the VM allocated outside the MMTk heap but
+<a href=#108 id=108 data-nosnippet>108</a>    /// wants to include into the current MMTk heap size.  MMTk core will consider the reported
+<a href=#109 id=109 data-nosnippet>109</a>    /// memory as part of MMTk heap for the purpose of heap size accounting.
+<a href=#110 id=110 data-nosnippet>110</a>    ///
+<a href=#111 id=111 data-nosnippet>111</a>    /// This amount should include memory that is kept alive by heap objects and can be released by
+<a href=#112 id=112 data-nosnippet>112</a>    /// executing finalizers (or other language-specific cleaning-up routines) that are executed
+<a href=#113 id=113 data-nosnippet>113</a>    /// when the heap objects are dead.  For example, if a language implementation allocates array
+<a href=#114 id=114 data-nosnippet>114</a>    /// headers in the MMTk heap, but allocates their underlying buffers that hold the actual
+<a href=#115 id=115 data-nosnippet>115</a>    /// elements using `malloc`, then those buffers should be included in this amount.  When the GC
+<a href=#116 id=116 data-nosnippet>116</a>    /// finds such an array dead, its finalizer shall `free` the buffer and reduce this amount.
+<a href=#117 id=117 data-nosnippet>117</a>    ///
+<a href=#118 id=118 data-nosnippet>118</a>    /// If possible, the VM should account off-heap memory in pages.  That is, count the number of
+<a href=#119 id=119 data-nosnippet>119</a>    /// pages occupied by off-heap objects, and report the number of bytes of those whole pages
+<a href=#120 id=120 data-nosnippet>120</a>    /// instead of individual objects.  Because the underlying operating system manages memory at
+<a href=#121 id=121 data-nosnippet>121</a>    /// page granularity, the occupied pages (instead of individual objects) determine the memory
+<a href=#122 id=122 data-nosnippet>122</a>    /// footprint of a process, and how much memory MMTk spaces can obtain from the OS.
+<a href=#123 id=123 data-nosnippet>123</a>    ///
+<a href=#124 id=124 data-nosnippet>124</a>    /// However, if the VM is incapable of accounting off-heap memory in pages (for example, if the
+<a href=#125 id=125 data-nosnippet>125</a>    /// VM uses `malloc` and the implementation of `malloc` is opaque to the VM), the VM binding
+<a href=#126 id=126 data-nosnippet>126</a>    /// can simply return the total number of bytes of those off-heap objects as an approximation.
+<a href=#127 id=127 data-nosnippet>127</a>    ///
+<a href=#128 id=128 data-nosnippet>128</a>    /// # Performance note
+<a href=#129 id=129 data-nosnippet>129</a>    ///
+<a href=#130 id=130 data-nosnippet>130</a>    /// This function will be called when MMTk polls for GC.  It happens every time the MMTk
+<a href=#131 id=131 data-nosnippet>131</a>    /// allocators have allocated a certain amount of memory, usually one or a few blocks.  Because
+<a href=#132 id=132 data-nosnippet>132</a>    /// this function is called very frequently, its implementation must be efficient.  If it is
+<a href=#133 id=133 data-nosnippet>133</a>    /// too expensive to compute the exact amount, an approximate value should be sufficient for
+<a href=#134 id=134 data-nosnippet>134</a>    /// MMTk to trigger GC promptly in order to release off-heap memory, and keep the memory
+<a href=#135 id=135 data-nosnippet>135</a>    /// footprint under control.
+<a href=#136 id=136 data-nosnippet>136</a>    </span><span class="kw">fn </span>vm_live_bytes() -&gt; usize {
+<a href=#137 id=137 data-nosnippet>137</a>        <span class="comment">// By default, MMTk assumes the amount of memory the VM allocates off-heap is negligible.
+<a href=#138 id=138 data-nosnippet>138</a>        </span><span class="number">0
+<a href=#139 id=139 data-nosnippet>139</a>    </span>}
+<a href=#140 id=140 data-nosnippet>140</a>
+<a href=#141 id=141 data-nosnippet>141</a>    <span class="doccomment">/// Callback function to ask the VM whether GC is enabled or disabled, allowing or disallowing MMTk
+<a href=#142 id=142 data-nosnippet>142</a>    /// to trigger garbage collection. When collection is disabled, you can still allocate through MMTk,
+<a href=#143 id=143 data-nosnippet>143</a>    /// but MMTk will not trigger a GC even if the heap is full. In such a case, the allocation will
+<a href=#144 id=144 data-nosnippet>144</a>    /// exceed MMTk's heap size (the soft heap limit). However, there is no guarantee that the physical
+<a href=#145 id=145 data-nosnippet>145</a>    /// allocation will succeed, and if it succeeds, there is no guarantee that further allocation will
+<a href=#146 id=146 data-nosnippet>146</a>    /// keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration
+<a href=#147 id=147 data-nosnippet>147</a>    /// to make sure that the physical memory allows the amount of allocation. We highly recommend
+<a href=#148 id=148 data-nosnippet>148</a>    /// to have GC always enabled (i.e. that this method always returns true). However, we support
+<a href=#149 id=149 data-nosnippet>149</a>    /// this to accomodate some VMs that require this behavior. Note that
+<a href=#150 id=150 data-nosnippet>150</a>    /// `handle_user_collection_request()` calls this function, too.  If this function returns
+<a href=#151 id=151 data-nosnippet>151</a>    /// false, `handle_user_collection_request()` will not trigger GC, either. Note also that any synchronization
+<a href=#152 id=152 data-nosnippet>152</a>    /// involving enabling and disabling collections by mutator threads should be implemented by the VM.
+<a href=#153 id=153 data-nosnippet>153</a>    </span><span class="kw">fn </span>is_collection_enabled() -&gt; bool {
+<a href=#154 id=154 data-nosnippet>154</a>        <span class="comment">// By default, MMTk assumes that collections are always enabled, and the binding should define
+<a href=#155 id=155 data-nosnippet>155</a>        // this method if the VM supports disabling GC, or if the VM cannot safely trigger GC until some
+<a href=#156 id=156 data-nosnippet>156</a>        // initialization is done, such as initializing class metadata for scanning objects.
+<a href=#157 id=157 data-nosnippet>157</a>        </span><span class="bool-val">true
+<a href=#158 id=158 data-nosnippet>158</a>    </span>}
+<a href=#159 id=159 data-nosnippet>159</a>
+<a href=#160 id=160 data-nosnippet>160</a>    <span class="doccomment">/// Ask the binding to create a [`GCTriggerPolicy`] if the option `gc_trigger` is set to
+<a href=#161 id=161 data-nosnippet>161</a>    /// `crate::util::options::GCTriggerSelector::Delegated`.
+<a href=#162 id=162 data-nosnippet>162</a>    </span><span class="kw">fn </span>create_gc_trigger() -&gt; Box&lt;<span class="kw">dyn </span>GCTriggerPolicy&lt;VM&gt;&gt; {
+<a href=#163 id=163 data-nosnippet>163</a>        <span class="macro">unimplemented!</span>()
+<a href=#164 id=164 data-nosnippet>164</a>    }
+<a href=#165 id=165 data-nosnippet>165</a>}</code></pre></div></section></main></body></html>
