@@ -12,6 +12,11 @@ categories = ["memory-management"]
 keywords = ["gc", "garbage", "collection", "garbage-collection", "allocation"]
 rust-version = "1.84"
 build = "build.rs"
+# Use the MSRV-aware resolver which is available since Rust 1.84.
+# When the specified dep version is incompatible,
+# Cargo will automatically fall back to a compatible version
+# TODO: Remove this after bumping Rust edition to 2024 (Rust 1.85+) because it will be the default.
+resolver = "3"
 
 [lib]
 name = "mmtk"
