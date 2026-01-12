@@ -2,7 +2,7 @@
 name = "mmtk"
 version = "0.31.0"
 authors = ["The MMTk Developers <>"]
-edition = "2021"
+edition = "2021" # TODO: Switch to 2024 after bumping MSRV to 1.85
 license = "MIT OR Apache-2.0"
 description = "MMTk is a framework for the design and implementation of high-performance and portable memory managers."
 homepage = "https://www.mmtk.io"
