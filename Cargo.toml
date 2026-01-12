@@ -55,13 +55,15 @@ spin = "0.10.0"
 static_assertions = "1.1.0"
 strum = "0.27.1"
 strum_macros = "0.27.1"
-sysinfo = "0.37.2"
+# sysinfo >=0.37.0 requires MSRV 1.88.0 and Rust edition 2024.
+sysinfo = "0.36.1"
 
 [dev-dependencies]
 paste = "1.0.8"
 rand = "0.9.0"
 rand_chacha = "0.9.0"
-criterion = "0.8"
+# criterion >=0.8.0 requires MSRV 1.88.0.
+criterion = "0.7.0"
 
 [build-dependencies]
 built = { version = "0.8.0", features = ["git2"] }
