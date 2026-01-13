@@ -2,7 +2,7 @@
 name = "mmtk"
 version = "0.31.0"
 authors = ["The MMTk Developers <>"]
-edition = "2021"
+edition = "2021" # TODO: Switch to 2024 after bumping MSRV to 1.85
 license = "MIT OR Apache-2.0"
 description = "MMTk is a framework for the design and implementation of high-performance and portable memory managers."
 homepage = "https://www.mmtk.io"
@@ -12,6 +12,17 @@ categories = ["memory-management"]
 keywords = ["gc", "garbage", "collection", "garbage-collection", "allocation"]
 rust-version = "1.84"
 build = "build.rs"
+# Use the MSRV-aware resolver which has been available since Rust 1.84.
+#
+# NOTE: The MSRV-aware resolver will only find compatible versions within the allowed version range.
+# For example, if we specify a dependency version as "0.7.2" or equivalently ">=0.7.2,<0.8.0",
+# and the version 0.7.4 is MSRV-compatible but 0.7.5 is not, then it will resolve to 0.7.4.
+# However, if 0.7.2 is not compatible with our MSRV,
+# the resolver will refuse to go below 0.7.2, and the resolution will fail.
+# For this reason, we still need to keep some dependency versions below the latest versions.
+#
+# TODO: Remove `resolver = "3"` after bumping Rust edition to 2024 (Rust 1.85+) because it will be the default.
+resolver = "3"
 
 [lib]
 name = "mmtk"
@@ -23,7 +34,6 @@ atomic = "0.6.0"
 atomic_refcell = "0.1.7"
 atomic-traits = "0.4.0"
 bytemuck = { version = "1.14.0", features = ["derive", "zeroable_maybe_uninit"] }
-bytemuck_derive = "=1.8.1" # We can remove this dependency when we use MSRV 1.84+
 cfg-if = "1.0"
 crossbeam = "0.8.1"
 delegate = "0.13.2"
@@ -47,21 +57,22 @@ portable-atomic = "1.4.3"
 probe = "0.5"
 regex = "1.7.0"
 rustversion = "1.0"
-rayon-core = "=1.12.1" # We can remove this dependency when we use MSRV 1.80+
-spin = "0.9.5"
+spin = "0.10.0"
 static_assertions = "1.1.0"
 strum = "0.27.1"
 strum_macros = "0.27.1"
-sysinfo = "0.33.1"
+# sysinfo >=0.37.0 requires MSRV 1.88.0 and Rust edition 2024.
+sysinfo = "0.36.1"
 
 [dev-dependencies]
 paste = "1.0.8"
 rand = "0.9.0"
 rand_chacha = "0.9.0"
-criterion = "0.5"
+# criterion >=0.8.0 requires MSRV 1.86.0.
+criterion = "0.7.0"
 
 [build-dependencies]
-built = { version = "0.7.7", features = ["git2"] }
+built = { version = "0.8.0", features = ["git2"] }
 
 [lints.clippy]
 # Allow this. Clippy suggests we should use Sft, Mmtk, rather than SFT and MMTK.
