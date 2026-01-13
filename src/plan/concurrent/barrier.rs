@@ -3,6 +3,7 @@ use std::sync::atomic::Ordering;
 use super::{concurrent_marking_work::ProcessModBufSATB, Pause};
 use crate::plan::global::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
+use crate::util::ref_scan_policy::StrongOnly;
 use crate::util::VMMutatorThread;
 use crate::{
     plan::{barriers::BarrierSemantics, concurrent::global::ConcurrentPlan, VectorQueue},
@@ -156,8 +157,17 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 
     fn object_probable_write_slow(&mut self, obj: ObjectReference) {
-        crate::plan::tracing::SlotIterator::<VM>::iterate_fields(obj, self.tls.0, |s| {
-            self.enqueue_node(Some(obj), s, None);
-        });
+        // Note: the purpose of the SATB barrier is to ensure all *strongly reachable* objects at
+        // the beginning of the trace will eventually be marked and scanned.  Therefore, we use the
+        // `StrongOnly` here to enqueue children of strong fields.  The current `obj` will
+        // eventually be scanned by the `ConcurrentTraceObjects` work packet using the
+        // `StrongClosure` policy, either during the concurrent tracing, or during `FinalMark`.
+        crate::plan::tracing::SlotIterator::<VM>::iterate_fields::<_, StrongOnly>(
+            obj,
+            self.tls.0,
+            |s| {
+                self.enqueue_node(Some(obj), s, None);
+            },
+        );
     }
 }

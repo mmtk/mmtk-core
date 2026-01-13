@@ -58,6 +58,8 @@ pub(crate) mod object_enum;
 pub(crate) mod object_forwarding;
 /// Reference processing implementation.
 pub(crate) mod reference_processor;
+/// RefScanPolicy implementations.
+pub(crate) mod ref_scan_policy;
 /// Utilities funcitons for Rust
 pub(crate) mod rust_util;
 /// Sanity checker for GC.

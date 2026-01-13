@@ -3,6 +3,7 @@ use super::*;
 use crate::global_state::GcStatus;
 use crate::plan::ObjectsClosure;
 use crate::plan::VectorObjectQueue;
+use crate::util::ref_scan_policy::StrongClosure;
 use crate::util::*;
 use crate::vm::slot::Slot;
 use crate::vm::*;
@@ -867,7 +868,11 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                 if <VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, object) {
                     trace!("Scan object (slot) {}", object);
                     // If an object supports slot-enqueuing, we enqueue its slots.
-                    <VM as VMBinding>::VMScanning::scan_object(tls, object, &mut closure);
+                    <VM as VMBinding>::VMScanning::scan_object::<_, StrongClosure>(
+                        tls,
+                        object,
+                        &mut closure,
+                    );
                     self.post_scan_object(object);
                 } else {
                     // If an object does not support slot-enqueuing, we have to use
@@ -896,7 +901,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                 // Scan objects and trace their outgoing edges at the same time.
                 for object in scan_later.iter().copied() {
                     trace!("Scan object (node) {}", object);
-                    <VM as VMBinding>::VMScanning::scan_object_and_trace_edges(
+                    <VM as VMBinding>::VMScanning::scan_object_and_trace_edges::<_, StrongClosure>(
                         tls,
                         object,
                         object_tracer,

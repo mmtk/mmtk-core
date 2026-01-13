@@ -43,6 +43,29 @@ impl<F: FnMut(ObjectReference) -> ObjectReference> ObjectTracer for F {
     }
 }
 
+/// This type specifies how object-scanning functions ([`Scanning::scan_object`] and
+/// [`Scanning::scan_object_and_trace_edges`]) should handle strong and weak reference fields.
+///
+/// Note that it is the VM and the VM binding that ultimately decides *which* reference is strong
+/// and *which* reference is weak.  Particularly, the VM binding is allowed to conservatively report
+/// weak references as strong.  For example,
+///
+/// -   A VM binding can report all weak references as strong during nursery collections or
+///     concurrent collections to avoid expensive weak reference processing.
+/// -   The VM binding of a JVM (e.g. mmtk-openjdk) can report the weak reference field in
+///     `SoftReference` as strong during non-emergency GCs, and weak during emergency GCs.
+pub trait RefScanPolicy {
+    /// True if the reference scanning function should visit strong reference fields in the object using
+    /// callbacks.
+    const SHOULD_VISIT_STRONG: bool;
+    /// True if the reference scanning function should visit weak reference fields in the object using
+    /// callbacks.
+    const SHOULD_VISIT_WEAK: bool;
+    /// True if the reference scanning function should discover weak reference fields in VM-specific
+    /// ways.
+    const SHOULD_DISCOVER_WEAK: bool;
+}
+
 /// An `ObjectTracerContext` gives a GC worker temporary access to an `ObjectTracer`, allowing
 /// the GC worker to trace objects.  This trait is intended to abstract out the implementation
 /// details of tracing objects, enqueuing objects, and creating work packets that expand the
@@ -190,7 +213,7 @@ pub trait Scanning<VM: VMBinding> {
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
     /// * `slot_visitor`: Called back for each field.
-    fn scan_object<SV: SlotVisitor<VM::VMSlot>>(
+    fn scan_object<SV: SlotVisitor<VM::VMSlot>, R: RefScanPolicy>(
         tls: VMWorkerThread,
         object: ObjectReference,
         slot_visitor: &mut SV,
@@ -215,7 +238,7 @@ pub trait Scanning<VM: VMBinding> {
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
     /// * `object_tracer`: Called back for the object reference held in each field.
-    fn scan_object_and_trace_edges<OT: ObjectTracer>(
+    fn scan_object_and_trace_edges<OT: ObjectTracer, R: RefScanPolicy>(
         _tls: VMWorkerThread,
         _object: ObjectReference,
         _object_tracer: &mut OT,

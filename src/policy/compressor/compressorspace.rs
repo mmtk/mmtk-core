@@ -14,6 +14,7 @@ use crate::util::metadata::extract_side_metadata;
 use crate::util::metadata::vo_bit;
 use crate::util::metadata::MetadataSpec;
 use crate::util::object_enum::{self, ObjectEnumerator};
+use crate::util::ref_scan_policy::RefUpdate;
 use crate::util::{Address, ObjectReference};
 use crate::vm::slot::Slot;
 use crate::MMTK;
@@ -341,15 +342,21 @@ impl<VM: VMBinding> CompressorSpace<VM> {
 
     fn update_references(&self, worker: &mut GCWorker<VM>, object: ObjectReference) {
         if VM::VMScanning::support_slot_enqueuing(worker.tls, object) {
-            VM::VMScanning::scan_object(worker.tls, object, &mut |s: VM::VMSlot| {
-                if let Some(o) = s.load() {
-                    s.store(self.forward(o, false));
-                }
-            });
+            VM::VMScanning::scan_object::<_, RefUpdate>(
+                worker.tls,
+                object,
+                &mut |s: VM::VMSlot| {
+                    if let Some(o) = s.load() {
+                        s.store(self.forward(o, false));
+                    }
+                },
+            );
         } else {
-            VM::VMScanning::scan_object_and_trace_edges(worker.tls, object, &mut |o| {
-                self.forward(o, false)
-            });
+            VM::VMScanning::scan_object_and_trace_edges::<_, RefUpdate>(
+                worker.tls,
+                object,
+                &mut |o| self.forward(o, false),
+            );
         }
     }
 
