@@ -10,6 +10,7 @@ use crate::util::alloc::allocator::get_maximum_aligned_size;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::VMThread;
+use crate::util::os::*;
 use crate::util::rust_util::unlikely;
 use crate::util::Address;
 use crate::vm::*;
@@ -250,7 +251,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     end_line,
                     self.tls
                 );
-                crate::util::memory::zero(
+                OS::memzero(
                     self.bump_pointer.cursor,
                     self.bump_pointer.limit - self.bump_pointer.cursor,
                 );
