@@ -8,6 +8,7 @@ use std::{fmt::Debug, ops::Range};
 
 use atomic::Atomic;
 
+use crate::util::address::AddressIterator;
 use crate::util::constants::{BYTES_IN_ADDRESS, LOG_BYTES_IN_ADDRESS};
 use crate::util::{Address, ObjectReference};
 
@@ -237,22 +238,13 @@ pub trait MemorySlice: Send + Debug + PartialEq + Eq + Clone + Hash {
 }
 
 /// Iterate slots within `Range<Address>`.
-pub struct AddressRangeIterator {
-    cursor: Address,
-    limit: Address,
-}
+pub struct AddressRangeIterator(AddressIterator);
 
 impl Iterator for AddressRangeIterator {
     type Item = Address;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.cursor >= self.limit {
-            None
-        } else {
-            let slot = self.cursor;
-            self.cursor += BYTES_IN_ADDRESS;
-            Some(slot)
-        }
+        self.0.next()
     }
 }
 
@@ -261,10 +253,7 @@ impl MemorySlice for Range<Address> {
     type SlotIterator = AddressRangeIterator;
 
     fn iter_slots(&self) -> Self::SlotIterator {
-        AddressRangeIterator {
-            cursor: self.start,
-            limit: self.end,
-        }
+        AddressRangeIterator(AddressIterator::new(self.start, self.end, BYTES_IN_ADDRESS))
     }
 
     fn object(&self) -> Option<ObjectReference> {

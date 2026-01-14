@@ -351,7 +351,6 @@ impl Address {
     /// Returns an iterator which steps from this address to below the
     /// `end` address, in steps of `step` bytes.
     pub fn iter_to(&self, end: Address, step: usize) -> AddressIterator {
-        // XXX: This is just a more general `mmtk::vm::slot::AddressRangeIterator`.
         AddressIterator {
             start: *self,
             end,
@@ -397,21 +396,30 @@ impl std::str::FromStr for Address {
     }
 }
 
+/// Iterate addresses from a start address to below an end address,
+/// with a given step size.
 pub struct AddressIterator {
     start: Address,
     end: Address,
     step: usize,
 }
 
+impl AddressIterator {
+    pub fn new(start: Address, end: Address, step: usize) -> Self {
+        Self { start, end, step }
+    }
+}
+
 impl Iterator for AddressIterator {
     type Item = Address;
+
     fn next(&mut self) -> Option<Self::Item> {
-        if self.start < self.end {
+        if self.start >= self.end {
+            None
+        } else {
             let current = self.start;
             self.start += self.step;
             Some(current)
-        } else {
-            None
         }
     }
 }
