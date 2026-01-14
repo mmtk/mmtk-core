@@ -348,7 +348,10 @@ impl Address {
         r1.start.max(r2.start)..r1.end.min(r2.end)
     }
 
+    /// Returns an iterator which steps from this address to below the
+    /// `end` address, in steps of `step` bytes.
     pub fn iter_to(&self, end: Address, step: usize) -> AddressIterator {
+        // XXX: This is just a more general `mmtk::vm::slot::AddressRangeIterator`.
         AddressIterator {
             start: *self,
             end,

@@ -1248,6 +1248,18 @@ impl SideMetadataSpec {
         );
     }
 
+    /// Walk the metadata between two addresses, calling visitor functions with
+    /// varying sizes of aligned metadata.
+    /// - `scan_words` calls its `visit_word` argument with each `usize` of metadata
+    ///   which is word-aligned, and the data address that the metadata word starts at.
+    /// - `scan_words` calls its `visit_byte` argument with each `u8` of metadata
+    ///   which is byte-aligned but word-unaligned, and the data address that the
+    ///   metadata byte starts at.
+    /// - `scan_words` calls its `visit_value` argument with each metadata value
+    ///   which is byte-unaligned, and the data address of the metadata valu.
+    ///
+    /// `scan_words` calls each function with arguments in order of lowest to
+    /// highest addresses.
     pub fn scan_words<T: MetadataValue>(
         &self,
         data_start_addr: Address,
