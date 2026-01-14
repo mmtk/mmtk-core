@@ -404,12 +404,6 @@ pub struct AddressIterator {
     step: usize,
 }
 
-impl AddressIterator {
-    pub fn new(start: Address, end: Address, step: usize) -> Self {
-        Self { start, end, step }
-    }
-}
-
 impl Iterator for AddressIterator {
     type Item = Address;
 

@@ -253,7 +253,7 @@ impl MemorySlice for Range<Address> {
     type SlotIterator = AddressRangeIterator;
 
     fn iter_slots(&self) -> Self::SlotIterator {
-        AddressRangeIterator(AddressIterator::new(self.start, self.end, BYTES_IN_ADDRESS))
+        AddressRangeIterator(self.start.iter_to(self.end, BYTES_IN_ADDRESS))
     }
 
     fn object(&self) -> Option<ObjectReference> {
