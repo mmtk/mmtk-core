@@ -157,11 +157,15 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 
     fn object_probable_write_slow(&mut self, obj: ObjectReference) {
-        // Note: the purpose of the SATB barrier is to ensure all *strongly reachable* objects at
-        // the beginning of the trace will eventually be marked and scanned.  Therefore, we use the
-        // `StrongOnly` here to enqueue children of strong fields.  The current `obj` will
-        // eventually be scanned by the `ConcurrentTraceObjects` work packet using the
-        // `StrongClosure` policy, either during the concurrent tracing, or during `FinalMark`.
+        // Note: The SATB barrier ensures all *strongly reachable* objects from roots at the
+        // beginning of a trace (i.e. the SATB) will eventually be marked.  To do this, the SATB
+        // barrier enqueues the current children of *strong fields*, but it doesn't mark the current
+        // object or its children.  Instead, the marking and scanning will happen in the
+        // `ConcurrentTraceObjects` work packet which is executed either during the concurrent
+        //  tracing, or during `FinalMark`.  For this reason, the barrier itself is not the right
+        // time to do "reference discovery" because we only discover references of objects
+        // determined to be live.  Therefore, we use `StrongOnly` here and only visit children of
+        // strong fields.
         crate::plan::tracing::SlotIterator::<VM>::iterate_fields::<_, StrongOnly>(
             obj,
             self.tls.0,
