@@ -167,36 +167,73 @@ where
     }
 }
 
-pub enum ByteWordRange {
-    Bytes { start: Address, end: Address },
-    Words { start: Address, end: Address },
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BitWordRange {
+    /// A range of whole words.
+    Words {
+        /// The starting address (inclusive) of the words.
+        start: Address,
+        /// The ending address (exclusive) of the words.
+        end: Address,
+    },
+    /// A range of bits within a word.
+    BitsInWord {
+        /// The address of the word.
+        addr: Address,
+        /// The starting bit index (inclusive), starting with zero from the low-order bit.
+        bit_start: BitOffset,
+        /// The ending bit index (exclusive), starting with zero from the low-order bit.
+        /// Be careful when shifting a `u8` value because shifting an `u8` by 8 or more
+        /// is considered an overflow in Rust. This index may be `BITS_IN_ADDRESS` which
+        /// means the range includes the highest bit.
+        bit_end: BitOffset,
+    },
 }
 
-pub fn break_byte_range(
+pub fn break_bit_word_range(
     start_addr: Address,
+    start_bit: BitOffset,
     end_addr: Address,
-    visitor: &mut impl FnMut(ByteWordRange),
+    end_bit: BitOffset,
+    visitor: &mut impl FnMut(BitWordRange),
 ) {
-    use crate::util::constants::BYTES_IN_ADDRESS;
-    let start_word = start_addr.align_up(BYTES_IN_ADDRESS);
+    use crate::util::constants::{BITS_IN_ADDRESS, BITS_IN_BYTE, BYTES_IN_ADDRESS};
+    if (start_addr, start_bit) == (end_addr, end_bit) {
+        return;
+    }
+    // Convert the byte-wise (addr, bit) pairs to word-wise (addr, bit) pairs.
+    let start_word = start_addr.align_down(BYTES_IN_ADDRESS);
     let end_word = end_addr.align_down(BYTES_IN_ADDRESS);
-    if start_word != start_addr {
-        visitor(ByteWordRange::Bytes {
-            start: start_addr,
-            end: start_word,
-        });
+    let start_bit = start_bit + BITS_IN_BYTE as u8 * (start_addr - start_word) as u8;
+    let end_bit = end_bit + BITS_IN_BYTE as u8 * (end_addr - end_word) as u8;
+
+    let start_aligned = start_bit == 0;
+    let end_aligned = end_bit == 0;
+    if !start_aligned {
+        visitor(BitWordRange::BitsInWord {
+            addr: start_word,
+            bit_start: start_bit,
+            bit_end: BITS_IN_ADDRESS as u8,
+        })
     }
-    if start_word != end_word {
-        visitor(ByteWordRange::Words {
-            start: start_word,
+    let word_range_start = if start_aligned {
+        start_addr
+    } else {
+        start_addr + BYTES_IN_ADDRESS
+    };
+
+    if word_range_start < end_word {
+        visitor(BitWordRange::Words {
+            start: word_range_start,
             end: end_word,
-        });
+        })
     }
-    if end_word != end_addr {
-        visitor(ByteWordRange::Bytes {
-            start: end_word,
-            end: end_addr,
-        });
+    if !end_aligned {
+        visitor(BitWordRange::BitsInWord {
+            addr: end_word,
+            bit_start: 0,
+            bit_end: end_bit,
+        })
     }
 }
 
