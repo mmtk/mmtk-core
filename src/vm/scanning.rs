@@ -57,13 +57,13 @@ impl<F: FnMut(ObjectReference) -> ObjectReference> ObjectTracer for F {
 pub trait RefScanPolicy {
     /// True if the reference scanning function should visit strong reference fields in the object using
     /// callbacks.
-    const SHOULD_VISIT_STRONG: bool;
+    const VISIT_STRONG: bool;
     /// True if the reference scanning function should visit weak reference fields in the object using
     /// callbacks.
-    const SHOULD_VISIT_WEAK: bool;
+    const VISIT_WEAK: bool;
     /// True if the reference scanning function should discover weak reference fields in VM-specific
     /// ways.
-    const SHOULD_DISCOVER_WEAK: bool;
+    const DISCOVER_WEAK: bool;
 }
 
 /// An `ObjectTracerContext` gives a GC worker temporary access to an `ObjectTracer`, allowing
