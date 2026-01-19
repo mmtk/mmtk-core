@@ -674,11 +674,6 @@ impl ObjectReference {
         unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_reachable(self)
     }
 
-    /// Is the object live, determined by the policy?
-    pub fn is_live(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_live(self)
-    }
-
     /// Can the object be moved?
     pub fn is_movable(self) -> bool {
         unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_movable()
