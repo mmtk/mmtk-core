@@ -17,17 +17,13 @@ macro_rules! define_erased_vm_mut_ref {
         pub struct $new_type<'a>(usize, PhantomData<&'a ()>);
         impl<'a> $new_type<'a> {
             pub fn new<VM: VMBinding>(r: &'a mut $orig_type) -> Self {
-                let worker_as_usize: usize = unsafe { std::mem::transmute(r) };
+                let worker_as_usize: usize = (r as *mut $orig_type).expose_provenance();
                 Self(worker_as_usize, PhantomData)
             }
             pub fn into_mut<VM: VMBinding>(self) -> &'a mut $orig_type {
-                // Provenance-related APIs were stabilized in Rust 1.84.
-                // Rust 1.91 introduced the warn-by-default lint `integer_to_ptr_transmutes`.
-                // Since our MSRV is still 1.74.1, we can't fix it until bumping MSRV.
-                #[allow(unknown_lints)]
-                #[allow(integer_to_ptr_transmutes)]
                 unsafe {
-                    std::mem::transmute(self.0)
+                    &mut *(std::ptr::with_exposed_provenance(self.0) as *const $orig_type
+                        as *mut $orig_type)
                 }
             }
         }
