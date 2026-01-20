@@ -1257,7 +1257,7 @@ impl SideMetadataSpec {
     ///
     /// `scan_words` calls each function with arguments in order of lowest to
     /// highest addresses.
-    pub fn scan_words<T: MetadataValue>(
+    pub fn scan_words(
         &self,
         data_start_addr: Address,
         data_end_addr: Address,

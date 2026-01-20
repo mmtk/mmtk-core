@@ -199,7 +199,7 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
 
         let mut to = region.start();
         let mut carry: i64 = 0;
-        MARK_SPEC.scan_words::<u8>(
+        MARK_SPEC.scan_words(
             region.start(),
             cursor.align_up(Block::BYTES),
             &mut |word, _, start, end| {
