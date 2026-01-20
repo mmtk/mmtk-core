@@ -1,4 +1,4 @@
-use crate::util::constants::BYTES_IN_WORD;
+use crate::util::constants::{BYTES_IN_WORD, LOG_BITS_IN_WORD};
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::spec_defs::{COMPRESSOR_MARK, COMPRESSOR_OFFSET_VECTOR};
 use crate::util::metadata::side_metadata::SideMetadataSpec;
@@ -105,7 +105,7 @@ pub struct ForwardingMetadata<VM: VMBinding> {
 #[derive(Copy, Clone, PartialEq, PartialOrd)]
 pub(crate) struct Block(Address);
 impl Region for Block {
-    const LOG_BYTES: usize = 9;
+    const LOG_BYTES: usize = 9; // 512 B
     fn from_aligned_address(address: Address) -> Self {
         assert!(address.is_aligned_to(Self::BYTES));
         Block(address)
@@ -163,6 +163,10 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
         // This function implements Geoff Langdale's
         // algorithm to find quote pairs using prefix sums:
         // https://branchfree.org/2019/03/06/code-fragment-finding-quote-pairs-with-carry-less-multiply-pclmulqdq/
+
+        // We require that each block has at least one word of
+        // mark bitmap for this algorithm to work.
+        const_assert!(Block::LOG_BYTES - MARK_SPEC.log_bytes_in_region >= LOG_BITS_IN_WORD);
         debug_assert!(processor_can_clmul());
         // We need a local function to use #[target_feature], which in turn
         // allows rustc to generate the POPCNT and PCLMULQDQ instructions.
@@ -234,10 +238,7 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
     pub fn calculate_offset_vector(&self, region: CompressorRegion, cursor: Address) {
         #[cfg(target_arch = "x86_64")]
         {
-            // XXX: how to derive this? It's s.t. the mark bits
-            // for one block occupy at least one word.
-            let blocks_large_enough = Block::LOG_BYTES >= 9;
-            if self._use_clmul && blocks_large_enough && processor_can_clmul() {
+            if self._use_clmul && processor_can_clmul() {
                 unsafe {
                     // SAFETY: We checked the processor supports the
                     // necessary instructions.
