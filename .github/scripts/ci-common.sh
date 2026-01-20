@@ -66,7 +66,12 @@ init_non_exclusive_features() {
             IFS='='; feature=($line); unset IFS;
             if [[ ! -z "$feature" ]]; then
                 # Trim whitespaces
-                features[i]=$(echo $feature)
+                feature_name=$(echo $feature)
+                # jemalloc does not support Windows
+                if [[ $os == "windows" && $feature_name == "malloc_jemalloc" ]]; then
+                    continue
+                fi
+                features[i]=$feature_name
                 let "i++"
             fi
         fi
@@ -117,6 +122,11 @@ init_exclusive_features() {
             if [[ ! -z "$feature" ]]; then
                 # Trim whitespaces
                 features[i]=$(echo $feature)
+                # jemalloc does not support Windows
+                if [[ $os == "windows" && $feature_name == "malloc_jemalloc" ]]; then
+                    continue
+                fi
+                features[i]=$feature_name
                 let "i++"
             fi
         fi
