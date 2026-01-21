@@ -16,9 +16,9 @@ use crate::vm::{ObjectTracer, SlotVisitor};
 ///
 /// [pg-weakref]:
 ///     https://docs.mmtk.io/portingguide/concerns/weakref.html#identifying-weak-references
-pub struct StrongClosure;
+pub struct Closure;
 
-impl RefScanPolicy for StrongClosure {
+impl RefScanPolicy for Closure {
     const VISIT_STRONG: bool = true;
     const VISIT_WEAK: bool = false;
     const DISCOVER_WEAK: bool = true;
