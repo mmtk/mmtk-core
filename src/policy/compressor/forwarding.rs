@@ -1,4 +1,4 @@
-use crate::util::constants::{BYTES_IN_WORD, LOG_BITS_IN_WORD};
+use crate::util::constants::BYTES_IN_WORD;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::spec_defs::{COMPRESSOR_MARK, COMPRESSOR_OFFSET_VECTOR};
 use crate::util::metadata::side_metadata::SideMetadataSpec;
@@ -166,6 +166,7 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
 
         // We require that each block has at least one word of
         // mark bitmap for this algorithm to work.
+        use crate::util::constants::LOG_BITS_IN_WORD;
         const_assert!(Block::LOG_BYTES - MARK_SPEC.log_bytes_in_region >= LOG_BITS_IN_WORD);
         debug_assert!(processor_can_clmul());
         // We need a local function to use #[target_feature], which in turn
