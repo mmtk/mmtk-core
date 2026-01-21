@@ -4,7 +4,7 @@ use crate::plan::PlanTraceObject;
 use crate::plan::VectorQueue;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::gc_work::{ScanObjects, SlotOf};
-use crate::util::ref_scan_policy::Closure;
+use crate::util::ref_scan_policy;
 use crate::util::ObjectReference;
 use crate::vm::slot::Slot;
 use crate::{
@@ -75,7 +75,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 
     fn scan_and_enqueue(&mut self, object: ObjectReference) {
-        crate::plan::tracing::SlotIterator::<VM>::iterate_fields::<Closure>(
+        crate::plan::tracing::SlotIterator::<VM>::iterate_fields::<ref_scan_policy::Closure>(
             object,
             self.worker().tls.0,
             |s| {

@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 use super::{concurrent_marking_work::ProcessModBufSATB, Pause};
 use crate::plan::global::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
-use crate::util::ref_scan_policy::StrongOnly;
+use crate::util::ref_scan_policy;
 use crate::util::VMMutatorThread;
 use crate::{
     plan::{barriers::BarrierSemantics, concurrent::global::ConcurrentPlan, VectorQueue},
@@ -166,7 +166,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         // time to do "reference discovery" because we only discover references of objects
         // determined to be live.  Therefore, we use `StrongOnly` here and only visit children of
         // strong fields.
-        crate::plan::tracing::SlotIterator::<VM>::iterate_fields::<StrongOnly>(
+        crate::plan::tracing::SlotIterator::<VM>::iterate_fields::<ref_scan_policy::StrongOnly>(
             obj,
             self.tls.0,
             |s| {
