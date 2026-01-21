@@ -11,6 +11,7 @@ use num_traits::FromPrimitive;
 use ranges::{BitByteRange, BitOffset, BitWordRange};
 use std::fmt;
 use std::io::Result;
+use std::ops::Range;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 /// This struct stores the specification of a side metadata bit-set.
@@ -1249,11 +1250,9 @@ impl SideMetadataSpec {
     }
 
     /// Walk the metadata between two addresses, calling visitor functions for parts
-    /// and whole words. `scan_words` calls its `visit_part_word` argument with a
+    /// and whole words. `scan_words` calls its `visit_word` argument with a
     /// metadata word, the data address corresponding to the start of that word,
-    /// and the start and ending indices of bits in the word. `scan_words` calls
-    /// `visit_full_word` argument with a metadata word and the data address
-    /// corresponding to the start of that word.
+    /// and optionally a range of bit offsets when visiting part of a word.
     ///
     /// `scan_words` calls each function with arguments in order of lowest to
     /// highest addresses.
@@ -1261,8 +1260,7 @@ impl SideMetadataSpec {
         &self,
         data_start_addr: Address,
         data_end_addr: Address,
-        visit_part_word: &mut impl FnMut(usize, Address, BitOffset, BitOffset),
-        visit_full_word: &mut impl FnMut(usize, Address),
+        visit_word: &mut impl FnMut(usize, Address, Option<Range<BitOffset>>),
     ) {
         assert!(self.uses_contiguous_side_metadata());
         let start_meta_addr = address_to_contiguous_meta_address(self, data_start_addr);
@@ -1275,7 +1273,7 @@ impl SideMetadataSpec {
                 for meta in start.iter_to(end, crate::util::constants::BYTES_IN_ADDRESS) {
                     let addr = contiguous_meta_address_to_address(self, meta, 0);
                     let word = unsafe { meta.load::<usize>() };
-                    visit_full_word(word, addr)
+                    visit_word(word, addr, None)
                 }
             }
             BitWordRange::BitsInWord {
@@ -1285,7 +1283,7 @@ impl SideMetadataSpec {
             } => {
                 let addr = contiguous_meta_address_to_address(self, meta, 0);
                 let word = unsafe { meta.load::<usize>() };
-                visit_part_word(word, addr, bit_start, bit_end)
+                visit_word(word, addr, Some(bit_start..bit_end))
             }
         };
 

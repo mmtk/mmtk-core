@@ -206,11 +206,12 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
         MARK_SPEC.scan_words(
             region.start(),
             cursor.align_up(Block::BYTES),
-            &mut |word, _, start, end| {
-                panic!("should be word aligned, got {word}[{start}:{end}] instead")
-            },
-            &mut |word: usize, addr: Address| {
-                inner(&mut to, &mut carry, word, addr);
+            &mut |word, addr, bits| match bits {
+                Some(range) => panic!(
+                    "should be word aligned, got {word}[{}:{}] instead",
+                    range.start, range.end
+                ),
+                None => inner(&mut to, &mut carry, word, addr),
             },
         );
     }
