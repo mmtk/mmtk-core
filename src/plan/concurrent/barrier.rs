@@ -166,7 +166,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         // time to do "reference discovery" because we only discover references of objects
         // determined to be live.  Therefore, we use `StrongOnly` here and only visit children of
         // strong fields.
-        crate::plan::tracing::SlotIterator::<VM>::iterate_fields::<_, StrongOnly>(
+        crate::plan::tracing::SlotIterator::<VM>::iterate_fields::<StrongOnly>(
             obj,
             self.tls.0,
             |s| {

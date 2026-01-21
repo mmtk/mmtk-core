@@ -213,10 +213,10 @@ pub trait Scanning<VM: VMBinding> {
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
     /// * `slot_visitor`: Called back for each field.
-    fn scan_object<SV: SlotVisitor<VM::VMSlot>, R: RefScanPolicy>(
+    fn scan_object<R: RefScanPolicy>(
         tls: VMWorkerThread,
         object: ObjectReference,
-        slot_visitor: &mut SV,
+        slot_visitor: &mut impl SlotVisitor<VM::VMSlot>,
     );
 
     /// Delegated scanning of a object, visiting each reference field encountered, and tracing the
@@ -238,10 +238,10 @@ pub trait Scanning<VM: VMBinding> {
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
     /// * `object_tracer`: Called back for the object reference held in each field.
-    fn scan_object_and_trace_edges<OT: ObjectTracer, R: RefScanPolicy>(
+    fn scan_object_and_trace_edges<R: RefScanPolicy>(
         _tls: VMWorkerThread,
         _object: ObjectReference,
-        _object_tracer: &mut OT,
+        _object_tracer: &mut impl ObjectTracer,
     ) {
         unreachable!("scan_object_and_trace_edges() will not be called when support_slot_enqueuing() is always true.")
     }

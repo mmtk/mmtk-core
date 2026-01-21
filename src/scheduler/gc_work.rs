@@ -868,7 +868,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                 if <VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, object) {
                     trace!("Scan object (slot) {}", object);
                     // If an object supports slot-enqueuing, we enqueue its slots.
-                    <VM as VMBinding>::VMScanning::scan_object::<_, Closure>(
+                    <VM as VMBinding>::VMScanning::scan_object::<Closure>(
                         tls,
                         object,
                         &mut closure,
@@ -901,7 +901,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                 // Scan objects and trace their outgoing edges at the same time.
                 for object in scan_later.iter().copied() {
                     trace!("Scan object (node) {}", object);
-                    <VM as VMBinding>::VMScanning::scan_object_and_trace_edges::<_, Closure>(
+                    <VM as VMBinding>::VMScanning::scan_object_and_trace_edges::<Closure>(
                         tls,
                         object,
                         object_tracer,

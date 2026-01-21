@@ -157,10 +157,10 @@ pub(crate) struct SlotIterator<VM: VMBinding> {
 
 impl<VM: VMBinding> SlotIterator<VM> {
     /// Iterate over the slots of an object by applying a function to each slot.
-    pub fn iterate_fields<F: FnMut(VM::VMSlot), R: RefScanPolicy>(
+    pub fn iterate_fields<R: RefScanPolicy>(
         object: ObjectReference,
         _tls: VMThread,
-        mut f: F,
+        mut f: impl FnMut(VM::VMSlot),
     ) {
         // FIXME: We should use tls from the arguments.
         // See https://github.com/mmtk/mmtk-core/issues/1375
@@ -168,6 +168,6 @@ impl<VM: VMBinding> SlotIterator<VM> {
         if !<VM::VMScanning as Scanning<VM>>::support_slot_enqueuing(fake_tls, object) {
             panic!("SlotIterator::iterate_fields cannot be used on objects that don't support slot-enqueuing");
         }
-        <VM::VMScanning as Scanning<VM>>::scan_object::<_, R>(fake_tls, object, &mut f);
+        <VM::VMScanning as Scanning<VM>>::scan_object::<R>(fake_tls, object, &mut f);
     }
 }
