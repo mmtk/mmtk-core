@@ -341,9 +341,9 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     }
 
     fn update_references(&self, worker: &mut GCWorker<VM>, object: ObjectReference) {
-        if VM::VMScanning::support_slot_enqueuing(worker.tls, object) {
+        if VM::VMScanning::support_slot_enqueuing(worker.tls.into(), object) {
             VM::VMScanning::scan_object::<ref_scan_policy::RefUpdate>(
-                worker.tls,
+                worker.tls.into(),
                 object,
                 &mut |s: VM::VMSlot| {
                     if let Some(o) = s.load() {
@@ -353,7 +353,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
             );
         } else {
             VM::VMScanning::scan_object_and_trace_edges::<ref_scan_policy::RefUpdate>(
-                worker.tls,
+                worker.tls.into(),
                 object,
                 &mut |o| self.forward(o, false),
             );

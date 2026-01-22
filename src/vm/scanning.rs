@@ -1,6 +1,7 @@
 use crate::plan::Mutator;
 use crate::scheduler::GCWorker;
 use crate::util::ObjectReference;
+use crate::util::VMThread;
 use crate::util::VMWorkerThread;
 use crate::vm::slot::Slot;
 use crate::vm::VMBinding;
@@ -191,7 +192,7 @@ pub trait Scanning<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
-    fn support_slot_enqueuing(_tls: VMWorkerThread, _object: ObjectReference) -> bool {
+    fn support_slot_enqueuing(_tls: VMThread, _object: ObjectReference) -> bool {
         true
     }
 
@@ -214,7 +215,7 @@ pub trait Scanning<VM: VMBinding> {
     /// * `object`: The object to be scanned.
     /// * `slot_visitor`: Called back for each field.
     fn scan_object<R: RefScanPolicy>(
-        tls: VMWorkerThread,
+        tls: VMThread,
         object: ObjectReference,
         slot_visitor: &mut impl SlotVisitor<VM::VMSlot>,
     );
@@ -239,7 +240,7 @@ pub trait Scanning<VM: VMBinding> {
     /// * `object`: The object to be scanned.
     /// * `object_tracer`: Called back for the object reference held in each field.
     fn scan_object_and_trace_edges<R: RefScanPolicy>(
-        _tls: VMWorkerThread,
+        _tls: VMThread,
         _object: ObjectReference,
         _object_tracer: &mut impl ObjectTracer,
     ) {

@@ -865,11 +865,11 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
             }
 
             for object in objects_to_scan.iter().copied() {
-                if <VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, object) {
+                if <VM as VMBinding>::VMScanning::support_slot_enqueuing(tls.into(), object) {
                     trace!("Scan object (slot) {}", object);
                     // If an object supports slot-enqueuing, we enqueue its slots.
                     <VM as VMBinding>::VMScanning::scan_object::<ref_scan_policy::Closure>(
-                        tls,
+                        tls.into(),
                         object,
                         &mut closure,
                     );
@@ -903,7 +903,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                     trace!("Scan object (node) {}", object);
                     <VM as VMBinding>::VMScanning::scan_object_and_trace_edges::<
                         ref_scan_policy::Closure,
-                    >(tls, object, object_tracer);
+                    >(tls.into(), object, object_tracer);
                     self.post_scan_object(object);
                 }
             });
