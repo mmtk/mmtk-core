@@ -47,7 +47,7 @@ impl RefScanPolicy for All {
 
 /// Instruct the VM binding to visit all strong fields, without any hints about the MMTk's
 /// intention to call the object-scanning function.  Particularly, the VM binding should not
-/// discover weak references as [`StrongClosure`] implies.
+/// discover weak references which the [`Closure`] policy implies.
 pub struct StrongOnly;
 
 impl RefScanPolicy for StrongOnly {
