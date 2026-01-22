@@ -32,6 +32,16 @@ Notes for the mmtk-core developers:
 
 ## 0.32.0
 
+### The Cargo feature "is_mmtk_object" is removed
+
+```admonish tldr
+The "is_mmtk_object" cargo feature is removed.  Anything previously enabled by the "is_mmtk_object"
+feature are now enabled by the "vo_bit" feature.
+```
+
+API changes: None.  If a VM binding uses the "is_mmtk_object" feature, it should now use the
+"vo_bit" feature if not already using, and existing code should still compile.
+
 ### Allocation options changed
 
 ```admonish tldr

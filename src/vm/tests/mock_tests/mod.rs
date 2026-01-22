@@ -35,7 +35,7 @@ mod mock_test_allocate_with_re_enable_collection;
 mod mock_test_allocate_without_initialize_collection;
 mod mock_test_allocator_info;
 mod mock_test_barrier_slow_path_assertion;
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 mod mock_test_conservatism;
 mod mock_test_debug_get_object_info;
 #[cfg(target_os = "linux")]
@@ -44,15 +44,15 @@ mod mock_test_handle_mmap_oom;
 #[cfg(feature = "vo_bit")]
 mod mock_test_heap_traversal;
 mod mock_test_init_fork;
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 mod mock_test_internal_ptr_before_object_ref;
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 mod mock_test_internal_ptr_invalid;
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 mod mock_test_internal_ptr_large_object_multi_page;
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 mod mock_test_internal_ptr_large_object_same_page;
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 mod mock_test_internal_ptr_normal_object;
 mod mock_test_is_in_mmtk_spaces;
 mod mock_test_issue139_allocate_non_multiple_of_min_alignment;
