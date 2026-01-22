@@ -62,7 +62,7 @@ extern bool mmtk_is_live_object(void* object);
 extern bool mmtk_will_never_move(void* object);
 
 // Return if the address is an object in MMTk heap.
-// Only available when the feature is_mmtk_object is enabled.
+// Only available when the feature vo_bit is enabled.
 extern bool mmtk_is_mmtk_object(void* addr);
 
 // Return if the object is in any MMTk space.

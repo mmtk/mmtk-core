@@ -22,7 +22,7 @@ pub mod copy;
 /// Heap implementation, including page resource, mmapper, etc.
 pub mod heap;
 /// Checking if an address is an valid MMTk object.
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 pub mod is_mmtk_object;
 /// Linear scan through a heap range
 pub mod linear_scan;

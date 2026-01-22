@@ -24,5 +24,5 @@ atomic = "0.6"
 
 [features]
 default = []
-is_mmtk_object = ["mmtk/is_mmtk_object"]
+vo_bit = ["mmtk/vo_bit"]
 malloc_counted_size = ["mmtk/malloc_counted_size"]
