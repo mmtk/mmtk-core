@@ -56,6 +56,8 @@ pub(crate) mod logger;
 pub(crate) mod object_enum;
 /// Forwarding word in object copying.
 pub(crate) mod object_forwarding;
+/// RefScanPolicy implementations.
+pub(crate) mod ref_scan_policy;
 /// Reference processing implementation.
 pub(crate) mod reference_processor;
 /// Utilities funcitons for Rust
