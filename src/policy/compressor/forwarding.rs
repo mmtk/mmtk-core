@@ -273,7 +273,7 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
 
     #[cfg(target_arch = "x86_64")]
     #[target_feature(enable = "pclmulqdq,popcnt")]
-    fn forward_clmul(&self, address: Address) -> Address {
+    unsafe fn forward_clmul(&self, address: Address) -> Address {
         debug_assert!(processor_can_clmul());
         let block = Block::from_unaligned_address(address);
         let (mut to, mut carry) = {
@@ -336,7 +336,7 @@ cfg_if::cfg_if! {
         }
 
         #[target_feature(enable = "pclmulqdq,popcnt")]
-        fn clmul_step(to: &mut Address, carry: &mut i64, word: usize) {
+        unsafe fn clmul_step(to: &mut Address, carry: &mut i64, word: usize) {
             use std::arch::x86_64;
             // Compute the prefix sum of this word of mark bitmap.
             let ones = x86_64::_mm_set1_epi8(0xFFu8 as i8);
