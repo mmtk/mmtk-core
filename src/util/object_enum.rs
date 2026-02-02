@@ -18,13 +18,13 @@ pub trait ObjectEnumerator {
     /// Visit a single object.
     fn visit_object(&mut self, object: ObjectReference);
     /// Visit an address range that may contain objects.
-    fn visit_address_range(&mut self, space_name: &str, start: Address, end: Address);
+    fn visit_address_range(&mut self, start: Address, end: Address);
 }
 
 /// An implementation of `ObjectEnumerator` that wraps a callback.
 pub struct ClosureObjectEnumerator<F, VM>
 where
-    F: FnMut(&str, Address, usize, ObjectReference),
+    F: FnMut(ObjectReference),
     VM: VMBinding,
 {
     object_callback: F,
@@ -33,7 +33,7 @@ where
 
 impl<F, VM> ClosureObjectEnumerator<F, VM>
 where
-    F: FnMut(&str, Address, usize, ObjectReference),
+    F: FnMut(ObjectReference),
     VM: VMBinding,
 {
     pub fn new(object_callback: F) -> Self {
@@ -46,17 +46,17 @@ where
 
 impl<F, VM> ObjectEnumerator for ClosureObjectEnumerator<F, VM>
 where
-    F: FnMut(&str, Address, usize, ObjectReference),
+    F: FnMut(ObjectReference),
     VM: VMBinding,
 {
     fn visit_object(&mut self, object: ObjectReference) {
-        (self.object_callback)(&"", Address::ZERO, 0, object);
+        (self.object_callback)(object);
     }
 
-    fn visit_address_range(&mut self, space_name: &str, start: Address, end: Address) {
+    fn visit_address_range(&mut self, start: Address, end: Address) {
         VO_BIT.scan_non_zero_values::<u8>(start, end, &mut |address| {
             let object = vo_bit::get_object_ref_for_vo_addr(address);
-            (self.object_callback)(space_name, start, end - start, object);
+            (self.object_callback)(object);
         })
     }
 }
@@ -76,7 +76,6 @@ pub(crate) trait BlockMayHaveObjects: Region {
 }
 
 pub(crate) fn enumerate_blocks_from_chunk_map<B>(
-    space_name: &str,
     enumerator: &mut dyn ObjectEnumerator,
     chunk_map: &ChunkMap,
 ) where
@@ -85,7 +84,7 @@ pub(crate) fn enumerate_blocks_from_chunk_map<B>(
     for chunk in chunk_map.all_chunks() {
         for block in chunk.iter_region::<B>() {
             if block.may_have_objects() {
-                enumerator.visit_address_range(space_name, block.start(), block.end());
+                enumerator.visit_address_range(block.start(), block.end());
             }
         }
     }
@@ -98,6 +97,6 @@ pub(crate) fn enumerate_blocks_from_monotonic_page_resource<VM>(
     VM: VMBinding,
 {
     for (start, size) in pr.iterate_allocated_regions() {
-        enumerator.visit_address_range(&"", start, start + size);
+        enumerator.visit_address_range(start, start + size);
     }
 }

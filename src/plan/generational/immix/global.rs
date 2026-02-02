@@ -10,6 +10,7 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::gc_work::TraceKind;
+use crate::policy::immix::defrag::StatsForDefrag;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::immix::ImmixSpaceArgs;
 use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
@@ -20,6 +21,7 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
+use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
@@ -131,8 +133,13 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         if full_heap {
             self.immix_space.prepare(
                 full_heap,
-                Some(crate::policy::immix::defrag::StatsForDefrag::new(self)),
+                Some(StatsForDefrag::new(self)),
+                // Bulk clear unlog bits so that we will reconstruct them.
+                UnlogBitsOperation::BulkClear,
             );
+        } else {
+            // We don't do anything special to unlog bits during nursery GC
+            // because ProcessModBuf will set the unlog bits back.
         }
     }
 
@@ -140,8 +147,16 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.release(tls);
         if full_heap {
-            self.immix_space.release(full_heap);
+            self.immix_space.release(
+                full_heap,
+                // We reconstructred unlog bits during tracing.  Keep them.
+                UnlogBitsOperation::NoOp,
+            );
+        } else {
+            // We don't do anything special to unlog bits during nursery GC
+            // because ProcessModBuf has set the unlog bits back.
         }
+
         self.last_gc_was_full_heap
             .store(full_heap, Ordering::Relaxed);
     }
@@ -247,12 +262,14 @@ impl<VM: VMBinding> GenImmix<VM> {
                 crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
         };
         let immix_space = ImmixSpace::new(
-            plan_args.get_space_args("immix_mature", true, false, VMRequest::discontiguous()),
+            plan_args.get_mature_space_args(
+                "immix_mature",
+                true,
+                false,
+                VMRequest::discontiguous(),
+            ),
             ImmixSpaceArgs {
-                // We need to unlog objects at tracing time since we currently clear all log bits during a major GC
-                unlog_object_when_traced: true,
                 // In GenImmix, young objects are not allocated in ImmixSpace directly.
-                #[cfg(feature = "vo_bit")]
                 mixed_age: false,
                 never_move_objects: false,
             },

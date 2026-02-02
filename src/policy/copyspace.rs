@@ -57,7 +57,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         !self.is_from_space()
     }
 
-    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, _object: ObjectReference) {
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(_object);
     }
@@ -147,6 +147,20 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, &self.pr);
     }
+
+    fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            log_bit.bzero_metadata(start, size);
+        }
+    }
+
+    fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            log_bit.bset_metadata(start, size);
+        }
+    }
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<VM> {
@@ -222,12 +236,6 @@ impl<VM: VMBinding> CopySpace<VM> {
                 *<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC
             {
                 side_forwarding_status_table.bzero_metadata(start, size);
-            }
-
-            if self.common.needs_log_bit {
-                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                    side.bzero_metadata(start, size);
-                }
             }
 
             // Clear VO bits because all objects in the space are dead.
@@ -359,6 +367,13 @@ impl<VM: VMBinding> PolicyCopyContext for CopySpaceCopyContext<VM> {
     ) -> Address {
         self.copy_allocator.alloc(bytes, align, offset)
     }
+
+    fn post_copy(&mut self, obj: ObjectReference, _bytes: usize) {
+        if self.copy_allocator.get_space().common().unlog_traced_object {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                .mark_byte_as_unlogged::<VM>(obj, Ordering::Relaxed);
+        }
+    }
 }
 
 impl<VM: VMBinding> CopySpaceCopyContext<VM> {
@@ -371,9 +386,7 @@ impl<VM: VMBinding> CopySpaceCopyContext<VM> {
             copy_allocator: BumpAllocator::new(tls.0, tospace, context),
         }
     }
-}
 
-impl<VM: VMBinding> CopySpaceCopyContext<VM> {
     pub fn rebind(&mut self, space: &CopySpace<VM>) {
         self.copy_allocator
             .rebind(unsafe { &*{ space as *const _ } });

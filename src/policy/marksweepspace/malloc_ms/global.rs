@@ -125,7 +125,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         )
     }
 
-    fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, object: ObjectReference) {
         trace!("initialize_object_metadata for object {}", object);
         set_vo_bit(object);
     }
@@ -243,6 +243,14 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     }
 
     fn enumerate_objects(&self, _enumerator: &mut dyn ObjectEnumerator) {
+        unimplemented!()
+    }
+
+    fn clear_side_log_bits(&self) {
+        unimplemented!()
+    }
+
+    fn set_side_log_bits(&self) {
         unimplemented!()
     }
 }

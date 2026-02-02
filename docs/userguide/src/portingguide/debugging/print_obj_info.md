@@ -20,7 +20,7 @@ Then call `mmtk_debug_print_object` with the interested object.
 
 ```console
 (rr) set language c
-(rr) call mmtk_debug_print_object_info(0x200fffed9f0)
+(rr) call mmtk_debug_print_object(0x200fffed9f0)
 In immix:
 marked = false
 line marked = false

@@ -139,7 +139,16 @@ impl SFTRefStorage {
     // Load with the acquire ordering.
     pub fn load(&self) -> &dyn SFT {
         let val = self.0.load(Ordering::Acquire);
-        unsafe { std::mem::transmute(val) }
+        // Provenance-related APIs were stabilized in Rust 1.84.
+        // Rust 1.91 introduced the warn-by-default lint `integer_to_ptr_transmutes`.
+        // However, pointer provenance API only works for ptr-sized intergers, and
+        // here we are transmuting from a double-word sized integer to a fat pointer.
+        // We still need to use transmute here.
+        #[allow(unknown_lints)]
+        #[allow(integer_to_ptr_transmutes)]
+        unsafe {
+            std::mem::transmute(val)
+        }
     }
 
     // Store a raw SFT pointer with the release ordering.
@@ -182,9 +191,13 @@ mod space_map {
         }
 
         fn get_checked(&self, address: Address) -> &dyn SFT {
-            // We should be able to map the entire address range to indices in the table.
-            debug_assert!(Self::addr_to_index(address) < self.sft.len());
-            unsafe { self.get_unchecked(address) }
+            if self.has_sft_entry(address) {
+                // We should be able to map the entire address range to indices in the table.
+                debug_assert!(Self::addr_to_index(address) < self.sft.len());
+                unsafe { self.get_unchecked(address) }
+            } else {
+                &EMPTY_SPACE_SFT
+            }
         }
 
         unsafe fn get_unchecked(&self, address: Address) -> &dyn SFT {

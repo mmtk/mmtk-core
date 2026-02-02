@@ -1,6 +1,5 @@
 use crate::policy::sft::SFT;
 use crate::policy::space::Space;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::linear_scan::RegionIterator;
 #[cfg(feature = "vo_bit")]
 use crate::util::ObjectReference;
@@ -140,7 +139,7 @@ impl<VM: VMBinding> RegionInspector for SpaceAsRegion<VM> {
     fn list_objects(&self) -> Vec<ObjectReference> {
         let mut res = vec![];
         let mut enumerator =
-            crate::util::object_enum::ClosureObjectEnumerator::<_, VM>::new(|_, _, _, object| {
+            crate::util::object_enum::ClosureObjectEnumerator::<_, VM>::new(|object| {
                 res.push(object);
             });
         self.space.enumerate_objects(&mut enumerator);

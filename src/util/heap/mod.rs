@@ -9,6 +9,7 @@ pub(crate) mod gc_trigger;
 mod heap_meta;
 pub(crate) mod monotonepageresource;
 pub(crate) mod pageresource;
+pub(crate) mod regionpageresource;
 pub(crate) mod space_descriptor;
 mod vmrequest;
 
@@ -21,6 +22,7 @@ pub(crate) use self::heap_meta::HeapMeta;
 pub use self::layout::vm_layout;
 pub(crate) use self::monotonepageresource::MonotonePageResource;
 pub(crate) use self::pageresource::PageResource;
+pub(crate) use self::regionpageresource::RegionPageResource;
 pub(crate) use self::vmrequest::VMRequest;
 
 /// Heap inspection API.

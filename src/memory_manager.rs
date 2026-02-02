@@ -543,9 +543,11 @@ pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
         "gc_poll() can only be called by a mutator thread."
     );
 
-    if VM::VMCollection::is_collection_enabled() && mmtk.gc_trigger.poll(false, None) {
+    if mmtk.gc_trigger.poll(false, None) {
         debug!("Collection required");
-        assert!(mmtk.state.is_initialized(), "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
+        if !mmtk.state.is_initialized() {
+            panic!("GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
+        }
         VM::VMCollection::block_for_gc(tls);
     }
 }

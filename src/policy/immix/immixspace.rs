@@ -14,6 +14,7 @@ use crate::util::heap::chunk_map::*;
 use crate::util::heap::BlockPageResource;
 use crate::util::heap::PageResource;
 use crate::util::linear_scan::{Region, RegionIterator};
+use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
@@ -137,19 +138,11 @@ pub struct ImmixSpace<VM: VMBinding> {
 
 /// Some arguments for Immix Space.
 pub struct ImmixSpaceArgs {
-    /// Mark an object as unlogged when we trace an object.
-    /// Normally we set the log bit when we copy an object with [`crate::util::copy::CopySemantics::PromoteToMature`].
-    /// In sticky immix, we 'promote' an object to mature when we trace the object
-    /// (no matter we copy an object or not). So we have to use `PromoteToMature`, and instead
-    /// just set the log bit in the space when an object is traced.
-    pub unlog_object_when_traced: bool,
     /// Whether this ImmixSpace instance contains both young and old objects.
     /// This affects the updating of valid-object bits.  If some lines or blocks of this ImmixSpace
     /// instance contain young objects, their VO bits need to be updated during this GC.  Currently
     /// only StickyImmix is affected.  GenImmix allocates young objects in a separete CopySpace
     /// nursery and its VO bits can be cleared in bulk.
-    // Currently only used when "vo_bit" is enabled.  Using #[cfg(...)] to eliminate dead code warning.
-    #[cfg(feature = "vo_bit")]
     pub mixed_age: bool,
     /// Disable copying for this Immix space.
     pub never_move_objects: bool,
@@ -209,7 +202,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, _object: ObjectReference) {
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(_object);
     }
@@ -281,7 +274,27 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
 
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
-        object_enum::enumerate_blocks_from_chunk_map::<Block>(self.name(), enumerator, &self.chunk_map);
+        object_enum::enumerate_blocks_from_chunk_map::<Block>(enumerator, &self.chunk_map);
+    }
+
+    fn clear_side_log_bits(&self) {
+        // Remove the following warning if we have a legitimate use case.
+        warn!("ImmixSpace::clear_side_log_bits is single-treaded.  Consider clearing side metadata in per-chunk work packets.");
+
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
+        }
+    }
+
+    fn set_side_log_bits(&self) {
+        // Remove the following warning if we have a legitimate use case.
+        warn!("ImmixSpace::set_side_log_bits is single-treaded.  Consider setting side metadata in per-chunk work packets.");
+
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for chunk in self.chunk_map.all_chunks() {
+            log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
+        }
     }
 }
 
@@ -395,7 +408,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         args: crate::policy::space::PlanCreateSpaceArgs<VM>,
         mut space_args: ImmixSpaceArgs,
     ) -> Self {
-        if space_args.unlog_object_when_traced {
+        if args.unlog_traced_object {
             assert!(
                 args.constraints.needs_log_bit,
                 "Invalid args when the plan does not use log bit"
@@ -497,6 +510,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             user_triggered_collection,
             self.reusable_blocks.len() == 0,
             full_heap_system_gc,
+            *self.common.options.immix_always_defrag,
         );
         self.defrag.in_defrag()
     }
@@ -506,7 +520,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self.scheduler
     }
 
-    pub fn prepare(&mut self, major_gc: bool, plan_stats: Option<StatsForDefrag>) {
+    pub(crate) fn prepare(
+        &mut self,
+        major_gc: bool,
+        plan_stats: Option<StatsForDefrag>,
+        unlog_bits_op: UnlogBitsOperation,
+    ) {
         if major_gc {
             // Update mark_state
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
@@ -514,14 +533,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             } else {
                 // For header metadata, we use cyclic mark bits.
                 unimplemented!("cyclic mark bits is not supported at the moment");
-            }
-
-            if self.common.needs_log_bit {
-                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                    for chunk in self.chunk_map.all_chunks() {
-                        side.bzero_metadata(chunk.start(), Chunk::BYTES);
-                    }
-                }
             }
 
             // Prepare defrag info
@@ -542,6 +553,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     } else {
                         None
                     },
+                    unlog_bits_op,
                 })
             });
             self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
@@ -602,7 +614,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Release for the immix space.
-    pub fn release(&mut self, major_gc: bool) {
+    pub(crate) fn release(&mut self, major_gc: bool, unlog_bits_op: UnlogBitsOperation) {
         if major_gc {
             // Update line_unavail_state for hole searching after this GC.
             if !super::BLOCK_ONLY {
@@ -617,7 +629,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.reusable_blocks.reset();
         }
         // Sweep chunks and blocks
-        let work_packets = self.generate_sweep_tasks();
+        let work_packets = self.generate_sweep_tasks(unlog_bits_op);
         self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
 
         self.lines_consumed.store(0, Ordering::Relaxed);
@@ -726,7 +738,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Generate chunk sweep tasks
-    fn generate_sweep_tasks(&self) -> Vec<Box<dyn GCWork<VM>>> {
+    fn generate_sweep_tasks(&self, unlog_bits_op: UnlogBitsOperation) -> Vec<Box<dyn GCWork<VM>>> {
         self.defrag.mark_histograms.lock().clear();
         // # Safety: ImmixSpace reference is always valid within this collection cycle.
         let space = unsafe { &*(self as *const Self) };
@@ -738,6 +750,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             Box::new(SweepChunk {
                 space,
                 chunk,
+                unlog_bits_op,
                 epilogue: epilogue.clone(),
             })
         });
@@ -905,6 +918,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     self.mark_lines(object);
                 }
 
+                self.unlog_object_if_needed(object);
+
                 object
             } else {
                 // We are forwarding objects. When the copy allocator allocates the block, it should
@@ -914,12 +929,19 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     object,
                     semantics,
                     copy_context,
-                    |_new_object| {
-                        // increase the number of objects being moved
+                    |new_object| {
+                        // post_copy should have set the unlog bit
+                        // if `unlog_traced_object` is true.
+                        debug_assert!(
+                            !self.common.unlog_traced_object
+                                || VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                                    .is_unlogged::<VM>(new_object, Ordering::Relaxed)
+                        );
+                        #[cfg(feature = "vo_bit")]
+                        vo_bit::helper::on_object_forwarded::<VM>(new_object);
+                         // increase the number of objects being moved
                         #[cfg(feature = "dump_memory_stats")]
                         self.immix_stats.increase_copied_objects(1);
-                        #[cfg(feature = "vo_bit")]
-                        vo_bit::helper::on_object_forwarded::<VM>(_new_object);
                     },
                 )
             };
@@ -930,13 +952,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
             queue.enqueue(new_object);
             debug_assert!(new_object.is_live());
-            self.unlog_object_if_needed(new_object);
             new_object
         }
     }
 
     fn unlog_object_if_needed(&self, object: ObjectReference) {
-        if self.space_args.unlog_object_when_traced {
+        if self.common.unlog_traced_object {
             // Make sure the side metadata for the line can fit into one byte. For smaller line size, we should
             // use `mark_as_unlogged` instead to mark the bit.
             const_assert!(
@@ -1085,6 +1106,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if !super::MARK_LINE_AT_SCAN_TIME {
             self.mark_lines(object);
         }
+        if self.common.unlog_traced_object {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                .mark_byte_as_unlogged::<VM>(object, Ordering::Relaxed);
+        }
     }
 
     pub(crate) fn prefer_copy_on_nursery_gc(&self) -> bool {
@@ -1107,6 +1132,7 @@ pub struct PrepareBlockState<VM: VMBinding> {
     pub space: &'static ImmixSpace<VM>,
     pub chunk: Chunk,
     pub defrag_threshold: Option<usize>,
+    pub unlog_bits_op: UnlogBitsOperation,
 }
 
 impl<VM: VMBinding> PrepareBlockState<VM> {
@@ -1121,7 +1147,7 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         // Clear object mark table for this chunk
         self.reset_object_mark();
         // Iterate over all blocks in this chunk
@@ -1135,7 +1161,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             let is_defrag_source = if !self.space.is_defrag_enabled() {
                 // Do not set any block as defrag source if defrag is disabled.
                 false
-            } else if super::DEFRAG_EVERY_BLOCK {
+            } else if *mmtk.options.immix_defrag_every_block {
                 // Set every block as defrag source if so desired.
                 true
             } else if let Some(defrag_threshold) = self.defrag_threshold {
@@ -1151,6 +1177,9 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             debug_assert!(!block.get_state().is_reusable());
             debug_assert_ne!(block.get_state(), BlockState::Marked);
         }
+
+        self.unlog_bits_op
+            .execute::<VM>(self.chunk.start(), Chunk::BYTES);
     }
 }
 
@@ -1158,6 +1187,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
 struct SweepChunk<VM: VMBinding> {
     space: &'static ImmixSpace<VM>,
     chunk: Chunk,
+    unlog_bits_op: UnlogBitsOperation,
     /// A destructor invoked when all `SweepChunk` packets are finished.
     epilogue: Arc<FlushPageResource<VM>>,
 }
@@ -1218,6 +1248,10 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             self.space.chunk_map.set_allocated(self.chunk, false)
         }
         self.space.defrag.add_completed_mark_histogram(histogram);
+
+        self.unlog_bits_op
+            .execute::<VM>(self.chunk.start(), Chunk::BYTES);
+
         self.epilogue.finish_one_work_packet();
     }
 }

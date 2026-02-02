@@ -17,6 +17,16 @@ class RootsKind(Enum):
     PINNING = 1
     TPINNING = 2
 
+class Semantics(Enum):
+    SOFT = 0
+    WEAK = 1
+    PHANTOM = 2
+
+class Pause(Enum):
+    FULL = 1
+    INITIAL_MARK = 2
+    FINAL_MARK = 3
+
 def get_args():
     parser = argparse.ArgumentParser(
             description="""
@@ -28,6 +38,11 @@ by Perfetto UI.
                         help="path to extra log line handler")
     parser.add_argument("input", type=str, help="Input file"),
     return parser.parse_args()
+
+def begin_end_diff_dict(begin, end, begin_key="begin", end_key="end", diff_key="diff"):
+    """ A convenient method for construct a dict of two values and their difference. """
+    diff = end - begin
+    return {begin_key: begin, end_key: end, diff_key: diff}
 
 class LogProcessor:
     def __init__(self):
@@ -146,6 +161,9 @@ class LogProcessor:
                     "stage": int(args[0]),
                 }
 
+            case "gc_requested":
+                result["tid"] = 1
+
             case _:
                 if self.enrich_event_extra is not None:
                     # Call ``enrich_event_extra`` in the extension script if defined.
@@ -188,6 +206,17 @@ class LogProcessor:
                         "immix_is_defrag_gc": bool(int(args[0])),
                     }
 
+                case "concurrent_pause_determined":
+                    pause_int = int(args[0])
+                    try:
+                        pause = Pause(pause_int).name   # will raise ValueError if not valid
+                    except ValueError:
+                        pause = f"(Unknown:{pause_int})"
+
+                    gc["args"] |= {
+                        "pause": pause,
+                    }
+
                 case _:
                     processed_for_gc = False
         else:
@@ -212,6 +241,12 @@ class LogProcessor:
 
                     roots_list.append(root_dict)
 
+                case "process_root_nodes":
+                    wp["args"] |= {
+                        "num_roots": int(args[0]),
+                        "num_enqueued_nodes": int(args[1]),
+                    }
+
                 case "process_slots":
                     wp["args"] |= {
                         # Group args by "process_slots" and "scan_objects" because a ProcessEdgesWork
@@ -235,9 +270,52 @@ class LogProcessor:
                         }
                     }
 
+                case "concurrent_trace_objects":
+                    objects = int(args[0])
+                    next_objects = int(args[1])
+                    iterations = int(args[2])
+                    total_objects = objects + next_objects
+                    wp["args"] |= {
+                        # Put args in a group.  See comments in "process_slots".
+                        "scan_objects": {
+                            "objects": objects,
+                            "next_objects": next_objects,
+                            "total_objects": total_objects,
+                            "iterations": iterations,
+                        }
+                    }
+
                 case "sweep_chunk":
                     wp["args"] |= {
                         "allocated_blocks": int(args[0]),
+                    }
+
+                case "finalization":
+                    wp["args"] |= {
+                        "num_candidates": begin_end_diff_dict(int(args[0]), int(args[1])),
+                        "ready_for_finalize": begin_end_diff_dict(int(args[2]), int(args[3])),
+                    }
+
+                case "reference_scanned":
+                    semantics_int = int(args[0])
+                    if semantics_int in Semantics:
+                        semantics_str = Semantics(semantics_int).name
+                    else:
+                        semantics_str = "(Unknown)"
+                    if "reference_scanned" not in wp["args"]:
+                        wp["args"]["reference_scanned"] = []
+                    wp["args"]["reference_scanned"].append({
+                        "semantics": semantics_str,
+                        "num_old": int(args[1]),
+                        "num_new": int(args[2]),
+                        "num_enqueued": int(args[3]),
+                    })
+
+                case "reference_retained":
+                    wp["args"] |= {
+                        "num_refs": int(args[0]),
+                        "num_live": int(args[1]),
+                        "num_retained": int(args[2]),
                     }
 
                 case _:
@@ -283,7 +361,6 @@ class LogProcessor:
         print(f"Dumping JSON output to {output_name}")
         with gzip.open(output_name, "wt") as f:
             self.output(f)
-
 
 def main():
     args = get_args()

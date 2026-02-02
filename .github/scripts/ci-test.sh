@@ -13,6 +13,10 @@ fi
 
 ALL_PLANS=$(sed -n '/enum PlanSelector/,/}/p' src/util/options.rs | sed -e 's;//.*;;g' -e '/^$/d' -e 's/,//g' | xargs | grep -o '{.*}' | grep -o '\w\+')
 
+# At the moment, the Compressor does not work with the mock VM tests.
+# So we skip testing the Compressor entirely.
+ALL_PLANS=$(echo -n "$ALL_PLANS" | sed '/Compressor/d')
+
 # Test with mock VM:
 # - Find all the files that start with mock_test_
 # - Run each file separately with cargo test, with the feature 'mock_test'

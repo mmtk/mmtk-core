@@ -19,16 +19,25 @@ Suite.
 Run the following command with a **normal** user (*not* as `root` or using `sudo`):
 
 ```shell
-./capture.py -e 50 -m /path/to/libmmtk_openjdk.so
+./capture.py -e 47 -m /path/to/libmmtk_openjdk.so --no-root-nodes
 ```
 
-`-e 50` means we only capture one GC in every 50 GCs because otherwise it will have to print too
+`-e 47` means we only capture one GC in every 47 GCs because otherwise it will have to print too
 much log.  (Note: Printing in bpftrace is done via a fixed-size user/kernel space buffer, therefore
 excessive printing will overrun the buffer and cause events to be dropped.  The `-e` option helps
 reducing the volume of log, thereby reducing the likelihood of buffer overrun and the time for
 post-processing.  If one single GC still produces too much log and overruns the buffer, the user
 should consider setting the `BPFTRACE_PERF_RB_PAGES` environment variable.  See the man page of
-`bpftrace`.)
+`bpftrace`.)  We choose a large prime number, such as 47, because some GCs may exhibit periodic
+behaviors under certain workloads.  For example, generational GCs may alternate between nursery and
+full-heap GC, making every odd GC a nursey GC, and every even GC a full-heap GC.  If we capture
+every 50th GC, we will only observe even or odd GCs because 50 is an even number, and it will give
+us an illusion of "all GCs are nursery GC" or "all GCs are full-heap GC".  This is an instance of
+[aliasing effect].
+
+[aliasing effect]: https://en.wikipedia.org/wiki/Aliasing
+
+`--no-root-nodes` skips the `process_root_nodes` USDT which does not exist in `libmmtk_openjdk.so`.
 
 Replace `/path/to/libmmtk_openjdk.so` with the actual path to the `.so` that contains MMTk and its
 binding.
@@ -84,7 +93,7 @@ This means things are working properly.  Now re-run `./capture.py` again, but pi
 file.
 
 ```
-./capture.py -m /path/to/libmmtk_openjdk.so > mybenchmark.log
+./capture.py -e 47 -m /path/to/libmmtk_openjdk.so --no-root-nodes > mybenchmark.log
 ```
 
 Type the root password if prompted.

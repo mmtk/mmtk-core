@@ -1,6 +1,5 @@
 //! MMTk instance.
 use crate::global_state::{GcStatus, GlobalState};
-use crate::plan::gc_requester::GCRequester;
 use crate::plan::CreateGeneralPlanArgs;
 use crate::plan::Plan;
 use crate::policy::sft_map::{create_sft_map, SFTMap};
@@ -14,7 +13,7 @@ use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::inspection::SpaceInspector;
 use crate::util::heap::layout::heap_parameters::MAX_SPACES;
-use crate::util::heap::layout::vm_layout::VMLayout;
+use crate::util::heap::layout::vm_layout::{vm_layout, VMLayout};
 use crate::util::heap::layout::{self, Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::opaque_pointer::*;
@@ -30,7 +29,9 @@ use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::default::Default;
-use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(feature = "sanity")]
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -47,7 +48,7 @@ lazy_static! {
     pub static ref VM_MAP: Box<dyn VMMap + Send + Sync> = layout::create_vm_map();
 
     /// A global Mmapper for mmaping and protection of virtual memory.
-    pub static ref MMAPPER: Box<dyn Mmapper + Send + Sync> = layout::create_mmapper();
+    pub static ref MMAPPER: Box<dyn Mmapper> = layout::create_mmapper();
 }
 
 use crate::util::rust_util::InitializeOnce;
@@ -80,13 +81,13 @@ impl MMTKBuilder {
 
     /// Set an option.
     pub fn set_option(&mut self, name: &str, val: &str) -> bool {
-        self.options.set_from_command_line(name, val)
+        self.options.set_from_string(name, val)
     }
 
     /// Set multiple options by a string. The string should be key-value pairs separated by white spaces,
     /// such as `threads=1 stress_factor=4096`.
     pub fn set_options_bulk_by_str(&mut self, options: &str) -> bool {
-        self.options.set_bulk_from_command_line(options)
+        self.options.set_bulk_from_string(options)
     }
 
     /// Custom VM layout constants. VM bindings may use this function for compressed or 39-bit heap support.
@@ -122,9 +123,7 @@ pub struct MMTK<VM: VMBinding> {
     #[cfg(feature = "extreme_assertions")]
     pub(crate) slot_logger: SlotLogger<VM::VMSlot>,
     pub(crate) gc_trigger: Arc<GCTrigger<VM>>,
-    pub(crate) gc_requester: Arc<GCRequester<VM>>,
     pub(crate) stats: Arc<Stats>,
-    inside_harness: AtomicBool,
     #[cfg(feature = "sanity")]
     inside_sanity: AtomicBool,
     /// Analysis counters. The feature analysis allows us to periodically stop the world and collect some statistics.
@@ -138,6 +137,9 @@ unsafe impl<VM: VMBinding> Send for MMTK<VM> {}
 impl<VM: VMBinding> MMTK<VM> {
     /// Create an MMTK instance. This is not public. Bindings should use [`MMTKBuilder::build`].
     pub(crate) fn new(options: Arc<Options>) -> Self {
+        // Verify the Mmapper can handle the required address space size.
+        vm_layout().validate_address_space();
+
         // Initialize SFT first in case we need to use this in the constructor.
         // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
         crate::policy::sft_map::SFTRefStorage::pre_use_check();
@@ -153,11 +155,9 @@ impl<VM: VMBinding> MMTK<VM> {
 
         let state = Arc::new(GlobalState::default());
 
-        let gc_requester = Arc::new(GCRequester::new(scheduler.clone()));
-
         let gc_trigger = Arc::new(GCTrigger::new(
             options.clone(),
-            gc_requester.clone(),
+            scheduler.clone(),
             state.clone(),
         ));
 
@@ -221,13 +221,11 @@ impl<VM: VMBinding> MMTK<VM> {
             sanity_checker: Mutex::new(SanityChecker::new()),
             #[cfg(feature = "sanity")]
             inside_sanity: AtomicBool::new(false),
-            inside_harness: AtomicBool::new(false),
             #[cfg(feature = "extreme_assertions")]
             slot_logger: SlotLogger::new(),
             #[cfg(feature = "analysis")]
             analysis_manager: Arc::new(AnalysisManager::new(stats.clone())),
             gc_trigger,
-            gc_requester,
             stats,
         }
     }
@@ -325,7 +323,7 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn harness_begin(&self, tls: VMMutatorThread) {
         probe!(mmtk, harness_begin);
         self.handle_user_collection_request(tls, true, true);
-        self.inside_harness.store(true, Ordering::SeqCst);
+        self.state.inside_harness.store(true, Ordering::SeqCst);
         self.stats.start_all();
         self.scheduler.enable_stat();
     }
@@ -335,7 +333,7 @@ impl<VM: VMBinding> MMTK<VM> {
     /// This is usually called by the benchmark harness right after the actual benchmark.
     pub fn harness_end(&'static self) {
         self.stats.stop_all(self);
-        self.inside_harness.store(false, Ordering::SeqCst);
+        self.state.inside_harness.store(false, Ordering::SeqCst);
         probe!(mmtk, harness_end);
     }
 
@@ -420,44 +418,22 @@ impl<VM: VMBinding> MMTK<VM> {
         force: bool,
         exhaustive: bool,
     ) -> bool {
-        use crate::vm::Collection;
-        if !self.get_plan().constraints().collects_garbage {
-            warn!("User attempted a collection request, but the plan can not do GC. The request is ignored.");
-            return false;
-        }
-
-        if force || !*self.options.ignore_system_gc && VM::VMCollection::is_collection_enabled() {
-            info!("User triggering collection");
-            if exhaustive {
-                if let Some(gen) = self.get_plan().generational() {
-                    gen.force_full_heap_collection();
-                }
-            }
-
-            self.state
-                .user_triggered_collection
-                .store(true, Ordering::Relaxed);
-            self.gc_requester.request();
+        if self
+            .gc_trigger
+            .handle_user_collection_request(force, exhaustive)
+        {
+            use crate::vm::Collection;
             VM::VMCollection::block_for_gc(tls);
-            return true;
+            true
+        } else {
+            false
         }
-
-        false
     }
 
     /// MMTK has requested stop-the-world activity (e.g., stw within a concurrent gc).
-    // This is not used, as we do not have a concurrent plan.
     #[allow(unused)]
     pub fn trigger_internal_collection_request(&self) {
-        self.state
-            .last_internal_triggered_collection
-            .store(true, Ordering::Relaxed);
-        self.state
-            .internal_triggered_collection
-            .store(true, Ordering::Relaxed);
-        // TODO: The current `GCRequester::request()` is probably incorrect for internally triggered GC.
-        // Consider removing functions related to "internal triggered collection".
-        self.gc_requester.request();
+        self.gc_trigger.trigger_internal_collection_request();
     }
 
     /// Get a reference to the plan.
@@ -519,7 +495,7 @@ impl<VM: VMBinding> MMTK<VM> {
     #[cfg(feature = "vo_bit")]
     pub fn enumerate_objects<F>(&self, f: F)
     where
-        F: FnMut(&str, crate::util::Address, usize, ObjectReference),
+        F: FnMut(ObjectReference),
     {
         use crate::util::object_enum;
 
@@ -595,7 +571,7 @@ impl<VM: VMBinding> MMTK<VM> {
         self.get_plan()
             .base()
             .vm_space
-            .initialize_object_metadata(object, false)
+            .initialize_object_metadata(object)
     }
 
     /// Inspect MMTk spaces. The space inspector allows users to inspect the heap hierarchically,

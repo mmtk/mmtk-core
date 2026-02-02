@@ -72,7 +72,7 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     fn is_sane(&self) -> bool {
         unimplemented!()
     }
-    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, _object: ObjectReference) {
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(_object);
     }
@@ -154,7 +154,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             })
             .expect("update cursor failed");
         if start + bytes > self.limit {
-            if alloc_options.on_fail.allow_oom_call() {
+            if alloc_options.allow_oom_call {
                 panic!("OutOfMemory");
             } else {
                 return Address::ZERO;
@@ -182,7 +182,15 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
-        enumerator.visit_address_range(self.get_name(), self.start, self.start + self.total_bytes);
+        enumerator.visit_address_range(self.start, self.start + self.total_bytes);
+    }
+
+    fn clear_side_log_bits(&self) {
+        unimplemented!()
+    }
+
+    fn set_side_log_bits(&self) {
+        unimplemented!()
     }
 }
 

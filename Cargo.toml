@@ -2,7 +2,7 @@
 name = "mmtk"
 version = "0.31.0"
 authors = ["The MMTk Developers <>"]
-edition = "2021"
+edition = "2021" # TODO: Switch to 2024 after bumping MSRV to 1.85
 license = "MIT OR Apache-2.0"
 description = "MMTk is a framework for the design and implementation of high-performance and portable memory managers."
 homepage = "https://www.mmtk.io"
@@ -10,8 +10,19 @@ repository = "https://github.com/mmtk/mmtk-core"
 readme = "README.md"
 categories = ["memory-management"]
 keywords = ["gc", "garbage", "collection", "garbage-collection", "allocation"]
-rust-version = "1.74.1"
+rust-version = "1.84"
 build = "build.rs"
+# Use the MSRV-aware resolver which has been available since Rust 1.84.
+#
+# NOTE: The MSRV-aware resolver will only find compatible versions within the allowed version range.
+# For example, if we specify a dependency version as "0.7.2" or equivalently ">=0.7.2,<0.8.0",
+# and the version 0.7.4 is MSRV-compatible but 0.7.5 is not, then it will resolve to 0.7.4.
+# However, if 0.7.2 is not compatible with our MSRV,
+# the resolver will refuse to go below 0.7.2, and the resolution will fail.
+# For this reason, we still need to keep some dependency versions below the latest versions.
+#
+# TODO: Remove `resolver = "3"` after bumping Rust edition to 2024 (Rust 1.85+) because it will be the default.
+resolver = "3"
 
 [lib]
 name = "mmtk"
@@ -22,13 +33,12 @@ doctest = false
 atomic = "0.6.0"
 atomic_refcell = "0.1.7"
 atomic-traits = "0.4.0"
-bytemuck = { version = "1.14.0", features = ["derive"] }
-bytemuck_derive = "=1.8.1" # We can remove this dependency when we use MSRV 1.84+
+bytemuck = { version = "1.14.0", features = ["derive", "zeroable_maybe_uninit"] }
 cfg-if = "1.0"
 crossbeam = "0.8.1"
 delegate = "0.13.2"
 downcast-rs = "2.0.1"
-enum-map = "2.4.2"
+enum-map = "2.7.3"
 env_logger = { version = "0.11.3", optional = true }
 is-terminal = "0.4.7"
 itertools = "0.14.0"
@@ -47,42 +57,45 @@ portable-atomic = "1.4.3"
 probe = "0.5"
 regex = "1.7.0"
 rustversion = "1.0"
-spin = "0.9.5"
+spin = "0.10.0"
 static_assertions = "1.1.0"
 strum = "0.27.1"
 strum_macros = "0.27.1"
-sysinfo = "0.33.1"
+# sysinfo >=0.37.0 requires MSRV 1.88.0 and Rust edition 2024.
+sysinfo = "0.36.1"
 
 [dev-dependencies]
 paste = "1.0.8"
 rand = "0.9.0"
 rand_chacha = "0.9.0"
-criterion = "0.5"
-# Note: `half` v2.5.0 started to require Rust 1.81.
-# `criterion` transitively depends on `half` via the dependency chain:
-#     criterion -> ciborium -> ciborium_ll -> half
-# The MSRV of `ciborium` v0.2.2 is declared as 1.58, and is declared to depend on `half` v2.2.
-# Ciborium should either bump its MSRV or select a version of `half` that satisfies its current MSRV.
-# We lock the version of `half` to 2.4.1 to workaround this.
-# TODO: When we bump MSRV to 1.84 or above, we can rely on Cargo's MSRV-aware dependency resolver and remove such workarounds.
-half = "=2.4.1"
+# criterion >=0.8.0 requires MSRV 1.86.0.
+criterion = "0.7.0"
 
 [build-dependencies]
-built = { version = "0.7.7", features = ["git2"] }
-# Note: Some components in ICU4X started to require Rust 1.81 since some versions, such as `litemap` v0.7.5.
-# The `built` crate depends on ICU4X via the dependency chain:
-#     built -> git2 -> url -> idna -> idna_adapter --(default)--------> crates from the ICU4X projects
-#                                                  --(alternatively)--> `unicode-rs`
-# But we don't need ICU4X (or even `url`) because we only use `git2` to get the Git commit hash.
-# We move away from ICU4X completely following the instruction in https://docs.rs/crate/idna_adapter/1.2.0
-idna_adapter = "=1.1.0"
+built = { version = "0.8.0", features = ["git2"] }
+
+[lints.clippy]
+# Allow this. Clippy suggests we should use Sft, Mmtk, rather than SFT and MMTK.
+# According to its documentation (https://rust-lang.github.io/rust-clippy/master/index.html#upper_case_acronyms),
+# with upper-case-acronyms-aggressive turned on, it should also warn us about SFTMap, VMBinding, GCWorker.
+# However, it seems clippy does not catch all these patterns at the moment. So it would be hard for us to
+# find all the patterns and consistently change all of them. I think it would be a better idea to just allow this.
+# We may reconsider this in the future. Plus, using upper case letters for acronyms does not sound a big issue
+# to me - considering it will break our API and all the efforts for all the developers to make the change, it may
+# not worth it.
+upper_case_acronyms = "allow"
+# Allow this -- 9 July 2025. Clippy suggests that we should always inline format args if possible.
+# This lint was upgraded to 'style' in Rust 1.67, and then was downgraded to pedantic in 1.67.1.
+# It was upgraded again in Rust 1.88, and downgraded again in Rust 1.89. We disable this lint to avoid warnings in affected versions.
+# See https://github.com/mmtk/mmtk-core/issues/1334.
+uninlined_format_args = "allow"
 
 [[bench]]
 name = "main"
 harness = false
 
 [features]
-default = ["builtin_env_logger"]
+default = ["builtin_env_logger", "log/release_max_level_off"]
 
 # Built-in env_logger.  This feature is enabled by default.
 # The user can disable this default feature to remove `env_logger` from the dependencies.
@@ -157,10 +170,6 @@ immix_non_moving = []
 # if `immix_non_moving` is in use.
 sticky_immix_non_moving_nursery = []
 
-# Make Immix do defrag GC for every GC. This is only used for debugging.
-immix_stress_defrag = []
-# Make Immix use every block as a possible defrag source. This is only used for debugging.
-immix_defrag_every_block = []
 # Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
 immix_smaller_block = []
 # Zero the unmarked lines after a GC cycle in immix. This helps debug untraced objects.
@@ -183,6 +192,12 @@ extreme_assertions = []
 
 # Enable multiple spaces for NoGC, each allocator maps to an individual ImmortalSpace.
 nogc_multi_space = []
+
+# Disable multiple spaces for Compressor.
+# Enabling this feature will cause the Compressor to move all objects, which will be
+# slower for large objects and will be outright incorrect for bindings which allocate
+# non-moving objects; but compacting all objects will be more space-efficient.
+compressor_single_space = []
 
 # To collect statistics for each GC work packet. Enabling this may introduce a small overhead (several percentage slowdown on benchmark time).
 work_packet_stats = []
