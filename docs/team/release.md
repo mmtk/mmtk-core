@@ -11,13 +11,12 @@ We maintain a 6-week release cycle. A release is usually cut at the end of a wee
 MMTk releases include MMTk core and the officially supported bindings. They share the same version number as MMTk core.
 
 The current releases include the following bindings:
-* OpenJDK
+* OpenJDK (Both OpenJDK 11 and OpenJDK 21)
 * JikesRVM
 * Julia
 
 The current releases do not include the following bindings:
 * Ruby: We have made good progress on the binding development, and we will include it soon.
-* V8: We currently lack of resources to work on the binding.
 
 ## Release Process
 
