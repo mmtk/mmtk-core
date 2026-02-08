@@ -419,37 +419,19 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     /// succeeds, the method will return true, meaning the object is marked by this invocation.
     /// Otherwise, it returns false.
     fn test_and_mark(&self, object: ObjectReference, value: u8) -> bool {
-        loop {
-            let mask = if self.in_nursery_gc {
-                LOS_BIT_MASK
-            } else {
-                MARK_BIT
-            };
-            let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
+        let mask = if self.in_nursery_gc {
+            LOS_BIT_MASK
+        } else {
+            MARK_BIT
+        };
+        let result = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
+            .fetch_update_metadata::<VM, u8, _>(
                 object,
-                None,
                 Ordering::SeqCst,
+                Ordering::SeqCst,
+                |old_value| (old_value & mask != value).then(|| old_value & !LOS_BIT_MASK | value),
             );
-            let mark_bit = old_value & mask;
-            if mark_bit == value {
-                return false;
-            }
-            // using LOS_BIT_MASK have side effects of clearing nursery bit
-            if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
-                .compare_exchange_metadata::<VM, u8>(
-                    object,
-                    old_value,
-                    old_value & !LOS_BIT_MASK | value,
-                    None,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                break;
-            }
-        }
-        true
+        result.is_ok()
     }
 
     fn test_mark_bit(&self, object: ObjectReference, value: u8) -> bool {
