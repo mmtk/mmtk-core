@@ -686,7 +686,7 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// * `addr`: A non-zero word-aligned address.  Because the raw address of an `ObjectReference`
 ///   cannot be zero and must be word-aligned, the caller must filter out zero and misaligned
 ///   addresses before calling this function.  Otherwise the behavior is undefined.
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 pub fn is_mmtk_object(addr: Address) -> Option<ObjectReference> {
     crate::util::is_mmtk_object::check_object_reference(addr)
 }
@@ -715,7 +715,7 @@ pub fn is_mmtk_object(addr: Address) -> Option<ObjectReference> {
 /// Argument:
 /// * `internal_ptr`: The address to start searching. We search backwards from this address (including this address) to find the base reference.
 /// * `max_search_bytes`: The maximum number of bytes we may search for an object with VO bit set. `internal_ptr - max_search_bytes` is not included.
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 pub fn find_object_from_internal_pointer(
     internal_ptr: Address,
     max_search_bytes: usize,

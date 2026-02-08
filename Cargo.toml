@@ -150,14 +150,12 @@ exec_permission_on_all_spaces = []
 
 # Global valid object (VO) bit metadata.
 # The VO bit is set when an object is allocated, and cleared when the GC determines it is dead.
+# It is useful for conservative garbage collection, including conservative stack scanning.
 # See `src/util/metadata/vo_bit/mod.rs`
 #
 # eager_sweeping: VO bits for dead objects must have been cleared by the end of each GC.
 # Native MarkSweep only ensures this in eager sweeping mode.
 vo_bit = ["eager_sweeping"]
-
-# conservative garbage collection support
-is_mmtk_object = ["vo_bit"]
 
 # Enable object pinning, in particular, enable pinning/unpinning, and its metadata
 object_pinning = []

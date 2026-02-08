@@ -1,13 +1,13 @@
 use criterion::Criterion;
 
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 use mmtk::util::test_util::fixtures::*;
 use mmtk::util::test_util::mock_method::*;
 use mmtk::util::test_util::mock_vm::{write_mockvm, MockVM};
 
 pub fn bench(c: &mut Criterion) {
     // Setting a larger heap, although the GC should be disabled in the MockVM
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     let mut fixture = MutatorFixture::create_with_heapsize(1 << 30);
 
     // Normal objects
@@ -22,7 +22,7 @@ pub fn bench(c: &mut Criterion) {
     });
 
     c.bench_function("internal pointer - normal objects", |_b| {
-        #[cfg(feature = "is_mmtk_object")]
+        #[cfg(feature = "vo_bit")]
         {
             use mmtk::memory_manager;
             use mmtk::AllocationSemantics;
@@ -45,8 +45,8 @@ pub fn bench(c: &mut Criterion) {
                 memory_manager::find_object_from_internal_pointer(obj_end - 1, NORMAL_OBJECT_SIZE);
             })
         }
-        #[cfg(not(feature = "is_mmtk_object"))]
-        panic!("The benchmark requires is_mmtk_object feature to run");
+        #[cfg(not(feature = "vo_bit"))]
+        panic!("The benchmark requires vo_bit feature to run");
     });
 
     // Large objects
@@ -60,7 +60,7 @@ pub fn bench(c: &mut Criterion) {
         }
     });
     c.bench_function("internal pointer - large objects", |_b| {
-        #[cfg(feature = "is_mmtk_object")]
+        #[cfg(feature = "vo_bit")]
         {
             use mmtk::memory_manager;
             use mmtk::AllocationSemantics;
@@ -83,7 +83,7 @@ pub fn bench(c: &mut Criterion) {
                 memory_manager::find_object_from_internal_pointer(obj_end - 1, LARGE_OBJECT_SIZE);
             })
         }
-        #[cfg(not(feature = "is_mmtk_object"))]
-        panic!("The benchmark requires is_mmtk_object feature to run");
+        #[cfg(not(feature = "vo_bit"))]
+        panic!("The benchmark requires vo_bit feature to run");
     });
 }
