@@ -347,6 +347,16 @@ impl Address {
     pub fn range_intersection(r1: &Range<Address>, r2: &Range<Address>) -> Range<Address> {
         r1.start.max(r2.start)..r1.end.min(r2.end)
     }
+
+    /// Returns an iterator which steps from this address to below the
+    /// `end` address, in steps of `step` bytes.
+    pub fn iter_to(&self, end: Address, step: usize) -> AddressIterator {
+        AddressIterator {
+            start: *self,
+            end,
+            step,
+        }
+    }
 }
 
 /// allows print Address as upper-case hex value
@@ -383,6 +393,28 @@ impl std::str::FromStr for Address {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let raw: usize = s.parse()?;
         Ok(Address(raw))
+    }
+}
+
+/// Iterate addresses from a start address to below an end address,
+/// with a given step size.
+pub struct AddressIterator {
+    start: Address,
+    end: Address,
+    step: usize,
+}
+
+impl Iterator for AddressIterator {
+    type Item = Address;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.start >= self.end {
+            None
+        } else {
+            let current = self.start;
+            self.start += self.step;
+            Some(current)
+        }
     }
 }
 

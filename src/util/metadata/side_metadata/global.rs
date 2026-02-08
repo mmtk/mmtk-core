@@ -8,9 +8,10 @@ use crate::util::metadata::metadata_val_traits::*;
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::Address;
 use num_traits::FromPrimitive;
-use ranges::BitByteRange;
+use ranges::{BitByteRange, BitOffset, BitWordRange};
 use std::fmt;
 use std::io::Result;
+use std::ops::Range;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 /// This struct stores the specification of a side metadata bit-set.
@@ -1246,6 +1247,53 @@ impl SideMetadataSpec {
             true,
             &mut visitor,
         );
+    }
+
+    /// Walk the metadata between two addresses, calling visitor functions for parts
+    /// and whole words. `scan_words` calls its `visit_word` argument with a
+    /// metadata word, the data address corresponding to the start of that word,
+    /// and optionally a range of bit offsets when visiting part of a word.
+    ///
+    /// `scan_words` calls each function with arguments in order of lowest to
+    /// highest addresses.
+    pub fn scan_words(
+        &self,
+        data_start_addr: Address,
+        data_end_addr: Address,
+        visit_word: &mut impl FnMut(usize, Address, Option<Range<BitOffset>>),
+    ) {
+        assert!(self.uses_contiguous_side_metadata());
+        let start_meta_addr = address_to_contiguous_meta_address(self, data_start_addr);
+        let start_meta_shift = meta_byte_lshift(self, data_start_addr);
+        let end_meta_addr = address_to_contiguous_meta_address(self, data_end_addr);
+        let end_meta_shift = meta_byte_lshift(self, data_end_addr);
+
+        let mut visitor = |range| match range {
+            BitWordRange::Words { start, end } => {
+                for meta in start.iter_to(end, crate::util::constants::BYTES_IN_ADDRESS) {
+                    let addr = contiguous_meta_address_to_address(self, meta, 0);
+                    let word = unsafe { meta.load::<usize>() };
+                    visit_word(word, addr, None)
+                }
+            }
+            BitWordRange::BitsInWord {
+                addr: meta,
+                bit_start,
+                bit_end,
+            } => {
+                let addr = contiguous_meta_address_to_address(self, meta, 0);
+                let word = unsafe { meta.load::<usize>() };
+                visit_word(word, addr, Some(bit_start..bit_end))
+            }
+        };
+
+        ranges::break_bit_word_range(
+            start_meta_addr,
+            start_meta_shift,
+            end_meta_addr,
+            end_meta_shift,
+            &mut visitor,
+        )
     }
 }
 

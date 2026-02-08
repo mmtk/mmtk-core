@@ -964,7 +964,10 @@ options! {
     /// Percentage of heap size reserved for defragmentation.
     /// According to [this paper](https://doi.org/10.1145/1375581.1375586), Immix works well with
     /// headroom between 1% to 3% of the heap size.
-    immix_defrag_headroom_percent: usize            [|v: &usize| *v <= 50] = 2
+    immix_defrag_headroom_percent: usize            [|v: &usize| *v <= 50] = 2,
+    /// Enable the use of an algorithm based on carryless multiplication to
+    /// compute the offset vector in the Compressor.
+    compressor_use_clmul: bool                      [always_valid] = true
 }
 
 #[cfg(test)]

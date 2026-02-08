@@ -2,6 +2,7 @@ use crate::util::constants::BYTES_IN_WORD;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::spec_defs::{COMPRESSOR_MARK, COMPRESSOR_OFFSET_VECTOR};
 use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::options::Options;
 use crate::util::{Address, ObjectReference};
 use crate::vm::object_model::ObjectModel;
 use crate::vm::VMBinding;
@@ -15,7 +16,7 @@ use std::sync::atomic::AtomicBool;
 #[derive(Copy, Clone, PartialEq, PartialOrd)]
 pub(crate) struct CompressorRegion(Address);
 impl Region for CompressorRegion {
-    const LOG_BYTES: usize = 20; // 1 MiB
+    const LOG_BYTES: usize = 18; // 256 kiB
     fn from_aligned_address(address: Address) -> Self {
         assert!(
             address.is_aligned_to(Self::BYTES),
@@ -94,6 +95,8 @@ impl Transducer {
 pub struct ForwardingMetadata<VM: VMBinding> {
     calculated: AtomicBool,
     vm: PhantomData<VM>,
+    // This field is only used on x86_64.
+    _use_clmul: bool,
 }
 
 // A block in the Compressor is the granularity at which we cache
@@ -102,7 +105,7 @@ pub struct ForwardingMetadata<VM: VMBinding> {
 #[derive(Copy, Clone, PartialEq, PartialOrd)]
 pub(crate) struct Block(Address);
 impl Region for Block {
-    const LOG_BYTES: usize = 9;
+    const LOG_BYTES: usize = 9; // 512 B
     fn from_aligned_address(address: Address) -> Self {
         assert!(address.is_aligned_to(Self::BYTES));
         Block(address)
@@ -116,11 +119,16 @@ pub(crate) const MARK_SPEC: SideMetadataSpec = COMPRESSOR_MARK;
 pub(crate) const OFFSET_VECTOR_SPEC: SideMetadataSpec = COMPRESSOR_OFFSET_VECTOR;
 
 impl<VM: VMBinding> ForwardingMetadata<VM> {
-    pub fn new() -> ForwardingMetadata<VM> {
+    pub fn new(options: &Options) -> ForwardingMetadata<VM> {
         ForwardingMetadata {
             calculated: AtomicBool::new(false),
             vm: PhantomData,
+            _use_clmul: *options.compressor_use_clmul,
         }
+    }
+
+    pub fn should_use_clmul(&self) -> bool {
+        self._use_clmul && processor_can_clmul()
     }
 
     pub fn mark_last_word_of_object(&self, object: ObjectReference) {
@@ -148,7 +156,50 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
         MARK_SPEC.fetch_or_atomic::<u8>(last_word_of_object, 1, Ordering::Relaxed);
     }
 
-    pub fn calculate_offset_vector(&self, region: CompressorRegion, cursor: Address) {
+    // TODO: We could compute a prefix-sum by Hillis-Steele too, for which
+    // the same offset-vector algorithm works. Would it be faster than the
+    // branchy version?
+
+    // SAFETY: Only call this function when the processor supports
+    // pclmulqdq and popcnt, i.e. when processor_can_clmul().
+    #[cfg(target_arch = "x86_64")]
+    unsafe fn calculate_offset_vector_clmul(&self, region: CompressorRegion, cursor: Address) {
+        // This function implements Geoff Langdale's
+        // algorithm to find quote pairs using prefix sums:
+        // https://branchfree.org/2019/03/06/code-fragment-finding-quote-pairs-with-carry-less-multiply-pclmulqdq/
+
+        // We require that each block has at least one word of
+        // mark bitmap for this algorithm to work.
+        use crate::util::constants::LOG_BITS_IN_WORD;
+        const_assert!(Block::LOG_BYTES - MARK_SPEC.log_bytes_in_region >= LOG_BITS_IN_WORD);
+        debug_assert!(processor_can_clmul());
+
+        let mut to = region.start();
+        let mut carry: i64 = 0;
+        MARK_SPEC.scan_words(
+            region.start(),
+            cursor.align_up(Block::BYTES),
+            &mut |word, addr, bits| match bits {
+                Some(range) => panic!(
+                    "should be word aligned, got {word}[{}:{}] instead",
+                    range.start, range.end
+                ),
+                None => {
+                    if addr.is_aligned_to(Block::BYTES) {
+                        // Write the state at the start of the block.
+                        // The carry has all bits set the same way,
+                        // so extract the least significant bit.
+                        let in_object = (carry as usize) & 1;
+                        let encoded = to.as_usize() + in_object;
+                        OFFSET_VECTOR_SPEC.store_atomic::<usize>(addr, encoded, Ordering::Relaxed);
+                    }
+                    clmul_step(&mut to, &mut carry, word)
+                }
+            },
+        );
+    }
+
+    fn calculate_offset_vector_base(&self, region: CompressorRegion, cursor: Address) {
         let mut state = Transducer::new(region.start());
         let first_block = Block::from_aligned_address(region.start());
         let last_block = Block::from_aligned_address(cursor);
@@ -166,6 +217,23 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
                 },
             );
         }
+    }
+
+    pub fn calculate_offset_vector(&self, region: CompressorRegion, cursor: Address) {
+        #[cfg(target_arch = "x86_64")]
+        {
+            if self.should_use_clmul() {
+                unsafe {
+                    // SAFETY: We checked the processor supports the
+                    // necessary instructions.
+                    self.calculate_offset_vector_clmul(region, cursor)
+                }
+            } else {
+                self.calculate_offset_vector_base(region, cursor)
+            }
+        }
+        #[cfg(not(target_arch = "x86_64"))]
+        self.calculate_offset_vector_base(region, cursor);
         self.calculated.store(true, Ordering::Relaxed);
     }
 
@@ -173,11 +241,22 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
         self.calculated.store(false, Ordering::Relaxed);
     }
 
-    pub fn forward(&self, address: Address) -> Address {
+    pub fn forward<const CAN_CLMUL: bool>(&self, address: Address) -> Address {
         debug_assert!(
             self.calculated.load(Ordering::Relaxed),
             "forward() should only be called when we have calculated an offset vector"
         );
+        #[cfg(target_arch = "x86_64")]
+        if CAN_CLMUL {
+            unsafe { self.forward_clmul(address) }
+        } else {
+            self.forward_base(address)
+        }
+        #[cfg(not(target_arch = "x86_64"))]
+        self.forward_base(address)
+    }
+
+    fn forward_base(&self, address: Address) -> Address {
         let block = Block::from_unaligned_address(address);
         let mut state = Transducer::decode(
             OFFSET_VECTOR_SPEC.load_atomic::<usize>(block.start(), Ordering::Relaxed),
@@ -190,6 +269,29 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
             state.visit_mark_bit(addr)
         });
         state.to
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[target_feature(enable = "pclmulqdq,popcnt")]
+    unsafe fn forward_clmul(&self, address: Address) -> Address {
+        debug_assert!(processor_can_clmul());
+        let block = Block::from_unaligned_address(address);
+        let (mut to, mut carry) = {
+            let state = Transducer::decode(
+                OFFSET_VECTOR_SPEC.load_atomic::<usize>(block.start(), Ordering::Relaxed),
+                block.start(),
+            );
+            (state.to, if state.in_object { -1i64 } else { 0i64 })
+        };
+        MARK_SPEC.scan_words(block.start(), address, &mut |word, _, bits| match bits {
+            Some(range) => {
+                assert_eq!(range.start, 0);
+                let mask = (1 << range.end) - 1;
+                clmul_step(&mut to, &mut carry, word & mask)
+            }
+            None => clmul_step(&mut to, &mut carry, word),
+        });
+        to
     }
 
     pub fn scan_marked_objects(
@@ -210,5 +312,54 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
 
     pub fn has_calculated_forwarding_addresses(&self) -> bool {
         self.calculated.load(Ordering::Relaxed)
+    }
+}
+
+cfg_if::cfg_if! {
+    if #[cfg(target_arch = "x86_64")] {
+        pub(crate) fn processor_can_clmul() -> bool {
+            is_x86_feature_detected!("pclmulqdq") && is_x86_feature_detected!("popcnt")
+        }
+
+        // This function is only used in a debug assertion for the x86_64-only
+        // calculate_offset_vector_clmul.
+        fn prefix_sum(x: usize) -> usize {
+            // This function implements a bit-parallel version of the Hillis-Steele prefix sum algorithm:
+            // https://en.wikipedia.org/wiki/Prefix_sum#Algorithm_1:_Shorter_span,_more_parallel
+            let mut result = x;
+            let mut n = 1;
+            while n < usize::BITS {
+                result ^= result << n;
+                n <<= 1;
+            }
+            result
+        }
+
+        #[target_feature(enable = "pclmulqdq,popcnt")]
+        unsafe fn clmul_step(to: &mut Address, carry: &mut i64, word: usize) {
+            use std::arch::x86_64;
+            // Compute the prefix sum of this word of mark bitmap.
+            let ones = x86_64::_mm_set1_epi8(0xFFu8 as i8);
+            let vector = x86_64::_mm_set_epi64x(0, word as i64);
+            let sum: i64 = x86_64::_mm_cvtsi128_si64(x86_64::_mm_clmulepi64_si128(vector, ones, 0));
+            debug_assert_eq!(sum, prefix_sum(word) as i64);
+            // Carry-in from the last word. If the last word ended in the
+            // middle of an object, we need to invert the in/out-of-object
+            // states in this word.
+            let flipped = sum ^ *carry;
+            // Produce a carry-out for the next word. This shift will
+            // replicate the most significant bit to all bit positions.
+            *carry = flipped >> 63;
+            // Now count the in-object bits. The marked bits on either
+            // end of an object are both in an object, despite that the
+            // prefix sum for the bit at the end of an object will be zero,
+            // so we bitwise-or the original word with the prefix sum to
+            // find all in-object bits.
+            *to += (((flipped as usize | word).count_ones()) * 8) as usize;
+        }
+    } else {
+        pub(crate) fn processor_can_clmul() -> bool {
+            false
+        }
     }
 }
