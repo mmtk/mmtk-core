@@ -11,6 +11,7 @@ use crate::util::address::ObjectReference;
 use crate::util::analysis::AnalysisManager;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::gc_trigger::GCTrigger;
+use crate::util::heap::inspection::SpaceInspector;
 use crate::util::heap::layout::heap_parameters::MAX_SPACES;
 use crate::util::heap::layout::vm_layout::{vm_layout, VMLayout};
 use crate::util::heap::layout::{self, Mmapper, VMMap};
@@ -571,6 +572,16 @@ impl<VM: VMBinding> MMTK<VM> {
             .base()
             .vm_space
             .initialize_object_metadata(object)
+    }
+
+    /// Inspect MMTk spaces. The space inspector allows users to inspect the heap hierarchically,
+    /// with all levels of regions. Users can further inspect objects in the regions if vo_bit is enabled.
+    pub fn inspect_spaces(&self) -> Vec<&dyn SpaceInspector> {
+        let mut ret = vec![];
+        self.get_plan().for_each_space(&mut |space| {
+            ret.push(space.as_inspector());
+        });
+        ret
     }
 }
 

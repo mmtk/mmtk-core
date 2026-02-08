@@ -135,6 +135,27 @@ pub trait Region: Copy + PartialEq + PartialOrd {
     }
 }
 
+/// Data structure to reference a MMTk 4KB page.
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Eq)]
+pub struct Page(Address);
+
+impl Region for Page {
+    const LOG_BYTES: usize = crate::util::constants::LOG_BYTES_IN_PAGE as usize;
+
+    fn from_aligned_address(address: Address) -> Self {
+        debug_assert!(address.is_aligned_to(Self::BYTES));
+        Self(address)
+    }
+
+    fn start(&self) -> Address {
+        self.0
+    }
+}
+
+// Re-export Chunk.
+pub use crate::util::heap::chunk_map::Chunk;
+
 /// An iterator for contiguous regions.
 pub struct RegionIterator<R: Region> {
     current: R,

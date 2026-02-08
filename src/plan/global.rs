@@ -883,13 +883,13 @@ pub trait HasSpaces {
     ///
     /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
     /// in the outer struct first.
-    fn for_each_space(&self, func: &mut dyn FnMut(&dyn Space<Self::VM>));
+    fn for_each_space<'a>(&'a self, func: &mut dyn FnMut(&'a dyn Space<Self::VM>));
 
     /// Visit each space field mutably.
     ///
     /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
     /// in the outer struct first.
-    fn for_each_space_mut(&mut self, func: &mut dyn FnMut(&mut dyn Space<Self::VM>));
+    fn for_each_space_mut<'a>(&'a mut self, func: &mut dyn FnMut(&'a mut dyn Space<Self::VM>));
 }
 
 /// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.
