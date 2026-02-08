@@ -2,6 +2,7 @@ use crate::DummyVM;
 use crate::DummyVMSlot;
 use mmtk::util::opaque_pointer::*;
 use mmtk::util::ObjectReference;
+use mmtk::vm::RefScanPolicy;
 use mmtk::vm::RootsWorkFactory;
 use mmtk::vm::Scanning;
 use mmtk::vm::SlotVisitor;
@@ -21,10 +22,10 @@ impl Scanning<DummyVM> for VMScanning {
     fn scan_vm_specific_roots(_tls: VMWorkerThread, _factory: impl RootsWorkFactory<DummyVMSlot>) {
         unimplemented!()
     }
-    fn scan_object<SV: SlotVisitor<DummyVMSlot>>(
-        _tls: VMWorkerThread,
+    fn scan_object<R: RefScanPolicy>(
+        _tls: VMThread,
         _object: ObjectReference,
-        _slot_visitor: &mut SV,
+        _slot_visitor: &mut impl SlotVisitor<DummyVMSlot>,
     ) {
         unimplemented!()
     }
