@@ -277,6 +277,22 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     pub fn get_used_pages(&self) -> usize {
         self.nursery.reserved_pages() + self.common.get_used_pages()
     }
+
+    pub fn is_live_object(&self, object: ObjectReference) -> bool {
+        use crate::policy::sft::SFT;
+        if self.is_current_gc_nursery() {
+            if self.nursery.in_space(object) {
+                self.nursery.is_live(object)
+            } else if self.common.get_los().in_space(object) {
+                self.common.get_los().is_live(object)
+            } else {
+                true
+            }
+        } else {
+            let sft = unsafe { crate::mmtk::SFT_MAP.get_unchecked(object.to_raw_address()) };
+            sft.is_live(object)
+        }
+    }
 }
 
 /// This trait includes methods that are specific to generational plans. This trait needs
