@@ -8,7 +8,7 @@ At a high level, in order to implement NoGC, we need to handle MMTk initializati
 
 If you're ever stuck at any point, feel free to send a message in the `#Porting` channel of our [Zulip](https://mmtk.zulipchat.com/)!
 
-## Set up
+## Set Up
 You want to set up the binding repository/directory structure before starting the port. For the sake of the tutorial guide we assume you have a directory structure similar to the one below. Note that such a directory structure is not a requirement[^1] but a recommendation. We assume you are using some form of version control system (such as `git` or `mercurial`) in this guide.
 
 [^1]: In fact some bindings may not be able to have such a directory structure due to the build tools used by the runtime.
@@ -37,7 +37,7 @@ You may also find it helpful to take inspiration from the [OpenJDK binding](http
 
 For this guide, we will assume your runtime is implemented in C or C++ as they are the most common implementation languages. However note that your runtime does not *need* to be implemented in C/C++ to work with MMTk.
 
-## Adding a Rust library to the runtime
+## Adding a Rust Library to the Runtime
 We recommend learning the ins and outs of your runtime's build system. You should try and add a simple Rust "hello world" library to your runtime's code and build system to investigate how easy it will be to add MMTk. Unfortunately this step is highly dependent on the runtime build system. We recommend taking a look at what other bindings do, but keep in mind that no two runtime build systems are the same even if they are using the same build tools.
 
 In case the build system is too complex and you want get to hacking, a quick and dirty way to add MMTk could be to build a static and/or dynamic binary for MMTk and link it to the runtime directly, manually building new binaries as necessary, like so:
@@ -50,14 +50,14 @@ In case the build system is too complex and you want get to hacking, a quick and
 
 Later, you can edit the runtime build process to build MMTk at the same time automatically.
 
-**Note:** If the runtime you are targeting already links some Rust FFI libraries, then you may notice "multiple definition" linker errors for Rust stdlib functions. Unfortunately this is a current limitation of Rust FFI wherein all symbols are bundled together in the final C lib which will cause multiple definitions errors when two or more Rust FFI libraries are linked together. There is ongoing work to stabilize the Rust package format that would hopefully make it easier in the future. A current workaround would be to use the `-Wl,--allow-multiple-definition` linker flag, but this unfortunately isn't ideal as it increases code sizes. See [here](https://internals.rust-lang.org/t/pre-rfc-stabilize-a-version-of-the-rlib-format/17558) and [here](https://github.com/rust-lang/rust/issues/73632) for more details.
+> **Note:** If the runtime you are targeting already links some Rust FFI libraries, then you may notice "multiple definition" linker errors for Rust stdlib functions. Unfortunately this is a current limitation of Rust FFI wherein all symbols are bundled together in the final C lib which will cause multiple definitions errors when two or more Rust FFI libraries are linked together. There is ongoing work to stabilize the Rust package format that would hopefully make it easier in the future. A current workaround would be to use the `-Wl,--allow-multiple-definition` linker flag, but this unfortunately isn't ideal as it increases code sizes. See [here](https://internals.rust-lang.org/t/pre-rfc-stabilize-a-version-of-the-rlib-format/17558) and [here](https://github.com/rust-lang/rust/issues/73632) for more details.
 
-**Note:** It is *highly* recommended to also check-in the generated `Cargo.lock` file into your version control. This improves the reproducibility of the build and ensures the same package versions are used when building in the future in order to prevent random breakages.
+> **Note:** It is *highly* recommended to also check-in the generated `Cargo.lock` file into your version control. This improves the reproducibility of the build and ensures the same package versions are used when building in the future in order to prevent random breakages.
 
 We recommend using the `debug` build when doing development work as it has helpful logging statements and assertions that will make catching bugs in your implementation easier.
 
-## The `VMBinding` trait
-Now let's actually start implementing the binding. Here we take a look at the Rust side of the binding first (i.e. `mmtk-X/mmtk`). What we want to do is implement the [`VMBinding`](https://docs.mmtk.io/api/mmtk/vm/trait.VMBinding.html) trait.
+## The `VMBinding` Trait
+Now let's actually start implementing the binding. Here we take a look at the MMTk-side of the binding first (i.e. `mmtk-X/mmtk`). What we want to do is implement the [`VMBinding`](https://docs.mmtk.io/api/mmtk/vm/trait.VMBinding.html) trait.
 
 The `VMBinding` trait is a "meta-trait" (i.e. a trait that encapsulates other traits) that we expect every binding to implement. In essence, it is the contract established between MMTk and the runtime. We discuss each of its seven key traits briefly:
 
@@ -71,11 +71,11 @@ The `VMBinding` trait is a "meta-trait" (i.e. a trait that encapsulates other tr
 
 For the time-being we can implement all the above traits via `unimplemented!()` stubs. If you are using the Dummy VM binding as a starting point, you will have to edit some of the concrete implementations to `unimplemented!()`. Note that you should change the type that implements `VMBinding` from `DummyVM` to an appropriately named type for your runtime. For example, the OpenJDK binding defines the zero-struct [`OpenJDK`](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/lib.rs#L139-L162) which implements the `VMBinding` trait.
 
-### Object model
+### Object Model
 
 The `ObjectModel` trait is a fundamental trait describing the layout of an object to MMTk. This is important as MMTk's core doesn't know of how objects look like internally as each runtime will be different. There are certain key aspects you need to be aware of while implementing the `ObjectModel` trait. We discuss them in this section.
 
-#### Header vs Side metadata
+#### Header vs Side Metadata
 
 Per-object metadata can live in one of two places: in the object header or in a separate space used just for metadata. Each one has its pros and cons.
 
@@ -83,7 +83,7 @@ Header metadata sits in close proximity to the actual object address but it is n
 
 The choice of metadata location depends on the runtime and its object model and header layout. For example the JikesRVM runtime reserved extra space at the start of each object for GC-related metadata. Such space may not be available in your runtime. In such cases you can use side metadata to reserve per-object metadata.
 
-#### Local vs Global metadata
+#### Local vs Global Metadata
 
 MMTk uses multiple GC policies and each policy may use a different set of object metadata from each other. A moving policy, for example, may require extra metadata (in comparison to a non-moving policy) to store the forwarding bits and forwarding pointer. Such a metadata, which is local to a policy, is referred to as "local" metadata.
 
@@ -129,7 +129,7 @@ test] for some `Slot` implementation examples.
 [slot-trait]: https://docs.mmtk.io/api/mmtk/vm/slot/trait.Slot.html
 [slot-test]: https://github.com/mmtk/mmtk-core/blob/master/src/vm/tests/mock_tests/mock_test_slots.rs
 
-#### Miscellaneous configuration options
+#### Miscellaneous Configuration Options
 
 There are many constants in the `ObjectModel` trait that can be overridden in your binding in order to meet your runtime's requirements. For example, the `OBJECT_REF_OFFSET_LOWER_BOUND` constant which defines the minimum offset from allocation result start (i.e. the address that MMTk will return to the runtime) and the actual start of the object, i.e. the `ObjectReference`. In other words, the constant represents the minimum offset from the allocation result start such that the following invariant always holds:
 
@@ -137,7 +137,7 @@ There are many constants in the `ObjectModel` trait that can be overridden in yo
 
 We recommend going through the [list of constants in the documentation](https://docs.mmtk.io/api/mmtk/vm/trait.ObjectModel.html) and seeing if the default values suit your runtime's semantics, changing them if required.
 
-## MMTk initialization
+## MMTk Initialization
 Now that we have most of the boilerplate set up, the next step is to initialize MMTk so that we can start allocating objects.
 
 In short, MMTk uses the builder pattern. The binding needs to create an [`MMTKBuilder`](https://docs.mmtk.io/api/mmtk/struct.MMTKBuilder.html),
@@ -166,7 +166,7 @@ via `mmtk_set_heap_size()`. We will create an `MMTK` instance from the builder i
 ### Runtime-side changes
 Create a `mmtk.h` header file in the runtime folder of the binding (i.e. `mmtk-X/X`) which exposes the functions required to implement NoGC and `#include` it in the relevant runtime code. You can use the [example `mmtk.h` header file](https://github.com/mmtk/mmtk-core/blob/master/docs/dummyvm/include/mmtk.h) as an example.
 
-**Note:** It is convention to prefix all MMTk API functions exposed with `mmtk_` in order to avoid name clashes. It is *highly* recommended that you follow this convention.
+> **Note:** It is convention to prefix all MMTk API functions exposed with `mmtk_` in order to avoid name clashes. It is *highly* recommended that you follow this convention.
 
 Having a clean heap API for MMTk to implement makes life easier. Some runtimes may already have a sufficiently clean abstraction such as OpenJDK after the merging of [JEP 304](https://openjdk.org/jeps/304). In (most) other cases, the runtime doesn't provide a clean enough heap API for MMTk to implement. In such cases, it is recommended to create a class (or equivalent) that abstracts allocation and other heap functions like what the [V8](https://chromium.googlesource.com/v8/v8/+/a9976e160f4755990ec065d4b077c9401340c8fb/src/heap/third-party/heap-api.h) and ART bindings do. This allows making minimal changes to the actual runtime and having a concrete implementation of the exposed heap API in the binding, reducing MMTk-specific code in the runtime. Ideally these changes are upstreamed like in the case of V8.
 
@@ -211,14 +211,12 @@ void mmtk_set_heap_size(size_t min, size_t max);
 
 Now we can initialize MMTk in the runtime. Note that MMTk should ideally be initialized around when the default heap of the runtime is initialized. You will have to figure out where is the best location to initialize MMTk in your runtime.
 
-Initializing MMTk requires two steps. First, we set the heap size by calling `mmtk_set_heap_size` with the initial heap size and the maximum heap size. Then, we initialize MMTk by calling `mmtk_init`. In the future, you may wish to make the heap size configurable via a command line argument or environment variable (See [setting options for MMTk](#setting-options-for-mmtk)).
-
-<!-- You may have noticed the `mmtk_initialize_collection` function defined above in the `mmtk.h` file. This function is called after the runtime has completely set up including (but not limited to) its thread system. This function will spawn GC threads and allow MMTk to collect objects. For the time-being we can ignore calling this function as NoGC does not collect objects so does not require calling `mmtk_initialize_collection`. -->
+Initializing MMTk requires two steps. First, we set the heap size by calling `mmtk_set_heap_size` with the initial heap size and the maximum heap size. Then, we initialize MMTk by calling `mmtk_init`. In the future, you may wish to make the heap size configurable via a command line argument or environment variable (See [Setting Options for MMTk](#setting-options-for-mmtk)).
 
 ### MMTk-side changes
-On the Rust side of the binding, we want to implement the two functions exposed by the `mmtk.h` file above. We use an [`MMTKBuilder`](https://docs.mmtk.io/api/mmtk/struct.MMTKBuilder.html) instance to actually create our concrete [`MMTK`](https://docs.mmtk.io/api/mmtk/struct.MMTK.html) instance. We recommend following the paradigm used by all our bindings wherein we have a `static` single `MMTK` instance and an `MMTKBuilder` instance that we can use to set relevant options. See the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/lib.rs#L169-L178) for an example.
+On the MMTk-side of the binding, we want to implement the two functions exposed by the `mmtk.h` file above. We use an [`MMTKBuilder`](https://docs.mmtk.io/api/mmtk/struct.MMTKBuilder.html) instance to actually create our concrete [`MMTK`](https://docs.mmtk.io/api/mmtk/struct.MMTK.html) instance. We recommend following the paradigm used by all our bindings wherein we have a `static` single `MMTK` instance and an `MMTKBuilder` instance that we can use to set relevant options. See the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/lib.rs#L169-L178) for an example.
 
-**Note:** MMTk currently assumes that there is only one `MMTK` instance in your runtime process. Multiple `MMTK` instances are currently not supported.
+> **Note:** MMTk currently assumes that there is only one `MMTK` instance in your runtime process. Multiple `MMTK` instances are currently not supported.
 
 The `mmtk_set_heap_size` function is fairly straightforward. We recommend using the implementation in the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L94-L104). The `mmtk_init` function is straightforward as well. It should simply manually initialize the `MMTK` `static` variable using `lazy_static`, like [here](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L83-L86) in the OpenJDK binding.
 
@@ -230,7 +228,7 @@ By this point, you should have MMTk initialized. If you are using a debug build 
 [...]
 ```
 
-## Binding mutator threads to MMTk
+## Binding Mutator Threads to MMTk
 
 For MMTk to allocate objects, it needs to be aware of mutator threads. MMTk only allows mutator threads to allocate objects. We do this by "binding" a mutator thread to MMTk when it is initialized in the runtime.
 
@@ -258,7 +256,7 @@ The placement of the `mmtk_bind_mutator` call in the runtime depends on the runt
 
 ### MMTk-side changes
 
-The Rust side of the binding should simply defer the actual implementation to [`mmtk::memory_manager::bind_mutator`](https://docs.mmtk.io/api/mmtk/memory_manager/fn.bind_mutator.html). See the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L106-L109) for an example.
+The MMTk-side of the binding should simply defer the actual implementation to [`mmtk::memory_manager::bind_mutator`](https://docs.mmtk.io/api/mmtk/memory_manager/fn.bind_mutator.html). See the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L106-L109) for an example.
 
 ## Allocation
 Now we can finally implement the allocation functions.
@@ -279,7 +277,7 @@ Add the following two functions to the `mmtk.h` file:
  * @param allocator the allocation semantics to use for the allocation
  * @return the address of the newly allocated object
  */
-void *mmtk_alloc(MmtkMutator mutator, size_t size, size_t align,
+void* mmtk_alloc(MmtkMutator mutator, size_t size, size_t align,
         ssize_t offset, int allocator);
 
 /**
@@ -315,17 +313,17 @@ Finally, you need to call `mmtk_post_alloc` with your chosen `ObjectReference` i
 initialize MMTk-level object metadata, such as logging bits, valid-object (VO) bits, etc.  As a VM
 binding developer, you can ignore the details for now.
 
-**Note:** Currently MMTk assumes object sizes are multiples of the `MIN_ALIGNMENT`. If you encounter errors with alignment, a simple workaround would be to align the requested object size up to the `MIN_ALIGNMENT`. See [here](https://github.com/mmtk/mmtk-core/issues/730) for the tracking issue to fix this bug.
+> **Note:** Currently MMTk assumes object sizes are multiples of the `MIN_ALIGNMENT`. If you encounter errors with alignment, a simple workaround would be to align the requested object size up to the `MIN_ALIGNMENT`. See [here](https://github.com/mmtk/mmtk-core/issues/730) for the tracking issue to fix this bug.
 
 ### MMTk-side changes
 
-The Rust side of the binding should simply defer the actual implementation to [`mmtk::memory_manager::alloc`](https://docs.mmtk.io/api/mmtk/memory_manager/fn.alloc.html) and [`mmtk::memory_manager::post_alloc`](https://docs.mmtk.io/api/mmtk/memory_manager/fn.post_alloc.html) respectively. See the [OpenJDK](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L125-L136) [binding](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L151-L161) for an example.
+The MMTk-side of the binding should simply defer the actual implementation to [`mmtk::memory_manager::alloc`](https://docs.mmtk.io/api/mmtk/memory_manager/fn.alloc.html) and [`mmtk::memory_manager::post_alloc`](https://docs.mmtk.io/api/mmtk/memory_manager/fn.post_alloc.html) respectively. See the [OpenJDK](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L125-L136) [binding](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L151-L161) for an example.
 
 Congratulations! At this point, you hopefully have object allocation working and can run simple programs with your runtime using MMTk!
 
-## Miscellaneous implementation steps
+## Miscellaneous Implementation Steps
 
-### Setting options for MMTk
+### Setting Options for MMTk
 
 The preferred method of setting [options for MMTk](https://docs.mmtk.io/api/mmtk/util/options/index.html) is by setting them via the `MMTKBuilder` instance. See [here](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L79) for an example in the OpenJDK binding.
 
@@ -335,7 +333,7 @@ MMTk also supports setting options via environment variables. This is generally 
 
 A full list of available options that you can set can be found [here](https://docs.mmtk.io/api/mmtk/util/options/struct.Options.html).
 
-### Runtime-specific steps
+### Runtime-specific Steps
 
 Often it is the case that the above changes are not enough to allow a runtime to work with MMTk. For example, for the ART binding, the runtime required that all inflated locks be deflated prior to writing the boot image. In order to fix this, we had to implement a heap visitor that visited each allocated object and checked if it had inflated locks, deflating them if they were.
 
