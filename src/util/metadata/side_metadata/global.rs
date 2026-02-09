@@ -53,7 +53,8 @@ impl SideMetadataSpec {
     /// Get the absolute offset for the spec.
     pub fn get_absolute_offset(&self) -> Address {
         debug_assert!(self.is_absolute_offset());
-        let base = crate::util::metadata::side_metadata::constants::global_side_metadata_base_address();
+        let base =
+            crate::util::metadata::side_metadata::constants::global_side_metadata_base_address();
         let rel = unsafe { self.offset.addr.as_usize() };
         base + rel
     }

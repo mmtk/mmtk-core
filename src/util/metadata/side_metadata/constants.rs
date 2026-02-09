@@ -1,13 +1,13 @@
 #[cfg(target_pointer_width = "32")]
-use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
-#[cfg(target_pointer_width = "32")]
 use crate::util::heap::layout::vm_layout::VMLayout;
-use crate::util::metadata::side_metadata::{SideMetadataOffset, SideMetadataSpec};
+#[cfg(target_pointer_width = "32")]
+use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 use crate::util::memory::{MmapAnnotation, MmapStrategy};
-use crate::util::{constants::LOG_BYTES_IN_PAGE, conversions::raw_align_up};
+use crate::util::metadata::side_metadata::{SideMetadataOffset, SideMetadataSpec};
 use crate::util::Address;
-use std::sync::Once;
+use crate::util::{constants::LOG_BYTES_IN_PAGE, conversions::raw_align_up};
 use crate::MMAPPER;
+use std::sync::Once;
 
 // The compile-time base offset for global side metadata layout. We treat offsets as relative
 // (starting from zero) and add the runtime base address when computing actual addresses.
@@ -77,9 +77,10 @@ pub(crate) fn local_side_metadata_base_address() -> Address {
 pub(crate) fn total_side_metadata_bytes() -> usize {
     #[cfg(target_pointer_width = "64")]
     {
-        let end =
-            upper_bound_address_for_contiguous_relative(&super::spec_defs::LAST_LOCAL_SIDE_METADATA_SPEC);
-        return end.get_extent(Address::ZERO);
+        let end = upper_bound_address_for_contiguous_relative(
+            &super::spec_defs::LAST_LOCAL_SIDE_METADATA_SPEC,
+        );
+        end.get_extent(Address::ZERO)
     }
     #[cfg(target_pointer_width = "32")]
     {
@@ -100,9 +101,7 @@ pub fn initialize_side_metadata_base() {
         };
         let base = MMAPPER
             .quarantine_address_range_anywhere(pages, MmapStrategy::SIDE_METADATA, &anno)
-            .unwrap_or_else(|e| {
-                panic!("failed to quarantine side metadata address range: {e}")
-            });
+            .unwrap_or_else(|e| panic!("failed to quarantine side metadata address range: {e}"));
         unsafe {
             SIDE_METADATA_BASE_ADDRESS = base;
         }
@@ -129,7 +128,8 @@ pub const LOCAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset =
 
 /// Total global side metadata bytes (independent of the runtime base address).
 pub(crate) fn global_side_metadata_bytes() -> usize {
-    let end =
-        upper_bound_address_for_contiguous_relative(&super::spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC);
+    let end = upper_bound_address_for_contiguous_relative(
+        &super::spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC,
+    );
     end.get_extent(Address::ZERO)
 }

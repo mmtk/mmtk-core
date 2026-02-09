@@ -199,8 +199,7 @@ impl Mmapper for ChunkStateMmapper {
         if !range.is_within_limit(mappable_limit) {
             // Unmap and return error if the mapping is outside the addressable range.
             let _ = munmap(start, bytes);
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 "quarantined side metadata range is outside the mappable address space",
             ));
         }

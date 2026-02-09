@@ -5,9 +5,9 @@ mod tests {
     use crate::util::constants;
     use crate::util::heap::layout::vm_layout;
     use crate::util::heap::layout::vm_layout::vm_layout;
+    use crate::util::metadata::side_metadata::spec_defs;
     use crate::util::metadata::side_metadata::SideMetadataContext;
     use crate::util::metadata::side_metadata::SideMetadataSpec;
-    use crate::util::metadata::side_metadata::spec_defs;
     use crate::util::metadata::side_metadata::*;
     use crate::util::test_util::{serial_test, with_cleanup};
     use crate::util::Address;
