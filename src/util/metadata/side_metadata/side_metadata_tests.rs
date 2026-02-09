@@ -7,7 +7,6 @@ mod tests {
     use crate::util::heap::layout::vm_layout::vm_layout;
     use crate::util::metadata::side_metadata::SideMetadataContext;
     use crate::util::metadata::side_metadata::SideMetadataSpec;
-    #[cfg(target_pointer_width = "64")]
     use crate::util::metadata::side_metadata::spec_defs;
     use crate::util::metadata::side_metadata::*;
     use crate::util::test_util::{serial_test, with_cleanup};
@@ -132,6 +131,27 @@ mod tests {
             address_to_meta_address(&lspec, unsafe { Address::from_usize(318) }),
             local_side_metadata_base_address() + 159usize
         );
+    }
+
+    #[test]
+    fn test_side_metadata_runtime_base_address() {
+        // Ensure runtime base is initialized.
+        initialize_side_metadata_base();
+        let base = global_side_metadata_base_address();
+        assert!(base.as_usize() != 0);
+        assert!(base.is_aligned_to(crate::MMAPPER.granularity()));
+
+        let global_end = base + global_side_metadata_bytes();
+        #[cfg(target_pointer_width = "64")]
+        {
+            assert_eq!(local_side_metadata_base_address(), global_end);
+        }
+
+        let spec = spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC;
+        let data_addr = unsafe { Address::from_usize(0) };
+        let meta_addr = address_to_meta_address(&spec, data_addr);
+        assert!(meta_addr >= base);
+        assert!(meta_addr < global_end);
     }
 
     #[test]
