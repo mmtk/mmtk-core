@@ -7,16 +7,23 @@ mod tests {
     use crate::util::heap::layout::vm_layout::vm_layout;
     use crate::util::metadata::side_metadata::SideMetadataContext;
     use crate::util::metadata::side_metadata::SideMetadataSpec;
+    use crate::util::metadata::side_metadata::spec_defs;
     use crate::util::metadata::side_metadata::*;
     use crate::util::test_util::{serial_test, with_cleanup};
     use crate::util::Address;
 
+    #[cfg(target_pointer_width = "64")]
+    fn local_side_metadata_base_offset() -> SideMetadataOffset {
+        SideMetadataOffset::layout_after(&spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC)
+    }
+
     #[test]
     fn test_side_metadata_address_to_meta_address() {
+        let global_base = global_side_metadata_base_address();
         let mut gspec = SideMetadataSpec {
             name: "gspec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: SideMetadataOffset::addr(Address::ZERO),
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -24,7 +31,7 @@ mod tests {
         let mut lspec = SideMetadataSpec {
             name: "lspec",
             is_global: false,
-            offset: SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: local_side_metadata_base_offset(),
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -40,29 +47,29 @@ mod tests {
 
         assert_eq!(
             address_to_meta_address(&gspec, unsafe { Address::from_usize(0) }),
-            GLOBAL_SIDE_METADATA_BASE_ADDRESS
+            global_base
         );
         assert_eq!(
             address_to_meta_address(&lspec, unsafe { Address::from_usize(0) }),
-            LOCAL_SIDE_METADATA_BASE_ADDRESS
+            local_side_metadata_base_address()
         );
 
         assert_eq!(
             address_to_meta_address(&gspec, unsafe { Address::from_usize(7) }),
-            GLOBAL_SIDE_METADATA_BASE_ADDRESS
+            global_base
         );
         assert_eq!(
             address_to_meta_address(&lspec, unsafe { Address::from_usize(7) }),
-            LOCAL_SIDE_METADATA_BASE_ADDRESS
+            local_side_metadata_base_address()
         );
 
         assert_eq!(
             address_to_meta_address(&gspec, unsafe { Address::from_usize(27) }),
-            GLOBAL_SIDE_METADATA_BASE_ADDRESS + 3usize
+            global_base + 3usize
         );
         assert_eq!(
             address_to_meta_address(&lspec, unsafe { Address::from_usize(129) }),
-            LOCAL_SIDE_METADATA_BASE_ADDRESS + 16usize
+            local_side_metadata_base_address() + 16usize
         );
 
         gspec.log_bytes_in_region = 2;
@@ -70,29 +77,29 @@ mod tests {
 
         assert_eq!(
             address_to_meta_address(&gspec, unsafe { Address::from_usize(0) }),
-            GLOBAL_SIDE_METADATA_BASE_ADDRESS
+            global_base
         );
         assert_eq!(
             address_to_meta_address(&lspec, unsafe { Address::from_usize(0) }),
-            LOCAL_SIDE_METADATA_BASE_ADDRESS
+            local_side_metadata_base_address()
         );
 
         assert_eq!(
             address_to_meta_address(&gspec, unsafe { Address::from_usize(32) }),
-            GLOBAL_SIDE_METADATA_BASE_ADDRESS + 1usize
+            global_base + 1usize
         );
         assert_eq!(
             address_to_meta_address(&lspec, unsafe { Address::from_usize(32) }),
-            LOCAL_SIDE_METADATA_BASE_ADDRESS + 2usize
+            local_side_metadata_base_address() + 2usize
         );
 
         assert_eq!(
             address_to_meta_address(&gspec, unsafe { Address::from_usize(316) }),
-            GLOBAL_SIDE_METADATA_BASE_ADDRESS + 9usize
+            global_base + 9usize
         );
         assert_eq!(
             address_to_meta_address(&lspec, unsafe { Address::from_usize(316) }),
-            LOCAL_SIDE_METADATA_BASE_ADDRESS + 19usize
+            local_side_metadata_base_address() + 19usize
         );
 
         gspec.log_num_of_bits = 1;
@@ -100,29 +107,29 @@ mod tests {
 
         assert_eq!(
             address_to_meta_address(&gspec, unsafe { Address::from_usize(0) }),
-            GLOBAL_SIDE_METADATA_BASE_ADDRESS
+            global_base
         );
         assert_eq!(
             address_to_meta_address(&lspec, unsafe { Address::from_usize(0) }),
-            LOCAL_SIDE_METADATA_BASE_ADDRESS
+            local_side_metadata_base_address()
         );
 
         assert_eq!(
             address_to_meta_address(&gspec, unsafe { Address::from_usize(32) }),
-            GLOBAL_SIDE_METADATA_BASE_ADDRESS + 2usize
+            global_base + 2usize
         );
         assert_eq!(
             address_to_meta_address(&lspec, unsafe { Address::from_usize(32) }),
-            LOCAL_SIDE_METADATA_BASE_ADDRESS + 16usize
+            local_side_metadata_base_address() + 16usize
         );
 
         assert_eq!(
             address_to_meta_address(&gspec, unsafe { Address::from_usize(316) }),
-            GLOBAL_SIDE_METADATA_BASE_ADDRESS + 19usize
+            global_base + 19usize
         );
         assert_eq!(
             address_to_meta_address(&lspec, unsafe { Address::from_usize(318) }),
-            LOCAL_SIDE_METADATA_BASE_ADDRESS + 159usize
+            local_side_metadata_base_address() + 159usize
         );
     }
 
@@ -131,7 +138,7 @@ mod tests {
         let mut spec = SideMetadataSpec {
             name: "test_spec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: SideMetadataOffset::addr(Address::ZERO),
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -151,7 +158,7 @@ mod tests {
         let mut spec = SideMetadataSpec {
             name: "test_spec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: SideMetadataOffset::addr(Address::ZERO),
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -200,7 +207,7 @@ mod tests {
                     let mut gspec = SideMetadataSpec {
                         name: "gspec",
                         is_global: true,
-                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        offset: SideMetadataOffset::addr(Address::ZERO),
                         log_num_of_bits: 1,
                         log_bytes_in_region: 1,
                     };
@@ -208,7 +215,7 @@ mod tests {
                     let mut lspec = SideMetadataSpec {
                         name: "lspec",
                         is_global: false,
-                        offset: SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS),
+                        offset: local_side_metadata_base_offset(),
                         log_num_of_bits: 1,
                         log_bytes_in_region: 1,
                     };
@@ -292,7 +299,7 @@ mod tests {
                     let metadata_1_spec = SideMetadataSpec {
                         name: "metadata_1_spec",
                         is_global: true,
-                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        offset: SideMetadataOffset::addr(Address::ZERO),
                         log_num_of_bits: 4,
                         log_bytes_in_region: 6,
                     };
@@ -367,7 +374,7 @@ mod tests {
                     let metadata_1_spec = SideMetadataSpec {
                         name: "metadata_1_spec",
                         is_global: true,
-                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        offset: SideMetadataOffset::addr(Address::ZERO),
                         log_num_of_bits: 1,
                         log_bytes_in_region: constants::LOG_BYTES_IN_WORD as usize,
                     };
@@ -424,7 +431,7 @@ mod tests {
                     let metadata_1_spec = SideMetadataSpec {
                         name: "metadata_1_spec",
                         is_global: true,
-                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        offset: SideMetadataOffset::addr(Address::ZERO),
                         log_num_of_bits: 1,
                         log_bytes_in_region: constants::LOG_BYTES_IN_WORD as usize,
                     };
@@ -481,7 +488,7 @@ mod tests {
                     let metadata_1_spec = SideMetadataSpec {
                         name: "metadata_1_spec",
                         is_global: false,
-                        offset: SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS),
+                        offset: local_side_metadata_base_offset(),
                         log_num_of_bits: 4,
                         log_bytes_in_region: 9,
                     };
@@ -573,7 +580,7 @@ mod tests {
                     let spec = SideMetadataSpec {
                         name: "test spec",
                         is_global: true,
-                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        offset: SideMetadataOffset::addr(Address::ZERO),
                         log_num_of_bits: 0,
                         log_bytes_in_region: 3,
                     };
@@ -630,7 +637,7 @@ mod tests {
                     let spec = SideMetadataSpec {
                         name: "test spec",
                         is_global: true,
-                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        offset: SideMetadataOffset::addr(Address::ZERO),
                         log_num_of_bits: 0,
                         log_bytes_in_region: 3,
                     };
@@ -731,7 +738,7 @@ mod tests {
                     let metadata_1_spec = SideMetadataSpec {
                         name: "metadata_1_spec",
                         is_global: true,
-                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        offset: SideMetadataOffset::addr(Address::ZERO),
                         log_num_of_bits,
                         log_bytes_in_region,
                     };

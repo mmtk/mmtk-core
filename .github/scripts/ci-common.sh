@@ -9,8 +9,10 @@ cargo_toml=$project_root/Cargo.toml
 
 dummyvm_toml=$project_root/docs/dummyvm/Cargo.toml
 
-# Pin certain deps for our MSRV
-cargo update -p home@0.5.12 --precise 0.5.5 # This requires Rust edition 2024
+# Pin certain deps for our MSRV (only when present in the lockfile).
+if rg -q 'name = "home"' "$project_root/Cargo.lock"; then
+    cargo update -p home@0.5.12 --precise 0.5.5 # This requires Rust edition 2024
+fi
 
 # Repeat a command for all the features. Requires the command as one argument (with double quotes)
 for_all_features() {

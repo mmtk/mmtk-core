@@ -1,4 +1,5 @@
 use crate::util::alloc::AllocationError;
+use crate::util::conversions::raw_align_up;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::vm::{Collection, VMBinding};
@@ -233,6 +234,68 @@ pub fn mmap_noreserve(
     strategy.prot = MmapProtection::NoAccess;
     let flags = MMAP_FLAGS | libc::MAP_NORESERVE;
     mmap_fixed(start, size, flags, strategy, anno)
+}
+
+/// mmap with no swap space reserve at any available address, aligned to `align`.
+/// Returns the base address of the aligned range.
+pub fn mmap_noreserve_anywhere(
+    size: usize,
+    align: usize,
+    mut strategy: MmapStrategy,
+    anno: &MmapAnnotation,
+) -> Result<Address> {
+    #[cfg(feature = "no_mmap_annotation")]
+    let _ = anno;
+    debug_assert!(align.is_power_of_two());
+    let aligned_size = raw_align_up(size, align);
+    let alloc_size = aligned_size + align;
+
+    strategy.prot = MmapProtection::NoAccess;
+    let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_NORESERVE;
+    let prot = strategy.prot.into_native_flags();
+
+    let ptr = unsafe { libc::mmap(std::ptr::null_mut(), alloc_size, prot, flags, -1, 0) };
+    if ptr == libc::MAP_FAILED {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    let start = Address::from_mut_ptr(ptr);
+    let aligned_start = start.align_up(align);
+    let prefix = aligned_start - start;
+    let suffix = alloc_size - prefix - aligned_size;
+
+    if prefix > 0 {
+        munmap(start, prefix)?;
+    }
+    if suffix > 0 {
+        munmap(aligned_start + aligned_size, suffix)?;
+    }
+
+    #[cfg(all(
+        any(target_os = "linux", target_os = "android"),
+        not(feature = "no_mmap_annotation")
+    ))]
+    {
+        let anno_str = anno.to_string();
+        let anno_cstr = std::ffi::CString::new(anno_str).unwrap();
+        let result = wrap_libc_call(
+            &|| unsafe {
+                libc::prctl(
+                    libc::PR_SET_VMA,
+                    libc::PR_SET_VMA_ANON_NAME,
+                    aligned_start.to_ptr::<libc::c_void>(),
+                    aligned_size,
+                    anno_cstr.as_ptr(),
+                )
+            },
+            0,
+        );
+        if let Err(e) = result {
+            debug!("Error while calling prctl: {e}");
+        }
+    }
+
+    Ok(aligned_start)
 }
 
 fn mmap_fixed(

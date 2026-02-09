@@ -85,7 +85,7 @@ pub trait ObjectModel<VM: VMBinding> {
     //
     // Note a number of Global and PolicySpecific side metadata specifications are already reserved by mmtk-core.
     // Any side metadata offset calculation must consider these to prevent overlaps. A binding should start their
-    // side metadata from GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS or LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.
+    // side metadata from global_side_metadata_vm_base_address() or LOCAL_SIDE_METADATA_VM_BASE_OFFSET.
 
     /// A global 1-bit metadata used by generational plans to track cross-generational pointers. It is generally
     /// located in side metadata.

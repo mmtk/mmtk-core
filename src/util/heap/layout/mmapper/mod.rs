@@ -81,6 +81,21 @@ pub trait Mmapper: Sync {
         anno: &MmapAnnotation,
     ) -> Result<()>;
 
+    /// Quarantine/reserve address range at any available address and return the base address.
+    /// The returned address is aligned to the mmapper's granularity.
+    ///
+    /// Arguments:
+    /// * `pages`: Number of pages to quarantine
+    /// * `strategy`: The mmap strategy.  The `prot` field is ignored because we always use
+    ///   `PROT_NONE`.
+    /// * `anno`: Human-readable annotation to apply to newly mapped memory ranges.
+    fn quarantine_address_range_anywhere(
+        &self,
+        pages: usize,
+        strategy: MmapStrategy,
+        anno: &MmapAnnotation,
+    ) -> Result<Address>;
+
     /// Ensure that a range of pages is mmapped (or equivalent).  If the
     /// pages are not yet mapped, demand-zero map them. Note that mapping
     /// occurs at chunk granularity, not page granularity.

@@ -448,7 +448,7 @@ mod tests {
         let spec = SideMetadataSpec {
             name: "ContiguousMetadataTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: SideMetadataOffset::addr(Address::ZERO),
             log_num_of_bits: 0,
             log_bytes_in_region: 3,
         };
@@ -461,7 +461,7 @@ mod tests {
         let spec = SideMetadataSpec {
             name: "ContiguousMetadataTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: SideMetadataOffset::addr(Address::ZERO),
             log_num_of_bits: 1,
             log_bytes_in_region: 3,
         };
@@ -474,7 +474,7 @@ mod tests {
         let spec = SideMetadataSpec {
             name: "ContiguousMetadataTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: SideMetadataOffset::addr(Address::ZERO),
             log_num_of_bits: 4,
             log_bytes_in_region: 3,
         };
@@ -487,7 +487,7 @@ mod tests {
         let spec = SideMetadataSpec {
             name: "ContiguousMetadataTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: SideMetadataOffset::addr(Address::ZERO),
             log_num_of_bits: 5,
             log_bytes_in_region: 3,
         };
@@ -511,7 +511,7 @@ mod tests {
         let spec = SideMetadataSpec {
             name: "ContiguousMetadataTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: SideMetadataOffset::addr(Address::ZERO),
             log_num_of_bits: 0,
             log_bytes_in_region: 12, // 4K
         };
@@ -540,7 +540,7 @@ mod tests {
         let create_spec = |log_num_of_bits: usize| SideMetadataSpec {
             name: "AlignMetadataBitTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: SideMetadataOffset::addr(Address::ZERO),
             log_num_of_bits,
             log_bytes_in_region: 3,
         };
