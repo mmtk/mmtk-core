@@ -244,7 +244,7 @@ pub fn mmap_noreserve_anywhere(
     mut strategy: MmapStrategy,
     anno: &MmapAnnotation,
 ) -> Result<Address> {
-    #[cfg(feature = "no_mmap_annotation")]
+    #[cfg(any(feature = "no_mmap_annotation", target_pointer_width = "32"))]
     let _ = anno;
     debug_assert!(align.is_power_of_two());
     let aligned_size = raw_align_up(size, align);
@@ -273,6 +273,7 @@ pub fn mmap_noreserve_anywhere(
 
     #[cfg(all(
         any(target_os = "linux", target_os = "android"),
+        target_pointer_width = "64",
         not(feature = "no_mmap_annotation")
     ))]
     {

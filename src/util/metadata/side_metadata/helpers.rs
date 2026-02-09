@@ -432,6 +432,7 @@ mod tests {
         }
     }
 
+    #[cfg(target_pointer_width = "64")]
     const TEST_ADDRESS_8B_REGION: [Address; 8] = [
         unsafe { Address::from_usize(0x8000_0000) },
         unsafe { Address::from_usize(0x8000_0008) },
@@ -441,6 +442,17 @@ mod tests {
         unsafe { Address::from_usize(0x8001_0000) },
         unsafe { Address::from_usize(0x8001_0008) },
         unsafe { Address::from_usize(0xd000_0000) },
+    ];
+    #[cfg(target_pointer_width = "32")]
+    const TEST_ADDRESS_8B_REGION: [Address; 8] = [
+        unsafe { Address::from_usize(0x0) },
+        unsafe { Address::from_usize(0x8) },
+        unsafe { Address::from_usize(0x10) },
+        unsafe { Address::from_usize(0x18) },
+        unsafe { Address::from_usize(0x20) },
+        unsafe { Address::from_usize(0x1000) },
+        unsafe { Address::from_usize(0x1008) },
+        unsafe { Address::from_usize(0x2000) },
     ];
 
     #[test]
