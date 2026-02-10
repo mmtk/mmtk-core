@@ -10,7 +10,6 @@ cargo_toml=$project_root/Cargo.toml
 dummyvm_toml=$project_root/docs/dummyvm/Cargo.toml
 
 # Pin certain deps for our MSRV
-cargo update -p home@0.5.11 --precise 0.5.5 # This can be removed once we move to Rust 1.81 or newer
 cargo update -p home@0.5.12 --precise 0.5.5 # This requires Rust edition 2024
 
 # Read a line and strip trailing CR (works for CRLF and LF files)
