@@ -83,10 +83,6 @@ init_non_exclusive_features() {
             if [[ ! -z "$feature" ]]; then
                 # Trim whitespaces
                 feature_name=$(trim_ws "$feature")
-                # jemalloc does not support Windows
-                if [[ $os == "windows" && $feature_name == "malloc_jemalloc" ]]; then
-                    continue
-                fi
                 features[i]=$feature_name
                 let "i++"
             fi
@@ -94,8 +90,6 @@ init_non_exclusive_features() {
     done < $cargo_toml
 
     non_exclusive_features=$(IFS=$','; echo "${features[*]}")
-
-    echo "Non exclusive features: $non_exclusive_features"
 }
 
 # Get exclusive features
@@ -142,10 +136,6 @@ init_exclusive_features() {
             if [[ ! -z "$feature" ]]; then
                 # Trim whitespaces
                 feature_name=$(trim_ws "$feature")
-                # jemalloc does not support Windows
-                if [[ $os == "windows" && $feature_name == "malloc_jemalloc" ]]; then
-                    continue
-                fi
                 features[i]=$feature_name
                 let "i++"
             fi

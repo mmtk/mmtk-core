@@ -3,14 +3,6 @@ use crate::util::malloc::library::*;
 use crate::util::Address;
 use crate::vm::VMBinding;
 
-/// Allocate with alignment. This also guarantees the memory is zero initialized.
-/// This uses posix_memalign, which is not available on Windows.
-/// This would somehow affect `MallocMarkSweep` performance on Windows.
-// #[cfg(all(
-//     not(target_os = "windows"),
-//     not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc"))
-// ))]
-#[cfg(not(target_os = "windows"))]
 pub fn align_alloc(size: usize, align: usize) -> Address {
     use crate::util::os::*;
     let mut ptr = std::ptr::null_mut::<libc::c_void>();
@@ -79,38 +71,28 @@ pub fn alloc<VM: VMBinding>(size: usize, align: usize, offset: usize) -> (Addres
     let mut is_offset_malloc = false;
     // malloc returns 16 bytes aligned address.
     // So if the alignment is smaller than 16 bytes, we do not need to align.
-
-    match (align, offset) {
-        (a, 0) if a <= 16 => {
-            let raw = unsafe { calloc(1, size) };
-            address = Address::from_mut_ptr(raw);
-            debug_assert!(address.is_aligned_to(align));
-        }
-        #[cfg(not(target_os = "windows"))]
-        // On non-Windows platforms with posix_memalign, we can use align_alloc for alignments > 16
-        // However, on Windows, there is no equivalent function.
-        // The memory alloc by `align_alloc` may not be freed correctly by `free`.
-        // So we use offset allocation for all alignments > 16 on Windows.
-        (a, 0) if a > 16 => {
-            address = align_alloc(size, align);
-            debug_assert!(
-                address.is_aligned_to(align),
-                "Address: {:x} is not aligned to the given alignment: {}",
-                address,
-                align
-            );
-        }
-        _ => {
-            address = align_offset_alloc::<VM>(size, align, offset);
-            is_offset_malloc = true;
-            debug_assert!(
-                (address + offset).is_aligned_to(align),
-                "Address: {:x} is not aligned to the given alignment: {} at offset: {}",
-                address,
-                align,
-                offset
-            );
-        }
+    if align <= 16 && offset == 0 {
+        let raw = unsafe { calloc(1, size) };
+        address = Address::from_mut_ptr(raw);
+        debug_assert!(address.is_aligned_to(align));
+    } else if align > 16 && offset == 0 {
+        address = align_alloc(size, align);
+        debug_assert!(
+            address.is_aligned_to(align),
+            "Address: {:x} is not aligned to the given alignment: {}",
+            address,
+            align
+        );
+    } else {
+        address = align_offset_alloc::<VM>(size, align, offset);
+        is_offset_malloc = true;
+        debug_assert!(
+            (address + offset).is_aligned_to(align),
+            "Address: {:x} is not aligned to the given alignment: {} at offset: {}",
+            address,
+            align,
+            offset
+        );
     }
     (address, is_offset_malloc)
 }

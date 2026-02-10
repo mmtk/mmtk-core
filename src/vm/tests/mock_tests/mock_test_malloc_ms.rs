@@ -18,20 +18,7 @@ fn test_malloc() {
             assert!((address4 + 4_isize).is_aligned_to(64));
 
             assert!(!bool1);
-
-            // Since Windows HeapAlloc only guarantees 16-byte alignment, the allocation with 32-byte alignment
-            // without offset will be treated as an offset allocation.
-            if cfg!(all(
-                not(target_os = "windows"),
-                not(any(
-                    feature = "malloc_jemalloc",
-                    feature = "malloc_mimalloc"
-                ))
-            )) {
-                assert!(!bool2);
-            } else {
-                assert!(bool2);
-            }
+            assert!(!bool2);
 
             assert!(bool3);
             assert!(bool4);
@@ -44,13 +31,8 @@ fn test_malloc() {
             unsafe {
                 malloc_ms_util::free(address1.to_mut_ptr());
             }
-
-            if !bool2 {
-                unsafe {
-                    malloc_ms_util::free(address2.to_mut_ptr());
-                }
-            } else {
-                malloc_ms_util::offset_free(address2);
+            unsafe {
+                malloc_ms_util::free(address2.to_mut_ptr());
             }
             malloc_ms_util::offset_free(address3);
             malloc_ms_util::offset_free(address4);

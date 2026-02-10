@@ -53,9 +53,6 @@ const TEST_ADDRESS: Address =
 #[cfg(target_os = "macos")]
 const TEST_ADDRESS: Address =
     crate::util::conversions::chunk_align_down(unsafe { Address::from_usize(0x2_0000_0000) });
-#[cfg(target_os = "windows")]
-const TEST_ADDRESS: Address =
-    crate::util::conversions::chunk_align_down(unsafe { Address::from_usize(0x5_0000_0000) });
 
 // util::heap::layout::mmapper::csm
 pub(crate) const CHUNK_STATE_MMAPPER_TEST_REGION: MmapTestRegion =
