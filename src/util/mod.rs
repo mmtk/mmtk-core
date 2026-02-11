@@ -28,7 +28,7 @@ pub mod is_mmtk_object;
 pub mod linear_scan;
 /// Various malloc implementations (conditionally compiled by features)
 pub mod malloc;
-/// Memory utilities (non-OS dependent). OS dependent memory utilities can be found in [`crate::util::os::memory`].
+/// Memory utilities (non-OS dependent). OS dependent memory utilities can be found in [`crate::util::os::OSMemory`].
 pub mod memory;
 /// Metadata (OnSide or InHeader) implementation.
 pub mod metadata;
