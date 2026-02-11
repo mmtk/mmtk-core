@@ -308,7 +308,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         }
         let start = self.common().start;
         let extent = self.common().extent;
-        if let Err(e) = OS::munprotect(start, extent, MmapProtection::ReadWriteExec) {
+        if let Err(e) = OS::munprotect(start, extent, self.common().mmap_protection()) {
             panic!("Failed to unprotect memory: {:?}", e);
         }
         trace!("Unprotect {:x} {:x}", start, start + extent);

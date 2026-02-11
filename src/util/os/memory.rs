@@ -199,13 +199,6 @@ impl MmapStrategy {
         reserve: true,
     };
 
-    #[cfg(test)]
-    /// The strategy for MMTk side metadata (test)
-    pub const SIDE_METADATA: Self = Self::TEST;
-    #[cfg(not(test))]
-    /// The strategy for MMTk side metadata
-    pub const SIDE_METADATA: Self = Self::INTERNAL_MEMORY;
-
     /// The strategy for MMTk's test memory
     #[cfg(test)]
     pub const TEST: Self = Self {
