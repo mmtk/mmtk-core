@@ -42,10 +42,6 @@ jobs:
     name: minimal-tests-core/${{ matrix.target.triple }}/${{ matrix.rust }}
     runs-on: ${{ matrix.target.os }}
 
-    defaults:
-      run:
-        shell: bash
-
     env:
       # This determines the default target which cargo-build, cargo-test, etc. use.
       CARGO_BUILD_TARGET: "${{ matrix.target.triple }}"
@@ -96,10 +92,6 @@ jobs:
 
     name: style-check/${{ matrix.target.triple }}/${{ matrix.rust }}
     runs-on: ${{ matrix.target.os }}
-
-    defaults:
-      run:
-        shell: bash
 
     env:
       # This determines the default target which cargo-build, cargo-test, etc. use.
