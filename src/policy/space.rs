@@ -232,7 +232,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
         // TODO: Concurrent zeroing
         if self.common().zeroed {
-            OS::memzero(res.start, bytes);
+            crate::util::memory::zero(res.start, bytes);
         }
 
         // Some assertions

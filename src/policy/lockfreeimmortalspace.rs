@@ -157,7 +157,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             }
         }
         if self.slow_path_zeroing {
-            crate::util::os::OS::memzero(start, bytes);
+            crate::util::memory::zero(start, bytes);
         }
         start
     }

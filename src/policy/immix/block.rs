@@ -253,10 +253,7 @@ impl Block {
                         line.mark(0);
                     }
                     #[cfg(feature = "immix_zero_on_release")]
-                    {
-                        use crate::util::os::*;
-                        OS::memzero(line.start(), Line::BYTES);
-                    }
+                    crate::util::memory::zero(line.start(), Line::BYTES);
 
                     // We need to clear the pin bit if it is on the side, as this line can be reused
                     #[cfg(feature = "object_pinning")]

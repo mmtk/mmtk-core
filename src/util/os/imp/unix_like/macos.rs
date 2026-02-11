@@ -20,7 +20,7 @@ impl OSMemory for MacOS {
 
         // Zero memory if we actually reserve the memory
         if strategy.reserve {
-            Self::memzero(start, size);
+            crate::util::memory::zero(start, size);
         }
         Ok(addr)
     }

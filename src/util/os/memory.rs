@@ -10,18 +10,6 @@ use crate::{
 
 /// Abstraction for OS memory operations.
 pub trait OSMemory {
-    /// Set a memory region to zero.
-    fn memzero(start: Address, len: usize) {
-        Self::memset(start, 0, len);
-    }
-
-    /// Set a memory region to a specific value.
-    fn memset(start: Address, val: u8, len: usize) {
-        unsafe {
-            std::ptr::write_bytes::<u8>(start.to_mut_ptr(), val, len);
-        }
-    }
-
     /// Perform a demand-zero mmap.
     ///
     /// Falback: `annotation` is only used for debugging. For platforms that do not support mmap annotations, this parameter can be ignored.

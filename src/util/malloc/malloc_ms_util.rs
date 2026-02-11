@@ -4,7 +4,6 @@ use crate::util::Address;
 use crate::vm::VMBinding;
 
 pub fn align_alloc(size: usize, align: usize) -> Address {
-    use crate::util::os::*;
     let mut ptr = std::ptr::null_mut::<libc::c_void>();
     let ptr_ptr = std::ptr::addr_of_mut!(ptr);
     let result = unsafe { posix_memalign(ptr_ptr, align, size) };
@@ -12,7 +11,7 @@ pub fn align_alloc(size: usize, align: usize) -> Address {
         return Address::ZERO;
     }
     let address = Address::from_mut_ptr(ptr);
-    OS::memzero(address, size);
+    crate::util::memory::zero(address, size);
     address
 }
 

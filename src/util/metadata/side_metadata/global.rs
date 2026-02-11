@@ -174,7 +174,7 @@ impl SideMetadataSpec {
         let mut visitor = |range| {
             match range {
                 BitByteRange::Bytes { start, end } => {
-                    OS::memzero(start, end - start);
+                    crate::util::memory::zero(start, end - start);
                     false
                 }
                 BitByteRange::BitsInByte {
@@ -211,7 +211,7 @@ impl SideMetadataSpec {
         let mut visitor = |range| {
             match range {
                 BitByteRange::Bytes { start, end } => {
-                    OS::memset(start, 0xff, end - start);
+                    crate::util::memory::set(start, 0xff, end - start);
                     false
                 }
                 BitByteRange::BitsInByte {
