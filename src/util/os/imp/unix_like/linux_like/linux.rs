@@ -61,15 +61,18 @@ impl OSMemory for Linux {
 }
 
 impl OSProcess for Linux {
+    type ProcessIDType = unix_common::ProcessIDType;
+    type ThreadIDType = unix_common::ThreadIDType;
+
     fn get_process_memory_maps() -> Result<String> {
         linux_common::get_process_memory_maps()
     }
 
-    fn get_process_id() -> Result<String> {
+    fn get_process_id() -> Result<Self::ProcessIDType> {
         unix_common::get_process_id()
     }
 
-    fn get_thread_id() -> Result<String> {
+    fn get_thread_id() -> Result<Self::ThreadIDType> {
         unix_common::get_thread_id()
     }
 

@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::io::Result;
 
 /// Representation of a CPU core identifier.
@@ -7,17 +8,20 @@ pub type CoreNum = u16;
 
 /// Abstraction for OS process operations.
 pub trait OSProcess {
+    type ProcessIDType: Display + Eq + Copy;
+    type ThreadIDType: Display + Eq + Copy;
+
     /// Get the memory maps for the process. The returned string is a multi-line string.
     /// Fallback: This is only used for debugging. For unimplemented cases, this function can return a placeholder Ok value.
     fn get_process_memory_maps() -> Result<String>;
 
     /// Get the process ID as a string.
     /// Fallback: This is only used for debugging. For unimplemented cases, this function can return a placeholder Ok value.
-    fn get_process_id() -> Result<String>;
+    fn get_process_id() -> Result<Self::ProcessIDType>;
 
     //// Get the thread ID as a string.
     /// Fallback: This is only used for debugging. For unimplemented cases, this function can return a placeholder Ok value.
-    fn get_thread_id() -> Result<String>;
+    fn get_thread_id() -> Result<Self::ThreadIDType>;
 
     /// Return the total number of cores allocated to the program.
     fn get_total_num_cpus() -> CoreNum;

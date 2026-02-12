@@ -39,14 +39,15 @@ pub fn mprotect(start: Address, size: usize, prot: MmapProtection) -> Result<()>
     )
 }
 
-pub fn get_process_id() -> Result<String> {
-    let pid = unsafe { libc::getpid() };
-    Ok(format!("{}", pid))
+pub type ProcessIDType = libc::pid_t;
+pub type ThreadIDType = libc::pthread_t;
+
+pub fn get_process_id() -> Result<ProcessIDType> {
+    Ok(unsafe { libc::getpid() })
 }
 
-pub fn get_thread_id() -> Result<String> {
-    let tid = unsafe { libc::pthread_self() };
-    Ok(format!("{}", tid))
+pub fn get_thread_id() -> Result<ThreadIDType> {
+    Ok(unsafe { libc::pthread_self() })
 }
 
 pub fn wrap_libc_call<T: PartialEq>(f: &dyn Fn() -> T, expect: T) -> Result<()> {

@@ -55,6 +55,9 @@ impl MmapStrategy {
 }
 
 impl OSProcess for MacOS {
+    type ProcessIDType = unix_common::ProcessIDType;
+    type ThreadIDType = unix_common::ThreadIDType;
+
     fn get_process_memory_maps() -> Result<String> {
         // Get the current process ID (replace this with a specific PID if needed)
         let pid = std::process::id();
@@ -82,11 +85,11 @@ impl OSProcess for MacOS {
         }
     }
 
-    fn get_process_id() -> Result<String> {
+    fn get_process_id() -> Result<Self::ProcessIDType> {
         unix_common::get_process_id()
     }
 
-    fn get_thread_id() -> Result<String> {
+    fn get_thread_id() -> Result<Self::ThreadIDType> {
         unix_common::get_thread_id()
     }
 
