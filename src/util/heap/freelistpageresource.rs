@@ -219,7 +219,11 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         // > (e.g., read versus read/write protection) exceeding the
         // > allowed maximum.
         assert!(self.protect_memory_on_release.is_some());
-        if let Err(e) = OS::mprotect(start, conversions::pages_to_bytes(pages)) {
+        if let Err(e) = OS::set_memory_access(
+            start,
+            conversions::pages_to_bytes(pages),
+            MmapProtection::NoAccess,
+        ) {
             panic!(
                 "Failed at protecting memory (starting at {}): {:?}",
                 start, e
@@ -230,7 +234,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     /// Unprotect the memory
     fn munprotect(&self, start: Address, pages: usize) {
         assert!(self.protect_memory_on_release.is_some());
-        if let Err(e) = OS::munprotect(
+        if let Err(e) = OS::set_memory_access(
             start,
             conversions::pages_to_bytes(pages),
             self.protect_memory_on_release.unwrap(),

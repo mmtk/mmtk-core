@@ -32,15 +32,7 @@ pub fn munmap(start: Address, size: usize) -> Result<()> {
     wrap_libc_call(&|| unsafe { libc::munmap(start.to_mut_ptr(), size) }, 0)
 }
 
-pub fn mprotect(start: Address, size: usize) -> Result<()> {
-    let prot = libc::PROT_NONE;
-    wrap_libc_call(
-        &|| unsafe { libc::mprotect(start.to_mut_ptr(), size, prot) },
-        0,
-    )
-}
-
-pub fn munprotect(start: Address, size: usize, prot: MmapProtection) -> Result<()> {
+pub fn mprotect(start: Address, size: usize, prot: MmapProtection) -> Result<()> {
     wrap_libc_call(
         &|| unsafe { libc::mprotect(start.to_mut_ptr(), size, prot.get_native_flags()) },
         0,

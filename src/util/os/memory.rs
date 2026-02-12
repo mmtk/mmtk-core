@@ -12,7 +12,8 @@ use crate::{
 pub trait OSMemory {
     /// Perform a demand-zero mmap.
     ///
-    /// Falback: `annotation` is only used for debugging. For platforms that do not support mmap annotations, this parameter can be ignored.
+    /// Fallback: `annotation` is only used for debugging. For platforms that do not support mmap annotations, this parameter can be ignored.
+    /// Fallback: see [`crate::util::os::MmapStrategy`] for fallbacks for `strategy`.
     fn dzmmap(
         start: Address,
         size: usize,
@@ -75,11 +76,8 @@ pub trait OSMemory {
     /// Unmap a memory region.
     fn munmap(start: Address, size: usize) -> Result<()>;
 
-    /// Change the protection of a memory region to no access to forbit any access to the memory region.
-    fn mprotect(start: Address, size: usize) -> Result<()>;
-
     /// Change the protection of a memory region to the specified protection.
-    fn munprotect(start: Address, size: usize, prot: MmapProtection) -> Result<()>;
+    fn set_memory_access(start: Address, size: usize, prot: MmapProtection) -> Result<()>;
 
     /// Checks if the memory has already been mapped. If not, we panic.
     ///

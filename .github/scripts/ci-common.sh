@@ -66,8 +66,7 @@ init_non_exclusive_features() {
             IFS='='; feature=($line); unset IFS;
             if [[ ! -z "$feature" ]]; then
                 # Trim whitespaces
-                feature=$(echo $feature)
-                features[i]=$feature
+                features[i]=$(echo $feature)
                 let "i++"
             fi
         fi

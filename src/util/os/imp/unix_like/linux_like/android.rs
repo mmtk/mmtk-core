@@ -32,12 +32,8 @@ impl OSMemory for Android {
         unix_common::munmap(start, size)
     }
 
-    fn mprotect(start: Address, size: usize) -> Result<()> {
-        unix_common::mprotect(start, size)
-    }
-
-    fn munprotect(start: Address, size: usize, prot: MmapProtection) -> Result<()> {
-        unix_common::munprotect(start, size, prot)
+    fn set_memory_access(start: Address, size: usize, prot: MmapProtection) -> Result<()> {
+        unix_common::mprotect(start, size, prot)
     }
 
     fn is_mmap_oom(os_errno: i32) -> bool {
