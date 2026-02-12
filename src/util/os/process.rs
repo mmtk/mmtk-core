@@ -8,7 +8,9 @@ pub type CoreNum = u16;
 
 /// Abstraction for OS process operations.
 pub trait OSProcess {
+    /// The process ID type for the OS.
     type ProcessIDType: Display + Eq + Copy;
+    /// The thread ID type for the OS.
     type ThreadIDType: Display + Eq + Copy;
 
     /// Get the memory maps for the process. The returned string is a multi-line string.
