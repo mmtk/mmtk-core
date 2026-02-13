@@ -292,7 +292,7 @@
 <a href=#292 id=292 data-nosnippet>292</a>            FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
 <a href=#293 id=293 data-nosnippet>293</a>        };
 <a href=#294 id=294 data-nosnippet>294</a>        pr.protect_memory_on_release = <span class="kw">if </span>protect_memory_on_release {
-<a href=#295 id=295 data-nosnippet>295</a>            <span class="prelude-val">Some</span>(common.mmap_strategy().prot)
+<a href=#295 id=295 data-nosnippet>295</a>            <span class="prelude-val">Some</span>(common.mmap_protection())
 <a href=#296 id=296 data-nosnippet>296</a>        } <span class="kw">else </span>{
 <a href=#297 id=297 data-nosnippet>297</a>            <span class="prelude-val">None
 <a href=#298 id=298 data-nosnippet>298</a>        </span>};

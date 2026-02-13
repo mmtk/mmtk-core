@@ -1,9 +1,9 @@
 (function() {
-    var implementors = Object.fromEntries([["mmtk",[["impl NoUninit for <a class=\"enum\" href=\"mmtk/plan/concurrent/enum.Pause.html\" title=\"enum mmtk::plan::concurrent::Pause\">Pause</a>"],["impl NoUninit for <a class=\"enum\" href=\"mmtk/util/heap/layout/mmapper/csm/enum.MapState.html\" title=\"enum mmtk::util::heap::layout::mmapper::csm::MapState\">MapState</a>"],["impl NoUninit for <a class=\"enum\" href=\"mmtk/util/memory/enum.HugePageSupport.html\" title=\"enum mmtk::util::memory::HugePageSupport\">HugePageSupport</a>"],["impl NoUninit for <a class=\"struct\" href=\"mmtk/util/address/struct.Address.html\" title=\"struct mmtk::util::address::Address\">Address</a>"],["impl NoUninit for <a class=\"struct\" href=\"mmtk/util/address/struct.ObjectReference.html\" title=\"struct mmtk::util::address::ObjectReference\">ObjectReference</a>"]]]]);
+    var implementors = Object.fromEntries([["mmtk",[["impl NoUninit for <a class=\"enum\" href=\"mmtk/plan/concurrent/enum.Pause.html\" title=\"enum mmtk::plan::concurrent::Pause\">Pause</a>"],["impl NoUninit for <a class=\"enum\" href=\"mmtk/util/heap/layout/mmapper/csm/enum.MapState.html\" title=\"enum mmtk::util::heap::layout::mmapper::csm::MapState\">MapState</a>"],["impl NoUninit for <a class=\"enum\" href=\"mmtk/util/os/enum.HugePageSupport.html\" title=\"enum mmtk::util::os::HugePageSupport\">HugePageSupport</a>"],["impl NoUninit for <a class=\"struct\" href=\"mmtk/util/address/struct.Address.html\" title=\"struct mmtk::util::address::Address\">Address</a>"],["impl NoUninit for <a class=\"struct\" href=\"mmtk/util/address/struct.ObjectReference.html\" title=\"struct mmtk::util::address::ObjectReference\">ObjectReference</a>"]]]]);
     if (window.register_implementors) {
         window.register_implementors(implementors);
     } else {
         window.pending_implementors = implementors;
     }
 })()
-//{"start":57,"fragment_lengths":[811]}
+//{"start":57,"fragment_lengths":[803]}

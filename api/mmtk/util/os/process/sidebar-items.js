@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"trait":["OSProcess"],"type":["CoreId","CoreNum"]};

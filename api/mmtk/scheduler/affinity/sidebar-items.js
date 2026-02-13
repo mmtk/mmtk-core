@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["bind_current_thread_to_core","bind_current_thread_to_cpuset","get_total_num_cpus"],"type":["CoreId"]};
+window.SIDEBAR_ITEMS = {};

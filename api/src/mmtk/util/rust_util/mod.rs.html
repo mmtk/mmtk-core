@@ -108,54 +108,47 @@
 <a href=#108 id=108 data-nosnippet>108</a>
 <a href=#109 id=109 data-nosnippet>109</a><span class="doccomment">/// Create a formatted string that makes the best effort idenfying the current process and thread.
 <a href=#110 id=110 data-nosnippet>110</a></span><span class="kw">pub fn </span>debug_process_thread_id() -&gt; String {
-<a href=#111 id=111 data-nosnippet>111</a>    <span class="kw">let </span>pid = <span class="kw">unsafe </span>{ libc::getpid() };
-<a href=#112 id=112 data-nosnippet>112</a>    <span class="attr">#[cfg(target_os = <span class="string">"linux"</span>)]
-<a href=#113 id=113 data-nosnippet>113</a>    </span>{
-<a href=#114 id=114 data-nosnippet>114</a>        <span class="comment">// `gettid()` is Linux-specific.
-<a href=#115 id=115 data-nosnippet>115</a>        </span><span class="kw">let </span>tid = <span class="kw">unsafe </span>{ libc::gettid() };
-<a href=#116 id=116 data-nosnippet>116</a>        <span class="macro">format!</span>(<span class="string">"PID: {}, TID: {}"</span>, pid, tid)
-<a href=#117 id=117 data-nosnippet>117</a>    }
-<a href=#118 id=118 data-nosnippet>118</a>    <span class="attr">#[cfg(not(target_os = <span class="string">"linux"</span>))]
-<a href=#119 id=119 data-nosnippet>119</a>    </span>{
-<a href=#120 id=120 data-nosnippet>120</a>        <span class="comment">// TODO: When we support other platforms, use platform-specific methods to get thread
-<a href=#121 id=121 data-nosnippet>121</a>        // identifiers.
-<a href=#122 id=122 data-nosnippet>122</a>        </span><span class="macro">format!</span>(<span class="string">"PID: {}"</span>, pid)
-<a href=#123 id=123 data-nosnippet>123</a>    }
-<a href=#124 id=124 data-nosnippet>124</a>}
-<a href=#125 id=125 data-nosnippet>125</a>
-<a href=#126 id=126 data-nosnippet>126</a><span class="attr">#[cfg(test)]
-<a href=#127 id=127 data-nosnippet>127</a></span><span class="kw">mod </span>initialize_once_tests {
-<a href=#128 id=128 data-nosnippet>128</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
-<a href=#129 id=129 data-nosnippet>129</a>
-<a href=#130 id=130 data-nosnippet>130</a>    <span class="attr">#[test]
-<a href=#131 id=131 data-nosnippet>131</a>    </span><span class="kw">fn </span>test_threads_compete_initialize() {
-<a href=#132 id=132 data-nosnippet>132</a>        <span class="kw">use </span>std::sync::atomic::AtomicUsize;
-<a href=#133 id=133 data-nosnippet>133</a>        <span class="kw">use </span>std::sync::atomic::Ordering;
-<a href=#134 id=134 data-nosnippet>134</a>        <span class="kw">use </span>std::thread;
-<a href=#135 id=135 data-nosnippet>135</a>
-<a href=#136 id=136 data-nosnippet>136</a>        <span class="comment">// Create multiple threads to initialize the same `InitializeOnce` value
-<a href=#137 id=137 data-nosnippet>137</a>        </span><span class="kw">const </span>N_THREADS: usize = <span class="number">1000</span>;
-<a href=#138 id=138 data-nosnippet>138</a>        <span class="comment">// The test value
-<a href=#139 id=139 data-nosnippet>139</a>        </span><span class="kw">static </span>I: InitializeOnce&lt;usize&gt; = InitializeOnce::new();
-<a href=#140 id=140 data-nosnippet>140</a>        <span class="comment">// Count how many times the function is called
-<a href=#141 id=141 data-nosnippet>141</a>        </span><span class="kw">static </span>INITIALIZE_COUNT: AtomicUsize = AtomicUsize::new(<span class="number">0</span>);
-<a href=#142 id=142 data-nosnippet>142</a>        <span class="comment">// The function to create initial value
-<a href=#143 id=143 data-nosnippet>143</a>        </span><span class="kw">fn </span>initialize_usize() -&gt; usize {
-<a href=#144 id=144 data-nosnippet>144</a>            INITIALIZE_COUNT.fetch_add(<span class="number">1</span>, Ordering::SeqCst);
-<a href=#145 id=145 data-nosnippet>145</a>            <span class="number">42
-<a href=#146 id=146 data-nosnippet>146</a>        </span>}
-<a href=#147 id=147 data-nosnippet>147</a>
-<a href=#148 id=148 data-nosnippet>148</a>        <span class="kw">let </span><span class="kw-2">mut </span>threads = <span class="macro">vec!</span>[];
-<a href=#149 id=149 data-nosnippet>149</a>        <span class="kw">for _ in </span><span class="number">1</span>..N_THREADS {
-<a href=#150 id=150 data-nosnippet>150</a>            threads.push(thread::spawn(|| {
-<a href=#151 id=151 data-nosnippet>151</a>                I.initialize_once(<span class="kw-2">&amp;</span>initialize_usize);
-<a href=#152 id=152 data-nosnippet>152</a>                <span class="comment">// Every thread should see the value correctly initialized.
-<a href=#153 id=153 data-nosnippet>153</a>                </span><span class="macro">assert_eq!</span>(<span class="kw-2">*</span>I, <span class="number">42</span>);
-<a href=#154 id=154 data-nosnippet>154</a>            }));
-<a href=#155 id=155 data-nosnippet>155</a>        }
-<a href=#156 id=156 data-nosnippet>156</a>        threads.into_iter().for_each(|t| t.join().unwrap());
-<a href=#157 id=157 data-nosnippet>157</a>
-<a href=#158 id=158 data-nosnippet>158</a>        <span class="comment">// The initialize_usize should only be called once
-<a href=#159 id=159 data-nosnippet>159</a>        </span><span class="macro">assert_eq!</span>(INITIALIZE_COUNT.load(Ordering::SeqCst), <span class="number">1</span>);
-<a href=#160 id=160 data-nosnippet>160</a>    }
-<a href=#161 id=161 data-nosnippet>161</a>}</code></pre></div></section></main></body></html>
+<a href=#111 id=111 data-nosnippet>111</a>    <span class="kw">use </span><span class="kw">crate</span>::util::os::<span class="kw-2">*</span>;
+<a href=#112 id=112 data-nosnippet>112</a>    <span class="macro">format!</span>(
+<a href=#113 id=113 data-nosnippet>113</a>        <span class="string">"PID: {}, TID: {}"</span>,
+<a href=#114 id=114 data-nosnippet>114</a>        OS::get_process_id().map_or(<span class="string">"(Failed to get PID)"</span>.to_string(), |pid| <span class="macro">format!</span>(<span class="string">"{}"</span>, pid)),
+<a href=#115 id=115 data-nosnippet>115</a>        OS::get_thread_id().map_or(<span class="string">"(Failed to get TID)"</span>.to_string(), |tid| <span class="macro">format!</span>(<span class="string">"{}"</span>, tid)),
+<a href=#116 id=116 data-nosnippet>116</a>    )
+<a href=#117 id=117 data-nosnippet>117</a>}
+<a href=#118 id=118 data-nosnippet>118</a>
+<a href=#119 id=119 data-nosnippet>119</a><span class="attr">#[cfg(test)]
+<a href=#120 id=120 data-nosnippet>120</a></span><span class="kw">mod </span>initialize_once_tests {
+<a href=#121 id=121 data-nosnippet>121</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#122 id=122 data-nosnippet>122</a>
+<a href=#123 id=123 data-nosnippet>123</a>    <span class="attr">#[test]
+<a href=#124 id=124 data-nosnippet>124</a>    </span><span class="kw">fn </span>test_threads_compete_initialize() {
+<a href=#125 id=125 data-nosnippet>125</a>        <span class="kw">use </span>std::sync::atomic::AtomicUsize;
+<a href=#126 id=126 data-nosnippet>126</a>        <span class="kw">use </span>std::sync::atomic::Ordering;
+<a href=#127 id=127 data-nosnippet>127</a>        <span class="kw">use </span>std::thread;
+<a href=#128 id=128 data-nosnippet>128</a>
+<a href=#129 id=129 data-nosnippet>129</a>        <span class="comment">// Create multiple threads to initialize the same `InitializeOnce` value
+<a href=#130 id=130 data-nosnippet>130</a>        </span><span class="kw">const </span>N_THREADS: usize = <span class="number">1000</span>;
+<a href=#131 id=131 data-nosnippet>131</a>        <span class="comment">// The test value
+<a href=#132 id=132 data-nosnippet>132</a>        </span><span class="kw">static </span>I: InitializeOnce&lt;usize&gt; = InitializeOnce::new();
+<a href=#133 id=133 data-nosnippet>133</a>        <span class="comment">// Count how many times the function is called
+<a href=#134 id=134 data-nosnippet>134</a>        </span><span class="kw">static </span>INITIALIZE_COUNT: AtomicUsize = AtomicUsize::new(<span class="number">0</span>);
+<a href=#135 id=135 data-nosnippet>135</a>        <span class="comment">// The function to create initial value
+<a href=#136 id=136 data-nosnippet>136</a>        </span><span class="kw">fn </span>initialize_usize() -&gt; usize {
+<a href=#137 id=137 data-nosnippet>137</a>            INITIALIZE_COUNT.fetch_add(<span class="number">1</span>, Ordering::SeqCst);
+<a href=#138 id=138 data-nosnippet>138</a>            <span class="number">42
+<a href=#139 id=139 data-nosnippet>139</a>        </span>}
+<a href=#140 id=140 data-nosnippet>140</a>
+<a href=#141 id=141 data-nosnippet>141</a>        <span class="kw">let </span><span class="kw-2">mut </span>threads = <span class="macro">vec!</span>[];
+<a href=#142 id=142 data-nosnippet>142</a>        <span class="kw">for _ in </span><span class="number">1</span>..N_THREADS {
+<a href=#143 id=143 data-nosnippet>143</a>            threads.push(thread::spawn(|| {
+<a href=#144 id=144 data-nosnippet>144</a>                I.initialize_once(<span class="kw-2">&amp;</span>initialize_usize);
+<a href=#145 id=145 data-nosnippet>145</a>                <span class="comment">// Every thread should see the value correctly initialized.
+<a href=#146 id=146 data-nosnippet>146</a>                </span><span class="macro">assert_eq!</span>(<span class="kw-2">*</span>I, <span class="number">42</span>);
+<a href=#147 id=147 data-nosnippet>147</a>            }));
+<a href=#148 id=148 data-nosnippet>148</a>        }
+<a href=#149 id=149 data-nosnippet>149</a>        threads.into_iter().for_each(|t| t.join().unwrap());
+<a href=#150 id=150 data-nosnippet>150</a>
+<a href=#151 id=151 data-nosnippet>151</a>        <span class="comment">// The initialize_usize should only be called once
+<a href=#152 id=152 data-nosnippet>152</a>        </span><span class="macro">assert_eq!</span>(INITIALIZE_COUNT.load(Ordering::SeqCst), <span class="number">1</span>);
+<a href=#153 id=153 data-nosnippet>153</a>    }
+<a href=#154 id=154 data-nosnippet>154</a>}</code></pre></div></section></main></body></html>
