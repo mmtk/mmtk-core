@@ -3,6 +3,7 @@ use crate::util::malloc::library::*;
 use crate::util::Address;
 use crate::vm::VMBinding;
 
+/// Allocate with alignment. This also guarantees the memory is zero initialized.
 pub fn align_alloc(size: usize, align: usize) -> Address {
     let mut ptr = std::ptr::null_mut::<libc::c_void>();
     let ptr_ptr = std::ptr::addr_of_mut!(ptr);
