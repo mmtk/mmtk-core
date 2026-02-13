@@ -1,7 +1,7 @@
 use super::mock_test_prelude::*;
 
-use crate::util::memory;
 use crate::util::opaque_pointer::*;
+use crate::util::os::*;
 use crate::util::Address;
 
 #[cfg(target_pointer_width = "32")]
@@ -18,14 +18,9 @@ pub fn test_handle_mmap_oom() {
                 let start = unsafe { Address::from_usize(0x100_0000) };
                 // mmap 1 terabyte memory - we expect this will fail due to out of memory.
                 // If that's not the case, increase the size we mmap.
-                let mmap_res = memory::dzmmap_noreplace(
-                    start,
-                    LARGE_SIZE,
-                    memory::MmapStrategy::TEST,
-                    memory::mmap_anno_test!(),
-                );
+                let mmap_res = OS::dzmmap(start, LARGE_SIZE, MmapStrategy::TEST, mmap_anno_test!());
 
-                memory::handle_mmap_error::<MockVM>(
+                OS::handle_mmap_error::<MockVM>(
                     mmap_res.err().unwrap(),
                     VMThread::UNINITIALIZED,
                     start,

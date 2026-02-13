@@ -108,19 +108,12 @@ unsafe impl<T> Sync for InitializeOnce<T> {}
 
 /// Create a formatted string that makes the best effort idenfying the current process and thread.
 pub fn debug_process_thread_id() -> String {
-    let pid = unsafe { libc::getpid() };
-    #[cfg(target_os = "linux")]
-    {
-        // `gettid()` is Linux-specific.
-        let tid = unsafe { libc::gettid() };
-        format!("PID: {}, TID: {}", pid, tid)
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        // TODO: When we support other platforms, use platform-specific methods to get thread
-        // identifiers.
-        format!("PID: {}", pid)
-    }
+    use crate::util::os::*;
+    format!(
+        "PID: {}, TID: {}",
+        OS::get_process_id().map_or("(Failed to get PID)".to_string(), |pid| format!("{}", pid)),
+        OS::get_thread_id().map_or("(Failed to get TID)".to_string(), |tid| format!("{}", tid)),
+    )
 }
 
 #[cfg(test)]

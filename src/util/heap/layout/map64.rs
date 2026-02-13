@@ -6,7 +6,7 @@ use crate::util::freelist::FreeList;
 use crate::util::heap::layout::heap_parameters::*;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
-use crate::util::memory::MmapStrategy;
+use crate::util::os::*;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::util::Address;
 use std::cell::UnsafeCell;
