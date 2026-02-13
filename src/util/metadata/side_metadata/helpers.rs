@@ -93,7 +93,6 @@ pub(super) fn align_metadata_address(
 /// Unmaps the specified metadata range, or panics.
 #[cfg(test)]
 pub(crate) fn ensure_munmap_metadata(start: Address, size: usize) {
-    use crate::util::os::*;
     trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
 
     assert!(OS::munmap(start, size).is_ok())
