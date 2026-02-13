@@ -172,9 +172,6 @@ impl<VM: VMBinding> Immix<VM> {
             plan_args
                 .global_side_metadata_specs
                 .push(ImmixFakeFieldBarrierSemantics::<VM>::UNLOG_BITS);
-            plan_args
-                .global_side_metadata_specs
-                .push(ImmixFakeFieldBarrierSemantics::<VM>::LOCK_BITS);
         }
         Self::new_with_args(
             plan_args,

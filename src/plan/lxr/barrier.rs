@@ -8,6 +8,7 @@ use atomic::Ordering;
 use super::LXR;
 use crate::plan::barriers::BarrierSemantics;
 use crate::plan::barriers::LOGGED_VALUE;
+use crate::plan::barriers::UNLOGGED_VALUE;
 use crate::plan::immix::Pause;
 use crate::plan::lxr::cm::ProcessModBufSATB;
 use crate::plan::lxr::rc::ProcessDecs;
@@ -20,7 +21,6 @@ use crate::scheduler::WorkBucketStage;
 use crate::util::address::CLDScanPolicy;
 use crate::util::address::RefScanPolicy;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::rc::RC_LOCK_BITS;
 use crate::util::*;
 use crate::vm::slot::MemorySlice;
 use crate::vm::slot::Slot;
@@ -31,9 +31,6 @@ use crate::MMTK;
 pub const TAKERATE_MEASUREMENT: bool = crate::args::TAKERATE_MEASUREMENT;
 pub static FAST_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub static SLOW_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-pub const UNLOCKED_VALUE: u8 = 0b0;
-pub const LOCKED_VALUE: u8 = 0b1;
 
 pub struct LXRFieldBarrierSemantics<VM: VMBinding> {
     mmtk: &'static MMTK<VM>,
@@ -49,7 +46,6 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
     const UNLOG_BITS: SideMetadataSpec = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
         .as_spec()
         .extract_side_spec();
-    const LOCK_BITS: SideMetadataSpec = RC_LOCK_BITS;
 
     #[allow(unused)]
     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
@@ -68,56 +64,35 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
         unsafe { Self::UNLOG_BITS.load(slot.to_address()) }
     }
 
-    fn attempt_to_lock_slot_bailout_if_logged(&self, slot: VM::VMSlot) -> bool {
+    fn attempt_to_log_field(&self, slot: VM::VMSlot) -> bool {
         loop {
             // Bailout if logged
             if self.get_slot_logging_state(slot) == LOGGED_VALUE {
                 return false;
             }
-            // Attempt to lock the slots
-            if Self::LOCK_BITS
-                .compare_exchange_atomic(
-                    slot.to_address(),
-                    UNLOCKED_VALUE,
-                    LOCKED_VALUE,
-                    Ordering::Relaxed,
-                    Ordering::Relaxed,
-                )
-                .is_ok()
-            {
-                if self.get_slot_logging_state(slot) == LOGGED_VALUE {
-                    self.unlock_slot(slot);
-                    return false;
+            // Attempt to log the slots
+            match Self::UNLOG_BITS.compare_exchange_atomic(
+                slot.to_address(),
+                UNLOGGED_VALUE,
+                LOGGED_VALUE,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => return true,
+                Err(current) => {
+                    if current == LOGGED_VALUE {
+                        return false;
+                    }
                 }
-                return true;
             }
-            // Failed to lock the slot. Spin.
+            // Failed to log the slot. Spin.
             std::hint::spin_loop();
         }
     }
 
-    fn unlock_slot(&self, slot: VM::VMSlot) {
-        RC_LOCK_BITS.store_atomic(slot.to_address(), UNLOCKED_VALUE, Ordering::Relaxed);
-    }
-
-    fn log_and_unlock_slot(&self, slot: VM::VMSlot) {
-        let heap_bytes_per_unlog_byte = if VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
-            32usize
-        } else {
-            64
-        };
-        if (1 << crate::args::LOG_BYTES_PER_RC_LOCK_BIT) >= heap_bytes_per_unlog_byte {
-            unsafe { Self::UNLOG_BITS.store(slot.to_address(), LOGGED_VALUE) };
-        } else {
-            Self::UNLOG_BITS.store_atomic(slot.to_address(), LOGGED_VALUE, Ordering::Relaxed);
-        }
-        RC_LOCK_BITS.store_atomic(slot.to_address(), UNLOCKED_VALUE, Ordering::Relaxed);
-    }
-
     fn log_slot_and_get_old_target(&self, slot: VM::VMSlot) -> Result<Option<ObjectReference>, ()> {
-        if self.attempt_to_lock_slot_bailout_if_logged(slot) {
-            let old = slot.load();
-            self.log_and_unlock_slot(slot);
+        let old = slot.load();
+        if self.attempt_to_log_field(slot) {
             Ok(old)
         } else {
             Err(())

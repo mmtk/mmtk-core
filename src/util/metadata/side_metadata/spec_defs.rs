@@ -63,8 +63,6 @@ define_side_metadata_specs!(
     SFT_DENSE_CHUNK_MAP_INDEX   = (global: true, log_num_of_bits: 3, log_bytes_in_region: LOG_BYTES_IN_CHUNK),
     // Reference counts
     RC_TABLE = (global: true, log_num_of_bits: crate::util::rc::LOG_REF_COUNT_BITS, log_bytes_in_region: crate::util::rc::LOG_MIN_OBJECT_SIZE),
-    // Field barrier lock bits
-    RC_LOCK_BITS = (global: true, log_num_of_bits: 0, log_bytes_in_region: crate::args::LOG_BYTES_PER_RC_LOCK_BIT),
     // Record defrag state for immix blocks
     IX_BLOCK_DEFRAG = (global: true, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
     // Mark table for sanity GC

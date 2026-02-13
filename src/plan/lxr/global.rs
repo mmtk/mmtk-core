@@ -27,7 +27,7 @@ use crate::util::heap::{PageResource, SpaceStats, VMRequest};
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::MetadataSpec;
 use crate::util::options::{GCTriggerSelector, Options};
-use crate::util::rc::{RefCountHelper, RC_LOCK_BIT_SPEC, RC_TABLE};
+use crate::util::rc::{RefCountHelper, RC_TABLE};
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::util::{metadata, Address, ObjectReference};
@@ -534,7 +534,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
 impl<VM: VMBinding> LXR<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Box<Self> {
         let immix_specs = metadata::extract_side_metadata(&[
-            RC_LOCK_BIT_SPEC,
             MetadataSpec::OnSide(RC_TABLE),
             MetadataSpec::OnSide(
                 *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC

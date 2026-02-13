@@ -355,6 +355,3 @@ impl<S: BarrierSemantics> Barrier<S::VM> for FieldBarrier<S> {
 
 pub const UNLOGGED_VALUE: u8 = 0b1;
 pub const LOGGED_VALUE: u8 = 0b0;
-
-pub const UNLOCKED_VALUE: u8 = 0b0;
-pub const LOCKED_VALUE: u8 = 0b1;

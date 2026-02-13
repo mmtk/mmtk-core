@@ -8,12 +8,9 @@ use std::ops::*;
 use std::sync::atomic::Ordering;
 
 use crate::mmtk::{MMAPPER, SFT_MAP};
-use crate::plan::barriers::LOCKED_VALUE;
 use crate::plan::barriers::LOGGED_VALUE;
-use crate::plan::barriers::UNLOCKED_VALUE;
 use crate::plan::barriers::UNLOGGED_VALUE;
 use crate::plan::SlotIterator;
-use crate::util::rc::RC_LOCK_BITS;
 use crate::vm::{ObjectModel, VMBinding};
 
 use super::heap::layout::vm_layout::vm_layout;
@@ -373,35 +370,6 @@ impl Address {
     pub fn is_in_mmtk_heap(self) -> bool {
         let layout = vm_layout();
         self >= layout.heap_start && self < layout.heap_end
-    }
-
-    pub fn unlock<VM: VMBinding>(self) {
-        debug_assert!(!self.is_zero());
-        RC_LOCK_BITS.store_atomic(self, UNLOCKED_VALUE, Ordering::Relaxed)
-    }
-
-    pub fn lock(&self) {
-        loop {
-            // Attempt to lock the edges
-            if RC_LOCK_BITS
-                .compare_exchange_atomic(
-                    *self,
-                    UNLOCKED_VALUE,
-                    LOCKED_VALUE,
-                    Ordering::Relaxed,
-                    Ordering::Relaxed,
-                )
-                .is_ok()
-            {
-                return;
-            }
-            // Failed to lock the edge. Spin.
-        }
-    }
-
-    pub fn is_locked<VM: VMBinding>(self) -> bool {
-        debug_assert!(!self.is_zero());
-        unsafe { RC_LOCK_BITS.load::<u8>(self) == LOCKED_VALUE }
     }
 
     pub fn is_field_logged<VM: VMBinding>(self) -> bool {
