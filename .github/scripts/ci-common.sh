@@ -12,6 +12,19 @@ dummyvm_toml=$project_root/docs/dummyvm/Cargo.toml
 # Pin certain deps for our MSRV
 cargo update -p home@0.5.12 --precise 0.5.5 # This requires Rust edition 2024
 
+# Read a line and strip trailing CR (works for CRLF and LF files)
+strip_cr() {
+  local s=$1
+  printf '%s' "${s%$'\r'}"
+}
+
+# Trim all whitespace (for feature keys)
+trim_ws() {
+  local s=$1
+  # remove all whitespace characters
+  printf '%s' "${s//[[:space:]]/}"
+}
+
 # Repeat a command for all the features. Requires the command as one argument (with double quotes)
 for_all_features() {
     # without mutually exclusive features
@@ -46,6 +59,8 @@ init_non_exclusive_features() {
     i=0
 
     while IFS= read -r line; do
+        line=$(strip_cr "$line")
+
         # Only parse non mutally exclusive features
         if [[ $line == *"-- Non mutually exclusive features --"* ]]; then
             parse_features=true
@@ -95,6 +110,8 @@ init_exclusive_features() {
     declare -a features=()
 
     while IFS= read -r line; do
+        line=$(strip_cr "$line")
+
         # Only parse mutally exclusive features
         if [[ $line == *"-- Mutally exclusive features --"* ]]; then
             parse_features=true
