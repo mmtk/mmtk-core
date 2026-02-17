@@ -10,6 +10,7 @@ use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::{extract_side_metadata, MetadataSpec};
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::object_forwarding;
+use crate::util::os::*;
 use crate::util::{copy::*, object_enum};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -292,7 +293,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         }
         let start = self.common().start;
         let extent = self.common().extent;
-        if let Err(e) = crate::util::memory::mprotect(start, extent) {
+        if let Err(e) = OS::set_memory_access(start, extent, MmapProtection::NoAccess) {
             panic!("Failed to protect memory: {:?}", e);
         }
         trace!("Protect {:x} {:x}", start, start + extent);
@@ -307,11 +308,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         }
         let start = self.common().start;
         let extent = self.common().extent;
-        if let Err(e) = crate::util::memory::munprotect(
-            start,
-            extent,
-            crate::util::memory::MmapProtection::ReadWriteExec,
-        ) {
+        if let Err(e) = OS::set_memory_access(start, extent, self.common().mmap_protection()) {
             panic!("Failed to unprotect memory: {:?}", e);
         }
         trace!("Unprotect {:x} {:x}", start, start + extent);

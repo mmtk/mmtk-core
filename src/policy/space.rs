@@ -30,7 +30,7 @@ use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
-use crate::util::memory::{self, HugePageSupport, MmapProtection, MmapStrategy};
+use crate::util::os::*;
 use crate::vm::VMBinding;
 
 use std::marker::PhantomData;
@@ -191,8 +191,13 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 .ensure_mapped(
                     res.start,
                     res.pages,
-                    self.common().mmap_strategy(),
-                    &memory::MmapAnnotation::Space {
+                    if *self.common().options.transparent_hugepages {
+                        HugePageSupport::TransparentHugePages
+                    } else {
+                        HugePageSupport::No
+                    },
+                    self.common().mmap_protection(),
+                    &MmapAnnotation::Space {
                         name: self.get_name(),
                     },
                 )
@@ -202,7 +207,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     self.get_name(),
                 ))
             {
-                memory::handle_mmap_error::<VM>(mmap_error, tls, res.start, bytes);
+                OS::handle_mmap_error::<VM>(mmap_error, tls, res.start, bytes);
             }
         };
         let grow_space = || {
@@ -227,7 +232,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
         // TODO: Concurrent zeroing
         if self.common().zeroed {
-            memory::zero(res.start, bytes);
+            crate::util::memory::zero(res.start, bytes);
         }
 
         // Some assertions
@@ -755,18 +760,11 @@ impl<VM: VMBinding> CommonSpace<VM> {
         self.vm_map
     }
 
-    pub fn mmap_strategy(&self) -> MmapStrategy {
-        MmapStrategy {
-            huge_page: if *self.options.transparent_hugepages {
-                HugePageSupport::TransparentHugePages
-            } else {
-                HugePageSupport::No
-            },
-            prot: if self.permission_exec || cfg!(feature = "exec_permission_on_all_spaces") {
-                MmapProtection::ReadWriteExec
-            } else {
-                MmapProtection::ReadWrite
-            },
+    pub fn mmap_protection(&self) -> MmapProtection {
+        if self.permission_exec || cfg!(feature = "exec_permission_on_all_spaces") {
+            MmapProtection::ReadWriteExec
+        } else {
+            MmapProtection::ReadWrite
         }
     }
 

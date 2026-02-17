@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use super::allocator::AllocatorContext;
 use crate::policy::marksweepspace::native_ms::*;
 use crate::util::alloc::allocator;
 use crate::util::alloc::Allocator;
@@ -9,8 +10,6 @@ use crate::util::linear_scan::Region;
 use crate::util::Address;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
-
-use super::allocator::AllocatorContext;
 
 /// A MiMalloc free list allocator
 #[repr(C)]
@@ -422,7 +421,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             let unswept = self.unswept_blocks.get_mut(bin).unwrap();
 
             // If we do eager sweeping, we should have no unswept blocks.
-            debug_assert!(!cfg!(feature = "eager_sweeping") || unswept.is_empty());
+            #[cfg(feature = "eager_sweeping")]
+            debug_assert!(unswept.is_empty());
 
             let mut sweep_later = |list: &mut BlockList| {
                 list.release_blocks(self.space);

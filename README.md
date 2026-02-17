@@ -134,6 +134,34 @@ latest Rust toolchain rather than relying on an outdated version of Rust.
 Note, however, that we may switch to a more conservative MSRV policy in the future when MMTk reaches
 a stable state.
 
+## Supported platforms
+
+Like [Rust platform support tiers][rustps], supports for MMTk core on different platforms (targets) are organized into three tiers.
+
+-   Tier 1 platforms are guaranteed to work.
+-   Tier 2 platforms are guaranteed to build.
+-   Tier 3 platforms have support in the mmtk-core code base, but we make no guarantee whether they will build or work.
+
+Here is a list of supported platforms.
+
+| Platform                    | Rust tier | MMTk tier | Notes |
+|-----------------------------|-----------|-----------|-------|
+| x86_64-unknown-linux-gnu    | 1         | 1         |       |
+| i686-unknown-linux-gnu      | 1         | 1         |       |
+| x86_64-apple-darwin         | 2         | 2         | (1)   |
+| aarch64-unknown-linux-gnu   | 1         | 3         |       |
+| riscv64gc-unknown-linux-gnu | 2         | 3         |       |
+| aarch64-linux-android       | 2         | 3         |       |
+| x86_64-linux-android        | 2         | 3         |       |
+
+Notes:
+
+1.  Rust recently [demoted][x86appledem] x86_64-apple-darwin to Tier 2.  We will replace it with aarch64-apple-darwin in the future.
+
+[rustps]: https://doc.rust-lang.org/nightly/rustc/platform-support.html
+[x86appledem]: https://github.com/mmtk/mmtk-core/issues/1365
+[mmtk-art]: https://github.com/k-sareen/mmtk-art
+
 ## Contributing to MMTk
 
 Thank you for your interest in contributing to MMTk. We appreciate all the contributors. Generally you can contribute to MMTk by either

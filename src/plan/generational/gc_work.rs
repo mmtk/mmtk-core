@@ -4,6 +4,7 @@ use crate::plan::PlanTraceObject;
 use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::{gc_work::*, GCWork, GCWorker, WorkBucketStage};
+use crate::util::os::*;
 use crate::util::ObjectReference;
 use crate::vm::slot::{MemorySlice, Slot};
 use crate::vm::*;
@@ -117,7 +118,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
                     !gen.is_object_in_nursery(*obj),
                     "{} was logged but is not mature. Dumping process memory maps:\n{}",
                     *obj,
-                    crate::util::memory::get_process_memory_maps(),
+                    OS::get_process_memory_maps().unwrap(),
                 );
                 <E::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<E::VM, u8>(
                     *obj,

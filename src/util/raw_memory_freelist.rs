@@ -1,9 +1,8 @@
 use super::freelist::*;
-use super::memory::MmapStrategy;
 use crate::util::address::Address;
 use crate::util::constants::*;
 use crate::util::conversions;
-use crate::util::memory::MmapAnnotation;
+use crate::util::os::*;
 
 /** log2 of the number of bits used by a free list entry (two entries per unit) */
 const LOG_ENTRY_BITS: usize = LOG_BITS_IN_INT as _;
@@ -199,7 +198,7 @@ impl RawMemoryFreeList {
     }
 
     fn mmap(&self, start: Address, bytes: usize) {
-        let res = super::memory::dzmmap_noreplace(
+        let res = OS::dzmmap(
             start,
             bytes,
             self.strategy,
@@ -222,7 +221,7 @@ impl Drop for RawMemoryFreeList {
     fn drop(&mut self) {
         let len = self.high_water - self.base;
         if len != 0 {
-            let _ = crate::util::memory::munmap(self.base, len);
+            let _ = OS::munmap(self.base, len);
         }
     }
 }
