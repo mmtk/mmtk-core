@@ -45,6 +45,7 @@ mod mimalloc {
         mi_calloc as calloc, mi_free as free, mi_malloc as malloc, mi_realloc as realloc,
     };
     // Posix
+    #[cfg_attr(target_os = "windows", allow(unused_imports))]
     pub use mimalloc_sys::mi_posix_memalign as posix_memalign;
     // GNU
     pub use mimalloc_sys::mi_malloc_usable_size as malloc_usable_size;

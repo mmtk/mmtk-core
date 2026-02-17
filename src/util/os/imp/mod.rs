@@ -1,3 +1,9 @@
+#[cfg(target_os = "windows")]
+pub(crate) mod windows;
+
+#[cfg(target_os = "windows")]
+pub use windows::Windows as OS;
+
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "android"))]
 pub(crate) mod unix_like;
 
