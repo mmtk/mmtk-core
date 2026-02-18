@@ -5,43 +5,51 @@ use crate::util::reference_processor::RescanReferences;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::Finalizable;
-use crate::vm::{Collection, VMBinding};
+use crate::vm::{Collection, ReferenceGlue, VMBinding};
 use crate::MMTK;
 use std::marker::PhantomData;
+
+type F<VM> = <<VM as VMBinding>::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType;
 
 /// A special processor for Finalizable objects.
 // TODO: we should consider if we want to merge FinalizableProcessor with ReferenceProcessor,
 // and treat final reference as a special reference type in ReferenceProcessor.
-#[derive(Default)]
-pub struct FinalizableProcessor<F: Finalizable> {
+pub struct FinalizableProcessor<VM: VMBinding> {
+    plan: &'static dyn crate::plan::Plan<VM = VM>,
     /// Candidate objects that has finalizers with them
-    candidates: Vec<F>,
+    candidates: Vec<F<VM>>,
     /// Index into candidates to record where we are up to in the last scan of the candidates.
     /// Index after nursery_index are new objects inserted after the last GC.
     nursery_index: usize,
     /// Objects that can be finalized. They are actually dead, but we keep them alive
     /// until the binding pops them from the queue.
-    ready_for_finalize: Vec<F>,
+    ready_for_finalize: Vec<F<VM>>,
 }
 
-impl<F: Finalizable> FinalizableProcessor<F> {
-    pub fn new() -> Self {
+impl<VM: VMBinding> FinalizableProcessor<VM> {
+    pub fn new(plan: &'static dyn crate::plan::Plan<VM = VM>) -> Self {
         Self {
+            plan,
             candidates: vec![],
             nursery_index: 0,
             ready_for_finalize: vec![],
         }
     }
 
-    pub fn add(&mut self, object: F) {
+    pub fn add(&mut self, object: F<VM>) {
         self.candidates.push(object);
     }
 
-    fn forward_finalizable_reference<E: ProcessEdgesWork>(e: &mut E, finalizable: &mut F) {
+    fn forward_finalizable_reference<E: ProcessEdgesWork>(e: &mut E, finalizable: &mut F<VM>) {
         finalizable.keep_alive::<E>(e);
     }
 
-    pub fn scan<E: ProcessEdgesWork>(&mut self, tls: VMWorkerThread, e: &mut E, nursery: bool) {
+    pub fn scan<E: ProcessEdgesWork<VM = VM>>(
+        &mut self,
+        tls: VMWorkerThread,
+        e: &mut E,
+        nursery: bool,
+    ) {
         let start = if nursery { self.nursery_index } else { 0 };
 
         // We should go through ready_for_finalize objects and keep them alive.
@@ -51,11 +59,11 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         self.candidates.append(&mut self.ready_for_finalize);
         debug_assert!(self.ready_for_finalize.is_empty());
 
-        for mut f in self.candidates.drain(start..).collect::<Vec<F>>() {
+        for mut f in self.candidates.drain(start..).collect::<Vec<F<VM>>>() {
             let reff = f.get_reference();
             trace!("Pop {:?} for finalization", reff);
-            if reff.is_live() {
-                FinalizableProcessor::<F>::forward_finalizable_reference(e, &mut f);
+            if self.plan.is_live_object(reff) {
+                FinalizableProcessor::<VM>::forward_finalizable_reference(e, &mut f);
                 trace!("{:?} is live, push {:?} back to candidates", reff, f);
                 self.candidates.push(f);
                 continue;
@@ -79,25 +87,25 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         <<E as ProcessEdgesWork>::VM as VMBinding>::VMCollection::schedule_finalization(tls);
     }
 
-    pub fn forward_candidate<E: ProcessEdgesWork>(&mut self, e: &mut E, _nursery: bool) {
+    pub fn forward_candidate<E: ProcessEdgesWork<VM = VM>>(&mut self, e: &mut E, _nursery: bool) {
         self.candidates
             .iter_mut()
-            .for_each(|f| FinalizableProcessor::<F>::forward_finalizable_reference(e, f));
+            .for_each(|f| FinalizableProcessor::<VM>::forward_finalizable_reference(e, f));
         e.flush();
     }
 
-    pub fn forward_finalizable<E: ProcessEdgesWork>(&mut self, e: &mut E, _nursery: bool) {
+    pub fn forward_finalizable<E: ProcessEdgesWork<VM = VM>>(&mut self, e: &mut E, _nursery: bool) {
         self.ready_for_finalize
             .iter_mut()
-            .for_each(|f| FinalizableProcessor::<F>::forward_finalizable_reference(e, f));
+            .for_each(|f| FinalizableProcessor::<VM>::forward_finalizable_reference(e, f));
         e.flush();
     }
 
-    pub fn get_ready_object(&mut self) -> Option<F> {
+    pub fn get_ready_object(&mut self) -> Option<F<VM>> {
         self.ready_for_finalize.pop()
     }
 
-    pub fn get_all_finalizers(&mut self) -> Vec<F> {
+    pub fn get_all_finalizers(&mut self) -> Vec<F<VM>> {
         let mut ret = std::mem::take(&mut self.candidates);
         let ready_objects = std::mem::take(&mut self.ready_for_finalize);
         ret.extend(ready_objects);
@@ -108,12 +116,12 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         ret
     }
 
-    pub fn get_finalizers_for(&mut self, object: ObjectReference) -> Vec<F> {
+    pub fn get_finalizers_for(&mut self, object: ObjectReference) -> Vec<F<VM>> {
         // Drain filter for finalizers that equal to 'object':
         // * for elements that equal to 'object', they will be removed from the original vec, and returned.
         // * for elements that do not equal to 'object', they will be left in the original vec.
         // TODO: We should replace this with `vec.drain_filter()` when it is stablized.
-        let drain_filter = |vec: &mut Vec<F>| -> Vec<F> {
+        let drain_filter = |vec: &mut Vec<F<VM>>| -> Vec<F<VM>> {
             let mut i = 0;
             let mut ret = vec![];
             while i < vec.len() {
@@ -126,7 +134,7 @@ impl<F: Finalizable> FinalizableProcessor<F> {
             }
             ret
         };
-        let mut ret: Vec<F> = drain_filter(&mut self.candidates);
+        let mut ret: Vec<F<VM>> = drain_filter(&mut self.candidates);
         ret.extend(drain_filter(&mut self.ready_for_finalize));
 
         // We removed objects from candidates. Reset nursery_index

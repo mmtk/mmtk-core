@@ -18,6 +18,7 @@ use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::statistics::counter::EventCounter;
+use crate::util::ObjectReference;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::Plan;
@@ -223,6 +224,22 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             }
         }
         true
+    }
+
+    fn is_live_object(&self, object: ObjectReference) -> bool {
+        use crate::policy::sft::SFT;
+        if self.is_current_gc_nursery() {
+            if self.immix.immix_space.in_space(object) {
+                self.immix.immix_space.is_live(object)
+            } else if self.immix.common().get_los().in_space(object) {
+                self.immix.common().get_los().is_live(object)
+            } else {
+                true
+            }
+        } else {
+            let sft = unsafe { crate::mmtk::SFT_MAP.get_unchecked(object.to_raw_address()) };
+            sft.is_live(object)
+        }
     }
 }
 
