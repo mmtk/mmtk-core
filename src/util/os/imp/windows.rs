@@ -139,8 +139,14 @@ impl OSMemory for Windows {
     fn set_memory_access(start: Address, size: usize, prot: MmapProtection) -> Result<()> {
         use windows_sys::Win32::System::Memory::*;
         let mut old_protect = 0;
-        let res =
-            unsafe { VirtualProtect(start.to_mut_ptr(), size, prot.get_native_flags(), &mut old_protect) };
+        let res = unsafe {
+            VirtualProtect(
+                start.to_mut_ptr(),
+                size,
+                prot.get_native_flags(),
+                &mut old_protect,
+            )
+        };
         if res == 0 {
             Err(std::io::Error::last_os_error())
         } else {

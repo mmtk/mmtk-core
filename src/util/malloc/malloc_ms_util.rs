@@ -4,12 +4,6 @@ use crate::util::Address;
 use crate::vm::VMBinding;
 
 /// Allocate with alignment. This also guarantees the memory is zero initialized.
-/// This uses posix_memalign, which is not available on Windows.
-/// This would somehow affect `MallocMarkSweep` performance on Windows.
-#[cfg(all(
-    not(target_os = "windows"),
-    not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc"))
-))]
 pub fn align_alloc(size: usize, align: usize) -> Address {
     let mut ptr = std::ptr::null_mut::<libc::c_void>();
     let ptr_ptr = std::ptr::addr_of_mut!(ptr);
@@ -75,24 +69,16 @@ pub fn get_malloc_usable_size(address: Address, is_offset_malloc: bool) -> usize
 pub fn alloc<VM: VMBinding>(size: usize, align: usize, offset: usize) -> (Address, bool) {
     let address: Address;
     let mut is_offset_malloc = false;
-    // malloc returns 16 bytes aligned address.
-    // So if the alignment is smaller than 16 bytes, we do not need to align.
 
     match (align, offset) {
+        // malloc returns 16 bytes aligned address.
+        // So if the alignment is smaller than 16 bytes, we do not need to align.
         (a, 0) if a <= 16 => {
             let raw = unsafe { calloc(1, size) };
             address = Address::from_mut_ptr(raw);
             debug_assert!(address.is_aligned_to(align));
         }
-        #[cfg(all(
-            not(target_os = "windows"),
-            not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc"))
-        ))]
-        // On non-Windows platforms with posix_memalign, we can use align_alloc for alignments > 16
-        // However, on Windows, there is no equivalent function.
-        // The memory alloc by `align_alloc` may not be freed correctly by `free`.
-        // So we use offset allocation for all alignments > 16 on Windows.
-        (a, 0) if a > 16 => {
+        (a, 0) if a > 16 && SUPPORT_ALIGNED_MALLOC => {
             address = align_alloc(size, align);
             debug_assert!(
                 address.is_aligned_to(align),
