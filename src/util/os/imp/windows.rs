@@ -136,23 +136,11 @@ impl OSMemory for Windows {
         }
     }
 
-    fn mprotect(start: Address, size: usize) -> Result<()> {
+    fn set_memory_access(start: Address, size: usize, prot: MmapProtection) -> Result<()> {
         use windows_sys::Win32::System::Memory::*;
         let mut old_protect = 0;
         let res =
-            unsafe { VirtualProtect(start.to_mut_ptr(), size, PAGE_NOACCESS, &mut old_protect) };
-        if res == 0 {
-            Err(std::io::Error::last_os_error())
-        } else {
-            Ok(())
-        }
-    }
-
-    fn munprotect(start: Address, size: usize, prot: MmapProtection) -> Result<()> {
-        use windows_sys::Win32::System::Memory::*;
-        let prot = prot.get_native_flags();
-        let mut old_protect = 0;
-        let res = unsafe { VirtualProtect(start.to_mut_ptr(), size, prot, &mut old_protect) };
+            unsafe { VirtualProtect(start.to_mut_ptr(), size, prot.get_native_flags(), &mut old_protect) };
         if res == 0 {
             Err(std::io::Error::last_os_error())
         } else {
@@ -187,19 +175,22 @@ impl MmapProtection {
 use crate::util::os::process::*;
 
 impl OSProcess for Windows {
+    type ProcessIDType = u32;
+    type ThreadIDType = u32;
+
     fn get_process_memory_maps() -> Result<String> {
         // Windows-specific implementation to get process memory maps
         Ok("get_process_memory_maps not implemented for Windows".to_string())
     }
 
-    fn get_process_id() -> Result<String> {
+    fn get_process_id() -> Result<Self::ProcessIDType> {
         use windows_sys::Win32::System::Threading::GetCurrentProcessId;
-        Ok(format!("{}", unsafe { GetCurrentProcessId() }))
+        Ok(unsafe { GetCurrentProcessId() })
     }
 
-    fn get_thread_id() -> Result<String> {
+    fn get_thread_id() -> Result<Self::ThreadIDType> {
         use windows_sys::Win32::System::Threading::GetCurrentThreadId;
-        Ok(format!("{}", unsafe { GetCurrentThreadId() }))
+        Ok(unsafe { GetCurrentThreadId() })
     }
 
     fn get_total_num_cpus() -> CoreNum {
