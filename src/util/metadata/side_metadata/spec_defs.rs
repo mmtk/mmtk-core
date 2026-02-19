@@ -1,9 +1,7 @@
 use crate::util::constants::*;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::linear_scan::Region;
-use crate::util::metadata::side_metadata::constants::{
-    GLOBAL_SIDE_METADATA_BASE_OFFSET, LOCAL_SIDE_METADATA_BASE_OFFSET,
-};
+use crate::util::metadata::side_metadata::layout::GLOBAL_SIDE_METADATA_BASE_OFFSET;
 use crate::util::metadata::side_metadata::SideMetadataOffset;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 
@@ -14,12 +12,12 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 macro_rules! define_side_metadata_specs {
     // Internal patterns
 
-    // Define the first spec with offset at either GLOBAL/LOCAL_SIDE_METADATA_BASE_OFFSET
-    (@first_spec $name: ident = (global: $is_global: expr, log_num_of_bits: $log_num_of_bits: expr, log_bytes_in_region: $log_bytes_in_region: expr)) => {
+// Define the first spec with the given base offset.
+    (@first_spec $base_offset: expr, $name: ident = (global: $is_global: expr, log_num_of_bits: $log_num_of_bits: expr, log_bytes_in_region: $log_bytes_in_region: expr)) => {
         pub const $name: SideMetadataSpec = SideMetadataSpec {
             name: stringify!($name),
             is_global: $is_global,
-            offset: if $is_global { GLOBAL_SIDE_METADATA_BASE_OFFSET } else { LOCAL_SIDE_METADATA_BASE_OFFSET },
+            offset: $base_offset,
             log_num_of_bits: $log_num_of_bits,
             log_bytes_in_region: $log_bytes_in_region,
         };
@@ -43,9 +41,9 @@ macro_rules! define_side_metadata_specs {
     // The actual macro
 
     // This is the pattern that should be used outside this macro.
-    (last_spec_as $last_spec_ident: ident, $name0: ident = (global: $is_global0: expr, log_num_of_bits: $log_num_of_bits0: expr, log_bytes_in_region: $log_bytes_in_region0: expr), $($tail:tt)*) => {
+    (base_offset $base_offset: expr, last_spec_as $last_spec_ident: ident, $name0: ident = (global: $is_global0: expr, log_num_of_bits: $log_num_of_bits0: expr, log_bytes_in_region: $log_bytes_in_region0: expr), $($tail:tt)*) => {
         // Defines the first spec
-        define_side_metadata_specs!(@first_spec $name0 = (global: $is_global0, log_num_of_bits: $log_num_of_bits0, log_bytes_in_region: $log_bytes_in_region0));
+        define_side_metadata_specs!(@first_spec $base_offset, $name0 = (global: $is_global0, log_num_of_bits: $log_num_of_bits0, log_bytes_in_region: $log_bytes_in_region0));
         // The rest specs
         define_side_metadata_specs!(@prev_spec $name0 as $last_spec_ident, $($tail)*);
     };
@@ -53,6 +51,7 @@ macro_rules! define_side_metadata_specs {
 
 // This defines all GLOBAL side metadata used by mmtk-core.
 define_side_metadata_specs!(
+    base_offset GLOBAL_SIDE_METADATA_BASE_OFFSET,
     last_spec_as LAST_GLOBAL_SIDE_METADATA_SPEC,
     // Mark the start of an object
     VO_BIT       = (global: true, log_num_of_bits: 0, log_bytes_in_region: LOG_MIN_OBJECT_SIZE as usize),
@@ -62,8 +61,15 @@ define_side_metadata_specs!(
     CHUNK_MARK   = (global: true, log_num_of_bits: 3, log_bytes_in_region: crate::util::heap::chunk_map::Chunk::LOG_BYTES),
 );
 
+#[cfg(target_pointer_width = "32")]
+const LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT: SideMetadataOffset = SideMetadataOffset::rel(0);
+#[cfg(target_pointer_width = "64")]
+const LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT: SideMetadataOffset =
+    SideMetadataOffset::layout_after(&LAST_GLOBAL_SIDE_METADATA_SPEC);
+
 // This defines all LOCAL side metadata used by mmtk-core.
 define_side_metadata_specs!(
+    base_offset LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT,
     last_spec_as LAST_LOCAL_SIDE_METADATA_SPEC,
     // Mark pages by (malloc) marksweep
     MALLOC_MS_ACTIVE_PAGE  = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::util::malloc::library::LOG_BYTES_IN_MALLOC_PAGE as usize),
@@ -108,7 +114,11 @@ mod tests {
     use super::*;
     #[test]
     fn first_global_spec() {
-        define_side_metadata_specs!(last_spec_as LAST_GLOBAL_SPEC, TEST_SPEC = (global: true, log_num_of_bits: 0, log_bytes_in_region: 3),);
+        define_side_metadata_specs!(
+            base_offset GLOBAL_SIDE_METADATA_BASE_OFFSET,
+            last_spec_as LAST_GLOBAL_SPEC,
+            TEST_SPEC = (global: true, log_num_of_bits: 0, log_bytes_in_region: 3),
+        );
         assert!(TEST_SPEC.is_global);
         assert!(TEST_SPEC.offset == GLOBAL_SIDE_METADATA_BASE_OFFSET);
         assert_eq!(TEST_SPEC.log_num_of_bits, 0);
@@ -118,9 +128,13 @@ mod tests {
 
     #[test]
     fn first_local_spec() {
-        define_side_metadata_specs!(last_spec_as LAST_LOCAL_SPEC, TEST_SPEC = (global: false, log_num_of_bits: 0, log_bytes_in_region: 3),);
+        define_side_metadata_specs!(
+            base_offset LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT,
+            last_spec_as LAST_LOCAL_SPEC,
+            TEST_SPEC = (global: false, log_num_of_bits: 0, log_bytes_in_region: 3),
+        );
         assert!(!TEST_SPEC.is_global);
-        assert!(TEST_SPEC.offset == LOCAL_SIDE_METADATA_BASE_OFFSET);
+        assert!(TEST_SPEC.offset == LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT);
         assert_eq!(TEST_SPEC.log_num_of_bits, 0);
         assert_eq!(TEST_SPEC.log_bytes_in_region, 3);
         assert_eq!(TEST_SPEC, LAST_LOCAL_SPEC);
@@ -129,6 +143,7 @@ mod tests {
     #[test]
     fn two_global_specs() {
         define_side_metadata_specs!(
+            base_offset GLOBAL_SIDE_METADATA_BASE_OFFSET,
             last_spec_as LAST_GLOBAL_SPEC,
             TEST_SPEC1 = (global: true, log_num_of_bits: 0, log_bytes_in_region: 3),
             TEST_SPEC2 = (global: true, log_num_of_bits: 1, log_bytes_in_region: 4),
@@ -150,6 +165,7 @@ mod tests {
     #[test]
     fn three_global_specs() {
         define_side_metadata_specs!(
+            base_offset GLOBAL_SIDE_METADATA_BASE_OFFSET,
             last_spec_as LAST_GLOBAL_SPEC,
             TEST_SPEC1 = (global: true, log_num_of_bits: 0, log_bytes_in_region: 3),
             TEST_SPEC2 = (global: true, log_num_of_bits: 1, log_bytes_in_region: 4),
@@ -177,11 +193,13 @@ mod tests {
     #[test]
     fn both_global_and_local() {
         define_side_metadata_specs!(
+            base_offset GLOBAL_SIDE_METADATA_BASE_OFFSET,
             last_spec_as LAST_GLOBAL_SPEC,
             TEST_GSPEC1 = (global: true, log_num_of_bits: 0, log_bytes_in_region: 3),
             TEST_GSPEC2 = (global: true, log_num_of_bits: 1, log_bytes_in_region: 4),
         );
         define_side_metadata_specs!(
+            base_offset LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT,
             last_spec_as LAST_LOCAL_SPEC,
             TEST_LSPEC1 = (global: false, log_num_of_bits: 2, log_bytes_in_region: 5),
             TEST_LSPEC2 = (global: false, log_num_of_bits: 3, log_bytes_in_region: 6),
@@ -200,7 +218,7 @@ mod tests {
         assert_eq!(TEST_GSPEC2, LAST_GLOBAL_SPEC);
 
         assert!(!TEST_LSPEC1.is_global);
-        assert!(TEST_LSPEC1.offset == LOCAL_SIDE_METADATA_BASE_OFFSET);
+        assert!(TEST_LSPEC1.offset == LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT);
         assert_eq!(TEST_LSPEC1.log_num_of_bits, 2);
         assert_eq!(TEST_LSPEC1.log_bytes_in_region, 5);
 

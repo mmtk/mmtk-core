@@ -35,5 +35,14 @@ pub fn set_meta_bits(
     SideMetadataSpec::set_meta_bits(meta_start_addr, meta_start_bit, meta_end_addr, meta_end_bit)
 }
 
+/// Expose `address_to_meta_address` when running `cargo bench`.
+#[inline(always)]
+pub fn side_metadata_address_to_meta_address(
+    metadata_spec: &SideMetadataSpec,
+    data_addr: Address,
+) -> Address {
+    crate::util::metadata::side_metadata::address_to_meta_address(metadata_spec, data_addr)
+}
+
 #[cfg(feature = "mock_test")]
 pub use crate::mmtk::MMAPPER;

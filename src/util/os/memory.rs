@@ -21,6 +21,16 @@ pub trait OSMemory {
         annotation: &MmapAnnotation<'_>,
     ) -> Result<Address>;
 
+    /// Perform a no-reserve mmap at any available address, aligned to `align`.
+    ///
+    /// This API is used for reserving address ranges (typically with `PROT_NONE`) before committing.
+    fn mmap_noreserve_anywhere(
+        size: usize,
+        align: usize,
+        strategy: MmapStrategy,
+        annotation: &MmapAnnotation<'_>,
+    ) -> Result<Address>;
+
     /// Handle mmap errors, possibly by signaling the VM about an out-of-memory condition.
     fn handle_mmap_error<VM: VMBinding>(
         error: std::io::Error,
@@ -196,6 +206,9 @@ impl MmapStrategy {
         replace: false,
         reserve: true,
     };
+
+    /// The strategy for MMTk side metadata.
+    pub const SIDE_METADATA: Self = Self::INTERNAL_MEMORY;
 
     /// The strategy for MMTk's test memory
     #[cfg(test)]

@@ -1,4 +1,5 @@
 use crate::util::address::Address;
+use crate::util::conversions::raw_align_up;
 use crate::util::os::*;
 use std::io::Result;
 
@@ -22,6 +23,40 @@ pub fn mmap(start: Address, size: usize, strategy: MmapStrategy) -> Result<Addre
         ptr,
     )?;
     Ok(start)
+}
+
+pub fn mmap_anywhere(size: usize, align: usize, strategy: MmapStrategy) -> Result<Address> {
+    debug_assert!(align.is_power_of_two());
+
+    let aligned_size = raw_align_up(size, align);
+    let alloc_size = aligned_size + align;
+    let prot = strategy.prot.get_native_flags();
+    let flags = libc::MAP_PRIVATE
+        | libc::MAP_ANONYMOUS
+        | if !strategy.reserve {
+            libc::MAP_NORESERVE
+        } else {
+            0
+        };
+
+    let ptr = unsafe { libc::mmap(std::ptr::null_mut(), alloc_size, prot, flags, -1, 0) };
+    if ptr == libc::MAP_FAILED {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    let start = Address::from_mut_ptr(ptr);
+    let aligned_start = start.align_up(align);
+    let prefix = aligned_start - start;
+    let suffix = alloc_size - prefix - aligned_size;
+
+    if prefix > 0 {
+        munmap(start, prefix)?;
+    }
+    if suffix > 0 {
+        munmap(aligned_start + aligned_size, suffix)?;
+    }
+
+    Ok(aligned_start)
 }
 
 pub fn is_mmap_oom(os_errno: i32) -> bool {

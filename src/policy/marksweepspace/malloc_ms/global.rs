@@ -435,11 +435,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// for the chunk map is mapped, and if it is allocated in the chunk map.
     fn is_meta_space_mapped_for_address(&self, address: Address) -> bool {
         let is_chunk_map_mapped = |chunk_start: Address| {
-            const CHUNK_MAP_MAX_META_ADDRESS: Address =
+            let chunk_map_max_meta_address =
                 ChunkMap::ALLOC_TABLE.upper_bound_address_for_contiguous();
             let meta_address =
                 side_metadata::address_to_meta_address(&ChunkMap::ALLOC_TABLE, chunk_start);
-            if meta_address < CHUNK_MAP_MAX_META_ADDRESS {
+            if meta_address < chunk_map_max_meta_address {
                 meta_address.is_mapped()
             } else {
                 false

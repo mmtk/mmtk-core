@@ -18,6 +18,23 @@ impl OSMemory for Android {
         linux_common::dzmmap(start, size, strategy, annotation)
     }
 
+    fn mmap_noreserve_anywhere(
+        size: usize,
+        align: usize,
+        strategy: MmapStrategy,
+        annotation: &MmapAnnotation<'_>,
+    ) -> Result<Address> {
+        let addr = unix_common::mmap_anywhere(
+            size,
+            align,
+            strategy.prot(MmapProtection::NoAccess).reserve(false),
+        )?;
+        if !cfg!(feature = "no_mmap_annotation") {
+            linux_common::set_vma_name(addr, size, annotation);
+        }
+        Ok(addr)
+    }
+
     fn munmap(start: Address, size: usize) -> Result<()> {
         unix_common::munmap(start, size)
     }

@@ -25,6 +25,19 @@ impl OSMemory for MacOS {
         Ok(addr)
     }
 
+    fn mmap_noreserve_anywhere(
+        size: usize,
+        align: usize,
+        strategy: MmapStrategy,
+        _annotation: &MmapAnnotation<'_>,
+    ) -> Result<Address> {
+        unix_common::mmap_anywhere(
+            size,
+            align,
+            strategy.prot(MmapProtection::NoAccess).reserve(false),
+        )
+    }
+
     fn munmap(start: Address, size: usize) -> Result<()> {
         unix_common::munmap(start, size)
     }

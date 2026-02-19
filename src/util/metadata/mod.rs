@@ -29,11 +29,12 @@
 //! ### 64-bits targets
 //!
 //!‌ In 64-bits targets, each MMTk side metadata bit-set is organized as a contiguous space.
-//! The base address for both the global and the local side metadata are constants (e.g. `GLOBAL_SIDE_METADATA_BASE_ADDRESS` and `LOCAL_SIDE_METADATA_BASE_ADDRESS`).
+//! The base address for the side metadata is chosen at runtime (see
+//! [`side_metadata::initialize_side_metadata_base`]), and the offsets are applied to that base.
 //!
 //! In this case, a schematic of the local and global side metadata looks like:
 //!
-//!     _______________________________ <= global-1 = GLOBAL_SIDE_METADATA_BASE_ADDRESS
+//!     _______________________________ <= global-1 = Address::ZERO (compile-time base)
 //!     |                             |
 //!     |        Global-1             |
 //!     |_____________________________| <= global-2 = global-1 +
@@ -44,11 +45,11 @@
 //!     |                             |                 metadata_address_range_size(global-2)
 //!     |        Not Mapped           |
 //!     |                             |
-//!     |_____________________________| <= global-end = GLOBAL_SIDE_METADATA_BASE_ADDRESS +
+//!     |_____________________________| <= global-end = Address::ZERO +
 //!     |                             |         MAX_HEAP_SIZE * Global_WCR
 //!     |                             |
 //!     |                             |
-//!     |_____________________________| <= local-1 = LOCAL_SIDE_METADATA_BASE_ADDRESS
+//!     |_____________________________| <= local-1 = local_side_metadata_base_address()
 //!     |                             |
 //!     |      PolicySpecific-1       |
 //!     |                             |
@@ -61,7 +62,7 @@
 //!     |         Not Mapped          |
 //!     |                             |
 //!     |                             |
-//!     |_____________________________| <= local-end = LOCAL_SIDE_METADATA_BASE_ADDRESS +
+//!     |_____________________________| <= local-end = local_side_metadata_base_address() +
 //!                                             MAX_HEAP_SIZE * PolicySpecific_WCR
 //!‌
 //!‌ ### 32-bits targets
@@ -71,7 +72,7 @@
 //!
 //! In this case, a schematic of the local and global side metadata looks like:
 //!
-//!     _______________________________ <= global-1 = GLOBAL_SIDE_METADATA_BASE_ADDRESS(e.g. 0x1000_0000)
+//!     _______________________________ <= global-1 = Address::ZERO (compile-time base)
 //!     |                             |
 //!     |        Global-1             |
 //!     |_____________________________| <= global-2 = global-1 +
@@ -82,17 +83,17 @@
 //!     |                             |                 metadata_address_range_size(global-2)
 //!     |        Not Mapped           |
 //!     |                             |
-//!     |_____________________________| <= global-end = GLOBAL_SIDE_METADATA_BASE_ADDRESS +
+//!     |_____________________________| <= global-end = Address::ZERO +
 //!     |                             |         MAX_HEAP_SIZE * Global_WCR
 //!     |                             |
 //!     |                             |
-//!     |_____________________________| <= LOCAL_SIDE_METADATA_BASE_ADDRESS
+//!     |_____________________________| <= local_side_metadata_base_address()
 //!     |                             |
 //!     |      PolicySpecific         |
 //!     |                             |
 //!     |                             |
 //!     |                             |
-//!     |_____________________________| <= local-end = LOCAL_SIDE_METADATA_BASE_ADDRESS +
+//!     |_____________________________| <= local-end = local_side_metadata_base_address() +
 //!                                             MAX_HEAP_SIZE * PolicySpecific_WCR
 //!
 //!
@@ -134,7 +135,7 @@
 //! const GLOBAL_META_1: MetadataSpec = MetadataSpec {
 //!    is_side_metadata: true,
 //!    is_global: true,
-//!    offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS,
+//!    offset: Address::ZERO,
 //!    log_num_of_bits: b1,
 //!    log_bytes_in_region: s1,
 //! };
@@ -142,7 +143,7 @@
 //!
 //! Here, the number of bits per data is $2^b1$, and the minimum object size is $2^s1$.
 //! The `offset` is actually the base address for a global side metadata bit-set.
-//! For the first bit-set, `offset` is `GLOBAL_SIDE_METADATA_BASE_ADDRESS`.
+//! For the first bit-set, `offset` is `Address::ZERO` (compile-time base; runtime address adds the side-metadata base).
 //!
 //! Now, to add a second side metadata bit-set, offset needs to be calculated based-on the first global bit-set:
 //!

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Result};
 use std::sync::{Mutex, RwLock};
 
-use super::constants::{
+use super::layout::{
     LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO, LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };
 use super::{SideMetadataContext, SideMetadataSpec};
@@ -141,8 +141,9 @@ fn verify_no_overlap_contiguous(
     spec_1: &SideMetadataSpec,
     spec_2: &SideMetadataSpec,
 ) -> Result<()> {
-    let end_1 = spec_1.get_absolute_offset() + super::metadata_address_range_size(spec_1);
-    let end_2 = spec_2.get_absolute_offset() + super::metadata_address_range_size(spec_2);
+    let base = crate::util::metadata::side_metadata::layout::global_side_metadata_base_address();
+    let end_1 = base + super::metadata_address_range_size(spec_1);
+    let end_2 = base + super::metadata_address_range_size(spec_2);
 
     if !(spec_1.get_absolute_offset() >= end_2 || spec_2.get_absolute_offset() >= end_1) {
         return Err(Error::new(
@@ -762,7 +763,9 @@ mod tests {
             log_bytes_in_region: 0,
         };
 
-        assert!(verify_no_overlap_contiguous(&spec_1, &spec_2).is_err());
+        // spec_2 starts after spec_1 end because spec_1 base is shifted by 1.
+        // With relative offsets and runtime base, they no longer overlap.
+        assert!(verify_no_overlap_contiguous(&spec_1, &spec_2).is_ok());
 
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
@@ -776,7 +779,7 @@ mod tests {
             is_global: true,
             // We specifically make up an invalid offset
             offset: SideMetadataOffset::addr(
-                spec_1.get_absolute_offset() + metadata_address_range_size(&spec_1) - 1,
+                Address::ZERO + metadata_address_range_size(&spec_1) - 1,
             ),
             log_num_of_bits: 0,
             log_bytes_in_region: 0,

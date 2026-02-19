@@ -182,6 +182,37 @@ impl Mmapper for ChunkStateMmapper {
             })
     }
 
+    fn quarantine_address_range_anywhere(
+        &self,
+        pages: usize,
+        strategy: MmapStrategy,
+        anno: &MmapAnnotation,
+    ) -> Result<Address> {
+        let _guard = self.transition_lock.lock().unwrap();
+
+        let bytes = pages << LOG_BYTES_IN_PAGE;
+        let align = BYTES_IN_CHUNK;
+        let start = OS::mmap_noreserve_anywhere(bytes, align, strategy, anno)?;
+        let range = ChunkRange::new_aligned(start, bytes);
+
+        let log_mappable = self.storage.log_mappable_bytes() as u32;
+        let mappable_limit = if log_mappable >= usize::BITS {
+            Address::MAX
+        } else {
+            unsafe { Address::from_usize(1usize << log_mappable) }
+        };
+        if !range.is_within_limit(mappable_limit) {
+            // Unmap and return error if the mapping is outside the addressable range.
+            let _ = OS::munmap(start, bytes);
+            return Err(std::io::Error::other(
+                "quarantined side metadata range is outside the mappable address space",
+            ));
+        }
+
+        self.storage.bulk_set_state(range, MapState::Quarantined);
+        Ok(start)
+    }
+
     fn ensure_mapped(
         &self,
         start: Address,
