@@ -4,9 +4,9 @@ use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 use crate::util::conversions::rshift_align_up;
 use crate::util::heap::layout::vm_layout::VMLayout;
-use crate::util::memory::{MmapAnnotation, MmapStrategy};
 #[cfg(target_pointer_width = "32")]
 use crate::util::metadata::side_metadata::address_to_chunked_meta_address;
+use crate::util::os::*;
 use crate::util::Address;
 use crate::MMAPPER;
 use std::io::Result;
@@ -93,10 +93,9 @@ pub(super) fn align_metadata_address(
 /// Unmaps the specified metadata range, or panics.
 #[cfg(test)]
 pub(crate) fn ensure_munmap_metadata(start: Address, size: usize) {
-    use crate::util::memory;
     trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
 
-    assert!(memory::munmap(start, size).is_ok())
+    assert!(OS::munmap(start, size).is_ok())
 }
 
 /// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)
@@ -143,14 +142,15 @@ pub(super) fn try_mmap_contiguous_metadata_space(
             MMAPPER.ensure_mapped(
                 mmap_start,
                 mmap_size >> LOG_BYTES_IN_PAGE,
-                MmapStrategy::SIDE_METADATA,
+                HugePageSupport::No,
+                MmapProtection::ReadWrite,
                 anno,
             )
         } else {
             MMAPPER.quarantine_address_range(
                 mmap_start,
                 mmap_size >> LOG_BYTES_IN_PAGE,
-                MmapStrategy::SIDE_METADATA,
+                HugePageSupport::No,
                 anno,
             )
         }

@@ -292,7 +292,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
         };
         pr.protect_memory_on_release = if protect_memory_on_release {
-            Some(common.mmap_strategy().prot)
+            Some(common.mmap_protection())
         } else {
             None
         };

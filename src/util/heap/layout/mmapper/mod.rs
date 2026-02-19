@@ -1,7 +1,4 @@
-use crate::util::{
-    memory::{MmapAnnotation, MmapStrategy},
-    Address,
-};
+use crate::util::{os::*, Address};
 use std::io::Result;
 
 #[allow(unused)] // Used in doc comment.
@@ -77,7 +74,7 @@ pub trait Mmapper: Sync {
         &self,
         start: Address,
         pages: usize,
-        strategy: MmapStrategy,
+        huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
     ) -> Result<()>;
 
@@ -112,7 +109,8 @@ pub trait Mmapper: Sync {
         &self,
         start: Address,
         pages: usize,
-        strategy: MmapStrategy,
+        huge_page_option: HugePageSupport,
+        prot: MmapProtection,
         anno: &MmapAnnotation,
     ) -> Result<()>;
 

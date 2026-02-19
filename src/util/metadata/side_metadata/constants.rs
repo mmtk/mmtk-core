@@ -2,7 +2,7 @@
 use crate::util::heap::layout::vm_layout::VMLayout;
 #[cfg(target_pointer_width = "32")]
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
-use crate::util::memory::{MmapAnnotation, MmapStrategy};
+use crate::util::os::{MmapAnnotation, MmapStrategy};
 use crate::util::metadata::side_metadata::{SideMetadataOffset, SideMetadataSpec};
 use crate::util::Address;
 use crate::util::{constants::LOG_BYTES_IN_PAGE, conversions::raw_align_up};
