@@ -7,7 +7,7 @@ use crate::util::{
 };
 use std::io::Result;
 
-use super::constants::{
+use super::layout::{
     local_side_metadata_base_address, LOCAL_SIDE_METADATA_PER_CHUNK,
     LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };

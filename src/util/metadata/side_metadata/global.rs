@@ -53,8 +53,7 @@ impl SideMetadataSpec {
     /// Get the absolute offset for the spec.
     pub fn get_absolute_offset(&self) -> Address {
         debug_assert!(self.is_absolute_offset());
-        let base =
-            crate::util::metadata::side_metadata::constants::global_side_metadata_base_address();
+        let base = crate::util::metadata::side_metadata::layout::global_side_metadata_base_address();
         let rel = unsafe { self.offset.addr.as_usize() };
         base + rel
     }
@@ -1496,7 +1495,7 @@ impl SideMetadataContext {
 
         #[cfg(target_pointer_width = "32")]
         if lsize > 0 {
-            let max = BYTES_IN_CHUNK >> super::constants::LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;
+            let max = BYTES_IN_CHUNK >> super::layout::LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;
             debug_assert!(
                 lsize <= max,
                 "local side metadata per chunk (0x{:x}) must be less than (0x{:x})",

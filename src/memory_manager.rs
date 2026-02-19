@@ -57,7 +57,7 @@ use std::collections::HashMap;
 /// * `builder`: The reference to a MMTk builder.
 pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     crate::util::logger::try_init();
-    crate::util::metadata::side_metadata::initialize_side_metadata_base();
+
     #[cfg(all(feature = "perf_counter", target_os = "linux"))]
     {
         use std::fs::File;
@@ -75,8 +75,8 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
             }
         }
     }
-    let mmtk = builder.build();
 
+    let mmtk = builder.build();
     info!(
         "Initialized MMTk with {:?} ({:?})",
         *mmtk.options.plan, *mmtk.options.gc_trigger

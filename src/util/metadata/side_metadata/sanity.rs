@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Result};
 use std::sync::{Mutex, RwLock};
 
-use super::constants::{
+use super::layout::{
     LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO, LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };
 use super::{SideMetadataContext, SideMetadataSpec};
@@ -141,7 +141,7 @@ fn verify_no_overlap_contiguous(
     spec_1: &SideMetadataSpec,
     spec_2: &SideMetadataSpec,
 ) -> Result<()> {
-    let base = crate::util::metadata::side_metadata::constants::global_side_metadata_base_address();
+    let base = crate::util::metadata::side_metadata::layout::global_side_metadata_base_address();
     let end_1 = base + super::metadata_address_range_size(spec_1);
     let end_2 = base + super::metadata_address_range_size(spec_2);
 

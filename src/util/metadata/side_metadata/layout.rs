@@ -16,6 +16,8 @@ pub(crate) const GLOBAL_SIDE_METADATA_BASE_OFFSET: SideMetadataOffset =
 
 static mut SIDE_METADATA_BASE_ADDRESS: Address = Address::ZERO;
 static BASE_INIT: Once = Once::new();
+static VM_SIDE_METADATA_LAYOUT_INIT: Once = Once::new();
+static mut VM_SIDE_METADATA_UPPER_BOUND_OFFSET: Address = Address::ZERO;
 
 /// Set the runtime side metadata base address. The address can only be assigned once.
 pub fn set_side_metadata_base_address(base: Address) {
@@ -38,6 +40,25 @@ pub fn global_side_metadata_base_address() -> Address {
     }
 
     unsafe { SIDE_METADATA_BASE_ADDRESS }
+}
+
+/// Record VM side metadata layout so startup reservation can cover VM specs.
+/// This must be called before `initialize_side_metadata_base()`.
+pub(crate) fn set_vm_side_metadata_specs(specs: &[SideMetadataSpec]) {
+    VM_SIDE_METADATA_LAYOUT_INIT.call_once(|| {
+        #[cfg(target_pointer_width = "64")]
+        {
+            let mut upper_bound = Address::ZERO;
+            for spec in specs {
+                if spec.is_absolute_offset() {
+                    upper_bound = upper_bound.max(spec.upper_bound_offset().addr_value());
+                }
+            }
+            unsafe {
+                VM_SIDE_METADATA_UPPER_BOUND_OFFSET = upper_bound;
+            }
+        }
+    });
 }
 
 fn upper_bound_address_for_contiguous_relative(spec: &SideMetadataSpec) -> Address {
@@ -77,10 +98,11 @@ pub(crate) fn local_side_metadata_base_address() -> Address {
 pub(crate) fn total_side_metadata_bytes() -> usize {
     #[cfg(target_pointer_width = "64")]
     {
-        let end = upper_bound_address_for_contiguous_relative(
+        let core_end = upper_bound_address_for_contiguous_relative(
             &super::spec_defs::LAST_LOCAL_SIDE_METADATA_SPEC,
         );
-        end.get_extent(Address::ZERO)
+        let vm_end = unsafe { VM_SIDE_METADATA_UPPER_BOUND_OFFSET };
+        core_end.max(vm_end).get_extent(Address::ZERO)
     }
     #[cfg(target_pointer_width = "32")]
     {
@@ -91,7 +113,7 @@ pub(crate) fn total_side_metadata_bytes() -> usize {
 }
 
 /// Initialize the side metadata base address by reserving address space with quarantine mmap.
-pub fn initialize_side_metadata_base() {
+pub(crate) fn initialize_side_metadata_base() {
     BASE_INIT.call_once(|| {
         let total_bytes = raw_align_up(total_side_metadata_bytes(), MMAPPER.granularity());
         let pages = total_bytes >> LOG_BYTES_IN_PAGE;

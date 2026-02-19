@@ -207,6 +207,9 @@ impl<VM: VMBinding> MMTK<VM> {
             },
         );
 
+        // Initialize side metadata runtime state and reserve its address range.
+        crate::util::metadata::side_metadata::initialize_side_metadata::<VM>();
+
         MMTK {
             options,
             state,

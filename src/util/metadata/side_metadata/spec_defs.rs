@@ -1,7 +1,7 @@
 use crate::util::constants::*;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::linear_scan::Region;
-use crate::util::metadata::side_metadata::constants::GLOBAL_SIDE_METADATA_BASE_OFFSET;
+use crate::util::metadata::side_metadata::layout::GLOBAL_SIDE_METADATA_BASE_OFFSET;
 use crate::util::metadata::side_metadata::SideMetadataOffset;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 
