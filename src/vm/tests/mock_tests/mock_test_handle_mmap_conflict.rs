@@ -25,12 +25,11 @@ pub fn test_handle_mmap_conflict() {
                     mmap_anno_test!(),
                 );
                 assert!(mmap2_res.is_err());
-                OS::handle_mmap_error::<MockVM>(
-                    mmap2_res.err().unwrap(),
-                    VMThread::UNINITIALIZED,
-                    start,
-                    one_megabyte,
-                );
+                let mmap_error = mmap2_res.err().unwrap();
+                assert_eq!(mmap_error.error_address, start);
+                assert_eq!(mmap_error.bytes, one_megabyte);
+                assert!(mmap_error.annotation.starts_with("mmtk:test:"));
+                OS::handle_mmap_error::<MockVM>(mmap_error, VMThread::UNINITIALIZED);
             });
 
             // The error should match the error message in memory::handle_mmap_error()

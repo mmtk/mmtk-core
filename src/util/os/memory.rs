@@ -1,5 +1,4 @@
 use bytemuck::NoUninit;
-use std::io::Result;
 
 use crate::util::os::*;
 use crate::vm::*;
@@ -7,6 +6,54 @@ use crate::{
     util::{address::Address, VMThread},
     vm::VMBinding,
 };
+
+#[derive(Debug)]
+pub struct MmapError {
+    pub error_address: Address,
+    pub bytes: usize,
+    pub annotation: String,
+    pub error: std::io::Error,
+}
+
+impl MmapError {
+    pub fn new(
+        error_address: Address,
+        bytes: usize,
+        annotation: &MmapAnnotation<'_>,
+        error: std::io::Error,
+    ) -> Self {
+        Self {
+            error_address,
+            bytes,
+            annotation: annotation.to_string(),
+            error,
+        }
+    }
+}
+
+impl From<MmapError> for std::io::Error {
+    fn from(err: MmapError) -> Self {
+        err.error
+    }
+}
+
+impl std::fmt::Display for MmapError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "mmap {} (size {}, annotation {}) failed: {}",
+            self.error_address, self.bytes, self.annotation, self.error
+        )
+    }
+}
+
+impl std::error::Error for MmapError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.error)
+    }
+}
+
+pub type MmapResult<T> = std::result::Result<T, MmapError>;
 
 /// Abstraction for OS memory operations.
 pub trait OSMemory {
@@ -19,7 +66,7 @@ pub trait OSMemory {
         size: usize,
         strategy: MmapStrategy,
         annotation: &MmapAnnotation<'_>,
-    ) -> Result<Address>;
+    ) -> MmapResult<Address>;
 
     /// Perform a no-reserve mmap at any available address, aligned to `align`.
     ///
@@ -29,19 +76,17 @@ pub trait OSMemory {
         align: usize,
         strategy: MmapStrategy,
         annotation: &MmapAnnotation<'_>,
-    ) -> Result<Address>;
+    ) -> std::io::Result<Address>;
 
     /// Handle mmap errors, possibly by signaling the VM about an out-of-memory condition.
-    fn handle_mmap_error<VM: VMBinding>(
-        error: std::io::Error,
-        tls: VMThread,
-        addr: Address,
-        bytes: usize,
-    ) {
+    fn handle_mmap_error<VM: VMBinding>(mmap_error: MmapError, tls: VMThread) {
         use crate::util::alloc::AllocationError;
         use std::io::ErrorKind;
 
-        eprintln!("Failed to mmap {}, size {}", addr, bytes);
+        eprintln!(
+            "Failed to mmap from {} to (size {}), annotation {}",
+            mmap_error.error_address, mmap_error.error_address + mmap_error.bytes, mmap_error.bytes, mmap_error.annotation
+        );
         eprintln!("{}", OS::get_process_memory_maps().unwrap());
 
         let call_binding_oom = || {
@@ -51,7 +96,7 @@ pub trait OSMemory {
             unreachable!()
         };
 
-        match error.kind() {
+        match mmap_error.error.kind() {
             // From Rust nightly 2021-05-12, we started to see Rust added this ErrorKind.
             ErrorKind::OutOfMemory => {
                 call_binding_oom();
@@ -60,7 +105,7 @@ pub trait OSMemory {
             // TODO: We may be able to remove this now.
             ErrorKind::Other => {
                 // further check the error
-                if let Some(os_errno) = error.raw_os_error() {
+                if let Some(os_errno) = mmap_error.error.raw_os_error() {
                     if OS::is_mmap_oom(os_errno) {
                         call_binding_oom();
                     }
@@ -70,24 +115,28 @@ pub trait OSMemory {
                 panic!("Failed to mmap, the address is already mapped. Should MMTk quarantine the address range first?");
             }
             _ => {
-                if let Some(os_errno) = error.raw_os_error() {
+                if let Some(os_errno) = mmap_error.error.raw_os_error() {
                     if OS::is_mmap_oom(os_errno) {
                         call_binding_oom();
                     }
                 }
             }
         }
-        panic!("Unexpected mmap failure: {:?}", error)
+        panic!("Unexpected mmap failure: {:?}", mmap_error.error)
     }
 
     /// Check whether the given OS error number indicates an out-of-memory condition.
     fn is_mmap_oom(os_errno: i32) -> bool;
 
     /// Unmap a memory region.
-    fn munmap(start: Address, size: usize) -> Result<()>;
+    fn munmap(start: Address, size: usize) -> std::io::Result<()>;
 
     /// Change the protection of a memory region to the specified protection.
-    fn set_memory_access(start: Address, size: usize, prot: MmapProtection) -> Result<()>;
+    fn set_memory_access(
+        start: Address,
+        size: usize,
+        prot: MmapProtection,
+    ) -> std::io::Result<()>;
 
     /// Checks if the memory has already been mapped. If not, we panic.
     ///
@@ -98,7 +147,7 @@ pub trait OSMemory {
     fn panic_if_unmapped(start: Address, size: usize);
 
     /// Get the total memory of the system in bytes.
-    fn get_system_total_memory() -> Result<u64> {
+    fn get_system_total_memory() -> std::io::Result<u64> {
         use sysinfo::MemoryRefreshKind;
         use sysinfo::{RefreshKind, System};
 

@@ -14,7 +14,7 @@ impl OSMemory for Linux {
         size: usize,
         strategy: MmapStrategy,
         annotation: &MmapAnnotation<'_>,
-    ) -> Result<Address> {
+    ) -> MmapResult<Address> {
         linux_common::dzmmap(start, size, strategy, annotation)
     }
 

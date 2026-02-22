@@ -5,7 +5,7 @@ use crate::util::heap::layout::Mmapper;
 use crate::util::os::*;
 use crate::util::Address;
 use bytemuck::NoUninit;
-use std::{io::Result, sync::Mutex};
+use std::sync::Mutex;
 
 mod byte_map_storage;
 #[cfg(target_pointer_width = "64")]
@@ -94,9 +94,9 @@ trait MapStateStorage {
     /// -   `Ok(Some(new_state))`: Set the state of all chunks within `group_range` to `new_state`.
     ///
     /// Return `Ok(())` if finished visiting all chunks normally.
-    fn bulk_transition_state<F>(&self, range: ChunkRange, update_fn: F) -> Result<()>
+    fn bulk_transition_state<F>(&self, range: ChunkRange, update_fn: F) -> MmapResult<()>
     where
-        F: FnMut(ChunkRange, MapState) -> Result<Option<MapState>>;
+        F: FnMut(ChunkRange, MapState) -> MmapResult<Option<MapState>>;
 }
 
 /// A [`Mmapper`] implementation based on a logical array of chunk states.
@@ -148,7 +148,7 @@ impl Mmapper for ChunkStateMmapper {
         pages: usize,
         huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
-    ) -> Result<()> {
+    ) -> MmapResult<()> {
         let _guard = self.transition_lock.lock().unwrap();
 
         let bytes = pages << LOG_BYTES_IN_PAGE;
@@ -187,7 +187,7 @@ impl Mmapper for ChunkStateMmapper {
         pages: usize,
         strategy: MmapStrategy,
         anno: &MmapAnnotation,
-    ) -> Result<Address> {
+    ) -> std::io::Result<Address> {
         let _guard = self.transition_lock.lock().unwrap();
 
         let bytes = pages << LOG_BYTES_IN_PAGE;
@@ -220,7 +220,7 @@ impl Mmapper for ChunkStateMmapper {
         huge_page_option: HugePageSupport,
         prot: MmapProtection,
         anno: &MmapAnnotation,
-    ) -> Result<()> {
+    ) -> MmapResult<()> {
         let _guard = self.transition_lock.lock().unwrap();
 
         let bytes = pages << LOG_BYTES_IN_PAGE;

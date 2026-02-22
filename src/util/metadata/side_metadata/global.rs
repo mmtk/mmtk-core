@@ -10,7 +10,6 @@ use crate::util::Address;
 use num_traits::FromPrimitive;
 use ranges::BitByteRange;
 use std::fmt;
-use std::io::Result;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 /// This struct stores the specification of a side metadata bit-set.
@@ -1399,7 +1398,7 @@ impl SideMetadataContext {
         start: Address,
         size: usize,
         space_name: &str,
-    ) -> Result<()> {
+    ) -> MmapResult<()> {
         debug!(
             "try_map_metadata_space({}, 0x{:x}, {}, {})",
             start,
@@ -1422,7 +1421,7 @@ impl SideMetadataContext {
         start: Address,
         size: usize,
         name: &str,
-    ) -> Result<()> {
+    ) -> MmapResult<()> {
         debug!(
             "try_map_metadata_address_range({}, 0x{:x}, {}, {})",
             start,
@@ -1449,7 +1448,7 @@ impl SideMetadataContext {
         size: usize,
         no_reserve: bool,
         space_name: &str,
-    ) -> Result<()> {
+    ) -> MmapResult<()> {
         for spec in self.global.iter() {
             let anno = MmapAnnotation::SideMeta {
                 space: space_name,
@@ -1457,7 +1456,7 @@ impl SideMetadataContext {
             };
             match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve, &anno) {
                 Ok(_) => {}
-                Err(e) => return Result::Err(e),
+                Err(e) => return Err(e),
             }
         }
 
@@ -1484,7 +1483,7 @@ impl SideMetadataContext {
                 };
                 match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve, &anno) {
                     Ok(_) => {}
-                    Err(e) => return Result::Err(e),
+                    Err(e) => return Err(e),
                 }
             }
             #[cfg(target_pointer_width = "32")]
@@ -1510,7 +1509,7 @@ impl SideMetadataContext {
             };
             match try_map_per_chunk_metadata_space(start, size, lsize, no_reserve, &anno) {
                 Ok(_) => {}
-                Err(e) => return Result::Err(e),
+                Err(e) => return Err(e),
             }
         }
 

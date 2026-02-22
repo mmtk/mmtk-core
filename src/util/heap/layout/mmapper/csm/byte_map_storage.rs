@@ -10,7 +10,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
 use atomic::Atomic;
-use std::io::Result;
+use crate::util::os::MmapResult;
 
 /// Logarithm of the address space size that [`ByteMapStateStorage`] is able to handle.
 /// This is enough for 32-bit architectures.
@@ -60,9 +60,9 @@ impl MapStateStorage for ByteMapStateStorage {
         }
     }
 
-    fn bulk_transition_state<F>(&self, range: ChunkRange, mut update_fn: F) -> Result<()>
+    fn bulk_transition_state<F>(&self, range: ChunkRange, mut update_fn: F) -> MmapResult<()>
     where
-        F: FnMut(ChunkRange, MapState) -> Result<Option<MapState>>,
+        F: FnMut(ChunkRange, MapState) -> MmapResult<Option<MapState>>,
     {
         if range.is_empty() {
             return Ok(());

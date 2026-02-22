@@ -12,7 +12,7 @@ use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::util::Address;
 use atomic::{Atomic, Ordering};
 use std::fmt;
-use std::io::Result;
+use crate::util::os::MmapResult;
 
 /// Logarithm of the address space size that [`TwoLevelStateStorage`] is able to handle.
 /// This is enough for ARM64, x86_64 and some other architectures.
@@ -103,9 +103,9 @@ impl MapStateStorage for TwoLevelStateStorage {
         });
     }
 
-    fn bulk_transition_state<F>(&self, range: ChunkRange, mut update_fn: F) -> Result<()>
+    fn bulk_transition_state<F>(&self, range: ChunkRange, mut update_fn: F) -> MmapResult<()>
     where
-        F: FnMut(ChunkRange, MapState) -> Result<Option<MapState>>,
+        F: FnMut(ChunkRange, MapState) -> MmapResult<Option<MapState>>,
     {
         if range.is_empty() {
             return Ok(());
