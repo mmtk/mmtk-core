@@ -19,13 +19,11 @@ pub fn test_handle_mmap_oom() {
                 // mmap 1 terabyte memory - we expect this will fail due to out of memory.
                 // If that's not the case, increase the size we mmap.
                 let mmap_res = OS::dzmmap(start, LARGE_SIZE, MmapStrategy::TEST, mmap_anno_test!());
-
-                OS::handle_mmap_error::<MockVM>(
-                    mmap_res.err().unwrap(),
-                    VMThread::UNINITIALIZED,
-                    start,
-                    LARGE_SIZE,
-                );
+                let mmap_error = mmap_res.err().unwrap();
+                assert_eq!(mmap_error.error_address, start);
+                assert_eq!(mmap_error.bytes, LARGE_SIZE);
+                assert!(mmap_error.annotation.starts_with("mmtk:test:"));
+                OS::handle_mmap_error::<MockVM>(mmap_error, VMThread::UNINITIALIZED);
             });
             assert!(panic_res.is_err());
 

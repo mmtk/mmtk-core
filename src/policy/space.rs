@@ -185,29 +185,27 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         let mmap = || {
             // Mmap the pages and the side metadata, and handle error. In case of any error,
             // we will either call back to the VM for OOM, or simply panic.
-            if let Err(mmap_error) = self
-                .common()
-                .mmapper
-                .ensure_mapped(
-                    res.start,
-                    res.pages,
-                    if *self.common().options.transparent_hugepages {
-                        HugePageSupport::TransparentHugePages
-                    } else {
-                        HugePageSupport::No
-                    },
-                    self.common().mmap_protection(),
-                    &MmapAnnotation::Space {
-                        name: self.get_name(),
-                    },
-                )
-                .and(self.common().metadata.try_map_metadata_space(
-                    res.start,
-                    bytes,
-                    self.get_name(),
-                ))
+            if let Err(mmap_error) = self.common().mmapper.ensure_mapped(
+                res.start,
+                res.pages,
+                if *self.common().options.transparent_hugepages {
+                    HugePageSupport::TransparentHugePages
+                } else {
+                    HugePageSupport::No
+                },
+                self.common().mmap_protection(),
+                &MmapAnnotation::Space {
+                    name: self.get_name(),
+                },
+            ) {
+                OS::handle_mmap_error::<VM>(mmap_error, tls);
+            }
+            if let Err(mmap_error) =
+                self.common()
+                    .metadata
+                    .try_map_metadata_space(res.start, bytes, self.get_name())
             {
-                OS::handle_mmap_error::<VM>(mmap_error, tls, res.start, bytes);
+                OS::handle_mmap_error::<VM>(mmap_error, tls);
             }
         };
         let grow_space = || {

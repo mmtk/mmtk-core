@@ -106,14 +106,16 @@ pub fn dzmmap(
     size: usize,
     strategy: MmapStrategy,
     annotation: &MmapAnnotation<'_>,
-) -> Result<Address> {
-    let addr = unix_common::mmap(start, size, strategy)?;
+) -> MmapResult<Address> {
+    let addr = unix_common::mmap(start, size, strategy)
+        .map_err(|e| MmapError::new(start, size, annotation, e))?;
 
     if !cfg!(feature = "no_mmap_annotation") {
         set_vma_name(addr, size, annotation);
     }
 
-    set_hugepage(addr, size, strategy.huge_page)?;
+    set_hugepage(addr, size, strategy.huge_page)
+        .map_err(|e| MmapError::new(addr, size, annotation, e))?;
 
     // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
 

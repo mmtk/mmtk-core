@@ -1,5 +1,4 @@
 use crate::util::{os::*, Address};
-use std::io::Result;
 
 #[allow(unused)] // Used in doc comment.
 use crate::util::constants::LOG_BYTES_IN_PAGE;
@@ -76,7 +75,7 @@ pub trait Mmapper: Sync {
         pages: usize,
         huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
-    ) -> Result<()>;
+    ) -> MmapResult<()>;
 
     /// Ensure that a range of pages is mmapped (or equivalent).  If the
     /// pages are not yet mapped, demand-zero map them. Note that mapping
@@ -97,7 +96,7 @@ pub trait Mmapper: Sync {
         huge_page_option: HugePageSupport,
         prot: MmapProtection,
         anno: &MmapAnnotation,
-    ) -> Result<()>;
+    ) -> MmapResult<()>;
 
     /// Is the page pointed to by this address mapped? Returns true if
     /// the page at the given address is mapped.
