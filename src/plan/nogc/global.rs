@@ -120,8 +120,6 @@ impl<VM: VMBinding> NoGC<VM> {
             base: BasePlan::new(plan_args),
         };
 
-        res.verify_side_metadata_sanity();
-
         res
     }
 }

@@ -227,8 +227,6 @@ impl<VM: VMBinding> GenCopy<VM> {
             copyspace1,
         };
 
-        res.verify_side_metadata_sanity();
-
         res
     }
 

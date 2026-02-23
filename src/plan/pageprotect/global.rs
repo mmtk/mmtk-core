@@ -120,8 +120,6 @@ impl<VM: VMBinding> PageProtect<VM> {
             common: CommonPlan::new(plan_args),
         };
 
-        ret.verify_side_metadata_sanity();
-
         ret
     }
 }

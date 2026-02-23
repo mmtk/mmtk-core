@@ -7,6 +7,7 @@ use crate::util::metadata::side_metadata::{SideMetadataOffset, SideMetadataSpec}
 use crate::util::Address;
 use crate::util::{constants::LOG_BYTES_IN_PAGE, conversions::raw_align_up};
 use crate::MMAPPER;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 
 // The compile-time base offset for global side metadata layout. We treat offsets as relative
@@ -18,6 +19,7 @@ static mut SIDE_METADATA_BASE_ADDRESS: Address = Address::ZERO;
 static BASE_INIT: Once = Once::new();
 static VM_SIDE_METADATA_LAYOUT_INIT: Once = Once::new();
 static mut VM_SIDE_METADATA_UPPER_BOUND_OFFSET: Address = Address::ZERO;
+static VM_SIDE_METADATA_LAYOUT_REGISTERED: AtomicBool = AtomicBool::new(false);
 
 /// Set the runtime side metadata base address. The address can only be assigned once.
 pub fn set_side_metadata_base_address(base: Address) {
@@ -35,8 +37,9 @@ pub fn set_side_metadata_base_address(base: Address) {
 pub fn global_side_metadata_base_address() -> Address {
     #[cfg(debug_assertions)]
     {
-        // Ensure initialization happens (Once provides synchronization).
-        initialize_side_metadata_base();
+        assert!(VM_SIDE_METADATA_LAYOUT_REGISTERED.load(Ordering::SeqCst), "global_side_metadata_base_address() called after VM side metadata layout was registered");
+        // // Ensure initialization happens (Once provides synchronization).
+        // initialize_side_metadata_base();
     }
 
     unsafe { SIDE_METADATA_BASE_ADDRESS }
@@ -57,6 +60,12 @@ pub(crate) fn set_vm_side_metadata_specs(specs: &[SideMetadataSpec]) {
             unsafe {
                 VM_SIDE_METADATA_UPPER_BOUND_OFFSET = upper_bound;
             }
+            VM_SIDE_METADATA_LAYOUT_REGISTERED.store(true, Ordering::SeqCst);
+            debug!(
+                "Registered VM side metadata layout: {} specs, upper_bound={}",
+                specs.len(),
+                upper_bound
+            );
         }
     });
 }
@@ -102,6 +111,12 @@ pub(crate) fn total_side_metadata_bytes() -> usize {
             &super::spec_defs::LAST_LOCAL_SIDE_METADATA_SPEC,
         );
         let vm_end = unsafe { VM_SIDE_METADATA_UPPER_BOUND_OFFSET };
+        debug!(
+            "total_side_metadata_bytes(): core_end={} vm_end={} (registered={})",
+            core_end,
+            vm_end,
+            VM_SIDE_METADATA_LAYOUT_REGISTERED.load(Ordering::SeqCst)
+        );
         core_end.max(vm_end).get_extent(Address::ZERO)
     }
     #[cfg(target_pointer_width = "32")]
@@ -112,21 +127,61 @@ pub(crate) fn total_side_metadata_bytes() -> usize {
     }
 }
 
+pub(crate) fn side_metadata_reserved_bytes() -> usize {
+    raw_align_up(total_side_metadata_bytes(), MMAPPER.granularity())
+}
+
+pub(crate) fn side_metadata_reserved_range() -> std::ops::Range<Address> {
+    let base = global_side_metadata_base_address();
+    let bytes = side_metadata_reserved_bytes();
+    base..(base + bytes)
+}
+
 /// Initialize the side metadata base address by reserving address space with quarantine mmap.
 pub(crate) fn initialize_side_metadata_base() {
     BASE_INIT.call_once(|| {
-        let total_bytes = raw_align_up(total_side_metadata_bytes(), MMAPPER.granularity());
+        #[cfg(target_pointer_width = "64")]
+        {
+            let core_end = upper_bound_address_for_contiguous_relative(
+                &super::spec_defs::LAST_LOCAL_SIDE_METADATA_SPEC,
+            );
+            let vm_end = unsafe { VM_SIDE_METADATA_UPPER_BOUND_OFFSET };
+            info!(
+                "Initializing side metadata base: vm_specs_registered={} core_end={} vm_end={}",
+                VM_SIDE_METADATA_LAYOUT_REGISTERED.load(Ordering::SeqCst),
+                core_end,
+                vm_end
+            );
+            if !VM_SIDE_METADATA_LAYOUT_REGISTERED.load(Ordering::SeqCst) {
+                warn!("Initializing side metadata base before VM side metadata layout was registered");
+                let bt = std::backtrace::Backtrace::capture();
+                debug!("backtrace for early side metadata base initialization:\n{bt}");
+            }
+        }
+        let total_bytes = side_metadata_reserved_bytes();
         let pages = total_bytes >> LOG_BYTES_IN_PAGE;
         let anno = MmapAnnotation::SideMeta {
             space: "side-metadata",
             meta: "all",
         };
+        info!(
+            "Quarantine side metadata range: total_bytes=0x{:x}, pages=0x{:x}, granularity=0x{:x}",
+            total_bytes,
+            pages,
+            MMAPPER.granularity()
+        );
         let base = MMAPPER
             .quarantine_address_range_anywhere(pages, MmapStrategy::SIDE_METADATA, &anno)
             .unwrap_or_else(|e| panic!("failed to quarantine side metadata address range: {e}"));
         unsafe {
             SIDE_METADATA_BASE_ADDRESS = base;
         }
+        info!(
+            "Side metadata base initialized at {} (range: {} - {})",
+            base,
+            base,
+            base + total_bytes
+        );
     });
 }
 

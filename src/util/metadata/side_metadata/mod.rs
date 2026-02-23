@@ -29,6 +29,13 @@ pub fn initialize_side_metadata<VM: VMBinding>() {
         *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
         *VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
     ]);
+    debug!(
+        "initialize_side_metadata(): collected {} VM side metadata specs",
+        vm_side_metadata_specs.len()
+    );
+    for spec in &vm_side_metadata_specs {
+        debug!("  VM side metadata spec: {:?}", spec);
+    }
     set_vm_side_metadata_specs(&vm_side_metadata_specs);
     initialize_side_metadata_base();
 }

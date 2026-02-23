@@ -282,8 +282,6 @@ impl<VM: VMBinding> GenImmix<VM> {
             last_gc_was_full_heap: AtomicBool::new(false),
         };
 
-        genimmix.verify_side_metadata_sanity();
-
         genimmix
     }
 

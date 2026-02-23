@@ -166,8 +166,6 @@ impl<VM: VMBinding> Immix<VM> {
             last_gc_was_defrag: AtomicBool::new(false),
         };
 
-        immix.verify_side_metadata_sanity();
-
         immix
     }
 

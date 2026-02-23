@@ -1368,6 +1368,37 @@ impl SideMetadataContext {
         &self.local
     }
 
+    #[cfg(debug_assertions)]
+    pub fn assert_metadata_ranges_in_reserved_range(
+        &self,
+        start: Address,
+        size: usize,
+        space_name: &str,
+    ) {
+        let reserved = super::layout::side_metadata_reserved_range();
+        let check_spec = |spec: &SideMetadataSpec| {
+            if !spec.uses_contiguous_side_metadata() {
+                return;
+            }
+            let metadata_start = address_to_meta_address(spec, start);
+            let mmap_start = metadata_start.align_down(BYTES_IN_PAGE);
+            let metadata_size = data_to_meta_size_round_up(spec, size);
+            let mmap_end = (metadata_start + metadata_size).align_up(BYTES_IN_PAGE);
+            debug_assert!(
+                mmap_start >= reserved.start && mmap_end <= reserved.end,
+                "Side metadata range for spec {} in space {} is outside reserved range: [{}, {}) vs [{}, {})",
+                spec.name,
+                space_name,
+                mmap_start,
+                mmap_end,
+                reserved.start,
+                reserved.end
+            );
+        };
+        self.global.iter().for_each(check_spec);
+        self.local.iter().for_each(check_spec);
+    }
+
     /// Return the pages reserved for side metadata based on the data pages we used.
     // We used to use PageAccouting to count pages used in side metadata. However,
     // that means we always count pages while we may reserve less than a page each time.

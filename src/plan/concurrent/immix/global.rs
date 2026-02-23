@@ -332,8 +332,6 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             concurrent_marking_active: AtomicBool::new(false),
         };
 
-        immix.verify_side_metadata_sanity();
-
         immix
     }
 

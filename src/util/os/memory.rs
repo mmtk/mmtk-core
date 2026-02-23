@@ -84,8 +84,11 @@ pub trait OSMemory {
         use std::io::ErrorKind;
 
         eprintln!(
-            "Failed to mmap from {} to (size {}), annotation {}",
-            mmap_error.error_address, mmap_error.error_address + mmap_error.bytes, mmap_error.bytes, mmap_error.annotation
+            "Failed to mmap from {} to {} (size {}), annotation {}",
+            mmap_error.error_address,
+            mmap_error.error_address + mmap_error.bytes,
+            mmap_error.bytes,
+            mmap_error.annotation
         );
         eprintln!("{}", OS::get_process_memory_maps().unwrap());
 

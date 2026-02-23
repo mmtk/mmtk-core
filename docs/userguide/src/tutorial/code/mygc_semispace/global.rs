@@ -187,8 +187,6 @@ impl<VM: VMBinding> MyGC<VM> {
             common: CommonPlan::new(plan_args),
         };
 
-        res.verify_side_metadata_sanity();
-
         res
     }
     // ANCHOR_END: plan_new

@@ -166,8 +166,6 @@ impl<VM: VMBinding> SemiSpace<VM> {
             common: CommonPlan::new(plan_args),
         };
 
-        res.verify_side_metadata_sanity();
-
         res
     }
 
