@@ -40,12 +40,6 @@ impl MmapError {
     }
 }
 
-impl From<MmapError> for std::io::Error {
-    fn from(err: MmapError) -> Self {
-        err.error
-    }
-}
-
 impl std::fmt::Display for MmapError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -86,7 +80,7 @@ pub trait OSMemory {
         eprintln!(
             "Failed to mmap from {} to {} (size {}), annotation {}",
             mmap_error.error_address,
-            mmap_error.error_address + mmap_error.bytes,
+            mmap_error.error_address.wrapping_add(mmap_error.bytes),
             mmap_error.bytes,
             mmap_error.annotation
         );
