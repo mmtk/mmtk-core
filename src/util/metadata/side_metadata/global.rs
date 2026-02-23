@@ -1446,10 +1446,7 @@ impl SideMetadataContext {
                 space: space_name,
                 meta: spec.name,
             };
-            match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve, &anno) {
-                Ok(_) => {}
-                Err(e) => return Err(e),
-            }
+            try_mmap_contiguous_metadata_space(start, size, spec, no_reserve, &anno)?;
         }
 
         #[cfg(target_pointer_width = "32")]
@@ -1473,10 +1470,7 @@ impl SideMetadataContext {
                     space: space_name,
                     meta: spec.name,
                 };
-                match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve, &anno) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
+                try_mmap_contiguous_metadata_space(start, size, spec, no_reserve, &anno)?;
             }
             #[cfg(target_pointer_width = "32")]
             {
@@ -1499,10 +1493,7 @@ impl SideMetadataContext {
                 space: space_name,
                 meta: "all",
             };
-            match try_map_per_chunk_metadata_space(start, size, lsize, no_reserve, &anno) {
-                Ok(_) => {}
-                Err(e) => return Err(e),
-            }
+            try_map_per_chunk_metadata_space(start, size, lsize, no_reserve, &anno)?;
         }
 
         Ok(())
