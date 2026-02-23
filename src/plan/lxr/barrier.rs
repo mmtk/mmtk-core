@@ -91,6 +91,9 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
     }
 
     fn log_slot_and_get_old_target(&self, slot: VM::VMSlot) -> Result<Option<ObjectReference>, ()> {
+        if self.get_slot_logging_state(slot) == LOGGED_VALUE {
+            return Err(());
+        }
         let old = slot.load();
         if self.attempt_to_log_field(slot) {
             Ok(old)
