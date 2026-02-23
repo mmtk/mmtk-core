@@ -90,7 +90,7 @@ harness = false
 [features]
 # default = ["sanity"]
 default = [
-    "perf_counter",
+    # "perf_counter",
     "dep:sysinfo",
     "dep:regex",
     "dep:env_logger",
