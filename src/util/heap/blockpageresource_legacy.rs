@@ -219,6 +219,7 @@ impl<B: Region> BlockQueue<B> {
     }
 }
 
+#[allow(dangerous_implicit_autorefs)]
 impl<B: Region> BlockQueue<B> {
     const CAPACITY: usize = 256;
 
