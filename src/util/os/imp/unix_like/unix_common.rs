@@ -14,14 +14,20 @@ impl MmapProtection {
     }
 }
 
-pub fn mmap(start: Address, size: usize, strategy: MmapStrategy) -> Result<Address> {
+pub fn mmap(
+    start: Address,
+    size: usize,
+    strategy: MmapStrategy,
+    annotation: &MmapAnnotation<'_>,
+) -> MmapResult<Address> {
     let ptr = start.to_mut_ptr();
     let prot = strategy.prot.get_native_flags();
     let flags = strategy.get_posix_mmap_flags();
     wrap_libc_call(
         &|| unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) },
         ptr,
-    )?;
+    )
+    .map_err(|e| MmapError::new(start, size, annotation, e))?;
     Ok(start)
 }
 

@@ -1,4 +1,5 @@
 use bytemuck::NoUninit;
+use std::io::Result;
 
 use crate::util::os::*;
 use crate::vm::*;
@@ -7,15 +8,23 @@ use crate::{
     vm::VMBinding,
 };
 
+/// Error returned by mmap-related operations in MMTk.
 #[derive(Debug)]
 pub struct MmapError {
+    /// The start address of the mmap operation that failed.
     pub error_address: Address,
+    /// The size (in bytes) of the mmap operation that failed.
     pub bytes: usize,
+    /// Human-readable annotation for the mmap operation.
+    ///
+    /// This is derived from [`MmapAnnotation`] at the call site.
     pub annotation: String,
+    /// The underlying OS I/O error.
     pub error: std::io::Error,
 }
 
 impl MmapError {
+    /// Create a new [`MmapError`].
     pub fn new(
         error_address: Address,
         bytes: usize,
@@ -53,6 +62,7 @@ impl std::error::Error for MmapError {
     }
 }
 
+/// Result type for mmap operations that can return [`MmapError`].
 pub type MmapResult<T> = std::result::Result<T, MmapError>;
 
 /// Abstraction for OS memory operations.
@@ -132,10 +142,10 @@ pub trait OSMemory {
     fn is_mmap_oom(os_errno: i32) -> bool;
 
     /// Unmap a memory region.
-    fn munmap(start: Address, size: usize) -> std::io::Result<()>;
+    fn munmap(start: Address, size: usize) -> Result<()>;
 
     /// Change the protection of a memory region to the specified protection.
-    fn set_memory_access(start: Address, size: usize, prot: MmapProtection) -> std::io::Result<()>;
+    fn set_memory_access(start: Address, size: usize, prot: MmapProtection) -> Result<()>;
 
     /// Checks if the memory has already been mapped. If not, we panic.
     ///
@@ -146,7 +156,7 @@ pub trait OSMemory {
     fn panic_if_unmapped(start: Address, size: usize);
 
     /// Get the total memory of the system in bytes.
-    fn get_system_total_memory() -> std::io::Result<u64> {
+    fn get_system_total_memory() -> Result<u64> {
         use sysinfo::MemoryRefreshKind;
         use sysinfo::{RefreshKind, System};
 
