@@ -16,7 +16,8 @@ struct VMScanning;
 // Just to make the code example look better.
 use MockVM as MyVM;
 
-// Placeholders for functions supposed to be implemented byu the VM.
+// Placeholders for functions supposed to be implemented by the VM.
+#[allow(dead_code)]
 mod my_vm {
     use crate::util::ObjectReference;
 

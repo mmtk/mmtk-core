@@ -8,6 +8,7 @@ use crate::util::heap::layout::heap_parameters::*;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::int_array_freelist::IntArrayFreeList;
+use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::util::Address;
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -56,7 +57,8 @@ impl Map32 {
                 total_available_discontiguous_chunks: 0,
                 total_available_large_discontiguous_chunks: 0,
                 finalized: false,
-                descriptor_map: vec![SpaceDescriptor::UNINITIALIZED; max_chunks],
+                // This can be big on 64-bit machines.  Use `new_zeroed_vec`.
+                descriptor_map: new_zeroed_vec(max_chunks),
                 out_of_virtual_space: AtomicBool::new(false),
             }),
             sync: Mutex::new(()),
@@ -388,7 +390,7 @@ impl Map32 {
     /// Get a mutable reference to the inner Map32Inner with a lock.
     /// The caller should only use the mutable reference while holding the lock.
     #[allow(clippy::mut_from_ref)]
-    fn mut_self_with_sync(&self) -> (MutexGuard<()>, &mut Map32Inner) {
+    fn mut_self_with_sync(&self) -> (MutexGuard<'_, ()>, &mut Map32Inner) {
         let guard = self.sync.lock().unwrap();
         (guard, unsafe { self.mut_self() })
     }
