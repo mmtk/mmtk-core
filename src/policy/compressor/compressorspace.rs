@@ -24,6 +24,12 @@ use std::sync::Arc;
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
 pub(crate) const TRACE_KIND_FORWARD_ROOT: TraceKind = 1;
 
+/// The number of bytes of the heap that each CalculateOffsetVector
+/// work packet should process. Calculating the offset vector is very fast,
+/// and we are often swamped by scheduling overhead when we
+/// only process one region per work packet.
+const OFFSET_VECTOR_PACKET_BYTES: usize = 1 << 21;
+
 /// [`CompressorSpace`] is a stop-the-world implementation of
 /// the Compressor, as described in Kermany and Petrank,
 /// [The Compressor: concurrent, incremental, and parallel compaction](https://dl.acm.org/doi/10.1145/1133255.1134023).
@@ -57,7 +63,7 @@ impl<VM: VMBinding> SFT for CompressorSpace<VM> {
         // Check if forwarding addresses have been calculated before attempting
         // to forward objects
         if self.forwarding.has_calculated_forwarding_addresses() {
-            Some(self.forward(object, false))
+            Some(self.forward::<false>(object, false))
         } else {
             None
         }
@@ -224,7 +230,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
             } else {
                 RegionPageResource::new_contiguous(common.start, common.extent, vm_map)
             },
-            forwarding: forwarding::ForwardingMetadata::new(),
+            forwarding: forwarding::ForwardingMetadata::new(&common.options),
             common,
             scheduler,
         }
@@ -265,7 +271,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         _queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
-        self.forward(object, true)
+        self.forward::<false>(object, true)
     }
 
     pub fn test_and_mark(object: ObjectReference) -> bool {
@@ -305,9 +311,17 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     }
 
     pub fn add_offset_vector_tasks(&'static self) {
-        let offset_vector_packets: Vec<Box<dyn GCWork<VM>>> = self.generate_tasks(&mut |r, _| {
-            Box::new(CalculateOffsetVector::<VM>::new(self, r.region, r.cursor()))
-        });
+        let offset_vector_packets: Vec<Box<dyn GCWork<VM>>> =
+            self.pr.with_regions(&mut |regions| {
+                regions
+                    .chunks(OFFSET_VECTOR_PACKET_BYTES / forwarding::CompressorRegion::BYTES)
+                    .map(|c| {
+                        let chunk = c.iter().map(|r| (r.region, r.cursor())).collect();
+                        Box::new(CalculateOffsetVector::<VM>::new(self, chunk))
+                            as Box<dyn GCWork<VM>>
+                    })
+                    .collect()
+            });
         self.scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
             .bulk_add(offset_vector_packets);
     }
@@ -320,7 +334,11 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         self.forwarding.calculate_offset_vector(region, cursor);
     }
 
-    pub fn forward(&self, object: ObjectReference, _vo_bit_valid: bool) -> ObjectReference {
+    pub fn forward<const CAN_CLMUL: bool>(
+        &self,
+        object: ObjectReference,
+        _vo_bit_valid: bool,
+    ) -> ObjectReference {
         if !self.in_space(object) {
             return object;
         }
@@ -336,30 +354,50 @@ impl<VM: VMBinding> CompressorSpace<VM> {
                 object
             );
         }
-        ObjectReference::from_raw_address(self.forwarding.forward(object.to_raw_address())).unwrap()
+        let to = self
+            .forwarding
+            .forward::<CAN_CLMUL>(object.to_raw_address());
+        ObjectReference::from_raw_address(to).unwrap()
     }
 
-    fn update_references(&self, worker: &mut GCWorker<VM>, object: ObjectReference) {
+    fn update_references<const CAN_CLMUL: bool>(
+        &self,
+        worker: &mut GCWorker<VM>,
+        object: ObjectReference,
+    ) {
         if VM::VMScanning::support_slot_enqueuing(worker.tls, object) {
             VM::VMScanning::scan_object(worker.tls, object, &mut |s: VM::VMSlot| {
                 if let Some(o) = s.load() {
-                    s.store(self.forward(o, false));
+                    s.store(self.forward::<CAN_CLMUL>(o, false));
                 }
             });
         } else {
             VM::VMScanning::scan_object_and_trace_edges(worker.tls, object, &mut |o| {
-                self.forward(o, false)
+                self.forward::<CAN_CLMUL>(o, false)
             });
         }
     }
 
     pub fn add_compact_tasks(&'static self) {
-        let compact_packets: Vec<Box<dyn GCWork<VM>>> =
-            self.generate_tasks(&mut |_, i| Box::new(Compact::<VM>::new(self, i)));
-        self.scheduler.work_buckets[WorkBucketStage::Compact].bulk_add(compact_packets);
+        // This pattern of having an inner function appears a few times.
+        // I want to generate the same packets, give or take different CAN_CLMUL values.
+        // I must use a nested function, and I cannot use a closure, for the const generic
+        // argument. So I can't reference arguments or generic types from outside the
+        // inner function, so I must pass the arguments and generic types from the
+        // outer function to the inner function.
+        fn inner<VM: VMBinding, const CAN_CLMUL: bool>(this: &'static CompressorSpace<VM>) {
+            let compact_packets: Vec<Box<dyn GCWork<VM>>> =
+                this.generate_tasks(&mut |_, i| Box::new(Compact::<VM, CAN_CLMUL>::new(this, i)));
+            this.scheduler.work_buckets[WorkBucketStage::Compact].bulk_add(compact_packets);
+        }
+        if self.forwarding.should_use_clmul() {
+            inner::<VM, true>(self)
+        } else {
+            inner::<VM, false>(self)
+        }
     }
 
-    pub fn compact_region(&self, worker: &mut GCWorker<VM>, index: usize) {
+    pub fn compact_region<const CAN_CLMUL: bool>(&self, worker: &mut GCWorker<VM>, index: usize) {
         self.pr.with_regions(&mut |regions| {
             let r = &regions[index];
             let start = r.region.start();
@@ -386,7 +424,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
                     // incorrect if the sizes of objects were to change.
                     let copied_size = VM::VMObjectModel::get_size_when_copied(obj);
                     debug_assert!(copied_size == VM::VMObjectModel::get_current_size(obj));
-                    let new_object = self.forward(obj, false);
+                    let new_object = self.forward::<CAN_CLMUL>(obj, false);
                     debug_assert!(
                         new_object.to_raw_address() >= to,
                         "whilst forwarding {obj}, the new address {0} should be after the end of the last object {to}",
@@ -401,7 +439,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
                     vo_bit::set_vo_bit(new_object);
                     to = new_object.to_object_start::<VM>() + copied_size;
                     debug_assert_eq!(end_of_new_object, to);
-                    self.update_references(worker, new_object);
+                    self.update_references::<CAN_CLMUL>(worker, new_object);
                 });
             self.pr.reset_cursor(r, to);
         });
@@ -410,55 +448,68 @@ impl<VM: VMBinding> CompressorSpace<VM> {
     pub fn after_compact(&self, worker: &mut GCWorker<VM>, los: &LargeObjectSpace<VM>) {
         self.pr.reset_allocator();
         // Update references from the LOS to Compressor too.
-        los.enumerate_to_space_objects(&mut object_enum::ClosureObjectEnumerator::<_, VM>::new(
-            &mut |o: ObjectReference| {
-                self.update_references(worker, o);
-            },
-        ));
+        fn inner<VM: VMBinding, const CAN_CLMUL: bool>(
+            this: &CompressorSpace<VM>,
+            worker: &mut GCWorker<VM>,
+            los: &LargeObjectSpace<VM>,
+        ) {
+            los.enumerate_to_space_objects(
+                &mut object_enum::ClosureObjectEnumerator::<_, VM>::new(
+                    &mut |o: ObjectReference| {
+                        this.update_references::<CAN_CLMUL>(worker, o);
+                    },
+                ),
+            );
+        }
+        if self.forwarding.should_use_clmul() {
+            inner::<VM, true>(self, worker, los);
+        } else {
+            inner::<VM, false>(self, worker, los);
+        }
     }
 }
 
-/// Calculate the offset vector for a region.
+/// Calculate the offset vector for some regions.
 pub struct CalculateOffsetVector<VM: VMBinding> {
     compressor_space: &'static CompressorSpace<VM>,
-    region: forwarding::CompressorRegion,
-    cursor: Address,
+    regions: Vec<(forwarding::CompressorRegion, Address)>,
 }
 
 impl<VM: VMBinding> GCWork<VM> for CalculateOffsetVector<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.compressor_space
-            .calculate_offset_vector_for_region(self.region, self.cursor);
+        for (region, cursor) in self.regions.iter() {
+            self.compressor_space
+                .calculate_offset_vector_for_region(*region, *cursor);
+        }
     }
 }
 
 impl<VM: VMBinding> CalculateOffsetVector<VM> {
     pub fn new(
         compressor_space: &'static CompressorSpace<VM>,
-        region: forwarding::CompressorRegion,
-        cursor: Address,
+        regions: Vec<(forwarding::CompressorRegion, Address)>,
     ) -> Self {
         Self {
             compressor_space,
-            region,
-            cursor,
+            regions,
         }
     }
 }
 
 /// Compact live objects in a region.
-pub struct Compact<VM: VMBinding> {
+pub struct Compact<VM: VMBinding, const CAN_CLMUL: bool> {
     compressor_space: &'static CompressorSpace<VM>,
     index: usize,
 }
 
-impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
+impl<VM: VMBinding, const CAN_CLMUL: bool> GCWork<VM> for Compact<VM, CAN_CLMUL> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.compressor_space.compact_region(worker, self.index);
+        self.compressor_space
+            .compact_region::<CAN_CLMUL>(worker, self.index);
     }
 }
 
-impl<VM: VMBinding> Compact<VM> {
+impl<VM: VMBinding, const CAN_CLMUL: bool> Compact<VM, CAN_CLMUL> {
     pub fn new(compressor_space: &'static CompressorSpace<VM>, index: usize) -> Self {
         Self {
             compressor_space,
