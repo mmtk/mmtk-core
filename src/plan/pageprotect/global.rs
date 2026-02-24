@@ -108,8 +108,14 @@ impl<VM: VMBinding> PageProtect<VM> {
 
         let ret = PageProtect {
             space: LargeObjectSpace::new(
-                plan_args.get_space_args("pageprotect", true, false, VMRequest::discontiguous()),
+                plan_args.get_normal_space_args(
+                    "pageprotect",
+                    true,
+                    false,
+                    VMRequest::discontiguous(),
+                ),
                 true,
+                false, // PageProtect does not use log bit
             ),
             common: CommonPlan::new(plan_args),
         };

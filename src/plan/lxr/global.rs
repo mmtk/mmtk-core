@@ -552,10 +552,10 @@ impl<VM: VMBinding> LXR<VM> {
             global_side_metadata_specs,
         };
         let immix_space = ImmixSpace::new(
-            plan_args.get_space_args("immix", true, false, VMRequest::discontiguous()),
+            plan_args.get_mature_space_args("immix", true, false, VMRequest::discontiguous()),
             ImmixSpaceArgs {
-                unlog_object_when_traced: false,
                 never_move_objects: false,
+                mixed_age: false,
             },
         );
         let mut lxr = Box::new(LXR {

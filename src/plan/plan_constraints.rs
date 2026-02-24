@@ -48,6 +48,8 @@ pub struct PlanConstraints {
     /// `MutatorConfig::prepare_func`).  Those plans can set this to `false` so that the
     /// `PrepareMutator` work packets will not be created at all.
     pub needs_prepare_mutator: bool,
+    /// Is this plan generational?
+    pub generational: bool,
 }
 
 impl PlanConstraints {
@@ -72,6 +74,7 @@ impl PlanConstraints {
             rc_enabled: false,
             // If we use mark sweep as non moving space, we need to prepare mutator. See [`common_prepare_func`].
             needs_prepare_mutator: cfg!(feature = "marksweep_as_nonmoving"),
+            generational: false,
         }
     }
 }

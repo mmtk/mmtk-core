@@ -56,7 +56,7 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     fn initialize_object_metadata(&self, object: ObjectReference, bytes: usize, _alloc: bool) {
         self.mark_state
             .on_object_metadata_initialization::<VM>(object);
-        if self.common.needs_log_bit {
+        if self.common.unlog_allocated_object {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
         if crate::args::BARRIER_MEASUREMENT
@@ -133,6 +133,20 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, &self.pr);
     }
+
+    fn clear_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            log_bit.bzero_metadata(start, size);
+        }
+    }
+
+    fn set_side_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            log_bit.bset_metadata(start, size);
+        }
+    }
 }
 
 use crate::scheduler::GCWorker;
@@ -206,7 +220,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         );
         if self.mark_state.test_and_mark::<VM>(object) {
             // Set the unlog bit if required
-            if self.common.needs_log_bit {
+            if self.common.unlog_traced_object {
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
                     object,
                     1,

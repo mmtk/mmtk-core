@@ -181,6 +181,14 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         enumerator.visit_address_range(self.start, self.start + self.total_bytes);
     }
+
+    fn clear_side_log_bits(&self) {
+        unimplemented!()
+    }
+
+    fn set_side_log_bits(&self) {
+        unimplemented!()
+    }
 }
 
 use crate::plan::{ObjectQueue, VectorObjectQueue};

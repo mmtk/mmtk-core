@@ -17,6 +17,11 @@ class RootsKind(Enum):
     PINNING = 1
     TPINNING = 2
 
+class Semantics(Enum):
+    SOFT = 0
+    WEAK = 1
+    PHANTOM = 2
+
 def get_args():
     parser = argparse.ArgumentParser(
             description="""
@@ -28,6 +33,11 @@ by Perfetto UI.
                         help="path to extra log line handler")
     parser.add_argument("input", type=str, help="Input file"),
     return parser.parse_args()
+
+def begin_end_diff_dict(begin, end, begin_key="begin", end_key="end", diff_key="diff"):
+    """ A convenient method for construct a dict of two values and their difference. """
+    diff = end - begin
+    return {begin_key: begin, end_key: end, diff_key: diff}
 
 class LogProcessor:
     def __init__(self):
@@ -246,6 +256,34 @@ class LogProcessor:
                         "allocated_blocks": int(args[0]),
                     }
 
+                case "finalization":
+                    wp["args"] |= {
+                        "num_candidates": begin_end_diff_dict(int(args[0]), int(args[1])),
+                        "ready_for_finalize": begin_end_diff_dict(int(args[2]), int(args[3])),
+                    }
+
+                case "reference_scanned":
+                    semantics_int = int(args[0])
+                    if semantics_int in Semantics:
+                        semantics_str = Semantics(semantics_int).name
+                    else:
+                        semantics_str = "(Unknown)"
+                    if "reference_scanned" not in wp["args"]:
+                        wp["args"]["reference_scanned"] = []
+                    wp["args"]["reference_scanned"].append({
+                        "semantics": semantics_str,
+                        "num_old": int(args[1]),
+                        "num_new": int(args[2]),
+                        "num_enqueued": int(args[3]),
+                    })
+
+                case "reference_retained":
+                    wp["args"] |= {
+                        "num_refs": int(args[0]),
+                        "num_live": int(args[1]),
+                        "num_retained": int(args[2]),
+                    }
+
                 case _:
                     processed_for_wp = False
         else:
@@ -289,7 +327,6 @@ class LogProcessor:
         print(f"Dumping JSON output to {output_name}")
         with gzip.open(output_name, "wt") as f:
             self.output(f)
-
 
 def main():
     args = get_args()

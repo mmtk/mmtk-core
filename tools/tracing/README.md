@@ -58,6 +58,18 @@ Currently, the core provides the following tracepoints.
 -   `mmtk:alloc_slow_once_end()`: the allocation slow path ends.
 -   `mmtk:plan_end_of_gc_begin()`: before executing `Plan::end_of_gc`.
 -   `mmtk:plan_end_of_gc_end()`: after executing `Plan::end_of_gc`.
+-   `mmtk:finalization(cb: int, ce: int, rb: int, re: int)`: a `Finalization` work packet.  The
+    arguments are the number of candidates at the beginning and the end of the work packet, and the
+    number of ready-to-finalize objects at the beginning and the end of the work packet.
+-   `mmtk:reference_scanned(semantics: int, old: int, new: int, enqueued: int)`: An invocation of
+    `ReferenceProcessor::scan`.  `semantics` is the semantics.  `old` and `new` are the number of
+    references of this semantics before and other this invocation, and `eneueue` is the number of
+    references enqueued.
+-   `mmtk:reference_retained(num_refs: int, num_live: int, num_retained: int)`: An invocation of
+    `ReferenceProcessor::retain`.  `num_refs` is the total number of reference objects visited.
+    `num_live` is the number of live reference objects, and `num_retained` is the number of
+    referents retained.
+
 
 ## Tracing tools
 

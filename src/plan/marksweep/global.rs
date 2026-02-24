@@ -112,7 +112,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
         };
 
         let res = MarkSweep {
-            ms: MarkSweepSpace::new(plan_args.get_space_args(
+            ms: MarkSweepSpace::new(plan_args.get_normal_space_args(
                 "ms",
                 true,
                 false,

@@ -58,6 +58,7 @@ pub const FULL_NURSERY_GC: bool = crate::args::BARRIER_MEASUREMENT;
 pub static GEN_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints {
     moves_objects: true,
     needs_log_bit: ACTIVE_BARRIER.equals(BarrierSelector::ObjectBarrier),
+    generational: true,
     needs_field_log_bit: false,
     barrier: *ACTIVE_BARRIER,
     // We may trace duplicate edges in sticky immix (or any plan that uses object remembering barrier). See https://github.com/mmtk/mmtk-core/issues/743.
