@@ -7,6 +7,7 @@ use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
+use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::{FreeListPageResource, PageResource};
@@ -488,8 +489,13 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     /// Allocate an object
-    pub fn allocate_pages(&self, tls: VMThread, pages: usize) -> Address {
-        self.acquire(tls, pages)
+    pub fn allocate_pages(
+        &self,
+        tls: VMThread,
+        pages: usize,
+        alloc_options: AllocationOptions,
+    ) -> Address {
+        self.acquire(tls, pages, alloc_options)
     }
 
     pub fn attempt_mark(&self, object: ObjectReference) -> bool {
