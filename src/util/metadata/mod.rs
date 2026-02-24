@@ -29,8 +29,7 @@
 //! ### 64-bits targets
 //!
 //!‌ In 64-bits targets, each MMTk side metadata bit-set is organized as a contiguous space.
-//! The base address for the side metadata is chosen at runtime (see
-//! [`side_metadata::initialize_side_metadata_base`]), and the offsets are applied to that base.
+//! The base address for the side metadata is chosen at runtime and the offsets are applied to that base.
 //!
 //! In this case, a schematic of the local and global side metadata looks like:
 //!

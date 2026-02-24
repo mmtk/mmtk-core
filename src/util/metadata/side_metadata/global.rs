@@ -1255,6 +1255,8 @@ impl fmt::Debug for SideMetadataSpec {
     }
 }
 
+/// Calculate the offset of the next side metadata spec after the given spec.
+/// This is used to calculate the offset field in [`crate::util::metadata::side_metadata::SideMetadataSpec`].
 pub const fn side_metadata_offset_after(spec: &SideMetadataSpec) -> usize {
     // Some metadata may be so small that its size is not a multiple of byte size. One example
     // is `CHUNK_MARK`. It is one byte per chunk. However, on 32-bit architectures, we allocate

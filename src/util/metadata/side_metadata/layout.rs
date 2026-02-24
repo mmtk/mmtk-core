@@ -12,8 +12,7 @@ use std::sync::Once;
 
 // The compile-time base offset for global side metadata layout. We treat offsets as relative
 // (starting from zero) and add the runtime base address when computing actual addresses.
-pub(crate) const GLOBAL_SIDE_METADATA_BASE_OFFSET: usize =
-    0;
+pub(crate) const GLOBAL_SIDE_METADATA_BASE_OFFSET: usize = 0;
 
 static mut SIDE_METADATA_BASE_ADDRESS: Address = Address::ZERO;
 static BASE_INIT: Once = Once::new();
@@ -55,7 +54,8 @@ pub(crate) fn set_vm_side_metadata_specs(specs: &[SideMetadataSpec]) {
             let mut upper_bound = Address::ZERO;
             for spec in specs {
                 if spec.is_absolute_offset() {
-                    upper_bound = upper_bound.max(unsafe { Address::from_usize(spec.upper_bound_offset()) });
+                    upper_bound =
+                        upper_bound.max(unsafe { Address::from_usize(spec.upper_bound_offset()) });
                 }
             }
             unsafe {
