@@ -44,6 +44,7 @@ mod generational;
 /// Sticky plans (using sticky marks for generational behaviors without a copying nursery)
 mod sticky;
 
+mod compressor;
 pub mod immix;
 pub mod lxr;
 mod markcompact;

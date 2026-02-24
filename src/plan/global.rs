@@ -59,6 +59,9 @@ pub fn create_mutator<VM: VMBinding>(
             crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
         }
         PlanSelector::LXR => crate::plan::lxr::mutator::create_lxr_mutator(tls, mmtk),
+        PlanSelector::Compressor => {
+            crate::plan::compressor::mutator::create_compressor_mutator(tls, mmtk)
+        }
     })
 }
 
@@ -93,6 +96,9 @@ pub fn create_plan<VM: VMBinding>(
             Box::new(crate::plan::sticky::immix::StickyImmix::new(args)) as Box<dyn Plan<VM = VM>>
         }
         PlanSelector::LXR => crate::plan::lxr::LXR::new(args) as Box<dyn Plan<VM = VM>>,
+        PlanSelector::Compressor => {
+            Box::new(crate::plan::compressor::Compressor::new(args)) as Box<dyn Plan<VM = VM>>
+        }
     };
 
     // We have created Plan in the heap, and we won't explicitly move it.

@@ -182,9 +182,13 @@ mod space_map {
         }
 
         fn get_checked(&self, address: Address) -> &dyn SFT {
-            // We should be able to map the entire address range to indices in the table.
-            debug_assert!(Self::addr_to_index(address) < self.sft.len());
-            unsafe { self.get_unchecked(address) }
+            if self.has_sft_entry(address) {
+                // We should be able to map the entire address range to indices in the table.
+                debug_assert!(Self::addr_to_index(address) < self.sft.len());
+                unsafe { self.get_unchecked(address) }
+            } else {
+                &EMPTY_SPACE_SFT
+            }
         }
 
         unsafe fn get_unchecked(&self, address: Address) -> &dyn SFT {

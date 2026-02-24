@@ -2,6 +2,7 @@ use criterion::Criterion;
 
 pub mod alloc;
 pub mod internal_pointer;
+pub mod mmapper;
 pub mod sft;
 
 // As we can only initialize one MMTk instance, we have to run each benchmark in a separate process.
@@ -26,6 +27,7 @@ pub fn bench(c: &mut Criterion) {
         Ok(bench) => match bench.as_str() {
             "alloc" => alloc::bench(c),
             "internal_pointer" => internal_pointer::bench(c),
+            "mmapper" => mmapper::bench(c),
             "sft" => sft::bench(c),
             _ => panic!("Unknown benchmark {:?}", bench),
         },

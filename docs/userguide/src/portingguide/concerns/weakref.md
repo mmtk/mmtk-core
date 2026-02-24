@@ -28,7 +28,7 @@ different properties.
     one weak reference.
 
 The garbage collector may reclaim weakly reachable objects, clear weak references to weakly
-reachable objects, and/or performing associated clean-up operations.
+reachable objects, and/or perform associated clean-up operations.
 
 [object graph]: ../../glossary.md#object-graph
 
@@ -195,7 +195,7 @@ already moved.
 ## Supporting weak references
 
 The general way to handle weak references is, after computing the transitive closure, iterate
-through all fields that contain weak references to objects.  For each field,
+through all fields that contain weak references.  For each field,
 
 -   if the referent has already been reached, write the new address of the object to the field (or
     do nothing if the object is not moved);
@@ -285,7 +285,7 @@ Take Java as an example,  we may run `process_weak_refs` four times.
             -   clear the referent field,
             -   remove the `SoftReference` from the list of soft references, and
             -   optionally enqueue it to the associated `ReferenceQueue` if it has one.
-    -   (This step may expand the transitive closure in emergency GCs if any referents are
+    -   (This step may expand the transitive closure in non-emergency GCs if any referents are
         retained.)
 2.  Visit all `WeakReference`.
     -   If the referent has been reached, then
@@ -371,8 +371,8 @@ To support ephemerons, the VM binding needs to identify ephemerons.  This includ
 individual objects, objects that contain ephemerons, and, equivalently, objects that contain
 key/value fields that have semantics similar to ephemerons.
 
-The following is the algorithm for processing ephemerons.  It gradually discovers ephemerons as we
-do the tracing.  We maintain a queue of ephemerons which is empty before the `Closure` stage.
+The following is an algorithm for processing ephemerons.  It gradually discovers ephemerons as we do
+the tracing.  We maintain a queue of ephemerons which is empty before the `Closure` stage.
 
 1.  In `Scanning::scan_object` and `Scanning::scan_object_and_trace_edges`, we enqueue ephemerons
     (into the queue of ephemerons we created before) as we scan them, but do not trace either the
@@ -389,7 +389,7 @@ do the tracing.  We maintain a queue of ephemerons which is empty before the `Cl
 This algorithm can be modified if we have a list of all ephemerons before GC starts.  We no longer
 need to maintain the queue.
 
--   In Step 1, we don't need to enqueue ephemerons.
+-   In Step 1, we don't need to enqueue ephemerons or trace their key or value fields.
 -   In Step 2, we iterate through all ephemerons.  We retain the value if both the ephemeron itself
     and the key have been reached, and the value has not been reached, yet.  We don't need to remove
     any ephemeron from the list.

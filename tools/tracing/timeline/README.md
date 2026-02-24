@@ -19,7 +19,7 @@ Suite.
 Run the following command with a **normal** user (*not* as `root` or using `sudo`):
 
 ```shell
-./capture.py -e 50 -m /path/to/libmmtk_openjdk.so
+./capture.py -e 50 -m /path/to/libmmtk_openjdk.so --no-root-nodes
 ```
 
 `-e 50` means we only capture one GC in every 50 GCs because otherwise it will have to print too
@@ -29,6 +29,8 @@ reducing the volume of log, thereby reducing the likelihood of buffer overrun an
 post-processing.  If one single GC still produces too much log and overruns the buffer, the user
 should consider setting the `BPFTRACE_PERF_RB_PAGES` environment variable.  See the man page of
 `bpftrace`.)
+
+`--no-root-nodes` skips the `process_root_nodes` USDT which does not exist in `libmmtk_openjdk.so`.
 
 Replace `/path/to/libmmtk_openjdk.so` with the actual path to the `.so` that contains MMTk and its
 binding.
@@ -84,7 +86,7 @@ This means things are working properly.  Now re-run `./capture.py` again, but pi
 file.
 
 ```
-./capture.py -m /path/to/libmmtk_openjdk.so > mybenchmark.log
+./capture.py -m /path/to/libmmtk_openjdk.so --no-root-nodes > mybenchmark.log
 ```
 
 Type the root password if prompted.

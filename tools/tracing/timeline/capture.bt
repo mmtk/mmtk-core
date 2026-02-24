@@ -1,5 +1,4 @@
 BEGIN {
-    @every = $EVERY;
     @harness = $HARNESS;
 
     @gc_count = 0;
@@ -33,7 +32,7 @@ usdt:$MMTK:mmtk:gc_start {
     printf("GC,B,%d,%lu\n", tid, nsecs);
     @gc_count += 1;
     // bpftrace warns that signed `%` operator may have undefiend behavior.
-    if ((uint64)@gc_count % (uint64)@every == 0 && @stats_enabled) {
+    if ((uint64)@gc_count % $EVERY == 0 && @stats_enabled) {
         @enable_print = 1;
     } else {
         @enable_print = 0;
@@ -87,11 +86,13 @@ usdt:$MMTK:mmtk:roots {
     }
 }
 
+//////// BEGIN:PROCESS_ROOT_NODES
 usdt:$MMTK:mmtk:process_root_nodes {
     if (@enable_print) {
         printf("process_root_nodes,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
     }
 }
+//////// END:PROCESS_ROOT_NODES
 
 usdt:$MMTK:mmtk:process_slots {
     if (@enable_print) {
