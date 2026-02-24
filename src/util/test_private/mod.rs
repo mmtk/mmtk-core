@@ -34,3 +34,6 @@ pub fn set_meta_bits(
 ) {
     SideMetadataSpec::set_meta_bits(meta_start_addr, meta_start_bit, meta_end_addr, meta_end_bit)
 }
+
+#[cfg(feature = "mock_test")]
+pub use crate::mmtk::MMAPPER;

@@ -54,23 +54,12 @@ const TEST_ADDRESS: Address =
 const TEST_ADDRESS: Address =
     crate::util::conversions::chunk_align_down(unsafe { Address::from_usize(0x2_0000_0000) });
 
-// util::heap::layout::fragmented_mmapper
-pub(crate) fn fragmented_mmapper_test_region() -> MmapTestRegion {
+pub(crate) fn chunk_state_mmapper_test_region() -> MmapTestRegion {
     MmapTestRegion::reserve_before_address(vm_layout().heap_start, MMAP_CHUNK_BYTES * 2)
-}
-// util::heap::layout::byte_map_mmaper
-pub(crate) const fn byte_map_mmapper_test_region_size() -> usize {
-    MMAP_CHUNK_BYTES * 2
-}
-pub(crate) fn byte_map_mmapper_test_region() -> MmapTestRegion {
-    MmapTestRegion::reserve_before(
-        fragmented_mmapper_test_region(),
-        byte_map_mmapper_test_region_size(),
-    )
 }
 // util::memory
 pub(crate) fn memory_test_region() -> MmapTestRegion {
-    MmapTestRegion::reserve_before(byte_map_mmapper_test_region(), MMAP_CHUNK_BYTES)
+    MmapTestRegion::reserve_before(chunk_state_mmapper_test_region(), MMAP_CHUNK_BYTES)
 }
 
 pub(crate) fn raw_memory_freelist_test_region() -> MmapTestRegion {

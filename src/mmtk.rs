@@ -13,7 +13,7 @@ use crate::util::analysis::AnalysisManager;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::heap_parameters::MAX_SPACES;
-use crate::util::heap::layout::vm_layout::VMLayout;
+use crate::util::heap::layout::vm_layout::{vm_layout, VMLayout};
 use crate::util::heap::layout::{self, Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::opaque_pointer::*;
@@ -48,7 +48,7 @@ lazy_static! {
     pub static ref VM_MAP: Box<dyn VMMap + Send + Sync> = layout::create_vm_map();
 
     /// A global Mmapper for mmaping and protection of virtual memory.
-    pub static ref MMAPPER: Box<dyn Mmapper + Send + Sync> = layout::create_mmapper();
+    pub static ref MMAPPER: Box<dyn Mmapper> = layout::create_mmapper();
 }
 
 use crate::util::rust_util::InitializeOnce;
@@ -140,6 +140,8 @@ impl<VM: VMBinding> MMTK<VM> {
     /// Create an MMTK instance. This is not public. Bindings should use [`MMTKBuilder::build`].
     pub(crate) fn new(options: Arc<Options>) -> Self {
         crate::VERBOSE.store(*options.verbose, Ordering::SeqCst);
+        // Verify the Mmapper can handle the required address space size.
+        vm_layout().validate_address_space();
 
         // Initialize SFT first in case we need to use this in the constructor.
         // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
