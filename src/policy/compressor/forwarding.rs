@@ -21,12 +21,12 @@ use std::sync::atomic::AtomicBool;
 /// using [`Transducer::decode`].
 #[derive(Debug)]
 struct Transducer {
-    // The total live data visited by the transducer.
+    /// The total live data visited by the transducer.
     live: usize,
-    // The address of the last mark bit which the transducer visited.
+    /// The address of the last mark bit which the transducer visited.
     last_bit_visited: Address,
-    // Whether or not the transducer is currently inside an object
-    // (i.e. if it has seen a first bit but no matching last bit yet).
+    /// Whether or not the transducer is currently inside an object
+    /// (i.e. if it has seen a first bit but no matching last bit yet).
     in_object: bool,
 }
 impl Transducer {
@@ -188,5 +188,9 @@ impl<VM: VMBinding> ForwardingMetadata<VM> {
             }
             in_object = !in_object;
         });
+    }
+
+    pub fn has_calculated_forwarding_addresses(&self) -> bool {
+        self.calculated.load(Ordering::Relaxed)
     }
 }
