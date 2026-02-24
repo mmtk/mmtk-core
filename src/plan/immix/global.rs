@@ -56,7 +56,6 @@ pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     } else {
         BarrierSelector::NoBarrier
     },
-    needs_prepare_mutator: false,
     ..PlanConstraints::default()
 };
 
@@ -104,7 +103,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         self.immix_space.prepare(
             true,
             false,
-            crate::policy::immix::defrag::StatsForDefrag::new(self),
+            Some(crate::policy::immix::defrag::StatsForDefrag::new(self)),
         );
     }
 
@@ -122,9 +121,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         self.immix_space.release(true);
     }
 
-    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
+    fn end_of_gc(&mut self, tls: VMWorkerThread) {
         self.last_gc_was_defrag
             .store(self.immix_space.end_of_gc(), Ordering::Relaxed);
+        self.common.end_of_gc(tls);
     }
 
     fn current_gc_may_move_object(&self) -> bool {

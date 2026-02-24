@@ -1,7 +1,8 @@
 use super::MarkCompact;
+use crate::plan::mutator_context::common_prepare_func;
+use crate::plan::mutator_context::common_release_func;
 use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::create_space_mapping;
-use crate::plan::mutator_context::unreachable_prepare_func;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
@@ -39,24 +40,23 @@ pub fn create_markcompact_mutator<VM: VMBinding>(
             vec.push((AllocatorSelector::MarkCompact(0), markcompact.mc_space()));
             vec
         }),
-        prepare_func: &unreachable_prepare_func,
+        prepare_func: &common_prepare_func,
         release_func: &markcompact_mutator_release,
     };
     let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
     builder.build()
 }
 
-pub fn markcompact_mutator_release<VM: VMBinding>(
-    _mutator: &mut Mutator<VM>,
-    _tls: VMWorkerThread,
-) {
+pub fn markcompact_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
     // reset the thread-local allocation bump pointer
     let markcompact_allocator = unsafe {
-        _mutator
+        mutator
             .allocators
-            .get_allocator_mut(_mutator.config.allocator_mapping[AllocationSemantics::Default])
+            .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::Default])
     }
     .downcast_mut::<MarkCompactAllocator<VM>>()
     .unwrap();
     markcompact_allocator.reset();
+
+    common_release_func(mutator, tls);
 }

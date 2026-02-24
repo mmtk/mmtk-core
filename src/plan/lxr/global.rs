@@ -480,6 +480,8 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         }
     }
 
+    fn end_of_gc(&mut self, _tls: VMWorkerThread) {}
+
     #[cfg(feature = "nogc_no_zeroing")]
     fn handle_user_collection_request(&self, _tls: crate::util::VMMutatorThread, _force: bool) {
         println!("Warning: User attempted a collection request. The request is ignored.");

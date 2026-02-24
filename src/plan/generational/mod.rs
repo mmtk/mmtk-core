@@ -64,7 +64,6 @@ pub static GEN_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints
     may_trace_duplicate_edges: ACTIVE_BARRIER.equals(BarrierSelector::ObjectBarrier),
     max_non_los_default_alloc_bytes:
         crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
-    needs_prepare_mutator: false,
     ..PlanConstraints::default()
 });
 

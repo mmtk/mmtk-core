@@ -40,7 +40,6 @@ pub const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     max_non_los_default_alloc_bytes:
         crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
-    needs_prepare_mutator: false,
     ..PlanConstraints::default()
 };
 
@@ -94,6 +93,10 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.common.release(tls, true);
         // release the collected region
         self.fromspace().release();
+    }
+
+    fn end_of_gc(&mut self, tls: VMWorkerThread) {
+        self.common.end_of_gc(tls)
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {

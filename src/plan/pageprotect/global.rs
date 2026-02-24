@@ -31,7 +31,6 @@ pub struct PageProtect<VM: VMBinding> {
 /// The plan constraints for the page protect plan.
 pub const CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: false,
-    needs_prepare_mutator: false,
     ..PlanConstraints::default()
 };
 
@@ -56,6 +55,10 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         self.space.release(true);
+    }
+
+    fn end_of_gc(&mut self, tls: VMWorkerThread) {
+        self.common.end_of_gc(tls);
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
