@@ -66,7 +66,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: "0.8.3"
+          ref: "0.8.4"
           path: ci-perf-kit
           submodules: true
       # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)

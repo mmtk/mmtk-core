@@ -126,7 +126,6 @@ impl ChunkStateMmapper {
     }
 }
 
-/// Generic mmap and protection functionality
 impl Mmapper for ChunkStateMmapper {
     fn log_granularity(&self) -> u8 {
         LOG_BYTES_IN_CHUNK as u8
@@ -134,10 +133,6 @@ impl Mmapper for ChunkStateMmapper {
 
     fn log_mappable_bytes(&self) -> u8 {
         self.storage.log_mappable_bytes()
-    }
-
-    fn eagerly_mmap_all_spaces(&self, _space_map: &[Address]) {
-        unimplemented!()
     }
 
     fn mark_as_mapped(&self, start: Address, bytes: usize) {
@@ -178,9 +173,6 @@ impl Mmapper for ChunkStateMmapper {
                         trace!("Already mapped {group_range}");
                         Ok(None)
                     }
-                    MapState::Protected => {
-                        panic!("Cannot quarantine protected memory")
-                    }
                 }
             })
     }
@@ -207,10 +199,6 @@ impl Mmapper for ChunkStateMmapper {
                         dzmmap_noreplace(group_start, group_bytes, strategy, anno)?;
                         Ok(Some(MapState::Mapped))
                     }
-                    MapState::Protected => {
-                        munprotect(group_start, group_bytes, strategy.prot)?;
-                        Ok(Some(MapState::Mapped))
-                    }
                     MapState::Quarantined => {
                         unsafe { dzmmap(group_start, group_bytes, strategy, anno) }?;
                         Ok(Some(MapState::Mapped))
@@ -222,29 +210,6 @@ impl Mmapper for ChunkStateMmapper {
 
     fn is_mapped_address(&self, addr: Address) -> bool {
         self.storage.get_state(addr) == MapState::Mapped
-    }
-
-    fn protect(&self, start: Address, pages: usize) {
-        let _guard = self.transition_lock.lock().unwrap();
-
-        let bytes = pages << LOG_BYTES_IN_PAGE;
-        let range = ChunkRange::new_unaligned(start, bytes);
-
-        self.storage
-            .bulk_transition_state(range, |group_range, state| {
-                let group_start: Address = group_range.start;
-                let group_bytes = group_range.bytes;
-
-                match state {
-                    MapState::Mapped => {
-                        crate::util::memory::mprotect(group_start, group_bytes).unwrap();
-                        Ok(Some(MapState::Protected))
-                    }
-                    MapState::Protected => Ok(None),
-                    _ => panic!("Cannot transition {group_range} to protected",),
-                }
-            })
-            .unwrap();
     }
 }
 
@@ -259,8 +224,6 @@ enum MapState {
     Quarantined,
     /// The chunk is mapped by MMTk and is in use.
     Mapped,
-    /// The chunk is mapped and is also protected by MMTk.
-    Protected,
 }
 
 #[cfg(test)]
@@ -363,105 +326,6 @@ mod tests {
                             MapState::Mapped
                         );
                     }
-                },
-                || {
-                    memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
-                },
-            )
-        })
-    }
-
-    #[test]
-    fn protect() {
-        serial_test(|| {
-            with_cleanup(
-                || {
-                    // map 2 chunks
-                    let mmapper = ChunkStateMmapper::new();
-                    let pages_per_chunk = BYTES_IN_CHUNK >> LOG_BYTES_IN_PAGE as usize;
-                    mmapper
-                        .ensure_mapped(
-                            FIXED_ADDRESS,
-                            pages_per_chunk * 2,
-                            MmapStrategy::TEST,
-                            mmap_anno_test!(),
-                        )
-                        .unwrap();
-
-                    // protect 1 chunk
-                    mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
-
-                    assert_eq!(
-                        get_chunk_map_state(&mmapper, FIXED_ADDRESS),
-                        MapState::Protected
-                    );
-                    assert_eq!(
-                        get_chunk_map_state(&mmapper, FIXED_ADDRESS + BYTES_IN_CHUNK),
-                        MapState::Mapped
-                    );
-                },
-                || {
-                    memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
-                },
-            )
-        })
-    }
-
-    #[test]
-    fn ensure_mapped_on_protected_chunks() {
-        serial_test(|| {
-            with_cleanup(
-                || {
-                    // map 2 chunks
-                    let mmapper = ChunkStateMmapper::new();
-                    let pages_per_chunk = BYTES_IN_CHUNK >> LOG_BYTES_IN_PAGE as usize;
-                    mmapper
-                        .ensure_mapped(
-                            FIXED_ADDRESS,
-                            pages_per_chunk * 2,
-                            MmapStrategy::TEST,
-                            mmap_anno_test!(),
-                        )
-                        .unwrap();
-
-                    assert_eq!(
-                        get_chunk_map_state(&mmapper, FIXED_ADDRESS),
-                        MapState::Mapped
-                    );
-                    assert_eq!(
-                        get_chunk_map_state(&mmapper, FIXED_ADDRESS + BYTES_IN_CHUNK),
-                        MapState::Mapped
-                    );
-
-                    // protect 1 chunk
-                    mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
-
-                    assert_eq!(
-                        get_chunk_map_state(&mmapper, FIXED_ADDRESS),
-                        MapState::Protected
-                    );
-                    assert_eq!(
-                        get_chunk_map_state(&mmapper, FIXED_ADDRESS + BYTES_IN_CHUNK),
-                        MapState::Mapped
-                    );
-
-                    // ensure mapped - this will unprotect the previously protected chunk
-                    mmapper
-                        .ensure_mapped(
-                            FIXED_ADDRESS,
-                            pages_per_chunk * 2,
-                            MmapStrategy::TEST,
-                            mmap_anno_test!(),
-                        )
-                        .unwrap();
-                    assert_eq!(
-                        get_chunk_map_state(&mmapper, FIXED_ADDRESS),
-                        MapState::Mapped
-                    );
-                    assert_eq!(
-                        get_chunk_map_state(&mmapper, FIXED_ADDRESS + BYTES_IN_CHUNK),
-                        MapState::Mapped
-                    );
                 },
                 || {
                     memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();

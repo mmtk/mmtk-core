@@ -1,4 +1,4 @@
-// GITHUB-CI: MMTK_PLAN=discontiguous
+// GITHUB-CI: MMTK_PLAN=all
 
 use super::mock_test_prelude::*;
 use super::mock_test_vm_layout_default::test_with_vm_layout;
