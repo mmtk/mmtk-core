@@ -11,11 +11,7 @@ use crate::{
     scheduler::{GCWork, GCWorker, WorkBucketStage},
     util::{
         constants::LOG_BYTES_IN_PAGE,
-        heap::{
-            chunk_map::{Chunk, ChunkState},
-            layout::vm_layout::LOG_BYTES_IN_CHUNK,
-            PageResource,
-        },
+        heap::{chunk_map::Chunk, layout::vm_layout::LOG_BYTES_IN_CHUNK, PageResource},
         linear_scan::Region,
         rc::{self, RefCountHelper},
         ObjectReference,
@@ -67,7 +63,7 @@ impl<VM: VMBinding> GCWork<VM> for SelectDefragBlocks {
             .immix_space;
         for i in 0..num_chunks {
             let chunk = self.chunks.start.next_nth(i);
-            if ix_space.chunk_map.get(chunk) != ChunkState::Allocated {
+            if !ix_space.chunk_map.is_allocated(chunk) {
                 continue;
             }
             for block in chunk.iter_region::<Block>() {
@@ -283,7 +279,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepDeadCycles<VM> {
         for i in 0..num_chunks {
             let mut db = 0;
             let chunk = self.chunks.start.next_nth(i);
-            if ix_space.chunk_map.get(chunk) != ChunkState::Allocated {
+            if !ix_space.chunk_map.is_allocated(chunk) {
                 continue;
             }
             for block in chunk
@@ -342,7 +338,7 @@ impl<VM: VMBinding> GCWork<VM> for ConcurrentChunkMetadataZeroing {
             .immix_space;
         for i in 0..num_chunks {
             let chunk = self.chunks.start.next_nth(i);
-            if ix_space.chunk_map.get(chunk) != ChunkState::Allocated {
+            if !ix_space.chunk_map.is_allocated(chunk) {
                 continue;
             }
             Self::reset_object_mark::<VM>(chunk);
@@ -376,7 +372,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareChunksForFullGC {
             .immix_space;
         for i in 0..num_chunks {
             let chunk = self.chunks.start.next_nth(i);
-            if ix_space.chunk_map.get(chunk) != ChunkState::Allocated {
+            if !ix_space.chunk_map.is_allocated(chunk) {
                 continue;
             }
             // Iterate over all blocks in this chunk

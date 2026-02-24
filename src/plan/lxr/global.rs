@@ -553,6 +553,7 @@ impl<VM: VMBinding> LXR<VM> {
             plan_args.get_space_args("immix", true, false, VMRequest::discontiguous()),
             ImmixSpaceArgs {
                 unlog_object_when_traced: false,
+                never_move_objects: false,
             },
         );
         let mut lxr = Box::new(LXR {

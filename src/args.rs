@@ -257,7 +257,4 @@ fn dump_features(active_barrier: BarrierSelector, options: &Options) {
 
 pub fn validate_features(active_barrier: BarrierSelector, options: &Options) {
     dump_features(active_barrier, options);
-    validate!(DEFRAG => !BLOCK_ONLY);
-    validate!(EAGER_INCREMENTS => !RC_NURSERY_EVACUATION);
-    validate!(RC_NURSERY_EVACUATION => !EAGER_INCREMENTS);
 }

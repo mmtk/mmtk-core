@@ -67,6 +67,8 @@ define_side_metadata_specs!(
     IX_BLOCK_DEFRAG = (global: true, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
     // Mark table for sanity GC
     SANITY_MARK_BITS = (global: true, log_num_of_bits: 3, log_bytes_in_region: crate::util::rc::LOG_MIN_OBJECT_SIZE),
+    // Mark chunks (any plan that uses the chunk map should include this spec in their global sidemetadata specs)
+    CHUNK_MARK   = (global: true, log_num_of_bits: 3, log_bytes_in_region: crate::util::heap::chunk_map::Chunk::LOG_BYTES),
 );
 
 // This defines all LOCAL side metadata used by mmtk-core.
@@ -87,8 +89,6 @@ define_side_metadata_specs!(
     NURSERY_PROMOTION_STATE   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
     PHASE_EPOCH   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
     IX_BLOCK_DEAD_WORDS = (global: false, log_num_of_bits: 5 /* u32 */, log_bytes_in_region: Block::LOG_BYTES),
-    // Mark chunks (any plan that uses the chunk map should include this spec in their local sidemetadata specs)
-    CHUNK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::util::heap::chunk_map::Chunk::LOG_BYTES),
     CHUNK_BIN   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::util::heap::chunk_map::Chunk::LOG_BYTES),
     CHUNK_LIVE_BLOCKS   = (global: false, log_num_of_bits: 4, log_bytes_in_region: crate::util::heap::chunk_map::Chunk::LOG_BYTES),
     CHUNK_PREV   = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::util::heap::chunk_map::Chunk::LOG_BYTES),
