@@ -100,7 +100,7 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
                 scheduler.work_buckets[WorkBucketStage::Closure].add(w);
             }
             for roots in &sanity_checker.root_nodes {
-                scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessRootNode::<
+                scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessRootNodes::<
                     P::VM,
                     SanityGCProcessEdges<P::VM>,
                     SanityGCProcessEdges<P::VM>,

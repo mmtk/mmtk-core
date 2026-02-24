@@ -29,7 +29,9 @@ use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::default::Default;
-use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(feature = "sanity")]
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -80,13 +82,13 @@ impl MMTKBuilder {
 
     /// Set an option.
     pub fn set_option(&mut self, name: &str, val: &str) -> bool {
-        self.options.set_from_command_line(name, val)
+        self.options.set_from_string(name, val)
     }
 
     /// Set multiple options by a string. The string should be key-value pairs separated by white spaces,
     /// such as `threads=1 stress_factor=4096`.
     pub fn set_options_bulk_by_str(&mut self, options: &str) -> bool {
-        self.options.set_bulk_from_command_line(options)
+        self.options.set_bulk_from_string(options)
     }
 
     /// Custom VM layout constants. VM bindings may use this function for compressed or 39-bit heap support.
@@ -124,7 +126,6 @@ pub struct MMTK<VM: VMBinding> {
     pub(crate) gc_trigger: Arc<GCTrigger<VM>>,
     pub(crate) gc_requester: Arc<GCRequester<VM>>,
     pub(crate) stats: Arc<Stats>,
-    inside_harness: AtomicBool,
     #[cfg(feature = "sanity")]
     inside_sanity: AtomicBool,
     /// Analysis counters. The feature analysis allows us to periodically stop the world and collect some statistics.
@@ -227,7 +228,6 @@ impl<VM: VMBinding> MMTK<VM> {
             sanity_checker: Mutex::new(SanityChecker::new()),
             #[cfg(feature = "sanity")]
             inside_sanity: AtomicBool::new(false),
-            inside_harness: AtomicBool::new(false),
             #[cfg(feature = "extreme_assertions")]
             slot_logger: SlotLogger::new(),
             #[cfg(feature = "analysis")]
@@ -339,7 +339,7 @@ impl<VM: VMBinding> MMTK<VM> {
             use crate::vm::Collection;
             VM::VMCollection::block_for_gc(tls);
         }
-        self.inside_harness.store(true, Ordering::SeqCst);
+        self.state.inside_harness.store(true, Ordering::SeqCst);
         crate::reset_counters();
         self.stats.start_all();
         self.scheduler.enable_stat();
@@ -352,13 +352,13 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn harness_end(&'static self) {
         self.stats.stop_all(self);
         crate::INSIDE_HARNESS.store(false, Ordering::SeqCst);
-        self.inside_harness.store(false, Ordering::SeqCst);
+        self.state.inside_harness.store(false, Ordering::SeqCst);
         #[cfg(feature = "tracing")]
         probe!(mmtk, harness_end);
     }
 
     pub fn inside_harness(&'static self) -> bool {
-        self.inside_harness.load(Ordering::SeqCst)
+        self.state.inside_harness.load(Ordering::SeqCst)
     }
 
     #[cfg(feature = "sanity")]
@@ -621,4 +621,33 @@ impl<VM: VMBinding> MMTK<VM> {
             .vm_space
             .initialize_object_metadata(object, false)
     }
+}
+
+/// A non-mangled function to print object information for debugging purposes. This function can be directly
+/// called from a debugger.
+#[no_mangle]
+pub fn mmtk_debug_print_object(object: crate::util::ObjectReference) {
+    // If the address is unmapped, we cannot access its metadata. Just quit.
+    if !object.to_raw_address().is_mapped() {
+        println!("{} is not mapped in MMTk", object);
+        return;
+    }
+
+    // If the address is not aligned to the object reference size, it is not an object reference.
+    if !object
+        .to_raw_address()
+        .is_aligned_to(crate::util::ObjectReference::ALIGNMENT)
+    {
+        println!(
+            "{} is not properly aligned. It is not an object reference.",
+            object
+        );
+    }
+
+    // Forward to the space
+    let sft = SFT_MAP.get_checked(object.to_raw_address());
+    // Print the space name
+    println!("In {}:", sft.name());
+    // Print object information
+    sft.debug_print_object_info(object);
 }

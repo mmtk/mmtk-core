@@ -230,6 +230,20 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     ) -> ObjectReference {
         panic!("We do not use SFT to trace objects for Immix. sft_trace_object() cannot be used.")
     }
+
+    fn debug_print_object_info(&self, object: ObjectReference) {
+        println!("marked  = {}", self.is_marked(object));
+        println!(
+            "line marked = {}",
+            Line::from_unaligned_address(object.to_raw_address()).is_marked(self.mark_state)
+        );
+        println!(
+            "block state = {:?}",
+            Block::from_unaligned_address(object.to_raw_address()).get_state()
+        );
+        object_forwarding::debug_print_object_forwarding_info::<VM>(object);
+        self.common.debug_print_object_global_info(object);
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
@@ -499,6 +513,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             full_heap_system_gc,
             self.cm_enabled,
             self.rc_enabled,
+            *self.common.options.immix_always_defrag,
         );
         self.defrag.in_defrag()
     }
@@ -1711,8 +1726,9 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let num_chunks = (self.chunks.end.start() - self.chunks.start.start()) >> Chunk::LOG_BYTES;
+        let defrag_every_block = *mmtk.options.immix_defrag_every_block;
         for i in 0..num_chunks {
             let chunk = self.chunks.start.next_nth(i);
             if !self.space.chunk_map.is_allocated(chunk) {
@@ -1731,7 +1747,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
                 let is_defrag_source = if !self.space.is_defrag_enabled() {
                     // Do not set any block as defrag source if defrag is disabled.
                     false
-                } else if super::DEFRAG_EVERY_BLOCK {
+                } else if defrag_every_block {
                     // Set every block as defrag source if so desired.
                     true
                 } else if let Some(defrag_threshold) = self.defrag_threshold {

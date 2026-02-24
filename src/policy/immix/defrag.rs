@@ -48,7 +48,6 @@ impl Defrag {
     pub const NUM_BINS: usize = (Block::LINES >> 1) + 1;
     const DEFRAG_LINE_REUSE_RATIO: f32 = 0.99;
     const MIN_SPILL_THRESHOLD: usize = 2;
-    const DEFRAG_HEADROOM_PERCENT: usize = super::DEFRAG_HEADROOM_PERCENT;
 
     /// Allocate a new local histogram.
     pub const fn new_histogram(&self) -> Histogram {
@@ -78,12 +77,13 @@ impl Defrag {
         full_heap_system_gc: bool,
         concurrent_marking_enabled: bool,
         rc_enabled: bool,
+        stress_defrag: bool,
     ) {
         let mut in_defrag = defrag_enabled
             && (emergency_collection
                 || (collection_attempts > 1)
                 || !exhausted_reusable_space
-                || super::STRESS_DEFRAG
+                || stress_defrag
                 || (collect_whole_heap && user_triggered && full_heap_system_gc))
             && !rc_enabled
             && !concurrent_marking_enabled;
@@ -99,7 +99,9 @@ impl Defrag {
 
     /// Get the number of defrag headroom pages.
     pub fn defrag_headroom_pages<VM: VMBinding>(&self, space: &ImmixSpace<VM>) -> usize {
-        space.get_page_resource().reserved_pages() * Self::DEFRAG_HEADROOM_PERCENT / 100
+        space.get_page_resource().reserved_pages()
+            * (*space.common().options.immix_defrag_headroom_percent)
+            / 100
     }
 
     /// Check if the defrag space is exhausted.

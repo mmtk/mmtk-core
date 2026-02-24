@@ -87,8 +87,6 @@ pub trait VMMap: Sync + Downcast {
     /// address is not within the MMTk heap range, or not within MMTk spaces.
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor;
 
-    fn add_to_cumulative_committed_pages(&self, pages: usize);
-
     fn out_of_virtual_space(&self) -> bool {
         false
     }

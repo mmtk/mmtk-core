@@ -154,7 +154,9 @@ jobs:
           ./.github/scripts/ci-style.sh
 
   extended-tests-ruby:
-    runs-on: ubuntu-22.04
+    # Note: CRuby requires an existing installation of CRuby 3.1.0 or newer to build itself.
+    # Ubuntu 22.04 only provides CRuby 3.0.  We need 24.04 or newer.
+    runs-on: ubuntu-24.04
     needs: binding-refs
     if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
     strategy:

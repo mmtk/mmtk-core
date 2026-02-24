@@ -10,7 +10,7 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::int_array_freelist::IntArrayFreeList;
 use crate::util::Address;
 use std::cell::UnsafeCell;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
 const NO_SPACE: u8 = 0;
@@ -35,12 +35,6 @@ pub struct Map32Inner {
     total_available_large_discontiguous_chunks: usize,
     finalized: bool,
     descriptor_map: Vec<SpaceDescriptor>,
-
-    // TODO: Is this the right place for this field?
-    // This used to be a global variable. When we remove global states, this needs to be put somewhere.
-    // Currently I am putting it here, as for where this variable is used, we already have
-    // references to vm_map - so it is convenient to put it here.
-    cumulative_committed_pages: AtomicUsize,
     out_of_virtual_space: AtomicBool,
 }
 
@@ -63,7 +57,6 @@ impl Map32 {
                 total_available_large_discontiguous_chunks: 0,
                 finalized: false,
                 descriptor_map: vec![SpaceDescriptor::UNINITIALIZED; max_chunks],
-                cumulative_committed_pages: AtomicUsize::new(0),
                 out_of_virtual_space: AtomicBool::new(false),
             }),
             sync: Mutex::new(()),
@@ -366,11 +359,6 @@ impl VMMap for Map32 {
             .get(index)
             .copied()
             .unwrap_or(SpaceDescriptor::UNINITIALIZED)
-    }
-
-    fn add_to_cumulative_committed_pages(&self, pages: usize) {
-        self.cumulative_committed_pages
-            .fetch_add(pages, Ordering::Relaxed);
     }
 
     fn out_of_virtual_space(&self) -> bool {
