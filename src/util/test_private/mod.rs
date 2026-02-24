@@ -44,5 +44,10 @@ pub fn side_metadata_address_to_meta_address(
     crate::util::metadata::side_metadata::address_to_meta_address(metadata_spec, data_addr)
 }
 
+/// Expose side metadata base initialization when running `cargo bench`.
+pub fn initialize_side_metadata_base() {
+    crate::util::metadata::side_metadata::initialize_side_metadata_base()
+}
+
 #[cfg(feature = "mock_test")]
 pub use crate::mmtk::MMAPPER;
