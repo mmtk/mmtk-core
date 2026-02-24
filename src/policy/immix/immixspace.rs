@@ -1050,7 +1050,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         debug_assert!(!owner.0.to_address().is_zero());
         let mature_evac = copy
             && self.rc_enabled
-            && self.scheduler().work_buckets[WorkBucketStage::Closure].is_activated();
+            && self.scheduler().work_buckets[WorkBucketStage::Closure].is_open();
         self.pr.acquire_blocks(
             alloc_count,
             steal_count,

@@ -870,29 +870,30 @@ impl<VM: VMBinding> LXR<VM> {
 
     fn disable_unnecessary_buckets(&'static self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
         if pause == Pause::RefCount {
-            scheduler.work_buckets[WorkBucketStage::Prepare].set_as_disabled();
+            scheduler.work_buckets[WorkBucketStage::Prepare].set_enabled(false);
         }
         if pause == Pause::RefCount || pause == Pause::InitialMark {
-            scheduler.work_buckets[WorkBucketStage::Closure].set_as_disabled();
-            scheduler.work_buckets[WorkBucketStage::WeakRefClosure].set_as_disabled();
-            scheduler.work_buckets[WorkBucketStage::FinalRefClosure].set_as_disabled();
-            scheduler.work_buckets[WorkBucketStage::PhantomRefClosure].set_as_disabled();
+            scheduler.work_buckets[WorkBucketStage::Closure].set_enabled(false);
+            scheduler.work_buckets[WorkBucketStage::WeakRefClosure].set_enabled(false);
+            scheduler.work_buckets[WorkBucketStage::FinalRefClosure].set_enabled(false);
+            scheduler.work_buckets[WorkBucketStage::PhantomRefClosure].set_enabled(false);
         }
-        scheduler.work_buckets[WorkBucketStage::TPinningClosure].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::PinningRootsTrace].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::SoftRefClosure].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::CalculateForwarding].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::SecondRoots].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::RefForwarding].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::FinalizableForwarding].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::Compact].set_as_disabled();
+        scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::TPinningClosure].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::PinningRootsTrace].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::SoftRefClosure].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::CalculateForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::SecondRoots].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::RefForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::FinalizableForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::Compact].set_enabled(false);
         if crate::args::LAZY_DECREMENTS
             && pause != Pause::Full
             && !cfg!(feature = "fragmentation_analysis")
         {
-            scheduler.work_buckets[WorkBucketStage::STWRCDecsAndSweep].set_as_disabled();
+            scheduler.work_buckets[WorkBucketStage::STWRCDecsAndSweep].set_enabled(false);
         }
     }
 

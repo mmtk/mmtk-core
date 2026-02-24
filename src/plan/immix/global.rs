@@ -250,18 +250,18 @@ impl<VM: VMBinding> Immix<VM> {
     }
 
     fn disable_unnecessary_buckets(&self, scheduler: &GCWorkScheduler<VM>) {
-        scheduler.work_buckets[WorkBucketStage::FinishConcurrentWork].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::Initial].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::TPinningClosure].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::PinningRootsTrace].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::SoftRefClosure].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::CalculateForwarding].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::SecondRoots].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::RefForwarding].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::FinalizableForwarding].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::Compact].set_as_disabled();
-        scheduler.work_buckets[WorkBucketStage::STWRCDecsAndSweep].set_as_disabled();
+        scheduler.work_buckets[WorkBucketStage::FinishConcurrentWork].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::Initial].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::TPinningClosure].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::PinningRootsTrace].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::SoftRefClosure].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::CalculateForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::SecondRoots].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::RefForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::FinalizableForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::Compact].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::STWRCDecsAndSweep].set_enabled(false);
     }
 }
