@@ -2,7 +2,7 @@
 use crate::util::heap::layout::vm_layout::VMLayout;
 #[cfg(target_pointer_width = "32")]
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
-use crate::util::metadata::side_metadata::{SideMetadataOffset, SideMetadataSpec};
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::os::{MmapAnnotation, MmapStrategy};
 use crate::util::Address;
 use crate::util::{constants::LOG_BYTES_IN_PAGE, conversions::raw_align_up};
@@ -12,8 +12,8 @@ use std::sync::Once;
 
 // The compile-time base offset for global side metadata layout. We treat offsets as relative
 // (starting from zero) and add the runtime base address when computing actual addresses.
-pub(crate) const GLOBAL_SIDE_METADATA_BASE_OFFSET: SideMetadataOffset =
-    SideMetadataOffset::addr(Address::ZERO);
+pub(crate) const GLOBAL_SIDE_METADATA_BASE_OFFSET: usize =
+    0;
 
 static mut SIDE_METADATA_BASE_ADDRESS: Address = Address::ZERO;
 static BASE_INIT: Once = Once::new();
@@ -55,7 +55,7 @@ pub(crate) fn set_vm_side_metadata_specs(specs: &[SideMetadataSpec]) {
             let mut upper_bound = Address::ZERO;
             for spec in specs {
                 if spec.is_absolute_offset() {
-                    upper_bound = upper_bound.max(spec.upper_bound_offset().addr_value());
+                    upper_bound = upper_bound.max(unsafe { Address::from_usize(spec.upper_bound_offset()) });
                 }
             }
             unsafe {
@@ -73,7 +73,7 @@ pub(crate) fn set_vm_side_metadata_specs(specs: &[SideMetadataSpec]) {
 
 fn upper_bound_address_for_contiguous_relative(spec: &SideMetadataSpec) -> Address {
     debug_assert!(spec.is_absolute_offset());
-    let rel = spec.offset.addr_value();
+    let rel = unsafe { Address::from_usize(spec.offset) };
     rel.add(super::metadata_address_range_size(spec))
 }
 
@@ -198,12 +198,12 @@ pub fn global_side_metadata_vm_base_address() -> Address {
     super::spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC.upper_bound_address_for_contiguous()
 }
 /// The base offset for the global side metadata available to VM bindings.
-pub const GLOBAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset =
+pub const GLOBAL_SIDE_METADATA_VM_BASE_OFFSET: usize =
     super::spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC.upper_bound_offset();
 
 /// The base address for the local side metadata space available to VM bindings, to be used for the per-object metadata.
 /// VM bindings must use this to avoid overlap with core internal local side metadata.
-pub const LOCAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset =
+pub const LOCAL_SIDE_METADATA_VM_BASE_OFFSET: usize =
     super::spec_defs::LAST_LOCAL_SIDE_METADATA_SPEC.upper_bound_offset();
 
 /// Total global side metadata bytes (independent of the runtime base address).

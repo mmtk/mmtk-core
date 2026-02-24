@@ -26,7 +26,7 @@ pub struct SideMetadataSpec {
     /// while global metadata is used by all the spaces.
     pub is_global: bool,
     /// The offset for this side metadata.
-    pub offset: SideMetadataOffset,
+    pub offset: usize,
     /// Number of bits needed per region. E.g. 0 = 1 bit, 1 = 2 bit.
     pub log_num_of_bits: usize,
     /// Number of bytes of the region. E.g. 3 = 8 bytes, 12 = 4096 bytes (page).
@@ -54,42 +54,33 @@ impl SideMetadataSpec {
         debug_assert!(self.is_absolute_offset());
         let base =
             crate::util::metadata::side_metadata::layout::global_side_metadata_base_address();
-        let rel = unsafe { self.offset.addr.as_usize() };
-        base + rel
+        base + self.offset
     }
 
     /// Get the relative offset for the spec.
     pub const fn get_rel_offset(&self) -> usize {
         debug_assert!(self.is_rel_offset());
-        unsafe { self.offset.rel_offset }
+        self.offset
     }
 
     /// Return the upperbound offset for the side metadata. The next side metadata should be laid out at this offset.
     #[cfg(target_pointer_width = "64")]
-    pub const fn upper_bound_offset(&self) -> SideMetadataOffset {
+    pub const fn upper_bound_offset(&self) -> usize {
         debug_assert!(self.is_absolute_offset());
-        SideMetadataOffset {
-            addr: unsafe { self.offset.addr }
-                .add(crate::util::metadata::side_metadata::metadata_address_range_size(self)),
-        }
+        self.offset + crate::util::metadata::side_metadata::metadata_address_range_size(self)
     }
 
     /// Return the upperbound offset for the side metadata. The next side metadata should be laid out at this offset.
     #[cfg(target_pointer_width = "32")]
-    pub const fn upper_bound_offset(&self) -> SideMetadataOffset {
+    pub const fn upper_bound_offset(&self) -> usize {
         if self.is_absolute_offset() {
-            SideMetadataOffset {
-                addr: unsafe { self.offset.addr }
-                    .add(crate::util::metadata::side_metadata::metadata_address_range_size(self)),
-            }
+            self.offset + crate::util::metadata::side_metadata::metadata_address_range_size(self)
         } else {
-            SideMetadataOffset {
-                rel_offset: unsafe { self.offset.rel_offset }
-                    + crate::util::metadata::side_metadata::metadata_bytes_per_chunk(
-                        self.log_bytes_in_region,
-                        self.log_num_of_bits,
-                    ),
-            }
+            self.offset
+                + crate::util::metadata::side_metadata::metadata_bytes_per_chunk(
+                    self.log_bytes_in_region,
+                    self.log_num_of_bits,
+                )
         }
     }
 
@@ -110,7 +101,7 @@ impl SideMetadataSpec {
     #[cfg(target_pointer_width = "32")]
     pub fn upper_bound_address_for_chunked(&self, data_addr: Address) -> Address {
         debug_assert!(self.is_rel_offset());
-        address_to_meta_chunk_addr(data_addr).add(unsafe { self.upper_bound_offset().rel_offset })
+        address_to_meta_chunk_addr(data_addr).add(self.upper_bound_offset())
     }
 
     /// Used only for debugging.
@@ -1257,80 +1248,23 @@ impl fmt::Debug for SideMetadataSpec {
             }}",
             self.name,
             self.is_global,
-            unsafe {
-                if self.is_absolute_offset() {
-                    format!("0x{:x}", self.offset.addr)
-                } else {
-                    format!("0x{:x}", self.offset.rel_offset)
-                }
-            },
+            format!("0x{:x}", self.offset),
             self.log_num_of_bits,
             self.log_bytes_in_region
         ))
     }
 }
 
-/// A union of Address or relative offset (usize) used to store offset for a side metadata spec.
-/// If a spec is contiguous side metadata, it uses address. Othrewise it uses usize.
-// The fields are made private on purpose. They can only be accessed from SideMetadata which knows whether it is Address or usize.
-#[derive(Clone, Copy)]
-pub union SideMetadataOffset {
-    addr: Address,
-    rel_offset: usize,
-}
-
-impl SideMetadataOffset {
-    /// Get an offset for a fixed address. This is usually used to set offset for the first spec (subsequent ones can be laid out with `layout_after`).
-    pub const fn addr(addr: Address) -> Self {
-        SideMetadataOffset { addr }
-    }
-
-    /// Get an offset for a relative offset (usize). This is usually used to set offset for the first spec (subsequent ones can be laid out with `layout_after`).
-    pub const fn rel(rel_offset: usize) -> Self {
-        SideMetadataOffset { rel_offset }
-    }
-
-    /// Get the address value for an absolute offset.
-    pub const fn addr_value(self) -> Address {
-        unsafe { self.addr }
-    }
-
-    /// Get an offset after a spec. This is used to layout another spec immediately after this one.
-    pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
-        // Some metadata may be so small that its size is not a multiple of byte size.  One example
-        // is `CHUNK_MARK`.  It is one byte per chunk.  However, on 32-bit architectures, we
-        // allocate side metadata per chunk.  In that case, it will only occupy one byte.  If we
-        // do not align the upper bound offset up, subsequent local metadata that need to be
-        // accessed at, for example, word granularity will be misaligned.
-        // TODO: Currently we align metadata to word size so that it is safe to access the metadata
-        // one word at a time.  In the future, we may allow each metadata to specify its own
-        // alignment requirement.
-        let upper_bound_offset = spec.upper_bound_offset();
-        if spec.is_absolute_offset() {
-            let addr = unsafe { upper_bound_offset.addr };
-            let aligned_addr = addr.align_up(BYTES_IN_WORD);
-            SideMetadataOffset::addr(aligned_addr)
-        } else {
-            let rel_offset = unsafe { upper_bound_offset.rel_offset };
-            let aligned_rel_offset = raw_align_up(rel_offset, BYTES_IN_WORD);
-            SideMetadataOffset::rel(aligned_rel_offset)
-        }
-    }
-}
-
-// Address and usize has the same layout, so we use usize for implementing these traits.
-
-impl PartialEq for SideMetadataOffset {
-    fn eq(&self, other: &Self) -> bool {
-        unsafe { self.rel_offset == other.rel_offset }
-    }
-}
-impl Eq for SideMetadataOffset {}
-
-impl std::hash::Hash for SideMetadataOffset {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        unsafe { self.rel_offset }.hash(state);
-    }
+pub const fn side_metadata_offset_after(spec: &SideMetadataSpec) -> usize {
+    // Some metadata may be so small that its size is not a multiple of byte size. One example
+    // is `CHUNK_MARK`. It is one byte per chunk. However, on 32-bit architectures, we allocate
+    // side metadata per chunk. In that case, it will only occupy one byte. If we do not align
+    // the upper bound offset up, subsequent local metadata that need to be accessed at, for
+    // example, word granularity will be misaligned.
+    // TODO: Currently we align metadata to word size so that it is safe to access the metadata
+    // one word at a time. In the future, we may allow each metadata to specify its own alignment
+    // requirement.
+    raw_align_up(spec.upper_bound_offset(), BYTES_IN_WORD)
 }
 
 /// This struct stores all the side metadata specs for a policy. Generally a policy needs to know its own
@@ -1636,7 +1570,7 @@ mod tests {
     use crate::util::metadata::side_metadata::SideMetadataContext;
 
     // offset is not used in these tests.
-    pub const ZERO_OFFSET: SideMetadataOffset = SideMetadataOffset { rel_offset: 0 };
+    pub const ZERO_OFFSET: usize = 0;
 
     #[test]
     fn calculate_reserved_pages_one_spec() {
@@ -1698,7 +1632,7 @@ mod tests {
             let spec = SideMetadataSpec {
                 name: "Test Spec $tname",
                 is_global: true,
-                offset: SideMetadataOffset::addr(Address::ZERO),
+                offset: 0,
                 log_num_of_bits: log_bits,
                 log_bytes_in_region: TEST_LOG_BYTES_IN_REGION, // page size
             };

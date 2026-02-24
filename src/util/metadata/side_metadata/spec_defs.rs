@@ -2,7 +2,7 @@ use crate::util::constants::*;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::linear_scan::Region;
 use crate::util::metadata::side_metadata::layout::GLOBAL_SIDE_METADATA_BASE_OFFSET;
-use crate::util::metadata::side_metadata::SideMetadataOffset;
+use crate::util::metadata::side_metadata::side_metadata_offset_after;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 
 // This macro helps define side metadata specs, and layout their offsets one after another.
@@ -27,7 +27,7 @@ macro_rules! define_side_metadata_specs {
         pub const $name: SideMetadataSpec = SideMetadataSpec {
             name: stringify!($name),
             is_global: $is_global,
-            offset: SideMetadataOffset::layout_after(&$last_spec),
+            offset: side_metadata_offset_after(&$last_spec),
             log_num_of_bits: $log_num_of_bits,
             log_bytes_in_region: $log_bytes_in_region,
         };
@@ -62,10 +62,10 @@ define_side_metadata_specs!(
 );
 
 #[cfg(target_pointer_width = "32")]
-const LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT: SideMetadataOffset = SideMetadataOffset::rel(0);
+const LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT: usize = 0;
 #[cfg(target_pointer_width = "64")]
-const LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT: SideMetadataOffset =
-    SideMetadataOffset::layout_after(&LAST_GLOBAL_SIDE_METADATA_SPEC);
+const LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT: usize =
+    side_metadata_offset_after(&LAST_GLOBAL_SIDE_METADATA_SPEC);
 
 // This defines all LOCAL side metadata used by mmtk-core.
 define_side_metadata_specs!(
@@ -155,7 +155,7 @@ mod tests {
         assert_eq!(TEST_SPEC1.log_bytes_in_region, 3);
 
         assert!(TEST_SPEC2.is_global);
-        assert!(TEST_SPEC2.offset == SideMetadataOffset::layout_after(&TEST_SPEC1));
+        assert!(TEST_SPEC2.offset == side_metadata_offset_after(&TEST_SPEC1));
         assert_eq!(TEST_SPEC2.log_num_of_bits, 1);
         assert_eq!(TEST_SPEC2.log_bytes_in_region, 4);
 
@@ -178,12 +178,12 @@ mod tests {
         assert_eq!(TEST_SPEC1.log_bytes_in_region, 3);
 
         assert!(TEST_SPEC2.is_global);
-        assert!(TEST_SPEC2.offset == SideMetadataOffset::layout_after(&TEST_SPEC1));
+        assert!(TEST_SPEC2.offset == side_metadata_offset_after(&TEST_SPEC1));
         assert_eq!(TEST_SPEC2.log_num_of_bits, 1);
         assert_eq!(TEST_SPEC2.log_bytes_in_region, 4);
 
         assert!(TEST_SPEC3.is_global);
-        assert!(TEST_SPEC3.offset == SideMetadataOffset::layout_after(&TEST_SPEC2));
+        assert!(TEST_SPEC3.offset == side_metadata_offset_after(&TEST_SPEC2));
         assert_eq!(TEST_SPEC3.log_num_of_bits, 2);
         assert_eq!(TEST_SPEC3.log_bytes_in_region, 5);
 
@@ -211,7 +211,7 @@ mod tests {
         assert_eq!(TEST_GSPEC1.log_bytes_in_region, 3);
 
         assert!(TEST_GSPEC2.is_global);
-        assert!(TEST_GSPEC2.offset == SideMetadataOffset::layout_after(&TEST_GSPEC1));
+        assert!(TEST_GSPEC2.offset == side_metadata_offset_after(&TEST_GSPEC1));
         assert_eq!(TEST_GSPEC2.log_num_of_bits, 1);
         assert_eq!(TEST_GSPEC2.log_bytes_in_region, 4);
 
@@ -223,7 +223,7 @@ mod tests {
         assert_eq!(TEST_LSPEC1.log_bytes_in_region, 5);
 
         assert!(!TEST_LSPEC2.is_global);
-        assert!(TEST_LSPEC2.offset == SideMetadataOffset::layout_after(&TEST_LSPEC1));
+        assert!(TEST_LSPEC2.offset == side_metadata_offset_after(&TEST_LSPEC1));
         assert_eq!(TEST_LSPEC2.log_num_of_bits, 3);
         assert_eq!(TEST_LSPEC2.log_bytes_in_region, 6);
 

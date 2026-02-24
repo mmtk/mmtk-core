@@ -485,7 +485,7 @@ pub mod specs {
     use crate::util::metadata::side_metadata::*;
     use crate::util::metadata::{
         header_metadata::HeaderMetadataSpec,
-        side_metadata::{SideMetadataOffset, SideMetadataSpec},
+        side_metadata::{side_metadata_offset_after, SideMetadataSpec},
         MetadataSpec,
     };
 
@@ -555,7 +555,7 @@ pub mod specs {
                     Self(MetadataSpec::OnSide(SideMetadataSpec {
                         name: stringify!($spec_name),
                         is_global: Self::IS_GLOBAL,
-                        offset: SideMetadataOffset::layout_after(side_spec),
+                        offset: side_metadata_offset_after(side_spec),
                         log_num_of_bits: Self::LOG_NUM_BITS,
                         log_bytes_in_region: $side_min_obj_size as usize,
                     }))

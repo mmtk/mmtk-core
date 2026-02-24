@@ -682,14 +682,14 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: true,
-            offset: SideMetadataOffset::addr(Address::ZERO),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
             is_global: true,
-            offset: SideMetadataOffset::layout_after(&spec_1),
+            offset: side_metadata_offset_after(&spec_1),
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -703,7 +703,7 @@ mod tests {
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
             is_global: true,
-            offset: SideMetadataOffset::layout_after(&spec_1),
+            offset: side_metadata_offset_after(&spec_1),
             log_num_of_bits: 3,
             log_bytes_in_region: 1,
         };
@@ -713,7 +713,7 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: true,
-            offset: SideMetadataOffset::addr(Address::ZERO),
+            offset: 0,
             log_num_of_bits: 1,
             #[cfg(target_pointer_width = "64")]
             log_bytes_in_region: 0,
@@ -723,7 +723,7 @@ mod tests {
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
             is_global: true,
-            offset: SideMetadataOffset::layout_after(&spec_1),
+            offset: side_metadata_offset_after(&spec_1),
             log_num_of_bits: 3,
             #[cfg(target_pointer_width = "64")]
             log_bytes_in_region: 2,
@@ -740,14 +740,14 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: true,
-            offset: SideMetadataOffset::addr(Address::ZERO),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
             is_global: true,
-            offset: SideMetadataOffset::layout_after(&spec_1),
+            offset: side_metadata_offset_after(&spec_1),
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -758,7 +758,7 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: true,
-            offset: SideMetadataOffset::addr(unsafe { Address::from_usize(1) }),
+            offset: 1,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -770,7 +770,7 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: true,
-            offset: SideMetadataOffset::addr(Address::ZERO),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -778,9 +778,7 @@ mod tests {
             name: "spec_2",
             is_global: true,
             // We specifically make up an invalid offset
-            offset: SideMetadataOffset::addr(
-                Address::ZERO + metadata_address_range_size(&spec_1) - 1,
-            ),
+            offset: (Address::ZERO + metadata_address_range_size(&spec_1) - 1).as_usize(),
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -794,14 +792,14 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: false,
-            offset: SideMetadataOffset::rel(0),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
             is_global: false,
-            offset: SideMetadataOffset::layout_after(&spec_1),
+            offset: side_metadata_offset_after(&spec_1),
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -812,7 +810,7 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: false,
-            offset: SideMetadataOffset::rel(1),
+            offset: 1,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -822,7 +820,7 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: false,
-            offset: SideMetadataOffset::rel(0),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -830,11 +828,9 @@ mod tests {
             name: "spec_2",
             is_global: false,
             // We make up an invalid offset
-            offset: SideMetadataOffset::rel(
-                spec_1.get_rel_offset()
-                    + metadata_bytes_per_chunk(spec_1.log_bytes_in_region, spec_1.log_num_of_bits)
-                    - 1,
-            ),
+            offset: spec_1.get_rel_offset()
+                + metadata_bytes_per_chunk(spec_1.log_bytes_in_region, spec_1.log_num_of_bits)
+                - 1,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -848,7 +844,7 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: false,
-            offset: SideMetadataOffset::rel(0),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -863,7 +859,7 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: false,
-            offset: SideMetadataOffset::rel(0),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };

@@ -13,8 +13,8 @@ mod tests {
     use crate::util::Address;
 
     #[cfg(target_pointer_width = "64")]
-    fn local_side_metadata_base_offset() -> SideMetadataOffset {
-        SideMetadataOffset::layout_after(&spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC)
+    fn local_side_metadata_base_offset() -> usize {
+        side_metadata_offset_after(&spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC)
     }
 
     #[test]
@@ -23,7 +23,7 @@ mod tests {
         let mut gspec = SideMetadataSpec {
             name: "gspec",
             is_global: true,
-            offset: SideMetadataOffset::addr(Address::ZERO),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -40,7 +40,7 @@ mod tests {
         let mut lspec = SideMetadataSpec {
             name: "lspec",
             is_global: false,
-            offset: SideMetadataOffset::rel(0),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -159,7 +159,7 @@ mod tests {
         let mut spec = SideMetadataSpec {
             name: "test_spec",
             is_global: true,
-            offset: SideMetadataOffset::addr(Address::ZERO),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -179,7 +179,7 @@ mod tests {
         let mut spec = SideMetadataSpec {
             name: "test_spec",
             is_global: true,
-            offset: SideMetadataOffset::addr(Address::ZERO),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -228,7 +228,7 @@ mod tests {
                     let mut gspec = SideMetadataSpec {
                         name: "gspec",
                         is_global: true,
-                        offset: SideMetadataOffset::addr(Address::ZERO),
+                        offset: 0,
                         log_num_of_bits: 1,
                         log_bytes_in_region: 1,
                     };
@@ -244,7 +244,7 @@ mod tests {
                     let mut lspec = SideMetadataSpec {
                         name: "lspec",
                         is_global: false,
-                        offset: SideMetadataOffset::rel(0),
+                        offset: 0,
                         log_num_of_bits: 1,
                         log_bytes_in_region: 1,
                     };
@@ -320,7 +320,7 @@ mod tests {
                     let metadata_1_spec = SideMetadataSpec {
                         name: "metadata_1_spec",
                         is_global: true,
-                        offset: SideMetadataOffset::addr(Address::ZERO),
+                        offset: 0,
                         log_num_of_bits: 4,
                         log_bytes_in_region: 6,
                     };
@@ -328,7 +328,7 @@ mod tests {
                     let metadata_2_spec = SideMetadataSpec {
                         name: "metadata_2_spec",
                         is_global: true,
-                        offset: SideMetadataOffset::layout_after(&metadata_1_spec),
+                        offset: side_metadata_offset_after(&metadata_1_spec),
                         log_num_of_bits: 3,
                         log_bytes_in_region: 7,
                     };
@@ -395,7 +395,7 @@ mod tests {
                     let metadata_1_spec = SideMetadataSpec {
                         name: "metadata_1_spec",
                         is_global: true,
-                        offset: SideMetadataOffset::addr(Address::ZERO),
+                        offset: 0,
                         log_num_of_bits: 1,
                         log_bytes_in_region: constants::LOG_BYTES_IN_WORD as usize,
                     };
@@ -452,7 +452,7 @@ mod tests {
                     let metadata_1_spec = SideMetadataSpec {
                         name: "metadata_1_spec",
                         is_global: true,
-                        offset: SideMetadataOffset::addr(Address::ZERO),
+                        offset: 0,
                         log_num_of_bits: 1,
                         log_bytes_in_region: constants::LOG_BYTES_IN_WORD as usize,
                     };
@@ -517,7 +517,7 @@ mod tests {
                     let metadata_2_spec = SideMetadataSpec {
                         name: "metadata_2_spec",
                         is_global: false,
-                        offset: SideMetadataOffset::layout_after(&metadata_1_spec),
+                        offset: side_metadata_offset_after(&metadata_1_spec),
                         log_num_of_bits: 3,
                         log_bytes_in_region: 7,
                     };
@@ -526,7 +526,7 @@ mod tests {
                     let metadata_1_spec = SideMetadataSpec {
                         name: "metadata_1_spec",
                         is_global: false,
-                        offset: SideMetadataOffset::rel(0),
+                        offset: 0,
                         log_num_of_bits: 4,
                         log_bytes_in_region: 9,
                     };
@@ -534,7 +534,7 @@ mod tests {
                     let metadata_2_spec = SideMetadataSpec {
                         name: "metadata_2_spec",
                         is_global: false,
-                        offset: SideMetadataOffset::layout_after(&metadata_1_spec),
+                        offset: side_metadata_offset_after(&metadata_1_spec),
                         log_num_of_bits: 3,
                         log_bytes_in_region: 7,
                     };
@@ -601,7 +601,7 @@ mod tests {
                     let spec = SideMetadataSpec {
                         name: "test spec",
                         is_global: true,
-                        offset: SideMetadataOffset::addr(Address::ZERO),
+                        offset: 0,
                         log_num_of_bits: 0,
                         log_bytes_in_region: 3,
                     };
@@ -658,7 +658,7 @@ mod tests {
                     let spec = SideMetadataSpec {
                         name: "test spec",
                         is_global: true,
-                        offset: SideMetadataOffset::addr(Address::ZERO),
+                        offset: 0,
                         log_num_of_bits: 0,
                         log_bytes_in_region: 3,
                     };
@@ -759,7 +759,7 @@ mod tests {
                     let metadata_1_spec = SideMetadataSpec {
                         name: "metadata_1_spec",
                         is_global: true,
-                        offset: SideMetadataOffset::addr(Address::ZERO),
+                        offset: 0,
                         log_num_of_bits,
                         log_bytes_in_region,
                     };
@@ -767,7 +767,7 @@ mod tests {
                     let metadata_2_spec = SideMetadataSpec {
                         name: "metadata_2_spec",
                         is_global: true,
-                        offset: SideMetadataOffset::layout_after(&metadata_1_spec),
+                        offset: side_metadata_offset_after(&metadata_1_spec),
                         log_num_of_bits,
                         log_bytes_in_region,
                     };

@@ -5,7 +5,7 @@ use mmtk::util::{
     constants::BYTES_IN_PAGE,
     constants::LOG_BYTES_IN_WORD,
     conversions::raw_align_up,
-    metadata::side_metadata::{SideMetadataOffset, SideMetadataSpec},
+    metadata::side_metadata::SideMetadataSpec,
     os::{MmapAnnotation, MmapProtection, MmapStrategy, OSMemory, OS},
     test_private::{initialize_side_metadata_base, side_metadata_address_to_meta_address},
     Address,
@@ -16,7 +16,7 @@ use std::hint::black_box;
 const BENCH_SPEC: SideMetadataSpec = SideMetadataSpec {
     name: "bench",
     is_global: true,
-    offset: SideMetadataOffset::addr(Address::ZERO),
+    offset: 0,
     log_num_of_bits: 0,
     log_bytes_in_region: LOG_BYTES_IN_WORD as usize,
 };
