@@ -106,7 +106,7 @@ impl<VM: VMBinding> PageProtect<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
-        let ret = PageProtect {
+        PageProtect {
             space: LargeObjectSpace::new(
                 plan_args.get_normal_space_args(
                     "pageprotect",
@@ -118,8 +118,6 @@ impl<VM: VMBinding> PageProtect<VM> {
                 false, // PageProtect does not use log bit
             ),
             common: CommonPlan::new(plan_args),
-        };
-
-        ret
+        }
     }
 }

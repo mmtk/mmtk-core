@@ -2,8 +2,8 @@
 use crate::util::heap::layout::vm_layout::VMLayout;
 #[cfg(target_pointer_width = "32")]
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
-use crate::util::os::{MmapAnnotation, MmapStrategy};
 use crate::util::metadata::side_metadata::{SideMetadataOffset, SideMetadataSpec};
+use crate::util::os::{MmapAnnotation, MmapStrategy};
 use crate::util::Address;
 use crate::util::{constants::LOG_BYTES_IN_PAGE, conversions::raw_align_up};
 use crate::MMAPPER;
@@ -35,11 +35,12 @@ pub fn set_side_metadata_base_address(base: Address) {
 
 /// Get the runtime side metadata base address.
 pub fn global_side_metadata_base_address() -> Address {
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, not(any(test, feature = "test_private"))))]
     {
-        assert!(VM_SIDE_METADATA_LAYOUT_REGISTERED.load(Ordering::SeqCst), "global_side_metadata_base_address() called after VM side metadata layout was registered");
-        // // Ensure initialization happens (Once provides synchronization).
-        // initialize_side_metadata_base();
+        assert!(
+            VM_SIDE_METADATA_LAYOUT_REGISTERED.load(Ordering::SeqCst),
+            "global_side_metadata_base_address() called before VM side metadata layout was registered"
+        );
     }
 
     unsafe { SIDE_METADATA_BASE_ADDRESS }
@@ -153,7 +154,9 @@ pub(crate) fn initialize_side_metadata_base() {
                 vm_end
             );
             if !VM_SIDE_METADATA_LAYOUT_REGISTERED.load(Ordering::SeqCst) {
-                warn!("Initializing side metadata base before VM side metadata layout was registered");
+                warn!(
+                    "Initializing side metadata base before VM side metadata layout was registered"
+                );
                 let bt = std::backtrace::Backtrace::capture();
                 debug!("backtrace for early side metadata base initialization:\n{bt}");
             }

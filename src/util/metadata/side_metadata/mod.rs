@@ -1,10 +1,10 @@
 //! This module provides an implementation of side table metadata.
 // For convenience, this module is public and the bindings may create and use side metadata for their purpose.
 
-mod layout;
 pub(crate) mod helpers;
 #[cfg(target_pointer_width = "32")]
 mod helpers_32;
+mod layout;
 
 mod global;
 pub(crate) mod ranges;
@@ -12,8 +12,8 @@ mod sanity;
 mod side_metadata_tests;
 pub(crate) mod spec_defs;
 
-pub use layout::*;
 pub use global::*;
+pub use layout::*;
 
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;

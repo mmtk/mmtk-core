@@ -135,11 +135,7 @@ pub trait OSMemory {
     fn munmap(start: Address, size: usize) -> std::io::Result<()>;
 
     /// Change the protection of a memory region to the specified protection.
-    fn set_memory_access(
-        start: Address,
-        size: usize,
-        prot: MmapProtection,
-    ) -> std::io::Result<()>;
+    fn set_memory_access(start: Address, size: usize, prot: MmapProtection) -> std::io::Result<()>;
 
     /// Checks if the memory has already been mapped. If not, we panic.
     ///

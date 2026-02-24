@@ -9,8 +9,8 @@ use std::fmt;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
-use atomic::Atomic;
 use crate::util::os::MmapResult;
+use atomic::Atomic;
 
 /// Logarithm of the address space size that [`ByteMapStateStorage`] is able to handle.
 /// This is enough for 32-bit architectures.

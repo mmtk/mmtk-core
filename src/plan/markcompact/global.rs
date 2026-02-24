@@ -205,12 +205,10 @@ impl<VM: VMBinding> MarkCompact<VM> {
             VMRequest::discontiguous(),
         ));
 
-        let res = MarkCompact {
+        MarkCompact {
             mc_space,
             common: CommonPlan::new(plan_args),
-        };
-
-        res
+        }
     }
 }
 
