@@ -5,11 +5,9 @@ export RUSTFLAGS="-D warnings -A unknown-lints"
 # --- Check line ends of text files ---
 
 if ! $project_root/.github/scripts/ci-check-lineends.sh; then
-    echo "ERROR: Some text files have non-unix line ends or do not have newline character at the end of file."
+    echo "ERROR: Line ends check failed."
     exit 1
 fi
-
-exit 0
 
 # --- Check format ---
 cargo fmt -- --check
