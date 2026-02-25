@@ -1,7 +1,5 @@
 use std::ops::Range;
 
-use atomic::Ordering;
-
 use super::block::Block;
 use crate::util::constants::{LOG_BITS_IN_BYTE, LOG_BYTES_IN_WORD, LOG_MIN_OBJECT_SIZE};
 use crate::util::linear_scan::{Region, RegionIterator};
@@ -11,6 +9,7 @@ use crate::{
     util::{Address, ObjectReference},
     vm::*,
 };
+use atomic::Ordering;
 
 /// Data structure to reference a line within an immix block.
 #[repr(transparent)]
@@ -149,6 +148,36 @@ impl Line {
         marked_lines
     }
 
+    /// Bulk set the local mark bits of a line range.
+    ///
+    /// This is useful during concurrent marking. By doing this, concurrent marking will
+    /// conservatively consider all objects allocated in the line range as live, and the mutator
+    /// doesn't need to explicitly mark bump-allocated objects in the fast path.
+    pub fn initialize_mark_table_as_marked<VM: VMBinding>(lines: Range<Line>) {
+        let meta = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec();
+        let start: *mut u8 = address_to_meta_address(&meta, lines.start.start()).to_mut_ptr();
+        let limit: *mut u8 = address_to_meta_address(&meta, lines.end.start()).to_mut_ptr();
+        unsafe {
+            let bytes = limit.offset_from(start) as usize;
+            std::ptr::write_bytes(start, 0xffu8, bytes);
+        }
+    }
+
+    /// Bulk set line mark states.
+    pub fn bulk_set_line_mark_states(line_mark_state: u8, lines: Range<Line>) {
+        for line in RegionIterator::<Line>::new(lines.start, lines.end) {
+            line.mark(line_mark_state);
+        }
+    }
+
+    /// Eagerly mark all line mark states and all side mark bits in the gap.
+    ///
+    /// Useful during concurrent marking.
+    pub fn eager_mark_lines<VM: VMBinding>(line_mark_state: u8, lines: Range<Line>) {
+        Self::bulk_set_line_mark_states(line_mark_state, lines.clone());
+        Self::initialize_mark_table_as_marked::<VM>(lines);
+    }
+
     pub fn clear_field_unlog_table<VM: VMBinding>(lines: Range<Line>) {
         let unlog_bit = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
             .as_spec()
@@ -198,16 +227,6 @@ impl Line {
         let mark_bit = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec();
         for i in (0..size).step_by(1 << LOG_MIN_OBJECT_SIZE) {
             mark_bit.store_atomic(start + i, 0u8, Ordering::SeqCst);
-        }
-    }
-
-    pub(super) fn initialize_mark_table_as_marked<VM: VMBinding>(lines: Range<Line>) {
-        let meta = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec();
-        let start: *mut u8 = address_to_meta_address(&meta, lines.start.start()).to_mut_ptr();
-        let limit: *mut u8 = address_to_meta_address(&meta, lines.end.start()).to_mut_ptr();
-        unsafe {
-            let bytes = limit.offset_from(start) as usize;
-            std::ptr::write_bytes(start, 0xffu8, bytes);
         }
     }
 }

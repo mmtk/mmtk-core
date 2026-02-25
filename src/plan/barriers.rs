@@ -26,9 +26,12 @@ pub static SLOW_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub enum BarrierSelector {
     /// No barrier is used.
     NoBarrier,
-    /// Object remembering barrier is used.
+    /// Object remembering post-write barrier is used.
     ObjectBarrier,
     FieldBarrier,
+    /// Object remembering pre-write barrier with weak reference loading barrier.
+    // TODO: We might be able to generalize this to object remembering pre-write barrier.
+    SATBBarrier,
 }
 
 impl BarrierSelector {
@@ -51,10 +54,21 @@ impl BarrierSelector {
 /// As a performance optimization, the binding may also choose to port the fast-path to the VM side,
 /// and call the slow-path (`object_reference_write_slow`) only if necessary.
 pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
+    /// Flush thread-local states like buffers or remembered sets.
     fn flush(&mut self) {}
 
-    /// load referent from java.lang.Reference
-    fn load_reference(&mut self, _referent: ObjectReference) {}
+    /// Weak reference loading barrier.  A mutator should call this when loading from a weak
+    /// reference field, for example, when executing  `java.lang.ref.Reference.get()` in JVM, or
+    /// loading from a global weak table in CRuby.
+    ///
+    /// Note: Merely loading from a field holding weak reference into a local variable will create a
+    /// strong reference from the stack to the referent, changing its reachablilty from weakly
+    /// reachable to strongly reachable.  Concurrent garbage collectors may need to handle such
+    /// events specially.  See [SATBBarrier::load_weak_reference] for a concrete example.
+    ///
+    /// Arguments:
+    /// *   `referent`: The referent object which the weak reference is pointing to.
+    fn load_weak_reference(&mut self, _referent: ObjectReference) {}
 
     /// Subsuming barrier for object reference write
     fn object_reference_write(
@@ -170,13 +184,13 @@ pub trait BarrierSemantics: 'static + Send {
         dst: <Self::VM as VMBinding>::VMMemorySlice,
     );
 
-    /// load referent from java.lang.Reference
-    fn load_reference(&mut self, _referent: ObjectReference) {}
-
     fn object_reference_clone_pre(&mut self, _obj: ObjectReference) {}
 
     /// Object will probably be modified
     fn object_probable_write_slow(&mut self, _obj: ObjectReference) {}
+
+    /// Loading from a weak reference field
+    fn load_weak_reference(&mut self, _o: ObjectReference) {}
 }
 
 /// Generic object barrier with a type argument defining it's slow-path behaviour.
@@ -185,6 +199,7 @@ pub struct ObjectBarrier<S: BarrierSemantics> {
 }
 
 impl<S: BarrierSemantics> ObjectBarrier<S> {
+    /// Create a new ObjectBarrier with the given semantics.
     pub fn new(semantics: S) -> Self {
         Self { semantics }
     }
@@ -295,8 +310,8 @@ impl<S: BarrierSemantics> Barrier<S::VM> for FieldBarrier<S> {
         self.semantics.flush();
     }
 
-    fn load_reference(&mut self, o: ObjectReference) {
-        self.semantics.load_reference(o)
+    fn load_weak_reference(&mut self, o: ObjectReference) {
+        self.semantics.load_weak_reference(o)
     }
 
     fn object_reference_clone_pre(&mut self, obj: ObjectReference) {
@@ -355,3 +370,91 @@ impl<S: BarrierSemantics> Barrier<S::VM> for FieldBarrier<S> {
 
 pub const UNLOGGED_VALUE: u8 = 0b1;
 pub const LOGGED_VALUE: u8 = 0b0;
+
+/// A SATB (Snapshot-At-The-Beginning) barrier implementation.
+/// This barrier is basically a pre-write object barrier with a weak reference loading barrier.
+pub struct SATBBarrier<S: BarrierSemantics> {
+    weak_ref_barrier_enabled: bool,
+    semantics: S,
+}
+
+impl<S: BarrierSemantics> SATBBarrier<S> {
+    /// Create a new SATBBarrier with the given semantics.
+    pub fn new(semantics: S) -> Self {
+        Self {
+            weak_ref_barrier_enabled: false,
+            semantics,
+        }
+    }
+
+    pub(crate) fn set_weak_ref_barrier_enabled(&mut self, value: bool) {
+        self.weak_ref_barrier_enabled = value;
+    }
+
+    fn object_is_unlogged(&self, object: ObjectReference) -> bool {
+        S::UNLOG_BIT_SPEC.load_atomic::<S::VM, u8>(object, None, Ordering::SeqCst) != 0
+    }
+}
+
+impl<S: BarrierSemantics> Barrier<S::VM> for SATBBarrier<S> {
+    fn flush(&mut self) {
+        self.semantics.flush();
+    }
+
+    fn load_weak_reference(&mut self, o: ObjectReference) {
+        if self.weak_ref_barrier_enabled {
+            self.semantics.load_weak_reference(o)
+        }
+    }
+
+    fn object_probable_write(&mut self, obj: ObjectReference) {
+        self.semantics.object_probable_write_slow(obj);
+    }
+
+    fn object_reference_write_pre(
+        &mut self,
+        src: Option<ObjectReference>,
+        slot: <S::VM as VMBinding>::VMSlot,
+        target: Option<ObjectReference>,
+    ) {
+        if self.object_is_unlogged(src.unwrap()) {
+            self.semantics
+                .object_reference_write_slow(src, slot, target);
+        }
+    }
+
+    fn object_reference_write_post(
+        &mut self,
+        _src: Option<ObjectReference>,
+        _slot: <S::VM as VMBinding>::VMSlot,
+        _target: Option<ObjectReference>,
+    ) {
+        unimplemented!()
+    }
+
+    fn object_reference_write_slow(
+        &mut self,
+        src: Option<ObjectReference>,
+        slot: <S::VM as VMBinding>::VMSlot,
+        target: Option<ObjectReference>,
+    ) {
+        self.semantics
+            .object_reference_write_slow(src, slot, target);
+    }
+
+    fn memory_region_copy_pre(
+        &mut self,
+        src: <S::VM as VMBinding>::VMMemorySlice,
+        dst: <S::VM as VMBinding>::VMMemorySlice,
+    ) {
+        self.semantics.memory_region_copy_slow(src, dst);
+    }
+
+    fn memory_region_copy_post(
+        &mut self,
+        _src: <S::VM as VMBinding>::VMMemorySlice,
+        _dst: <S::VM as VMBinding>::VMMemorySlice,
+    ) {
+        unimplemented!()
+    }
+}

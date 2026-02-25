@@ -298,7 +298,7 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
         }
     }
 
-    fn load_reference(&mut self, o: ObjectReference) {
+    fn load_weak_reference(&mut self, o: ObjectReference) {
         if !self.lxr.cm_in_progress() || self.lxr.is_marked(o) {
             return;
         }

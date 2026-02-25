@@ -30,6 +30,8 @@ impl<VM: VMBinding> GCRequester<VM> {
             // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
             // with GC workers, which is expensive for functions like `poll`.  We use the atomic
             // flag `request_flag` to elide the need to acquire the mutex in subsequent calls.
+            #[cfg(feature = "tracing")]
+            probe!(mmtk, gcrequester_request);
             self.scheduler.request_schedule_collection();
         }
     }

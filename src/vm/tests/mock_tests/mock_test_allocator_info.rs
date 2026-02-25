@@ -29,6 +29,7 @@ pub fn test_allocator_info() {
                 | PlanSelector::GenImmix
                 | PlanSelector::MarkCompact
                 | PlanSelector::Compressor
+                | PlanSelector::ConcurrentImmix
                 | PlanSelector::StickyImmix => {
                     // These plans all use bump pointer allocator.
                     let AllocatorInfo::BumpPointer {

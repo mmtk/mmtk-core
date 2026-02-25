@@ -112,6 +112,24 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
                 .fetch_add(bytes, Ordering::SeqCst);
             return;
         }
+        if self.should_allocate_as_live() {
+            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::<VM, u8>(
+                object,
+                self.mark_state,
+                None,
+                Ordering::SeqCst,
+            );
+            debug_assert!(
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.load_atomic::<VM, u8>(
+                    object,
+                    None,
+                    Ordering::Acquire
+                ) == 0
+            );
+
+            self.treadmill.add_to_treadmill(object, false);
+            return;
+        }
         let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
             object,
             None,
@@ -259,8 +277,6 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     }
 
     fn set_side_log_bits(&self) {
-        debug_assert!(self.treadmill.is_from_space_empty());
-        debug_assert!(self.treadmill.is_nursery_empty());
         let mut enumator = ClosureObjectEnumerator::<_, VM>::new(|object| {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         });
@@ -401,7 +417,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     pub fn prepare(&mut self, full_heap: bool) {
         self.trace_in_progress = true;
         if full_heap {
-            debug_assert!(self.treadmill.is_from_space_empty());
             self.mark_state = MARK_BIT - self.mark_state;
         }
         self.num_pages_released_lazy.store(0, Ordering::Relaxed);
@@ -549,10 +564,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
-    pub fn is_marked(&self, object: ObjectReference) -> bool {
-        self.test_mark_bit(object, self.mark_state)
-    }
-
     /// Test if the object's mark bit is the same as the given value. If it is not the same,
     /// the method will attemp to mark the object and clear its nursery bit. If the attempt
     /// succeeds, the method will return true, meaning the object is marked by this invocation.
@@ -639,6 +650,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         for o in released_objects {
             mature_objects.remove(&o);
         }
+    }
+
+    pub fn is_marked(&self, object: ObjectReference) -> bool {
+        self.test_mark_bit(object, self.mark_state)
     }
 }
 

@@ -182,7 +182,7 @@ impl<VM: VMBinding> BarrierSemantics for ImmixFakeFieldBarrierSemantics<VM> {
         }
     }
 
-    fn load_reference(&mut self, o: ObjectReference) {
+    fn load_weak_reference(&mut self, o: ObjectReference) {
         if crate::args::BARRIER_MEASUREMENT_NO_SLOW {
             return;
         }

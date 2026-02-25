@@ -227,6 +227,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Add the `ScheduleCollection` packet.  Called by the last parked worker.
     fn add_schedule_collection_packet(&self) {
         // We are still holding the mutex `WorkerMonitor::sync`.  Do not notify now.
+        #[cfg(feature = "tracing")]
+        probe!(mmtk, add_schedule_collection_packet);
         self.work_buckets[WorkBucketStage::Unconstrained].add_no_notify(ScheduleCollection);
     }
 
@@ -461,6 +463,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     ///
     /// Return true if there're any non-empty buckets updated.
     pub(crate) fn update_buckets(&self) -> bool {
+        debug!("update_buckets");
         let mut buckets_updated = false;
         let mut new_packets = false;
         let start_index = self.bucket_update_progress.load(Ordering::SeqCst) + 1;
@@ -838,6 +841,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Called when GC has finished, i.e. when all work packets have been executed.
+    ///
+    /// Return `true` if any concurrent work packets have been scheduled.
     fn on_gc_finished(&self, worker: &GCWorker<VM>) {
         // All GC workers must have parked by now.
         debug_assert!(!self.worker_group.has_designated_work());
@@ -901,6 +906,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 );
             }
         }
+
+        mmtk.state
+            .set_used_pages_after_last_gc(mmtk.get_plan().get_used_pages());
 
         #[cfg(feature = "extreme_assertions")]
         if crate::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {
@@ -983,6 +991,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         }
         self.worker_monitor.notify_work_available(true);
     }
+
     pub fn wakeup_all_conc_workers(&self) {
         self.worker_monitor.notify_work_available(true);
     }
