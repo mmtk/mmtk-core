@@ -160,7 +160,6 @@ pub(super) fn try_mmap_contiguous_metadata_space(
 }
 
 /// Performs the translation of data address (`data_addr`) to metadata address for the specified metadata (`metadata_spec`).
-#[inline(always)]
 pub(crate) fn address_to_meta_address(
     metadata_spec: &SideMetadataSpec,
     data_addr: Address,
