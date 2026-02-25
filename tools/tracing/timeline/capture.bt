@@ -138,8 +138,8 @@ usdt:$MMTK:mmtk:concurrent_trace_objects {
     }
 }
 
-usdt:$MMTK:mmtk:gcrequester_request {
-    printf("gcrequester_request,i,%d,%lu\n", tid, nsecs);
+usdt:$MMTK:mmtk:gc_requested {
+    printf("gc_requested,i,%d,%lu\n", tid, nsecs);
 }
 
 usdt:$MMTK:mmtk:add_schedule_collection_packet {
@@ -170,5 +170,3 @@ usdt:$MMTK:mmtk:reference_retained {
         printf("reference_retained,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
     }
 }
-
-// vim: ft=bpftrace ts=4 sw=4 sts=4 et

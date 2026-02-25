@@ -198,7 +198,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_object_metadata(&self, _object: ObjectReference, _bytes: usize, _alloc: bool) {
+    fn initialize_object_metadata(&self, _object: ObjectReference, _bytes: usize) {
         self.copy_alloc_bytes.store(0, Ordering::SeqCst);
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(_object);

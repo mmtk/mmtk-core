@@ -139,7 +139,14 @@ impl SFTRefStorage {
     // Load with the acquire ordering.
     pub fn load(&self) -> &dyn SFT {
         let val = self.0.load(Ordering::Acquire);
-        unsafe { std::mem::transmute(val) }
+        // Provenance-related APIs were stabilized in Rust 1.84.
+        // Rust 1.91 introduced the warn-by-default lint `integer_to_ptr_transmutes`.
+        // Since our MSRV is still 1.74.1, we can't fix it until bumping MSRV.
+        #[allow(unknown_lints)]
+        #[allow(integer_to_ptr_transmutes)]
+        unsafe {
+            std::mem::transmute(val)
+        }
     }
 
     // Store a raw SFT pointer with the release ordering.

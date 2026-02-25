@@ -58,7 +58,7 @@ impl<VM: VMBinding> SFT for VMSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, object: ObjectReference) {
         self.mark_state
             .on_object_metadata_initialization::<VM>(object);
         if self.common.unlog_allocated_object {

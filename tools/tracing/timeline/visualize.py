@@ -161,7 +161,7 @@ class LogProcessor:
                     "stage": int(args[0]),
                 }
 
-            case "gcrequester_request":
+            case "gc_requested":
                 result["tid"] = 1
 
             case _:
@@ -204,6 +204,17 @@ class LogProcessor:
                 case "immix_defrag":
                     gc["args"] |= {
                         "immix_is_defrag_gc": bool(int(args[0])),
+                    }
+
+                case "concurrent_pause_determined":
+                    pause_int = int(args[0])
+                    try:
+                        pause = Pause(pause_int).name   # will raise ValueError if not valid
+                    except ValueError:
+                        pause = f"(Unknown:{pause_int})"
+
+                    gc["args"] |= {
+                        "pause": pause,
                     }
 
                 case _:
@@ -272,17 +283,6 @@ class LogProcessor:
                             "total_objects": total_objects,
                             "iterations": iterations,
                         }
-                    }
-
-                case "concurrent_pause_determined":
-                    pause_int = int(args[0])
-                    if pause_int in Pause:
-                        pause = Pause(pause_int).name
-                    else:
-                        pause = f"(Unknown:{pause_int})"
-
-                    gc["args"] |= {
-                        "pause": pause,
                     }
 
                 case "sweep_chunk":

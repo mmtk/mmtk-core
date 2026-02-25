@@ -1,4 +1,4 @@
-# Enabling debug assertions
+# Enable debug assertions
 
 MMTk is implemented with an extensive amount of assertions to ensure the correctness.
 We strongly recommend using a debug build of MMTk that includes all the debugging assertions
