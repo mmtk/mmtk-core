@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["HugePageSupport","MmapAnnotation","MmapProtection"],"struct":["MmapStrategy"],"trait":["OSMemory"]};
+window.SIDEBAR_ITEMS = {"enum":["HugePageSupport","MmapAnnotation","MmapProtection"],"struct":["MmapError","MmapStrategy"],"trait":["OSMemory"],"type":["MmapResult"]};

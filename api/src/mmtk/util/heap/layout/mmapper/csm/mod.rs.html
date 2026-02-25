@@ -5,7 +5,7 @@
 <a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span><span class="kw">crate</span>::util::os::<span class="kw-2">*</span>;
 <a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <a href=#7 id=7 data-nosnippet>7</a><span class="kw">use </span>bytemuck::NoUninit;
-<a href=#8 id=8 data-nosnippet>8</a><span class="kw">use </span>std::{io::Result, sync::Mutex};
+<a href=#8 id=8 data-nosnippet>8</a><span class="kw">use </span>std::sync::Mutex;
 <a href=#9 id=9 data-nosnippet>9</a>
 <a href=#10 id=10 data-nosnippet>10</a><span class="kw">mod </span>byte_map_storage;
 <a href=#11 id=11 data-nosnippet>11</a><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
@@ -94,9 +94,9 @@
 <a href=#94 id=94 data-nosnippet>94</a>    /// -   `Ok(Some(new_state))`: Set the state of all chunks within `group_range` to `new_state`.
 <a href=#95 id=95 data-nosnippet>95</a>    ///
 <a href=#96 id=96 data-nosnippet>96</a>    /// Return `Ok(())` if finished visiting all chunks normally.
-<a href=#97 id=97 data-nosnippet>97</a>    </span><span class="kw">fn </span>bulk_transition_state&lt;F&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, range: ChunkRange, update_fn: F) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt;
+<a href=#97 id=97 data-nosnippet>97</a>    </span><span class="kw">fn </span>bulk_transition_state&lt;F&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, range: ChunkRange, update_fn: F) -&gt; MmapResult&lt;()&gt;
 <a href=#98 id=98 data-nosnippet>98</a>    <span class="kw">where
-<a href=#99 id=99 data-nosnippet>99</a>        </span>F: FnMut(ChunkRange, MapState) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;MapState&gt;&gt;;
+<a href=#99 id=99 data-nosnippet>99</a>        </span>F: FnMut(ChunkRange, MapState) -&gt; MmapResult&lt;<span class="prelude-ty">Option</span>&lt;MapState&gt;&gt;;
 <a href=#100 id=100 data-nosnippet>100</a>}
 <a href=#101 id=101 data-nosnippet>101</a>
 <a href=#102 id=102 data-nosnippet>102</a><span class="doccomment">/// A [`Mmapper`] implementation based on a logical array of chunk states.
@@ -148,7 +148,7 @@
 <a href=#148 id=148 data-nosnippet>148</a>        pages: usize,
 <a href=#149 id=149 data-nosnippet>149</a>        huge_page_option: HugePageSupport,
 <a href=#150 id=150 data-nosnippet>150</a>        anno: <span class="kw-2">&amp;</span>MmapAnnotation,
-<a href=#151 id=151 data-nosnippet>151</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#151 id=151 data-nosnippet>151</a>    ) -&gt; MmapResult&lt;()&gt; {
 <a href=#152 id=152 data-nosnippet>152</a>        <span class="kw">let </span>_guard = <span class="self">self</span>.transition_lock.lock().unwrap();
 <a href=#153 id=153 data-nosnippet>153</a>
 <a href=#154 id=154 data-nosnippet>154</a>        <span class="kw">let </span>bytes = pages &lt;&lt; LOG_BYTES_IN_PAGE;
@@ -189,7 +189,7 @@
 <a href=#189 id=189 data-nosnippet>189</a>        huge_page_option: HugePageSupport,
 <a href=#190 id=190 data-nosnippet>190</a>        prot: MmapProtection,
 <a href=#191 id=191 data-nosnippet>191</a>        anno: <span class="kw-2">&amp;</span>MmapAnnotation,
-<a href=#192 id=192 data-nosnippet>192</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#192 id=192 data-nosnippet>192</a>    ) -&gt; MmapResult&lt;()&gt; {
 <a href=#193 id=193 data-nosnippet>193</a>        <span class="kw">let </span>_guard = <span class="self">self</span>.transition_lock.lock().unwrap();
 <a href=#194 id=194 data-nosnippet>194</a>
 <a href=#195 id=195 data-nosnippet>195</a>        <span class="kw">let </span>bytes = pages &lt;&lt; LOG_BYTES_IN_PAGE;

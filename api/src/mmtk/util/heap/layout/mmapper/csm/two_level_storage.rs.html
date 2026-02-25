@@ -6,13 +6,13 @@
 <a href=#6 id=6 data-nosnippet>6</a></span><span class="kw">use </span><span class="kw">super</span>::MapState;
 <a href=#7 id=7 data-nosnippet>7</a><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::mmapper::csm::{ChunkRange, MapStateStorage};
 <a href=#8 id=8 data-nosnippet>8</a><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
-<a href=#9 id=9 data-nosnippet>9</a><span class="kw">use </span><span class="kw">crate</span>::util::rust_util::atomic_box::OnceOptionBox;
-<a href=#10 id=10 data-nosnippet>10</a><span class="kw">use </span><span class="kw">crate</span>::util::rust_util::rev_group::RevisitableGroupByForIterator;
-<a href=#11 id=11 data-nosnippet>11</a><span class="kw">use </span><span class="kw">crate</span>::util::rust_util::zeroed_alloc::new_zeroed_vec;
-<a href=#12 id=12 data-nosnippet>12</a><span class="kw">use </span><span class="kw">crate</span>::util::Address;
-<a href=#13 id=13 data-nosnippet>13</a><span class="kw">use </span>atomic::{Atomic, Ordering};
-<a href=#14 id=14 data-nosnippet>14</a><span class="kw">use </span>std::fmt;
-<a href=#15 id=15 data-nosnippet>15</a><span class="kw">use </span>std::io::Result;
+<a href=#9 id=9 data-nosnippet>9</a><span class="kw">use </span><span class="kw">crate</span>::util::os::MmapResult;
+<a href=#10 id=10 data-nosnippet>10</a><span class="kw">use </span><span class="kw">crate</span>::util::rust_util::atomic_box::OnceOptionBox;
+<a href=#11 id=11 data-nosnippet>11</a><span class="kw">use </span><span class="kw">crate</span>::util::rust_util::rev_group::RevisitableGroupByForIterator;
+<a href=#12 id=12 data-nosnippet>12</a><span class="kw">use </span><span class="kw">crate</span>::util::rust_util::zeroed_alloc::new_zeroed_vec;
+<a href=#13 id=13 data-nosnippet>13</a><span class="kw">use </span><span class="kw">crate</span>::util::Address;
+<a href=#14 id=14 data-nosnippet>14</a><span class="kw">use </span>atomic::{Atomic, Ordering};
+<a href=#15 id=15 data-nosnippet>15</a><span class="kw">use </span>std::fmt;
 <a href=#16 id=16 data-nosnippet>16</a>
 <a href=#17 id=17 data-nosnippet>17</a><span class="doccomment">/// Logarithm of the address space size that [`TwoLevelStateStorage`] is able to handle.
 <a href=#18 id=18 data-nosnippet>18</a>/// This is enough for ARM64, x86_64 and some other architectures.
@@ -103,9 +103,9 @@
 <a href=#103 id=103 data-nosnippet>103</a>        });
 <a href=#104 id=104 data-nosnippet>104</a>    }
 <a href=#105 id=105 data-nosnippet>105</a>
-<a href=#106 id=106 data-nosnippet>106</a>    <span class="kw">fn </span>bulk_transition_state&lt;F&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, range: ChunkRange, <span class="kw-2">mut </span>update_fn: F) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt;
+<a href=#106 id=106 data-nosnippet>106</a>    <span class="kw">fn </span>bulk_transition_state&lt;F&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, range: ChunkRange, <span class="kw-2">mut </span>update_fn: F) -&gt; MmapResult&lt;()&gt;
 <a href=#107 id=107 data-nosnippet>107</a>    <span class="kw">where
-<a href=#108 id=108 data-nosnippet>108</a>        </span>F: FnMut(ChunkRange, MapState) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;MapState&gt;&gt;,
+<a href=#108 id=108 data-nosnippet>108</a>        </span>F: FnMut(ChunkRange, MapState) -&gt; MmapResult&lt;<span class="prelude-ty">Option</span>&lt;MapState&gt;&gt;,
 <a href=#109 id=109 data-nosnippet>109</a>    {
 <a href=#110 id=110 data-nosnippet>110</a>        <span class="kw">if </span>range.is_empty() {
 <a href=#111 id=111 data-nosnippet>111</a>            <span class="kw">return </span><span class="prelude-val">Ok</span>(());

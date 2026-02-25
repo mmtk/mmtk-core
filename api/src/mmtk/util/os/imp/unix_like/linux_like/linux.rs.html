@@ -14,7 +14,7 @@
 <a href=#14 id=14 data-nosnippet>14</a>        size: usize,
 <a href=#15 id=15 data-nosnippet>15</a>        strategy: MmapStrategy,
 <a href=#16 id=16 data-nosnippet>16</a>        annotation: <span class="kw-2">&amp;</span>MmapAnnotation&lt;<span class="lifetime">'_</span>&gt;,
-<a href=#17 id=17 data-nosnippet>17</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;Address&gt; {
+<a href=#17 id=17 data-nosnippet>17</a>    ) -&gt; MmapResult&lt;Address&gt; {
 <a href=#18 id=18 data-nosnippet>18</a>        linux_common::dzmmap(start, size, strategy, annotation)
 <a href=#19 id=19 data-nosnippet>19</a>    }
 <a href=#20 id=20 data-nosnippet>20</a>
