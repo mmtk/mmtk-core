@@ -8,6 +8,57 @@ use crate::{
     vm::VMBinding,
 };
 
+/// Error returned by mmap-related operations in MMTk.
+#[derive(Debug)]
+pub struct MmapError {
+    /// The start address of the mmap operation that failed.
+    pub error_address: Address,
+    /// The size (in bytes) of the mmap operation that failed.
+    pub bytes: usize,
+    /// Human-readable annotation for the mmap operation.
+    ///
+    /// This is derived from [`MmapAnnotation`] at the call site.
+    pub annotation: String,
+    /// The underlying OS I/O error.
+    pub error: std::io::Error,
+}
+
+impl MmapError {
+    /// Create a new [`MmapError`].
+    pub fn new(
+        error_address: Address,
+        bytes: usize,
+        annotation: &MmapAnnotation<'_>,
+        error: std::io::Error,
+    ) -> Self {
+        Self {
+            error_address,
+            bytes,
+            annotation: annotation.to_string(),
+            error,
+        }
+    }
+}
+
+impl std::fmt::Display for MmapError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "mmap {} (size {}, annotation {}) failed: {}",
+            self.error_address, self.bytes, self.annotation, self.error
+        )
+    }
+}
+
+impl std::error::Error for MmapError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.error)
+    }
+}
+
+/// Result type for mmap operations that can return [`MmapError`].
+pub type MmapResult<T> = std::result::Result<T, MmapError>;
+
 /// Abstraction for OS memory operations.
 pub trait OSMemory {
     /// Perform a demand-zero mmap.
@@ -19,19 +70,20 @@ pub trait OSMemory {
         size: usize,
         strategy: MmapStrategy,
         annotation: &MmapAnnotation<'_>,
-    ) -> Result<Address>;
+    ) -> MmapResult<Address>;
 
     /// Handle mmap errors, possibly by signaling the VM about an out-of-memory condition.
-    fn handle_mmap_error<VM: VMBinding>(
-        error: std::io::Error,
-        tls: VMThread,
-        addr: Address,
-        bytes: usize,
-    ) {
+    fn handle_mmap_error<VM: VMBinding>(mmap_error: MmapError, tls: VMThread) {
         use crate::util::alloc::AllocationError;
         use std::io::ErrorKind;
 
-        eprintln!("Failed to mmap {}, size {}", addr, bytes);
+        eprintln!(
+            "Failed to mmap from {} to {} (size {}), annotation {}",
+            mmap_error.error_address,
+            mmap_error.error_address.wrapping_add(mmap_error.bytes),
+            mmap_error.bytes,
+            mmap_error.annotation
+        );
         eprintln!("{}", OS::get_process_memory_maps().unwrap());
 
         let call_binding_oom = || {
@@ -41,7 +93,7 @@ pub trait OSMemory {
             unreachable!()
         };
 
-        match error.kind() {
+        match mmap_error.error.kind() {
             // From Rust nightly 2021-05-12, we started to see Rust added this ErrorKind.
             ErrorKind::OutOfMemory => {
                 call_binding_oom();
@@ -50,7 +102,7 @@ pub trait OSMemory {
             // TODO: We may be able to remove this now.
             ErrorKind::Other => {
                 // further check the error
-                if let Some(os_errno) = error.raw_os_error() {
+                if let Some(os_errno) = mmap_error.error.raw_os_error() {
                     if OS::is_mmap_oom(os_errno) {
                         call_binding_oom();
                     }
@@ -60,14 +112,14 @@ pub trait OSMemory {
                 panic!("Failed to mmap, the address is already mapped. Should MMTk quarantine the address range first?");
             }
             _ => {
-                if let Some(os_errno) = error.raw_os_error() {
+                if let Some(os_errno) = mmap_error.error.raw_os_error() {
                     if OS::is_mmap_oom(os_errno) {
                         call_binding_oom();
                     }
                 }
             }
         }
-        panic!("Unexpected mmap failure: {:?}", error)
+        panic!("Unexpected mmap failure: {:?}", mmap_error.error)
     }
 
     /// Check whether the given OS error number indicates an out-of-memory condition.

@@ -106,14 +106,14 @@ pub fn dzmmap(
     size: usize,
     strategy: MmapStrategy,
     annotation: &MmapAnnotation<'_>,
-) -> Result<Address> {
-    let addr = unix_common::mmap(start, size, strategy)?;
+) -> MmapResult<Address> {
+    let addr = unix_common::mmap(start, size, strategy, annotation)?;
 
     if !cfg!(feature = "no_mmap_annotation") {
         set_vma_name(addr, size, annotation);
     }
 
-    set_hugepage(addr, size, strategy.huge_page)?;
+    set_hugepage(addr, size, strategy.huge_page).expect("Failed to set huge page option");
 
     // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
 
@@ -127,11 +127,14 @@ pub fn panic_if_unmapped(start: Address, size: usize) {
         replace: false,
         reserve: true,
     };
-    match unix_common::mmap(start, size, strategy) {
+    let annotation = MmapAnnotation::Misc {
+        name: "panic_if_unmapped",
+    };
+    match unix_common::mmap(start, size, strategy, &annotation) {
         Ok(_) => panic!("{} of size {} is not mapped", start, size),
         Err(e) => {
             assert!(
-                e.kind() == std::io::ErrorKind::AlreadyExists,
+                e.error.kind() == std::io::ErrorKind::AlreadyExists,
                 "Failed to check mapped: {:?}",
                 e
             );

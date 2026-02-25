@@ -11,9 +11,9 @@ impl OSMemory for MacOS {
         start: Address,
         size: usize,
         strategy: MmapStrategy,
-        _annotation: &MmapAnnotation<'_>,
-    ) -> Result<Address> {
-        let addr = unix_common::mmap(start, size, strategy)?;
+        annotation: &MmapAnnotation<'_>,
+    ) -> MmapResult<Address> {
+        let addr = unix_common::mmap(start, size, strategy, annotation)?;
 
         // Annotation is ignored on macOS
         // Huge page is ignored on macOS

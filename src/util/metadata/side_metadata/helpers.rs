@@ -9,7 +9,6 @@ use crate::util::metadata::side_metadata::address_to_chunked_meta_address;
 use crate::util::os::*;
 use crate::util::Address;
 use crate::MMAPPER;
-use std::io::Result;
 
 /// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)
 pub(super) fn address_to_contiguous_meta_address(
@@ -127,7 +126,7 @@ pub(super) fn try_mmap_contiguous_metadata_space(
     spec: &SideMetadataSpec,
     no_reserve: bool,
     anno: &MmapAnnotation,
-) -> Result<usize> {
+) -> MmapResult<usize> {
     debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
     debug_assert!(size % BYTES_IN_PAGE == 0);
 
