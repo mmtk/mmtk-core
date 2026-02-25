@@ -11,7 +11,7 @@
 # You may also run this script directly to check line ends.
 # It can also automatically fix the line ends for you if you add the -f option:
 #
-#   ./github/scripts/ci-check-lineends.sh -f
+#   ./.github/scripts/ci-check-lineends.sh -f
 #
 # Other options will be forwarded to the check-lineends.sh script, too.
 
