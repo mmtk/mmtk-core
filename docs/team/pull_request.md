@@ -14,11 +14,18 @@ can be merged.
 If an MMTk core PR should be tested with other bindings PRs, one can specify the binding branch that
 should be tested with by adding a comment like below (see https://github.com/mmtk/mmtk-core/blob/master/.github/workflows/pr-binding-refs.yml).
 If there are multiple comments that match, the first one is effective. If the info is missing for
-a binding, the default repo (`mmtk/mmtk-X`) and branch (`master`) will be used instead.
+a binding, the default repo (`mmtk/mmtk-X`) and branch (`master` for most bindings) will be used instead.
+
+Note that OpenJDK 11 and OpenJDK 21 are considered two bindings.  Their default repos are both
+`mmtk/mmtk-openjdk`, but their default branches are `jdk-11` and `jdk-21`, respectively.  We can
+speficy the repo and branch of one of OpenJDK 11 and OpenJDK 21, or both.
+
 ```
 binding-refs
-OPENJDK_BINDING_REPO=xx/xx
-OPENJDK_BINDING_REF=xxxxxx
+OPENJDK11_BINDING_REPO=xx/xx
+OPENJDK11_BINDING_REF=xxxxxx
+OPENJDK21_BINDING_REPO=xx/xx
+OPENJDK21_BINDING_REF=xxxxxx
 JIKESRVM_BINDING_REPO=xx/xx
 JIKESRVM_BINDING_REF=xxxxxx
 V8_BINDING_REPO=xx/xx

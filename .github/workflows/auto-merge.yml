@@ -16,11 +16,32 @@ jobs:
       pr: ${{ steps.get-pr.outputs.pr }}
     steps:
       - id: get-commit-hash
-        run: echo "commit=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "commit=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Commit hash: ${GITHUB_SHA}"
       - id: get-pr
         run: |
-          PR_NUMBER=$(gh pr list --search "${GITHUB_SHA}" --state merged --repo mmtk/mmtk-core --json number --jq '.[0].number')
-          echo "pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          for n in {1..5}; do
+              echo "Wait 30s then try get the pull request number"
+              sleep 30
+
+              echo "Pull request for the commit is below:"
+              gh pr list --search "${GITHUB_SHA}" --state merged --repo mmtk/mmtk-core
+              echo "Pull request for the commit is above."
+
+              PR_NUMBER=$(gh pr list --search "${GITHUB_SHA}" --state merged --repo mmtk/mmtk-core --json number --jq '.[0].number')
+
+              if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
+                echo "Found PR: $PR_NUMBER"
+                echo "pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+                echo "Output pr = $PR_NUMBER"
+                exit 0
+              fi
+
+              echo "PR not found, retrying..."
+          done
+          echo "We can't find the merged PR for ${GITHUB_SHA}"
+          exit 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -31,14 +52,26 @@ jobs:
     with:
       pull_request: ${{ needs.get-merged-pr.outputs.pr }}
 
-  check-merge-openjdk-pr:
+  check-merge-openjdk11-pr:
     uses: ./.github/workflows/auto-merge-inner.yml
     needs: [get-merged-pr, binding-refs]
     with:
-      repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
-      base_repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo_default }}
-      ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
-      base_ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref_default }}
+      repo: ${{ needs.binding-refs.outputs.openjdk11_binding_repo }}
+      base_repo: ${{ needs.binding-refs.outputs.openjdk11_binding_repo_default }}
+      ref: ${{ needs.binding-refs.outputs.openjdk11_binding_ref }}
+      base_ref: ${{ needs.binding-refs.outputs.openjdk11_binding_ref_default }}
+      core_commit: ${{ needs.get-merged-pr.outputs.commit }}
+      update_lockfile: cargo build
+    secrets: inherit
+
+  check-merge-openjdk21-pr:
+    uses: ./.github/workflows/auto-merge-inner.yml
+    needs: [get-merged-pr, binding-refs]
+    with:
+      repo: ${{ needs.binding-refs.outputs.openjdk21_binding_repo }}
+      base_repo: ${{ needs.binding-refs.outputs.openjdk21_binding_repo_default }}
+      ref: ${{ needs.binding-refs.outputs.openjdk21_binding_ref }}
+      base_ref: ${{ needs.binding-refs.outputs.openjdk21_binding_ref_default }}
       core_commit: ${{ needs.get-merged-pr.outputs.commit }}
       update_lockfile: cargo build
     secrets: inherit

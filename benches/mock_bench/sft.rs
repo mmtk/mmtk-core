@@ -1,4 +1,5 @@
-use criterion::black_box;
+use std::hint::black_box;
+
 use criterion::Criterion;
 
 use mmtk::memory_manager;

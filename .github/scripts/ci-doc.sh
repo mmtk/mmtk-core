@@ -27,5 +27,11 @@ cargo build --manifest-path $dummyvm_toml
 
 # Install mdbook using the stable toolchain and the default target
 unset CARGO_BUILD_TARGET
-cargo +stable install mdbook mdbook-admonish mdbook-hide
-mdbook build $project_root/docs/userguide
+
+# mdbook-admonish does not support mdbook 0.5. So we pin the version to 0.4 for mdbook.
+# When the issue (https://github.com/tommilligan/mdbook-admonish/issues/233) is resolved, we can upgrade mdbook to 0.5.
+cargo +stable install mdbook --version "^0.4"
+cargo +stable install mdbook-admonish --version "=1.20.0"
+# It seems we don't need a specific version for mdbook-hide atm.
+cargo +stable install mdbook-hide
+rustup run stable mdbook build $project_root/docs/userguide

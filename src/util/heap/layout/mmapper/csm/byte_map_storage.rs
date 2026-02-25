@@ -107,22 +107,9 @@ impl MapStateStorage for ByteMapStateStorage {
 
 impl ByteMapStateStorage {
     pub fn new() -> Self {
-        // Because AtomicU8 does not implement Copy, it is a compilation error to usen the
-        // expression `[Atomic::new(MapState::Unmapped); MMAP_NUM_CHUNKS]` because that involves
-        // copying.  We must define a constant for it.
-        //
-        // TODO: Use the inline const expression `const { Atomic::new(MapState::Unmapped) }` after
-        // we bump MSRV to 1.79.
-
-        // If we declare a const Atomic, Clippy will warn about const items being interior mutable.
-        // Using inline const expression will eliminate this warning, but that is experimental until
-        // 1.79.  Fix it after we bump MSRV.
-        #[allow(clippy::declare_interior_mutable_const)]
-        const INITIAL_ENTRY: Atomic<MapState> = Atomic::new(MapState::Unmapped);
-
         ByteMapStateStorage {
             lock: Mutex::new(()),
-            mapped: [INITIAL_ENTRY; MMAP_NUM_CHUNKS],
+            mapped: [const { Atomic::new(MapState::Unmapped) }; MMAP_NUM_CHUNKS],
         }
     }
 }

@@ -12,10 +12,16 @@
 # to specify the binding pull requests. Note if any of the following values are omitted, the default values
 # will be used (run with the master in mmtk's binding repos).
 # Repo is in the format of user/repo. Ref could be sha or branch name.
+#
+# Note that OpenJDK 11 and OpenJDK 21 are considered two bindings, and their repo and ref names are
+# specified separately.  It is allowed to specify one or both of OpenJDK 11 and 21.
+#
 # ```
 # binding-refs
-# OPENJDK_BINDING_REPO=xx/xx
-# OPENJDK_BINDING_REF=xxxxxx
+# OPENJDK11_BINDING_REPO=xx/xx
+# OPENJDK11_BINDING_REF=xxxxxx
+# OPENJDK21_BINDING_REPO=xx/xx
+# OPENJDK21_BINDING_REF=xxxxxx
 # JIKESRVM_BINDING_REPO=xx/xx
 # JIKESRVM_BINDING_REF=xxxxxx
 # V8_BINDING_REPO=xx/xx
@@ -37,18 +43,31 @@ on:
         type: string
         required: true
     outputs:
-      openjdk_binding_repo:
-        description: "The repository of OpenJDK binding, such as {user}/{repo}"
-        value: ${{ jobs.binding-refs.outputs.openjdk_binding_repo}}
-      openjdk_binding_repo_default:
-        description: "The default repository of OpenJDK binding, such as {user}/{repo}"
-        value: ${{ jobs.binding-refs.outputs.openjdk_binding_repo_default }}
-      openjdk_binding_ref:
-        description: "The git ref of OpenJDK binding, such as sha and branch name"
-        value: ${{ jobs.binding-refs.outputs.openjdk_binding_ref}}
-      openjdk_binding_ref_default:
-        description: "The default git ref of OpenJDK binding, such as sha and branch name"
-        value: ${{ jobs.binding-refs.outputs.openjdk_binding_ref_default }}
+      openjdk11_binding_repo:
+        description: "The repository of OpenJDK 11 binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.openjdk11_binding_repo}}
+      openjdk11_binding_repo_default:
+        description: "The default repository of OpenJDK 11 binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.openjdk11_binding_repo_default }}
+      openjdk11_binding_ref:
+        description: "The git ref of OpenJDK 11 binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.openjdk11_binding_ref}}
+      openjdk11_binding_ref_default:
+        description: "The default git ref of OpenJDK 11 binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.openjdk11_binding_ref_default }}
+
+      openjdk21_binding_repo:
+        description: "The repository of OpenJDK 21 binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.openjdk21_binding_repo}}
+      openjdk21_binding_repo_default:
+        description: "The default repository of OpenJDK 21 binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.openjdk21_binding_repo_default }}
+      openjdk21_binding_ref:
+        description: "The git ref of OpenJDK 21 binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.openjdk21_binding_ref}}
+      openjdk21_binding_ref_default:
+        description: "The default git ref of OpenJDK 21 binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.openjdk21_binding_ref_default }}
 
       jikesrvm_binding_repo:
         description: "The repository of JikesRVM binding, such as {user}/{repo}"
@@ -121,8 +140,10 @@ jobs:
   binding-refs:
     runs-on: ubuntu-latest
     env:
-      OPENJDK_BINDING_REPO_DEFAULT: mmtk/mmtk-openjdk
-      OPENJDK_BINDING_REF_DEFAULT: master
+      OPENJDK11_BINDING_REPO_DEFAULT: mmtk/mmtk-openjdk
+      OPENJDK11_BINDING_REF_DEFAULT: jdk-11
+      OPENJDK21_BINDING_REPO_DEFAULT: mmtk/mmtk-openjdk
+      OPENJDK21_BINDING_REF_DEFAULT: jdk-21
       JIKESRVM_BINDING_REPO_DEFAULT: mmtk/mmtk-jikesrvm
       JIKESRVM_BINDING_REF_DEFAULT: master
       V8_BINDING_REPO_DEFAULT: mmtk/mmtk-v8
@@ -134,10 +155,14 @@ jobs:
       RUBY_BINDING_REPO_DEFAULT: mmtk/mmtk-ruby
       RUBY_BINDING_REF_DEFAULT: master
     outputs:
-        openjdk_binding_repo: ${{ steps.print.outputs.openjdk_binding_repo }}
-        openjdk_binding_repo_default: ${{ env.OPENJDK_BINDING_REPO_DEFAULT }}
-        openjdk_binding_ref: ${{ steps.print.outputs.openjdk_binding_ref }}
-        openjdk_binding_ref_default: ${{ env.OPENJDK_BINDING_REF_DEFAULT }}
+        openjdk11_binding_repo: ${{ steps.print.outputs.openjdk11_binding_repo }}
+        openjdk11_binding_repo_default: ${{ env.OPENJDK11_BINDING_REPO_DEFAULT }}
+        openjdk11_binding_ref: ${{ steps.print.outputs.openjdk11_binding_ref }}
+        openjdk11_binding_ref_default: ${{ env.OPENJDK11_BINDING_REF_DEFAULT }}
+        openjdk21_binding_repo: ${{ steps.print.outputs.openjdk21_binding_repo }}
+        openjdk21_binding_repo_default: ${{ env.OPENJDK21_BINDING_REPO_DEFAULT }}
+        openjdk21_binding_ref: ${{ steps.print.outputs.openjdk21_binding_ref }}
+        openjdk21_binding_ref_default: ${{ env.OPENJDK21_BINDING_REF_DEFAULT }}
         jikesrvm_binding_repo: ${{ steps.print.outputs.jikesrvm_binding_repo }}
         jikesrvm_binding_repo_default: ${{ env.JIKESRVM_BINDING_REPO_DEFAULT }}
         jikesrvm_binding_ref: ${{ steps.print.outputs.jikesrvm_binding_ref }}
@@ -164,11 +189,33 @@ jobs:
           with:
             pull_request: ${{ inputs.pull_request }}
             token: ${{ secrets.GITHUB_TOKEN }}
-            default_env: 'OPENJDK_BINDING_REPO=${{ env.OPENJDK_BINDING_REPO_DEFAULT }},OPENJDK_BINDING_REF=${{ env.OPENJDK_BINDING_REF_DEFAULT }},JIKESRVM_BINDING_REPO=${{ env.JIKESRVM_BINDING_REPO_DEFAULT }},JIKESRVM_BINDING_REF=${{ env.JIKESRVM_BINDING_REF_DEFAULT }},V8_BINDING_REPO=${{ env.V8_BINDING_REPO_DEFAULT }},V8_BINDING_REF=${{ env.V8_BINDING_REF_DEFAULT }},JULIA_BINDING_REPO=${{ env.JULIA_BINDING_REPO_DEFAULT }},JULIA_BINDING_REF=${{ env.JULIA_BINDING_REF_DEFAULT }},JULIA_VM_REPO=${{ env.JULIA_VM_REPO_DEFAULT }},JULIA_VM_REF=${{ env.JULIA_VM_REF_DEFAULT }},RUBY_BINDING_REPO=${{ env.RUBY_BINDING_REPO_DEFAULT }},RUBY_BINDING_REF=${{ env.RUBY_BINDING_REF_DEFAULT }}'
+            # Note: In the following lines, YAML makes one multi-line string literal from the
+            # indented lines after the '|' character, and then GitHub Actions replaces '${{ ... }}'
+            # with the expression values, and finally comment-env-vars parses the value of
+            # `default_env` (a multi-line string). comment-env-vars splits the string by /[\n\r,]/,
+            # and keeps only elements that contain non-blank sub-strings separated by '='.  Both the
+            # LHS and RHS of '=' are trimmed.
+            default_env: |
+              OPENJDK11_BINDING_REPO=${{ env.OPENJDK11_BINDING_REPO_DEFAULT }}
+              OPENJDK11_BINDING_REF=${{ env.OPENJDK11_BINDING_REF_DEFAULT }}
+              OPENJDK21_BINDING_REPO=${{ env.OPENJDK21_BINDING_REPO_DEFAULT }}
+              OPENJDK21_BINDING_REF=${{ env.OPENJDK21_BINDING_REF_DEFAULT }}
+              JIKESRVM_BINDING_REPO=${{ env.JIKESRVM_BINDING_REPO_DEFAULT }}
+              JIKESRVM_BINDING_REF=${{ env.JIKESRVM_BINDING_REF_DEFAULT }}
+              V8_BINDING_REPO=${{ env.V8_BINDING_REPO_DEFAULT }}
+              V8_BINDING_REF=${{ env.V8_BINDING_REF_DEFAULT }}
+              JULIA_BINDING_REPO=${{ env.JULIA_BINDING_REPO_DEFAULT }}
+              JULIA_BINDING_REF=${{ env.JULIA_BINDING_REF_DEFAULT }}
+              JULIA_VM_REPO=${{ env.JULIA_VM_REPO_DEFAULT }}
+              JULIA_VM_REF=${{ env.JULIA_VM_REF_DEFAULT }}
+              RUBY_BINDING_REPO=${{ env.RUBY_BINDING_REPO_DEFAULT }}
+              RUBY_BINDING_REF=${{ env.RUBY_BINDING_REF_DEFAULT }}
         - id: print
           run: |
-            echo "openjdk_binding_repo=${{ env.OPENJDK_BINDING_REPO }}" >> $GITHUB_OUTPUT
-            echo "openjdk_binding_ref=${{ env.OPENJDK_BINDING_REF }}" >> $GITHUB_OUTPUT
+            echo "openjdk11_binding_repo=${{ env.OPENJDK11_BINDING_REPO }}" >> $GITHUB_OUTPUT
+            echo "openjdk11_binding_ref=${{ env.OPENJDK11_BINDING_REF }}" >> $GITHUB_OUTPUT
+            echo "openjdk21_binding_repo=${{ env.OPENJDK21_BINDING_REPO }}" >> $GITHUB_OUTPUT
+            echo "openjdk21_binding_ref=${{ env.OPENJDK21_BINDING_REF }}" >> $GITHUB_OUTPUT
             echo "jikesrvm_binding_repo=${{ env.JIKESRVM_BINDING_REPO }}" >> $GITHUB_OUTPUT
             echo "jikesrvm_binding_ref=${{ env.JIKESRVM_BINDING_REF }}" >> $GITHUB_OUTPUT
             echo "v8_binding_repo=${{ env.V8_BINDING_REPO }}" >> $GITHUB_OUTPUT

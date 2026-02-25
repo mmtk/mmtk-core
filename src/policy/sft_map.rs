@@ -141,7 +141,9 @@ impl SFTRefStorage {
         let val = self.0.load(Ordering::Acquire);
         // Provenance-related APIs were stabilized in Rust 1.84.
         // Rust 1.91 introduced the warn-by-default lint `integer_to_ptr_transmutes`.
-        // Since our MSRV is still 1.74.1, we can't fix it until bumping MSRV.
+        // However, pointer provenance API only works for ptr-sized intergers, and
+        // here we are transmuting from a double-word sized integer to a fat pointer.
+        // We still need to use transmute here.
         #[allow(unknown_lints)]
         #[allow(integer_to_ptr_transmutes)]
         unsafe {
