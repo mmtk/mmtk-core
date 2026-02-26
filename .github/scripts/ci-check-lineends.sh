@@ -17,7 +17,7 @@
 
 BAD_LINE_ENDS=0
 
-find . -name 'target' -prune -o -type f -a '(' \
+FILES=$(find . -name 'target' -prune -o -type f -a '(' \
     -name '.gitignore' \
     -o -name '*.rs' \
     -o -name '*.h' \
@@ -32,7 +32,9 @@ find . -name 'target' -prune -o -type f -a '(' \
     -o -name '*.html' \
     -o -name '*.css' \
     -o -name '*.js' \
-    ')' -print0 | if ! xargs -0 $(dirname $0)/check-lineends.py "$@"; then
+    ')' -print)
+
+if ! xargs $(dirname $0)/check-lineends.py "$@" <<<$FILES; then
     BAD_LINE_ENDS=1
 fi
 
