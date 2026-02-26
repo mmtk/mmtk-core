@@ -13,7 +13,7 @@
 #
 #   ./.github/scripts/ci-check-lineends.sh -f
 #
-# Other options will be forwarded to the check-lineends.sh script, too.
+# Other options will be forwarded to the check-lineends.py script, too.
 
 BAD_LINE_ENDS=0
 
@@ -32,11 +32,10 @@ find . -name 'target' -prune -o -type f -a '(' \
     -o -name '*.html' \
     -o -name '*.css' \
     -o -name '*.js' \
-    ')' -print | while read FILE; do
-    if ! $(dirname $0)/check-lineends.sh "$@" $FIX_ARG "$FILE"; then
-        BAD_LINE_ENDS=1
-    fi
-done
+    ')' -print0 | if ! xargs -0 $(dirname $0)/check-lineends.py "$@"; then
+    BAD_LINE_ENDS=1
+fi
+
 
 if [[ "$BAD_LINE_ENDS" -ne 0 ]]; then
     echo "ERROR: Some text files have non-unix line ends or do not have newline character at the end of file."
