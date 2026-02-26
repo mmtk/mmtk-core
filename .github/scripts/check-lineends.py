@@ -43,16 +43,16 @@ def process_file(filename, fix):
     if no_eol:
         pv(1, "File does not end with a newline character:", filename)
 
-    if wrong:
-        if fix:
-            pv(1, "Fixing file:", filename)
-            fixed_content = ANY_NEWLINE.sub(content, r'\n')
-            if no_eol:
-                fixed_content += r'\n'
-            with open(filename, 'wb') as f:
-                f.write(fixed_content)
-        else:
-            sys.exit(1)
+    if wrong and fix:
+        pv(1, "Fixing file:", filename)
+        fixed_content = ANY_NEWLINE.sub(b'\n', content)
+        if no_eol:
+            fixed_content += b'\n'
+        with open(filename, 'wb') as f:
+            f.write(fixed_content)
+
+    return wrong
+
 
 def main():
     args = parser.parse_args()
@@ -63,8 +63,14 @@ def main():
     if args.verbose:
         verbosity = 2
 
+    any_wrong = False
+
     for filename in args.filename:
-        process_file(filename, args.fix)
+        if process_file(filename, args.fix) == True:
+            any_wrong = True
+
+    if any_wrong:
+        sys.exit(1)
 
 if __name__=='__main__':
     main()
