@@ -20,3 +20,4 @@ assets_version = "3.0.2" # do not edit: managed by `mdbook-admonish install`
 
 [preprocessor.hide]
 hide = false # This is overwritten to true by env var MDBOOK_preprocessor__hide__hide when we render the user guide for publishing.
+This file doesn't end with a new line
