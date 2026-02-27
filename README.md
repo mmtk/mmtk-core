@@ -166,3 +166,5 @@ Notes:
 
 Thank you for your interest in contributing to MMTk. We appreciate all the contributors. Generally you can contribute to MMTk by either
 reporting MMTk bugs you encountered or submitting your patches to MMTk. For details, you can refer to our [contribution guidelines](./CONTRIBUTING.md).
+This line ends with CRThis line ends with CR LF
+This line doesn't end with line end chars.
