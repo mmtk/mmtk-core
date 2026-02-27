@@ -39,6 +39,10 @@ FILES=$(find . -name 'target' -prune -o -type f -a '(' \
     -o -name '*.html' \
     -o -name '*.css' \
     -o -name '*.js' \
+    -o -name 'COPYRIGHT' \
+    -o -name 'LICENSE-*' \
+    -o -name 'rust-toolchain' \
+    -o -name '.gitignore' \
     ')' -print)
 
 if ! xargs $(dirname $0)/check-lineends.py "$@" <<<$FILES; then
