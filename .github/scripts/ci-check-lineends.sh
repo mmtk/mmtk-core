@@ -12,6 +12,10 @@
 #
 #   ./.github/scripts/ci-check-lineends.sh -f
 #
+# You can also pass the '-v' option to see which files it is checking.
+#
+#   ./.github/scripts/ci-check-lineends.sh -v
+#
 # In this project, text files use UNIX line ends, and must have a newline character at the end of the file.
 # Note that not having a newline character at the end of a file may have unexpected consequences.
 # For example, when concatenating multiple files,

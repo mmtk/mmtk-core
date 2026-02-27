@@ -4,7 +4,7 @@ export RUSTFLAGS="-D warnings -A unknown-lints"
 
 # --- Check line ends of text files ---
 
-if ! $project_root/.github/scripts/ci-check-lineends.sh -v; then
+if ! $project_root/.github/scripts/ci-check-lineends.sh; then
     echo "ERROR: Line ends check failed."
     exit 1
 fi
