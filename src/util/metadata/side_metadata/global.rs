@@ -1631,6 +1631,8 @@ mod tests {
         f: impl Fn(&SideMetadataSpec, Address, Address) + std::panic::RefUnwindSafe,
     ) {
         serial_test(|| {
+            initialize_side_metadata_base();
+
             let spec = SideMetadataSpec {
                 name: "Test Spec $tname",
                 is_global: true,
