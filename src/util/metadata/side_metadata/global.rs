@@ -1242,15 +1242,11 @@ impl fmt::Debug for SideMetadataSpec {
         f.write_fmt(format_args!(
             "SideMetadataSpec {} {{ \
             **is_global: {:?} \
-            **offset: {} \
+            **offset: 0x{:x} \
             **log_num_of_bits: 0x{:x} \
             **log_bytes_in_region: 0x{:x} \
             }}",
-            self.name,
-            self.is_global,
-            format!("0x{:x}", self.offset),
-            self.log_num_of_bits,
-            self.log_bytes_in_region
+            self.name, self.is_global, self.offset, self.log_num_of_bits, self.log_bytes_in_region
         ))
     }
 }

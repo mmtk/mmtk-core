@@ -56,24 +56,22 @@ pub fn global_side_metadata_base_address() -> Address {
 /// This must be called before `initialize_side_metadata_base()`.
 pub(crate) fn set_vm_side_metadata_specs(specs: &[SideMetadataSpec]) {
     VM_SIDE_METADATA_LAYOUT_INIT.call_once(|| {
-        {
-            let mut upper_bound = Address::ZERO;
-            for spec in specs {
-                if spec.is_absolute_offset() {
-                    upper_bound =
-                        upper_bound.max(unsafe { Address::from_usize(spec.upper_bound_offset()) });
-                }
+        let mut upper_bound = Address::ZERO;
+        for spec in specs {
+            if spec.is_absolute_offset() {
+                upper_bound =
+                    upper_bound.max(unsafe { Address::from_usize(spec.upper_bound_offset()) });
             }
-            unsafe {
-                VM_SIDE_METADATA_UPPER_BOUND_OFFSET = upper_bound;
-            }
-            VM_SIDE_METADATA_LAYOUT_REGISTERED.store(true, Ordering::SeqCst);
-            debug!(
-                "Registered VM side metadata layout: {} specs, upper_bound={}",
-                specs.len(),
-                upper_bound
-            );
         }
+        unsafe {
+            VM_SIDE_METADATA_UPPER_BOUND_OFFSET = upper_bound;
+        }
+        VM_SIDE_METADATA_LAYOUT_REGISTERED.store(true, Ordering::SeqCst);
+        debug!(
+            "Registered VM side metadata layout: {} specs, upper_bound={}",
+            specs.len(),
+            upper_bound
+        );
     });
 }
 
