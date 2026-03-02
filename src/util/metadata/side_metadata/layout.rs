@@ -56,7 +56,6 @@ pub fn global_side_metadata_base_address() -> Address {
 /// This must be called before `initialize_side_metadata_base()`.
 pub(crate) fn set_vm_side_metadata_specs(specs: &[SideMetadataSpec]) {
     VM_SIDE_METADATA_LAYOUT_INIT.call_once(|| {
-        #[cfg(target_pointer_width = "64")]
         {
             let mut upper_bound = Address::ZERO;
             for spec in specs {
@@ -113,12 +112,12 @@ pub(crate) fn local_side_metadata_base_address() -> Address {
 
 /// Total side metadata bytes that should be reserved at startup (independent of runtime base).
 pub(crate) fn total_side_metadata_bytes() -> usize {
+    let vm_end = unsafe { VM_SIDE_METADATA_UPPER_BOUND_OFFSET };
     #[cfg(target_pointer_width = "64")]
     {
         let core_end = upper_bound_address_for_contiguous_relative(
             &super::spec_defs::LAST_LOCAL_SIDE_METADATA_SPEC,
         );
-        let vm_end = unsafe { VM_SIDE_METADATA_UPPER_BOUND_OFFSET };
         debug!(
             "total_side_metadata_bytes(): core_end={} vm_end={} (registered={})",
             core_end,
@@ -131,7 +130,7 @@ pub(crate) fn total_side_metadata_bytes() -> usize {
     {
         let local_bytes =
             1usize << (VMLayout::LOG_ARCH_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO);
-        return global_side_metadata_bytes() + local_bytes;
+        return global_side_metadata_bytes().max(vm_end.as_usize()) + local_bytes;
     }
 }
 
@@ -216,5 +215,6 @@ pub(crate) fn global_side_metadata_bytes() -> usize {
     let end = upper_bound_address_for_contiguous_relative(
         &super::spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC,
     );
-    end.get_extent(Address::ZERO)
+    end.max(unsafe { VM_SIDE_METADATA_UPPER_BOUND_OFFSET })
+        .get_extent(Address::ZERO)
 }
