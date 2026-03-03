@@ -1,6 +1,6 @@
 use crate::plan::concurrent::immix::global::ConcurrentImmix;
 use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
-use crate::scheduler::gc_work::{PlanProcessEdges, UnsupportedProcessEdges};
+use crate::scheduler::gc_work::PlanProcessEdges;
 use crate::scheduler::ProcessEdgesWork;
 use crate::vm::VMBinding;
 
@@ -21,5 +21,5 @@ impl<E: ProcessEdgesWork> crate::scheduler::GCWorkContext for ConcurrentImmixGCW
     type VM = E::VM;
     type PlanType = ConcurrentImmix<E::VM>;
     type DefaultProcessEdges = E;
-    type PinningProcessEdges = UnsupportedProcessEdges<Self::VM>;
+    type PinningProcessEdges = E;
 }
