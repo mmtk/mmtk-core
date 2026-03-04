@@ -634,6 +634,12 @@ pub trait ProcessEdgesWork:
     ///
     /// `roots` indicates if we are creating a packet for root scanning.  It is only true when this
     /// method is called to handle `RootsWorkFactory::create_process_pinning_roots_work`.
+    ///
+    /// It normally returns `Some(work_packet)` and the `work_packet` should be added to the same
+    /// work bucket as `self`.  In some special cases, such as ConcurrentImmix, this function may
+    /// return `None`, which means the function has enqueued plan-specific object scanning work
+    /// packets that defer from `Self::ScanObjectsWorkType`.  In that case, there is no work packets
+    /// for the caller to add.
     fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType>;
 
     /// Flush the nodes in ProcessEdgesBase, and create a ScanObjects work packet for it. If the node set is empty,
