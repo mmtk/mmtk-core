@@ -5,7 +5,7 @@
 use crate::{
     scheduler::GCWorker,
     util::ObjectReference,
-    vm::{ObjectTracer, ObjectTracerContext, Scanning, VMBinding},
+    vm::{ObjectTracer, ObjectTracerContext, RefScanPolicy, Scanning, VMBinding},
 };
 
 use super::mock_test_prelude::MockVM;
@@ -65,10 +65,10 @@ impl Scanning<MyVM> for VMScanning {
 
     // Methods after this are placeholders.  We only ensure they compile.
 
-    fn scan_object<SV: crate::vm::SlotVisitor<<MockVM as VMBinding>::VMSlot>>(
-        _tls: crate::util::VMWorkerThread,
+    fn scan_object<R: RefScanPolicy>(
+        _tls: crate::util::VMThread,
         _object: ObjectReference,
-        _slot_visitor: &mut SV,
+        _slot_visitor: &mut impl crate::vm::SlotVisitor<<MyVM as VMBinding>::VMSlot>,
     ) {
         unimplemented!()
     }
