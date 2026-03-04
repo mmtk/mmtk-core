@@ -782,7 +782,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::Relaxed),
             );
         }
-        println!("is live = {}", object.is_live());
+        println!("is reachable = {}", object.is_reachable());
     }
 }
 
