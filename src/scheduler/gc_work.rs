@@ -563,6 +563,7 @@ impl RootKind {
     pub fn should_skip_mark_and_decs(&self) -> bool {
         matches!(self, RootKind::YoungCodeCacheRoots)
             || matches!(self, RootKind::YoungWeakHandleRoots)
+            || matches!(self, RootKind::Weak)
     }
 
     pub fn should_skip_decs(&self) -> bool {
