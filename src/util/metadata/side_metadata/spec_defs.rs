@@ -1,7 +1,9 @@
 use crate::util::constants::*;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::linear_scan::Region;
-use crate::util::metadata::side_metadata::layout::GLOBAL_SIDE_METADATA_BASE_OFFSET;
+use crate::util::metadata::side_metadata::layout::{
+    GLOBAL_SIDE_METADATA_BASE_OFFSET, LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT,
+};
 use crate::util::metadata::side_metadata::side_metadata_offset_after;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 
@@ -60,12 +62,6 @@ define_side_metadata_specs!(
     // Mark chunks (any plan that uses the chunk map should include this spec in their global sidemetadata specs)
     CHUNK_MARK   = (global: true, log_num_of_bits: 3, log_bytes_in_region: crate::util::heap::chunk_map::Chunk::LOG_BYTES),
 );
-
-#[cfg(target_pointer_width = "32")]
-const LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT: usize = 0;
-#[cfg(target_pointer_width = "64")]
-const LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT: usize =
-    side_metadata_offset_after(&LAST_GLOBAL_SIDE_METADATA_SPEC);
 
 // This defines all LOCAL side metadata used by mmtk-core.
 define_side_metadata_specs!(

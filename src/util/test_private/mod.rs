@@ -10,6 +10,7 @@
 
 pub use crate::util::metadata::side_metadata::helpers::scan_non_zero_bits_in_metadata_bytes;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::vm::VMBinding;
 
 use super::Address;
 
@@ -44,9 +45,9 @@ pub fn side_metadata_address_to_meta_address(
     crate::util::metadata::side_metadata::address_to_meta_address(metadata_spec, data_addr)
 }
 
-/// Expose side metadata base initialization when running `cargo bench`.
-pub fn initialize_side_metadata_base() {
-    crate::util::metadata::side_metadata::initialize_side_metadata_base()
+/// Expose side metadata initialization when running `cargo bench`.
+pub fn initialize_side_metadata<VM: VMBinding>() {
+    crate::util::metadata::side_metadata::initialize_side_metadata::<VM>()
 }
 
 #[cfg(feature = "mock_test")]

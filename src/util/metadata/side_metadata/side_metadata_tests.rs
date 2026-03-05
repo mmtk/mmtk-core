@@ -17,14 +17,10 @@ mod tests {
         side_metadata_offset_after(&spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC)
     }
 
-    fn ensure_side_metadata_base_initialized() {
-        initialize_side_metadata_base();
-    }
-
     #[test]
     fn test_side_metadata_address_to_meta_address() {
         serial_test(|| {
-            ensure_side_metadata_base_initialized();
+            core_test_initialize_side_metadata();
             let global_base = global_side_metadata_base_address();
             let mut gspec = SideMetadataSpec {
                 name: "gspec",
@@ -143,7 +139,7 @@ mod tests {
     #[test]
     fn test_side_metadata_runtime_base_address() {
         serial_test(|| {
-            ensure_side_metadata_base_initialized();
+            core_test_initialize_side_metadata();
             let base = global_side_metadata_base_address();
             assert!(base.as_usize() != 0);
             assert!(base.is_aligned_to(crate::MMAPPER.granularity()));
@@ -235,7 +231,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    ensure_side_metadata_base_initialized();
+                    core_test_initialize_side_metadata();
                     // We need to do this because of the static NO_METADATA
                     // sanity::reset();
                     let mut gspec = SideMetadataSpec {
@@ -326,7 +322,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    ensure_side_metadata_base_initialized();
+                    core_test_initialize_side_metadata();
                     // We need to do this because of the static NO_METADATA
                     // sanity::reset();
                     let data_addr = vm_layout().heap_start;
@@ -402,7 +398,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    ensure_side_metadata_base_initialized();
+                    core_test_initialize_side_metadata();
                     // We need to do this because of the static NO_METADATA
                     // sanity::reset();
                     let data_addr = vm_layout().heap_start + (vm_layout::BYTES_IN_CHUNK << 1) * 2;
@@ -459,7 +455,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    ensure_side_metadata_base_initialized();
+                    core_test_initialize_side_metadata();
                     // We need to do this because of the static NO_METADATA
                     // sanity::reset();
                     let data_addr =
@@ -517,7 +513,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    ensure_side_metadata_base_initialized();
+                    core_test_initialize_side_metadata();
                     // We need to do this because of the static NO_METADATA
                     // sanity::reset();
                     let data_addr = vm_layout().heap_start + (vm_layout::BYTES_IN_CHUNK << 2);
@@ -612,7 +608,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    ensure_side_metadata_base_initialized();
+                    core_test_initialize_side_metadata();
                     let data_addr = vm_layout::vm_layout().heap_start;
 
                     // 1 bit per 8 bytes
@@ -670,7 +666,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    ensure_side_metadata_base_initialized();
+                    core_test_initialize_side_metadata();
                     let data_addr = vm_layout::vm_layout().heap_start;
 
                     // 1 bit per 8 bytes
@@ -769,7 +765,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    ensure_side_metadata_base_initialized();
+                    core_test_initialize_side_metadata();
                     let data_addr = vm_layout().heap_start;
 
                     let log_num_of_bits = 0;

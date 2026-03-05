@@ -40,6 +40,12 @@ pub fn initialize_side_metadata<VM: VMBinding>() {
     initialize_side_metadata_base();
 }
 
+#[cfg(test)]
+pub(crate) fn core_test_initialize_side_metadata() {
+    set_vm_side_metadata_specs(&[]);
+    initialize_side_metadata_base();
+}
+
 // Re-export helper functions. Allow unused imports in case there is no function that can be re-exported.
 #[allow(unused_imports)]
 pub(crate) use helpers::*;

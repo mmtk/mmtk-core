@@ -75,7 +75,7 @@ pub trait OSMemory {
     /// Perform a no-reserve mmap at any available address, aligned to `align`.
     ///
     /// This API is used for reserving address ranges (typically with `PROT_NONE`) before committing.
-    fn mmap_noreserve_anywhere(
+    fn dzmmap_anywhere(
         size: usize,
         align: usize,
         strategy: MmapStrategy,

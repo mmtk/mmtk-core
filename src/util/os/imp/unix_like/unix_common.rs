@@ -22,7 +22,7 @@ pub fn mmap(
 ) -> MmapResult<Address> {
     let ptr = start.to_mut_ptr();
     let prot = strategy.prot.get_native_flags();
-    let flags = strategy.get_posix_mmap_flags();
+    let flags = strategy.get_posix_mmap_flags(true);
     wrap_libc_call(
         &|| unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) },
         ptr,
@@ -37,13 +37,7 @@ pub fn mmap_anywhere(size: usize, align: usize, strategy: MmapStrategy) -> Resul
     let aligned_size = raw_align_up(size, align);
     let alloc_size = aligned_size + align;
     let prot = strategy.prot.get_native_flags();
-    let flags = libc::MAP_PRIVATE
-        | libc::MAP_ANONYMOUS
-        | if !strategy.reserve {
-            libc::MAP_NORESERVE
-        } else {
-            0
-        };
+    let flags = strategy.get_posix_mmap_flags(false);
 
     let ptr = unsafe { libc::mmap(std::ptr::null_mut(), alloc_size, prot, flags, -1, 0) };
     if ptr == libc::MAP_FAILED {
@@ -51,18 +45,7 @@ pub fn mmap_anywhere(size: usize, align: usize, strategy: MmapStrategy) -> Resul
     }
 
     let start = Address::from_mut_ptr(ptr);
-    let aligned_start = start.align_up(align);
-    let prefix = aligned_start - start;
-    let suffix = alloc_size - prefix - aligned_size;
-
-    if prefix > 0 {
-        munmap(start, prefix)?;
-    }
-    if suffix > 0 {
-        munmap(aligned_start + aligned_size, suffix)?;
-    }
-
-    Ok(aligned_start)
+    Ok(start.align_up(align))
 }
 
 pub fn is_mmap_oom(os_errno: i32) -> bool {

@@ -7,7 +7,7 @@ use mmtk::util::{
     conversions::raw_align_up,
     metadata::side_metadata::SideMetadataSpec,
     os::{MmapAnnotation, MmapProtection, MmapStrategy, OSMemory, OS},
-    test_private::{initialize_side_metadata_base, side_metadata_address_to_meta_address},
+    test_private::side_metadata_address_to_meta_address,
     Address,
 };
 use std::hint::black_box;
@@ -45,9 +45,6 @@ pub fn bench(c: &mut Criterion) {
     });
 
     c.bench_function("side_metadata_load", |b| {
-        // Ensure side-metadata base is initialized before translation/loading.
-        initialize_side_metadata_base();
-
         let addrs = prepare_data_addrs();
 
         // Pre-map metadata range so the benchmark measures translation + load.

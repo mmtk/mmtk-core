@@ -1308,7 +1308,11 @@ impl SideMetadataContext {
         size: usize,
         space_name: &str,
     ) {
-        let reserved = super::layout::side_metadata_reserved_range();
+        let reserved = {
+            let base = super::layout::global_side_metadata_base_address();
+            let bytes = super::layout::side_metadata_reserved_bytes();
+            base..(base + bytes)
+        };
         let check_spec = |spec: &SideMetadataSpec| {
             if !spec.uses_contiguous_side_metadata() {
                 return;
@@ -1627,7 +1631,7 @@ mod tests {
         f: impl Fn(&SideMetadataSpec, Address, Address) + std::panic::RefUnwindSafe,
     ) {
         serial_test(|| {
-            initialize_side_metadata_base();
+            core_test_initialize_side_metadata();
 
             let spec = SideMetadataSpec {
                 name: "Test Spec $tname",
