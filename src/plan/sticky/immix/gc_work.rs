@@ -1,7 +1,7 @@
 use crate::policy::gc_work::TraceKind;
 use crate::policy::gc_work::DEFAULT_TRACE;
 use crate::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
-use crate::scheduler::gc_work::PlanProcessEdges;
+use crate::scheduler::gc_work::PlanProcessSlots;
 use crate::{plan::generational::gc_work::GenNurseryProcessEdges, vm::VMBinding};
 
 use super::global::StickyImmix;
@@ -24,6 +24,6 @@ impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
 {
     type VM = VM;
     type PlanType = StickyImmix<VM>;
-    type DefaultProcessEdges = PlanProcessEdges<VM, Self::PlanType, KIND>;
-    type PinningProcessEdges = PlanProcessEdges<VM, Self::PlanType, TRACE_KIND_TRANSITIVE_PIN>;
+    type DefaultProcessEdges = PlanProcessSlots<VM, Self::PlanType, KIND>;
+    type PinningProcessEdges = PlanProcessSlots<VM, Self::PlanType, TRACE_KIND_TRANSITIVE_PIN>;
 }

@@ -1,4 +1,4 @@
-use crate::plan::VectorObjectQueue;
+use crate::plan::tracing::OptionObjectQueue;
 use crate::policy::compressor::forwarding;
 use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::largeobjectspace::LargeObjectSpace;
@@ -115,7 +115,7 @@ impl<VM: VMBinding> SFT for CompressorSpace<VM> {
 
     fn sft_trace_object(
         &self,
-        _queue: &mut VectorObjectQueue,
+        _queue: &mut OptionObjectQueue,
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {

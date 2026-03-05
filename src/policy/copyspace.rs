@@ -1,4 +1,4 @@
-use crate::plan::{ObjectQueue, VectorObjectQueue};
+use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 use crate::policy::copy_context::PolicyCopyContext;
 use crate::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
 use crate::policy::sft::GCWorkerMutRef;
@@ -93,7 +93,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
 
     fn sft_trace_object(
         &self,
-        queue: &mut VectorObjectQueue,
+        queue: &mut OptionObjectQueue,
         object: ObjectReference,
         worker: GCWorkerMutRef,
     ) -> ObjectReference {

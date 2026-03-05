@@ -2,7 +2,7 @@ use super::global::GenImmix;
 use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::policy::gc_work::TraceKind;
 use crate::policy::gc_work::DEFAULT_TRACE;
-use crate::scheduler::gc_work::PlanProcessEdges;
+use crate::scheduler::gc_work::PlanProcessSlots;
 use crate::scheduler::gc_work::UnsupportedProcessEdges;
 use crate::vm::VMBinding;
 
@@ -22,6 +22,6 @@ impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
 {
     type VM = VM;
     type PlanType = GenImmix<VM>;
-    type DefaultProcessEdges = PlanProcessEdges<VM, GenImmix<VM>, KIND>;
+    type DefaultProcessEdges = PlanProcessSlots<VM, GenImmix<VM>, KIND>;
     type PinningProcessEdges = UnsupportedProcessEdges<VM>;
 }

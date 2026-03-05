@@ -23,11 +23,11 @@ pub struct GenNurseryProcessEdges<
     const KIND: TraceKind,
 > {
     plan: &'static P,
-    base: ProcessEdgesBase<VM>,
+    base: ProcessSlotsBase<VM>,
 }
 
 impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
-    ProcessEdgesWork for GenNurseryProcessEdges<VM, P, KIND>
+    ProcessSlotsWork for GenNurseryProcessEdges<VM, P, KIND>
 {
     type VM = VM;
     type ScanObjectsWorkType = PlanScanObjects<Self, P>;
@@ -38,7 +38,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
         mmtk: &'static MMTK<VM>,
         bucket: WorkBucketStage,
     ) -> Self {
-        let base = ProcessEdgesBase::new(slots, roots, mmtk, bucket);
+        let base = ProcessSlotsBase::new(slots, roots, mmtk, bucket);
         let plan = base.plan().downcast_ref().unwrap();
         Self { plan, base }
     }
@@ -75,7 +75,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
 impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind> Deref
     for GenNurseryProcessEdges<VM, P, KIND>
 {
-    type Target = ProcessEdgesBase<VM>;
+    type Target = ProcessSlotsBase<VM>;
     fn deref(&self) -> &Self::Target {
         &self.base
     }
@@ -92,12 +92,12 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
 /// The modbuf contains a list of objects in mature space(s) that
 /// may contain pointers to the nursery space.
 /// This work packet scans the recorded objects and forwards pointers if necessary.
-pub struct ProcessModBuf<E: ProcessEdgesWork> {
+pub struct ProcessModBuf<E: ProcessSlotsWork> {
     modbuf: Vec<ObjectReference>,
     phantom: PhantomData<E>,
 }
 
-impl<E: ProcessEdgesWork> ProcessModBuf<E> {
+impl<E: ProcessSlotsWork> ProcessModBuf<E> {
     pub fn new(modbuf: Vec<ObjectReference>) -> Self {
         debug_assert!(!modbuf.is_empty());
         Self {
@@ -107,7 +107,7 @@ impl<E: ProcessEdgesWork> ProcessModBuf<E> {
     }
 }
 
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
+impl<E: ProcessSlotsWork> GCWork<E::VM> for ProcessModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         // Process and scan modbuf only if the current GC is a nursery GC
         let gen = mmtk.get_plan().generational().unwrap();
@@ -141,13 +141,13 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
 /// The array-copy modbuf contains a list of array slices in mature space(s) that
 /// may contain pointers to the nursery space.
 /// This work packet forwards and updates each entry in the recorded slices.
-pub struct ProcessRegionModBuf<E: ProcessEdgesWork> {
+pub struct ProcessRegionModBuf<E: ProcessSlotsWork> {
     /// A list of `(start_address, bytes)` tuple.
     modbuf: Vec<<E::VM as VMBinding>::VMMemorySlice>,
     phantom: PhantomData<E>,
 }
 
-impl<E: ProcessEdgesWork> ProcessRegionModBuf<E> {
+impl<E: ProcessSlotsWork> ProcessRegionModBuf<E> {
     pub fn new(modbuf: Vec<<E::VM as VMBinding>::VMMemorySlice>) -> Self {
         Self {
             modbuf,
@@ -156,7 +156,7 @@ impl<E: ProcessEdgesWork> ProcessRegionModBuf<E> {
     }
 }
 
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
+impl<E: ProcessSlotsWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         // Scan modbuf only if the current GC is a nursery GC
         if mmtk

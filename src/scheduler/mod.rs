@@ -31,4 +31,4 @@ pub(crate) use worker::current_worker_ordinal;
 pub use worker::GCWorker;
 
 pub(crate) mod gc_work;
-pub use gc_work::ProcessEdgesWork;
+pub use gc_work::ProcessSlotsWork;

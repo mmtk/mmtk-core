@@ -3,16 +3,94 @@
 
 use std::marker::PhantomData;
 
-use crate::scheduler::gc_work::{ProcessEdgesWork, SlotOf};
+use crate::plan::PlanTraceObject;
+use crate::policy::gc_work::TraceKind;
+use crate::scheduler::gc_work::{ProcessSlotsWork, SlotOf};
 use crate::scheduler::{GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
 use crate::util::{ObjectReference, VMThread, VMWorkerThread};
 use crate::vm::{Scanning, SlotVisitor, VMBinding};
+use crate::Plan;
+
+pub trait EdgeTracer {
+    type VM: VMBinding;
+
+    fn trace_object<Q: ObjectQueue>(
+        &mut self,
+        worker: &mut GCWorker<Self::VM>,
+        object: ObjectReference,
+        queue: &mut Q,
+    ) -> ObjectReference;
+}
+
+#[derive(Default)]
+pub struct SFTEdgeTracer<VM: VMBinding> {
+    phantom_data: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> EdgeTracer for SFTEdgeTracer<VM> {
+    type VM = VM;
+
+    fn trace_object<Q: ObjectQueue>(
+        &mut self,
+        worker: &mut GCWorker<VM>,
+        object: ObjectReference,
+        queue: &mut Q,
+    ) -> ObjectReference {
+        use crate::policy::sft::GCWorkerMutRef;
+
+        // Erase <VM> type parameter
+        let worker = GCWorkerMutRef::new(worker);
+
+        // Invoke trace object on sft
+        let sft = unsafe { crate::mmtk::SFT_MAP.get_unchecked(object.to_raw_address()) };
+        let mut tmp_queue = None;
+        let result = sft.sft_trace_object(&mut tmp_queue, object, worker);
+        if let Some(queued_object) = tmp_queue {
+            queue.enqueue(queued_object);
+        }
+        result
+    }
+}
+
+pub struct PlanEdgeTracer<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> {
+    plan: &'static P,
+}
+
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> PlanEdgeTracer<P, KIND> {
+    pub(crate) fn new(plan: &'static P) -> Self {
+        Self { plan }
+    }
+}
+
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> EdgeTracer
+    for PlanEdgeTracer<P, KIND>
+{
+    type VM = P::VM;
+
+    fn trace_object<Q: ObjectQueue>(
+        &mut self,
+        worker: &mut GCWorker<Self::VM>,
+        object: ObjectReference,
+        queue: &mut Q,
+    ) -> ObjectReference {
+        self.plan.trace_object::<Q, KIND>(queue, object, worker)
+    }
+}
 
 /// This trait represents an object queue to enqueue objects during tracing.
 pub trait ObjectQueue {
     /// Enqueue an object into the queue.
     fn enqueue(&mut self, object: ObjectReference);
 }
+
+impl ObjectQueue for Option<ObjectReference> {
+    fn enqueue(&mut self, object: ObjectReference) {
+        debug_assert!(self.is_none());
+        *self = Some(object);
+    }
+}
+
+pub type OptionObjectQueue = Option<ObjectReference>;
 
 /// A vector queue for object references.
 pub type VectorObjectQueue = VectorQueue<ObjectReference>;
@@ -92,13 +170,13 @@ impl ObjectQueue for VectorQueue<ObjectReference> {
 /// A transitive closure visitor to collect the slots from objects.
 /// It maintains a buffer for the slots, and flushes slots to a new work packet
 /// if the buffer is full or if the type gets dropped.
-pub struct ObjectsClosure<'a, E: ProcessEdgesWork> {
+pub struct ObjectsClosure<'a, E: ProcessSlotsWork> {
     buffer: VectorQueue<SlotOf<E>>,
     pub(crate) worker: &'a mut GCWorker<E::VM>,
     bucket: WorkBucketStage,
 }
 
-impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
+impl<'a, E: ProcessSlotsWork> ObjectsClosure<'a, E> {
     /// Create an [`ObjectsClosure`].
     ///
     /// Arguments:
@@ -123,7 +201,7 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
     }
 }
 
-impl<E: ProcessEdgesWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'_, E> {
+impl<E: ProcessSlotsWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'_, E> {
     fn visit_slot(&mut self, slot: SlotOf<E>) {
         #[cfg(debug_assertions)]
         {
@@ -141,7 +219,7 @@ impl<E: ProcessEdgesWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'_, E> {
     }
 }
 
-impl<E: ProcessEdgesWork> Drop for ObjectsClosure<'_, E> {
+impl<E: ProcessSlotsWork> Drop for ObjectsClosure<'_, E> {
     fn drop(&mut self) {
         self.flush();
     }

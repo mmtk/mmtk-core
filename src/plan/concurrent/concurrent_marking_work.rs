@@ -8,7 +8,7 @@ use crate::util::ObjectReference;
 use crate::vm::slot::Slot;
 use crate::{
     plan::ObjectQueue,
-    scheduler::{gc_work::ProcessEdgesBase, GCWork, GCWorker, ProcessEdgesWork, WorkBucketStage},
+    scheduler::{gc_work::ProcessSlotsBase, GCWork, GCWorker, ProcessSlotsWork, WorkBucketStage},
     vm::*,
     MMTK,
 };
@@ -194,7 +194,7 @@ pub struct ProcessRootSlots<
     P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,
     const KIND: TraceKind,
 > {
-    base: ProcessEdgesBase<VM>,
+    base: ProcessSlotsBase<VM>,
     _p: std::marker::PhantomData<P>,
 }
 
@@ -216,7 +216,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 }
 
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
-    ProcessEdgesWork for ProcessRootSlots<VM, P, KIND>
+    ProcessSlotsWork for ProcessRootSlots<VM, P, KIND>
 {
     type VM = VM;
     type ScanObjectsWorkType = ScanObjects<Self>;
@@ -230,7 +230,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         bucket: WorkBucketStage,
     ) -> Self {
         debug_assert!(roots);
-        let base = ProcessEdgesBase::new(slots, roots, mmtk, bucket);
+        let base = ProcessSlotsBase::new(slots, roots, mmtk, bucket);
         Self {
             base,
             _p: std::marker::PhantomData,
@@ -291,7 +291,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind> Deref
     for ProcessRootSlots<VM, P, KIND>
 {
-    type Target = ProcessEdgesBase<VM>;
+    type Target = ProcessSlotsBase<VM>;
     fn deref(&self) -> &Self::Target {
         &self.base
     }

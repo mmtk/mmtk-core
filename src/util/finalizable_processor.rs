@@ -1,5 +1,5 @@
 use crate::plan::is_nursery_gc;
-use crate::scheduler::gc_work::ProcessEdgesWork;
+use crate::scheduler::gc_work::ProcessSlotsWork;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
 use crate::util::reference_processor::RescanReferences;
 use crate::util::ObjectReference;
@@ -37,11 +37,11 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         self.candidates.push(object);
     }
 
-    fn forward_finalizable_reference<E: ProcessEdgesWork>(e: &mut E, finalizable: &mut F) {
+    fn forward_finalizable_reference<E: ProcessSlotsWork>(e: &mut E, finalizable: &mut F) {
         finalizable.keep_alive::<E>(e);
     }
 
-    pub fn scan<E: ProcessEdgesWork>(&mut self, tls: VMWorkerThread, e: &mut E, nursery: bool) {
+    pub fn scan<E: ProcessSlotsWork>(&mut self, tls: VMWorkerThread, e: &mut E, nursery: bool) {
         let start = if nursery { self.nursery_index } else { 0 };
 
         // We should go through ready_for_finalize objects and keep them alive.
@@ -76,17 +76,17 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         // Set nursery_index to the end of the candidates (the candidates before the index are scanned)
         self.nursery_index = self.candidates.len();
 
-        <<E as ProcessEdgesWork>::VM as VMBinding>::VMCollection::schedule_finalization(tls);
+        <<E as ProcessSlotsWork>::VM as VMBinding>::VMCollection::schedule_finalization(tls);
     }
 
-    pub fn forward_candidate<E: ProcessEdgesWork>(&mut self, e: &mut E, _nursery: bool) {
+    pub fn forward_candidate<E: ProcessSlotsWork>(&mut self, e: &mut E, _nursery: bool) {
         self.candidates
             .iter_mut()
             .for_each(|f| FinalizableProcessor::<F>::forward_finalizable_reference(e, f));
         e.flush();
     }
 
-    pub fn forward_finalizable<E: ProcessEdgesWork>(&mut self, e: &mut E, _nursery: bool) {
+    pub fn forward_finalizable<E: ProcessSlotsWork>(&mut self, e: &mut E, _nursery: bool) {
         self.ready_for_finalize
             .iter_mut()
             .for_each(|f| FinalizableProcessor::<F>::forward_finalizable_reference(e, f));
@@ -137,9 +137,9 @@ impl<F: Finalizable> FinalizableProcessor<F> {
 }
 
 #[derive(Default)]
-pub struct Finalization<E: ProcessEdgesWork>(PhantomData<E>);
+pub struct Finalization<E: ProcessSlotsWork>(PhantomData<E>);
 
-impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
+impl<E: ProcessSlotsWork> GCWork<E::VM> for Finalization<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if !*mmtk.options.no_reference_types {
             // Rescan soft and weak references at the end of the transitive closure from resurrected
@@ -181,16 +181,16 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
         );
     }
 }
-impl<E: ProcessEdgesWork> Finalization<E> {
+impl<E: ProcessSlotsWork> Finalization<E> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
 }
 
 #[derive(Default)]
-pub struct ForwardFinalization<E: ProcessEdgesWork>(PhantomData<E>);
+pub struct ForwardFinalization<E: ProcessSlotsWork>(PhantomData<E>);
 
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ForwardFinalization<E> {
+impl<E: ProcessSlotsWork> GCWork<E::VM> for ForwardFinalization<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("Forward finalization");
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
@@ -202,7 +202,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ForwardFinalization<E> {
         trace!("Finished forwarding finlizable");
     }
 }
-impl<E: ProcessEdgesWork> ForwardFinalization<E> {
+impl<E: ProcessSlotsWork> ForwardFinalization<E> {
     pub fn new() -> Self {
         Self(PhantomData)
     }

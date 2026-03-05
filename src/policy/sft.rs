@@ -1,4 +1,4 @@
-use crate::plan::VectorObjectQueue;
+use crate::plan::tracing::OptionObjectQueue;
 use crate::scheduler::GCWorker;
 use crate::util::*;
 use crate::vm::VMBinding;
@@ -103,7 +103,7 @@ pub trait SFT {
         &self,
         // We use concrete type for `queue` because SFT doesn't support generic parameters,
         // and SFTProcessEdges uses `VectorObjectQueue`.
-        queue: &mut VectorObjectQueue,
+        queue: &mut OptionObjectQueue,
         object: ObjectReference,
         worker: GCWorkerMutRef,
     ) -> ObjectReference;
@@ -194,7 +194,7 @@ impl SFT for EmptySpaceSFT {
 
     fn sft_trace_object(
         &self,
-        _queue: &mut VectorObjectQueue,
+        _queue: &mut OptionObjectQueue,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
