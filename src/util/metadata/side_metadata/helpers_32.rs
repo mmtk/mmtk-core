@@ -2,10 +2,9 @@ use super::SideMetadataSpec;
 use crate::util::{
     constants::{self, LOG_BITS_IN_BYTE},
     heap::layout::vm_layout::{BYTES_IN_CHUNK, CHUNK_MASK, LOG_BYTES_IN_CHUNK},
-    memory::{self, MmapAnnotation},
+    os::*,
     Address,
 };
-use std::io::Result;
 
 use super::constants::{
     LOCAL_SIDE_METADATA_BASE_ADDRESS, LOCAL_SIDE_METADATA_PER_CHUNK,
@@ -102,7 +101,7 @@ pub(super) const fn metadata_bytes_per_chunk(
 pub(crate) fn ensure_munmap_metadata_chunk(start: Address, local_per_chunk: usize) {
     if local_per_chunk != 0 {
         let policy_meta_start = address_to_meta_chunk_addr(start);
-        assert!(memory::munmap(policy_meta_start, local_per_chunk).is_ok())
+        assert!(OS::munmap(policy_meta_start, local_per_chunk).is_ok())
     }
 }
 
@@ -113,7 +112,7 @@ pub(super) fn try_map_per_chunk_metadata_space(
     local_per_chunk: usize,
     no_reserve: bool,
     anno: &MmapAnnotation,
-) -> Result<usize> {
+) -> MmapResult<usize> {
     let mut aligned_start = start.align_down(BYTES_IN_CHUNK);
     let aligned_end = (start + size).align_up(BYTES_IN_CHUNK);
 
@@ -152,11 +151,13 @@ pub(super) fn try_map_per_chunk_metadata_space(
                 local_per_chunk,
                 res
             );
-            return Result::Err(res.err().unwrap());
+            return Err(res.err().unwrap());
         }
         if munmap_first_chunk.is_none() {
             // if first chunk is newly mapped, it needs munmap on failure
-            munmap_first_chunk = Some(memory::result_is_mapped(res));
+            let map_exists =
+                res.is_err_and(|e| e.error.kind() == std::io::ErrorKind::AlreadyExists);
+            munmap_first_chunk = Some(map_exists);
         }
         aligned_start += BYTES_IN_CHUNK;
         total_mapped += local_per_chunk;
@@ -177,7 +178,7 @@ pub(super) fn try_mmap_metadata_chunk(
     local_per_chunk: usize,
     no_reserve: bool,
     anno: &MmapAnnotation,
-) -> Result<()> {
+) -> MmapResult<()> {
     debug_assert!(start.is_aligned_to(BYTES_IN_CHUNK));
 
     let policy_meta_start = address_to_meta_chunk_addr(start);
@@ -187,15 +188,11 @@ pub(super) fn try_mmap_metadata_chunk(
         MMAPPER.ensure_mapped(
             policy_meta_start,
             pages,
-            memory::MmapStrategy::SIDE_METADATA,
+            HugePageSupport::No,
+            MmapProtection::ReadWrite,
             anno,
         )
     } else {
-        MMAPPER.quarantine_address_range(
-            policy_meta_start,
-            pages,
-            memory::MmapStrategy::SIDE_METADATA,
-            anno,
-        )
+        MMAPPER.quarantine_address_range(policy_meta_start, pages, HugePageSupport::No, anno)
     }
 }

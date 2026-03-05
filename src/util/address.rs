@@ -203,6 +203,11 @@ impl Address {
         Address(self.0 + size)
     }
 
+    /// Wrapping (modular) addition. Computes self + rhs, wrapping around at the boundary of the type.
+    pub const fn wrapping_add(self, size: usize) -> Address {
+        Address(self.0.wrapping_add(size))
+    }
+
     // We implemented the Sub trait but we still keep this sub function.
     // The sub() function is const fn, and we can use it to declare Address constants.
     // The Sub trait function cannot be const.
