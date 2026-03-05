@@ -139,7 +139,7 @@ fn total_side_metadata_bytes() -> usize {
     {
         let local_bytes =
             1usize << (VMLayout::LOG_ARCH_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO);
-        return global_side_metadata_bytes().max(vm_end) + local_bytes;
+        global_side_metadata_bytes().max(vm_end) + local_bytes
     }
 }
 

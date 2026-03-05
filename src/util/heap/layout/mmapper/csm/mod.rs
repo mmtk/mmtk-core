@@ -196,7 +196,11 @@ impl Mmapper for ChunkStateMmapper {
         let range = ChunkRange::new_aligned(start, bytes);
 
         let log_mappable = self.storage.log_mappable_bytes() as u32;
-        let mappable_limit = unsafe { Address::from_usize(1usize << log_mappable) };
+        let mappable_limit = if log_mappable < usize::BITS {
+            unsafe { Address::from_usize(1usize << log_mappable) }
+        } else {
+            Address::MAX
+        };
         if !range.is_within_limit(mappable_limit) {
             // Unmap and return error if the mapping is outside the addressable range.
             let _ = OS::munmap(start, bytes);
