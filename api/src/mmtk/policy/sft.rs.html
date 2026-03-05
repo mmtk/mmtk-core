@@ -75,10 +75,10 @@
 <a href=#75 id=75 data-nosnippet>75</a>    /// This default implementation works for all spaces that use MMTk's mapper to allocate memory.
 <a href=#76 id=76 data-nosnippet>76</a>    /// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.
 <a href=#77 id=77 data-nosnippet>77</a>    /// Such spaces needs to override this method.
-<a href=#78 id=78 data-nosnippet>78</a>    </span><span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
+<a href=#78 id=78 data-nosnippet>78</a>    </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
 <a href=#79 id=79 data-nosnippet>79</a>    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;;
 <a href=#80 id=80 data-nosnippet>80</a>
-<a href=#81 id=81 data-nosnippet>81</a>    <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
+<a href=#81 id=81 data-nosnippet>81</a>    <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
 <a href=#82 id=82 data-nosnippet>82</a>    </span><span class="kw">fn </span>find_object_from_internal_pointer(
 <a href=#83 id=83 data-nosnippet>83</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
 <a href=#84 id=84 data-nosnippet>84</a>        ptr: Address,
@@ -172,11 +172,11 @@
 <a href=#172 id=172 data-nosnippet>172</a>    <span class="kw">fn </span>is_in_space(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
 <a href=#173 id=173 data-nosnippet>173</a>        <span class="bool-val">false
 <a href=#174 id=174 data-nosnippet>174</a>    </span>}
-<a href=#175 id=175 data-nosnippet>175</a>    <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
+<a href=#175 id=175 data-nosnippet>175</a>    <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
 <a href=#176 id=176 data-nosnippet>176</a>    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
 <a href=#177 id=177 data-nosnippet>177</a>        <span class="prelude-val">None
 <a href=#178 id=178 data-nosnippet>178</a>    </span>}
-<a href=#179 id=179 data-nosnippet>179</a>    <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
+<a href=#179 id=179 data-nosnippet>179</a>    <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
 <a href=#180 id=180 data-nosnippet>180</a>    </span><span class="kw">fn </span>find_object_from_internal_pointer(
 <a href=#181 id=181 data-nosnippet>181</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
 <a href=#182 id=182 data-nosnippet>182</a>        _ptr: Address,

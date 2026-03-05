@@ -105,7 +105,7 @@
 <a href=#105 id=105 data-nosnippet>105</a>    }
 <a href=#106 id=106 data-nosnippet>106</a>
 <a href=#107 id=107 data-nosnippet>107</a>    <span class="doccomment">/// For malloc space, we just use the side metadata.
-<a href=#108 id=108 data-nosnippet>108</a>    </span><span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
+<a href=#108 id=108 data-nosnippet>108</a>    </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
 <a href=#109 id=109 data-nosnippet>109</a>    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
 <a href=#110 id=110 data-nosnippet>110</a>        <span class="macro">debug_assert!</span>(!addr.is_zero());
 <a href=#111 id=111 data-nosnippet>111</a>        <span class="comment">// `addr` cannot be mapped by us. It should be mapped by the malloc library.
@@ -113,7 +113,7 @@
 <a href=#113 id=113 data-nosnippet>113</a>        <span class="self">self</span>.has_object_alloced_by_malloc(addr)
 <a href=#114 id=114 data-nosnippet>114</a>    }
 <a href=#115 id=115 data-nosnippet>115</a>
-<a href=#116 id=116 data-nosnippet>116</a>    <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
+<a href=#116 id=116 data-nosnippet>116</a>    <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
 <a href=#117 id=117 data-nosnippet>117</a>    </span><span class="kw">fn </span>find_object_from_internal_pointer(
 <a href=#118 id=118 data-nosnippet>118</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
 <a href=#119 id=119 data-nosnippet>119</a>        ptr: Address,
@@ -545,7 +545,7 @@
 <a href=#545 id=545 data-nosnippet>545</a>    ///
 <a href=#546 id=546 data-nosnippet>546</a>    /// This function doesn't check if `addr` is aligned.
 <a href=#547 id=547 data-nosnippet>547</a>    /// If not, it will try to load the VO bit for the address rounded down to the metadata's granularity.
-<a href=#548 id=548 data-nosnippet>548</a>    </span><span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
+<a href=#548 id=548 data-nosnippet>548</a>    </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
 <a href=#549 id=549 data-nosnippet>549</a>    </span><span class="kw">pub fn </span>has_object_alloced_by_malloc(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
 <a href=#550 id=550 data-nosnippet>550</a>        <span class="kw">if </span>!<span class="self">self</span>.is_meta_space_mapped_for_address(addr) {
 <a href=#551 id=551 data-nosnippet>551</a>            <span class="kw">return </span><span class="prelude-val">None</span>;
