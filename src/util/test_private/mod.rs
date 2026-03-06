@@ -10,6 +10,7 @@
 
 pub use crate::util::metadata::side_metadata::helpers::scan_non_zero_bits_in_metadata_bytes;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::vm::VMBinding;
 
 use super::Address;
 
@@ -33,6 +34,20 @@ pub fn set_meta_bits(
     meta_end_bit: u8,
 ) {
     SideMetadataSpec::set_meta_bits(meta_start_addr, meta_start_bit, meta_end_addr, meta_end_bit)
+}
+
+/// Expose `address_to_meta_address` when running `cargo bench`.
+#[inline(always)]
+pub fn side_metadata_address_to_meta_address(
+    metadata_spec: &SideMetadataSpec,
+    data_addr: Address,
+) -> Address {
+    crate::util::metadata::side_metadata::address_to_meta_address(metadata_spec, data_addr)
+}
+
+/// Expose side metadata initialization when running `cargo bench`.
+pub fn initialize_side_metadata<VM: VMBinding>() {
+    crate::util::metadata::side_metadata::initialize_side_metadata::<VM>(Address::ZERO)
 }
 
 #[cfg(feature = "mock_test")]

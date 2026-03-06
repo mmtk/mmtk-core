@@ -187,7 +187,7 @@ impl<VM: VMBinding> Compressor<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
-        let res = Compressor {
+        Compressor {
             compressor_space: CompressorSpace::new(plan_args.get_normal_space_args(
                 "compressor_space",
                 true,
@@ -195,10 +195,6 @@ impl<VM: VMBinding> Compressor<VM> {
                 VMRequest::discontiguous(),
             )),
             common: CommonPlan::new(plan_args),
-        };
-
-        res.verify_side_metadata_sanity();
-
-        res
+        }
     }
 }

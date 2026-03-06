@@ -1,4 +1,5 @@
 use crate::util::address::Address;
+use crate::util::conversions::raw_align_up;
 use crate::util::os::*;
 use std::io::Result;
 
@@ -21,13 +22,30 @@ pub fn mmap(
 ) -> MmapResult<Address> {
     let ptr = start.to_mut_ptr();
     let prot = strategy.prot.get_native_flags();
-    let flags = strategy.get_posix_mmap_flags();
+    let flags = strategy.get_posix_mmap_flags(true);
     wrap_libc_call(
         &|| unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) },
         ptr,
     )
     .map_err(|e| MmapError::new(start, size, annotation, e))?;
     Ok(start)
+}
+
+pub fn mmap_anywhere(size: usize, align: usize, strategy: MmapStrategy) -> Result<Address> {
+    debug_assert!(align.is_power_of_two());
+
+    let aligned_size = raw_align_up(size, align);
+    let alloc_size = aligned_size + align;
+    let prot = strategy.prot.get_native_flags();
+    let flags = strategy.get_posix_mmap_flags(false);
+
+    let ptr = unsafe { libc::mmap(std::ptr::null_mut(), alloc_size, prot, flags, -1, 0) };
+    if ptr == libc::MAP_FAILED {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    let start = Address::from_mut_ptr(ptr);
+    Ok(start.align_up(align))
 }
 
 pub fn is_mmap_oom(os_errno: i32) -> bool {

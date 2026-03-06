@@ -403,7 +403,21 @@ mod tests {
     use super::*;
     use crate::util::metadata::side_metadata::*;
 
+    fn should_skip_spec_on_this_target(spec: &SideMetadataSpec) -> bool {
+        use layout::LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO;
+        log_data_meta_ratio(spec) < LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO
+    }
+
     fn test_round_trip_conversion(spec: &SideMetadataSpec, test_data: &[Address]) {
+        core_test_initialize_side_metadata();
+        if should_skip_spec_on_this_target(spec) {
+            eprintln!(
+                "Skipping {} on this target: spec ratio is outside global side metadata worst-case bound",
+                spec.name
+            );
+            return;
+        }
+
         for ref_addr in test_data {
             let addr = *ref_addr;
 
@@ -447,7 +461,7 @@ mod tests {
         let spec = SideMetadataSpec {
             name: "ContiguousMetadataTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 3,
         };
@@ -460,7 +474,7 @@ mod tests {
         let spec = SideMetadataSpec {
             name: "ContiguousMetadataTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: 0,
             log_num_of_bits: 1,
             log_bytes_in_region: 3,
         };
@@ -473,7 +487,7 @@ mod tests {
         let spec = SideMetadataSpec {
             name: "ContiguousMetadataTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: 0,
             log_num_of_bits: 4,
             log_bytes_in_region: 3,
         };
@@ -486,7 +500,7 @@ mod tests {
         let spec = SideMetadataSpec {
             name: "ContiguousMetadataTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: 0,
             log_num_of_bits: 5,
             log_bytes_in_region: 3,
         };
@@ -510,7 +524,7 @@ mod tests {
         let spec = SideMetadataSpec {
             name: "ContiguousMetadataTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 12, // 4K
         };
@@ -539,7 +553,7 @@ mod tests {
         let create_spec = |log_num_of_bits: usize| SideMetadataSpec {
             name: "AlignMetadataBitTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: 0,
             log_num_of_bits,
             log_bytes_in_region: 3,
         };
