@@ -31,18 +31,20 @@ static VM_SIDE_METADATA_UPPER_BOUND_OFFSET: OnceLock<usize> = OnceLock::new();
 /// Record VM side metadata layout so startup reservation can cover VM specs.
 /// This must be called before `initialize_side_metadata_base()`.
 pub(super) fn set_vm_side_metadata_specs(specs: &[SideMetadataSpec]) {
-    let mut upper_bound = 0usize;
-    for spec in specs {
-        if spec.is_absolute_offset() {
-            upper_bound = upper_bound.max(spec.upper_bound_offset());
+    let _ = VM_SIDE_METADATA_UPPER_BOUND_OFFSET.get_or_init(|| {
+        let mut upper_bound = 0usize;
+        for spec in specs {
+            if spec.is_absolute_offset() {
+                upper_bound = upper_bound.max(spec.upper_bound_offset());
+            }
         }
-    }
-    let _ = VM_SIDE_METADATA_UPPER_BOUND_OFFSET.set(upper_bound);
-    debug!(
-        "Registered VM side metadata layout: {} specs, upper_bound={}",
-        specs.len(),
+        debug!(
+            "Registered VM side metadata layout: {} specs, upper_bound={}",
+            specs.len(),
+            upper_bound
+        );
         upper_bound
-    );
+    });
 }
 
 // Step 2: Call `initialize_side_metadata_base()` to reserve address space for side metadata.
