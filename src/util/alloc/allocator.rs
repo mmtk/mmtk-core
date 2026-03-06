@@ -11,7 +11,6 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use crate::policy::space::Space;
-use crate::util::constants::*;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection};
@@ -221,6 +220,7 @@ pub fn get_maximum_aligned_size_inner<VM: VMBinding>(
 
 #[cfg(debug_assertions)]
 pub(crate) fn assert_allocation_args<VM: VMBinding>(size: usize, align: usize, offset: usize) {
+    use crate::util::constants::*;
     // MMTk has assumptions about minimal object size.
     // We need to make sure that all allocations comply with the min object size.
     // Ideally, we check the allocation size, and if it is smaller, we transparently allocate the min
