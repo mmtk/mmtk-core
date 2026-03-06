@@ -158,7 +158,7 @@ pub fn align_allocation_inner<VM: VMBinding>(
     // Make sure MIN_ALIGNMENT is reasonable.
     #[allow(clippy::assertions_on_constants)]
     {
-        debug_assert!(VM::MIN_ALIGNMENT >= BYTES_IN_INT);
+        debug_assert!(VM::MIN_ALIGNMENT >= std::mem::size_of::<i32>());
     }
     debug_assert!(!(fillalignmentgap && region.is_zero()));
     debug_assert!(alignment <= VM::MAX_ALIGNMENT);

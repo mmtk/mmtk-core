@@ -272,7 +272,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MallocSpac
 
 // Actually no max object size.
 #[allow(dead_code)]
-pub const MAX_OBJECT_SIZE: usize = crate::util::constants::MAX_INT;
+pub const MAX_OBJECT_SIZE: usize = i32::MAX as _;
 
 impl<VM: VMBinding> MallocSpace<VM> {
     pub fn extend_global_side_metadata_specs(specs: &mut Vec<SideMetadataSpec>) {
