@@ -239,10 +239,6 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 
     fn flush(&mut self) {}
 
-    fn trace_object(&mut self, _object: ObjectReference) -> ObjectReference {
-        unreachable!()
-    }
-
     fn process_slots(&mut self) {
         let pause = self
             .base
@@ -275,8 +271,20 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         }
     }
 
-    fn create_scan_work(&self, _nodes: Vec<ObjectReference>) -> Self::ScanObjectsWorkType {
-        unimplemented!()
+    // The following two methods are implemented to support pinning roots and tpinning roots.
+    // MMTk will create [`crate::scheduler::gc_work::ProcessRootNodes`] to process root nodes with this type.
+
+    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        // We just push to the node buffer. ProcessRootNodes will take all the nodes later.
+        self.nodes.push(object);
+        object
+    }
+
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
+        // Don't create a scan object work packet. Instead, create a concurrent trace work.
+        self.create_and_schedule_concurrent_trace_objects_work(nodes);
+        // Return None to avoid creating a scan objects work packet.
+        None
     }
 }
 

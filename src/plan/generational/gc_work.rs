@@ -67,8 +67,8 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
         }
     }
 
-    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Self::ScanObjectsWorkType {
-        PlanScanObjects::new(self.plan, nodes, false, self.bucket)
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
+        Some(PlanScanObjects::new(self.plan, nodes, false, self.bucket))
     }
 }
 
