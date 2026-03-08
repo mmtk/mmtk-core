@@ -213,7 +213,11 @@ impl<VM: VMBinding> MMTK<VM> {
             },
         );
 
+        // The order here is important:
+        // Initialize side metadat sanity first
         plan.verify_side_metadata_sanity();
+        // Then intiialize SFT because it may use side metadata
+        plan.initialize_sft();
 
         MMTK {
             options,
