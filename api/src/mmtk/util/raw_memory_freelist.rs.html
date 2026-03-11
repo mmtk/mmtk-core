@@ -5,7 +5,7 @@
 <a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span><span class="kw">crate</span>::util::os::<span class="kw-2">*</span>;
 <a href=#6 id=6 data-nosnippet>6</a>
 <a href=#7 id=7 data-nosnippet>7</a><span class="doccomment">/** log2 of the number of bits used by a free list entry (two entries per unit) */
-<a href=#8 id=8 data-nosnippet>8</a></span><span class="kw">const </span>LOG_ENTRY_BITS: usize = LOG_BITS_IN_INT <span class="kw">as _</span>;
+<a href=#8 id=8 data-nosnippet>8</a></span><span class="kw">const </span>LOG_ENTRY_BITS: usize = i32::BITS.ilog2() <span class="kw">as _</span>;
 <a href=#9 id=9 data-nosnippet>9</a>
 <a href=#10 id=10 data-nosnippet>10</a><span class="doccomment">/** log2 of the number of bytes used by a free list entry (two entries per unit) */
 <a href=#11 id=11 data-nosnippet>11</a></span><span class="kw">const </span>LOG_BYTES_IN_ENTRY: usize = LOG_ENTRY_BITS - (LOG_BITS_IN_BYTE <span class="kw">as </span>usize);

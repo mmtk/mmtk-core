@@ -55,28 +55,30 @@
 <a href=#55 id=55 data-nosnippet>55</a>        PlanConstraints {
 <a href=#56 id=56 data-nosnippet>56</a>            collects_garbage: <span class="bool-val">true</span>,
 <a href=#57 id=57 data-nosnippet>57</a>            moves_objects: <span class="bool-val">false</span>,
-<a href=#58 id=58 data-nosnippet>58</a>            max_non_los_default_alloc_bytes: MAX_INT,
-<a href=#59 id=59 data-nosnippet>59</a>            max_non_los_copy_bytes: MAX_INT,
-<a href=#60 id=60 data-nosnippet>60</a>            <span class="comment">// As `LAZY_SWEEP` is true, needs_linear_scan is true for all the plans. This is strange.
-<a href=#61 id=61 data-nosnippet>61</a>            // https://github.com/mmtk/mmtk-core/issues/1027 tracks the issue.
-<a href=#62 id=62 data-nosnippet>62</a>            </span>needs_linear_scan: <span class="kw">crate</span>::util::constants::SUPPORT_CARD_SCANNING
-<a href=#63 id=63 data-nosnippet>63</a>                || <span class="kw">crate</span>::util::constants::LAZY_SWEEP,
-<a href=#64 id=64 data-nosnippet>64</a>            needs_concurrent_workers: <span class="bool-val">false</span>,
-<a href=#65 id=65 data-nosnippet>65</a>            <span class="comment">// We may trace duplicate edges in mark sweep. If we use mark sweep as the non moving policy, it will be included in every
-<a href=#66 id=66 data-nosnippet>66</a>            </span>may_trace_duplicate_edges: <span class="macro">cfg!</span>(feature = <span class="string">"marksweep_as_nonmoving"</span>),
-<a href=#67 id=67 data-nosnippet>67</a>            needs_forward_after_liveness: <span class="bool-val">false</span>,
-<a href=#68 id=68 data-nosnippet>68</a>            needs_log_bit: <span class="bool-val">false</span>,
-<a href=#69 id=69 data-nosnippet>69</a>            barrier: BarrierSelector::NoBarrier,
-<a href=#70 id=70 data-nosnippet>70</a>            <span class="comment">// If we use mark sweep as non moving space, we need to prepare mutator. See [`common_prepare_func`].
-<a href=#71 id=71 data-nosnippet>71</a>            </span>needs_prepare_mutator: <span class="macro">cfg!</span>(feature = <span class="string">"marksweep_as_nonmoving"</span>),
-<a href=#72 id=72 data-nosnippet>72</a>            generational: <span class="bool-val">false</span>,
-<a href=#73 id=73 data-nosnippet>73</a>        }
-<a href=#74 id=74 data-nosnippet>74</a>    }
-<a href=#75 id=75 data-nosnippet>75</a>}
-<a href=#76 id=76 data-nosnippet>76</a>
-<a href=#77 id=77 data-nosnippet>77</a><span class="doccomment">/// The default plan constraints. Each plan should define their own plan constraints.
-<a href=#78 id=78 data-nosnippet>78</a>/// They can start from the default constraints and explicitly set some of the fields.
-<a href=#79 id=79 data-nosnippet>79</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>DEFAULT_PLAN_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
-<a href=#80 id=80 data-nosnippet>80</a>
-<a href=#81 id=81 data-nosnippet>81</a><span class="comment">// Use two pages as the size limit for non-LOS objects to avoid copying large objects
-<a href=#82 id=82 data-nosnippet>82</a></span><span class="kw">pub const </span>MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN: usize = <span class="number">2 </span>&lt;&lt; LOG_BYTES_IN_PAGE;</code></pre></div></section></main></body></html>
+<a href=#58 id=58 data-nosnippet>58</a>            <span class="comment">// No limit by default.  All objects can go to non-LOS space.
+<a href=#59 id=59 data-nosnippet>59</a>            </span>max_non_los_default_alloc_bytes: usize::MAX,
+<a href=#60 id=60 data-nosnippet>60</a>            <span class="comment">// No limit by default.  All objects can go to non-LOS space.
+<a href=#61 id=61 data-nosnippet>61</a>            </span>max_non_los_copy_bytes: usize::MAX,
+<a href=#62 id=62 data-nosnippet>62</a>            <span class="comment">// As `LAZY_SWEEP` is true, needs_linear_scan is true for all the plans. This is strange.
+<a href=#63 id=63 data-nosnippet>63</a>            // https://github.com/mmtk/mmtk-core/issues/1027 tracks the issue.
+<a href=#64 id=64 data-nosnippet>64</a>            </span>needs_linear_scan: <span class="kw">crate</span>::util::constants::SUPPORT_CARD_SCANNING
+<a href=#65 id=65 data-nosnippet>65</a>                || <span class="kw">crate</span>::util::constants::LAZY_SWEEP,
+<a href=#66 id=66 data-nosnippet>66</a>            needs_concurrent_workers: <span class="bool-val">false</span>,
+<a href=#67 id=67 data-nosnippet>67</a>            <span class="comment">// We may trace duplicate edges in mark sweep. If we use mark sweep as the non moving policy, it will be included in every
+<a href=#68 id=68 data-nosnippet>68</a>            </span>may_trace_duplicate_edges: <span class="macro">cfg!</span>(feature = <span class="string">"marksweep_as_nonmoving"</span>),
+<a href=#69 id=69 data-nosnippet>69</a>            needs_forward_after_liveness: <span class="bool-val">false</span>,
+<a href=#70 id=70 data-nosnippet>70</a>            needs_log_bit: <span class="bool-val">false</span>,
+<a href=#71 id=71 data-nosnippet>71</a>            barrier: BarrierSelector::NoBarrier,
+<a href=#72 id=72 data-nosnippet>72</a>            <span class="comment">// If we use mark sweep as non moving space, we need to prepare mutator. See [`common_prepare_func`].
+<a href=#73 id=73 data-nosnippet>73</a>            </span>needs_prepare_mutator: <span class="macro">cfg!</span>(feature = <span class="string">"marksweep_as_nonmoving"</span>),
+<a href=#74 id=74 data-nosnippet>74</a>            generational: <span class="bool-val">false</span>,
+<a href=#75 id=75 data-nosnippet>75</a>        }
+<a href=#76 id=76 data-nosnippet>76</a>    }
+<a href=#77 id=77 data-nosnippet>77</a>}
+<a href=#78 id=78 data-nosnippet>78</a>
+<a href=#79 id=79 data-nosnippet>79</a><span class="doccomment">/// The default plan constraints. Each plan should define their own plan constraints.
+<a href=#80 id=80 data-nosnippet>80</a>/// They can start from the default constraints and explicitly set some of the fields.
+<a href=#81 id=81 data-nosnippet>81</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>DEFAULT_PLAN_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
+<a href=#82 id=82 data-nosnippet>82</a>
+<a href=#83 id=83 data-nosnippet>83</a><span class="comment">// Use two pages as the size limit for non-LOS objects to avoid copying large objects
+<a href=#84 id=84 data-nosnippet>84</a></span><span class="kw">pub const </span>MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN: usize = <span class="number">2 </span>&lt;&lt; LOG_BYTES_IN_PAGE;</code></pre></div></section></main></body></html>
