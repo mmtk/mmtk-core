@@ -429,6 +429,27 @@ impl<VM: VMBinding> MMTK<VM> {
         }
     }
 
+    /// Disable collection in MMTk core.
+    ///
+    /// This method is nestable.  Each call must be paired with a matching call to
+    /// [`MMTK::enable_collection`].
+    pub fn disable_collection(&self) {
+        self.gc_trigger.disable_collection();
+    }
+
+    /// Re-enable collection in MMTk core.
+    ///
+    /// This method is nestable.  Calling it without a prior matching call to
+    /// [`MMTK::disable_collection`] is a logic error.
+    pub fn enable_collection(&self) {
+        self.gc_trigger.enable_collection();
+    }
+
+    /// Return whether collection is enabled in MMTk core.
+    pub fn is_collection_enabled(&self) -> bool {
+        self.gc_trigger.is_collection_enabled()
+    }
+
     /// MMTK has requested stop-the-world activity (e.g., stw within a concurrent gc).
     #[allow(unused)]
     pub fn trigger_internal_collection_request(&self) {

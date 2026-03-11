@@ -7,12 +7,11 @@ use crate::scheduler::GCWorkScheduler;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions;
 use crate::util::options::{GCTriggerSelector, Options, DEFAULT_MAX_NURSERY, DEFAULT_MIN_NURSERY};
-use crate::vm::Collection;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::mem::MaybeUninit;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// GCTrigger is responsible for triggering GCs based on the given policy.
 /// All the decisions about heap limit and GC triggering should be resolved here.
@@ -27,6 +26,10 @@ pub struct GCTrigger<VM: VMBinding> {
     /// Set by mutators to trigger GC.  It is atomic so that mutators can check if GC has already
     /// been requested efficiently in `poll` without acquiring any mutex.
     request_flag: AtomicBool,
+    /// Nesting level for collection-disable scopes requested via MMTk APIs.
+    collection_disable_depth: AtomicUsize,
+    /// Serializes collection-disable updates with GC request scheduling.
+    collection_control_lock: Mutex<()>,
     scheduler: Arc<GCWorkScheduler<VM>>,
     options: Arc<Options>,
     state: Arc<GlobalState>,
@@ -63,6 +66,8 @@ impl<VM: VMBinding> GCTrigger<VM> {
             },
             options,
             request_flag: AtomicBool::new(false),
+            collection_disable_depth: AtomicUsize::new(0),
+            collection_control_lock: Mutex::new(()),
             scheduler,
             state,
         }
@@ -93,6 +98,15 @@ impl<VM: VMBinding> GCTrigger<VM> {
         }
     }
 
+    fn request_if_collection_enabled(&self) -> bool {
+        let _guard = self.collection_control_lock.lock().unwrap();
+        if self.collection_disable_depth.load(Ordering::Acquire) > 0 {
+            return false;
+        }
+        self.request();
+        true
+    }
+
     /// Clear the "GC requested" flag so that mutators can trigger the next GC.
     /// Called by a GC worker when all mutators have come to a stop.
     pub fn clear_request(&self) {
@@ -107,7 +121,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// * `space_full`: Space request failed, must recover pages within 'space'.
     /// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.
     pub fn poll(&self, space_full: bool, space: Option<&dyn Space<VM>>) -> bool {
-        if !VM::VMCollection::is_collection_enabled() {
+        if !self.is_collection_enabled() {
             return false;
         }
 
@@ -127,8 +141,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 plan.get_reserved_pages(),
                 plan.get_total_pages(),
             );
-            self.request();
-            return true;
+            return self.request_if_collection_enabled();
         }
         false
     }
@@ -145,7 +158,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
             return false;
         }
 
-        if force || !*self.options.ignore_system_gc && VM::VMCollection::is_collection_enabled() {
+        if force || !*self.options.ignore_system_gc && self.is_collection_enabled() {
             info!("User triggering collection");
             // TODO: this may not work reliably. If a GC has been triggered, this will not force it to be a full heap GC.
             if exhaustive {
@@ -157,11 +170,29 @@ impl<VM: VMBinding> GCTrigger<VM> {
             self.state
                 .user_triggered_collection
                 .store(true, Ordering::Relaxed);
-            self.request();
-            return true;
+            return self.request_if_collection_enabled();
         }
 
         false
+    }
+
+    pub fn disable_collection(&self) {
+        let _guard = self.collection_control_lock.lock().unwrap();
+        self.collection_disable_depth.fetch_add(1, Ordering::Release);
+    }
+
+    pub fn enable_collection(&self) {
+        let _guard = self.collection_control_lock.lock().unwrap();
+        let depth = self.collection_disable_depth.load(Ordering::Acquire);
+        assert!(
+            depth > 0,
+            "enable_collection() called without a matching disable_collection()"
+        );
+        self.collection_disable_depth.store(depth - 1, Ordering::Release);
+    }
+
+    pub fn is_collection_enabled(&self) -> bool {
+        self.collection_disable_depth.load(Ordering::Acquire) == 0
     }
 
     /// MMTK has requested stop-the-world activity (e.g., stw within a concurrent gc).
