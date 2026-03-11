@@ -90,11 +90,6 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> BarrierSem
         // Only enqueue array slices in mature spaces
         if !dst_in_nursery {
             // enqueue
-            debug_assert_eq!(
-                dst.bytes() & (std::mem::size_of::<i32>() - 1),
-                0,
-                "bytes should be a multiple of 32-bit words"
-            );
             self.region_modbuf.push(dst);
             self.region_modbuf
                 .is_full()

@@ -157,6 +157,12 @@ pub fn align_allocation_inner<VM: VMBinding>(
     // Make sure MIN_ALIGNMENT is reasonable.
     #[allow(clippy::assertions_on_constants)]
     {
+        // TODO: This is a static assertion that VM::MIN_ALIGNMENT must be at least 4.
+        // This assertion has existed since JikesRVM MMTk.
+        // We are keeping it here because some implementation details of the allocator may rely on this assertion.
+        // Some GC algorithms may require a stricter minimum alignment, and that can override the value.
+        // We should refactor the VM binding API and the internal interface
+        // to reconcile the requirements from the VM and the GC algorithms.
         debug_assert!(VM::MIN_ALIGNMENT >= std::mem::size_of::<i32>());
     }
     debug_assert!(!(fillalignmentgap && region.is_zero()));
