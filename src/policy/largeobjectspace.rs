@@ -72,7 +72,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         // VO bit: Set for all objects.
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(object);
-        #[cfg(all(feature = "is_mmtk_object", debug_assertions))]
+        #[cfg(all(feature = "vo_bit", debug_assertions))]
         {
             use crate::util::constants::LOG_BYTES_IN_PAGE;
             let vo_addr = object.to_raw_address();
@@ -129,11 +129,11 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         self.treadmill.add_to_treadmill(object, into_nursery);
     }
 
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
         crate::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
     }
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn find_object_from_internal_pointer(
         &self,
         ptr: Address,
@@ -302,7 +302,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
         };
         pr.protect_memory_on_release = if protect_memory_on_release {
-            Some(common.mmap_strategy().prot)
+            Some(common.mmap_protection())
         } else {
             None
         };
@@ -312,8 +312,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             mark_state: 0,
             in_nursery_gc: false,
             treadmill: TreadMill::new(),
-            #[cfg(feature = "dump_memory_stats")]
-            live_bytes: AtomicUsize::new(0),
             clear_log_bit_on_sweep,
         }
     }

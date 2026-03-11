@@ -10,10 +10,10 @@ use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::{extract_side_metadata, MetadataSpec};
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::object_forwarding;
+use crate::util::os::*;
 use crate::util::{copy::*, object_enum};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
-use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -74,12 +74,12 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         }
     }
 
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
         crate::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
     }
 
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn find_object_from_internal_pointer(
         &self,
         ptr: Address,
@@ -316,8 +316,8 @@ impl<VM: VMBinding> CopySpace<VM> {
         }
         let start = self.common().start;
         let extent = self.common().extent;
-        unsafe {
-            mprotect(start.to_mut_ptr(), extent, PROT_NONE);
+        if let Err(e) = OS::set_memory_access(start, extent, MmapProtection::NoAccess) {
+            panic!("Failed to protect memory: {:?}", e);
         }
         trace!("Protect {:x} {:x}", start, start + extent);
     }
@@ -331,12 +331,8 @@ impl<VM: VMBinding> CopySpace<VM> {
         }
         let start = self.common().start;
         let extent = self.common().extent;
-        unsafe {
-            mprotect(
-                start.to_mut_ptr(),
-                extent,
-                PROT_READ | PROT_WRITE | PROT_EXEC,
-            );
+        if let Err(e) = OS::set_memory_access(start, extent, self.common().mmap_protection()) {
+            panic!("Failed to unprotect memory: {:?}", e);
         }
         trace!("Unprotect {:x} {:x}", start, start + extent);
     }

@@ -75,10 +75,10 @@ pub trait SFT {
     /// This default implementation works for all spaces that use MMTk's mapper to allocate memory.
     /// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.
     /// Such spaces needs to override this method.
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference>;
 
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn find_object_from_internal_pointer(
         &self,
         ptr: Address,
@@ -172,11 +172,11 @@ impl SFT for EmptySpaceSFT {
     fn is_in_space(&self, _object: ObjectReference) -> bool {
         false
     }
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn is_mmtk_object(&self, _addr: Address) -> Option<ObjectReference> {
         None
     }
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn find_object_from_internal_pointer(
         &self,
         _ptr: Address,

@@ -224,7 +224,11 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
         object
     }
 
-    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Self::ScanObjectsWorkType {
-        ScanObjects::<Self>::new(nodes, false, WorkBucketStage::Closure)
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
+        Some(ScanObjects::<Self>::new(
+            nodes,
+            false,
+            WorkBucketStage::Closure,
+        ))
     }
 }
