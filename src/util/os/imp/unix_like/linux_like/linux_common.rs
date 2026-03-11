@@ -43,12 +43,14 @@ pub fn set_hugepage(start: Address, size: usize, options: HugePageSupport) -> Re
 
 impl MmapStrategy {
     /// get the flags for POSIX mmap.
-    pub fn get_posix_mmap_flags(&self) -> i32 {
+    pub fn get_posix_mmap_flags(&self, fixed: bool) -> i32 {
         let mut flags = libc::MAP_PRIVATE | libc::MAP_ANONYMOUS;
-        if self.replace {
-            flags |= libc::MAP_FIXED;
-        } else {
-            flags |= libc::MAP_FIXED_NOREPLACE
+        if fixed {
+            if self.replace {
+                flags |= libc::MAP_FIXED;
+            } else {
+                flags |= libc::MAP_FIXED_NOREPLACE
+            }
         }
         if !self.reserve {
             flags |= libc::MAP_NORESERVE;
@@ -117,6 +119,23 @@ pub fn dzmmap(
 
     // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
 
+    Ok(addr)
+}
+
+pub fn dzmmap_anywhere(
+    size: usize,
+    align: usize,
+    strategy: MmapStrategy,
+    annotation: &MmapAnnotation<'_>,
+) -> Result<Address> {
+    let addr = unix_common::mmap_anywhere(
+        size,
+        align,
+        strategy.prot(MmapProtection::NoAccess).reserve(false),
+    )?;
+    if !cfg!(feature = "no_mmap_annotation") {
+        set_vma_name(addr, size, annotation);
+    }
     Ok(addr)
 }
 

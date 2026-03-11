@@ -162,6 +162,12 @@ impl<VM: VMBinding> MMTK<VM> {
 
         let stats = Arc::new(Stats::new(&options));
 
+        // Initialize side metadata runtime state and reserve its address range before creating
+        // spaces. Plan/space initialization may map side metadata during setup.
+        crate::util::metadata::side_metadata::initialize_side_metadata::<VM>(
+            *options.side_metadata_base_address,
+        );
+
         // We need this during creating spaces, but we do not use this once the MMTk instance is created.
         // So we do not save it in MMTK. This may change in the future.
         let mut heap = HeapMeta::new();
@@ -206,6 +212,12 @@ impl<VM: VMBinding> MMTK<VM> {
                 })
             },
         );
+
+        // The order here is important:
+        // Initialize side metadat sanity first
+        plan.verify_side_metadata_sanity();
+        // Then intiialize SFT because it may use side metadata
+        plan.initialize_sft();
 
         MMTK {
             options,
