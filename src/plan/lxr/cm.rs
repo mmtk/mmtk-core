@@ -474,7 +474,17 @@ impl<VM: VMBinding> GCWork<VM> for ProcessModBufSATB {
         } else {
             return;
         };
-        GCWork::do_work(&mut w, worker, mmtk);
+
+        let current_pause = mmtk
+            .get_plan()
+            .downcast_ref::<LXR<VM>>()
+            .unwrap()
+            .current_pause();
+        if current_pause != Some(Pause::FinalMark) {
+            worker.scheduler().postpone(w);
+        } else {
+            GCWork::do_work(&mut w, worker, mmtk);
+        }
 
         // crate::NUM_CONCURRENT_TRACING_PACKETS.fetch_sub(1, Ordering::SeqCst);
     }

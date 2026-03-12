@@ -424,7 +424,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         &self,
         queue: Injector<Box<dyn GCWork<VM>>>,
         pqueue: Injector<Box<dyn GCWork<VM>>>,
-    ) {
+    ) -> bool {
         crate::MOVE_CONCURRENT_MARKING_TO_STW.store(false, Ordering::SeqCst);
         crate::PAUSE_CONCURRENT_MARKING.store(false, Ordering::SeqCst);
         let mut notify = false;
@@ -442,6 +442,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         if notify {
             self.wakeup_all_conc_workers();
         }
+        notify
     }
 
     /// Schedule "sentinel" work packets for all open buckets.
@@ -697,11 +698,16 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     LastParkedResult::WakeAll
                 } else {
                     // GC finished.
-                    self.on_gc_finished(worker);
+                    let conc_work = self.on_gc_finished(worker);
 
                     // Clear the current goal
                     goals.on_current_goal_completed();
-                    self.respond_to_requests(worker, goals)
+
+                    if conc_work {
+                        LastParkedResult::WakeAll
+                    } else {
+                        self.respond_to_requests(worker, goals)
+                    }
                 }
             }
             WorkerGoal::StopForFork => {
@@ -843,7 +849,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Called when GC has finished, i.e. when all work packets have been executed.
     ///
     /// Return `true` if any concurrent work packets have been scheduled.
-    fn on_gc_finished(&self, worker: &GCWorker<VM>) {
+    fn on_gc_finished(&self, worker: &GCWorker<VM>) -> bool {
         // All GC workers must have parked by now.
         debug_assert!(!self.worker_group.has_designated_work());
         self.debug_assert_all_stw_buckets_empty();
@@ -926,8 +932,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
 
         self.set_in_gc_pause(false);
-        self.schedule_concurrent_packets(queue, pqueue);
         self.debug_assert_all_stw_buckets_closed();
+        self.schedule_concurrent_packets(queue, pqueue)
     }
 
     pub fn enable_stat(&self) {
