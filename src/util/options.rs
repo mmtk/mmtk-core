@@ -909,6 +909,10 @@ options! {
     vm_space_start:         Address                 [always_valid] = Address::ZERO,
     /// The size of vmspace.
     vm_space_size:          usize                   [|v: &usize| *v > 0] = 0xdc0_0000,
+    /// The base address to reserve side metadata at startup.
+    /// If this is zero, MMTk will reserve side metadata at any available address.
+    /// If non-zero, MMTk will quarantine side metadata at this fixed address.
+    side_metadata_base_address: Address             [always_valid] = Address::ZERO,
     /// Perf events to measure
     /// Semicolons are used to separate events
     /// Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).

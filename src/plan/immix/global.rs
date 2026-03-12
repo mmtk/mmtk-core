@@ -149,7 +149,7 @@ impl<VM: VMBinding> Immix<VM> {
         mut plan_args: CreateSpecificPlanArgs<VM>,
         space_args: ImmixSpaceArgs,
     ) -> Self {
-        let immix = Immix {
+        Immix {
             immix_space: ImmixSpace::new(
                 if space_args.mixed_age {
                     plan_args.get_mixed_age_space_args(
@@ -170,11 +170,7 @@ impl<VM: VMBinding> Immix<VM> {
             ),
             common: CommonPlan::new(plan_args),
             last_gc_was_defrag: AtomicBool::new(false),
-        };
-
-        immix.verify_side_metadata_sanity();
-
-        immix
+        }
     }
 
     /// Schedule a full heap immix collection. This method is used by immix/genimmix/stickyimmix

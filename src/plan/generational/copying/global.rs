@@ -220,16 +220,12 @@ impl<VM: VMBinding> GenCopy<VM> {
             true,
         );
 
-        let res = GenCopy {
+        GenCopy {
             gen: CommonGenPlan::new(plan_args),
             hi: AtomicBool::new(false),
             copyspace0,
             copyspace1,
-        };
-
-        res.verify_side_metadata_sanity();
-
-        res
+        }
     }
 
     fn requires_full_heap_collection(&self) -> bool {

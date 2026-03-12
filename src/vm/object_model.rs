@@ -86,7 +86,7 @@ pub trait ObjectModel<VM: VMBinding> {
     //
     // Note a number of Global and PolicySpecific side metadata specifications are already reserved by mmtk-core.
     // Any side metadata offset calculation must consider these to prevent overlaps. A binding should start their
-    // side metadata from GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS or LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.
+    // side metadata from global_side_metadata_vm_base_address() or LOCAL_SIDE_METADATA_VM_BASE_OFFSET.
 
     /// A global 1-bit metadata used by generational plans to track cross-generational pointers. It is generally
     /// located in side metadata.
@@ -490,7 +490,7 @@ pub mod specs {
     use crate::util::metadata::side_metadata::*;
     use crate::util::metadata::{
         header_metadata::HeaderMetadataSpec,
-        side_metadata::{SideMetadataOffset, SideMetadataSpec},
+        side_metadata::{side_metadata_offset_after, SideMetadataSpec},
         MetadataSpec,
     };
 
@@ -560,7 +560,7 @@ pub mod specs {
                     Self(MetadataSpec::OnSide(SideMetadataSpec {
                         name: stringify!($spec_name),
                         is_global: Self::IS_GLOBAL,
-                        offset: SideMetadataOffset::layout_after(side_spec),
+                        offset: side_metadata_offset_after(side_spec),
                         log_num_of_bits: Self::LOG_NUM_BITS,
                         log_bytes_in_region: $side_min_obj_size as usize,
                     }))

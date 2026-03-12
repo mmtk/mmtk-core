@@ -319,7 +319,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         scheduler.work_buckets[WorkBucketStage::FinalizableForwarding].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::Compact].set_enabled(false);
 
-        let immix = ConcurrentImmix {
+        ConcurrentImmix {
             immix_space: ImmixSpace::new(
                 plan_args.get_normal_space_args("immix", true, false, VMRequest::discontiguous()),
                 immix_args,
@@ -330,11 +330,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             previous_pause: Atomic::new(None),
             should_do_full_gc: AtomicBool::new(false),
             concurrent_marking_active: AtomicBool::new(false),
-        };
-
-        immix.verify_side_metadata_sanity();
-
-        immix
+        }
     }
 
     fn set_ref_closure_buckets_enabled(&self, do_closure: bool) {

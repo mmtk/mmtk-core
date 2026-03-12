@@ -73,7 +73,7 @@ pub fn create_plan<VM: VMBinding>(
     plan: PlanSelector,
     args: CreateGeneralPlanArgs<VM>,
 ) -> Box<dyn Plan<VM = VM>> {
-    let plan = match plan {
+    match plan {
         PlanSelector::NoGC => {
             Box::new(crate::plan::nogc::NoGC::new(args)) as Box<dyn Plan<VM = VM>>
         }
@@ -106,18 +106,7 @@ pub fn create_plan<VM: VMBinding>(
         PlanSelector::Compressor => {
             Box::new(crate::plan::compressor::Compressor::new(args)) as Box<dyn Plan<VM = VM>>
         }
-    };
-
-    // We have created Plan in the heap, and we won't explicitly move it.
-    // Each space now has a fixed address for its lifetime. It is safe now to initialize SFT.
-    let sft_map: &mut dyn crate::policy::sft_map::SFTMap =
-        unsafe { crate::mmtk::SFT_MAP.get_mut() }.as_mut();
-    plan.for_each_space(&mut |s| {
-        sft_map.notify_space_creation(s.as_sft());
-        s.initialize_sft(sft_map);
-    });
-
-    plan
+    }
 }
 
 /// Create thread local GC worker.
@@ -362,6 +351,18 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// Dump memory stats for the plan
     #[cfg(feature = "dump_memory_stats")]
     fn dump_memory_stats(&self) {}
+
+    /// Call `space.initialize_sft` for all spaces in this plan, and notify the SFT map about the creation of each space.
+    /// This method should only be called after 1. side metadata is initialized (as some SFT maps may use side metadata), 2. the plan is created in the heap and won't be moved,
+    /// and 3. the side metadata sanity is initialized (otherwise we may try access side metadata and trigger sanity check before side metadata sanity is initialized)
+    fn initialize_sft(&self) {
+        let sft_map: &mut dyn crate::policy::sft_map::SFTMap =
+            unsafe { crate::mmtk::SFT_MAP.get_mut() }.as_mut();
+        self.for_each_space(&mut |s| {
+            sft_map.notify_space_creation(s.as_sft());
+            s.initialize_sft(sft_map);
+        });
+    }
 }
 
 impl_downcast!(Plan assoc VM);

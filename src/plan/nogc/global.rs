@@ -98,7 +98,7 @@ impl<VM: VMBinding> NoGC<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs::<VM>(&[]),
         };
 
-        let res = NoGC {
+        NoGC {
             nogc_space: NoGCImmortalSpace::new(plan_args.get_normal_space_args(
                 "nogc_space",
                 cfg!(not(feature = "nogc_no_zeroing")),
@@ -118,10 +118,6 @@ impl<VM: VMBinding> NoGC<VM> {
                 VMRequest::discontiguous(),
             )),
             base: BasePlan::new(plan_args),
-        };
-
-        res.verify_side_metadata_sanity();
-
-        res
+        }
     }
 }
