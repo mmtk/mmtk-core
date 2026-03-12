@@ -38,8 +38,8 @@ use std::collections::HashMap;
 /// 2. Set command line options for MMTKBuilder by [`crate::memory_manager::process`] or [`crate::memory_manager::process_bulk`].
 /// 3. Initialize MMTk by calling this function, `mmtk_init()`, and pass the builder earlier. This call will return an MMTK instance.
 ///    Usually a binding store the MMTK instance statically as a singleton. We plan to allow multiple instances, but this is not yet fully
-///    supported. Currently we assume a binding will only need one MMTk instance. Note that GC is enabled by default and the binding should
-///    implement `VMCollection::is_collection_enabled()` if it requires that the GC should be disabled at a particular time.
+///    supported. Currently we assume a binding will only need one MMTk instance. Note that GC is enabled by default, and bindings can use
+///    [`disable_collection`] / [`enable_collection`] to control collection.
 ///
 /// This method will attempt to initialize the built-in `env_logger` if the Cargo feature "builtin_env_logger" is enabled (by default).
 /// If the VM would like to use its own logger, it should disable the default feature "builtin_env_logger" in `Cargo.toml`.
@@ -565,6 +565,27 @@ pub fn start_worker<VM: VMBinding>(
 /// Wrapper for [`crate::mmtk::MMTK::initialize_collection`].
 pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
     mmtk.initialize_collection(tls);
+}
+
+/// Disable collection in MMTk core.
+///
+/// This call is nestable.  Each call must be paired with a matching call to
+/// [`enable_collection`].
+pub fn disable_collection<VM: VMBinding>(mmtk: &MMTK<VM>) {
+    mmtk.disable_collection();
+}
+
+/// Re-enable collection in MMTk core.
+///
+/// This call is nestable.  Calling it without a prior matching call to
+/// [`disable_collection`] is a logic error.
+pub fn enable_collection<VM: VMBinding>(mmtk: &MMTK<VM>) {
+    mmtk.enable_collection();
+}
+
+/// Return whether collection is enabled in MMTk core.
+pub fn is_collection_enabled<VM: VMBinding>(mmtk: &MMTK<VM>) -> bool {
+    mmtk.is_collection_enabled()
 }
 
 /// Process MMTk run-time options. Returns true if the option is processed successfully.
