@@ -178,7 +178,8 @@ impl<VM: VMBinding> GCTrigger<VM> {
 
     pub fn disable_collection(&self) {
         let _guard = self.collection_control_lock.lock().unwrap();
-        self.collection_disable_depth.fetch_add(1, Ordering::Release);
+        self.collection_disable_depth
+            .fetch_add(1, Ordering::Release);
     }
 
     pub fn enable_collection(&self) {
@@ -188,7 +189,8 @@ impl<VM: VMBinding> GCTrigger<VM> {
             depth > 0,
             "enable_collection() called without a matching disable_collection()"
         );
-        self.collection_disable_depth.store(depth - 1, Ordering::Release);
+        self.collection_disable_depth
+            .store(depth - 1, Ordering::Release);
     }
 
     pub fn is_collection_enabled(&self) -> bool {
