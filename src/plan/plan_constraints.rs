@@ -55,8 +55,10 @@ impl PlanConstraints {
         PlanConstraints {
             collects_garbage: true,
             moves_objects: false,
-            max_non_los_default_alloc_bytes: MAX_INT,
-            max_non_los_copy_bytes: MAX_INT,
+            // No limit by default.  All objects can go to non-LOS space.
+            max_non_los_default_alloc_bytes: usize::MAX,
+            // No limit by default.  All objects can go to non-LOS space.
+            max_non_los_copy_bytes: usize::MAX,
             // As `LAZY_SWEEP` is true, needs_linear_scan is true for all the plans. This is strange.
             // https://github.com/mmtk/mmtk-core/issues/1027 tracks the issue.
             needs_linear_scan: crate::util::constants::SUPPORT_CARD_SCANNING

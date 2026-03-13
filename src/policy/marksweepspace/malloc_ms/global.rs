@@ -104,7 +104,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     }
 
     /// For malloc space, we just use the side metadata.
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
         debug_assert!(!addr.is_zero());
         // `addr` cannot be mapped by us. It should be mapped by the malloc library.
@@ -112,7 +112,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         self.has_object_alloced_by_malloc(addr)
     }
 
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn find_object_from_internal_pointer(
         &self,
         ptr: Address,
@@ -271,7 +271,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MallocSpac
 
 // Actually no max object size.
 #[allow(dead_code)]
-pub const MAX_OBJECT_SIZE: usize = crate::util::constants::MAX_INT;
+pub const MAX_OBJECT_SIZE: usize = usize::MAX;
 
 impl<VM: VMBinding> MallocSpace<VM> {
     pub fn extend_global_side_metadata_specs(specs: &mut Vec<SideMetadataSpec>) {
@@ -544,7 +544,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     ///
     /// This function doesn't check if `addr` is aligned.
     /// If not, it will try to load the VO bit for the address rounded down to the metadata's granularity.
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     pub fn has_object_alloced_by_malloc(&self, addr: Address) -> Option<ObjectReference> {
         if !self.is_meta_space_mapped_for_address(addr) {
             return None;

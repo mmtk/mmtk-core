@@ -150,7 +150,7 @@ pub extern "C" fn mmtk_will_never_move(object: ObjectReference) -> bool {
     !object.is_movable()
 }
 
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 #[no_mangle]
 pub extern "C" fn mmtk_is_mmtk_object(addr: Address) -> bool {
     memory_manager::is_mmtk_object(addr).is_some()
