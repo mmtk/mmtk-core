@@ -1148,6 +1148,7 @@ impl<VM: VMBinding> LXR<VM> {
         unsafe {
             let me = &*(self as *const Self);
             self.immix_space.block_allocation.lxr = Some(me);
+            self.common.los.lxr = Some(me);
         }
         let mut lazy_sweeping_jobs = crate::LAZY_SWEEPING_JOBS.write();
         lazy_sweeping_jobs.swap();

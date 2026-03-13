@@ -3,6 +3,7 @@ use std::ops::Range;
 use super::block::Block;
 use crate::util::constants::{LOG_BITS_IN_BYTE, LOG_BYTES_IN_WORD, LOG_MIN_OBJECT_SIZE};
 use crate::util::linear_scan::{Region, RegionIterator};
+use crate::util::metadata::side_metadata::spec_defs::IX_LINE_REUSE_COUNT;
 use crate::util::metadata::side_metadata::*;
 use crate::util::rc;
 use crate::{
@@ -160,6 +161,17 @@ impl Line {
         unsafe {
             let bytes = limit.offset_from(start) as usize;
             std::ptr::write_bytes(start, 0xffu8, bytes);
+        }
+    }
+
+    pub fn inc_reuse_counts<VM: VMBinding>(lines: Range<Line>) {
+        let mut l = lines.start;
+        while l < lines.end {
+            let addr = l.start();
+            let count = IX_LINE_REUSE_COUNT.load_atomic::<u8>(addr, Ordering::SeqCst);
+            let new_count = if count == u8::MAX { 0 } else { count + 1 };
+            IX_LINE_REUSE_COUNT.store_atomic(addr, new_count, Ordering::SeqCst);
+            l = l.next();
         }
     }
 

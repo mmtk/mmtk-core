@@ -12,6 +12,8 @@ use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::{FreeListPageResource, PageResource};
 use crate::util::metadata;
+use crate::util::metadata::side_metadata::spec_defs::LOS_PAGE_REUSE_COUNT;
+use crate::util::metadata::MetadataSpec;
 use crate::util::object_enum::ClosureObjectEnumerator;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
@@ -50,6 +52,7 @@ pub struct LargeObjectSpace<VM: VMBinding> {
     pub rc_enabled: bool,
     rc: RefCountHelper<VM>,
     pub is_end_of_satb_or_full_gc: bool,
+    pub(crate) lxr: Option<&'static crate::plan::lxr::LXR<VM>>,
 }
 
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
@@ -111,6 +114,15 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             crate::plan::lxr::SURVIVAL_RATIO_PREDICTOR
                 .los_alloc_vol
                 .fetch_add(bytes, Ordering::SeqCst);
+            let lxr = self.lxr.unwrap();
+            if lxr.cm_in_progress() {
+                for off in (0..bytes).step_by(BYTES_IN_PAGE) {
+                    let a = object.to_raw_address() + off;
+                    let count = LOS_PAGE_REUSE_COUNT.load_atomic::<u8>(a, Ordering::SeqCst);
+                    let new_count = if count == u8::MAX { 0 } else { count + 1 };
+                    LOS_PAGE_REUSE_COUNT.store_atomic::<u8>(a, new_count, Ordering::SeqCst);
+                }
+            }
             return;
         }
         #[cfg(feature = "vo_bit")]
@@ -334,11 +346,17 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     ) -> Self {
         let is_discontiguous = args.vmrequest.is_discontiguous();
         let vm_map = args.vm_map;
-        let policy_args = args.into_policy_args(
-            false,
-            false,
-            metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC]),
-        );
+        let rc_enabled = args.constraints.rc_enabled;
+        let specs = if rc_enabled {
+            vec![
+                *VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                MetadataSpec::OnSide(LOS_PAGE_REUSE_COUNT),
+            ]
+        } else {
+            vec![*VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC]
+        };
+        let policy_args =
+            args.into_policy_args(false, false, metadata::extract_side_metadata(&specs));
         let metadata = policy_args.metadata();
         let common = CommonSpace::new(policy_args);
         let mut pr = if is_discontiguous {
@@ -367,6 +385,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             rc_enabled: false,
             rc: RefCountHelper::NEW,
             is_end_of_satb_or_full_gc: false,
+            lxr: None,
         }
     }
 

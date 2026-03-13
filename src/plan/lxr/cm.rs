@@ -217,7 +217,10 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
                 self.scanned_non_null_slots += 1;
             }
             if crate::args::RC_MATURE_EVACUATION && !SRC_IN_DEFRAG && self.plan.in_defrag(t) {
-                self.plan.immix_space.mature_evac_remset.record(s, t);
+                self.plan
+                    .immix_space
+                    .mature_evac_remset
+                    .record(s, t, self.plan);
             }
             self.trace_object(t);
             if crate::args::PREFETCH {
@@ -268,7 +271,10 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
                     && (CHECK_REMSET || out_of_heap)
                     && self.plan.in_defrag(t)
                 {
-                    self.plan.immix_space.mature_evac_remset.record(s, t);
+                    self.plan
+                        .immix_space
+                        .mature_evac_remset
+                        .record(s, t, self.plan);
                 }
                 self.next_objects.push(t);
                 if self.next_objects.len() > Self::SATB_BUFFER_SIZE {
@@ -500,22 +506,16 @@ pub struct LXRStopTheWorldProcessEdges<VM: VMBinding, const FULL_GC: bool> {
     next_array_slices: VectorQueue<VM::VMMemorySlice>,
     next_slot_count: u32,
     remset_recorded_slots: bool,
-    refs: Vec<ObjectReference>,
     should_record_forwarded_roots: bool,
 }
 
 impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC> {
-    pub(super) fn new_remset(
-        slots: Vec<SlotOf<Self>>,
-        refs: Vec<ObjectReference>,
-        mmtk: &'static MMTK<VM>,
-    ) -> Self {
+    pub(super) fn new_remset(slots: Vec<SlotOf<Self>>, mmtk: &'static MMTK<VM>) -> Self {
         if cfg!(feature = "rust_mem_counter") {
             crate::rust_mem_counter::SATB_BUFFER_COUNTER.add(slots.len());
         }
         let mut me = Self::new(slots, false, mmtk, WorkBucketStage::Closure);
         me.remset_recorded_slots = true;
-        me.refs = refs;
         me
     }
 }
@@ -548,7 +548,6 @@ impl<VM: VMBinding, const FULL_GC: bool> ProcessEdgesWork
             next_array_slices: VectorQueue::new(),
             next_slot_count: 0,
             remset_recorded_slots: false,
-            refs: vec![],
             should_record_forwarded_roots: false,
         }
     }
@@ -720,17 +719,10 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
     }
 
     #[inline]
-    fn __process_slot<const WEAK_ROOT: bool, const REMSET: bool>(
-        &mut self,
-        slot: SlotOf<Self>,
-        i: usize,
-    ) {
+    fn __process_slot<const WEAK_ROOT: bool, const REMSET: bool>(&mut self, slot: SlotOf<Self>) {
         let Some(object) = slot.load() else {
             return;
         };
-        if !FULL_GC && REMSET && object != self.refs[i] {
-            return;
-        }
         let new_object = if !FULL_GC {
             self.mature_evac_trace_object::<WEAK_ROOT, REMSET>(object)
         } else {
@@ -764,7 +756,7 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
         slices: &[VM::VMMemorySlice],
     ) {
         for (i, s) in slots.iter().enumerate() {
-            self.__process_slot::<WEAK_ROOT, REMSET>(*s, i);
+            self.__process_slot::<WEAK_ROOT, REMSET>(*s);
             if crate::args::PREFETCH {
                 if let Some(s) = slots.get(i + crate::args::PREFETCH_STEP) {
                     if let Some(o) = s.load() {
@@ -776,7 +768,7 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
         for slice in slices {
             let n = slice.len();
             for (i, s) in slice.iter_slots().enumerate() {
-                self.__process_slot::<false, false>(s, i);
+                self.__process_slot::<false, false>(s);
                 if crate::args::PREFETCH {
                     if i + crate::args::PREFETCH_STEP < n {
                         let s = slice.get(i + crate::args::PREFETCH_STEP);

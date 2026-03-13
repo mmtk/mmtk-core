@@ -20,6 +20,7 @@ use crate::util::heap::BlockPageResource;
 use crate::util::heap::PageResource;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::log_bit::UnlogBitsOperation;
+use crate::util::metadata::side_metadata::spec_defs::IX_LINE_REUSE_COUNT;
 use crate::util::metadata::side_metadata::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
@@ -375,6 +376,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Block::LOG_TABLE),
                 MetadataSpec::OnSide(Block::NURSERY_PROMOTION_STATE_TABLE),
                 MetadataSpec::OnSide(Block::PHASE_EPOCH),
+                MetadataSpec::OnSide(IX_LINE_REUSE_COUNT),
             ];
             return metadata::extract_side_metadata(&meta);
         }
@@ -1563,6 +1565,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             .fetch_add(num_lines << Line::LOG_BYTES, Ordering::SeqCst);
         if self.block_allocation.cm_in_progress_or_final_mark() {
             Line::initialize_mark_table_as_marked::<VM>(start..end);
+            Line::inc_reuse_counts::<VM>(start..end);
         } else {
             // Line::clear_mark_table::<VM>(start..end);
         }

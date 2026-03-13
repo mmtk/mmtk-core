@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::util::ObjectReference;
+use crate::util::metadata::side_metadata::spec_defs::{IX_LINE_REUSE_COUNT, LOS_PAGE_REUSE_COUNT};
 use crate::vm::slot::Slot;
 use crate::{
     plan::{immix::Pause, lxr::cm::LXRStopTheWorldProcessEdges},
@@ -32,17 +32,27 @@ impl<VM: VMBinding> EvacuateMatureObjects<VM> {
         }
     }
 
-    fn address_is_valid_oop_slot(&self, s: VM::VMSlot, lxr: &LXR<VM>) -> bool {
+    fn address_is_valid_oop_slot(&self, s: VM::VMSlot, original_reuse: u8, lxr: &LXR<VM>) -> bool {
         // Keep slots not in the mmtk heap
         // These should be slots in the c++ `ClassLoaderData` objects. We remember these slots
         // in the remembered-set to avoid expensive CLD scanning.
-        if !lxr.immix_space.address_in_space(s.to_address())
-            && !lxr.los().address_in_space(s.to_address())
-        {
-            return true;
+        let addr = s.to_address();
+        // Check reuse count
+        if lxr.immix_space.address_in_space(addr) {
+            let reuse = IX_LINE_REUSE_COUNT.load_atomic::<u8>(addr, atomic::Ordering::SeqCst);
+            if reuse != original_reuse {
+                return false;
+            }
+        } else if lxr.los().address_in_space(addr) {
+            let reuse = LOS_PAGE_REUSE_COUNT.load_atomic::<u8>(addr, atomic::Ordering::SeqCst);
+            if reuse != original_reuse {
+                return false;
+            }
+        } else {
+            return false;
         }
         // Skip slots in collection set
-        if lxr.address_in_defrag(s.to_address()) {
+        if lxr.address_in_defrag(addr) {
             return false;
         }
         if crate::args::NO_RC_PAUSES_DURING_CONCURRENT_MARKING {
@@ -58,18 +68,19 @@ impl<VM: VMBinding> EvacuateMatureObjects<VM> {
         true
     }
 
-    fn process_slot(&mut self, s: VM::VMSlot, old_ref: ObjectReference, lxr: &LXR<VM>) -> bool {
+    fn process_slot(&mut self, s: VM::VMSlot, reuse: u8, lxr: &LXR<VM>, ooh: bool) -> bool {
         // Skip slots that does not contain a real oop
-        if !self.address_is_valid_oop_slot(s, lxr) {
+        if !ooh && !self.address_is_valid_oop_slot(s, reuse, lxr) {
             return false;
         }
         // Skip objects that are dead or out of the collection set.
+        let v = unsafe { s.to_address().load::<u32>() };
+        if v & 0b111 != 0 {
+            panic!("Invalid slot: {s:?} -> {v:#x}");
+        }
         let Some(o) = s.load() else {
             return false;
         };
-        if old_ref != o {
-            return false;
-        }
         if !o.is_in_any_space() || !lxr.immix_space.in_space(o) {
             return false;
         }
@@ -89,17 +100,15 @@ impl<VM: VMBinding> EvacuateMatureObjects<VM> {
         assert_eq!(lxr.current_pause(), Some(Pause::FinalMark));
         let remset = std::mem::take(&mut self.remset);
         let mut slots = vec![];
-        let mut refs = vec![];
         for entry in remset {
-            let (s, o) = entry.decode::<VM>();
-            if self.process_slot(s, o, lxr) {
+            let (s, reuse, ooh) = entry.decode::<VM>();
+            if self.process_slot(s, reuse, lxr, ooh) {
                 slots.push(s);
-                refs.push(o);
             }
         }
         if !slots.is_empty() {
             Some(Box::new(
-                LXRStopTheWorldProcessEdges::<_, false>::new_remset(slots, refs, mmtk),
+                LXRStopTheWorldProcessEdges::<_, false>::new_remset(slots, mmtk),
             ))
         } else {
             None

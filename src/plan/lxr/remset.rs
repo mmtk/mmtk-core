@@ -1,6 +1,8 @@
 use std::{cell::UnsafeCell, marker::PhantomData};
 
 use crate::policy::immix::ImmixSpace;
+use crate::policy::space::Space;
+use crate::util::metadata::side_metadata::spec_defs::{IX_LINE_REUSE_COUNT, LOS_PAGE_REUSE_COUNT};
 use crate::util::ObjectReference;
 use crate::{
     plan::lxr::LXR,
@@ -15,15 +17,22 @@ use atomic::Ordering;
 use std::sync::atomic::AtomicUsize;
 
 #[repr(C)]
-pub(super) struct RemSetEntry(Address, ObjectReference);
+pub(super) struct RemSetEntry(Address, u8, bool);
 
 impl RemSetEntry {
-    fn encode<VM: VMBinding>(slot: VM::VMSlot, o: ObjectReference) -> Self {
-        Self(slot.raw_address(), o)
+    fn encode<VM: VMBinding>(slot: VM::VMSlot, ix: bool, ooh: bool) -> Self {
+        let reuse = if ix {
+            IX_LINE_REUSE_COUNT.load_atomic::<u8>(slot.to_address(), Ordering::SeqCst)
+        } else if !ooh {
+            LOS_PAGE_REUSE_COUNT.load_atomic::<u8>(slot.to_address(), Ordering::SeqCst)
+        } else {
+            0
+        };
+        Self(slot.raw_address(), reuse, ooh)
     }
 
-    pub fn decode<VM: VMBinding>(&self) -> (VM::VMSlot, ObjectReference) {
-        (VM::VMSlot::from_address(self.0), self.1)
+    pub fn decode<VM: VMBinding>(&self) -> (VM::VMSlot, u8, bool) {
+        (VM::VMSlot::from_address(self.0), self.1, self.2)
     }
 }
 
@@ -95,12 +104,15 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
         }
     }
 
-    pub fn record(&self, s: VM::VMSlot, o: ObjectReference) {
+    pub fn record(&self, s: VM::VMSlot, _o: ObjectReference, lxr: &LXR<VM>) {
         if cfg!(feature = "rust_mem_counter") {
             crate::rust_mem_counter::MATURE_EVAC_REMSET_COUNTER.add(1);
         }
         let id = crate::gc_worker_id().unwrap();
-        self.gc_buffer(id).push(RemSetEntry::encode::<VM>(s, o));
+        let ix = lxr.immix_space.address_in_space(s.to_address());
+        let ooh: bool = !ix && !lxr.los().address_in_space(s.to_address());
+        self.gc_buffer(id)
+            .push(RemSetEntry::encode::<VM>(s, ix, ooh));
         if self.gc_buffer(id).len() >= EvacuateMatureObjects::<VM>::CAPACITY {
             self.flush(id)
         }
