@@ -170,7 +170,7 @@ impl Line {
             let addr = l.start();
             let count = IX_LINE_REUSE_COUNT.load_atomic::<u8>(addr, Ordering::SeqCst);
             let new_count = if count == u8::MAX { 0 } else { count + 1 };
-            IX_LINE_REUSE_COUNT.store_atomic(addr, new_count, Ordering::SeqCst);
+            IX_LINE_REUSE_COUNT.store_atomic::<u8>(addr, new_count, Ordering::SeqCst);
             l = l.next();
         }
     }
