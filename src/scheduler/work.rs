@@ -1,5 +1,5 @@
 use super::worker::*;
-use crate::mmtk::MMTK;
+use crate::{mmtk::MMTK, plan::tracing::EdgeTracer};
 use crate::vm::VMBinding;
 #[cfg(feature = "work_packet_stats")]
 use std::any::{type_name, TypeId};
@@ -58,7 +58,6 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
     }
 }
 
-use super::gc_work::ProcessSlotsWork;
 use crate::plan::Plan;
 
 /// This trait provides a group of associated types that are needed to
@@ -83,7 +82,7 @@ pub trait GCWorkContext: Send + 'static {
     /// The `ProcessEdgesWork` implementation to use for tracing edges that do not have special
     /// pinning requirements.  Concrete plans and spaces may choose to move or not to move the
     /// objects the traced edges point to.
-    type DefaultProcessEdges: ProcessSlotsWork<VM = Self::VM>;
+    type DefaultEdgeTracer: EdgeTracer<VM = Self::VM>;
 
     /// The `ProcessEdgesWork` implementation to use for tracing edges that must not be updated
     /// (i.e. the objects the traced edges pointed to must not be moved).  This is used for
@@ -97,5 +96,5 @@ pub trait GCWorkContext: Send + 'static {
     ///
     /// If a plan does not support object pinning, it should use `UnsupportedProcessEdges` for this
     /// type member.
-    type PinningProcessEdges: ProcessSlotsWork<VM = Self::VM>;
+    type PinningEdgeTracer: EdgeTracer<VM = Self::VM>;
 }

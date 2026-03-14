@@ -1,7 +1,7 @@
 use super::global::MarkCompact;
+use crate::plan::tracing::{PlanEdgeTracer, UnsupportedEdgeTracer};
 use crate::policy::markcompactspace::MarkCompactSpace;
 use crate::policy::markcompactspace::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
-use crate::scheduler::gc_work::PlanProcessSlots;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
@@ -93,22 +93,22 @@ impl<VM: VMBinding> Compact<VM> {
 }
 
 /// Marking trace
-pub type MarkingProcessEdges<VM> = PlanProcessSlots<VM, MarkCompact<VM>, TRACE_KIND_MARK>;
+pub type MarkingEdgeTracer<VM> = PlanEdgeTracer<MarkCompact<VM>, TRACE_KIND_MARK>;
 /// Forwarding trace
-pub type ForwardingProcessEdges<VM> = PlanProcessSlots<VM, MarkCompact<VM>, TRACE_KIND_FORWARD>;
+pub type ForwardingEdgeTracer<VM> = PlanEdgeTracer<MarkCompact<VM>, TRACE_KIND_FORWARD>;
 
 pub struct MarkCompactGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MarkCompact<VM>;
-    type DefaultProcessEdges = MarkingProcessEdges<VM>;
-    type PinningProcessEdges = UnsupportedProcessEdges<VM>;
+    type DefaultEdgeTracer = MarkingEdgeTracer<VM>;
+    type PinningEdgeTracer = UnsupportedEdgeTracer<VM>;
 }
 
 pub struct MarkCompactForwardingGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactForwardingGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MarkCompact<VM>;
-    type DefaultProcessEdges = ForwardingProcessEdges<VM>;
-    type PinningProcessEdges = UnsupportedProcessEdges<VM>;
+    type DefaultEdgeTracer = ForwardingEdgeTracer<VM>;
+    type PinningEdgeTracer = UnsupportedEdgeTracer<VM>;
 }

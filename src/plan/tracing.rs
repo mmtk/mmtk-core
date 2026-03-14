@@ -5,14 +5,19 @@ use std::marker::PhantomData;
 
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
-use crate::scheduler::gc_work::{ProcessSlotsWork, SlotOf};
+use crate::scheduler::gc_work::{
+    PlanProcessSlots, ProcessSlotsWork, SFTProcessSlots, SlotOfET, UnsupportedProcessEdges,
+};
 use crate::scheduler::{GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
 use crate::util::{ObjectReference, VMThread, VMWorkerThread};
 use crate::vm::{Scanning, SlotVisitor, VMBinding};
-use crate::Plan;
+use crate::{Plan, MMTK};
 
-pub trait EdgeTracer {
+pub trait EdgeTracer: 'static + Send {
     type VM: VMBinding;
+    type ProcessSlotsWorkType: ProcessSlotsWork<VM = Self::VM>;
+
+    fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self;
 
     fn trace_object<Q: ObjectQueue>(
         &mut self,
@@ -20,6 +25,16 @@ pub trait EdgeTracer {
         object: ObjectReference,
         queue: &mut Q,
     ) -> ObjectReference;
+
+    fn make_process_slots_work(
+        &self,
+        slots: Vec<<Self::VM as VMBinding>::VMSlot>,
+        roots: bool,
+        mmtk: &'static MMTK<Self::VM>,
+        bucket: WorkBucketStage,
+    ) -> Self::ProcessSlotsWorkType {
+        Self::ProcessSlotsWorkType::new(slots, roots, mmtk, bucket)
+    }
 }
 
 #[derive(Default)]
@@ -29,6 +44,11 @@ pub struct SFTEdgeTracer<VM: VMBinding> {
 
 impl<VM: VMBinding> EdgeTracer for SFTEdgeTracer<VM> {
     type VM = VM;
+    type ProcessSlotsWorkType = SFTProcessSlots<Self::VM>;
+
+    fn from_mmtk(_mmtk: &'static MMTK<Self::VM>) -> Self {
+        Default::default()
+    }
 
     fn trace_object<Q: ObjectQueue>(
         &mut self,
@@ -66,6 +86,12 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> EdgeTracer
     for PlanEdgeTracer<P, KIND>
 {
     type VM = P::VM;
+    type ProcessSlotsWorkType = PlanProcessSlots<Self::VM, P, KIND>;
+
+    fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
+        let plan = mmtk.get_plan().downcast_ref::<P>().unwrap();
+        Self::new(plan)
+    }
 
     fn trace_object<Q: ObjectQueue>(
         &mut self,
@@ -74,6 +100,29 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> EdgeTracer
         queue: &mut Q,
     ) -> ObjectReference {
         self.plan.trace_object::<Q, KIND>(queue, object, worker)
+    }
+}
+
+#[derive(Default)]
+pub struct UnsupportedEdgeTracer<VM: VMBinding> {
+    phantom_data: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> EdgeTracer for UnsupportedEdgeTracer<VM> {
+    type VM = VM;
+    type ProcessSlotsWorkType = UnsupportedProcessEdges<Self::VM>;
+
+    fn from_mmtk(_mmtk: &'static MMTK<Self::VM>) -> Self {
+        unimplemented!()
+    }
+
+    fn trace_object<Q: ObjectQueue>(
+        &mut self,
+        _worker: &mut GCWorker<VM>,
+        _object: ObjectReference,
+        _queue: &mut Q,
+    ) -> ObjectReference {
+        unimplemented!()
     }
 }
 
@@ -170,13 +219,13 @@ impl ObjectQueue for VectorQueue<ObjectReference> {
 /// A transitive closure visitor to collect the slots from objects.
 /// It maintains a buffer for the slots, and flushes slots to a new work packet
 /// if the buffer is full or if the type gets dropped.
-pub struct ObjectsClosure<'a, E: ProcessSlotsWork> {
-    buffer: VectorQueue<SlotOf<E>>,
+pub struct ObjectsClosure<'a, E: EdgeTracer> {
+    buffer: VectorQueue<SlotOfET<E>>,
     pub(crate) worker: &'a mut GCWorker<E::VM>,
     bucket: WorkBucketStage,
 }
 
-impl<'a, E: ProcessSlotsWork> ObjectsClosure<'a, E> {
+impl<'a, E: EdgeTracer> ObjectsClosure<'a, E> {
     /// Create an [`ObjectsClosure`].
     ///
     /// Arguments:
@@ -195,14 +244,19 @@ impl<'a, E: ProcessSlotsWork> ObjectsClosure<'a, E> {
         if !buf.is_empty() {
             self.worker.add_work(
                 self.bucket,
-                E::new(buf, false, self.worker.mmtk, self.bucket),
+                E::from_mmtk(self.worker.mmtk).make_process_slots_work(
+                    buf,
+                    false,
+                    self.worker.mmtk,
+                    self.bucket,
+                ),
             );
         }
     }
 }
 
-impl<E: ProcessSlotsWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'_, E> {
-    fn visit_slot(&mut self, slot: SlotOf<E>) {
+impl<E: EdgeTracer> SlotVisitor<SlotOfET<E>> for ObjectsClosure<'_, E> {
+    fn visit_slot(&mut self, slot: SlotOfET<E>) {
         #[cfg(debug_assertions)]
         {
             use crate::vm::slot::Slot;
@@ -219,7 +273,7 @@ impl<E: ProcessSlotsWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'_, E> {
     }
 }
 
-impl<E: ProcessSlotsWork> Drop for ObjectsClosure<'_, E> {
+impl<E: EdgeTracer> Drop for ObjectsClosure<'_, E> {
     fn drop(&mut self) {
         self.flush();
     }

@@ -6,6 +6,7 @@ use crate::plan::tracing::PlanEdgeTracer;
 use crate::plan::tracing::SFTEdgeTracer;
 use crate::plan::ObjectsClosure;
 use crate::plan::VectorObjectQueue;
+use crate::plan::tracing::UnsupportedEdgeTracer;
 use crate::util::*;
 use crate::vm::slot::Slot;
 use crate::vm::*;
@@ -289,19 +290,19 @@ impl<E: ProcessSlotsWork> ProcessEdgesWorkTracer<E> {
 /// the call to `with_tracer`, making use of its `trace_object` method.  It then creates work
 /// packets using the methods of the `ProcessEdgesWork` and add the work packet into the given
 /// `stage`.
-pub(crate) struct ProcessEdgesWorkTracerContext<E: ProcessSlotsWork> {
+pub(crate) struct ProcessEdgesWorkTracerContext<E: EdgeTracer> {
     stage: WorkBucketStage,
     phantom_data: PhantomData<E>,
 }
 
-impl<E: ProcessSlotsWork> Clone for ProcessEdgesWorkTracerContext<E> {
+impl<E: EdgeTracer> Clone for ProcessEdgesWorkTracerContext<E> {
     fn clone(&self) -> Self {
         Self { ..*self }
     }
 }
 
-impl<E: ProcessSlotsWork> ObjectTracerContext<E::VM> for ProcessEdgesWorkTracerContext<E> {
-    type TracerType = ProcessEdgesWorkTracer<E>;
+impl<E: EdgeTracer> ObjectTracerContext<E::VM> for ProcessEdgesWorkTracerContext<E> {
+    type TracerType = ProcessEdgesWorkTracer<E::ProcessSlotsWorkType>;
 
     fn with_tracer<R, F>(&self, worker: &mut GCWorker<E::VM>, func: F) -> R
     where
@@ -310,7 +311,7 @@ impl<E: ProcessSlotsWork> ObjectTracerContext<E::VM> for ProcessEdgesWorkTracerC
         let mmtk = worker.mmtk;
 
         // Prepare the underlying ProcessEdgesWork
-        let mut process_edges_work = E::new(vec![], false, mmtk, self.stage);
+        let mut process_edges_work = E::from_mmtk(mmtk).make_process_slots_work(vec![], false, mmtk, self.stage);
         // FIXME: This line allows us to omit the borrowing lifetime of worker.
         // We should refactor ProcessEdgesWork so that it uses `worker` locally, not as a member.
         process_edges_work.set_worker(worker);
@@ -338,11 +339,11 @@ impl<E: ProcessSlotsWork> ObjectTracerContext<E::VM> for ProcessEdgesWorkTracerC
 /// VM binding to process weak references.
 ///
 /// NOTE: This will replace `{Soft,Weak,Phantom}RefProcessing` and `Finalization` in the future.
-pub struct VMProcessWeakRefs<E: ProcessSlotsWork> {
+pub struct VMProcessWeakRefs<E: EdgeTracer> {
     phantom_data: PhantomData<E>,
 }
 
-impl<E: ProcessSlotsWork> VMProcessWeakRefs<E> {
+impl<E: EdgeTracer> VMProcessWeakRefs<E> {
     pub fn new() -> Self {
         Self {
             phantom_data: PhantomData,
@@ -350,7 +351,7 @@ impl<E: ProcessSlotsWork> VMProcessWeakRefs<E> {
     }
 }
 
-impl<E: ProcessSlotsWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
+impl<E: EdgeTracer> GCWork<E::VM> for VMProcessWeakRefs<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("VMProcessWeakRefs");
 
@@ -381,11 +382,11 @@ impl<E: ProcessSlotsWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
 /// VM binding to process weak references.
 ///
 /// NOTE: This will replace `RefForwarding` and `ForwardFinalization` in the future.
-pub struct VMForwardWeakRefs<E: ProcessSlotsWork> {
+pub struct VMForwardWeakRefs<E: EdgeTracer> {
     phantom_data: PhantomData<E>,
 }
 
-impl<E: ProcessSlotsWork> VMForwardWeakRefs<E> {
+impl<E: EdgeTracer> VMForwardWeakRefs<E> {
     pub fn new() -> Self {
         Self {
             phantom_data: PhantomData,
@@ -393,7 +394,7 @@ impl<E: ProcessSlotsWork> VMForwardWeakRefs<E> {
     }
 }
 
-impl<E: ProcessSlotsWork> GCWork<E::VM> for VMForwardWeakRefs<E> {
+impl<E: EdgeTracer> GCWork<E::VM> for VMForwardWeakRefs<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("VMForwardWeakRefs");
 
@@ -434,8 +435,8 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
         let mutators = <C::VM as VMBinding>::VMActivePlan::number_of_mutators();
         let factory = ProcessEdgesWorkRootsWorkFactory::<
             C::VM,
-            C::DefaultProcessEdges,
-            C::PinningProcessEdges,
+            C::DefaultEdgeTracer,
+            C::PinningEdgeTracer,
         >::new(mmtk);
         <C::VM as VMBinding>::VMScanning::scan_roots_in_mutator_thread(
             worker.tls,
@@ -467,8 +468,8 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanVMSpecificRoots<C> {
         trace!("ScanStaticRoots");
         let factory = ProcessEdgesWorkRootsWorkFactory::<
             C::VM,
-            C::DefaultProcessEdges,
-            C::PinningProcessEdges,
+            C::DefaultEdgeTracer,
+            C::PinningEdgeTracer,
         >::new(mmtk);
         <C::VM as VMBinding>::VMScanning::scan_vm_specific_roots(worker.tls, factory);
     }
@@ -540,6 +541,7 @@ impl<VM: VMBinding> ProcessSlotsBase<VM> {
 
 /// A short-hand for `<E::VM as VMBinding>::VMSlot`.
 pub type SlotOf<E> = <<E as ProcessSlotsWork>::VM as VMBinding>::VMSlot;
+pub type SlotOfET<E> = <<E as EdgeTracer>::VM as VMBinding>::VMSlot;
 
 /// An abstract trait for work packets that process object graph edges.  Its method
 /// [`ProcessEdgesWork::trace_object`] traces an object and, upon first visit, enqueues it into an
@@ -710,7 +712,7 @@ pub struct SFTProcessSlots<VM: VMBinding> {
 
 impl<VM: VMBinding> ProcessSlotsWork for SFTProcessSlots<VM> {
     type VM = VM;
-    type ScanObjectsWorkType = ScanObjects<Self>;
+    type ScanObjectsWorkType = ScanObjects<SFTEdgeTracer<VM>>;
 
     fn new(
         slots: Vec<SlotOf<Self>>,
@@ -728,8 +730,8 @@ impl<VM: VMBinding> ProcessSlotsWork for SFTProcessSlots<VM> {
             .trace_object(self.worker(), object, &mut self.base.nodes)
     }
 
-    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Option<ScanObjects<Self>> {
-        Some(ScanObjects::<Self>::new(nodes, false, self.bucket))
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
+        Some(Self::ScanObjectsWorkType::new(nodes, false, self.bucket))
     }
 }
 
@@ -738,14 +740,14 @@ impl<VM: VMBinding> ProcessSlotsWork for SFTProcessSlots<VM> {
 /// `DefaultProcessEdge` and the `PinningProcessEdges` type members of the [`GCWorkContext`] trait.
 pub(crate) struct ProcessEdgesWorkRootsWorkFactory<
     VM: VMBinding,
-    DPE: ProcessSlotsWork<VM = VM>,
-    PPE: ProcessSlotsWork<VM = VM>,
+    DPE: EdgeTracer<VM = VM>,
+    PPE: EdgeTracer<VM = VM>,
 > {
     mmtk: &'static MMTK<VM>,
     phantom: PhantomData<(DPE, PPE)>,
 }
 
-impl<VM: VMBinding, DPE: ProcessSlotsWork<VM = VM>, PPE: ProcessSlotsWork<VM = VM>> Clone
+impl<VM: VMBinding, DPE: EdgeTracer<VM = VM>, PPE: EdgeTracer<VM = VM>> Clone
     for ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
 {
     fn clone(&self) -> Self {
@@ -765,8 +767,8 @@ enum RootsKind {
     TPINNING = 2,
 }
 
-impl<VM: VMBinding, DPE: ProcessSlotsWork<VM = VM>, PPE: ProcessSlotsWork<VM = VM>>
-    RootsWorkFactory<VM::VMSlot> for ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
+impl<VM: VMBinding, DPE: EdgeTracer<VM = VM>, PPE: EdgeTracer<VM = VM>> RootsWorkFactory<VM::VMSlot>
+    for ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
 {
     fn create_process_roots_work(&mut self, slots: Vec<VM::VMSlot>) {
         // Note: We should use the same USDT name "mmtk:roots" for all the three kinds of roots. A
@@ -781,7 +783,12 @@ impl<VM: VMBinding, DPE: ProcessSlotsWork<VM = VM>, PPE: ProcessSlotsWork<VM = V
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,
-            DPE::new(slots, true, self.mmtk, WorkBucketStage::Closure),
+            DPE::from_mmtk(self.mmtk).make_process_slots_work(
+                slots,
+                true,
+                self.mmtk,
+                WorkBucketStage::Closure,
+            ),
         );
     }
 
@@ -806,7 +813,7 @@ impl<VM: VMBinding, DPE: ProcessSlotsWork<VM = VM>, PPE: ProcessSlotsWork<VM = V
     }
 }
 
-impl<VM: VMBinding, DPE: ProcessSlotsWork<VM = VM>, PPE: ProcessSlotsWork<VM = VM>>
+impl<VM: VMBinding, DPE: EdgeTracer<VM = VM>, PPE: EdgeTracer<VM = VM>>
     ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
 {
     fn new(mmtk: &'static MMTK<VM>) -> Self {
@@ -834,7 +841,7 @@ impl<VM: VMBinding> DerefMut for SFTProcessSlots<VM> {
 pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
     /// The associated ProcessEdgesWork for processing the outgoing edges of the objects in this
     /// packet.
-    type E: ProcessSlotsWork<VM = VM>;
+    type E: EdgeTracer<VM = VM>;
 
     /// Called after each object is scanned.
     fn post_scan_object(&self, object: ObjectReference);
@@ -846,8 +853,8 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
     fn do_work_common(
         &self,
         buffer: &[ObjectReference],
-        worker: &mut GCWorker<<Self::E as ProcessSlotsWork>::VM>,
-        mmtk: &'static MMTK<<Self::E as ProcessSlotsWork>::VM>,
+        worker: &mut GCWorker<<Self::E as EdgeTracer>::VM>,
+        mmtk: &'static MMTK<<Self::E as EdgeTracer>::VM>,
     ) {
         let tls = worker.tls;
 
@@ -923,15 +930,15 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
 /// (it won't call `post_scan_object()` in [`policy::gc_work::PolicyTraceObject`]).
 /// It should be used only for policies that do not perform policy-specific actions when scanning
 /// an object.
-pub struct ScanObjects<Edges: ProcessSlotsWork> {
+pub struct ScanObjects<E: EdgeTracer> {
     buffer: Vec<ObjectReference>,
     #[allow(unused)]
     concurrent: bool,
-    phantom: PhantomData<Edges>,
+    phantom: PhantomData<E>,
     bucket: WorkBucketStage,
 }
 
-impl<Edges: ProcessSlotsWork> ScanObjects<Edges> {
+impl<E: EdgeTracer> ScanObjects<E> {
     pub fn new(buffer: Vec<ObjectReference>, concurrent: bool, bucket: WorkBucketStage) -> Self {
         Self {
             buffer,
@@ -942,7 +949,7 @@ impl<Edges: ProcessSlotsWork> ScanObjects<Edges> {
     }
 }
 
-impl<VM: VMBinding, E: ProcessSlotsWork<VM = VM>> ScanObjectsWork<VM> for ScanObjects<E> {
+impl<VM: VMBinding, E: EdgeTracer<VM = VM>> ScanObjectsWork<VM> for ScanObjects<E> {
     type E = E;
 
     fn get_bucket(&self) -> WorkBucketStage {
@@ -954,7 +961,7 @@ impl<VM: VMBinding, E: ProcessSlotsWork<VM = VM>> ScanObjectsWork<VM> for ScanOb
     }
 }
 
-impl<E: ProcessSlotsWork> GCWork<E::VM> for ScanObjects<E> {
+impl<E: EdgeTracer> GCWork<E::VM> for ScanObjects<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanObjects");
         self.do_work_common(&self.buffer, worker, mmtk);
@@ -983,7 +990,7 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
     for PlanProcessSlots<VM, P, KIND>
 {
     type VM = VM;
-    type ScanObjectsWorkType = PlanScanObjects<Self, P>;
+    type ScanObjectsWorkType = PlanScanObjects<PlanEdgeTracer<P, KIND>, P>;
 
     fn new(
         slots: Vec<SlotOf<Self>>,
@@ -998,7 +1005,7 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
     }
 
     fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
-        Some(PlanScanObjects::<Self, P>::new(
+        Some(Self::ScanObjectsWorkType::new(
             self.plan,
             nodes,
             false,
@@ -1043,7 +1050,7 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
 
 /// This is an alternative to `ScanObjects` that calls the `post_scan_object` of the policy
 /// selected by the plan.  It is applicable to plans that derive `PlanTraceObject`.
-pub struct PlanScanObjects<E: ProcessSlotsWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> {
+pub struct PlanScanObjects<E: EdgeTracer, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> {
     plan: &'static P,
     buffer: Vec<ObjectReference>,
     #[allow(dead_code)]
@@ -1052,7 +1059,7 @@ pub struct PlanScanObjects<E: ProcessSlotsWork, P: Plan<VM = E::VM> + PlanTraceO
     bucket: WorkBucketStage,
 }
 
-impl<E: ProcessSlotsWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> PlanScanObjects<E, P> {
+impl<E: EdgeTracer, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> PlanScanObjects<E, P> {
     pub fn new(
         plan: &'static P,
         buffer: Vec<ObjectReference>,
@@ -1069,7 +1076,7 @@ impl<E: ProcessSlotsWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> PlanScan
     }
 }
 
-impl<E: ProcessSlotsWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> ScanObjectsWork<E::VM>
+impl<E: EdgeTracer, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> ScanObjectsWork<E::VM>
     for PlanScanObjects<E, P>
 {
     type E = E;
@@ -1083,7 +1090,7 @@ impl<E: ProcessSlotsWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> ScanObje
     }
 }
 
-impl<E: ProcessSlotsWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> GCWork<E::VM>
+impl<E: EdgeTracer, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> GCWork<E::VM>
     for PlanScanObjects<E, P>
 {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
@@ -1114,15 +1121,15 @@ impl<E: ProcessSlotsWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> GCWork<E
 ///     not their descendents.
 pub(crate) struct ProcessRootNodes<
     VM: VMBinding,
-    R2OPE: ProcessSlotsWork<VM = VM>,
-    O2OPE: ProcessSlotsWork<VM = VM>,
+    R2OPE: EdgeTracer<VM = VM>,
+    O2OPE: EdgeTracer<VM = VM>,
 > {
     phantom: PhantomData<(VM, R2OPE, O2OPE)>,
     roots: Vec<ObjectReference>,
     bucket: WorkBucketStage,
 }
 
-impl<VM: VMBinding, R2OPE: ProcessSlotsWork<VM = VM>, O2OPE: ProcessSlotsWork<VM = VM>>
+impl<VM: VMBinding, R2OPE: EdgeTracer<VM = VM>, O2OPE: EdgeTracer<VM = VM>>
     ProcessRootNodes<VM, R2OPE, O2OPE>
 {
     pub fn new(nodes: Vec<ObjectReference>, bucket: WorkBucketStage) -> Self {
@@ -1134,7 +1141,7 @@ impl<VM: VMBinding, R2OPE: ProcessSlotsWork<VM = VM>, O2OPE: ProcessSlotsWork<VM
     }
 }
 
-impl<VM: VMBinding, R2OPE: ProcessSlotsWork<VM = VM>, O2OPE: ProcessSlotsWork<VM = VM>> GCWork<VM>
+impl<VM: VMBinding, R2OPE: EdgeTracer<VM = VM>, O2OPE: EdgeTracer<VM = VM>> GCWork<VM>
     for ProcessRootNodes<VM, R2OPE, O2OPE>
 {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
@@ -1162,8 +1169,12 @@ impl<VM: VMBinding, R2OPE: ProcessSlotsWork<VM = VM>, O2OPE: ProcessSlotsWork<VM
         // first time.  We will create a work packet for scanning those roots.
         let root_objects_to_scan = {
             // We create an instance of E to use its `trace_object` method and its object queue.
-            let mut process_edges_work =
-                R2OPE::new(vec![], true, mmtk, WorkBucketStage::PinningRootsTrace);
+            let mut process_edges_work = R2OPE::from_mmtk(mmtk).make_process_slots_work(
+                vec![],
+                true,
+                mmtk,
+                WorkBucketStage::PinningRootsTrace,
+            );
             process_edges_work.set_worker(worker);
 
             for object in self.roots.iter().copied() {
@@ -1184,7 +1195,8 @@ impl<VM: VMBinding, R2OPE: ProcessSlotsWork<VM = VM>, O2OPE: ProcessSlotsWork<VM
         probe!(mmtk, process_root_nodes, num_roots, num_enqueued_nodes);
 
         if !root_objects_to_scan.is_empty() {
-            let mut process_edges_work = O2OPE::new(vec![], true, mmtk, self.bucket);
+            let mut process_edges_work =
+                O2OPE::from_mmtk(mmtk).make_process_slots_work(vec![], true, mmtk, self.bucket);
             process_edges_work.set_worker(worker);
             if let Some(work) = process_edges_work.create_scan_work(root_objects_to_scan) {
                 crate::memory_manager::add_work_packet(mmtk, self.bucket, work);
@@ -1218,7 +1230,7 @@ impl<VM: VMBinding> DerefMut for UnsupportedProcessEdges<VM> {
 impl<VM: VMBinding> ProcessSlotsWork for UnsupportedProcessEdges<VM> {
     type VM = VM;
 
-    type ScanObjectsWorkType = ScanObjects<Self>;
+    type ScanObjectsWorkType = ScanObjects<UnsupportedEdgeTracer<VM>>;
 
     fn new(
         _slots: Vec<SlotOf<Self>>,

@@ -1,5 +1,7 @@
 use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::Pause;
+use crate::plan::tracing::EdgeTracer;
+use crate::plan::tracing::UnsupportedEdgeTracer;
 use crate::plan::PlanTraceObject;
 use crate::plan::VectorQueue;
 use crate::policy::gc_work::TraceKind;
@@ -189,6 +191,36 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 }
 
+pub struct ConcurrentRootEdgeTracer<
+    VM: VMBinding,
+    P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,
+    const KIND: TraceKind,
+> {
+    plan: &'static P,
+}
+
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
+    EdgeTracer for ConcurrentRootEdgeTracer<VM, P, KIND>
+{
+    type VM = VM;
+
+    type ProcessSlotsWorkType = ProcessRootSlots<VM, P, KIND>;
+
+    fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
+        let plan = mmtk.get_plan().downcast_ref::<P>().unwrap();
+        Self { plan }
+    }
+
+    fn trace_object<Q: ObjectQueue>(
+        &mut self,
+        worker: &mut GCWorker<Self::VM>,
+        object: ObjectReference,
+        queue: &mut Q,
+    ) -> ObjectReference {
+        self.plan.trace_object::<Q, KIND>(queue, object, worker)
+    }
+}
+
 pub struct ProcessRootSlots<
     VM: VMBinding,
     P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,
@@ -219,7 +251,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     ProcessSlotsWork for ProcessRootSlots<VM, P, KIND>
 {
     type VM = VM;
-    type ScanObjectsWorkType = ScanObjects<Self>;
+    type ScanObjectsWorkType = ScanObjects<UnsupportedEdgeTracer<VM>>; // It won't instantiate ScanObjectsWorkType anyway.
     const OVERWRITE_REFERENCE: bool = false;
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
 

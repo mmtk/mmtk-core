@@ -1,4 +1,5 @@
 use crate::plan::is_nursery_gc;
+use crate::plan::tracing::EdgeTracer;
 use crate::scheduler::gc_work::ProcessSlotsWork;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
 use crate::util::reference_processor::RescanReferences;
@@ -137,9 +138,9 @@ impl<F: Finalizable> FinalizableProcessor<F> {
 }
 
 #[derive(Default)]
-pub struct Finalization<E: ProcessSlotsWork>(PhantomData<E>);
+pub struct Finalization<E: EdgeTracer>(PhantomData<E>);
 
-impl<E: ProcessSlotsWork> GCWork<E::VM> for Finalization<E> {
+impl<E: EdgeTracer> GCWork<E::VM> for Finalization<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if !*mmtk.options.no_reference_types {
             // Rescan soft and weak references at the end of the transitive closure from resurrected
@@ -160,7 +161,12 @@ impl<E: ProcessSlotsWork> GCWork<E::VM> for Finalization<E> {
             num_candidates_begin, num_ready_for_finalize_begin
         );
 
-        let mut w = E::new(vec![], false, mmtk, WorkBucketStage::FinalRefClosure);
+        let mut w = E::from_mmtk(mmtk).make_process_slots_work(
+            vec![],
+            false,
+            mmtk,
+            WorkBucketStage::FinalRefClosure,
+        );
         w.set_worker(worker);
         finalizable_processor.scan(worker.tls, &mut w, is_nursery_gc(mmtk.get_plan()));
 
@@ -181,20 +187,25 @@ impl<E: ProcessSlotsWork> GCWork<E::VM> for Finalization<E> {
         );
     }
 }
-impl<E: ProcessSlotsWork> Finalization<E> {
+impl<E: EdgeTracer> Finalization<E> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
 }
 
 #[derive(Default)]
-pub struct ForwardFinalization<E: ProcessSlotsWork>(PhantomData<E>);
+pub struct ForwardFinalization<E: EdgeTracer>(PhantomData<E>);
 
-impl<E: ProcessSlotsWork> GCWork<E::VM> for ForwardFinalization<E> {
+impl<E: EdgeTracer> GCWork<E::VM> for ForwardFinalization<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("Forward finalization");
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
-        let mut w = E::new(vec![], false, mmtk, WorkBucketStage::FinalizableForwarding);
+        let mut w = E::from_mmtk(mmtk).make_process_slots_work(
+            vec![],
+            false,
+            mmtk,
+            WorkBucketStage::FinalizableForwarding,
+        );
         w.set_worker(worker);
         finalizable_processor.forward_candidate(&mut w, is_nursery_gc(mmtk.get_plan()));
 
@@ -202,7 +213,7 @@ impl<E: ProcessSlotsWork> GCWork<E::VM> for ForwardFinalization<E> {
         trace!("Finished forwarding finlizable");
     }
 }
-impl<E: ProcessSlotsWork> ForwardFinalization<E> {
+impl<E: EdgeTracer> ForwardFinalization<E> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
