@@ -1,6 +1,5 @@
 //! Read/Write barrier implementations.
 
-use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
 use atomic::Ordering;
@@ -9,6 +8,7 @@ use super::LXR;
 use crate::plan::barriers::BarrierSemantics;
 use crate::plan::barriers::LOGGED_VALUE;
 use crate::plan::barriers::UNLOGGED_VALUE;
+use crate::plan::barriers::{FAST_COUNT, SLOW_COUNT};
 use crate::plan::immix::Pause;
 use crate::plan::lxr::cm::ProcessModBufSATB;
 use crate::plan::lxr::rc::ProcessDecs;
@@ -29,8 +29,6 @@ use crate::LazySweepingJobsCounter;
 use crate::MMTK;
 
 pub const TAKERATE_MEASUREMENT: bool = crate::args::TAKERATE_MEASUREMENT;
-pub static FAST_COUNT: AtomicUsize = AtomicUsize::new(0);
-pub static SLOW_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 pub struct LXRFieldBarrierSemantics<VM: VMBinding> {
     mmtk: &'static MMTK<VM>,

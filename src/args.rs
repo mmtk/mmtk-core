@@ -175,7 +175,7 @@ pub const RC_DONT_EVACUATE_NURSERY_IN_RECYCLED_LINES: bool =
 // ---------- Barrier flags ---------- //
 pub const BARRIER_MEASUREMENT: bool = cfg!(feature = "barrier_measurement");
 pub const BARRIER_MEASUREMENT_NO_SLOW: bool = cfg!(feature = "barrier_measurement_no_slow");
-pub const TAKERATE_MEASUREMENT: bool = false;
+pub const TAKERATE_MEASUREMENT: bool = cfg!(feature = "takerate_measurement");
 pub const INSTRUMENTATION: bool = cfg!(feature = "instrumentation");
 
 // ---------- Debugging flags ---------- //
