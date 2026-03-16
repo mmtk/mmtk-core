@@ -964,7 +964,9 @@ options! {
     /// Percentage of heap size reserved for defragmentation.
     /// According to [this paper](https://doi.org/10.1145/1375581.1375586), Immix works well with
     /// headroom between 1% to 3% of the heap size.
-    immix_defrag_headroom_percent: usize            [|v: &usize| *v <= 50] = 2
+    immix_defrag_headroom_percent: usize            [|v: &usize| *v <= 50] = 2,
+    /// Disable concurrent marking in ConcurrentImmix. Setting this to true will make ConcurrentImmix behave exactly like full heap Immix. This option is only intended for debugging.
+    concurrent_immix_disable_concurrent_marking: bool              [always_valid] = false
 }
 
 #[cfg(test)]

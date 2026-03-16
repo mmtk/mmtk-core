@@ -86,18 +86,25 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             return true;
         }
 
-        let threshold = self.get_total_pages() >> 1;
-        let used_pages_after_last_gc = self.common.base.global_state.get_used_pages_after_last_gc();
-        let used_pages_now = self.get_used_pages();
-        let allocated = used_pages_now.saturating_sub(used_pages_after_last_gc);
-        if !concurrent_marking_in_progress && allocated > threshold {
-            info!("Allocated {allocated} pages since last GC ({used_pages_now} - {used_pages_after_last_gc} > {threshold}): Do concurrent marking");
-            debug_assert!(
-                self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].is_empty()
-            );
-            debug_assert!(!self.concurrent_marking_in_progress());
-            debug_assert_ne!(self.previous_pause(), Some(Pause::InitialMark));
-            return true;
+        if !*self
+            .base()
+            .options
+            .concurrent_immix_disable_concurrent_marking
+        {
+            let threshold = self.get_total_pages() >> 1;
+            let used_pages_after_last_gc =
+                self.common.base.global_state.get_used_pages_after_last_gc();
+            let used_pages_now = self.get_used_pages();
+            let allocated = used_pages_now.saturating_sub(used_pages_after_last_gc);
+            if !concurrent_marking_in_progress && allocated > threshold {
+                info!("Allocated {allocated} pages since last GC ({used_pages_now} - {used_pages_after_last_gc} > {threshold}): Do concurrent marking");
+                debug_assert!(
+                    self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].is_empty()
+                );
+                debug_assert!(!self.concurrent_marking_in_progress());
+                debug_assert_ne!(self.previous_pause(), Some(Pause::InitialMark));
+                return true;
+            }
         }
         false
     }
@@ -294,6 +301,10 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
 
 impl<VM: VMBinding> ConcurrentImmix<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        if *args.options.concurrent_immix_disable_concurrent_marking {
+            warn!("Option 'concurrent_immix_disable_concurrent_marking' is set to true. Concurrent marking is disabled for ConcurrentImmix. This will make ConcurrentImmix behave exactly like full heap Immix.");
+        }
+
         let spec = crate::util::metadata::extract_side_metadata(&[
             *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
         ]);
