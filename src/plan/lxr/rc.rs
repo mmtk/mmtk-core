@@ -803,7 +803,7 @@ pub struct ProcessDecs<VM: VMBinding> {
     new_decs: VectorQueue<ObjectReference>,
     counter: LazySweepingJobsCounter,
     mark_objects: VectorQueue<ObjectReference>,
-    cm_in_progress: bool,
+    mark_dead_objects: bool,
     mature_sweeping_in_progress: bool,
     rc: RefCountHelper<VM>,
 }
@@ -825,7 +825,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             new_decs: VectorQueue::default(),
             counter,
             mark_objects: VectorQueue::default(),
-            cm_in_progress: false,
+            mark_dead_objects: false,
             mature_sweeping_in_progress: false,
             rc: RefCountHelper::NEW,
         }
@@ -841,7 +841,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             new_decs: VectorQueue::default(),
             counter,
             mark_objects: VectorQueue::default(),
-            cm_in_progress: false,
+            mark_dead_objects: false,
             mature_sweeping_in_progress: false,
             rc: RefCountHelper::NEW,
         }
@@ -885,7 +885,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
     }
 
     fn record_mature_evac_remset(&mut self, lxr: &LXR<VM>, s: VM::VMSlot, o: ObjectReference) {
-        if !(crate::args::RC_MATURE_EVACUATION && self.cm_in_progress) {
+        if !(crate::args::RC_MATURE_EVACUATION && self.mark_dead_objects) {
             return;
         }
         if !lxr.address_in_defrag(s.to_address()) && lxr.in_defrag(o) {
@@ -910,7 +910,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
                 s.dead_mature_rc_los_volume += o.get_size::<VM>();
             }
         });
-        if self.cm_in_progress {
+        if self.mark_dead_objects {
             let marked = lxr.mark(o);
             if cfg!(feature = "lxr_satb_live_bytes_counter") && marked {
                 crate::record_live_bytes(o.get_size::<VM>());
@@ -940,7 +940,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
                         } else {
                             self.record_mature_evac_remset(lxr, slot, x);
                         }
-                        if self.cm_in_progress && !lxr.is_marked(x) {
+                        if self.mark_dead_objects && !lxr.is_marked(x) {
                             if cfg!(any(feature = "sanity", debug_assertions)) {
                                 assert!(
                                     x.to_raw_address().is_mapped(),
@@ -1040,8 +1040,11 @@ impl<VM: VMBinding> GCWork<VM> for ProcessDecs<VM> {
             return;
         }
         let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
-        self.cm_in_progress = lxr.cm_in_progress()
-            || (!crate::args::LAZY_DECREMENTS && lxr.current_pause() == Some(Pause::InitialMark));
+        self.mark_dead_objects = if crate::args::LAZY_DECREMENTS {
+            lxr.cm_in_progress() && lxr.previous_pause() != Some(Pause::InitialMark)
+        } else {
+            lxr.cm_in_progress() && lxr.current_pause() != Some(Pause::InitialMark)
+        };
         self.mature_sweeping_in_progress = if crate::args::LAZY_DECREMENTS {
             lxr.previous_pause() == Some(Pause::FinalMark)
                 || lxr.current_pause() == Some(Pause::Full)
