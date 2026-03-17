@@ -75,8 +75,8 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             return true;
         }
 
+        // Check stw for final mark
         let concurrent_marking_in_progress = self.concurrent_marking_in_progress();
-
         if concurrent_marking_in_progress
             && self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].is_drained()
         {
@@ -86,26 +86,27 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             return true;
         }
 
-        if !*self
-            .base()
-            .options
-            .concurrent_immix_disable_concurrent_marking
-        {
-            let threshold = self.get_total_pages() >> 1;
-            let used_pages_after_last_gc =
-                self.common.base.global_state.get_used_pages_after_last_gc();
-            let used_pages_now = self.get_used_pages();
-            let allocated = used_pages_now.saturating_sub(used_pages_after_last_gc);
-            if !concurrent_marking_in_progress && allocated > threshold {
-                info!("Allocated {allocated} pages since last GC ({used_pages_now} - {used_pages_after_last_gc} > {threshold}): Do concurrent marking");
-                debug_assert!(
-                    self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].is_empty()
-                );
-                debug_assert!(!self.concurrent_marking_in_progress());
-                debug_assert_ne!(self.previous_pause(), Some(Pause::InitialMark));
-                return true;
-            }
+        // Check stw for initial mark
+
+        // If concurrent marking is disbled, no need to check further.
+        if self.concurrent_marking_is_disabled() {
+            return false;
         }
+
+        let threshold = self.get_total_pages() >> 1;
+        let used_pages_after_last_gc = self.common.base.global_state.get_used_pages_after_last_gc();
+        let used_pages_now = self.get_used_pages();
+        let allocated = used_pages_now.saturating_sub(used_pages_after_last_gc);
+        if !concurrent_marking_in_progress && allocated > threshold {
+            info!("Allocated {allocated} pages since last GC ({used_pages_now} - {used_pages_after_last_gc} > {threshold}): Do concurrent marking");
+            debug_assert!(
+                self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].is_empty()
+            );
+            debug_assert!(!self.concurrent_marking_in_progress());
+            debug_assert_ne!(self.previous_pause(), Some(Pause::InitialMark));
+            return true;
+        }
+
         false
     }
 
@@ -446,6 +447,13 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
     fn previous_pause(&self) -> Option<Pause> {
         self.previous_pause.load(Ordering::SeqCst)
+    }
+
+    fn concurrent_marking_is_disabled(&self) -> bool {
+        *self
+            .base()
+            .options
+            .concurrent_immix_disable_concurrent_marking
     }
 }
 
