@@ -155,12 +155,12 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
 /// The modbuf contains a list of objects in mature space(s) that
 /// may contain pointers to the nursery space.
 /// This work packet scans the recorded objects and forwards pointers if necessary.
-pub struct ProcessModBuf<E: TracePolicy> {
+pub struct ProcessModBuf<T: TracePolicy> {
     modbuf: Vec<ObjectReference>,
-    phantom: PhantomData<E>,
+    phantom: PhantomData<T>,
 }
 
-impl<E: TracePolicy> ProcessModBuf<E> {
+impl<T: TracePolicy> ProcessModBuf<T> {
     pub fn new(modbuf: Vec<ObjectReference>) -> Self {
         debug_assert!(!modbuf.is_empty());
         Self {
@@ -170,8 +170,8 @@ impl<E: TracePolicy> ProcessModBuf<E> {
     }
 }
 
-impl<E: TracePolicy> GCWork<E::VM> for ProcessModBuf<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+impl<T: TracePolicy> GCWork<T::VM> for ProcessModBuf<T> {
+    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         // Process and scan modbuf only if the current GC is a nursery GC
         let gen = mmtk.get_plan().generational().unwrap();
         if gen.is_current_gc_nursery() {
@@ -183,7 +183,7 @@ impl<E: TracePolicy> GCWork<E::VM> for ProcessModBuf<E> {
                     *obj,
                     OS::get_process_memory_maps().unwrap(),
                 );
-                <E::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<E::VM, u8>(
+                <T::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<T::VM, u8>(
                     *obj,
                     1,
                     None,
@@ -193,7 +193,7 @@ impl<E: TracePolicy> GCWork<E::VM> for ProcessModBuf<E> {
             // Scan objects in the modbuf and forward pointers
             let modbuf = std::mem::take(&mut self.modbuf);
             GCWork::do_work(
-                &mut ScanObjects::<E>::new(modbuf, false, WorkBucketStage::Closure),
+                &mut ScanObjects::<T>::new(modbuf, false, WorkBucketStage::Closure),
                 worker,
                 mmtk,
             )
@@ -204,14 +204,14 @@ impl<E: TracePolicy> GCWork<E::VM> for ProcessModBuf<E> {
 /// The array-copy modbuf contains a list of array slices in mature space(s) that
 /// may contain pointers to the nursery space.
 /// This work packet forwards and updates each entry in the recorded slices.
-pub struct ProcessRegionModBuf<E: TracePolicy> {
+pub struct ProcessRegionModBuf<T: TracePolicy> {
     /// A list of `(start_address, bytes)` tuple.
-    modbuf: Vec<<E::VM as VMBinding>::VMMemorySlice>,
-    phantom: PhantomData<E>,
+    modbuf: Vec<<T::VM as VMBinding>::VMMemorySlice>,
+    phantom: PhantomData<T>,
 }
 
-impl<E: TracePolicy> ProcessRegionModBuf<E> {
-    pub fn new(modbuf: Vec<<E::VM as VMBinding>::VMMemorySlice>) -> Self {
+impl<T: TracePolicy> ProcessRegionModBuf<T> {
+    pub fn new(modbuf: Vec<<T::VM as VMBinding>::VMMemorySlice>) -> Self {
         Self {
             modbuf,
             phantom: PhantomData,
@@ -219,8 +219,8 @@ impl<E: TracePolicy> ProcessRegionModBuf<E> {
     }
 }
 
-impl<E: TracePolicy> GCWork<E::VM> for ProcessRegionModBuf<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+impl<T: TracePolicy> GCWork<T::VM> for ProcessRegionModBuf<T> {
+    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         // Scan modbuf only if the current GC is a nursery GC
         if mmtk
             .get_plan()
@@ -237,7 +237,7 @@ impl<E: TracePolicy> GCWork<E::VM> for ProcessRegionModBuf<E> {
             }
             // Forward entries
             GCWork::do_work(
-                &mut E::from_mmtk(mmtk).make_process_slots_work(
+                &mut T::from_mmtk(mmtk).make_process_slots_work(
                     slots,
                     false,
                     mmtk,

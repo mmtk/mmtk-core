@@ -14,11 +14,11 @@ impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
     type DefaultTracePolicy = PlanTracePolicy<ConcurrentImmix<VM>, KIND>;
     type PinningTracePolicy = PlanTracePolicy<ConcurrentImmix<VM>, TRACE_KIND_TRANSITIVE_PIN>;
 }
-pub(super) struct ConcurrentImmixGCWorkContext<E: TracePolicy>(std::marker::PhantomData<E>);
+pub(super) struct ConcurrentImmixGCWorkContext<T: TracePolicy>(std::marker::PhantomData<T>);
 
-impl<E: TracePolicy> crate::scheduler::GCWorkContext for ConcurrentImmixGCWorkContext<E> {
-    type VM = E::VM;
-    type PlanType = ConcurrentImmix<E::VM>;
-    type DefaultTracePolicy = E;
-    type PinningTracePolicy = E;
+impl<T: TracePolicy> crate::scheduler::GCWorkContext for ConcurrentImmixGCWorkContext<T> {
+    type VM = T::VM;
+    type PlanType = ConcurrentImmix<T::VM>;
+    type DefaultTracePolicy = T;
+    type PinningTracePolicy = T;
 }

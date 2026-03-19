@@ -138,10 +138,10 @@ impl<F: Finalizable> FinalizableProcessor<F> {
 }
 
 #[derive(Default)]
-pub struct Finalization<E: TracePolicy>(PhantomData<E>);
+pub struct Finalization<T: TracePolicy>(PhantomData<T>);
 
-impl<E: TracePolicy> GCWork<E::VM> for Finalization<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+impl<T: TracePolicy> GCWork<T::VM> for Finalization<T> {
+    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         if !*mmtk.options.no_reference_types {
             // Rescan soft and weak references at the end of the transitive closure from resurrected
             // objects.  New soft and weak references may be discovered during this.
@@ -161,7 +161,7 @@ impl<E: TracePolicy> GCWork<E::VM> for Finalization<E> {
             num_candidates_begin, num_ready_for_finalize_begin
         );
 
-        let mut w = E::from_mmtk(mmtk).make_process_slots_work(
+        let mut w = T::from_mmtk(mmtk).make_process_slots_work(
             vec![],
             false,
             mmtk,
@@ -187,20 +187,21 @@ impl<E: TracePolicy> GCWork<E::VM> for Finalization<E> {
         );
     }
 }
-impl<E: TracePolicy> Finalization<E> {
+
+impl<T: TracePolicy> Finalization<T> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
 }
 
 #[derive(Default)]
-pub struct ForwardFinalization<E: TracePolicy>(PhantomData<E>);
+pub struct ForwardFinalization<T: TracePolicy>(PhantomData<T>);
 
-impl<E: TracePolicy> GCWork<E::VM> for ForwardFinalization<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+impl<T: TracePolicy> GCWork<T::VM> for ForwardFinalization<T> {
+    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         trace!("Forward finalization");
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
-        let mut w = E::from_mmtk(mmtk).make_process_slots_work(
+        let mut w = T::from_mmtk(mmtk).make_process_slots_work(
             vec![],
             false,
             mmtk,
@@ -213,7 +214,7 @@ impl<E: TracePolicy> GCWork<E::VM> for ForwardFinalization<E> {
         trace!("Finished forwarding finlizable");
     }
 }
-impl<E: TracePolicy> ForwardFinalization<E> {
+impl<T: TracePolicy> ForwardFinalization<T> {
     pub fn new() -> Self {
         Self(PhantomData)
     }

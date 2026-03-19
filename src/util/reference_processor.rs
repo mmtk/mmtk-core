@@ -536,9 +536,9 @@ impl<VM: VMBinding> GCWork<VM> for RescanReferences<VM> {
 }
 
 #[derive(Default)]
-pub(crate) struct SoftRefProcessing<E: TracePolicy>(PhantomData<E>);
-impl<E: TracePolicy> GCWork<E::VM> for SoftRefProcessing<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+pub(crate) struct SoftRefProcessing<T: TracePolicy>(PhantomData<T>);
+impl<T: TracePolicy> GCWork<T::VM> for SoftRefProcessing<T> {
+    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         if !mmtk.state.is_emergency_collection() {
             // Postpone the scanning to the end of the transitive closure from strongly reachable
             // soft references.
@@ -551,7 +551,7 @@ impl<E: TracePolicy> GCWork<E::VM> for SoftRefProcessing<E> {
 
             // Retain soft references.  This will expand the transitive closure.  We create an
             // instance of `E` for this.
-            let mut w = E::from_mmtk(mmtk).make_process_slots_work(
+            let mut w = T::from_mmtk(mmtk).make_process_slots_work(
                 vec![],
                 false,
                 mmtk,
@@ -566,7 +566,8 @@ impl<E: TracePolicy> GCWork<E::VM> for SoftRefProcessing<E> {
         }
     }
 }
-impl<E: TracePolicy> SoftRefProcessing<E> {
+
+impl<T: TracePolicy> SoftRefProcessing<T> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
@@ -599,10 +600,10 @@ impl<VM: VMBinding> PhantomRefProcessing<VM> {
 }
 
 #[derive(Default)]
-pub(crate) struct RefForwarding<E: TracePolicy>(PhantomData<E>);
-impl<E: TracePolicy> GCWork<E::VM> for RefForwarding<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        let mut w = E::from_mmtk(mmtk).make_process_slots_work(
+pub(crate) struct RefForwarding<T: TracePolicy>(PhantomData<T>);
+impl<T: TracePolicy> GCWork<T::VM> for RefForwarding<T> {
+    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
+        let mut w = T::from_mmtk(mmtk).make_process_slots_work(
             vec![],
             false,
             mmtk,
@@ -613,7 +614,7 @@ impl<E: TracePolicy> GCWork<E::VM> for RefForwarding<E> {
         w.flush();
     }
 }
-impl<E: TracePolicy> RefForwarding<E> {
+impl<T: TracePolicy> RefForwarding<T> {
     pub fn new() -> Self {
         Self(PhantomData)
     }

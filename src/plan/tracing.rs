@@ -282,19 +282,19 @@ impl ObjectQueue for VectorQueue<ObjectReference> {
 /// A transitive closure visitor to collect the slots from objects.
 /// It maintains a buffer for the slots, and flushes slots to a new work packet
 /// if the buffer is full or if the type gets dropped.
-pub struct ObjectsClosure<'a, E: TracePolicy> {
-    buffer: VectorQueue<SlotOfET<E>>,
-    pub(crate) worker: &'a mut GCWorker<E::VM>,
+pub struct ObjectsClosure<'a, T: TracePolicy> {
+    buffer: VectorQueue<SlotOfET<T>>,
+    pub(crate) worker: &'a mut GCWorker<T::VM>,
     bucket: WorkBucketStage,
 }
 
-impl<'a, E: TracePolicy> ObjectsClosure<'a, E> {
+impl<'a, T: TracePolicy> ObjectsClosure<'a, T> {
     /// Create an [`ObjectsClosure`].
     ///
     /// Arguments:
     /// * `worker`: the current worker. The objects closure should not leave the context of this worker.
     /// * `bucket`: new work generated will be push ed to the bucket.
-    pub fn new(worker: &'a mut GCWorker<E::VM>, bucket: WorkBucketStage) -> Self {
+    pub fn new(worker: &'a mut GCWorker<T::VM>, bucket: WorkBucketStage) -> Self {
         Self {
             buffer: VectorQueue::new(),
             worker,
@@ -307,7 +307,7 @@ impl<'a, E: TracePolicy> ObjectsClosure<'a, E> {
         if !buf.is_empty() {
             self.worker.add_work(
                 self.bucket,
-                E::from_mmtk(self.worker.mmtk).make_process_slots_work(
+                T::from_mmtk(self.worker.mmtk).make_process_slots_work(
                     buf,
                     false,
                     self.worker.mmtk,
@@ -318,8 +318,8 @@ impl<'a, E: TracePolicy> ObjectsClosure<'a, E> {
     }
 }
 
-impl<E: TracePolicy> SlotVisitor<SlotOfET<E>> for ObjectsClosure<'_, E> {
-    fn visit_slot(&mut self, slot: SlotOfET<E>) {
+impl<T: TracePolicy> SlotVisitor<SlotOfET<T>> for ObjectsClosure<'_, T> {
+    fn visit_slot(&mut self, slot: SlotOfET<T>) {
         #[cfg(debug_assertions)]
         {
             use crate::vm::slot::Slot;
@@ -336,7 +336,7 @@ impl<E: TracePolicy> SlotVisitor<SlotOfET<E>> for ObjectsClosure<'_, E> {
     }
 }
 
-impl<E: TracePolicy> Drop for ObjectsClosure<'_, E> {
+impl<T: TracePolicy> Drop for ObjectsClosure<'_, T> {
     fn drop(&mut self) {
         self.flush();
     }
