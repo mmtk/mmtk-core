@@ -51,6 +51,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
     type VM = VM;
 
     type ProcessSlotsWorkType = GenNurseryProcessSlots<VM, P, KIND>;
+    type ScanObjectsWorkType = PlanScanObjects<Self, P>;
 
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
         Self {
@@ -67,6 +68,15 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
     ) -> ObjectReference {
         self.plan
             .trace_object_nursery::<_, KIND>(queue, object, worker)
+    }
+
+    fn create_scan_work(
+        &self,
+        nodes: Vec<ObjectReference>,
+        _mmtk: &'static MMTK<Self::VM>,
+        bucket: WorkBucketStage,
+    ) -> Self::ScanObjectsWorkType {
+        PlanScanObjects::new(self.plan, nodes, false, bucket)
     }
 }
 

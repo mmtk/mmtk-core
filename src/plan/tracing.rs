@@ -6,7 +6,8 @@ use std::marker::PhantomData;
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::gc_work::{
-    PlanProcessSlots, ProcessSlotsWork, SFTProcessSlots, SlotOfET, UnsupportedProcessEdges,
+    PlanProcessSlots, PlanScanObjects, ProcessSlotsWork, SFTProcessSlots, ScanObjects,
+    ScanObjectsWork, SlotOfET, UnsupportedProcessEdges,
 };
 use crate::scheduler::{GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
 use crate::util::{ObjectReference, VMThread, VMWorkerThread};
@@ -16,6 +17,7 @@ use crate::{Plan, MMTK};
 pub trait EdgeTracer: 'static + Send + Clone {
     type VM: VMBinding;
     type ProcessSlotsWorkType: ProcessSlotsWork<VM = Self::VM>;
+    type ScanObjectsWorkType: ScanObjectsWork<Self::VM>;
 
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self;
 
@@ -35,6 +37,13 @@ pub trait EdgeTracer: 'static + Send + Clone {
     ) -> Self::ProcessSlotsWorkType {
         Self::ProcessSlotsWorkType::new(slots, roots, mmtk, bucket)
     }
+
+    fn create_scan_work(
+        &self,
+        nodes: Vec<ObjectReference>,
+        mmtk: &'static MMTK<Self::VM>,
+        bucket: WorkBucketStage,
+    ) -> Self::ScanObjectsWorkType;
 }
 
 #[derive(Default)]
@@ -53,6 +62,7 @@ impl<VM: VMBinding> Clone for SFTEdgeTracer<VM> {
 impl<VM: VMBinding> EdgeTracer for SFTEdgeTracer<VM> {
     type VM = VM;
     type ProcessSlotsWorkType = SFTProcessSlots<Self::VM>;
+    type ScanObjectsWorkType = ScanObjects<Self>;
 
     fn from_mmtk(_mmtk: &'static MMTK<Self::VM>) -> Self {
         Default::default()
@@ -78,6 +88,15 @@ impl<VM: VMBinding> EdgeTracer for SFTEdgeTracer<VM> {
         }
         result
     }
+
+    fn create_scan_work(
+        &self,
+        nodes: Vec<ObjectReference>,
+        _mmtk: &'static MMTK<Self::VM>,
+        bucket: WorkBucketStage,
+    ) -> Self::ScanObjectsWorkType {
+        ScanObjects::new(nodes, false, bucket)
+    }
 }
 
 pub struct PlanEdgeTracer<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> {
@@ -101,6 +120,7 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> EdgeTracer
 {
     type VM = P::VM;
     type ProcessSlotsWorkType = PlanProcessSlots<Self::VM, P, KIND>;
+    type ScanObjectsWorkType = PlanScanObjects<Self, P>;
 
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
         let plan = mmtk.get_plan().downcast_ref::<P>().unwrap();
@@ -114,6 +134,15 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> EdgeTracer
         queue: &mut Q,
     ) -> ObjectReference {
         self.plan.trace_object::<Q, KIND>(queue, object, worker)
+    }
+
+    fn create_scan_work(
+        &self,
+        nodes: Vec<ObjectReference>,
+        _mmtk: &'static MMTK<Self::VM>,
+        bucket: WorkBucketStage,
+    ) -> Self::ScanObjectsWorkType {
+        PlanScanObjects::new(self.plan, nodes, false, bucket)
     }
 }
 
@@ -133,6 +162,7 @@ impl<VM: VMBinding> Clone for UnsupportedEdgeTracer<VM> {
 impl<VM: VMBinding> EdgeTracer for UnsupportedEdgeTracer<VM> {
     type VM = VM;
     type ProcessSlotsWorkType = UnsupportedProcessEdges<Self::VM>;
+    type ScanObjectsWorkType = ScanObjects<Self>;
 
     fn from_mmtk(_mmtk: &'static MMTK<Self::VM>) -> Self {
         unimplemented!()
@@ -144,6 +174,15 @@ impl<VM: VMBinding> EdgeTracer for UnsupportedEdgeTracer<VM> {
         _object: ObjectReference,
         _queue: &mut Q,
     ) -> ObjectReference {
+        unimplemented!()
+    }
+
+    fn create_scan_work(
+        &self,
+        _nodes: Vec<ObjectReference>,
+        _mmtk: &'static MMTK<Self::VM>,
+        _bucket: WorkBucketStage,
+    ) -> Self::ScanObjectsWorkType {
         unimplemented!()
     }
 }

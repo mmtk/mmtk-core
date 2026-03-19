@@ -213,6 +213,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     type VM = VM;
 
     type ProcessSlotsWorkType = ProcessRootSlots<VM, P, KIND>;
+    type ScanObjectsWorkType = ScanObjects<Self>; // Unused
 
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
         let plan = mmtk.get_plan().downcast_ref::<P>().unwrap();
@@ -226,6 +227,17 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         queue: &mut Q,
     ) -> ObjectReference {
         self.plan.trace_object::<Q, KIND>(queue, object, worker)
+    }
+
+    fn create_scan_work(
+        &self,
+        _nodes: Vec<ObjectReference>,
+        _mmtk: &'static MMTK<Self::VM>,
+        _bucket: WorkBucketStage,
+    ) -> Self::ScanObjectsWorkType {
+        // This should create `ConcurrentTraceObjects`, but it currently does not implement `ScanObjectsWork`.
+        // `ProcessRootSlots` currently bypasses this method.
+        todo!()
     }
 }
 

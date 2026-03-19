@@ -248,41 +248,54 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
 
 /// This implements `ObjectTracer` by forwarding the `trace_object` calls to the wrapped
 /// `ProcessEdgesWork` instance.
-pub(crate) struct ProcessEdgesWorkTracer<E: ProcessSlotsWork> {
-    process_edges_work: E,
+pub(crate) struct ProcessEdgesWorkTracer<'w, E: EdgeTracer> {
+    worker: &'w mut GCWorker<E::VM>,
+    tracer: E,
+    queue: VectorObjectQueue,
     stage: WorkBucketStage,
 }
 
-impl<E: ProcessSlotsWork> ObjectTracer for ProcessEdgesWorkTracer<E> {
+impl<'w, E: EdgeTracer> ObjectTracer for ProcessEdgesWorkTracer<'w, E> {
     /// Forward the `trace_object` call to the underlying `ProcessEdgesWork`,
     /// and flush as soon as the underlying buffer of `process_edges_work` is full.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        let result = self.process_edges_work.trace_object(object);
+        let result = self
+            .tracer
+            .trace_object(self.worker, object, &mut self.queue);
         self.flush_if_full();
         result
     }
 }
 
-impl<E: ProcessSlotsWork> ProcessEdgesWorkTracer<E> {
+impl<'w, E: EdgeTracer> ProcessEdgesWorkTracer<'w, E> {
+    fn new(worker: &'w mut GCWorker<E::VM>, tracer: E, stage: WorkBucketStage) -> Self {
+        Self {
+            worker,
+            tracer,
+            queue: VectorObjectQueue::new(),
+            stage,
+        }
+    }
+
     fn flush_if_full(&mut self) {
-        if self.process_edges_work.nodes.is_full() {
+        if self.queue.is_full() {
             self.flush();
         }
     }
 
     pub fn flush_if_not_empty(&mut self) {
-        if !self.process_edges_work.nodes.is_empty() {
+        if !self.queue.is_empty() {
             self.flush();
         }
     }
 
     fn flush(&mut self) {
-        let next_nodes = self.process_edges_work.pop_nodes();
+        let next_nodes = self.queue.take();
         assert!(!next_nodes.is_empty());
-        if let Some(work_packet) = self.process_edges_work.create_scan_work(next_nodes) {
-            let worker = self.process_edges_work.worker();
-            worker.scheduler().work_buckets[self.stage].add(work_packet);
-        }
+        let work_packet = self
+            .tracer
+            .create_scan_work(next_nodes, self.worker.mmtk, self.stage);
+        self.worker.scheduler().work_buckets[self.stage].add(work_packet);
     }
 }
 
@@ -311,26 +324,16 @@ impl<E: EdgeTracer> Clone for ProcessEdgesWorkTracerContext<E> {
 }
 
 impl<E: EdgeTracer> ObjectTracerContext<E::VM> for ProcessEdgesWorkTracerContext<E> {
-    type TracerType = ProcessEdgesWorkTracer<E::ProcessSlotsWorkType>;
+    type TracerType<'w> = ProcessEdgesWorkTracer<'w, E>;
 
-    fn with_tracer<R, F>(&self, worker: &mut GCWorker<E::VM>, func: F) -> R
+    fn with_tracer<'w, R, F>(&self, worker: &'w mut GCWorker<E::VM>, func: F) -> R
     where
-        F: FnOnce(&mut Self::TracerType) -> R,
+        F: FnOnce(&mut Self::TracerType<'w>) -> R,
     {
         let mmtk = worker.mmtk;
 
-        // Prepare the underlying ProcessEdgesWork
-        let mut process_edges_work =
-            E::from_mmtk(mmtk).make_process_slots_work(vec![], false, mmtk, self.stage);
-        // FIXME: This line allows us to omit the borrowing lifetime of worker.
-        // We should refactor ProcessEdgesWork so that it uses `worker` locally, not as a member.
-        process_edges_work.set_worker(worker);
-
-        // Cretae the tracer.
-        let mut tracer = ProcessEdgesWorkTracer {
-            process_edges_work,
-            stage: self.stage,
-        };
+        // Cretae the callback tracer.
+        let mut tracer = ProcessEdgesWorkTracer::new(worker, E::from_mmtk(mmtk), self.stage);
 
         // The caller can use the tracer here.
         let result = func(&mut tracer);

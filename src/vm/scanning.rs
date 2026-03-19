@@ -57,7 +57,7 @@ pub trait ObjectTracerContext<VM: VMBinding>: Clone + Send + 'static {
     /// For this reason, `TracerType` should have a `<'w>` lifetime parameter.
     /// Generic Associated Types (GAT) is already stablized in Rust 1.65.
     /// We should update our toolchain version, too.
-    type TracerType: ObjectTracer;
+    type TracerType<'w>: ObjectTracer;
 
     /// Create a temporary `ObjectTracer` and provide access in the scope of `func`.
     ///
@@ -76,9 +76,9 @@ pub trait ObjectTracerContext<VM: VMBinding>: Clone + Send + 'static {
     /// -   `func`: A caller-supplied closure in which the created `ObjectTracer` can be used.
     ///
     /// Returns: The return value of `func`.
-    fn with_tracer<R, F>(&self, worker: &mut GCWorker<VM>, func: F) -> R
+    fn with_tracer<'w, R, F>(&self, worker: &'w mut GCWorker<VM>, func: F) -> R
     where
-        F: FnOnce(&mut Self::TracerType) -> R;
+        F: FnOnce(&mut Self::TracerType<'w>) -> R;
 }
 
 /// Root-scanning methods use this trait to create work packets for processing roots.
