@@ -6,10 +6,11 @@ use crate::policy::gc_work::TraceKind;
 use crate::scheduler::{gc_work::*, GCWork, GCWorker, WorkBucketStage};
 use crate::util::os::*;
 use crate::util::ObjectReference;
-use crate::vm::slot::MemorySlice;
+use crate::vm::slot::{MemorySlice, Slot};
 use crate::vm::*;
 use crate::MMTK;
 use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 
 use super::global::GenerationalPlanExt;
 
@@ -23,11 +24,22 @@ pub struct GenNurseryEdgeTracer<
 }
 
 impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
+    GenNurseryEdgeTracer<VM, P, KIND>
+{
+    pub(crate) fn new(plan: &'static P) -> Self {
+        Self {
+            plan,
+            phantom_data: PhantomData,
+        }
+    }
+}
+
+impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
     EdgeTracer for GenNurseryEdgeTracer<VM, P, KIND>
 {
     type VM = VM;
 
-    type ProcessSlotsWorkType = PlanProcessSlots<VM, P, KIND>;
+    type ProcessSlotsWorkType = GenNurseryProcessSlots<VM, P, KIND>;
 
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
         Self {
@@ -44,6 +56,78 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
     ) -> ObjectReference {
         self.plan
             .trace_object_nursery::<_, KIND>(queue, object, worker)
+    }
+}
+
+/// Process edges for a nursery GC. This type is provided if a generational plan does not use
+/// [`crate::scheduler::gc_work::SFTProcessEdges`]. If a plan uses `SFTProcessEdges`,
+/// it does not need to use this type.
+pub struct GenNurseryProcessSlots<
+    VM: VMBinding,
+    P: GenerationalPlanExt<VM> + PlanTraceObject<VM>,
+    const KIND: TraceKind,
+> {
+    plan: &'static P,
+    tracer: GenNurseryEdgeTracer<VM, P, KIND>,
+    base: ProcessSlotsBase<VM>,
+}
+
+impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
+    ProcessSlotsWork for GenNurseryProcessSlots<VM, P, KIND>
+{
+    type VM = VM;
+    type ScanObjectsWorkType = PlanScanObjects<GenNurseryEdgeTracer<VM, P, KIND>, P>;
+
+    fn new(
+        slots: Vec<SlotOf<Self>>,
+        roots: bool,
+        mmtk: &'static MMTK<VM>,
+        bucket: WorkBucketStage,
+    ) -> Self {
+        let base = ProcessSlotsBase::new(slots, roots, mmtk, bucket);
+        let plan = base.plan().downcast_ref::<P>().unwrap();
+        let tracer = GenNurseryEdgeTracer::new(plan);
+        Self { plan, tracer, base }
+    }
+
+    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        self.tracer
+            .trace_object(self.worker(), object, &mut self.base.nodes)
+    }
+
+    fn process_slot(&mut self, slot: SlotOf<Self>) {
+        let Some(object) = slot.load() else {
+            // Skip slots that are not holding an object reference.
+            return;
+        };
+        let new_object = self.trace_object(object);
+        debug_assert!(!self.plan.is_object_in_nursery(new_object));
+        // Note: If `object` is a mature object, `trace_object` will not call `space.trace_object`,
+        // but will still return `object`.  In that case, we don't need to write it back.
+        if new_object != object {
+            slot.store(new_object);
+        }
+    }
+
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
+        Some(PlanScanObjects::new(self.plan, nodes, false, self.bucket))
+    }
+}
+
+impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind> Deref
+    for GenNurseryProcessSlots<VM, P, KIND>
+{
+    type Target = ProcessSlotsBase<VM>;
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
+    DerefMut for GenNurseryProcessSlots<VM, P, KIND>
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
     }
 }
 
