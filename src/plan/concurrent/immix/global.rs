@@ -75,8 +75,8 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             return true;
         }
 
+        // Check stw for final mark
         let concurrent_marking_in_progress = self.concurrent_marking_in_progress();
-
         if concurrent_marking_in_progress
             && self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].is_drained()
         {
@@ -84,6 +84,13 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             // we trigger the FinalMark pause at the next poll() site (here).
             // FIXME: Immediately trigger FinalMark when the Concurrent bucket is drained.
             return true;
+        }
+
+        // Check stw for initial mark
+
+        // If concurrent marking is disbled, no need to check further.
+        if self.concurrent_marking_is_disabled() {
+            return false;
         }
 
         let threshold = self.get_total_pages() >> 1;
@@ -99,6 +106,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             debug_assert_ne!(self.previous_pause(), Some(Pause::InitialMark));
             return true;
         }
+
         false
     }
 
@@ -294,6 +302,10 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
 
 impl<VM: VMBinding> ConcurrentImmix<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        if *args.options.concurrent_immix_disable_concurrent_marking {
+            warn!("Option 'concurrent_immix_disable_concurrent_marking' is set to true. Concurrent marking is disabled for ConcurrentImmix. This will make ConcurrentImmix behave exactly like full heap Immix.");
+        }
+
         let spec = crate::util::metadata::extract_side_metadata(&[
             *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
         ]);
@@ -435,6 +447,13 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
     fn previous_pause(&self) -> Option<Pause> {
         self.previous_pause.load(Ordering::SeqCst)
+    }
+
+    fn concurrent_marking_is_disabled(&self) -> bool {
+        *self
+            .base()
+            .options
+            .concurrent_immix_disable_concurrent_marking
     }
 }
 
