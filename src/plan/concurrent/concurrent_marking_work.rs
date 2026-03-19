@@ -199,6 +199,14 @@ pub struct ConcurrentRootEdgeTracer<
     plan: &'static P,
 }
 
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind> Clone
+    for ConcurrentRootEdgeTracer<VM, P, KIND>
+{
+    fn clone(&self) -> Self {
+        Self { plan: self.plan }
+    }
+}
+
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
     EdgeTracer for ConcurrentRootEdgeTracer<VM, P, KIND>
 {

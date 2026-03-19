@@ -34,6 +34,17 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
     }
 }
 
+impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind> Clone
+    for GenNurseryEdgeTracer<VM, P, KIND>
+{
+    fn clone(&self) -> Self {
+        Self {
+            plan: self.plan,
+            phantom_data: PhantomData,
+        }
+    }
+}
+
 impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
     EdgeTracer for GenNurseryEdgeTracer<VM, P, KIND>
 {

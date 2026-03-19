@@ -13,7 +13,7 @@ use crate::util::{ObjectReference, VMThread, VMWorkerThread};
 use crate::vm::{Scanning, SlotVisitor, VMBinding};
 use crate::{Plan, MMTK};
 
-pub trait EdgeTracer: 'static + Send {
+pub trait EdgeTracer: 'static + Send + Clone {
     type VM: VMBinding;
     type ProcessSlotsWorkType: ProcessSlotsWork<VM = Self::VM>;
 
@@ -40,6 +40,14 @@ pub trait EdgeTracer: 'static + Send {
 #[derive(Default)]
 pub struct SFTEdgeTracer<VM: VMBinding> {
     phantom_data: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> Clone for SFTEdgeTracer<VM> {
+    fn clone(&self) -> Self {
+        Self {
+            phantom_data: PhantomData,
+        }
+    }
 }
 
 impl<VM: VMBinding> EdgeTracer for SFTEdgeTracer<VM> {
@@ -82,6 +90,12 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> PlanEdgeTracer<P, 
     }
 }
 
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> Clone for PlanEdgeTracer<P, KIND> {
+    fn clone(&self) -> Self {
+        Self { plan: self.plan }
+    }
+}
+
 impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> EdgeTracer
     for PlanEdgeTracer<P, KIND>
 {
@@ -106,6 +120,14 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> EdgeTracer
 #[derive(Default)]
 pub struct UnsupportedEdgeTracer<VM: VMBinding> {
     phantom_data: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> Clone for UnsupportedEdgeTracer<VM> {
+    fn clone(&self) -> Self {
+        Self {
+            phantom_data: PhantomData,
+        }
+    }
 }
 
 impl<VM: VMBinding> EdgeTracer for UnsupportedEdgeTracer<VM> {
