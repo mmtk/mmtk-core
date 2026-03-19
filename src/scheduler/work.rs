@@ -1,6 +1,6 @@
 use super::worker::*;
-use crate::{mmtk::MMTK, plan::tracing::EdgeTracer};
 use crate::vm::VMBinding;
+use crate::{mmtk::MMTK, plan::tracing::EdgeTracer};
 #[cfg(feature = "work_packet_stats")]
 use std::any::{type_name, TypeId};
 

@@ -4,9 +4,9 @@ use crate::global_state::GcStatus;
 use crate::plan::tracing::EdgeTracer;
 use crate::plan::tracing::PlanEdgeTracer;
 use crate::plan::tracing::SFTEdgeTracer;
+use crate::plan::tracing::UnsupportedEdgeTracer;
 use crate::plan::ObjectsClosure;
 use crate::plan::VectorObjectQueue;
-use crate::plan::tracing::UnsupportedEdgeTracer;
 use crate::util::*;
 use crate::vm::slot::Slot;
 use crate::vm::*;
@@ -311,7 +311,8 @@ impl<E: EdgeTracer> ObjectTracerContext<E::VM> for ProcessEdgesWorkTracerContext
         let mmtk = worker.mmtk;
 
         // Prepare the underlying ProcessEdgesWork
-        let mut process_edges_work = E::from_mmtk(mmtk).make_process_slots_work(vec![], false, mmtk, self.stage);
+        let mut process_edges_work =
+            E::from_mmtk(mmtk).make_process_slots_work(vec![], false, mmtk, self.stage);
         // FIXME: This line allows us to omit the borrowing lifetime of worker.
         // We should refactor ProcessEdgesWork so that it uses `worker` locally, not as a member.
         process_edges_work.set_worker(worker);
