@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use std::vec::Vec;
 
 use crate::plan::is_nursery_gc;
-use crate::plan::tracing::EdgeTracer;
+use crate::plan::tracing::TracePolicy;
 use crate::scheduler::ProcessSlotsWork;
 use crate::scheduler::WorkBucketStage;
 use crate::util::ObjectReference;
@@ -536,8 +536,8 @@ impl<VM: VMBinding> GCWork<VM> for RescanReferences<VM> {
 }
 
 #[derive(Default)]
-pub(crate) struct SoftRefProcessing<E: EdgeTracer>(PhantomData<E>);
-impl<E: EdgeTracer> GCWork<E::VM> for SoftRefProcessing<E> {
+pub(crate) struct SoftRefProcessing<E: TracePolicy>(PhantomData<E>);
+impl<E: TracePolicy> GCWork<E::VM> for SoftRefProcessing<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if !mmtk.state.is_emergency_collection() {
             // Postpone the scanning to the end of the transitive closure from strongly reachable
@@ -566,7 +566,7 @@ impl<E: EdgeTracer> GCWork<E::VM> for SoftRefProcessing<E> {
         }
     }
 }
-impl<E: EdgeTracer> SoftRefProcessing<E> {
+impl<E: TracePolicy> SoftRefProcessing<E> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
@@ -599,8 +599,8 @@ impl<VM: VMBinding> PhantomRefProcessing<VM> {
 }
 
 #[derive(Default)]
-pub(crate) struct RefForwarding<E: EdgeTracer>(PhantomData<E>);
-impl<E: EdgeTracer> GCWork<E::VM> for RefForwarding<E> {
+pub(crate) struct RefForwarding<E: TracePolicy>(PhantomData<E>);
+impl<E: TracePolicy> GCWork<E::VM> for RefForwarding<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         let mut w = E::from_mmtk(mmtk).make_process_slots_work(
             vec![],
@@ -613,7 +613,7 @@ impl<E: EdgeTracer> GCWork<E::VM> for RefForwarding<E> {
         w.flush();
     }
 }
-impl<E: EdgeTracer> RefForwarding<E> {
+impl<E: TracePolicy> RefForwarding<E> {
     pub fn new() -> Self {
         Self(PhantomData)
     }

@@ -1,5 +1,5 @@
 use super::global::Immix;
-use crate::plan::tracing::PlanEdgeTracer;
+use crate::plan::tracing::PlanTracePolicy;
 use crate::policy::gc_work::TraceKind;
 use crate::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
 use crate::vm::VMBinding;
@@ -12,6 +12,6 @@ impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
 {
     type VM = VM;
     type PlanType = Immix<VM>;
-    type DefaultEdgeTracer = PlanEdgeTracer<Immix<VM>, KIND>;
-    type PinningEdgeTracer = PlanEdgeTracer<Immix<VM>, TRACE_KIND_TRANSITIVE_PIN>;
+    type DefaultTracePolicy = PlanTracePolicy<Immix<VM>, KIND>;
+    type PinningTracePolicy = PlanTracePolicy<Immix<VM>, TRACE_KIND_TRANSITIVE_PIN>;
 }

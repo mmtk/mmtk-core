@@ -14,7 +14,7 @@ use crate::util::{ObjectReference, VMThread, VMWorkerThread};
 use crate::vm::{Scanning, SlotVisitor, VMBinding};
 use crate::{Plan, MMTK};
 
-pub trait EdgeTracer: 'static + Send + Clone {
+pub trait TracePolicy: 'static + Send + Clone {
     type VM: VMBinding;
     type ProcessSlotsWorkType: ProcessSlotsWork<VM = Self::VM>;
     type ScanObjectsWorkType: ScanObjectsWork<Self::VM>;
@@ -47,11 +47,11 @@ pub trait EdgeTracer: 'static + Send + Clone {
 }
 
 #[derive(Default)]
-pub struct SFTEdgeTracer<VM: VMBinding> {
+pub struct SFTTracePolicy<VM: VMBinding> {
     phantom_data: PhantomData<VM>,
 }
 
-impl<VM: VMBinding> Clone for SFTEdgeTracer<VM> {
+impl<VM: VMBinding> Clone for SFTTracePolicy<VM> {
     fn clone(&self) -> Self {
         Self {
             phantom_data: PhantomData,
@@ -59,7 +59,7 @@ impl<VM: VMBinding> Clone for SFTEdgeTracer<VM> {
     }
 }
 
-impl<VM: VMBinding> EdgeTracer for SFTEdgeTracer<VM> {
+impl<VM: VMBinding> TracePolicy for SFTTracePolicy<VM> {
     type VM = VM;
     type ProcessSlotsWorkType = SFTProcessSlots<Self::VM>;
     type ScanObjectsWorkType = ScanObjects<Self>;
@@ -99,24 +99,24 @@ impl<VM: VMBinding> EdgeTracer for SFTEdgeTracer<VM> {
     }
 }
 
-pub struct PlanEdgeTracer<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> {
+pub struct PlanTracePolicy<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> {
     plan: &'static P,
 }
 
-impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> PlanEdgeTracer<P, KIND> {
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> PlanTracePolicy<P, KIND> {
     pub(crate) fn new(plan: &'static P) -> Self {
         Self { plan }
     }
 }
 
-impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> Clone for PlanEdgeTracer<P, KIND> {
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> Clone for PlanTracePolicy<P, KIND> {
     fn clone(&self) -> Self {
         Self { plan: self.plan }
     }
 }
 
-impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> EdgeTracer
-    for PlanEdgeTracer<P, KIND>
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> TracePolicy
+    for PlanTracePolicy<P, KIND>
 {
     type VM = P::VM;
     type ProcessSlotsWorkType = PlanProcessSlots<Self::VM, P, KIND>;
@@ -147,11 +147,11 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> EdgeTracer
 }
 
 #[derive(Default)]
-pub struct UnsupportedEdgeTracer<VM: VMBinding> {
+pub struct UnsupportedTracePolicy<VM: VMBinding> {
     phantom_data: PhantomData<VM>,
 }
 
-impl<VM: VMBinding> Clone for UnsupportedEdgeTracer<VM> {
+impl<VM: VMBinding> Clone for UnsupportedTracePolicy<VM> {
     fn clone(&self) -> Self {
         Self {
             phantom_data: PhantomData,
@@ -159,7 +159,7 @@ impl<VM: VMBinding> Clone for UnsupportedEdgeTracer<VM> {
     }
 }
 
-impl<VM: VMBinding> EdgeTracer for UnsupportedEdgeTracer<VM> {
+impl<VM: VMBinding> TracePolicy for UnsupportedTracePolicy<VM> {
     type VM = VM;
     type ProcessSlotsWorkType = UnsupportedProcessEdges<Self::VM>;
     type ScanObjectsWorkType = ScanObjects<Self>;
@@ -282,13 +282,13 @@ impl ObjectQueue for VectorQueue<ObjectReference> {
 /// A transitive closure visitor to collect the slots from objects.
 /// It maintains a buffer for the slots, and flushes slots to a new work packet
 /// if the buffer is full or if the type gets dropped.
-pub struct ObjectsClosure<'a, E: EdgeTracer> {
+pub struct ObjectsClosure<'a, E: TracePolicy> {
     buffer: VectorQueue<SlotOfET<E>>,
     pub(crate) worker: &'a mut GCWorker<E::VM>,
     bucket: WorkBucketStage,
 }
 
-impl<'a, E: EdgeTracer> ObjectsClosure<'a, E> {
+impl<'a, E: TracePolicy> ObjectsClosure<'a, E> {
     /// Create an [`ObjectsClosure`].
     ///
     /// Arguments:
@@ -318,7 +318,7 @@ impl<'a, E: EdgeTracer> ObjectsClosure<'a, E> {
     }
 }
 
-impl<E: EdgeTracer> SlotVisitor<SlotOfET<E>> for ObjectsClosure<'_, E> {
+impl<E: TracePolicy> SlotVisitor<SlotOfET<E>> for ObjectsClosure<'_, E> {
     fn visit_slot(&mut self, slot: SlotOfET<E>) {
         #[cfg(debug_assertions)]
         {
@@ -336,7 +336,7 @@ impl<E: EdgeTracer> SlotVisitor<SlotOfET<E>> for ObjectsClosure<'_, E> {
     }
 }
 
-impl<E: EdgeTracer> Drop for ObjectsClosure<'_, E> {
+impl<E: TracePolicy> Drop for ObjectsClosure<'_, E> {
     fn drop(&mut self) {
         self.flush();
     }

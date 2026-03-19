@@ -1,5 +1,5 @@
 use super::global::Compressor;
-use crate::plan::tracing::{PlanEdgeTracer, UnsupportedEdgeTracer};
+use crate::plan::tracing::{PlanTracePolicy, UnsupportedTracePolicy};
 use crate::policy::compressor::{CompressorSpace, TRACE_KIND_FORWARD_ROOT, TRACE_KIND_MARK};
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::scheduler::gc_work::*;
@@ -89,22 +89,22 @@ impl<VM: VMBinding> AfterCompact<VM> {
 }
 
 /// Marking trace
-pub type MarkingProcessEdges<VM> = PlanEdgeTracer<Compressor<VM>, TRACE_KIND_MARK>;
+pub type MarkingTracePolicy<VM> = PlanTracePolicy<Compressor<VM>, TRACE_KIND_MARK>;
 /// Forwarding trace
-pub type ForwardingProcessEdges<VM> = PlanEdgeTracer<Compressor<VM>, TRACE_KIND_FORWARD_ROOT>;
+pub type ForwardingTracePolicy<VM> = PlanTracePolicy<Compressor<VM>, TRACE_KIND_FORWARD_ROOT>;
 
 pub struct CompressorWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for CompressorWorkContext<VM> {
     type VM = VM;
     type PlanType = Compressor<VM>;
-    type DefaultEdgeTracer = MarkingProcessEdges<VM>;
-    type PinningEdgeTracer = UnsupportedEdgeTracer<VM>;
+    type DefaultTracePolicy = MarkingTracePolicy<VM>;
+    type PinningTracePolicy = UnsupportedTracePolicy<VM>;
 }
 
 pub struct CompressorForwardingWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for CompressorForwardingWorkContext<VM> {
     type VM = VM;
     type PlanType = Compressor<VM>;
-    type DefaultEdgeTracer = ForwardingProcessEdges<VM>;
-    type PinningEdgeTracer = UnsupportedEdgeTracer<VM>;
+    type DefaultTracePolicy = ForwardingTracePolicy<VM>;
+    type PinningTracePolicy = UnsupportedTracePolicy<VM>;
 }

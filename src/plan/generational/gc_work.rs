@@ -1,6 +1,6 @@
 use atomic::Ordering;
 
-use crate::plan::tracing::EdgeTracer;
+use crate::plan::tracing::TracePolicy;
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::{gc_work::*, GCWork, GCWorker, WorkBucketStage};
@@ -14,7 +14,7 @@ use std::ops::{Deref, DerefMut};
 
 use super::global::GenerationalPlanExt;
 
-pub struct GenNurseryEdgeTracer<
+pub struct GenNurseryTracePolicy<
     VM: VMBinding,
     P: GenerationalPlanExt<VM> + PlanTraceObject<VM>,
     const KIND: TraceKind,
@@ -24,7 +24,7 @@ pub struct GenNurseryEdgeTracer<
 }
 
 impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
-    GenNurseryEdgeTracer<VM, P, KIND>
+    GenNurseryTracePolicy<VM, P, KIND>
 {
     pub(crate) fn new(plan: &'static P) -> Self {
         Self {
@@ -35,7 +35,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
 }
 
 impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind> Clone
-    for GenNurseryEdgeTracer<VM, P, KIND>
+    for GenNurseryTracePolicy<VM, P, KIND>
 {
     fn clone(&self) -> Self {
         Self {
@@ -46,7 +46,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
 }
 
 impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
-    EdgeTracer for GenNurseryEdgeTracer<VM, P, KIND>
+    TracePolicy for GenNurseryTracePolicy<VM, P, KIND>
 {
     type VM = VM;
 
@@ -89,7 +89,7 @@ pub struct GenNurseryProcessSlots<
     const KIND: TraceKind,
 > {
     plan: &'static P,
-    tracer: GenNurseryEdgeTracer<VM, P, KIND>,
+    policy: GenNurseryTracePolicy<VM, P, KIND>,
     base: ProcessSlotsBase<VM>,
 }
 
@@ -97,7 +97,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
     ProcessSlotsWork for GenNurseryProcessSlots<VM, P, KIND>
 {
     type VM = VM;
-    type ScanObjectsWorkType = PlanScanObjects<GenNurseryEdgeTracer<VM, P, KIND>, P>;
+    type ScanObjectsWorkType = PlanScanObjects<GenNurseryTracePolicy<VM, P, KIND>, P>;
 
     fn new(
         slots: Vec<SlotOf<Self>>,
@@ -107,12 +107,12 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
     ) -> Self {
         let base = ProcessSlotsBase::new(slots, roots, mmtk, bucket);
         let plan = base.plan().downcast_ref::<P>().unwrap();
-        let tracer = GenNurseryEdgeTracer::new(plan);
-        Self { plan, tracer, base }
+        let policy = GenNurseryTracePolicy::new(plan);
+        Self { plan, policy, base }
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        self.tracer
+        self.policy
             .trace_object(self.worker(), object, &mut self.base.nodes)
     }
 
@@ -155,12 +155,12 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
 /// The modbuf contains a list of objects in mature space(s) that
 /// may contain pointers to the nursery space.
 /// This work packet scans the recorded objects and forwards pointers if necessary.
-pub struct ProcessModBuf<E: EdgeTracer> {
+pub struct ProcessModBuf<E: TracePolicy> {
     modbuf: Vec<ObjectReference>,
     phantom: PhantomData<E>,
 }
 
-impl<E: EdgeTracer> ProcessModBuf<E> {
+impl<E: TracePolicy> ProcessModBuf<E> {
     pub fn new(modbuf: Vec<ObjectReference>) -> Self {
         debug_assert!(!modbuf.is_empty());
         Self {
@@ -170,7 +170,7 @@ impl<E: EdgeTracer> ProcessModBuf<E> {
     }
 }
 
-impl<E: EdgeTracer> GCWork<E::VM> for ProcessModBuf<E> {
+impl<E: TracePolicy> GCWork<E::VM> for ProcessModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         // Process and scan modbuf only if the current GC is a nursery GC
         let gen = mmtk.get_plan().generational().unwrap();
@@ -204,13 +204,13 @@ impl<E: EdgeTracer> GCWork<E::VM> for ProcessModBuf<E> {
 /// The array-copy modbuf contains a list of array slices in mature space(s) that
 /// may contain pointers to the nursery space.
 /// This work packet forwards and updates each entry in the recorded slices.
-pub struct ProcessRegionModBuf<E: EdgeTracer> {
+pub struct ProcessRegionModBuf<E: TracePolicy> {
     /// A list of `(start_address, bytes)` tuple.
     modbuf: Vec<<E::VM as VMBinding>::VMMemorySlice>,
     phantom: PhantomData<E>,
 }
 
-impl<E: EdgeTracer> ProcessRegionModBuf<E> {
+impl<E: TracePolicy> ProcessRegionModBuf<E> {
     pub fn new(modbuf: Vec<<E::VM as VMBinding>::VMMemorySlice>) -> Self {
         Self {
             modbuf,
@@ -219,7 +219,7 @@ impl<E: EdgeTracer> ProcessRegionModBuf<E> {
     }
 }
 
-impl<E: EdgeTracer> GCWork<E::VM> for ProcessRegionModBuf<E> {
+impl<E: TracePolicy> GCWork<E::VM> for ProcessRegionModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         // Scan modbuf only if the current GC is a nursery GC
         if mmtk

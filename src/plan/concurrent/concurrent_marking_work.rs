@@ -1,7 +1,7 @@
 use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::Pause;
-use crate::plan::tracing::EdgeTracer;
-use crate::plan::tracing::UnsupportedEdgeTracer;
+use crate::plan::tracing::TracePolicy;
+use crate::plan::tracing::UnsupportedTracePolicy;
 use crate::plan::PlanTraceObject;
 use crate::plan::VectorQueue;
 use crate::policy::gc_work::TraceKind;
@@ -191,7 +191,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 }
 
-pub struct ConcurrentRootEdgeTracer<
+pub struct ConcurrentRootTracePolicy<
     VM: VMBinding,
     P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,
     const KIND: TraceKind,
@@ -200,7 +200,7 @@ pub struct ConcurrentRootEdgeTracer<
 }
 
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind> Clone
-    for ConcurrentRootEdgeTracer<VM, P, KIND>
+    for ConcurrentRootTracePolicy<VM, P, KIND>
 {
     fn clone(&self) -> Self {
         Self { plan: self.plan }
@@ -208,7 +208,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 }
 
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
-    EdgeTracer for ConcurrentRootEdgeTracer<VM, P, KIND>
+    TracePolicy for ConcurrentRootTracePolicy<VM, P, KIND>
 {
     type VM = VM;
 
@@ -271,7 +271,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     ProcessSlotsWork for ProcessRootSlots<VM, P, KIND>
 {
     type VM = VM;
-    type ScanObjectsWorkType = ScanObjects<UnsupportedEdgeTracer<VM>>; // It won't instantiate ScanObjectsWorkType anyway.
+    type ScanObjectsWorkType = ScanObjects<UnsupportedTracePolicy<VM>>; // It won't instantiate ScanObjectsWorkType anyway.
     const OVERWRITE_REFERENCE: bool = false;
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
 

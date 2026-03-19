@@ -1,6 +1,7 @@
 use super::gc_work::MarkCompactGCWorkContext;
 use super::gc_work::{
-    CalculateForwardingAddress, Compact, ForwardingEdgeTracer, MarkingEdgeTracer, UpdateReferences,
+    CalculateForwardingAddress, Compact, ForwardingTracePolicy, MarkingTracePolicy,
+    UpdateReferences,
 };
 use crate::plan::global::CommonPlan;
 use crate::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
@@ -112,7 +113,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
                 PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
             };
             scheduler.work_buckets[WorkBucketStage::SoftRefClosure]
-                .add(SoftRefProcessing::<MarkingEdgeTracer<VM>>::new());
+                .add(SoftRefProcessing::<MarkingTracePolicy<VM>>::new());
             scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
                 .add(WeakRefProcessing::<VM>::new());
             scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
@@ -120,7 +121,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
 
             use crate::util::reference_processor::RefForwarding;
             scheduler.work_buckets[WorkBucketStage::RefForwarding]
-                .add(RefForwarding::<ForwardingEdgeTracer<VM>>::new());
+                .add(RefForwarding::<ForwardingTracePolicy<VM>>::new());
 
             use crate::util::reference_processor::RefEnqueue;
             scheduler.work_buckets[WorkBucketStage::Release].add(RefEnqueue::<VM>::new());
@@ -133,20 +134,20 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             // treat finalizable objects as roots and perform a closure (marking)
             // must be done before calculating forwarding pointers
             scheduler.work_buckets[WorkBucketStage::FinalRefClosure]
-                .add(Finalization::<MarkingEdgeTracer<VM>>::new());
+                .add(Finalization::<MarkingTracePolicy<VM>>::new());
             // update finalizable object references
             // must be done before compacting
             scheduler.work_buckets[WorkBucketStage::FinalizableForwarding]
-                .add(ForwardFinalization::<ForwardingEdgeTracer<VM>>::new());
+                .add(ForwardFinalization::<ForwardingTracePolicy<VM>>::new());
         }
 
         // VM-specific weak ref processing
         scheduler.work_buckets[WorkBucketStage::VMRefClosure]
-            .set_sentinel(Box::new(VMProcessWeakRefs::<MarkingEdgeTracer<VM>>::new()));
+            .set_sentinel(Box::new(VMProcessWeakRefs::<MarkingTracePolicy<VM>>::new()));
 
         // VM-specific weak ref forwarding
         scheduler.work_buckets[WorkBucketStage::VMRefForwarding]
-            .add(VMForwardWeakRefs::<ForwardingEdgeTracer<VM>>::new());
+            .add(VMForwardWeakRefs::<ForwardingTracePolicy<VM>>::new());
 
         // VM-specific work after forwarding, possible to implement ref enququing.
         scheduler.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
