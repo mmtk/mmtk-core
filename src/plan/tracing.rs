@@ -139,6 +139,8 @@ impl ObjectQueue for Option<ObjectReference> {
     }
 }
 
+/// A one-element object queue backed by an `Option<ObjectReference>`.  Used by SFT to decouple the
+/// concrete [`ObjectQueue`] type from the dynamic dispatching.
 pub type OptionObjectQueue = Option<ObjectReference>;
 
 /// A vector queue for object references.
