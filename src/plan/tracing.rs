@@ -6,10 +6,10 @@ use std::marker::PhantomData;
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::gc_work::{
-    PlanProcessSlots, PlanScanObjects, ProcessSlotsWork, SFTProcessSlots, ScanObjects,
-    ScanObjectsWork, SlotOfET, UnsupportedProcessEdges,
+    PlanProcessSlots, PlanScanObjects, ProcessSlotsWork, SFTProcessSlots, ScanObjects, SlotOfTP,
+    UnsupportedProcessEdges,
 };
-use crate::scheduler::{GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
+use crate::scheduler::{GCWork, GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
 use crate::util::{ObjectReference, VMThread, VMWorkerThread};
 use crate::vm::{Scanning, SlotVisitor, VMBinding};
 use crate::{Plan, MMTK};
@@ -17,7 +17,7 @@ use crate::{Plan, MMTK};
 pub trait TracePolicy: 'static + Send + Clone {
     type VM: VMBinding;
     type ProcessSlotsWorkType: ProcessSlotsWork<VM = Self::VM>;
-    type ScanObjectsWorkType: ScanObjectsWork<Self::VM>;
+    type ScanObjectsWorkType: GCWork<Self::VM>;
 
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self;
 
@@ -44,6 +44,10 @@ pub trait TracePolicy: 'static + Send + Clone {
         mmtk: &'static MMTK<Self::VM>,
         bucket: WorkBucketStage,
     ) -> Self::ScanObjectsWorkType;
+
+    fn may_move_objects() -> bool;
+
+    fn is_concurrent() -> bool;
 }
 
 #[derive(Default)]
@@ -97,6 +101,14 @@ impl<VM: VMBinding> TracePolicy for SFTTracePolicy<VM> {
     ) -> Self::ScanObjectsWorkType {
         ScanObjects::new(nodes, false, bucket)
     }
+
+    fn may_move_objects() -> bool {
+        true
+    }
+
+    fn is_concurrent() -> bool {
+        false
+    }
 }
 
 pub struct PlanTracePolicy<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> {
@@ -144,6 +156,14 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> TracePolicy
     ) -> Self::ScanObjectsWorkType {
         PlanScanObjects::new(self.plan, nodes, false, bucket)
     }
+
+    fn may_move_objects() -> bool {
+        P::may_move_objects::<KIND>()
+    }
+
+    fn is_concurrent() -> bool {
+        false
+    }
 }
 
 #[derive(Default)]
@@ -183,6 +203,14 @@ impl<VM: VMBinding> TracePolicy for UnsupportedTracePolicy<VM> {
         _mmtk: &'static MMTK<Self::VM>,
         _bucket: WorkBucketStage,
     ) -> Self::ScanObjectsWorkType {
+        unimplemented!()
+    }
+
+    fn may_move_objects() -> bool {
+        unimplemented!()
+    }
+
+    fn is_concurrent() -> bool {
         unimplemented!()
     }
 }
@@ -283,7 +311,7 @@ impl ObjectQueue for VectorQueue<ObjectReference> {
 /// It maintains a buffer for the slots, and flushes slots to a new work packet
 /// if the buffer is full or if the type gets dropped.
 pub struct ObjectsClosure<'a, T: TracePolicy> {
-    buffer: VectorQueue<SlotOfET<T>>,
+    buffer: VectorQueue<SlotOfTP<T>>,
     pub(crate) worker: &'a mut GCWorker<T::VM>,
     bucket: WorkBucketStage,
 }
@@ -318,8 +346,8 @@ impl<'a, T: TracePolicy> ObjectsClosure<'a, T> {
     }
 }
 
-impl<T: TracePolicy> SlotVisitor<SlotOfET<T>> for ObjectsClosure<'_, T> {
-    fn visit_slot(&mut self, slot: SlotOfET<T>) {
+impl<T: TracePolicy> SlotVisitor<SlotOfTP<T>> for ObjectsClosure<'_, T> {
+    fn visit_slot(&mut self, slot: SlotOfTP<T>) {
         #[cfg(debug_assertions)]
         {
             use crate::vm::slot::Slot;

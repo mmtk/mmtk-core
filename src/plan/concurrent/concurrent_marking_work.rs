@@ -14,6 +14,7 @@ use crate::{
     vm::*,
     MMTK,
 };
+use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
 pub struct ConcurrentTraceObjects<
@@ -213,7 +214,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     type VM = VM;
 
     type ProcessSlotsWorkType = ProcessRootSlots<VM, P, KIND>;
-    type ScanObjectsWorkType = ScanObjects<Self>; // Unused
+    type ScanObjectsWorkType = ConcurrentTraceObjects<VM, P, KIND>;
 
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
         let plan = mmtk.get_plan().downcast_ref::<P>().unwrap();
@@ -231,13 +232,20 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 
     fn create_scan_work(
         &self,
-        _nodes: Vec<ObjectReference>,
-        _mmtk: &'static MMTK<Self::VM>,
+        nodes: Vec<ObjectReference>,
+        mmtk: &'static MMTK<Self::VM>,
         _bucket: WorkBucketStage,
     ) -> Self::ScanObjectsWorkType {
-        // This should create `ConcurrentTraceObjects`, but it currently does not implement `ScanObjectsWork`.
-        // `ProcessRootSlots` currently bypasses this method.
-        todo!()
+        ConcurrentTraceObjects::<VM, P, KIND>::new(nodes, mmtk)
+    }
+
+    fn may_move_objects() -> bool {
+        // Concurrent marking never moves objects.
+        false
+    }
+
+    fn is_concurrent() -> bool {
+        true
     }
 }
 
@@ -246,8 +254,8 @@ pub struct ProcessRootSlots<
     P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,
     const KIND: TraceKind,
 > {
-    base: ProcessSlotsBase<VM>,
-    _p: std::marker::PhantomData<P>,
+    slots: Vec<VM::VMSlot>,
+    phantom_data: PhantomData<P>,
 }
 
 unsafe impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
@@ -258,9 +266,12 @@ unsafe impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, con
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
     ProcessRootSlots<VM, P, KIND>
 {
-    fn create_and_schedule_concurrent_trace_objects_work(&self, objects: Vec<ObjectReference>) {
-        let worker = self.worker();
-        let mmtk = self.mmtk();
+    fn create_and_schedule_concurrent_trace_objects_work(
+        &self,
+        worker: &mut GCWorker<VM>,
+        objects: Vec<ObjectReference>,
+    ) {
+        let mmtk = worker.mmtk;
         let w = ConcurrentTraceObjects::<VM, P, KIND>::new(objects.clone(), mmtk);
 
         worker.scheduler().work_buckets[WorkBucketStage::Concurrent].add_no_notify(w);
@@ -278,23 +289,42 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     fn new(
         slots: Vec<SlotOf<Self>>,
         roots: bool,
-        mmtk: &'static MMTK<VM>,
-        bucket: WorkBucketStage,
+        _mmtk: &'static MMTK<VM>,
+        _bucket: WorkBucketStage,
     ) -> Self {
         debug_assert!(roots);
-        let base = ProcessSlotsBase::new(slots, roots, mmtk, bucket);
         Self {
-            base,
-            _p: std::marker::PhantomData,
+            slots,
+            phantom_data: PhantomData,
         }
     }
 
-    fn flush(&mut self) {}
+    fn flush(&mut self) {
+        unimplemented!()
+    }
 
     fn process_slots(&mut self) {
-        let pause = self
-            .base
-            .plan()
+        unimplemented!()
+    }
+
+    // The following two methods are implemented to support pinning roots and tpinning roots.
+    // MMTk will create [`crate::scheduler::gc_work::ProcessRootNodes`] to process root nodes with this type.
+
+    fn trace_object(&mut self, _object: ObjectReference) -> ObjectReference {
+        unimplemented!()
+    }
+
+    fn create_scan_work(&self, _nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
+        unimplemented!()
+    }
+}
+
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
+    GCWork<VM> for ProcessRootSlots<VM, P, KIND>
+{
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        let pause = mmtk
+            .get_plan()
             .concurrent()
             .unwrap()
             .current_pause()
@@ -313,30 +343,14 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
                     if root_objects.len() == Self::CAPACITY {
                         let mut buffer = Vec::with_capacity(Self::CAPACITY);
                         std::mem::swap(&mut buffer, &mut root_objects);
-                        self.create_and_schedule_concurrent_trace_objects_work(buffer);
+                        self.create_and_schedule_concurrent_trace_objects_work(worker, buffer);
                     }
                 }
             }
             if !root_objects.is_empty() {
-                self.create_and_schedule_concurrent_trace_objects_work(root_objects);
+                self.create_and_schedule_concurrent_trace_objects_work(worker, root_objects);
             }
         }
-    }
-
-    // The following two methods are implemented to support pinning roots and tpinning roots.
-    // MMTk will create [`crate::scheduler::gc_work::ProcessRootNodes`] to process root nodes with this type.
-
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        // We just push to the node buffer. ProcessRootNodes will take all the nodes later.
-        self.nodes.push(object);
-        object
-    }
-
-    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
-        // Don't create a scan object work packet. Instead, create a concurrent trace work.
-        self.create_and_schedule_concurrent_trace_objects_work(nodes);
-        // Return None to avoid creating a scan objects work packet.
-        None
     }
 }
 
@@ -345,7 +359,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 {
     type Target = ProcessSlotsBase<VM>;
     fn deref(&self) -> &Self::Target {
-        &self.base
+        unimplemented!("Unsupported")
     }
 }
 
@@ -353,6 +367,6 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     DerefMut for ProcessRootSlots<VM, P, KIND>
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
+        unimplemented!("Unsupported")
     }
 }

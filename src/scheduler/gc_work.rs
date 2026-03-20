@@ -546,7 +546,7 @@ impl<VM: VMBinding> ProcessSlotsBase<VM> {
 
 /// A short-hand for `<E::VM as VMBinding>::VMSlot`.
 pub type SlotOf<E> = <<E as ProcessSlotsWork>::VM as VMBinding>::VMSlot;
-pub type SlotOfET<E> = <<E as TracePolicy>::VM as VMBinding>::VMSlot;
+pub type SlotOfTP<E> = <<E as TracePolicy>::VM as VMBinding>::VMSlot;
 
 /// An abstract trait for work packets that process object graph edges.  Its method
 /// [`ProcessEdgesWork::trace_object`] traces an object and, upon first visit, enqueues it into an
@@ -571,7 +571,7 @@ pub type SlotOfET<E> = <<E as TracePolicy>::VM as VMBinding>::VMSlot;
 /// TODO: We should refactor this trait to decouple it from slots. See:
 /// <https://github.com/mmtk/mmtk-core/issues/599>
 pub trait ProcessSlotsWork:
-    Send + 'static + Sized + DerefMut + Deref<Target = ProcessSlotsBase<Self::VM>>
+    Send + 'static + Sized + DerefMut + Deref<Target = ProcessSlotsBase<Self::VM>> + GCWork<Self::VM>
 {
     /// The associate type for the VM.
     type VM: VMBinding;
@@ -685,18 +685,106 @@ pub trait ProcessSlotsWork:
     }
 }
 
-impl<E: ProcessSlotsWork> GCWork<E::VM> for E {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
-        self.set_worker(worker);
-        self.process_slots();
-        if !self.nodes.is_empty() {
-            self.flush();
+pub struct DefaultProcessSlots<T: TracePolicy> {
+    policy: T,
+    slots: Vec<SlotOfTP<T>>,
+    #[allow(unused)] // Only used by sanity
+    roots: bool,
+    bucket: WorkBucketStage,
+}
+
+impl<T: TracePolicy> DefaultProcessSlots<T> {
+    const SCAN_OBJECTS_IMMEDIATELY: bool = true;
+
+    pub fn new(policy: T, slots: Vec<SlotOfTP<T>>, roots: bool, bucket: WorkBucketStage) -> Self {
+        Self {
+            policy,
+            slots,
+            roots,
+            bucket,
         }
+    }
+
+    /// If the work includes roots, we will store the roots somewhere so for sanity GC, we can do another
+    /// transitive closure from the roots.
+    #[cfg(feature = "sanity")]
+    fn cache_roots_for_sanity_gc(&mut self) {
+        assert!(self.roots);
+        self.mmtk()
+            .sanity_checker
+            .lock()
+            .unwrap()
+            .add_root_slots(self.slots.clone());
+    }
+}
+
+impl<T: TracePolicy> GCWork<T::VM> for DefaultProcessSlots<T> {
+    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
+        let mut queue = VectorObjectQueue::new();
+
+        for slot in self.slots.iter() {
+            if let Some(object) = slot.load() {
+                let new_object = self.policy.trace_object(worker, object, &mut queue);
+                if T::may_move_objects() && new_object != object {
+                    slot.store(new_object);
+                }
+            }
+        }
+
+        if !queue.is_empty() {
+            let queued_objects = queue.take();
+            let mut work = self
+                .policy
+                .create_scan_work(queued_objects, mmtk, self.bucket);
+
+            if Self::SCAN_OBJECTS_IMMEDIATELY {
+                work.do_work(worker, mmtk);
+            } else {
+                worker.add_work(self.bucket, work);
+            }
+        }
+
         #[cfg(feature = "sanity")]
-        if self.roots && !_mmtk.is_in_sanity() {
+        if self.roots && !mmtk.is_in_sanity() {
             self.cache_roots_for_sanity_gc();
         }
-        trace!("ProcessEdgesWork End");
+    }
+}
+
+impl<T: TracePolicy> ProcessSlotsWork for DefaultProcessSlots<T> {
+    type VM = T::VM;
+
+    type ScanObjectsWorkType = ScanObjects<T>; // TODO: Should be DefaultScanObjects.
+
+    fn new(
+        _slots: Vec<SlotOf<Self>>,
+        _roots: bool,
+        _mmtk: &'static MMTK<Self::VM>,
+        _bucket: WorkBucketStage,
+    ) -> Self {
+        unimplemented!("Unsupported")
+    }
+
+    fn trace_object(&mut self, _object: ObjectReference) -> ObjectReference {
+        todo!()
+    }
+
+    fn create_scan_work(&self, _nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
+        todo!()
+    }
+}
+
+impl<T: TracePolicy> Deref for DefaultProcessSlots<T> {
+    type Target = ProcessSlotsBase<T::VM>;
+
+    fn deref(&self) -> &Self::Target {
+        unimplemented!("Unsupported")
+    }
+}
+
+impl<T: TracePolicy> DerefMut for DefaultProcessSlots<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unimplemented!("Unsupported")
     }
 }
 
@@ -711,8 +799,7 @@ impl<E: ProcessSlotsWork> GCWork<E::VM> for E {
 // TODO: This is not used any more. Should we remove it?
 #[allow(dead_code)]
 pub struct SFTProcessSlots<VM: VMBinding> {
-    pub policy: SFTTracePolicy<VM>,
-    pub base: ProcessSlotsBase<VM>,
+    base: DefaultProcessSlots<SFTTracePolicy<VM>>,
 }
 
 impl<VM: VMBinding> ProcessSlotsWork for SFTProcessSlots<VM> {
@@ -725,18 +812,23 @@ impl<VM: VMBinding> ProcessSlotsWork for SFTProcessSlots<VM> {
         mmtk: &'static MMTK<VM>,
         bucket: WorkBucketStage,
     ) -> Self {
-        let base = ProcessSlotsBase::new(slots, roots, mmtk, bucket);
-        let policy = Default::default();
-        Self { policy, base }
+        let policy = SFTTracePolicy::from_mmtk(mmtk);
+        let base = DefaultProcessSlots::new(policy, slots, roots, bucket);
+        Self { base }
     }
 
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        self.policy
-            .trace_object(self.worker(), object, &mut self.base.nodes)
+    fn trace_object(&mut self, _object: ObjectReference) -> ObjectReference {
+        unimplemented!()
     }
 
-    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
-        Some(Self::ScanObjectsWorkType::new(nodes, false, self.bucket))
+    fn create_scan_work(&self, _nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
+        unimplemented!()
+    }
+}
+
+impl<VM: VMBinding> GCWork<VM> for SFTProcessSlots<VM> {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        self.base.do_work(worker, mmtk);
     }
 }
 
@@ -984,9 +1076,7 @@ pub struct PlanProcessSlots<
     P: Plan<VM = VM> + PlanTraceObject<VM>,
     const KIND: TraceKind,
 > {
-    plan: &'static P,
-    policy: PlanTracePolicy<P, KIND>,
-    base: ProcessSlotsBase<VM>,
+    base: DefaultProcessSlots<PlanTracePolicy<P, KIND>>,
 }
 
 impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKind> ProcessSlotsWork
@@ -1001,35 +1091,29 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
         mmtk: &'static MMTK<VM>,
         bucket: WorkBucketStage,
     ) -> Self {
-        let base = ProcessSlotsBase::new(slots, roots, mmtk, bucket);
-        let plan = base.plan().downcast_ref::<P>().unwrap();
-        let policy = PlanTracePolicy::new(plan);
-        Self { plan, policy, base }
+        let policy = PlanTracePolicy::from_mmtk(mmtk);
+        let base = DefaultProcessSlots::new(policy, slots, roots, bucket);
+        Self { base }
     }
 
-    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
-        Some(Self::ScanObjectsWorkType::new(
-            self.plan,
-            nodes,
-            false,
-            self.bucket,
-        ))
+    fn create_scan_work(&self, _nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
+        unimplemented!()
     }
 
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        self.policy
-            .trace_object(self.worker(), object, &mut self.base.nodes)
+    fn trace_object(&mut self, _object: ObjectReference) -> ObjectReference {
+        unimplemented!()
     }
 
-    fn process_slot(&mut self, slot: SlotOf<Self>) {
-        let Some(object) = slot.load() else {
-            // Skip slots that are not holding an object reference.
-            return;
-        };
-        let new_object = self.trace_object(object);
-        if P::may_move_objects::<KIND>() && new_object != object {
-            slot.store(new_object);
-        }
+    fn process_slot(&mut self, _slot: SlotOf<Self>) {
+        unimplemented!()
+    }
+}
+
+impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKind> GCWork<VM>
+    for PlanProcessSlots<VM, P, KIND>
+{
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        self.base.do_work(worker, mmtk);
     }
 }
 
@@ -1105,35 +1189,34 @@ impl<T: TracePolicy, P: Plan<VM = T::VM> + PlanTraceObject<T::VM>> GCWork<T::VM>
 
 /// This work packet processes pinning roots.
 ///
-/// The `roots` member holds a list of `ObjectReference` to objects directly pointed by roots.
-/// These objects will be traced using `R2OPE` (Root-to-Object Process Edges).
+/// The `roots` member holds a list of `ObjectReference` to objects directly pointed by roots. These
+/// objects will be traced using `R2OTP` (Root-to-Object Trace Policy).
 ///
-/// After that, it will create work packets for tracing their children.  Those work packets (and
-/// the work packets further created by them) will use `O2OPE` (Object-to-Object Process Edges) as
-/// their `ProcessEdgesWork` implementations.
+/// After that, it will create work packets for tracing their children.  Those work packets (and the
+/// work packets further created by them) will use `O2OPE` (Object-to-Object Trace Policy) as their
+/// `TracePolicy` implementations.
 ///
-/// Because `roots` are pinning roots, `R2OPE` must be a `ProcessEdgesWork` that never moves any
-/// object.
+/// Because `roots` are pinning roots, `R2OTP` must be a `TracePolicy` that never moves any object.
 ///
 /// The choice of `O2OPE` determines whether the `roots` are transitively pinning or not.
 ///
-/// -   If `O2OPE` is set to a `ProcessEdgesWork` that never moves objects, all descendents of
-///     `roots` will not be moved in this GC.  That implements transitive pinning roots.
-/// -   If `O2OPE` may move objects, then this `ProcessRootsNode<VM, R2OPE, O2OPE>` work packet
-///     will only pin the objects in `roots` (because `R2OPE` must not move objects anyway), but
-///     not their descendents.
+/// -   If `O2OPE` is set to a `TracePolicy` that never moves objects, no descendents of `roots`
+///     will be moved in this GC.  That implements transitive pinning roots.
+/// -   If `O2OPE` may move objects, then this `ProcessRootsNode<VM, R2OTP, O2OPE>` work packet will
+///     only pin the objects in `roots` (because `R2OTP` must not move objects anyway), but not
+///     their descendents.
 pub(crate) struct ProcessRootNodes<
     VM: VMBinding,
-    R2OPE: TracePolicy<VM = VM>,
-    O2OPE: TracePolicy<VM = VM>,
+    R2OTP: TracePolicy<VM = VM>,
+    O2OTP: TracePolicy<VM = VM>,
 > {
-    phantom: PhantomData<(VM, R2OPE, O2OPE)>,
+    phantom: PhantomData<(VM, R2OTP, O2OTP)>,
     roots: Vec<ObjectReference>,
     bucket: WorkBucketStage,
 }
 
-impl<VM: VMBinding, R2OPE: TracePolicy<VM = VM>, O2OPE: TracePolicy<VM = VM>>
-    ProcessRootNodes<VM, R2OPE, O2OPE>
+impl<VM: VMBinding, R2OTP: TracePolicy<VM = VM>, O2OTP: TracePolicy<VM = VM>>
+    ProcessRootNodes<VM, R2OTP, O2OTP>
 {
     pub fn new(nodes: Vec<ObjectReference>, bucket: WorkBucketStage) -> Self {
         Self {
@@ -1144,8 +1227,8 @@ impl<VM: VMBinding, R2OPE: TracePolicy<VM = VM>, O2OPE: TracePolicy<VM = VM>>
     }
 }
 
-impl<VM: VMBinding, R2OPE: TracePolicy<VM = VM>, O2OPE: TracePolicy<VM = VM>> GCWork<VM>
-    for ProcessRootNodes<VM, R2OPE, O2OPE>
+impl<VM: VMBinding, R2OTP: TracePolicy<VM = VM>, O2OTP: TracePolicy<VM = VM>> GCWork<VM>
+    for ProcessRootNodes<VM, R2OTP, O2OTP>
 {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         trace!("ProcessRootNodes");
@@ -1171,17 +1254,12 @@ impl<VM: VMBinding, R2OPE: TracePolicy<VM = VM>, O2OPE: TracePolicy<VM = VM>> GC
         // The `root_objects_to_scan` variable will hold those root objects which are traced for the
         // first time.  We will create a work packet for scanning those roots.
         let root_objects_to_scan = {
-            // We create an instance of E to use its `trace_object` method and its object queue.
-            let mut process_edges_work = R2OPE::from_mmtk(mmtk).make_process_slots_work(
-                vec![],
-                true,
-                mmtk,
-                WorkBucketStage::PinningRootsTrace,
-            );
-            process_edges_work.set_worker(worker);
+            let mut queue = VectorObjectQueue::new();
+
+            let mut r2o_policy = R2OTP::from_mmtk(mmtk);
 
             for object in self.roots.iter().copied() {
-                let new_object = process_edges_work.trace_object(object);
+                let new_object = r2o_policy.trace_object(worker, object, &mut queue);
                 debug_assert_eq!(
                     object, new_object,
                     "Object moved while tracing root unmovable root object: {} -> {}",
@@ -1189,20 +1267,19 @@ impl<VM: VMBinding, R2OPE: TracePolicy<VM = VM>, O2OPE: TracePolicy<VM = VM>> GC
                 );
             }
 
-            // This contains root objects that are visited the first time.
-            // It is sufficient to only scan these objects.
-            process_edges_work.nodes.take()
+            queue.take()
         };
 
         let num_enqueued_nodes = root_objects_to_scan.len();
         probe!(mmtk, process_root_nodes, num_roots, num_enqueued_nodes);
 
         if !root_objects_to_scan.is_empty() {
-            let mut process_edges_work =
-                O2OPE::from_mmtk(mmtk).make_process_slots_work(vec![], true, mmtk, self.bucket);
-            process_edges_work.set_worker(worker);
-            if let Some(work) = process_edges_work.create_scan_work(root_objects_to_scan) {
-                crate::memory_manager::add_work_packet(mmtk, self.bucket, work);
+            let work =
+                O2OTP::from_mmtk(mmtk).create_scan_work(root_objects_to_scan, mmtk, self.bucket);
+            if O2OTP::is_concurrent() {
+                worker.scheduler().work_buckets[self.bucket].add_no_notify(work);
+            } else {
+                worker.add_work(self.bucket, work);
             }
         }
 
@@ -1249,6 +1326,12 @@ impl<VM: VMBinding> ProcessSlotsWork for UnsupportedProcessEdges<VM> {
     }
 
     fn create_scan_work(&self, _nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
+        panic!("unsupported!")
+    }
+}
+
+impl<VM: VMBinding> GCWork<VM> for UnsupportedProcessEdges<VM> {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         panic!("unsupported!")
     }
 }
