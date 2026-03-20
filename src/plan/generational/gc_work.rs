@@ -10,7 +10,6 @@ use crate::vm::slot::MemorySlice;
 use crate::vm::*;
 use crate::MMTK;
 use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
 
 use super::global::GenerationalPlanExt;
 
@@ -59,6 +58,16 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
             .trace_object_nursery::<_, KIND>(queue, object, worker)
     }
 
+    fn make_process_slots_work(
+        &self,
+        slots: Vec<<Self::VM as VMBinding>::VMSlot>,
+        roots: bool,
+        mmtk: &'static MMTK<Self::VM>,
+        bucket: WorkBucketStage,
+    ) -> Self::ProcessSlotsWorkType {
+        GenNurseryProcessSlots::new(slots, roots, mmtk, bucket)
+    }
+
     fn create_scan_work(
         &self,
         nodes: Vec<ObjectReference>,
@@ -89,13 +98,10 @@ pub struct GenNurseryProcessSlots<
 }
 
 impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
-    ProcessSlotsWork for GenNurseryProcessSlots<VM, P, KIND>
+    GenNurseryProcessSlots<VM, P, KIND>
 {
-    type VM = VM;
-    type ScanObjectsWorkType = PlanScanObjects<GenNurseryTracePolicy<VM, P, KIND>, P>;
-
     fn new(
-        slots: Vec<SlotOf<Self>>,
+        slots: Vec<VM::VMSlot>,
         roots: bool,
         mmtk: &'static MMTK<VM>,
         bucket: WorkBucketStage,
@@ -104,18 +110,6 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
         let base = DefaultProcessSlots::new(policy, slots, roots, bucket);
         Self { base }
     }
-
-    fn trace_object(&mut self, _object: ObjectReference) -> ObjectReference {
-        unimplemented!()
-    }
-
-    fn process_slot(&mut self, _slot: SlotOf<Self>) {
-        unimplemented!()
-    }
-
-    fn create_scan_work(&self, _nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
-        unimplemented!()
-    }
 }
 
 impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
@@ -123,23 +117,6 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
 {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         self.base.do_work(worker, mmtk);
-    }
-}
-
-impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind> Deref
-    for GenNurseryProcessSlots<VM, P, KIND>
-{
-    type Target = ProcessSlotsBase<VM>;
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
-
-impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
-    DerefMut for GenNurseryProcessSlots<VM, P, KIND>
-{
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
     }
 }
 
