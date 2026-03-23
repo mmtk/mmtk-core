@@ -572,6 +572,69 @@ impl<VM: VMBinding> MMTK<VM> {
             .vm_space
             .initialize_object_metadata(object)
     }
+
+    pub fn gc_poll(&self, tls: VMMutatorThread, poll_options: PollOptions) {
+        use crate::vm::{ActivePlan, Collection};
+        debug_assert!(
+            VM::VMActivePlan::is_mutator(tls.0),
+            "gc_poll() can only be called by a mutator thread."
+        );
+
+        let mut gc_attempts = 0;
+        loop {
+            assert!(gc_attempts < 2, "gc_poll() attempted more than twice for GC, and is still trying to poll. This is a bug. Last GC emergency? {}", self.state.is_emergency_collection());
+            if self.gc_trigger.poll(false, None) {
+                debug!("Collection required");
+                if !self.state.is_initialized() {
+                    panic!("GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
+                }
+
+                if !poll_options.at_safepoint {
+                    return;
+                }
+
+                VM::VMCollection::block_for_gc(tls);
+                gc_attempts += 1;
+
+                if self.gc_trigger.is_heap_full() {
+                    if self.state.is_emergency_collection() {
+                        debug!(
+                            "Emergency collection failed to free up enough memory. Out of memory!"
+                        );
+                        if poll_options.allow_oom_call {
+                            VM::VMCollection::out_of_memory(
+                                tls.0,
+                                crate::util::alloc::AllocationError::HeapOutOfMemory,
+                            );
+                        }
+                        return;
+                    } else {
+                        debug!("Force emergency collection.");
+                        self.state.force_emergency_collection();
+                    }
+                    debug!("Heap is still full after GC. Will poll again.");
+                }
+            }
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct PollOptions {
+    /// Whether this GC polling is at a safepoint.
+    ///
+    /// **The default is `true`**.
+    ///
+    /// If `true`, the polling is allowed to block the current thread for GC.
+    ///
+    /// If `false`, the polling may trigger a GC but will not block the current thread for GC immediately.
+    pub at_safepoint: bool,
+
+    /// Whether the polling is allowed to call [`Collection::out_of_memory`] in case of out of memory.
+    ///
+    /// **The default is `true`**.
+    pub allow_oom_call: bool,
 }
 
 /// A non-mangled function to print object information for debugging purposes. This function can be directly

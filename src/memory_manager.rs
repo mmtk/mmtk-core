@@ -12,6 +12,7 @@
 //! pointer. Either way, the VM binding code needs to guarantee the safety.
 
 use crate::mmtk::MMTKBuilder;
+use crate::mmtk::PollOptions;
 use crate::mmtk::MMTK;
 use crate::plan::AllocationSemantics;
 use crate::plan::{Mutator, MutatorContext};
@@ -536,20 +537,8 @@ pub fn get_malloc_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// Usually a binding does not need to call this function. MMTk will poll for GC during its allocation.
 /// However, if a binding uses counted malloc (which won't poll for GC), they may want to poll for GC manually.
 /// This function should only be used by mutator threads.
-pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
-    use crate::vm::{ActivePlan, Collection};
-    debug_assert!(
-        VM::VMActivePlan::is_mutator(tls.0),
-        "gc_poll() can only be called by a mutator thread."
-    );
-
-    if mmtk.gc_trigger.poll(false, None) {
-        debug!("Collection required");
-        if !mmtk.state.is_initialized() {
-            panic!("GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
-        }
-        VM::VMCollection::block_for_gc(tls);
-    }
+pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread, poll_options: PollOptions) {
+    mmtk.gc_poll(tls, poll_options)
 }
 
 /// Wrapper for [`crate::scheduler::GCWorker::run`].
