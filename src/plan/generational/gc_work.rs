@@ -58,6 +58,10 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
             .trace_object_nursery::<_, KIND>(queue, object, worker)
     }
 
+    fn post_scan_object(&mut self, object: ObjectReference) {
+        self.plan.post_scan_object(object);
+    }
+
     fn make_process_slots_work(
         &self,
         slots: Vec<<Self::VM as VMBinding>::VMSlot>,

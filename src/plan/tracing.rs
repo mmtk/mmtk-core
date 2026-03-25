@@ -25,6 +25,8 @@ pub trait TracePolicy: 'static + Send + Clone {
         queue: &mut Q,
     ) -> ObjectReference;
 
+    fn post_scan_object(&mut self, object: ObjectReference);
+
     fn make_process_slots_work(
         &self,
         slots: Vec<<Self::VM as VMBinding>::VMSlot>,
@@ -87,6 +89,10 @@ impl<VM: VMBinding> TracePolicy for SFTTracePolicy<VM> {
             queue.enqueue(queued_object);
         }
         result
+    }
+
+    fn post_scan_object(&mut self, _object: ObjectReference) {
+        // Do nothing.  SFTTracePolicy is only suitable for plans that don't need post_scan_object.
     }
 
     fn make_process_slots_work(
@@ -154,6 +160,10 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> TracePolicy
         self.plan.trace_object::<Q, KIND>(queue, object, worker)
     }
 
+    fn post_scan_object(&mut self, object: ObjectReference) {
+        self.plan.post_scan_object(object);
+    }
+
     fn make_process_slots_work(
         &self,
         slots: Vec<<Self::VM as VMBinding>::VMSlot>,
@@ -213,6 +223,10 @@ impl<VM: VMBinding> TracePolicy for UnsupportedTracePolicy<VM> {
         unimplemented!()
     }
 
+    fn post_scan_object(&mut self, _object: ObjectReference) {
+        unimplemented!()
+    }
+
     fn make_process_slots_work(
         &self,
         _slots: Vec<<Self::VM as VMBinding>::VMSlot>,
@@ -244,6 +258,12 @@ impl<VM: VMBinding> TracePolicy for UnsupportedTracePolicy<VM> {
 pub trait ObjectQueue {
     /// Enqueue an object into the queue.
     fn enqueue(&mut self, object: ObjectReference);
+}
+
+impl<F: FnMut(ObjectReference)> ObjectQueue for F {
+    fn enqueue(&mut self, object: ObjectReference) {
+        self(object)
+    }
 }
 
 impl ObjectQueue for Option<ObjectReference> {
