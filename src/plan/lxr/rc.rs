@@ -804,6 +804,7 @@ pub struct ProcessDecs<VM: VMBinding> {
     counter: LazySweepingJobsCounter,
     mark_objects: VectorQueue<ObjectReference>,
     mark_dead_objects: bool,
+    cld_policy: CLDScanPolicy,
     mature_sweeping_in_progress: bool,
     rc: RefCountHelper<VM>,
 }
@@ -826,6 +827,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             counter,
             mark_objects: VectorQueue::default(),
             mark_dead_objects: false,
+            cld_policy: CLDScanPolicy::Ignore,
             mature_sweeping_in_progress: false,
             rc: RefCountHelper::NEW,
         }
@@ -842,6 +844,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             counter,
             mark_objects: VectorQueue::default(),
             mark_dead_objects: false,
+            cld_policy: CLDScanPolicy::Ignore,
             mature_sweeping_in_progress: false,
             rc: RefCountHelper::NEW,
         }
@@ -927,7 +930,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             unimplemented!()
         } else if !cfg!(feature = "lxr_no_recursive_dec") {
             o.iterate_fields::<VM, _>(
-                CLDScanPolicy::Claim,
+                self.cld_policy,
                 RefScanPolicy::Follow,
                 |slot, out_of_heap| {
                     if let Some(x) = slot.load() {
