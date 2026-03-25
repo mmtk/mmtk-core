@@ -6,6 +6,7 @@ use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::Finalizable;
 use crate::vm::{Collection, VMBinding};
+use crate::MMTK;
 use std::marker::PhantomData;
 
 /// A special processor for Finalizable objects.
@@ -139,8 +140,7 @@ impl<F: Finalizable> FinalizableProcessor<F> {
 pub struct Finalization<E: ProcessEdgesWork>(PhantomData<E>);
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>) {
-        let mmtk = worker.mmtk;
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &MMTK<E::VM>) {
         if !*mmtk.options.no_reference_types {
             // Rescan soft and weak references at the end of the transitive closure from resurrected
             // objects.  New soft and weak references may be discovered during this.
@@ -191,8 +191,7 @@ impl<E: ProcessEdgesWork> Finalization<E> {
 pub struct ForwardFinalization<E: ProcessEdgesWork>(PhantomData<E>);
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ForwardFinalization<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>) {
-        let mmtk = worker.mmtk;
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &MMTK<E::VM>) {
         trace!("Forward finalization");
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
         let mut w = E::new(

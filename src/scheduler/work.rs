@@ -1,4 +1,5 @@
 use super::worker::*;
+use crate::mmtk::MMTK;
 use crate::vm::VMBinding;
 #[cfg(feature = "work_packet_stats")]
 use std::any::{type_name, TypeId};
@@ -22,14 +23,14 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
     /// this is what you intend.  But you should always consider adding the work packet
     /// into a bucket so that other GC workers can execute it in parallel, unless the context-
     /// switching overhead is a problem.
-    fn do_work(&mut self, worker: &mut GCWorker<VM>);
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>);
 
     /// Do work and collect statistics. This internally calls `do_work()`. In most cases,
     /// this should be called rather than `do_work()` so that MMTk can correctly collect
     /// statistics for the work packets.
     /// If the feature "work_packet_stats" is not enabled, this call simply forwards the call
     /// to `do_work()`.
-    fn do_work_with_stat(&mut self, worker: &mut GCWorker<VM>) {
+    fn do_work_with_stat(&mut self, worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>) {
         debug!("{}", std::any::type_name::<Self>());
         debug_assert!(!worker.tls.0.0.is_null(), "TLS must be set correctly for a GC worker before the worker does any work. GC Worker {} has no valid tls.", worker.ordinal);
 
@@ -37,11 +38,11 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
         // Start collecting statistics
         let stat = {
             let mut worker_stat = worker.shared.borrow_stat_mut();
-            worker_stat.measure_work(TypeId::of::<Self>(), type_name::<Self>(), worker.mmtk)
+            worker_stat.measure_work(TypeId::of::<Self>(), type_name::<Self>(), mmtk)
         };
 
         // Do the actual work
-        self.do_work(worker);
+        self.do_work(worker, mmtk);
 
         #[cfg(feature = "work_packet_stats")]
         // Finish collecting statistics

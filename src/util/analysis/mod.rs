@@ -32,8 +32,7 @@ pub trait RtAnalysis<VM: VMBinding> {
 pub struct GcHookWork;
 
 impl<VM: VMBinding> GCWork<VM> for GcHookWork {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>) {
-        let mmtk = worker.mmtk;
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>) {
         mmtk.analysis_manager.gc_hook(mmtk);
     }
 }

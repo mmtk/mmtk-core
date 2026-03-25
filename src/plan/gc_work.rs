@@ -8,7 +8,7 @@ pub(super) struct SetCommonPlanUnlogBits<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for SetCommonPlanUnlogBits<VM> {
-    fn do_work(&mut self, _worker: &mut crate::scheduler::GCWorker<VM>) {
+    fn do_work(&mut self, _worker: &mut crate::scheduler::GCWorker<VM>, _mmtk: &crate::MMTK<VM>) {
         self.common_plan.set_side_log_bits();
     }
 }
@@ -18,7 +18,7 @@ pub(super) struct ClearCommonPlanUnlogBits<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for ClearCommonPlanUnlogBits<VM> {
-    fn do_work(&mut self, _worker: &mut crate::scheduler::GCWorker<VM>) {
+    fn do_work(&mut self, _worker: &mut crate::scheduler::GCWorker<VM>, _mmtk: &crate::MMTK<VM>) {
         self.common_plan.clear_side_log_bits();
     }
 }
