@@ -19,7 +19,7 @@ impl GcCounter {
 }
 
 impl<VM: VMBinding> RtAnalysis<VM> for GcCounter {
-    fn gc_hook(&mut self, _mmtk: &'static MMTK<VM>) {
+    fn gc_hook(&mut self, _mmtk: &MMTK<VM>) {
         if self.running {
             // The analysis routine simply updates the counter when the allocation hook is called
             self.counter.lock().unwrap().inc();

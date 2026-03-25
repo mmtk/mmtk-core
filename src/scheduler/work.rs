@@ -23,14 +23,14 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
     /// this is what you intend.  But you should always consider adding the work packet
     /// into a bucket so that other GC workers can execute it in parallel, unless the context-
     /// switching overhead is a problem.
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>);
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>);
 
     /// Do work and collect statistics. This internally calls `do_work()`. In most cases,
     /// this should be called rather than `do_work()` so that MMTk can correctly collect
     /// statistics for the work packets.
     /// If the feature "work_packet_stats" is not enabled, this call simply forwards the call
     /// to `do_work()`.
-    fn do_work_with_stat(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work_with_stat(&mut self, worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>) {
         debug!("{}", std::any::type_name::<Self>());
         debug_assert!(!worker.tls.0.0.is_null(), "TLS must be set correctly for a GC worker before the worker does any work. GC Worker {} has no valid tls.", worker.ordinal);
 

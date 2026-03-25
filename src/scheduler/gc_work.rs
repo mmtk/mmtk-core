@@ -13,7 +13,7 @@ use std::ops::{Deref, DerefMut};
 pub struct ScheduleCollection;
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>) {
         // Tell GC trigger that GC started.
         mmtk.gc_trigger.policy.on_gc_start(mmtk);
 
@@ -29,7 +29,10 @@ impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
         mmtk.set_gc_status(GcStatus::GcPrepare);
 
         // Let the plan to schedule collection work
-        mmtk.get_plan().schedule_collection(worker.scheduler());
+        worker
+            .mmtk
+            .get_plan()
+            .schedule_collection(worker.scheduler());
     }
 }
 
@@ -53,7 +56,7 @@ impl<C: GCWorkContext> Prepare<C> {
 }
 
 impl<C: GCWorkContext> GCWork<C::VM> for Prepare<C> {
-    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &MMTK<C::VM>) {
         trace!("Prepare Global");
         // We assume this is the only running work packet that accesses plan at the point of execution
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
@@ -92,7 +95,7 @@ impl<VM: VMBinding> PrepareMutator<VM> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for PrepareMutator<VM> {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
         trace!("Prepare Mutator");
         self.mutator.prepare(worker.tls);
     }
@@ -103,7 +106,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareMutator<VM> {
 pub struct PrepareCollector;
 
 impl<VM: VMBinding> GCWork<VM> for PrepareCollector {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>) {
         trace!("Prepare Collector");
         worker.get_copy_context_mut().prepare();
         mmtk.get_plan().prepare_worker(worker);
@@ -130,7 +133,7 @@ impl<C: GCWorkContext> Release<C> {
 unsafe impl<C: GCWorkContext> Send for Release<C> {}
 
 impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
-    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &MMTK<C::VM>) {
         trace!("Release Global");
 
         mmtk.gc_trigger.policy.on_gc_release(mmtk);
@@ -170,7 +173,7 @@ impl<VM: VMBinding> ReleaseMutator<VM> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for ReleaseMutator<VM> {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
         trace!("Release Mutator");
         self.mutator.release(worker.tls);
     }
@@ -181,7 +184,7 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseMutator<VM> {
 pub struct ReleaseCollector;
 
 impl<VM: VMBinding> GCWork<VM> for ReleaseCollector {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
         trace!("Release Collector");
         worker.get_copy_context_mut().release();
     }
@@ -220,7 +223,7 @@ impl<C: GCWorkContext> StopMutators<C> {
 }
 
 impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
-    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &MMTK<C::VM>) {
         trace!("stop_all_mutators start");
         mmtk.state.prepare_for_stack_scanning();
         <C::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
@@ -348,7 +351,7 @@ impl<E: ProcessEdgesWork> VMProcessWeakRefs<E> {
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &MMTK<E::VM>) {
         trace!("VMProcessWeakRefs");
 
         let stage = WorkBucketStage::VMRefClosure;
@@ -391,7 +394,7 @@ impl<E: ProcessEdgesWork> VMForwardWeakRefs<E> {
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for VMForwardWeakRefs<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &MMTK<E::VM>) {
         trace!("VMForwardWeakRefs");
 
         let stage = WorkBucketStage::VMRefForwarding;
@@ -416,7 +419,7 @@ pub struct VMPostForwarding<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for VMPostForwarding<VM> {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
         trace!("VMPostForwarding start");
         <VM as VMBinding>::VMCollection::post_forwarding(worker.tls);
         trace!("VMPostForwarding end");
@@ -426,14 +429,14 @@ impl<VM: VMBinding> GCWork<VM> for VMPostForwarding<VM> {
 pub struct ScanMutatorRoots<C: GCWorkContext>(pub &'static mut Mutator<C::VM>);
 
 impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
-    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &MMTK<C::VM>) {
         trace!("ScanMutatorRoots for mutator {:?}", self.0.get_tls());
         let mutators = <C::VM as VMBinding>::VMActivePlan::number_of_mutators();
         let factory = ProcessEdgesWorkRootsWorkFactory::<
             C::VM,
             C::DefaultProcessEdges,
             C::PinningProcessEdges,
-        >::new(mmtk);
+        >::new(worker.mmtk);
         <C::VM as VMBinding>::VMScanning::scan_roots_in_mutator_thread(
             worker.tls,
             unsafe { &mut *(self.0 as *mut _) },
@@ -460,13 +463,13 @@ impl<C: GCWorkContext> ScanVMSpecificRoots<C> {
 }
 
 impl<C: GCWorkContext> GCWork<C::VM> for ScanVMSpecificRoots<C> {
-    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, _mmtk: &MMTK<C::VM>) {
         trace!("ScanStaticRoots");
         let factory = ProcessEdgesWorkRootsWorkFactory::<
             C::VM,
             C::DefaultProcessEdges,
             C::PinningProcessEdges,
-        >::new(mmtk);
+        >::new(worker.mmtk);
         <C::VM as VMBinding>::VMScanning::scan_vm_specific_roots(worker.tls, factory);
     }
 }
@@ -676,7 +679,7 @@ pub trait ProcessEdgesWork:
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &MMTK<E::VM>) {
         self.set_worker(worker);
         self.process_slots();
         if !self.nodes.is_empty() {
@@ -848,7 +851,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         &self,
         buffer: &[ObjectReference],
         worker: &mut GCWorker<<Self::E as ProcessEdgesWork>::VM>,
-        mmtk: &'static MMTK<<Self::E as ProcessEdgesWork>::VM>,
+        mmtk: &MMTK<<Self::E as ProcessEdgesWork>::VM>,
     ) {
         let tls = worker.tls;
 
@@ -956,7 +959,7 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>> ScanObjectsWork<VM> for ScanOb
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &MMTK<E::VM>) {
         trace!("ScanObjects");
         self.do_work_common(&self.buffer, worker, mmtk);
         trace!("ScanObjects End");
@@ -1087,7 +1090,7 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> ScanObje
 impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> GCWork<E::VM>
     for PlanScanObjects<E, P>
 {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &MMTK<E::VM>) {
         trace!("PlanScanObjects");
         self.do_work_common(&self.buffer, worker, mmtk);
         trace!("PlanScanObjects End");
@@ -1138,7 +1141,7 @@ impl<VM: VMBinding, R2OPE: ProcessEdgesWork<VM = VM>, O2OPE: ProcessEdgesWork<VM
 impl<VM: VMBinding, R2OPE: ProcessEdgesWork<VM = VM>, O2OPE: ProcessEdgesWork<VM = VM>> GCWork<VM>
     for ProcessRootNodes<VM, R2OPE, O2OPE>
 {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>) {
         trace!("ProcessRootNodes");
 
         #[cfg(feature = "sanity")]
@@ -1163,8 +1166,12 @@ impl<VM: VMBinding, R2OPE: ProcessEdgesWork<VM = VM>, O2OPE: ProcessEdgesWork<VM
         // first time.  We will create a work packet for scanning those roots.
         let root_objects_to_scan = {
             // We create an instance of E to use its `trace_object` method and its object queue.
-            let mut process_edges_work =
-                R2OPE::new(vec![], true, mmtk, WorkBucketStage::PinningRootsTrace);
+            let mut process_edges_work = R2OPE::new(
+                vec![],
+                true,
+                worker.mmtk,
+                WorkBucketStage::PinningRootsTrace,
+            );
             process_edges_work.set_worker(worker);
 
             for object in self.roots.iter().copied() {
@@ -1185,7 +1192,7 @@ impl<VM: VMBinding, R2OPE: ProcessEdgesWork<VM = VM>, O2OPE: ProcessEdgesWork<VM
         probe!(mmtk, process_root_nodes, num_roots, num_enqueued_nodes);
 
         if !root_objects_to_scan.is_empty() {
-            let mut process_edges_work = O2OPE::new(vec![], true, mmtk, self.bucket);
+            let mut process_edges_work = O2OPE::new(vec![], true, worker.mmtk, self.bucket);
             process_edges_work.set_worker(worker);
             if let Some(work) = process_edges_work.create_scan_work(root_objects_to_scan) {
                 crate::memory_manager::add_work_packet(mmtk, self.bucket, work);

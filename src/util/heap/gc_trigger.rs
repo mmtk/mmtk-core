@@ -285,14 +285,14 @@ pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
     /// can never accomodate the pending allocation.
     fn on_pending_allocation(&self, _pages: usize) {}
     /// Inform the triggering policy that a GC starts.
-    fn on_gc_start(&self, _mmtk: &'static MMTK<VM>) {}
+    fn on_gc_start(&self, _mmtk: &MMTK<VM>) {}
     /// Inform the triggering policy that a GC is about to start the release work. This is called
     /// in the global Release work packet. This means we assume a plan
     /// do not schedule any work that reclaims memory before the global `Release` work. The current plans
     /// satisfy this assumption: they schedule other release work in `plan.release()`.
-    fn on_gc_release(&self, _mmtk: &'static MMTK<VM>) {}
+    fn on_gc_release(&self, _mmtk: &MMTK<VM>) {}
     /// Inform the triggering policy that a GC ends.
-    fn on_gc_end(&self, _mmtk: &'static MMTK<VM>) {}
+    fn on_gc_end(&self, _mmtk: &MMTK<VM>) {}
     /// Is a GC required now? The GC trigger may implement its own heuristics to decide when
     /// a GC should be performed. However, we recommend the implementation to do its own checks
     /// first, and always call `plan.collection_required(space_full, space)` at the end as a fallback to see if the plan needs
@@ -489,7 +489,7 @@ impl MemBalancerStats {
     // * allocation = live pages at the start of GC - live pages at the end of last GC
     // * collection = live pages at the end of GC - live pages before release
 
-    fn non_generational_mem_stats_on_gc_start<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
+    fn non_generational_mem_stats_on_gc_start<VM: VMBinding>(&mut self, mmtk: &MMTK<VM>) {
         self.allocation_pages = mmtk
             .get_plan()
             .get_reserved_pages()
@@ -501,11 +501,11 @@ impl MemBalancerStats {
             self.allocation_pages
         );
     }
-    fn non_generational_mem_stats_on_gc_release<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
+    fn non_generational_mem_stats_on_gc_release<VM: VMBinding>(&mut self, mmtk: &MMTK<VM>) {
         self.gc_release_live_pages = mmtk.get_plan().get_reserved_pages();
         trace!("live before release = {}", self.gc_release_live_pages);
     }
-    fn non_generational_mem_stats_on_gc_end<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
+    fn non_generational_mem_stats_on_gc_end<VM: VMBinding>(&mut self, mmtk: &MMTK<VM>) {
         self.gc_end_live_pages = mmtk.get_plan().get_reserved_pages();
         trace!("live pages = {}", self.gc_end_live_pages);
         // Use live pages as an estimate for pages traversed during GC
@@ -534,7 +534,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
         self.pending_pages.fetch_add(pages, Ordering::SeqCst);
     }
 
-    fn on_gc_start(&self, mmtk: &'static MMTK<VM>) {
+    fn on_gc_start(&self, mmtk: &MMTK<VM>) {
         trace!("=== on_gc_start ===");
         self.access_stats(|stats| {
             stats.gc_start_time = Instant::now();
@@ -553,7 +553,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
         });
     }
 
-    fn on_gc_release(&self, mmtk: &'static MMTK<VM>) {
+    fn on_gc_release(&self, mmtk: &MMTK<VM>) {
         trace!("=== on_gc_release ===");
         self.access_stats(|stats| {
             if let Some(plan) = mmtk.get_plan().generational() {
@@ -564,7 +564,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
         });
     }
 
-    fn on_gc_end(&self, mmtk: &'static MMTK<VM>) {
+    fn on_gc_end(&self, mmtk: &MMTK<VM>) {
         trace!("=== on_gc_end ===");
         self.access_stats(|stats| {
             stats.gc_end_time = Instant::now();

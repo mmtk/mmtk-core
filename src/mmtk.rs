@@ -289,7 +289,7 @@ impl<VM: VMBinding> MMTK<VM> {
     /// is only safe for the VM to call `fork()` after the underlying **native threads** of the GC
     /// threads have exited.  After calling this function, the VM should wait for their underlying
     /// native threads to exit in VM-specific manner before calling `fork()`.
-    pub fn prepare_to_fork(&'static self) {
+    pub fn prepare_to_fork(&self) {
         assert!(
             self.state.is_initialized(),
             "MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
@@ -307,7 +307,7 @@ impl<VM: VMBinding> MMTK<VM> {
     /// *   `tls`: The thread that wants to respawn MMTk threads after forking. This value will be
     ///     passed back to the VM in `Collection::spawn_gc_thread()` so that the VM knows the
     ///     context.
-    pub fn after_fork(&'static self, tls: VMThread) {
+    pub fn after_fork(&self, tls: VMThread) {
         assert!(
             self.state.is_initialized(),
             "MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
@@ -330,7 +330,7 @@ impl<VM: VMBinding> MMTK<VM> {
     /// Generic hook to allow benchmarks to be harnessed. MMTk will stop collecting
     /// statistics, and print out the collected statistics in a defined format.
     /// This is usually called by the benchmark harness right after the actual benchmark.
-    pub fn harness_end(&'static self) {
+    pub fn harness_end(&self) {
         self.stats.stop_all(self);
         self.state.inside_harness.store(false, Ordering::SeqCst);
         probe!(mmtk, harness_end);
