@@ -1,8 +1,6 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::global_state::GcStatus;
-use crate::plan::tracing::PlanTracePolicy;
-use crate::plan::tracing::SFTTracePolicy;
 use crate::plan::tracing::TracePolicy;
 use crate::plan::ObjectsClosure;
 use crate::plan::VectorObjectQueue;
@@ -547,39 +545,6 @@ impl<T: TracePolicy> GCWork<T::VM> for DefaultProcessSlots<T> {
     }
 }
 
-/// A general implementation of [`ProcessEdgesWork`] using SFT. A plan can always implement their
-/// own [`ProcessEdgesWork`] instances. However, most plans can use this work packet for tracing amd
-/// they do not need to provide a plan-specific trace object work packet. If they choose to use this
-/// type, they need to provide a correct implementation for some related methods (such as
-/// `Space.set_copy_for_sft_trace()`, `SFT.sft_trace_object()`). Some plans are not using this type,
-/// mostly due to more complex tracing. Either it is impossible to use this type, or there is
-/// performance overheads for using this general trace type. In such cases, they implement their
-/// specific [`ProcessEdgesWork`] instances.
-// TODO: This is not used any more. Should we remove it?
-#[allow(dead_code)]
-pub struct SFTProcessSlots<VM: VMBinding> {
-    base: DefaultProcessSlots<SFTTracePolicy<VM>>,
-}
-
-impl<VM: VMBinding> SFTProcessSlots<VM> {
-    pub fn new(
-        slots: Vec<VM::VMSlot>,
-        roots: bool,
-        mmtk: &'static MMTK<VM>,
-        bucket: WorkBucketStage,
-    ) -> Self {
-        let policy = SFTTracePolicy::from_mmtk(mmtk);
-        let base = DefaultProcessSlots::new(policy, slots, roots, bucket);
-        Self { base }
-    }
-}
-
-impl<VM: VMBinding> GCWork<VM> for SFTProcessSlots<VM> {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        self.base.do_work(worker, mmtk);
-    }
-}
-
 /// An implementation of `RootsWorkFactory` that creates work packets based on `ProcessEdgesWork`
 /// for handling roots.  The `DPE` and the `PPE` type parameters correspond to the
 /// `DefaultProcessEdge` and the `PinningProcessEdges` type members of the [`GCWorkContext`] trait.
@@ -802,40 +767,6 @@ impl<T: TracePolicy> GCWork<T::VM> for ScanObjects<T> {
 use crate::mmtk::MMTK;
 use crate::plan::Plan;
 use crate::plan::PlanTraceObject;
-use crate::policy::gc_work::TraceKind;
-
-/// This provides an implementation of [`crate::scheduler::gc_work::ProcessEdgesWork`]. A plan that implements
-/// `PlanTraceObject` can use this work packet for tracing objects.
-pub struct PlanProcessSlots<
-    VM: VMBinding,
-    P: Plan<VM = VM> + PlanTraceObject<VM>,
-    const KIND: TraceKind,
-> {
-    base: DefaultProcessSlots<PlanTracePolicy<P, KIND>>,
-}
-
-impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKind>
-    PlanProcessSlots<VM, P, KIND>
-{
-    pub fn new(
-        slots: Vec<VM::VMSlot>,
-        roots: bool,
-        mmtk: &'static MMTK<VM>,
-        bucket: WorkBucketStage,
-    ) -> Self {
-        let policy = PlanTracePolicy::from_mmtk(mmtk);
-        let base = DefaultProcessSlots::new(policy, slots, roots, bucket);
-        Self { base }
-    }
-}
-
-impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKind> GCWork<VM>
-    for PlanProcessSlots<VM, P, KIND>
-{
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        self.base.do_work(worker, mmtk);
-    }
-}
 
 /// This is an alternative to `ScanObjects` that calls the `post_scan_object` of the policy
 /// selected by the plan.  It is applicable to plans that derive `PlanTraceObject`.
@@ -986,18 +917,5 @@ impl<VM: VMBinding, R2OTP: TracePolicy<VM = VM>, O2OTP: TracePolicy<VM = VM>> GC
         }
 
         trace!("ProcessRootNodes End");
-    }
-}
-
-/// A `ProcessEdgesWork` type that panics when any of its method is used.
-/// This is currently used for plans that do not support transitively pinning.
-#[derive(Default)]
-pub struct UnsupportedProcessEdges<VM: VMBinding> {
-    phantom: PhantomData<VM>,
-}
-
-impl<VM: VMBinding> GCWork<VM> for UnsupportedProcessEdges<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        panic!("unsupported!")
     }
 }

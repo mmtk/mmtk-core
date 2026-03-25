@@ -5,10 +5,7 @@ use std::marker::PhantomData;
 
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
-use crate::scheduler::gc_work::{
-    PlanProcessSlots, PlanScanObjects, SFTProcessSlots, ScanObjects, SlotOfTP,
-    UnsupportedProcessEdges,
-};
+use crate::scheduler::gc_work::{DefaultProcessSlots, PlanScanObjects, ScanObjects, SlotOfTP};
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
 use crate::util::{ObjectReference, VMThread, VMWorkerThread};
 use crate::vm::{Scanning, SlotVisitor, VMBinding};
@@ -48,6 +45,7 @@ pub trait TracePolicy: 'static + Send + Clone {
     fn is_concurrent() -> bool;
 }
 
+#[allow(dead_code)]
 #[derive(Default)]
 pub struct SFTTracePolicy<VM: VMBinding> {
     phantom_data: PhantomData<VM>,
@@ -63,7 +61,7 @@ impl<VM: VMBinding> Clone for SFTTracePolicy<VM> {
 
 impl<VM: VMBinding> TracePolicy for SFTTracePolicy<VM> {
     type VM = VM;
-    type ProcessSlotsWorkType = SFTProcessSlots<Self::VM>;
+    type ProcessSlotsWorkType = DefaultProcessSlots<Self>;
     type ScanObjectsWorkType = ScanObjects<Self>;
 
     fn from_mmtk(_mmtk: &'static MMTK<Self::VM>) -> Self {
@@ -95,10 +93,10 @@ impl<VM: VMBinding> TracePolicy for SFTTracePolicy<VM> {
         &self,
         slots: Vec<<Self::VM as VMBinding>::VMSlot>,
         roots: bool,
-        mmtk: &'static MMTK<Self::VM>,
+        _mmtk: &'static MMTK<Self::VM>,
         bucket: WorkBucketStage,
     ) -> Self::ProcessSlotsWorkType {
-        SFTProcessSlots::new(slots, roots, mmtk, bucket)
+        DefaultProcessSlots::new(self.clone(), slots, roots, bucket)
     }
 
     fn create_scan_work(
@@ -139,7 +137,7 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> TracePolicy
     for PlanTracePolicy<P, KIND>
 {
     type VM = P::VM;
-    type ProcessSlotsWorkType = PlanProcessSlots<Self::VM, P, KIND>;
+    type ProcessSlotsWorkType = DefaultProcessSlots<Self>;
     type ScanObjectsWorkType = PlanScanObjects<Self, P>;
 
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
@@ -160,10 +158,10 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> TracePolicy
         &self,
         slots: Vec<<Self::VM as VMBinding>::VMSlot>,
         roots: bool,
-        mmtk: &'static MMTK<Self::VM>,
+        _mmtk: &'static MMTK<Self::VM>,
         bucket: WorkBucketStage,
     ) -> Self::ProcessSlotsWorkType {
-        PlanProcessSlots::new(slots, roots, mmtk, bucket)
+        DefaultProcessSlots::new(self.clone(), slots, roots, bucket)
     }
 
     fn create_scan_work(
@@ -199,7 +197,7 @@ impl<VM: VMBinding> Clone for UnsupportedTracePolicy<VM> {
 
 impl<VM: VMBinding> TracePolicy for UnsupportedTracePolicy<VM> {
     type VM = VM;
-    type ProcessSlotsWorkType = UnsupportedProcessEdges<Self::VM>;
+    type ProcessSlotsWorkType = DefaultProcessSlots<Self>;
     type ScanObjectsWorkType = ScanObjects<Self>;
 
     fn from_mmtk(_mmtk: &'static MMTK<Self::VM>) -> Self {
