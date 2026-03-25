@@ -20,6 +20,7 @@ use crate::policy::space::Space;
 use crate::scheduler::WorkBucketStage;
 use crate::util::address::CLDScanPolicy;
 use crate::util::address::RefScanPolicy;
+use crate::util::metadata::side_metadata::address_to_meta_address;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::*;
 use crate::vm::slot::MemorySlice;
@@ -276,6 +277,25 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
     }
 
     fn memory_region_copy_slow(&mut self, _src: VM::VMMemorySlice, dst: VM::VMMemorySlice) {
+        // Quickly check if all fields are logged. If yes, skip the barrier.
+        let unlog_bits_start = address_to_meta_address(&Self::UNLOG_BITS, dst.start());
+        let unlog_bits_start_aligned = unlog_bits_start.align_down(16);
+        let unlog_bits_end =
+            address_to_meta_address(&Self::UNLOG_BITS, dst.start() + dst.bytes() - 1);
+        let unlog_bits_end_aligned = unlog_bits_end.align_down(16);
+        let mut cursor = unlog_bits_start_aligned;
+        let mut all_logged = true;
+        while cursor <= unlog_bits_end_aligned {
+            if unsafe { cursor.load::<u128>() } != 0 {
+                all_logged = false;
+                break;
+            }
+            cursor = cursor + 16usize;
+        }
+        if all_logged {
+            return;
+        }
+
         #[cfg(feature = "lxr_precise_incs_counter")]
         let mut slots = 0;
         for s in dst.iter_slots() {
