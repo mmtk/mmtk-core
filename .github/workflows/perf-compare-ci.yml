@@ -20,6 +20,7 @@ env:
   # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
   CI_PERF_KIT_BUILD: ci-perf-kit/upload
   CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
+  CI_PERF_KIT_VERSION: 0.8.7
 
 jobs:
     # Figure out binding PRs.
@@ -112,7 +113,7 @@ jobs:
             with:
               repository: mmtk/ci-perf-kit
               token: ${{ secrets.CI_ACCESS_TOKEN }}
-              ref: "0.8.6"
+              ref: ${{ env.CI_PERF_KIT_VERSION }}
               path: ci-perf-kit
               submodules: true
           # setup
@@ -223,7 +224,7 @@ jobs:
               with:
                 repository: mmtk/ci-perf-kit
                 token: ${{ secrets.CI_ACCESS_TOKEN }}
-                ref: "0.8.6"
+                ref: ${{ env.CI_PERF_KIT_VERSION }}
                 path: ci-perf-kit
                 submodules: true
             # setup
