@@ -9,7 +9,6 @@ use crate::scheduler::WorkBucketStage;
 use crate::vm::ActivePlan;
 use crate::vm::Scanning;
 use crate::vm::VMBinding;
-use crate::MMTK;
 use std::marker::PhantomData;
 
 /// iterate through the heap and calculate the new location of live objects
@@ -18,7 +17,7 @@ pub struct CalculateForwardingAddress<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for CalculateForwardingAddress<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>) {
         self.mc_space.calculate_forwarding_pointer();
     }
 }
@@ -39,7 +38,8 @@ pub struct UpdateReferences<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Send for UpdateReferences<VM> {}
 
 impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>) {
+        let mmtk = worker.mmtk;
         // The following needs to be done right before the second round of root scanning
         VM::VMScanning::prepare_for_roots_re_scanning();
         mmtk.state.prepare_for_stack_scanning();
@@ -81,7 +81,7 @@ pub struct Compact<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>) {
         self.mc_space.compact();
     }
 }

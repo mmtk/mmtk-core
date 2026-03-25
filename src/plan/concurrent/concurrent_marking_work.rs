@@ -113,7 +113,7 @@ unsafe impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, con
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
     GCWork<VM> for ConcurrentTraceObjects<VM, P, KIND>
 {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>) {
         self.worker = worker;
         let mut num_objects = 0;
         let mut num_next_objects = 0;
@@ -175,7 +175,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
     GCWork<VM> for ProcessModBufSATB<VM, P, KIND>
 {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>) {
         let mut w = if let Some(nodes) = self.nodes.take() {
             if nodes.is_empty() {
                 return;
@@ -185,7 +185,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         } else {
             return;
         };
-        GCWork::do_work(&mut w, worker, worker.mmtk);
+        GCWork::do_work(&mut w, worker);
     }
 }
 

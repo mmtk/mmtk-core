@@ -571,7 +571,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 }
 
 use crate::scheduler::GCWork;
-use crate::MMTK;
 
 struct PrepareChunkMap<VM: VMBinding> {
     space: &'static MarkSweepSpace<VM>,
@@ -579,7 +578,7 @@ struct PrepareChunkMap<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for PrepareChunkMap<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>) {
         debug_assert!(self.space.chunk_map.get(self.chunk).unwrap().is_allocated());
         // number of allocated blocks.
         let mut n_occupied_blocks = 0;
@@ -609,7 +608,7 @@ struct ReleaseMarkSweepSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for ReleaseMarkSweepSpace<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>) {
         {
             let mut abandoned = self.space.abandoned.lock().unwrap();
             abandoned.sweep_later(self.space);
@@ -629,7 +628,7 @@ struct SweepChunk<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>) {
         assert!(self.space.chunk_map.get(self.chunk).unwrap().is_allocated());
 
         // number of allocated blocks.

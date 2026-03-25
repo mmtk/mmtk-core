@@ -889,7 +889,6 @@ impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MallocObj
 }
 
 use crate::scheduler::GCWork;
-use crate::MMTK;
 
 /// Simple work packet that just sweeps a single chunk
 pub struct MSSweepChunk<VM: VMBinding> {
@@ -899,7 +898,7 @@ pub struct MSSweepChunk<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for MSSweepChunk<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>) {
         self.ms.sweep_chunk(self.chunk);
     }
 }

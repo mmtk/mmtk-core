@@ -16,7 +16,6 @@ use crate::util::metadata::MetadataSpec;
 use crate::util::object_enum::{self, ObjectEnumerator};
 use crate::util::{Address, ObjectReference};
 use crate::vm::slot::Slot;
-use crate::MMTK;
 use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
 use std::sync::Arc;
@@ -426,7 +425,7 @@ pub struct CalculateOffsetVector<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for CalculateOffsetVector<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>) {
         self.compressor_space
             .calculate_offset_vector_for_region(self.region, self.cursor);
     }
@@ -453,7 +452,7 @@ pub struct Compact<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>) {
         self.compressor_space.compact_region(worker, self.index);
     }
 }

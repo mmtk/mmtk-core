@@ -60,7 +60,8 @@ impl<P: Plan> ScheduleSanityGC<P> {
 }
 
 impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
-    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &MMTK<P::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<P::VM>) {
+        let mmtk = worker.mmtk;
         let scheduler = worker.scheduler();
         let plan = mmtk.get_plan();
 
@@ -126,7 +127,8 @@ impl<P: Plan> SanityPrepare<P> {
 }
 
 impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
-    fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &MMTK<P::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<P::VM>) {
+        let mmtk = worker.mmtk;
         info!("Sanity GC prepare");
         {
             let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
@@ -146,7 +148,8 @@ impl<P: Plan> SanityRelease<P> {
 }
 
 impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
-    fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &MMTK<P::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<P::VM>) {
+        let mmtk = worker.mmtk;
         info!("Sanity GC release");
         mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
         mmtk.sanity_end();
