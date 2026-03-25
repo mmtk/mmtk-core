@@ -104,7 +104,7 @@ pub fn set_vm_space<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, start: Address, 
 /// structure, and use that as a reference to the mutator (it is okay to drop the box once the content is copied --
 /// Note that `Mutator` may contain pointers so a binding may drop the box only if they perform a deep copy).
 ///
-/// MMTk generally does not expect the runtime to create or destroy mutators during a pause. See also [`ActivePlan::mutators`].
+/// MMTk generally does not expect the runtime to create or destroy mutators during a pause. See also [`crate::vm::ActivePlan::mutators`].
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -127,7 +127,7 @@ pub fn bind_mutator<VM: VMBinding>(
 /// attempt to reclaim the memory for the mutator, so a binding should properly reclaim the memory
 /// for the mutator after this call.
 ///
-/// MMTk generally does not expect the runtime to create or destroy mutators during a pause. See also [`ActivePlan::mutators`].
+/// MMTk generally does not expect the runtime to create or destroy mutators during a pause. See also [`crate::vm::ActivePlan::mutators`].
 ///
 /// Arguments:
 /// * `mutator`: A reference to the mutator to be destroyed.
