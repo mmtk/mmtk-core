@@ -38,7 +38,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
 {
     type VM = VM;
 
-    type ProcessSlotsWorkType = GenNurseryProcessSlots<VM, P, KIND>;
+    type ProcessSlotsWorkType = DefaultProcessSlots<Self>;
     type ScanObjectsWorkType = PlanScanObjects<Self, P>;
 
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
@@ -62,10 +62,10 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
         &self,
         slots: Vec<<Self::VM as VMBinding>::VMSlot>,
         roots: bool,
-        mmtk: &'static MMTK<Self::VM>,
+        _mmtk: &'static MMTK<Self::VM>,
         bucket: WorkBucketStage,
     ) -> Self::ProcessSlotsWorkType {
-        GenNurseryProcessSlots::new(slots, roots, mmtk, bucket)
+        DefaultProcessSlots::new(self.clone(), slots, roots, bucket)
     }
 
     fn create_scan_work(
@@ -83,40 +83,6 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
 
     fn is_concurrent() -> bool {
         false
-    }
-}
-
-/// Process edges for a nursery GC. This type is provided if a generational plan does not use
-/// [`crate::scheduler::gc_work::SFTProcessEdges`]. If a plan uses `SFTProcessEdges`,
-/// it does not need to use this type.
-pub struct GenNurseryProcessSlots<
-    VM: VMBinding,
-    P: GenerationalPlanExt<VM> + PlanTraceObject<VM>,
-    const KIND: TraceKind,
-> {
-    base: DefaultProcessSlots<GenNurseryTracePolicy<VM, P, KIND>>,
-}
-
-impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
-    GenNurseryProcessSlots<VM, P, KIND>
-{
-    fn new(
-        slots: Vec<VM::VMSlot>,
-        roots: bool,
-        mmtk: &'static MMTK<VM>,
-        bucket: WorkBucketStage,
-    ) -> Self {
-        let policy = GenNurseryTracePolicy::from_mmtk(mmtk);
-        let base = DefaultProcessSlots::new(policy, slots, roots, bucket);
-        Self { base }
-    }
-}
-
-impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
-    GCWork<VM> for GenNurseryProcessSlots<VM, P, KIND>
-{
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        self.base.do_work(worker, mmtk);
     }
 }
 
