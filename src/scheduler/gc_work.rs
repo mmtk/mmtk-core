@@ -2,7 +2,6 @@ use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::global_state::GcStatus;
 use crate::plan::tracing::TracePolicy;
-use crate::plan::ObjectsClosure;
 use crate::plan::VectorObjectQueue;
 use crate::util::*;
 use crate::vm::slot::Slot;
@@ -650,9 +649,11 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
     fn do_work_common(
         &self,
         buffer: &[ObjectReference],
-        worker: &mut GCWorker<<Self::T as TracePolicy>::VM>,
-        mmtk: &'static MMTK<<Self::T as TracePolicy>::VM>,
+        worker: &mut GCWorker<VM>,
+        mmtk: &'static MMTK<VM>,
     ) {
+        let policy = Self::T::from_mmtk(mmtk);
+
         let tls = worker.tls;
 
         let objects_to_scan = buffer;
@@ -660,13 +661,20 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         // Scan the objects in the list that supports slot-enququing.
         let mut scan_later = vec![];
         {
-            let mut closure = ObjectsClosure::<Self::T>::new(worker, self.get_bucket());
+            let mut slots = Vec::new();
+
+            let flush = |slots: &mut _, worker: &mut GCWorker<VM>| {
+                let buffer = std::mem::take(slots);
+                let work_packet =
+                    policy.make_process_slots_work(buffer, false, mmtk, self.get_bucket());
+                worker.add_work(self.get_bucket(), work_packet);
+            };
 
             // For any object we need to scan, we count its live bytes.
             // Check the option outside the loop for better performance.
             if crate::util::rust_util::unlikely(*mmtk.get_options().count_live_bytes_in_gc) {
                 // Borrow before the loop.
-                let mut live_bytes_stats = closure.worker.shared.live_bytes_per_space.borrow_mut();
+                let mut live_bytes_stats = worker.shared.live_bytes_per_space.borrow_mut();
                 for object in objects_to_scan.iter().copied() {
                     crate::scheduler::worker::GCWorkerShared::<VM>::increase_live_bytes(
                         &mut live_bytes_stats,
@@ -679,7 +687,12 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                 if <VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, object) {
                     trace!("Scan object (slot) {}", object);
                     // If an object supports slot-enqueuing, we enqueue its slots.
-                    <VM as VMBinding>::VMScanning::scan_object(tls, object, &mut closure);
+                    <VM as VMBinding>::VMScanning::scan_object(tls, object, &mut |slot| {
+                        slots.push(slot);
+                        if slots.len() >= EDGES_WORK_BUFFER_SIZE {
+                            flush(&mut slots, worker);
+                        }
+                    });
                     self.post_scan_object(object);
                 } else {
                     // If an object does not support slot-enqueuing, we have to use
@@ -690,6 +703,10 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                     // So we postpone the processing of objects that needs object enqueuing
                     scan_later.push(object);
                 }
+            }
+
+            if !slots.is_empty() {
+                flush(&mut slots, worker);
             }
         }
 

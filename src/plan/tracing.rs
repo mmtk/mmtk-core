@@ -5,10 +5,10 @@ use std::marker::PhantomData;
 
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
-use crate::scheduler::gc_work::{DefaultProcessSlots, PlanScanObjects, ScanObjects, SlotOfTP};
+use crate::scheduler::gc_work::{DefaultProcessSlots, PlanScanObjects, ScanObjects};
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
 use crate::util::{ObjectReference, VMThread, VMWorkerThread};
-use crate::vm::{Scanning, SlotVisitor, VMBinding};
+use crate::vm::{Scanning, VMBinding};
 use crate::{Plan, MMTK};
 
 pub trait TracePolicy: 'static + Send + Clone {
@@ -349,69 +349,6 @@ impl<T> Default for VectorQueue<T> {
 impl ObjectQueue for VectorQueue<ObjectReference> {
     fn enqueue(&mut self, v: ObjectReference) {
         self.push(v);
-    }
-}
-
-/// A transitive closure visitor to collect the slots from objects.
-/// It maintains a buffer for the slots, and flushes slots to a new work packet
-/// if the buffer is full or if the type gets dropped.
-pub struct ObjectsClosure<'a, T: TracePolicy> {
-    buffer: VectorQueue<SlotOfTP<T>>,
-    pub(crate) worker: &'a mut GCWorker<T::VM>,
-    bucket: WorkBucketStage,
-}
-
-impl<'a, T: TracePolicy> ObjectsClosure<'a, T> {
-    /// Create an [`ObjectsClosure`].
-    ///
-    /// Arguments:
-    /// * `worker`: the current worker. The objects closure should not leave the context of this worker.
-    /// * `bucket`: new work generated will be push ed to the bucket.
-    pub fn new(worker: &'a mut GCWorker<T::VM>, bucket: WorkBucketStage) -> Self {
-        Self {
-            buffer: VectorQueue::new(),
-            worker,
-            bucket,
-        }
-    }
-
-    fn flush(&mut self) {
-        let buf = self.buffer.take();
-        if !buf.is_empty() {
-            self.worker.add_work(
-                self.bucket,
-                T::from_mmtk(self.worker.mmtk).make_process_slots_work(
-                    buf,
-                    false,
-                    self.worker.mmtk,
-                    self.bucket,
-                ),
-            );
-        }
-    }
-}
-
-impl<T: TracePolicy> SlotVisitor<SlotOfTP<T>> for ObjectsClosure<'_, T> {
-    fn visit_slot(&mut self, slot: SlotOfTP<T>) {
-        #[cfg(debug_assertions)]
-        {
-            use crate::vm::slot::Slot;
-            trace!(
-                "(ObjectsClosure) Visit slot {:?} (pointing to {:?})",
-                slot,
-                slot.load()
-            );
-        }
-        self.buffer.push(slot);
-        if self.buffer.is_full() {
-            self.flush();
-        }
-    }
-}
-
-impl<T: TracePolicy> Drop for ObjectsClosure<'_, T> {
-    fn drop(&mut self) {
-        self.flush();
     }
 }
 
