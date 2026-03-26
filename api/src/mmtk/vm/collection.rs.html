@@ -13,8 +13,8 @@
 <a href=#13 id=13 data-nosnippet>13</a>
 <a href=#14 id=14 data-nosnippet>14</a><span class="doccomment">/// VM-specific methods for garbage collection.
 <a href=#15 id=15 data-nosnippet>15</a></span><span class="kw">pub trait </span>Collection&lt;VM: VMBinding&gt; {
-<a href=#16 id=16 data-nosnippet>16</a>    <span class="doccomment">/// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a GC.
-<a href=#17 id=17 data-nosnippet>17</a>    /// This method should not return until all the threads are yielded.
+<a href=#16 id=16 data-nosnippet>16</a>    <span class="doccomment">/// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a pause.
+<a href=#17 id=17 data-nosnippet>17</a>    /// This method should not return until all the threads are yielded. When the method returns, MMTk assumes the pause starts.
 <a href=#18 id=18 data-nosnippet>18</a>    /// The actual thread synchronization mechanism is up to the VM, and MMTk does not make assumptions on that.
 <a href=#19 id=19 data-nosnippet>19</a>    /// MMTk provides a callback function and expects the binding to use the callback for each mutator when it
 <a href=#20 id=20 data-nosnippet>20</a>    /// is ready for stack scanning. Usually a stack can be scanned as soon as the thread stops in the yieldpoint.
@@ -26,7 +26,7 @@
 <a href=#26 id=26 data-nosnippet>26</a>    <span class="kw">where
 <a href=#27 id=27 data-nosnippet>27</a>        </span>F: FnMut(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;);
 <a href=#28 id=28 data-nosnippet>28</a>
-<a href=#29 id=29 data-nosnippet>29</a>    <span class="doccomment">/// Resume all the mutator threads, the opposite of the above. When a GC is finished, MMTk calls this method.
+<a href=#29 id=29 data-nosnippet>29</a>    <span class="doccomment">/// Resume all the mutator threads, the opposite of the above. When a pause is finished, MMTk calls this method.
 <a href=#30 id=30 data-nosnippet>30</a>    ///
 <a href=#31 id=31 data-nosnippet>31</a>    /// This method may not be called by the same GC thread that called `stop_all_mutators`.
 <a href=#32 id=32 data-nosnippet>32</a>    ///
