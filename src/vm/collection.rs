@@ -13,8 +13,8 @@ pub enum GCThreadContext<VM: VMBinding> {
 
 /// VM-specific methods for garbage collection.
 pub trait Collection<VM: VMBinding> {
-    /// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a GC.
-    /// This method should not return until all the threads are yielded.
+    /// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a pause.
+    /// This method should not return until all the threads are yielded. When the method returns, MMTk assumes the pause starts.
     /// The actual thread synchronization mechanism is up to the VM, and MMTk does not make assumptions on that.
     /// MMTk provides a callback function and expects the binding to use the callback for each mutator when it
     /// is ready for stack scanning. Usually a stack can be scanned as soon as the thread stops in the yieldpoint.
@@ -26,7 +26,7 @@ pub trait Collection<VM: VMBinding> {
     where
         F: FnMut(&'static mut Mutator<VM>);
 
-    /// Resume all the mutator threads, the opposite of the above. When a GC is finished, MMTk calls this method.
+    /// Resume all the mutator threads, the opposite of the above. When a pause is finished, MMTk calls this method.
     ///
     /// This method may not be called by the same GC thread that called `stop_all_mutators`.
     ///
