@@ -1,5 +1,6 @@
 use super::worker::*;
-use crate::vm::VMBinding;
+use crate::scheduler::gc_work::DefaultRootsWorkFactory;
+use crate::vm::{RootsWorkFactory, VMBinding};
 use crate::{mmtk::MMTK, plan::tracing::TracePolicy};
 #[cfg(feature = "work_packet_stats")]
 use std::any::{type_name, TypeId};
@@ -97,4 +98,12 @@ pub trait GCWorkContext: Send + 'static {
     /// If a plan does not support object pinning, it should use `UnsupportedProcessEdges` for this
     /// type member.
     type PinningTracePolicy: TracePolicy<VM = Self::VM>;
+
+    fn make_roots_work_factory(
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> impl RootsWorkFactory<<Self::VM as VMBinding>::VMSlot> {
+        DefaultRootsWorkFactory::<Self::VM, Self::DefaultTracePolicy, Self::PinningTracePolicy>::new(
+            mmtk,
+        )
+    }
 }

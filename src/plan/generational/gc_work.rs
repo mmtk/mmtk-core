@@ -84,10 +84,6 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
     fn may_move_objects() -> bool {
         true
     }
-
-    fn is_concurrent() -> bool {
-        false
-    }
 }
 
 /// The modbuf contains a list of objects in mature space(s) that

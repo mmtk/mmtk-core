@@ -433,11 +433,10 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("ScanMutatorRoots for mutator {:?}", self.0.get_tls());
         let mutators = <C::VM as VMBinding>::VMActivePlan::number_of_mutators();
-        let factory = ProcessEdgesWorkRootsWorkFactory::<
-            C::VM,
-            C::DefaultTracePolicy,
-            C::PinningTracePolicy,
-        >::new(mmtk);
+        let factory =
+            DefaultRootsWorkFactory::<C::VM, C::DefaultTracePolicy, C::PinningTracePolicy>::new(
+                mmtk,
+            );
         <C::VM as VMBinding>::VMScanning::scan_roots_in_mutator_thread(
             worker.tls,
             unsafe { &mut *(self.0 as *mut _) },
@@ -466,11 +465,10 @@ impl<C: GCWorkContext> ScanVMSpecificRoots<C> {
 impl<C: GCWorkContext> GCWork<C::VM> for ScanVMSpecificRoots<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("ScanStaticRoots");
-        let factory = ProcessEdgesWorkRootsWorkFactory::<
-            C::VM,
-            C::DefaultTracePolicy,
-            C::PinningTracePolicy,
-        >::new(mmtk);
+        let factory =
+            DefaultRootsWorkFactory::<C::VM, C::DefaultTracePolicy, C::PinningTracePolicy>::new(
+                mmtk,
+            );
         <C::VM as VMBinding>::VMScanning::scan_vm_specific_roots(worker.tls, factory);
     }
 }
@@ -547,17 +545,17 @@ impl<T: TracePolicy> GCWork<T::VM> for DefaultProcessSlots<T> {
 /// An implementation of `RootsWorkFactory` that creates work packets based on `ProcessEdgesWork`
 /// for handling roots.  The `DPE` and the `PPE` type parameters correspond to the
 /// `DefaultProcessEdge` and the `PinningProcessEdges` type members of the [`GCWorkContext`] trait.
-pub(crate) struct ProcessEdgesWorkRootsWorkFactory<
+pub(crate) struct DefaultRootsWorkFactory<
     VM: VMBinding,
     DPE: TracePolicy<VM = VM>,
     PPE: TracePolicy<VM = VM>,
 > {
-    mmtk: &'static MMTK<VM>,
+    pub(crate) mmtk: &'static MMTK<VM>,
     phantom: PhantomData<(DPE, PPE)>,
 }
 
 impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>> Clone
-    for ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
+    for DefaultRootsWorkFactory<VM, DPE, PPE>
 {
     fn clone(&self) -> Self {
         Self {
@@ -570,14 +568,14 @@ impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>> Clone
 /// For USDT tracepoints for roots.
 /// Keep in sync with `tools/tracing/timeline/visualize.py`.
 #[repr(usize)]
-enum RootsKind {
+pub(crate) enum RootsKind {
     NORMAL = 0,
     PINNING = 1,
     TPINNING = 2,
 }
 
 impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>>
-    RootsWorkFactory<VM::VMSlot> for ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
+    RootsWorkFactory<VM::VMSlot> for DefaultRootsWorkFactory<VM, DPE, PPE>
 {
     fn create_process_roots_work(&mut self, slots: Vec<VM::VMSlot>) {
         // Note: We should use the same USDT name "mmtk:roots" for all the three kinds of roots. A
@@ -623,9 +621,9 @@ impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>>
 }
 
 impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>>
-    ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
+    DefaultRootsWorkFactory<VM, DPE, PPE>
 {
-    fn new(mmtk: &'static MMTK<VM>) -> Self {
+    pub(crate) fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
             mmtk,
             phantom: PhantomData,
@@ -926,11 +924,7 @@ impl<VM: VMBinding, R2OTP: TracePolicy<VM = VM>, O2OTP: TracePolicy<VM = VM>> GC
         if !root_objects_to_scan.is_empty() {
             let work =
                 O2OTP::from_mmtk(mmtk).create_scan_work(root_objects_to_scan, mmtk, self.bucket);
-            if O2OTP::is_concurrent() {
-                worker.scheduler().work_buckets[self.bucket].add_no_notify(work);
-            } else {
-                worker.add_work(self.bucket, work);
-            }
+            worker.add_work(self.bucket, work);
         }
 
         trace!("ProcessRootNodes End");

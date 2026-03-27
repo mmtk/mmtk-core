@@ -43,8 +43,6 @@ pub trait TracePolicy: 'static + Send + Clone {
     ) -> Self::ScanObjectsWorkType;
 
     fn may_move_objects() -> bool;
-
-    fn is_concurrent() -> bool;
 }
 
 #[allow(dead_code)]
@@ -117,10 +115,6 @@ impl<VM: VMBinding> TracePolicy for SFTTracePolicy<VM> {
     fn may_move_objects() -> bool {
         true
     }
-
-    fn is_concurrent() -> bool {
-        false
-    }
 }
 
 pub struct PlanTracePolicy<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> {
@@ -186,10 +180,6 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> TracePolicy
     fn may_move_objects() -> bool {
         P::may_move_objects::<KIND>()
     }
-
-    fn is_concurrent() -> bool {
-        false
-    }
 }
 
 #[derive(Default)]
@@ -246,10 +236,6 @@ impl<VM: VMBinding> TracePolicy for UnsupportedTracePolicy<VM> {
     }
 
     fn may_move_objects() -> bool {
-        unimplemented!()
-    }
-
-    fn is_concurrent() -> bool {
         unimplemented!()
     }
 }

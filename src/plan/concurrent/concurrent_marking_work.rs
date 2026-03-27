@@ -4,6 +4,8 @@ use crate::plan::tracing::TracePolicy;
 use crate::plan::PlanTraceObject;
 use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::TraceKind;
+use crate::scheduler::gc_work::DefaultRootsWorkFactory;
+use crate::scheduler::gc_work::RootsKind;
 use crate::scheduler::EDGES_WORK_BUFFER_SIZE;
 use crate::util::ObjectReference;
 use crate::vm::slot::Slot;
@@ -238,10 +240,6 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         // Concurrent marking never moves objects.
         false
     }
-
-    fn is_concurrent() -> bool {
-        true
-    }
 }
 
 pub struct ProcessRootSlots<
@@ -313,5 +311,63 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         if !queue.is_empty() {
             flush(&mut queue);
         }
+    }
+}
+
+pub(crate) struct ConcurrentMarkingRootsWorkFactory<
+    VM: VMBinding,
+    P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,
+    const KIND: TraceKind,
+> {
+    parent: DefaultRootsWorkFactory<
+        VM,
+        ConcurrentRootTracePolicy<VM, P, KIND>,
+        ConcurrentRootTracePolicy<VM, P, KIND>,
+    >,
+}
+
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind> Clone
+    for ConcurrentMarkingRootsWorkFactory<VM, P, KIND>
+{
+    fn clone(&self) -> Self {
+        Self {
+            parent: self.parent.clone(),
+        }
+    }
+}
+
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
+    ConcurrentMarkingRootsWorkFactory<VM, P, KIND>
+{
+    pub(crate) fn new(mmtk: &'static MMTK<VM>) -> Self {
+        Self {
+            parent: DefaultRootsWorkFactory::new(mmtk),
+        }
+    }
+
+    fn create_and_schedule_root_nodes_work(&mut self, nodes: Vec<ObjectReference>) {
+        let mmtk = self.parent.mmtk;
+        let policy = ConcurrentRootTracePolicy::<VM, P, KIND>::from_mmtk(mmtk);
+        let work_packet = ConcurrentTraceObjects::new(policy, nodes, false);
+        mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].add_no_notify(work_packet);
+    }
+}
+
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
+    RootsWorkFactory<VM::VMSlot> for ConcurrentMarkingRootsWorkFactory<VM, P, KIND>
+{
+    fn create_process_roots_work(&mut self, slots: Vec<VM::VMSlot>) {
+        // It will create `ProcessRootSlots` as usual.
+        self.parent.create_process_roots_work(slots);
+    }
+
+    fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+        probe!(mmtk, roots, RootsKind::PINNING, nodes.len());
+        self.create_and_schedule_root_nodes_work(nodes);
+    }
+
+    fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+        probe!(mmtk, roots, RootsKind::TPINNING, nodes.len());
+        self.create_and_schedule_root_nodes_work(nodes);
     }
 }
