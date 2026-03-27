@@ -23,7 +23,7 @@ pub struct ConcurrentTraceObjects<
     P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,
     const KIND: TraceKind,
 > {
-    policy: ConcurrentRootTracePolicy<VM, P, KIND>,
+    policy: ConcurrentMarkingTracePolicy<VM, P, KIND>,
     /// initial objects to mark and scan
     initial_objects: Vec<ObjectReference>,
     /// `true` if the `initial_objects` are already marked.
@@ -37,7 +37,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     const CONCURRENT_TRACE_OVERFLOW: usize = Self::SATB_BUFFER_SIZE * 2;
 
     pub fn new(
-        policy: ConcurrentRootTracePolicy<VM, P, KIND>,
+        policy: ConcurrentMarkingTracePolicy<VM, P, KIND>,
         initial_objects: Vec<ObjectReference>,
         already_marked: bool,
     ) -> Self {
@@ -163,7 +163,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
             }
 
             ConcurrentTraceObjects::<VM, P, KIND>::new(
-                ConcurrentRootTracePolicy::from_mmtk(mmtk),
+                ConcurrentMarkingTracePolicy::from_mmtk(mmtk),
                 nodes,
                 false, // These objects are not marked, yet.
             )
@@ -174,7 +174,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 }
 
-pub struct ConcurrentRootTracePolicy<
+pub struct ConcurrentMarkingTracePolicy<
     VM: VMBinding,
     P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,
     const KIND: TraceKind,
@@ -183,7 +183,7 @@ pub struct ConcurrentRootTracePolicy<
 }
 
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind> Clone
-    for ConcurrentRootTracePolicy<VM, P, KIND>
+    for ConcurrentMarkingTracePolicy<VM, P, KIND>
 {
     fn clone(&self) -> Self {
         Self { plan: self.plan }
@@ -191,7 +191,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 }
 
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
-    TracePolicy for ConcurrentRootTracePolicy<VM, P, KIND>
+    TracePolicy for ConcurrentMarkingTracePolicy<VM, P, KIND>
 {
     type VM = VM;
 
@@ -293,7 +293,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         let flush = |queue: &mut VectorObjectQueue| {
             let objects = queue.take();
             let w = ConcurrentTraceObjects::<VM, P, KIND>::new(
-                ConcurrentRootTracePolicy::from_mmtk(mmtk),
+                ConcurrentMarkingTracePolicy::from_mmtk(mmtk),
                 objects,
                 false, // These objects are not marked, yet.
             );
@@ -321,8 +321,8 @@ pub(crate) struct ConcurrentMarkingRootsWorkFactory<
 > {
     parent: DefaultRootsWorkFactory<
         VM,
-        ConcurrentRootTracePolicy<VM, P, KIND>,
-        ConcurrentRootTracePolicy<VM, P, KIND>,
+        ConcurrentMarkingTracePolicy<VM, P, KIND>,
+        ConcurrentMarkingTracePolicy<VM, P, KIND>,
     >,
 }
 
@@ -347,7 +347,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 
     fn create_and_schedule_root_nodes_work(&mut self, nodes: Vec<ObjectReference>) {
         let mmtk = self.parent.mmtk;
-        let policy = ConcurrentRootTracePolicy::<VM, P, KIND>::from_mmtk(mmtk);
+        let policy = ConcurrentMarkingTracePolicy::<VM, P, KIND>::from_mmtk(mmtk);
         let work_packet = ConcurrentTraceObjects::new(policy, nodes, false);
         mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].add_no_notify(work_packet);
     }

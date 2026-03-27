@@ -1,4 +1,4 @@
-use crate::plan::concurrent::concurrent_marking_work::ConcurrentRootTracePolicy;
+use crate::plan::concurrent::concurrent_marking_work::ConcurrentMarkingTracePolicy;
 use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::immix::gc_work::ConcurrentImmixGCWorkContext;
 use crate::plan::concurrent::immix::gc_work::ConcurrentImmixSTWGCWorkContext;
@@ -367,7 +367,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         self.set_ref_closure_buckets_enabled(false);
 
         scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-            ConcurrentImmixGCWorkContext<ConcurrentRootTracePolicy<VM, Self, TRACE_KIND_FAST>>,
+            ConcurrentImmixGCWorkContext<ConcurrentMarkingTracePolicy<VM, Self, TRACE_KIND_FAST>>,
         >::new());
         scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<
             ConcurrentImmixGCWorkContext<UnsupportedTracePolicy<VM>>,
@@ -379,7 +379,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
         // Skip root scanning in the final mark
         scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-            ConcurrentImmixGCWorkContext<ConcurrentRootTracePolicy<VM, Self, TRACE_KIND_FAST>>,
+            ConcurrentImmixGCWorkContext<ConcurrentMarkingTracePolicy<VM, Self, TRACE_KIND_FAST>>,
         >::new_no_scan_roots());
 
         scheduler.work_buckets[WorkBucketStage::Release].add(Release::<
