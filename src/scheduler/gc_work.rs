@@ -631,41 +631,38 @@ impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>>
     }
 }
 
-/// Trait for a work packet that scans objects
-pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
-    /// The associated ProcessEdgesWork for processing the outgoing edges of the objects in this
-    /// packet.
-    type T: TracePolicy<VM = VM>;
+pub struct DefaultScanObjects<T: TracePolicy> {
+    policy: T,
+    objects: Vec<ObjectReference>,
+    bucket: WorkBucketStage,
+}
 
-    /// Called after each object is scanned.
-    fn post_scan_object(&self, object: ObjectReference);
+impl<T: TracePolicy> DefaultScanObjects<T> {
+    pub fn new(policy: T, objects: Vec<ObjectReference>, bucket: WorkBucketStage) -> Self {
+        Self {
+            policy,
+            objects,
+            bucket,
+        }
+    }
+}
 
-    /// Return the work bucket for this work packet and its derived work packets.
-    fn get_bucket(&self) -> WorkBucketStage;
-
-    /// The common code for ScanObjects and PlanScanObjects.
-    fn do_work_common(
-        &self,
-        buffer: &[ObjectReference],
-        worker: &mut GCWorker<VM>,
-        mmtk: &'static MMTK<VM>,
-    ) {
-        let policy = Self::T::from_mmtk(mmtk);
+impl<T: TracePolicy> GCWork<T::VM> for DefaultScanObjects<T> {
+    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
+        trace!("ScanObjects");
 
         let tls = worker.tls;
-
-        let objects_to_scan = buffer;
 
         // Scan the objects in the list that supports slot-enququing.
         let mut scan_later = vec![];
         {
             let mut slots = Vec::new();
 
-            let flush = |slots: &mut _, worker: &mut GCWorker<VM>| {
+            let policy2 = self.policy.clone(); // Otherwise the closure below will borrow the policy during its lifetime, making it unusable.
+            let flush = |slots: &mut _, worker: &mut GCWorker<T::VM>| {
                 let buffer = std::mem::take(slots);
-                let work_packet =
-                    policy.make_process_slots_work(buffer, false, mmtk, self.get_bucket());
-                worker.add_work(self.get_bucket(), work_packet);
+                let work_packet = policy2.make_process_slots_work(buffer, false, mmtk, self.bucket);
+                worker.add_work(self.bucket, work_packet);
             };
 
             // For any object we need to scan, we count its live bytes.
@@ -673,25 +670,25 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
             if crate::util::rust_util::unlikely(*mmtk.get_options().count_live_bytes_in_gc) {
                 // Borrow before the loop.
                 let mut live_bytes_stats = worker.shared.live_bytes_per_space.borrow_mut();
-                for object in objects_to_scan.iter().copied() {
-                    crate::scheduler::worker::GCWorkerShared::<VM>::increase_live_bytes(
+                for object in self.objects.iter().copied() {
+                    crate::scheduler::worker::GCWorkerShared::<T::VM>::increase_live_bytes(
                         &mut live_bytes_stats,
                         object,
                     );
                 }
             }
 
-            for object in objects_to_scan.iter().copied() {
-                if <VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, object) {
+            for object in self.objects.iter().copied() {
+                if <T::VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, object) {
                     trace!("Scan object (slot) {}", object);
                     // If an object supports slot-enqueuing, we enqueue its slots.
-                    <VM as VMBinding>::VMScanning::scan_object(tls, object, &mut |slot| {
+                    <T::VM as VMBinding>::VMScanning::scan_object(tls, object, &mut |slot| {
                         slots.push(slot);
                         if slots.len() >= EDGES_WORK_BUFFER_SIZE {
                             flush(&mut slots, worker);
                         }
                     });
-                    self.post_scan_object(object);
+                    self.policy.post_scan_object(object);
                 } else {
                     // If an object does not support slot-enqueuing, we have to use
                     // `Scanning::scan_object_and_trace_edges` and offload the job of updating the
@@ -708,130 +705,28 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
             }
         }
 
-        let total_objects = objects_to_scan.len();
+        let total_objects = self.objects.len();
         let scan_and_trace = scan_later.len();
         probe!(mmtk, scan_objects, total_objects, scan_and_trace);
 
         // If any object does not support slot-enqueuing, we process them now.
         if !scan_later.is_empty() {
-            let object_tracer_context =
-                DefaultTracerContext::new(Self::T::from_mmtk(mmtk), self.get_bucket());
+            let object_tracer_context = DefaultTracerContext::new(self.policy.clone(), self.bucket);
 
             object_tracer_context.with_tracer(worker, |object_tracer| {
                 // Scan objects and trace their outgoing edges at the same time.
                 for object in scan_later.iter().copied() {
                     trace!("Scan object (node) {}", object);
-                    <VM as VMBinding>::VMScanning::scan_object_and_trace_edges(
+                    <T::VM as VMBinding>::VMScanning::scan_object_and_trace_edges(
                         tls,
                         object,
                         object_tracer,
                     );
-                    self.post_scan_object(object);
+                    self.policy.post_scan_object(object);
                 }
             });
         }
-    }
-}
-
-/// Scan objects and enqueue the slots of the objects.  For objects that do not support
-/// slot-enqueuing, this work packet also traces their outgoing edges directly.
-///
-/// This work packet does not execute policy-specific post-scanning hooks
-/// (it won't call `post_scan_object()` in [`policy::gc_work::PolicyTraceObject`]).
-/// It should be used only for policies that do not perform policy-specific actions when scanning
-/// an object.
-pub struct ScanObjects<T: TracePolicy> {
-    buffer: Vec<ObjectReference>,
-    #[allow(unused)]
-    concurrent: bool,
-    phantom: PhantomData<T>,
-    bucket: WorkBucketStage,
-}
-
-impl<T: TracePolicy> ScanObjects<T> {
-    pub fn new(buffer: Vec<ObjectReference>, concurrent: bool, bucket: WorkBucketStage) -> Self {
-        Self {
-            buffer,
-            concurrent,
-            phantom: PhantomData,
-            bucket,
-        }
-    }
-}
-
-impl<VM: VMBinding, T: TracePolicy<VM = VM>> ScanObjectsWork<VM> for ScanObjects<T> {
-    type T = T;
-
-    fn get_bucket(&self) -> WorkBucketStage {
-        self.bucket
-    }
-
-    fn post_scan_object(&self, _object: ObjectReference) {
-        // Do nothing.
-    }
-}
-
-impl<T: TracePolicy> GCWork<T::VM> for ScanObjects<T> {
-    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
-        trace!("ScanObjects");
-        self.do_work_common(&self.buffer, worker, mmtk);
         trace!("ScanObjects End");
-    }
-}
-
-use crate::mmtk::MMTK;
-use crate::plan::Plan;
-use crate::plan::PlanTraceObject;
-
-/// This is an alternative to `ScanObjects` that calls the `post_scan_object` of the policy
-/// selected by the plan.  It is applicable to plans that derive `PlanTraceObject`.
-pub struct PlanScanObjects<T: TracePolicy, P: Plan<VM = T::VM> + PlanTraceObject<T::VM>> {
-    plan: &'static P,
-    buffer: Vec<ObjectReference>,
-    #[allow(dead_code)]
-    concurrent: bool,
-    phantom: PhantomData<T>,
-    bucket: WorkBucketStage,
-}
-
-impl<T: TracePolicy, P: Plan<VM = T::VM> + PlanTraceObject<T::VM>> PlanScanObjects<T, P> {
-    pub fn new(
-        plan: &'static P,
-        buffer: Vec<ObjectReference>,
-        concurrent: bool,
-        bucket: WorkBucketStage,
-    ) -> Self {
-        Self {
-            plan,
-            buffer,
-            concurrent,
-            phantom: PhantomData,
-            bucket,
-        }
-    }
-}
-
-impl<T: TracePolicy, P: Plan<VM = T::VM> + PlanTraceObject<T::VM>> ScanObjectsWork<T::VM>
-    for PlanScanObjects<T, P>
-{
-    type T = T;
-
-    fn get_bucket(&self) -> WorkBucketStage {
-        self.bucket
-    }
-
-    fn post_scan_object(&self, object: ObjectReference) {
-        self.plan.post_scan_object(object);
-    }
-}
-
-impl<T: TracePolicy, P: Plan<VM = T::VM> + PlanTraceObject<T::VM>> GCWork<T::VM>
-    for PlanScanObjects<T, P>
-{
-    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
-        trace!("PlanScanObjects");
-        self.do_work_common(&self.buffer, worker, mmtk);
-        trace!("PlanScanObjects End");
     }
 }
 

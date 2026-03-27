@@ -39,7 +39,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
     type VM = VM;
 
     type ProcessSlotsWorkType = DefaultProcessSlots<Self>;
-    type ScanObjectsWorkType = PlanScanObjects<Self, P>;
+    type ScanObjectsWorkType = DefaultScanObjects<Self>;
 
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
         Self {
@@ -78,7 +78,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
         _mmtk: &'static MMTK<Self::VM>,
         bucket: WorkBucketStage,
     ) -> Self::ScanObjectsWorkType {
-        PlanScanObjects::new(self.plan, nodes, false, bucket)
+        DefaultScanObjects::new(self.clone(), nodes, bucket)
     }
 
     fn may_move_objects() -> bool {
@@ -127,7 +127,11 @@ impl<T: TracePolicy> GCWork<T::VM> for ProcessModBuf<T> {
             // Scan objects in the modbuf and forward pointers
             let modbuf = std::mem::take(&mut self.modbuf);
             GCWork::do_work(
-                &mut ScanObjects::<T>::new(modbuf, false, WorkBucketStage::Closure),
+                &mut DefaultScanObjects::<T>::new(
+                    T::from_mmtk(mmtk),
+                    modbuf,
+                    WorkBucketStage::Closure,
+                ),
                 worker,
                 mmtk,
             )
