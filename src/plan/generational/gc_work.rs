@@ -38,9 +38,6 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
 {
     type VM = VM;
 
-    type ProcessSlotsWorkType = DefaultProcessSlots<Self>;
-    type ScanObjectsWorkType = DefaultScanObjects<Self>;
-
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
         Self {
             plan: mmtk.get_plan().downcast_ref().unwrap(),
@@ -60,25 +57,6 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
 
     fn post_scan_object(&mut self, object: ObjectReference) {
         self.plan.post_scan_object(object);
-    }
-
-    fn make_process_slots_work(
-        &self,
-        slots: Vec<<Self::VM as VMBinding>::VMSlot>,
-        roots: bool,
-        _mmtk: &'static MMTK<Self::VM>,
-        bucket: WorkBucketStage,
-    ) -> Self::ProcessSlotsWorkType {
-        DefaultProcessSlots::new(self.clone(), slots, roots, bucket)
-    }
-
-    fn create_scan_work(
-        &self,
-        nodes: Vec<ObjectReference>,
-        _mmtk: &'static MMTK<Self::VM>,
-        bucket: WorkBucketStage,
-    ) -> Self::ScanObjectsWorkType {
-        DefaultScanObjects::new(self.clone(), nodes, bucket)
     }
 
     fn may_move_objects() -> bool {
@@ -175,10 +153,10 @@ impl<T: TracePolicy> GCWork<T::VM> for ProcessRegionModBuf<T> {
             }
             // Forward entries
             GCWork::do_work(
-                &mut T::from_mmtk(mmtk).make_process_slots_work(
+                &mut DefaultProcessSlots::new(
+                    T::from_mmtk(mmtk),
                     slots,
                     false,
-                    mmtk,
                     WorkBucketStage::Closure,
                 ),
                 worker,

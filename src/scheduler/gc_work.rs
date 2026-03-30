@@ -286,9 +286,7 @@ impl<'w, T: TracePolicy> QueuingObjectTracer<'w, T> {
     fn flush(&mut self) {
         let next_nodes = self.queue.take();
         assert!(!next_nodes.is_empty());
-        let work_packet = self
-            .policy
-            .create_scan_work(next_nodes, self.worker.mmtk, self.stage);
+        let work_packet = DefaultScanObjects::new(self.policy.clone(), next_nodes, self.stage);
         self.worker.scheduler().work_buckets[self.stage].add(work_packet);
     }
 }
@@ -434,7 +432,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
         trace!("ScanMutatorRoots for mutator {:?}", self.0.get_tls());
         let mutators = <C::VM as VMBinding>::VMActivePlan::number_of_mutators();
         let factory =
-            DefaultRootsWorkFactory::<C::VM, C::DefaultTracePolicy, C::PinningTracePolicy>::new(
+            TracingRootsWorkFactory::<C::VM, C::DefaultTracePolicy, C::PinningTracePolicy>::new(
                 mmtk,
             );
         <C::VM as VMBinding>::VMScanning::scan_roots_in_mutator_thread(
@@ -466,7 +464,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanVMSpecificRoots<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("ScanStaticRoots");
         let factory =
-            DefaultRootsWorkFactory::<C::VM, C::DefaultTracePolicy, C::PinningTracePolicy>::new(
+            TracingRootsWorkFactory::<C::VM, C::DefaultTracePolicy, C::PinningTracePolicy>::new(
                 mmtk,
             );
         <C::VM as VMBinding>::VMScanning::scan_vm_specific_roots(worker.tls, factory);
@@ -524,9 +522,8 @@ impl<T: TracePolicy> GCWork<T::VM> for DefaultProcessSlots<T> {
 
         if !queue.is_empty() {
             let queued_objects = queue.take();
-            let mut work = self
-                .policy
-                .create_scan_work(queued_objects, mmtk, self.bucket);
+            let mut work =
+                DefaultScanObjects::new(self.policy.clone(), queued_objects, self.bucket);
 
             if Self::SCAN_OBJECTS_IMMEDIATELY {
                 work.do_work(worker, mmtk);
@@ -542,10 +539,12 @@ impl<T: TracePolicy> GCWork<T::VM> for DefaultProcessSlots<T> {
     }
 }
 
-/// An implementation of `RootsWorkFactory` that creates work packets based on `ProcessEdgesWork`
-/// for handling roots.  The `DPE` and the `PPE` type parameters correspond to the
-/// `DefaultProcessEdge` and the `PinningProcessEdges` type members of the [`GCWorkContext`] trait.
-pub(crate) struct DefaultRootsWorkFactory<
+/// An implementation of [`RootsWorkFactory`] for stop-the-world tracing GC, i.e. finding the
+/// transitive closure from roots, with all mutators stopped.
+///
+/// It will create relevant work packets for tpinning, pinning and non-pinning roots, and put them
+/// into the stop-the-world work buckets.
+pub(crate) struct TracingRootsWorkFactory<
     VM: VMBinding,
     DPE: TracePolicy<VM = VM>,
     PPE: TracePolicy<VM = VM>,
@@ -555,7 +554,7 @@ pub(crate) struct DefaultRootsWorkFactory<
 }
 
 impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>> Clone
-    for DefaultRootsWorkFactory<VM, DPE, PPE>
+    for TracingRootsWorkFactory<VM, DPE, PPE>
 {
     fn clone(&self) -> Self {
         Self {
@@ -575,7 +574,7 @@ pub(crate) enum RootsKind {
 }
 
 impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>>
-    RootsWorkFactory<VM::VMSlot> for DefaultRootsWorkFactory<VM, DPE, PPE>
+    RootsWorkFactory<VM::VMSlot> for TracingRootsWorkFactory<VM, DPE, PPE>
 {
     fn create_process_roots_work(&mut self, slots: Vec<VM::VMSlot>) {
         // Note: We should use the same USDT name "mmtk:roots" for all the three kinds of roots. A
@@ -590,10 +589,10 @@ impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>>
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,
-            DPE::from_mmtk(self.mmtk).make_process_slots_work(
+            DefaultProcessSlots::new(
+                DPE::from_mmtk(self.mmtk),
                 slots,
                 true,
-                self.mmtk,
                 WorkBucketStage::Closure,
             ),
         );
@@ -621,7 +620,7 @@ impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>>
 }
 
 impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>>
-    DefaultRootsWorkFactory<VM, DPE, PPE>
+    TracingRootsWorkFactory<VM, DPE, PPE>
 {
     pub(crate) fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
@@ -658,10 +657,10 @@ impl<T: TracePolicy> GCWork<T::VM> for DefaultScanObjects<T> {
         {
             let mut slots = Vec::new();
 
-            let policy2 = self.policy.clone(); // Otherwise the closure below will borrow the policy during its lifetime, making it unusable.
             let flush = |slots: &mut _, worker: &mut GCWorker<T::VM>| {
                 let buffer = std::mem::take(slots);
-                let work_packet = policy2.make_process_slots_work(buffer, false, mmtk, self.bucket);
+                let work_packet =
+                    DefaultProcessSlots::new(T::from_mmtk(mmtk), buffer, false, self.bucket);
                 worker.add_work(self.bucket, work_packet);
             };
 
@@ -818,7 +817,7 @@ impl<VM: VMBinding, R2OTP: TracePolicy<VM = VM>, O2OTP: TracePolicy<VM = VM>> GC
 
         if !root_objects_to_scan.is_empty() {
             let work =
-                O2OTP::from_mmtk(mmtk).create_scan_work(root_objects_to_scan, mmtk, self.bucket);
+                DefaultScanObjects::new(O2OTP::from_mmtk(mmtk), root_objects_to_scan, self.bucket);
             worker.add_work(self.bucket, work);
         }
 

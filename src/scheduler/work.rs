@@ -1,5 +1,5 @@
 use super::worker::*;
-use crate::scheduler::gc_work::DefaultRootsWorkFactory;
+use crate::scheduler::gc_work::TracingRootsWorkFactory;
 use crate::vm::{RootsWorkFactory, VMBinding};
 use crate::{mmtk::MMTK, plan::tracing::TracePolicy};
 #[cfg(feature = "work_packet_stats")]
@@ -102,7 +102,7 @@ pub trait GCWorkContext: Send + 'static {
     fn make_roots_work_factory(
         mmtk: &'static MMTK<Self::VM>,
     ) -> impl RootsWorkFactory<<Self::VM as VMBinding>::VMSlot> {
-        DefaultRootsWorkFactory::<Self::VM, Self::DefaultTracePolicy, Self::PinningTracePolicy>::new(
+        TracingRootsWorkFactory::<Self::VM, Self::DefaultTracePolicy, Self::PinningTracePolicy>::new(
             mmtk,
         )
     }

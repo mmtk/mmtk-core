@@ -2,11 +2,8 @@ use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::Pause;
 use crate::plan::tracing::TracePolicy;
 use crate::plan::PlanTraceObject;
-use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::TraceKind;
-use crate::scheduler::gc_work::DefaultRootsWorkFactory;
 use crate::scheduler::gc_work::RootsKind;
-use crate::scheduler::EDGES_WORK_BUFFER_SIZE;
 use crate::util::ObjectReference;
 use crate::vm::slot::Slot;
 use crate::{
@@ -195,9 +192,6 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 {
     type VM = VM;
 
-    type ProcessSlotsWorkType = ProcessRootSlots<VM, P, KIND>;
-    type ScanObjectsWorkType = ConcurrentTraceObjects<VM, P, KIND>;
-
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
         let plan = mmtk.get_plan().downcast_ref::<P>().unwrap();
         Self { plan }
@@ -216,101 +210,9 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         self.plan.post_scan_object(object);
     }
 
-    fn make_process_slots_work(
-        &self,
-        slots: Vec<<Self::VM as VMBinding>::VMSlot>,
-        roots: bool,
-        mmtk: &'static MMTK<Self::VM>,
-        bucket: WorkBucketStage,
-    ) -> Self::ProcessSlotsWorkType {
-        ProcessRootSlots::new(slots, roots, mmtk, bucket)
-    }
-
-    fn create_scan_work(
-        &self,
-        nodes: Vec<ObjectReference>,
-        _mmtk: &'static MMTK<Self::VM>,
-        _bucket: WorkBucketStage,
-    ) -> Self::ScanObjectsWorkType {
-        // This is called by root scanning, so
-        ConcurrentTraceObjects::new(self.clone(), nodes, false)
-    }
-
     fn may_move_objects() -> bool {
         // Concurrent marking never moves objects.
         false
-    }
-}
-
-pub struct ProcessRootSlots<
-    VM: VMBinding,
-    P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,
-    const KIND: TraceKind,
-> {
-    slots: Vec<VM::VMSlot>,
-    phantom_data: PhantomData<P>,
-}
-
-unsafe impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
-    Send for ProcessRootSlots<VM, P, KIND>
-{
-}
-
-impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
-    ProcessRootSlots<VM, P, KIND>
-{
-    fn new(
-        slots: Vec<VM::VMSlot>,
-        roots: bool,
-        _mmtk: &'static MMTK<VM>,
-        _bucket: WorkBucketStage,
-    ) -> Self {
-        debug_assert!(roots);
-        Self {
-            slots,
-            phantom_data: PhantomData,
-        }
-    }
-}
-
-impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
-    GCWork<VM> for ProcessRootSlots<VM, P, KIND>
-{
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        let pause = mmtk
-            .get_plan()
-            .concurrent()
-            .unwrap()
-            .current_pause()
-            .unwrap();
-        // No need to scan roots in the final mark
-        if pause == Pause::FinalMark {
-            return;
-        }
-        debug_assert_eq!(pause, Pause::InitialMark);
-
-        let mut queue = VectorObjectQueue::new();
-        let flush = |queue: &mut VectorObjectQueue| {
-            let objects = queue.take();
-            let w = ConcurrentTraceObjects::<VM, P, KIND>::new(
-                ConcurrentMarkingTracePolicy::from_mmtk(mmtk),
-                objects,
-                false, // These objects are not marked, yet.
-            );
-            worker.scheduler().work_buckets[WorkBucketStage::Concurrent].add_no_notify(w);
-        };
-
-        for slot in self.slots.iter() {
-            if let Some(object) = slot.load() {
-                queue.push(object);
-                if queue.len() == EDGES_WORK_BUFFER_SIZE {
-                    flush(&mut queue);
-                }
-            }
-        }
-        if !queue.is_empty() {
-            flush(&mut queue);
-        }
     }
 }
 
@@ -319,11 +221,8 @@ pub(crate) struct ConcurrentMarkingRootsWorkFactory<
     P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,
     const KIND: TraceKind,
 > {
-    parent: DefaultRootsWorkFactory<
-        VM,
-        ConcurrentMarkingTracePolicy<VM, P, KIND>,
-        ConcurrentMarkingTracePolicy<VM, P, KIND>,
-    >,
+    pub(crate) mmtk: &'static MMTK<VM>,
+    phantom_data: PhantomData<P>,
 }
 
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind> Clone
@@ -331,9 +230,15 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 {
     fn clone(&self) -> Self {
         Self {
-            parent: self.parent.clone(),
+            mmtk: self.mmtk,
+            phantom_data: PhantomData,
         }
     }
+}
+
+unsafe impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
+    Send for ConcurrentMarkingRootsWorkFactory<VM, P, KIND>
+{
 }
 
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
@@ -341,12 +246,28 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 {
     pub(crate) fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
-            parent: DefaultRootsWorkFactory::new(mmtk),
+            mmtk,
+            phantom_data: PhantomData,
         }
     }
 
+    fn is_final_mark(&mut self) -> bool {
+        let pause = self
+            .mmtk
+            .get_plan()
+            .concurrent()
+            .unwrap()
+            .current_pause()
+            .unwrap();
+        debug_assert!(
+            pause == Pause::InitialMark || pause == Pause::FinalMark,
+            "pause is neither InitialMark nor FinalMark.  pause: {pause:?}"
+        );
+        pause == Pause::FinalMark
+    }
+
     fn create_and_schedule_root_nodes_work(&mut self, nodes: Vec<ObjectReference>) {
-        let mmtk = self.parent.mmtk;
+        let mmtk = self.mmtk;
         let policy = ConcurrentMarkingTracePolicy::<VM, P, KIND>::from_mmtk(mmtk);
         let work_packet = ConcurrentTraceObjects::new(policy, nodes, false);
         mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].add_no_notify(work_packet);
@@ -357,17 +278,37 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     RootsWorkFactory<VM::VMSlot> for ConcurrentMarkingRootsWorkFactory<VM, P, KIND>
 {
     fn create_process_roots_work(&mut self, slots: Vec<VM::VMSlot>) {
-        // It will create `ProcessRootSlots` as usual.
-        self.parent.create_process_roots_work(slots);
+        probe!(mmtk, roots, RootsKind::NORMAL, slots.len());
+
+        if self.is_final_mark() {
+            return;
+        }
+
+        // We don't divide the `slots` vector into smaller chunks here.  We assume the VM binding
+        // respects the constant `EDGES_WORK_BUFFER_SIZE` and provides lists of slots in reasonable
+        // lengths.  Even if a single `ConcurrentTraceObjects` work packet is too large, it can
+        // still break up the list during tracing using the constant `CONCURRENT_TRACE_OVERFLOW`.
+        let nodes = slots.iter().flat_map(|slot| slot.load()).collect();
+        self.create_and_schedule_root_nodes_work(nodes);
     }
 
     fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         probe!(mmtk, roots, RootsKind::PINNING, nodes.len());
+
+        if self.is_final_mark() {
+            return;
+        }
+
         self.create_and_schedule_root_nodes_work(nodes);
     }
 
     fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         probe!(mmtk, roots, RootsKind::TPINNING, nodes.len());
+
+        if self.is_final_mark() {
+            return;
+        }
+
         self.create_and_schedule_root_nodes_work(nodes);
     }
 }

@@ -5,16 +5,13 @@ use std::marker::PhantomData;
 
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
-use crate::scheduler::gc_work::{DefaultProcessSlots, DefaultScanObjects};
-use crate::scheduler::{GCWork, GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
+use crate::scheduler::{GCWorker, EDGES_WORK_BUFFER_SIZE};
 use crate::util::{ObjectReference, VMThread, VMWorkerThread};
 use crate::vm::{Scanning, VMBinding};
 use crate::{Plan, MMTK};
 
 pub trait TracePolicy: 'static + Send + Clone {
     type VM: VMBinding;
-    type ProcessSlotsWorkType: GCWork<Self::VM>;
-    type ScanObjectsWorkType: GCWork<Self::VM>;
 
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self;
 
@@ -26,21 +23,6 @@ pub trait TracePolicy: 'static + Send + Clone {
     ) -> ObjectReference;
 
     fn post_scan_object(&mut self, object: ObjectReference);
-
-    fn make_process_slots_work(
-        &self,
-        slots: Vec<<Self::VM as VMBinding>::VMSlot>,
-        roots: bool,
-        mmtk: &'static MMTK<Self::VM>,
-        bucket: WorkBucketStage,
-    ) -> Self::ProcessSlotsWorkType;
-
-    fn create_scan_work(
-        &self,
-        nodes: Vec<ObjectReference>,
-        mmtk: &'static MMTK<Self::VM>,
-        bucket: WorkBucketStage,
-    ) -> Self::ScanObjectsWorkType;
 
     fn may_move_objects() -> bool;
 }
@@ -61,8 +43,6 @@ impl<VM: VMBinding> Clone for SFTTracePolicy<VM> {
 
 impl<VM: VMBinding> TracePolicy for SFTTracePolicy<VM> {
     type VM = VM;
-    type ProcessSlotsWorkType = DefaultProcessSlots<Self>;
-    type ScanObjectsWorkType = DefaultScanObjects<Self>;
 
     fn from_mmtk(_mmtk: &'static MMTK<Self::VM>) -> Self {
         Default::default()
@@ -93,25 +73,6 @@ impl<VM: VMBinding> TracePolicy for SFTTracePolicy<VM> {
         // Do nothing.  SFTTracePolicy is only suitable for plans that don't need post_scan_object.
     }
 
-    fn make_process_slots_work(
-        &self,
-        slots: Vec<<Self::VM as VMBinding>::VMSlot>,
-        roots: bool,
-        _mmtk: &'static MMTK<Self::VM>,
-        bucket: WorkBucketStage,
-    ) -> Self::ProcessSlotsWorkType {
-        DefaultProcessSlots::new(self.clone(), slots, roots, bucket)
-    }
-
-    fn create_scan_work(
-        &self,
-        nodes: Vec<ObjectReference>,
-        _mmtk: &'static MMTK<Self::VM>,
-        bucket: WorkBucketStage,
-    ) -> Self::ScanObjectsWorkType {
-        DefaultScanObjects::new(self.clone(), nodes, bucket)
-    }
-
     fn may_move_objects() -> bool {
         true
     }
@@ -137,8 +98,6 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> TracePolicy
     for PlanTracePolicy<P, KIND>
 {
     type VM = P::VM;
-    type ProcessSlotsWorkType = DefaultProcessSlots<Self>;
-    type ScanObjectsWorkType = DefaultScanObjects<Self>;
 
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
         let plan = mmtk.get_plan().downcast_ref::<P>().unwrap();
@@ -156,25 +115,6 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> TracePolicy
 
     fn post_scan_object(&mut self, object: ObjectReference) {
         self.plan.post_scan_object(object);
-    }
-
-    fn make_process_slots_work(
-        &self,
-        slots: Vec<<Self::VM as VMBinding>::VMSlot>,
-        roots: bool,
-        _mmtk: &'static MMTK<Self::VM>,
-        bucket: WorkBucketStage,
-    ) -> Self::ProcessSlotsWorkType {
-        DefaultProcessSlots::new(self.clone(), slots, roots, bucket)
-    }
-
-    fn create_scan_work(
-        &self,
-        nodes: Vec<ObjectReference>,
-        _mmtk: &'static MMTK<Self::VM>,
-        bucket: WorkBucketStage,
-    ) -> Self::ScanObjectsWorkType {
-        DefaultScanObjects::new(self.clone(), nodes, bucket)
     }
 
     fn may_move_objects() -> bool {
@@ -197,8 +137,6 @@ impl<VM: VMBinding> Clone for UnsupportedTracePolicy<VM> {
 
 impl<VM: VMBinding> TracePolicy for UnsupportedTracePolicy<VM> {
     type VM = VM;
-    type ProcessSlotsWorkType = DefaultProcessSlots<Self>;
-    type ScanObjectsWorkType = DefaultScanObjects<Self>;
 
     fn from_mmtk(_mmtk: &'static MMTK<Self::VM>) -> Self {
         unimplemented!()
@@ -214,24 +152,6 @@ impl<VM: VMBinding> TracePolicy for UnsupportedTracePolicy<VM> {
     }
 
     fn post_scan_object(&mut self, _object: ObjectReference) {
-        unimplemented!()
-    }
-
-    fn make_process_slots_work(
-        &self,
-        _slots: Vec<<Self::VM as VMBinding>::VMSlot>,
-        _roots: bool,
-        _mmtk: &'static MMTK<Self::VM>,
-        _bucket: WorkBucketStage,
-    ) -> Self::ProcessSlotsWorkType {
-        unimplemented!()
-    }
-    fn create_scan_work(
-        &self,
-        _nodes: Vec<ObjectReference>,
-        _mmtk: &'static MMTK<Self::VM>,
-        _bucket: WorkBucketStage,
-    ) -> Self::ScanObjectsWorkType {
         unimplemented!()
     }
 
