@@ -23,7 +23,7 @@ pub struct GCTrigger<VM: VMBinding> {
     /// once we have a fixed address for the plan.
     plan: MaybeUninit<&'static dyn Plan<VM = VM>>,
     /// The triggering policy.
-    pub policy: Box<dyn GCTriggerPolicy<VM>>,
+    pub trace: Box<dyn GCTriggerPolicy<VM>>,
     /// Set by mutators to trigger GC.  It is atomic so that mutators can check if GC has already
     /// been requested efficiently in `poll` without acquiring any mutex.
     request_flag: AtomicBool,
@@ -40,7 +40,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
     ) -> Self {
         GCTrigger {
             plan: MaybeUninit::uninit(),
-            policy: match *options.gc_trigger {
+            trace: match *options.gc_trigger {
                 GCTriggerSelector::FixedHeapSize(size) => Box::new(FixedHeapSizeTrigger {
                     total_pages: conversions::bytes_to_pages_up(size),
                 }),
@@ -113,7 +113,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
 
         let plan = self.plan();
         if self
-            .policy
+            .trace
             .is_gc_required(space_full, space.map(|s| SpaceStats::new(s)), plan)
         {
             info!(
@@ -196,7 +196,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
 
     /// Check if the heap is full
     pub fn is_heap_full(&self) -> bool {
-        self.policy.is_heap_full(self.plan())
+        self.trace.is_heap_full(self.plan())
     }
 
     /// Return upper bound of the nursery size (in number of bytes)
@@ -207,7 +207,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
             NurserySize::Bounded { min: _, max } => max,
             NurserySize::ProportionalBounded { min: _, max } => {
                 let heap_size_bytes =
-                    conversions::pages_to_bytes(self.policy.get_current_heap_size_in_pages());
+                    conversions::pages_to_bytes(self.trace.get_current_heap_size_in_pages());
                 let max_bytes = heap_size_bytes as f64 * max;
                 let max_bytes = conversions::raw_align_up(max_bytes as usize, BYTES_IN_PAGE);
                 if max_bytes > DEFAULT_MAX_NURSERY {
@@ -229,8 +229,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
             NurserySize::Bounded { min, max: _ } => min,
             NurserySize::ProportionalBounded { min, max: _ } => {
                 let min_bytes =
-                    conversions::pages_to_bytes(self.policy.get_current_heap_size_in_pages())
-                        as f64
+                    conversions::pages_to_bytes(self.trace.get_current_heap_size_in_pages()) as f64
                         * min;
                 let min_bytes = conversions::raw_align_up(min_bytes as usize, BYTES_IN_PAGE);
                 if min_bytes < DEFAULT_MIN_NURSERY {

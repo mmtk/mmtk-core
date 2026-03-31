@@ -70,7 +70,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// overflow happens there, there is nothing we can do about it.
     /// Return a boolean to indicate if we will be out of memory, determined by the check.
     fn will_oom_on_acquire(&self, size: usize) -> bool {
-        let max_pages = self.get_gc_trigger().policy.get_max_heap_size_in_pages();
+        let max_pages = self.get_gc_trigger().trace.get_max_heap_size_in_pages();
         let requested_pages = size >> LOG_BYTES_IN_PAGE;
         requested_pages > max_pages
     }
@@ -314,7 +314,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         let meta_pages_reserved = self.estimate_side_meta_pages(pages_reserved);
         let total_pages_reserved = pages_reserved + meta_pages_reserved;
         self.get_gc_trigger()
-            .policy
+            .trace
             .on_pending_allocation(total_pages_reserved);
 
         VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator

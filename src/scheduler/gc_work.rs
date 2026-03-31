@@ -14,12 +14,12 @@ pub struct ScheduleCollection;
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         // Tell GC trigger that GC started.
-        mmtk.gc_trigger.policy.on_gc_start(mmtk);
+        mmtk.gc_trigger.trace.on_gc_start(mmtk);
 
         // Determine collection kind
         let is_emergency = mmtk.state.set_collection_kind(
             mmtk.get_plan().last_collection_was_exhaustive(),
-            mmtk.gc_trigger.policy.can_heap_size_grow(),
+            mmtk.gc_trigger.trace.can_heap_size_grow(),
         );
         if is_emergency {
             mmtk.get_plan().notify_emergency_collection();
@@ -132,7 +132,7 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Release Global");
 
-        mmtk.gc_trigger.policy.on_gc_release(mmtk);
+        mmtk.gc_trigger.trace.on_gc_release(mmtk);
         // We assume this is the only running work packet that accesses plan at the point of execution
 
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
@@ -245,7 +245,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
 /// [`TracingProcessNodes`] work packets to scan and trace objects.
 pub(crate) struct TracingObjectTracer<'w, T: Trace> {
     worker: &'w mut GCWorker<T::VM>,
-    policy: T,
+    trace: T,
     queue: VectorObjectQueue,
     stage: WorkBucketStage,
 }
@@ -255,7 +255,7 @@ impl<'w, T: Trace> ObjectTracer for TracingObjectTracer<'w, T> {
     /// and flush as soon as the underlying buffer of `process_edges_work` is full.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         let result = self
-            .policy
+            .trace
             .trace_object(self.worker, object, &mut self.queue);
         self.flush_if_full();
         result
@@ -263,10 +263,10 @@ impl<'w, T: Trace> ObjectTracer for TracingObjectTracer<'w, T> {
 }
 
 impl<'w, T: Trace> TracingObjectTracer<'w, T> {
-    fn new(worker: &'w mut GCWorker<T::VM>, policy: T, stage: WorkBucketStage) -> Self {
+    fn new(worker: &'w mut GCWorker<T::VM>, trace: T, stage: WorkBucketStage) -> Self {
         Self {
             worker,
-            policy,
+            trace,
             queue: VectorObjectQueue::new(),
             stage,
         }
@@ -287,7 +287,7 @@ impl<'w, T: Trace> TracingObjectTracer<'w, T> {
     fn flush(&mut self) {
         let next_nodes = self.queue.take();
         assert!(!next_nodes.is_empty());
-        let work_packet = TracingProcessNodes::new(self.policy.clone(), next_nodes, self.stage);
+        let work_packet = TracingProcessNodes::new(self.trace.clone(), next_nodes, self.stage);
         self.worker.scheduler().work_buckets[self.stage].add(work_packet);
     }
 }
@@ -296,20 +296,20 @@ impl<'w, T: Trace> TracingObjectTracer<'w, T> {
 /// transitive closure during a stop-the-world tracing GC or the final mark pause of a concurrent
 /// GC.  It is used during object scanning as well as weak reference processing.
 pub(crate) struct TracingTracerContext<T: Trace> {
-    policy: T,
+    trace: T,
     stage: WorkBucketStage,
 }
 
 impl<T: Trace> TracingTracerContext<T> {
-    pub fn new(policy: T, stage: WorkBucketStage) -> Self {
-        Self { policy, stage }
+    pub fn new(trace: T, stage: WorkBucketStage) -> Self {
+        Self { trace, stage }
     }
 }
 
 impl<T: Trace> Clone for TracingTracerContext<T> {
     fn clone(&self) -> Self {
         Self {
-            policy: self.policy.clone(),
+            trace: self.trace.clone(),
             stage: self.stage,
         }
     }
@@ -476,7 +476,7 @@ pub type SlotOfTP<E> = <<E as Trace>::VM as VMBinding>::VMSlot;
 /// moved or forwarded.  It will spawn or immediately run the [`DefaultScanObjects`] work packet to
 /// scan newly traced objects.
 pub struct TracingProcessSlots<T: Trace> {
-    policy: T,
+    trace: T,
     slots: Vec<SlotOfTP<T>>,
     #[allow(unused)] // Only used by sanity
     roots: bool,
@@ -486,9 +486,9 @@ pub struct TracingProcessSlots<T: Trace> {
 impl<T: Trace> TracingProcessSlots<T> {
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
 
-    pub fn new(policy: T, slots: Vec<SlotOfTP<T>>, roots: bool, bucket: WorkBucketStage) -> Self {
+    pub fn new(trace: T, slots: Vec<SlotOfTP<T>>, roots: bool, bucket: WorkBucketStage) -> Self {
         Self {
-            policy,
+            trace,
             slots,
             roots,
             bucket,
@@ -514,7 +514,7 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessSlots<T> {
 
         for slot in self.slots.iter() {
             if let Some(object) = slot.load() {
-                let new_object = self.policy.trace_object(worker, object, &mut queue);
+                let new_object = self.trace.trace_object(worker, object, &mut queue);
                 if T::may_move_objects() && new_object != object {
                     slot.store(new_object);
                 }
@@ -524,7 +524,7 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessSlots<T> {
         if !queue.is_empty() {
             let queued_objects = queue.take();
             let mut work =
-                TracingProcessNodes::new(self.policy.clone(), queued_objects, self.bucket);
+                TracingProcessNodes::new(self.trace.clone(), queued_objects, self.bucket);
 
             if Self::SCAN_OBJECTS_IMMEDIATELY {
                 work.do_work(worker, mmtk);
@@ -638,15 +638,15 @@ impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>>
 /// support slot enqueuing, it will immediately trace their slots and spawn other
 /// [`TracingProcessNodes`] work packets to process their newly traced children.
 pub struct TracingProcessNodes<T: Trace> {
-    policy: T,
+    trace: T,
     objects: Vec<ObjectReference>,
     bucket: WorkBucketStage,
 }
 
 impl<T: Trace> TracingProcessNodes<T> {
-    pub fn new(policy: T, objects: Vec<ObjectReference>, bucket: WorkBucketStage) -> Self {
+    pub fn new(trace: T, objects: Vec<ObjectReference>, bucket: WorkBucketStage) -> Self {
         Self {
-            policy,
+            trace,
             objects,
             bucket,
         }
@@ -694,7 +694,7 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessNodes<T> {
                             flush(&mut slots, worker);
                         }
                     });
-                    self.policy.post_scan_object(object);
+                    self.trace.post_scan_object(object);
                 } else {
                     // If an object does not support slot-enqueuing, we have to use
                     // `Scanning::scan_object_and_trace_edges` and offload the job of updating the
@@ -717,7 +717,7 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessNodes<T> {
 
         // If any object does not support slot-enqueuing, we process them now.
         if !scan_later.is_empty() {
-            let object_tracer_context = TracingTracerContext::new(self.policy.clone(), self.bucket);
+            let object_tracer_context = TracingTracerContext::new(self.trace.clone(), self.bucket);
 
             object_tracer_context.with_tracer(worker, |object_tracer| {
                 // Scan objects and trace their outgoing edges at the same time.
@@ -728,7 +728,7 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessNodes<T> {
                         object,
                         object_tracer,
                     );
-                    self.policy.post_scan_object(object);
+                    self.trace.post_scan_object(object);
                 }
             });
         }
@@ -810,10 +810,10 @@ impl<VM: VMBinding, R2OTP: Trace<VM = VM>, O2OTP: Trace<VM = VM>> GCWork<VM>
         let root_objects_to_scan = {
             let mut queue = VectorObjectQueue::new();
 
-            let mut r2o_policy = R2OTP::from_mmtk(mmtk);
+            let mut r2o_trace = R2OTP::from_mmtk(mmtk);
 
             for object in self.roots.iter().copied() {
-                let new_object = r2o_policy.trace_object(worker, object, &mut queue);
+                let new_object = r2o_trace.trace_object(worker, object, &mut queue);
                 debug_assert_eq!(
                     object, new_object,
                     "Object moved while tracing root unmovable root object: {} -> {}",

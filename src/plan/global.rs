@@ -275,7 +275,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     fn get_total_pages(&self) -> usize {
         self.base()
             .gc_trigger
-            .policy
+            .trace
             .get_current_heap_size_in_pages()
     }
 
