@@ -494,18 +494,6 @@ impl<T: Trace> TracingProcessSlots<T> {
             bucket,
         }
     }
-
-    /// If the work includes roots, we will store the roots somewhere so for sanity GC, we can do another
-    /// transitive closure from the roots.
-    #[cfg(feature = "sanity")]
-    fn cache_roots_for_sanity_gc(&mut self) {
-        assert!(self.roots);
-        self.mmtk()
-            .sanity_checker
-            .lock()
-            .unwrap()
-            .add_root_slots(self.slots.clone());
-    }
 }
 
 impl<T: Trace> GCWork<T::VM> for TracingProcessSlots<T> {
@@ -531,11 +519,6 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessSlots<T> {
             } else {
                 worker.add_work(self.bucket, work);
             }
-        }
-
-        #[cfg(feature = "sanity")]
-        if self.roots && !mmtk.is_in_sanity() {
-            self.cache_roots_for_sanity_gc();
         }
     }
 }
@@ -583,6 +566,14 @@ impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> RootsWorkFactory<V
         // different names, and our `capture.bt` mentions all of them, `bpftrace` may complain that
         // it cannot find one or more of those USDT trace points in the binary.
         probe!(mmtk, roots, RootsKind::NORMAL, slots.len());
+
+        #[cfg(feature = "sanity")]
+        self.mmtk
+            .sanity_checker
+            .lock()
+            .unwrap()
+            .add_root_slots(slots.clone());
+
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,
@@ -597,6 +588,14 @@ impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> RootsWorkFactory<V
 
     fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         probe!(mmtk, roots, RootsKind::PINNING, nodes.len());
+
+        #[cfg(feature = "sanity")]
+        self.mmtk
+            .sanity_checker
+            .lock()
+            .unwrap()
+            .add_root_nodes(nodes.clone());
+
         // Will process roots within the PinningRootsTrace bucket
         // And put work in the Closure bucket
         crate::memory_manager::add_work_packet(
@@ -608,6 +607,14 @@ impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> RootsWorkFactory<V
 
     fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         probe!(mmtk, roots, RootsKind::TPINNING, nodes.len());
+
+        #[cfg(feature = "sanity")]
+        self.mmtk
+            .sanity_checker
+            .lock()
+            .unwrap()
+            .add_root_nodes(nodes.clone());
+
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::TPinningClosure,
@@ -786,16 +793,6 @@ impl<VM: VMBinding, R2OT: Trace<VM = VM>, O2OT: Trace<VM = VM>> GCWork<VM>
 {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         trace!("TracingProcessPinningRoots");
-
-        #[cfg(feature = "sanity")]
-        {
-            if !mmtk.is_in_sanity() {
-                mmtk.sanity_checker
-                    .lock()
-                    .unwrap()
-                    .add_root_nodes(self.roots.clone());
-            }
-        }
 
         let num_roots = self.roots.len();
 

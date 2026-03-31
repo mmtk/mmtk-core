@@ -1,12 +1,13 @@
+use crate::plan::tracing::Trace;
 use crate::plan::Plan;
-use crate::scheduler::gc_work::*;
+use crate::scheduler::gc_work::TracingProcessPinningRoots;
+use crate::scheduler::gc_work::TracingProcessSlots;
 use crate::util::ObjectReference;
 use crate::vm::slot::Slot;
 use crate::vm::*;
 use crate::MMTK;
 use crate::{scheduler::*, ObjectQueue};
 use std::collections::HashSet;
-use std::ops::{Deref, DerefMut};
 
 #[allow(dead_code)]
 pub struct SanityChecker<SL: Slot> {
@@ -86,20 +87,18 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
         {
             let sanity_checker = mmtk.sanity_checker.lock().unwrap();
             for roots in &sanity_checker.root_slots {
-                scheduler.work_buckets[WorkBucketStage::Closure].add(
-                    SanityGCProcessEdges::<P::VM>::new(
-                        roots.clone(),
-                        true,
-                        mmtk,
-                        WorkBucketStage::Closure,
-                    ),
-                );
+                scheduler.work_buckets[WorkBucketStage::Closure].add(TracingProcessSlots::new(
+                    SanityTrace::from_mmtk(mmtk),
+                    roots.clone(),
+                    true,
+                    WorkBucketStage::Closure,
+                ));
             }
             for roots in &sanity_checker.root_nodes {
-                scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessRootNodes::<
+                scheduler.work_buckets[WorkBucketStage::Closure].add(TracingProcessPinningRoots::<
                     P::VM,
-                    SanityGCProcessEdges<P::VM>,
-                    SanityGCProcessEdges<P::VM>,
+                    SanityTrace<P::VM>,
+                    SanityTrace<P::VM>,
                 >::new(
                     roots.clone(),
                     WorkBucketStage::Closure,
@@ -153,50 +152,39 @@ impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
     }
 }
 
-// #[derive(Default)]
-pub struct SanityGCProcessEdges<VM: VMBinding> {
-    base: ProcessEdgesBase<VM>,
+pub struct SanityTrace<VM: VMBinding> {
+    mmtk: &'static MMTK<VM>,
 }
 
-impl<VM: VMBinding> Deref for SanityGCProcessEdges<VM> {
-    type Target = ProcessEdgesBase<VM>;
-    fn deref(&self) -> &Self::Target {
-        &self.base
+impl<VM: VMBinding> Clone for SanityTrace<VM> {
+    fn clone(&self) -> Self {
+        Self { mmtk: self.mmtk }
     }
 }
 
-impl<VM: VMBinding> DerefMut for SanityGCProcessEdges<VM> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
-    }
-}
-
-impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
+impl<VM: VMBinding> Trace for SanityTrace<VM> {
     type VM = VM;
-    type ScanObjectsWorkType = ScanObjects<Self>;
 
-    const OVERWRITE_REFERENCE: bool = false;
-    fn new(
-        slots: Vec<SlotOf<Self>>,
-        roots: bool,
-        mmtk: &'static MMTK<VM>,
-        bucket: WorkBucketStage,
-    ) -> Self {
-        Self {
-            base: ProcessEdgesBase::new(slots, roots, mmtk, bucket),
-            // ..Default::default()
-        }
+    fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
+        Self { mmtk }
     }
 
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        let mut sanity_checker = self.mmtk().sanity_checker.lock().unwrap();
+    fn trace_object<Q: ObjectQueue>(
+        &mut self,
+        _worker: &mut GCWorker<Self::VM>,
+        object: ObjectReference,
+        queue: &mut Q,
+    ) -> ObjectReference {
+        // TODO: Rewrite the sanity checker as a simple loop in a single work packet.
+        // It is very inefficient to acquire the mutex in every single `trace_object`.
+        let mut sanity_checker = self.mmtk.sanity_checker.lock().unwrap();
         if !sanity_checker.refs.contains(&object) {
             // FIXME steveb consider VM-specific integrity check on reference.
             assert!(object.is_sane(), "Invalid reference {:?}", object);
 
             // Let plan check object
             assert!(
-                self.mmtk().get_plan().sanity_check_object(object),
+                self.mmtk.get_plan().sanity_check_object(object),
                 "Invalid reference {:?}",
                 object
             );
@@ -211,7 +199,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
             // Object is not "marked"
             sanity_checker.refs.insert(object); // "Mark" it
             trace!("Sanity mark object {}", object);
-            self.nodes.enqueue(object);
+            queue.enqueue(object);
         }
 
         // If the valid object (VO) bit metadata is enabled, all live objects should have the VO
@@ -224,11 +212,11 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
         object
     }
 
-    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
-        Some(ScanObjects::<Self>::new(
-            nodes,
-            false,
-            WorkBucketStage::Closure,
-        ))
+    fn post_scan_object(&mut self, _object: ObjectReference) {
+        // Do nothing
+    }
+
+    fn may_move_objects() -> bool {
+        false
     }
 }

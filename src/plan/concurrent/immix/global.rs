@@ -384,6 +384,13 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<ConcurrentImmixGCWorkContext<UnsupportedTrace<VM>>>::new(self));
 
+        // Sanity
+        #[cfg(feature = "sanity")]
+        {
+            use crate::util::sanity::sanity_checker::ScheduleSanityGC;
+            scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC::<Self>::new(self));
+        }
+
         // Deal with weak ref and finalizers
         // TODO: Check against schedule_common_work and see if we are still missing any work packet
         type RefTracePolicy<VM> =

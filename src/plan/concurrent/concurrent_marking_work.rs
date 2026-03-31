@@ -288,7 +288,20 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         // respects the constant `EDGES_WORK_BUFFER_SIZE` and provides lists of slots in reasonable
         // lengths.  Even if a single `ConcurrentTraceObjects` work packet is too large, it can
         // still break up the list during tracing using the constant `CONCURRENT_TRACE_OVERFLOW`.
-        let nodes = slots.iter().flat_map(|slot| slot.load()).collect();
+        let nodes = slots
+            .iter()
+            .flat_map(|slot| slot.load())
+            .collect::<Vec<_>>();
+
+        // Note: During concurrent marking, mutators can overwrite the root slots and make the roots unstable.
+        // Therefore, instead of recording the root slots, we record the loaded root nodes.
+        #[cfg(feature = "sanity")]
+        self.mmtk
+            .sanity_checker
+            .lock()
+            .unwrap()
+            .add_root_nodes(nodes.clone());
+
         self.create_and_schedule_root_nodes_work(nodes);
     }
 
@@ -299,6 +312,13 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
             return;
         }
 
+        #[cfg(feature = "sanity")]
+        self.mmtk
+            .sanity_checker
+            .lock()
+            .unwrap()
+            .add_root_nodes(nodes.clone());
+
         self.create_and_schedule_root_nodes_work(nodes);
     }
 
@@ -308,6 +328,13 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         if self.is_final_mark() {
             return;
         }
+
+        #[cfg(feature = "sanity")]
+        self.mmtk
+            .sanity_checker
+            .lock()
+            .unwrap()
+            .add_root_nodes(nodes.clone());
 
         self.create_and_schedule_root_nodes_work(nodes);
     }
