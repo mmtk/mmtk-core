@@ -738,39 +738,39 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessNodes<T> {
 
 /// This work packet processes pinning roots during stop-the-world tracing GC.
 ///
-/// Note that by definition, a "root" is an *edge* that points from outside the object graph.  This
+/// Note that by definition, a "root" is an *edge* from outside the object graph to an object.  This
 /// work packet represents each edge as the `ObjectReference` of the object the edge points to.
-/// Because pinning roots by definition cannot be updated, we don't need to represent the edges with
+/// Because pinning roots by definition cannot be updated, we don't need to represent the edges as a
 /// [`Slot`].
 ///
 /// The `roots` member holds a list of `ObjectReference` to objects directly pointed by roots. These
-/// objects will be traced using `R2OTP` (Root-to-Object Trace Policy).
+/// objects will be traced using `R2OT` (Root-to-Object Trace).
 ///
 /// After that, it will create work packets for tracing their children.  Those work packets (and the
-/// work packets further created by them) will use `O2OPE` (Object-to-Object Trace Policy) as their
-/// `Trace` implementations.
+/// work packets further created by them) will use `O2OT` (Object-to-Object Trace) as their `Trace`
+/// implementations.
 ///
-/// Because `roots` are pinning roots, `R2OTP` must be a `Trace` that never moves any object.
+/// Because `roots` are pinning roots, `R2OT` must be a `Trace` that never moves any object.
 ///
-/// The choice of `O2OPE` determines whether the `roots` are transitively pinning or not.
+/// The choice of `O2OT` determines whether the `roots` are transitively pinning or not.
 ///
-/// -   If `O2OPE` is set to a `Trace` that never moves objects, no descendents of `roots` will be
+/// -   If `O2OT` is set to a `Trace` that never moves objects, no descendents of `roots` will be
 ///     moved in this GC.  That implements transitive pinning roots.
-/// -   If `O2OPE` may move objects, then this `ProcessRootsNode<VM, R2OTP, O2OPE>` work packet will
-///     only pin the objects in `roots` (because `R2OTP` must not move objects anyway), but not
-///     their descendents.
+/// -   If `O2OT` may move objects, then this `ProcessRootsNode<VM, R2OT, O2OT>` work packet will
+///     only pin the objects in `roots` (because `R2OT` must not move objects anyway), but not their
+///     descendents.
 pub(crate) struct TracingProcessPinningRoots<
     VM: VMBinding,
-    R2OTP: Trace<VM = VM>,
-    O2OTP: Trace<VM = VM>,
+    R2OT: Trace<VM = VM>,
+    O2OT: Trace<VM = VM>,
 > {
-    phantom: PhantomData<(VM, R2OTP, O2OTP)>,
+    phantom: PhantomData<(VM, R2OT, O2OT)>,
     roots: Vec<ObjectReference>,
     bucket: WorkBucketStage,
 }
 
-impl<VM: VMBinding, R2OTP: Trace<VM = VM>, O2OTP: Trace<VM = VM>>
-    TracingProcessPinningRoots<VM, R2OTP, O2OTP>
+impl<VM: VMBinding, R2OT: Trace<VM = VM>, O2OT: Trace<VM = VM>>
+    TracingProcessPinningRoots<VM, R2OT, O2OT>
 {
     pub fn new(nodes: Vec<ObjectReference>, bucket: WorkBucketStage) -> Self {
         Self {
@@ -781,8 +781,8 @@ impl<VM: VMBinding, R2OTP: Trace<VM = VM>, O2OTP: Trace<VM = VM>>
     }
 }
 
-impl<VM: VMBinding, R2OTP: Trace<VM = VM>, O2OTP: Trace<VM = VM>> GCWork<VM>
-    for TracingProcessPinningRoots<VM, R2OTP, O2OTP>
+impl<VM: VMBinding, R2OT: Trace<VM = VM>, O2OT: Trace<VM = VM>> GCWork<VM>
+    for TracingProcessPinningRoots<VM, R2OT, O2OT>
 {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         trace!("TracingProcessPinningRoots");
@@ -810,7 +810,7 @@ impl<VM: VMBinding, R2OTP: Trace<VM = VM>, O2OTP: Trace<VM = VM>> GCWork<VM>
         let root_objects_to_scan = {
             let mut queue = VectorObjectQueue::new();
 
-            let mut r2o_trace = R2OTP::from_mmtk(mmtk);
+            let mut r2o_trace = R2OT::from_mmtk(mmtk);
 
             for object in self.roots.iter().copied() {
                 let new_object = r2o_trace.trace_object(worker, object, &mut queue);
@@ -829,7 +829,7 @@ impl<VM: VMBinding, R2OTP: Trace<VM = VM>, O2OTP: Trace<VM = VM>> GCWork<VM>
 
         if !root_objects_to_scan.is_empty() {
             let work =
-                TracingProcessNodes::new(O2OTP::from_mmtk(mmtk), root_objects_to_scan, self.bucket);
+                TracingProcessNodes::new(O2OT::from_mmtk(mmtk), root_objects_to_scan, self.bucket);
             worker.add_work(self.bucket, work);
         }
 
