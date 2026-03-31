@@ -550,6 +550,8 @@ pub enum RootKind {
     YoungWeakCLDRoots,
     YoungCodeCacheRoots,
     YoungWeakHandleRoots,
+    /// JDK11 Only
+    MatureWeakRoots,
     Weak,
 }
 
@@ -563,6 +565,7 @@ impl RootKind {
     pub fn should_skip_mark_and_decs(&self) -> bool {
         matches!(self, RootKind::YoungCodeCacheRoots)
             || matches!(self, RootKind::YoungWeakHandleRoots)
+            || matches!(self, RootKind::MatureWeakRoots)
             || matches!(self, RootKind::Weak)
     }
 
@@ -572,6 +575,7 @@ impl RootKind {
             || matches!(self, RootKind::YoungStrongCLDRoots)
             || matches!(self, RootKind::YoungWeakCLDRoots)
             || matches!(self, RootKind::YoungWeakHandleRoots)
+            || matches!(self, RootKind::MatureWeakRoots)
             || matches!(self, RootKind::Weak)
     }
 }

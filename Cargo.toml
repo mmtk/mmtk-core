@@ -243,6 +243,7 @@ fixed_clean_alloc_trigger_based_on_system_time = []
 takerate_measurement = []
 enable_sysinfo = []
 regex = ["dep:regex"]
+jdk11 = []
 
 fixed_alloc_trigger_based_on_system_time = []
 

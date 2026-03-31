@@ -583,7 +583,10 @@ impl<VM: VMBinding, const FULL_GC: bool> ProcessEdgesWork
         }
         let slots = std::mem::take(&mut self.slots);
         let slices = std::mem::take(&mut self.array_slices);
-        if self.roots && self.root_kind == Some(RootKind::Weak) {
+        if self.roots
+            && (self.root_kind == Some(RootKind::Weak)
+                || self.root_kind == Some(RootKind::MatureWeakRoots))
+        {
             self.process_slots_impl::<true, false>(&slots, &slices);
         } else if self.remset_recorded_slots {
             self.process_slots_impl::<false, true>(&slots, &slices);
@@ -689,7 +692,6 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
             object,
             self.remset_recorded_slots
         );
-        debug_assert!(object.class_is_valid::<VM>());
         let object = object.get_forwarded_object().unwrap_or(object);
         let new_object = if self.lxr.immix_space.in_space(object) {
             if self
