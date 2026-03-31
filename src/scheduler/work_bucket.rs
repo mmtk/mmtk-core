@@ -412,7 +412,6 @@ pub enum WorkBucketStage {
     Compact,
     /// Work packets that should be done just before GC shall go here.  This includes releasing
     /// resources and setting states in plans, spaces, GC workers, mutators, etc.
-    FixRelocations,
     Release,
     STWRCDecsAndSweep,
     /// Resume mutators and end GC.

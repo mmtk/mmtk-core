@@ -886,7 +886,6 @@ impl<VM: VMBinding> LXR<VM> {
         scheduler.work_buckets[WorkBucketStage::RefForwarding].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::FinalizableForwarding].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::Compact].set_enabled(false);
-        scheduler.work_buckets[WorkBucketStage::FixRelocations].set_enabled(false);
         if crate::args::LAZY_DECREMENTS
             && pause != Pause::Full
             && !cfg!(feature = "fragmentation_analysis")
