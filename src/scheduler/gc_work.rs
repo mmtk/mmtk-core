@@ -14,12 +14,12 @@ pub struct ScheduleCollection;
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         // Tell GC trigger that GC started.
-        mmtk.gc_trigger.trace.on_gc_start(mmtk);
+        mmtk.gc_trigger.policy.on_gc_start(mmtk);
 
         // Determine collection kind
         let is_emergency = mmtk.state.set_collection_kind(
             mmtk.get_plan().last_collection_was_exhaustive(),
-            mmtk.gc_trigger.trace.can_heap_size_grow(),
+            mmtk.gc_trigger.policy.can_heap_size_grow(),
         );
         if is_emergency {
             mmtk.get_plan().notify_emergency_collection();
@@ -132,7 +132,7 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Release Global");
 
-        mmtk.gc_trigger.trace.on_gc_release(mmtk);
+        mmtk.gc_trigger.policy.on_gc_release(mmtk);
         // We assume this is the only running work packet that accesses plan at the point of execution
 
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
