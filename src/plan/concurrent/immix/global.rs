@@ -1,4 +1,4 @@
-use crate::plan::concurrent::concurrent_marking_work::ConcurrentMarkingTracePolicy;
+use crate::plan::concurrent::concurrent_marking_work::ConcurrentMarkingTrace;
 use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::immix::gc_work::ConcurrentImmixGCWorkContext;
 use crate::plan::concurrent::immix::gc_work::ConcurrentImmixSTWGCWorkContext;
@@ -8,7 +8,7 @@ use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::immix::mutator::ALLOCATOR_MAPPING;
-use crate::plan::tracing::UnsupportedTracePolicy;
+use crate::plan::tracing::UnsupportedTrace;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -367,11 +367,10 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         self.set_ref_closure_buckets_enabled(false);
 
         scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-            ConcurrentImmixGCWorkContext<ConcurrentMarkingTracePolicy<VM, Self, TRACE_KIND_FAST>>,
+            ConcurrentImmixGCWorkContext<ConcurrentMarkingTrace<VM, Self, TRACE_KIND_FAST>>,
         >::new());
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<
-            ConcurrentImmixGCWorkContext<UnsupportedTracePolicy<VM>>,
-        >::new(self));
+        scheduler.work_buckets[WorkBucketStage::Prepare]
+            .add(Prepare::<ConcurrentImmixGCWorkContext<UnsupportedTrace<VM>>>::new(self));
     }
 
     fn schedule_concurrent_marking_final_pause(&'static self, scheduler: &GCWorkScheduler<VM>) {
@@ -379,17 +378,16 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
         // Skip root scanning in the final mark
         scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-            ConcurrentImmixGCWorkContext<ConcurrentMarkingTracePolicy<VM, Self, TRACE_KIND_FAST>>,
+            ConcurrentImmixGCWorkContext<ConcurrentMarkingTrace<VM, Self, TRACE_KIND_FAST>>,
         >::new_no_scan_roots());
 
-        scheduler.work_buckets[WorkBucketStage::Release].add(Release::<
-            ConcurrentImmixGCWorkContext<UnsupportedTracePolicy<VM>>,
-        >::new(self));
+        scheduler.work_buckets[WorkBucketStage::Release]
+            .add(Release::<ConcurrentImmixGCWorkContext<UnsupportedTrace<VM>>>::new(self));
 
         // Deal with weak ref and finalizers
         // TODO: Check against schedule_common_work and see if we are still missing any work packet
         type RefTracePolicy<VM> =
-            crate::plan::tracing::PlanTracePolicy<ConcurrentImmix<VM>, TRACE_KIND_FAST>;
+            crate::plan::tracing::PlanTrace<ConcurrentImmix<VM>, TRACE_KIND_FAST>;
         // Reference processing
         if !*self.base().options.no_reference_types {
             use crate::util::reference_processor::{

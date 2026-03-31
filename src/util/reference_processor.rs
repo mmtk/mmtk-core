@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use std::vec::Vec;
 
 use crate::plan::is_nursery_gc;
-use crate::plan::tracing::TracePolicy;
+use crate::plan::tracing::Trace;
 use crate::scheduler::gc_work::TracingTracerContext;
 use crate::scheduler::WorkBucketStage;
 use crate::util::ObjectReference;
@@ -545,8 +545,8 @@ impl<VM: VMBinding> GCWork<VM> for RescanReferences<VM> {
 }
 
 #[derive(Default)]
-pub(crate) struct SoftRefProcessing<T: TracePolicy>(PhantomData<T>);
-impl<T: TracePolicy> GCWork<T::VM> for SoftRefProcessing<T> {
+pub(crate) struct SoftRefProcessing<T: Trace>(PhantomData<T>);
+impl<T: Trace> GCWork<T::VM> for SoftRefProcessing<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         if !mmtk.state.is_emergency_collection() {
             // Postpone the scanning to the end of the transitive closure from strongly reachable
@@ -571,7 +571,7 @@ impl<T: TracePolicy> GCWork<T::VM> for SoftRefProcessing<T> {
     }
 }
 
-impl<T: TracePolicy> SoftRefProcessing<T> {
+impl<T: Trace> SoftRefProcessing<T> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
@@ -604,8 +604,8 @@ impl<VM: VMBinding> PhantomRefProcessing<VM> {
 }
 
 #[derive(Default)]
-pub(crate) struct RefForwarding<T: TracePolicy>(PhantomData<T>);
-impl<T: TracePolicy> GCWork<T::VM> for RefForwarding<T> {
+pub(crate) struct RefForwarding<T: Trace>(PhantomData<T>);
+impl<T: Trace> GCWork<T::VM> for RefForwarding<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         let tracer_context =
             TracingTracerContext::new(T::from_mmtk(mmtk), WorkBucketStage::RefForwarding);
@@ -614,7 +614,7 @@ impl<T: TracePolicy> GCWork<T::VM> for RefForwarding<T> {
         });
     }
 }
-impl<T: TracePolicy> RefForwarding<T> {
+impl<T: Trace> RefForwarding<T> {
     pub fn new() -> Self {
         Self(PhantomData)
     }

@@ -168,7 +168,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
             };
             self.work_buckets[WorkBucketStage::SoftRefClosure]
-                .add(SoftRefProcessing::<C::DefaultTracePolicy>::new());
+                .add(SoftRefProcessing::<C::DefaultTrace>::new());
             self.work_buckets[WorkBucketStage::WeakRefClosure].add(WeakRefProcessing::<VM>::new());
             self.work_buckets[WorkBucketStage::PhantomRefClosure]
                 .add(PhantomRefProcessing::<VM>::new());
@@ -176,7 +176,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             use crate::util::reference_processor::RefForwarding;
             if plan.constraints().needs_forward_after_liveness {
                 self.work_buckets[WorkBucketStage::RefForwarding]
-                    .add(RefForwarding::<C::DefaultTracePolicy>::new());
+                    .add(RefForwarding::<C::DefaultTrace>::new());
             }
 
             use crate::util::reference_processor::RefEnqueue;
@@ -188,11 +188,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
             // finalization
             self.work_buckets[WorkBucketStage::FinalRefClosure]
-                .add(Finalization::<C::DefaultTracePolicy>::new());
+                .add(Finalization::<C::DefaultTrace>::new());
             // forward refs
             if plan.constraints().needs_forward_after_liveness {
                 self.work_buckets[WorkBucketStage::FinalizableForwarding]
-                    .add(ForwardFinalization::<C::DefaultTracePolicy>::new());
+                    .add(ForwardFinalization::<C::DefaultTrace>::new());
             }
         }
 
@@ -218,12 +218,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // because there are no other packets in the bucket.  We set it as sentinel for
         // consistency.
         self.work_buckets[WorkBucketStage::VMRefClosure]
-            .set_sentinel(Box::new(VMProcessWeakRefs::<C::DefaultTracePolicy>::new()));
+            .set_sentinel(Box::new(VMProcessWeakRefs::<C::DefaultTrace>::new()));
 
         if plan.constraints().needs_forward_after_liveness {
             // VM-specific weak ref forwarding
             self.work_buckets[WorkBucketStage::VMRefForwarding]
-                .add(VMForwardWeakRefs::<C::DefaultTracePolicy>::new());
+                .add(VMForwardWeakRefs::<C::DefaultTrace>::new());
         }
 
         self.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());

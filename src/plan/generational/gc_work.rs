@@ -1,6 +1,6 @@
 use atomic::Ordering;
 
-use crate::plan::tracing::TracePolicy;
+use crate::plan::tracing::Trace;
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::{gc_work::*, GCWork, GCWorker, WorkBucketStage};
@@ -13,7 +13,7 @@ use std::marker::PhantomData;
 
 use super::global::GenerationalPlanExt;
 
-pub struct GenNurseryTracePolicy<
+pub struct GenNurseryTrace<
     VM: VMBinding,
     P: GenerationalPlanExt<VM> + PlanTraceObject<VM>,
     const KIND: TraceKind,
@@ -23,7 +23,7 @@ pub struct GenNurseryTracePolicy<
 }
 
 impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind> Clone
-    for GenNurseryTracePolicy<VM, P, KIND>
+    for GenNurseryTrace<VM, P, KIND>
 {
     fn clone(&self) -> Self {
         Self {
@@ -33,8 +33,8 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
     }
 }
 
-impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
-    TracePolicy for GenNurseryTracePolicy<VM, P, KIND>
+impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind> Trace
+    for GenNurseryTrace<VM, P, KIND>
 {
     type VM = VM;
 
@@ -67,12 +67,12 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
 /// The modbuf contains a list of objects in mature space(s) that
 /// may contain pointers to the nursery space.
 /// This work packet scans the recorded objects and forwards pointers if necessary.
-pub struct ProcessModBuf<T: TracePolicy> {
+pub struct ProcessModBuf<T: Trace> {
     modbuf: Vec<ObjectReference>,
     phantom: PhantomData<T>,
 }
 
-impl<T: TracePolicy> ProcessModBuf<T> {
+impl<T: Trace> ProcessModBuf<T> {
     pub fn new(modbuf: Vec<ObjectReference>) -> Self {
         debug_assert!(!modbuf.is_empty());
         Self {
@@ -82,7 +82,7 @@ impl<T: TracePolicy> ProcessModBuf<T> {
     }
 }
 
-impl<T: TracePolicy> GCWork<T::VM> for ProcessModBuf<T> {
+impl<T: Trace> GCWork<T::VM> for ProcessModBuf<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         // Process and scan modbuf only if the current GC is a nursery GC
         let gen = mmtk.get_plan().generational().unwrap();
@@ -120,13 +120,13 @@ impl<T: TracePolicy> GCWork<T::VM> for ProcessModBuf<T> {
 /// The array-copy modbuf contains a list of array slices in mature space(s) that
 /// may contain pointers to the nursery space.
 /// This work packet forwards and updates each entry in the recorded slices.
-pub struct ProcessRegionModBuf<T: TracePolicy> {
+pub struct ProcessRegionModBuf<T: Trace> {
     /// A list of `(start_address, bytes)` tuple.
     modbuf: Vec<<T::VM as VMBinding>::VMMemorySlice>,
     phantom: PhantomData<T>,
 }
 
-impl<T: TracePolicy> ProcessRegionModBuf<T> {
+impl<T: Trace> ProcessRegionModBuf<T> {
     pub fn new(modbuf: Vec<<T::VM as VMBinding>::VMMemorySlice>) -> Self {
         Self {
             modbuf,
@@ -135,7 +135,7 @@ impl<T: TracePolicy> ProcessRegionModBuf<T> {
     }
 }
 
-impl<T: TracePolicy> GCWork<T::VM> for ProcessRegionModBuf<T> {
+impl<T: Trace> GCWork<T::VM> for ProcessRegionModBuf<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         // Scan modbuf only if the current GC is a nursery GC
         if mmtk

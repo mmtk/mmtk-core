@@ -1,6 +1,6 @@
 use crate::plan::concurrent::concurrent_marking_work::ConcurrentMarkingRootsWorkFactory;
 use crate::plan::concurrent::immix::global::ConcurrentImmix;
-use crate::plan::tracing::{PlanTracePolicy, TracePolicy};
+use crate::plan::tracing::{PlanTrace, Trace};
 use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::immix::TRACE_KIND_FAST;
 use crate::vm::VMBinding;
@@ -13,16 +13,16 @@ impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
 {
     type VM = VM;
     type PlanType = ConcurrentImmix<VM>;
-    type DefaultTracePolicy = PlanTracePolicy<ConcurrentImmix<VM>, KIND>;
-    type PinningTracePolicy = PlanTracePolicy<ConcurrentImmix<VM>, TRACE_KIND_TRANSITIVE_PIN>;
+    type DefaultTrace = PlanTrace<ConcurrentImmix<VM>, KIND>;
+    type PinningTrace = PlanTrace<ConcurrentImmix<VM>, TRACE_KIND_TRANSITIVE_PIN>;
 }
-pub(super) struct ConcurrentImmixGCWorkContext<T: TracePolicy>(std::marker::PhantomData<T>);
+pub(super) struct ConcurrentImmixGCWorkContext<T: Trace>(std::marker::PhantomData<T>);
 
-impl<T: TracePolicy> crate::scheduler::GCWorkContext for ConcurrentImmixGCWorkContext<T> {
+impl<T: Trace> crate::scheduler::GCWorkContext for ConcurrentImmixGCWorkContext<T> {
     type VM = T::VM;
     type PlanType = ConcurrentImmix<T::VM>;
-    type DefaultTracePolicy = T;
-    type PinningTracePolicy = T;
+    type DefaultTrace = T;
+    type PinningTrace = T;
 
     fn make_roots_work_factory(
         mmtk: &'static crate::MMTK<Self::VM>,

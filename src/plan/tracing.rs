@@ -10,7 +10,7 @@ use crate::util::{ObjectReference, VMThread, VMWorkerThread};
 use crate::vm::{Scanning, VMBinding};
 use crate::{Plan, MMTK};
 
-pub trait TracePolicy: 'static + Send + Clone {
+pub trait Trace: 'static + Send + Clone {
     type VM: VMBinding;
 
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self;
@@ -29,11 +29,11 @@ pub trait TracePolicy: 'static + Send + Clone {
 
 #[allow(dead_code)]
 #[derive(Default)]
-pub struct SFTTracePolicy<VM: VMBinding> {
+pub struct SFTTrace<VM: VMBinding> {
     phantom_data: PhantomData<VM>,
 }
 
-impl<VM: VMBinding> Clone for SFTTracePolicy<VM> {
+impl<VM: VMBinding> Clone for SFTTrace<VM> {
     fn clone(&self) -> Self {
         Self {
             phantom_data: PhantomData,
@@ -41,7 +41,7 @@ impl<VM: VMBinding> Clone for SFTTracePolicy<VM> {
     }
 }
 
-impl<VM: VMBinding> TracePolicy for SFTTracePolicy<VM> {
+impl<VM: VMBinding> Trace for SFTTrace<VM> {
     type VM = VM;
 
     fn from_mmtk(_mmtk: &'static MMTK<Self::VM>) -> Self {
@@ -70,7 +70,7 @@ impl<VM: VMBinding> TracePolicy for SFTTracePolicy<VM> {
     }
 
     fn post_scan_object(&mut self, _object: ObjectReference) {
-        // Do nothing.  SFTTracePolicy is only suitable for plans that don't need post_scan_object.
+        // Do nothing.  SFTTrace is only suitable for plans that don't need post_scan_object.
     }
 
     fn may_move_objects() -> bool {
@@ -78,25 +78,23 @@ impl<VM: VMBinding> TracePolicy for SFTTracePolicy<VM> {
     }
 }
 
-pub struct PlanTracePolicy<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> {
+pub struct PlanTrace<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> {
     plan: &'static P,
 }
 
-impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> PlanTracePolicy<P, KIND> {
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> PlanTrace<P, KIND> {
     pub(crate) fn new(plan: &'static P) -> Self {
         Self { plan }
     }
 }
 
-impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> Clone for PlanTracePolicy<P, KIND> {
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> Clone for PlanTrace<P, KIND> {
     fn clone(&self) -> Self {
         Self { plan: self.plan }
     }
 }
 
-impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> TracePolicy
-    for PlanTracePolicy<P, KIND>
-{
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> Trace for PlanTrace<P, KIND> {
     type VM = P::VM;
 
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
@@ -123,11 +121,11 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> TracePolicy
 }
 
 #[derive(Default)]
-pub struct UnsupportedTracePolicy<VM: VMBinding> {
+pub struct UnsupportedTrace<VM: VMBinding> {
     phantom_data: PhantomData<VM>,
 }
 
-impl<VM: VMBinding> Clone for UnsupportedTracePolicy<VM> {
+impl<VM: VMBinding> Clone for UnsupportedTrace<VM> {
     fn clone(&self) -> Self {
         Self {
             phantom_data: PhantomData,
@@ -135,7 +133,7 @@ impl<VM: VMBinding> Clone for UnsupportedTracePolicy<VM> {
     }
 }
 
-impl<VM: VMBinding> TracePolicy for UnsupportedTracePolicy<VM> {
+impl<VM: VMBinding> Trace for UnsupportedTrace<VM> {
     type VM = VM;
 
     fn from_mmtk(_mmtk: &'static MMTK<Self::VM>) -> Self {

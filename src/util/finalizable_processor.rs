@@ -1,5 +1,5 @@
 use crate::plan::is_nursery_gc;
-use crate::plan::tracing::TracePolicy;
+use crate::plan::tracing::Trace;
 use crate::scheduler::gc_work::TracingTracerContext;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
 use crate::util::reference_processor::RescanReferences;
@@ -141,9 +141,9 @@ impl<F: Finalizable> FinalizableProcessor<F> {
 }
 
 #[derive(Default)]
-pub struct Finalization<T: TracePolicy>(PhantomData<T>);
+pub struct Finalization<T: Trace>(PhantomData<T>);
 
-impl<T: TracePolicy> GCWork<T::VM> for Finalization<T> {
+impl<T: Trace> GCWork<T::VM> for Finalization<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         if !*mmtk.options.no_reference_types {
             // Rescan soft and weak references at the end of the transitive closure from resurrected
@@ -189,16 +189,16 @@ impl<T: TracePolicy> GCWork<T::VM> for Finalization<T> {
     }
 }
 
-impl<T: TracePolicy> Finalization<T> {
+impl<T: Trace> Finalization<T> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
 }
 
 #[derive(Default)]
-pub struct ForwardFinalization<T: TracePolicy>(PhantomData<T>);
+pub struct ForwardFinalization<T: Trace>(PhantomData<T>);
 
-impl<T: TracePolicy> GCWork<T::VM> for ForwardFinalization<T> {
+impl<T: Trace> GCWork<T::VM> for ForwardFinalization<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         trace!("Forward finalization");
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
@@ -213,7 +213,7 @@ impl<T: TracePolicy> GCWork<T::VM> for ForwardFinalization<T> {
         trace!("Finished forwarding finlizable");
     }
 }
-impl<T: TracePolicy> ForwardFinalization<T> {
+impl<T: Trace> ForwardFinalization<T> {
     pub fn new() -> Self {
         Self(PhantomData)
     }

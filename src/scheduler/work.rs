@@ -1,7 +1,7 @@
 use super::worker::*;
 use crate::scheduler::gc_work::TracingRootsWorkFactory;
 use crate::vm::{RootsWorkFactory, VMBinding};
-use crate::{mmtk::MMTK, plan::tracing::TracePolicy};
+use crate::{mmtk::MMTK, plan::tracing::Trace};
 #[cfg(feature = "work_packet_stats")]
 use std::any::{type_name, TypeId};
 
@@ -83,7 +83,7 @@ pub trait GCWorkContext: Send + 'static {
     /// The `ProcessEdgesWork` implementation to use for tracing edges that do not have special
     /// pinning requirements.  Concrete plans and spaces may choose to move or not to move the
     /// objects the traced edges point to.
-    type DefaultTracePolicy: TracePolicy<VM = Self::VM>;
+    type DefaultTrace: Trace<VM = Self::VM>;
 
     /// The `ProcessEdgesWork` implementation to use for tracing edges that must not be updated
     /// (i.e. the objects the traced edges pointed to must not be moved).  This is used for
@@ -97,13 +97,11 @@ pub trait GCWorkContext: Send + 'static {
     ///
     /// If a plan does not support object pinning, it should use `UnsupportedProcessEdges` for this
     /// type member.
-    type PinningTracePolicy: TracePolicy<VM = Self::VM>;
+    type PinningTrace: Trace<VM = Self::VM>;
 
     fn make_roots_work_factory(
         mmtk: &'static MMTK<Self::VM>,
     ) -> impl RootsWorkFactory<<Self::VM as VMBinding>::VMSlot> {
-        TracingRootsWorkFactory::<Self::VM, Self::DefaultTracePolicy, Self::PinningTracePolicy>::new(
-            mmtk,
-        )
+        TracingRootsWorkFactory::<Self::VM, Self::DefaultTrace, Self::PinningTrace>::new(mmtk)
     }
 }

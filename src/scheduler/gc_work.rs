@@ -1,7 +1,7 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::global_state::GcStatus;
-use crate::plan::tracing::TracePolicy;
+use crate::plan::tracing::Trace;
 use crate::plan::VectorObjectQueue;
 use crate::util::*;
 use crate::vm::slot::Slot;
@@ -243,14 +243,14 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
 
 /// This implementation of [`ObjectTracer`] queues newly visited objects and create the
 /// [`TracingProcessNodes`] work packets to scan and trace objects.
-pub(crate) struct TracingObjectTracer<'w, T: TracePolicy> {
+pub(crate) struct TracingObjectTracer<'w, T: Trace> {
     worker: &'w mut GCWorker<T::VM>,
     policy: T,
     queue: VectorObjectQueue,
     stage: WorkBucketStage,
 }
 
-impl<'w, T: TracePolicy> ObjectTracer for TracingObjectTracer<'w, T> {
+impl<'w, T: Trace> ObjectTracer for TracingObjectTracer<'w, T> {
     /// Forward the `trace_object` call to the underlying `ProcessEdgesWork`,
     /// and flush as soon as the underlying buffer of `process_edges_work` is full.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
@@ -262,7 +262,7 @@ impl<'w, T: TracePolicy> ObjectTracer for TracingObjectTracer<'w, T> {
     }
 }
 
-impl<'w, T: TracePolicy> TracingObjectTracer<'w, T> {
+impl<'w, T: Trace> TracingObjectTracer<'w, T> {
     fn new(worker: &'w mut GCWorker<T::VM>, policy: T, stage: WorkBucketStage) -> Self {
         Self {
             worker,
@@ -295,18 +295,18 @@ impl<'w, T: TracePolicy> TracingObjectTracer<'w, T> {
 /// This implementation of [`ObjectTracerContext`] creates the [`TracingObjectTracer`] to expand the
 /// transitive closure during a stop-the-world tracing GC or the final mark pause of a concurrent
 /// GC.  It is used during object scanning as well as weak reference processing.
-pub(crate) struct TracingTracerContext<T: TracePolicy> {
+pub(crate) struct TracingTracerContext<T: Trace> {
     policy: T,
     stage: WorkBucketStage,
 }
 
-impl<T: TracePolicy> TracingTracerContext<T> {
+impl<T: Trace> TracingTracerContext<T> {
     pub fn new(policy: T, stage: WorkBucketStage) -> Self {
         Self { policy, stage }
     }
 }
 
-impl<T: TracePolicy> Clone for TracingTracerContext<T> {
+impl<T: Trace> Clone for TracingTracerContext<T> {
     fn clone(&self) -> Self {
         Self {
             policy: self.policy.clone(),
@@ -315,7 +315,7 @@ impl<T: TracePolicy> Clone for TracingTracerContext<T> {
     }
 }
 
-impl<T: TracePolicy> ObjectTracerContext<T::VM> for TracingTracerContext<T> {
+impl<T: Trace> ObjectTracerContext<T::VM> for TracingTracerContext<T> {
     type TracerType<'w> = TracingObjectTracer<'w, T>;
 
     fn with_tracer<'w, R, F>(&self, worker: &'w mut GCWorker<T::VM>, func: F) -> R
@@ -344,11 +344,11 @@ impl<T: TracePolicy> ObjectTracerContext<T::VM> for TracingTracerContext<T> {
 /// VM binding to process weak references.
 ///
 /// NOTE: This will replace `{Soft,Weak,Phantom}RefProcessing` and `Finalization` in the future.
-pub struct VMProcessWeakRefs<T: TracePolicy> {
+pub struct VMProcessWeakRefs<T: Trace> {
     phantom_data: PhantomData<T>,
 }
 
-impl<T: TracePolicy> VMProcessWeakRefs<T> {
+impl<T: Trace> VMProcessWeakRefs<T> {
     pub fn new() -> Self {
         Self {
             phantom_data: PhantomData,
@@ -356,7 +356,7 @@ impl<T: TracePolicy> VMProcessWeakRefs<T> {
     }
 }
 
-impl<T: TracePolicy> GCWork<T::VM> for VMProcessWeakRefs<T> {
+impl<T: Trace> GCWork<T::VM> for VMProcessWeakRefs<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         trace!("VMProcessWeakRefs");
 
@@ -384,11 +384,11 @@ impl<T: TracePolicy> GCWork<T::VM> for VMProcessWeakRefs<T> {
 /// VM binding to process weak references.
 ///
 /// NOTE: This will replace `RefForwarding` and `ForwardFinalization` in the future.
-pub struct VMForwardWeakRefs<T: TracePolicy> {
+pub struct VMForwardWeakRefs<T: Trace> {
     phantom_data: PhantomData<T>,
 }
 
-impl<T: TracePolicy> VMForwardWeakRefs<T> {
+impl<T: Trace> VMForwardWeakRefs<T> {
     pub fn new() -> Self {
         Self {
             phantom_data: PhantomData,
@@ -396,7 +396,7 @@ impl<T: TracePolicy> VMForwardWeakRefs<T> {
     }
 }
 
-impl<T: TracePolicy> GCWork<T::VM> for VMForwardWeakRefs<T> {
+impl<T: Trace> GCWork<T::VM> for VMForwardWeakRefs<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         trace!("VMForwardWeakRefs");
 
@@ -432,10 +432,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("ScanMutatorRoots for mutator {:?}", self.0.get_tls());
         let mutators = <C::VM as VMBinding>::VMActivePlan::number_of_mutators();
-        let factory =
-            TracingRootsWorkFactory::<C::VM, C::DefaultTracePolicy, C::PinningTracePolicy>::new(
-                mmtk,
-            );
+        let factory = TracingRootsWorkFactory::<C::VM, C::DefaultTrace, C::PinningTrace>::new(mmtk);
         <C::VM as VMBinding>::VMScanning::scan_roots_in_mutator_thread(
             worker.tls,
             unsafe { &mut *(self.0 as *mut _) },
@@ -464,16 +461,13 @@ impl<C: GCWorkContext> ScanVMSpecificRoots<C> {
 impl<C: GCWorkContext> GCWork<C::VM> for ScanVMSpecificRoots<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("ScanStaticRoots");
-        let factory =
-            TracingRootsWorkFactory::<C::VM, C::DefaultTracePolicy, C::PinningTracePolicy>::new(
-                mmtk,
-            );
+        let factory = TracingRootsWorkFactory::<C::VM, C::DefaultTrace, C::PinningTrace>::new(mmtk);
         <C::VM as VMBinding>::VMScanning::scan_vm_specific_roots(worker.tls, factory);
     }
 }
 
 /// A short-hand for `<E::VM as VMBinding>::VMSlot`.
-pub type SlotOfTP<E> = <<E as TracePolicy>::VM as VMBinding>::VMSlot;
+pub type SlotOfTP<E> = <<E as Trace>::VM as VMBinding>::VMSlot;
 
 /// A work packet for processing slots during a stop-the-world tracing GC and the final mark pause
 /// of a concurrent GC.
@@ -481,7 +475,7 @@ pub type SlotOfTP<E> = <<E as TracePolicy>::VM as VMBinding>::VMSlot;
 /// It will call `trace_object` on the value of each slot, and updates the slot if the object is
 /// moved or forwarded.  It will spawn or immediately run the [`DefaultScanObjects`] work packet to
 /// scan newly traced objects.
-pub struct TracingProcessSlots<T: TracePolicy> {
+pub struct TracingProcessSlots<T: Trace> {
     policy: T,
     slots: Vec<SlotOfTP<T>>,
     #[allow(unused)] // Only used by sanity
@@ -489,7 +483,7 @@ pub struct TracingProcessSlots<T: TracePolicy> {
     bucket: WorkBucketStage,
 }
 
-impl<T: TracePolicy> TracingProcessSlots<T> {
+impl<T: Trace> TracingProcessSlots<T> {
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
 
     pub fn new(policy: T, slots: Vec<SlotOfTP<T>>, roots: bool, bucket: WorkBucketStage) -> Self {
@@ -514,7 +508,7 @@ impl<T: TracePolicy> TracingProcessSlots<T> {
     }
 }
 
-impl<T: TracePolicy> GCWork<T::VM> for TracingProcessSlots<T> {
+impl<T: Trace> GCWork<T::VM> for TracingProcessSlots<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         let mut queue = VectorObjectQueue::new();
 
@@ -551,16 +545,12 @@ impl<T: TracePolicy> GCWork<T::VM> for TracingProcessSlots<T> {
 ///
 /// It will create relevant work packets for tpinning, pinning and non-pinning roots, and put them
 /// into the stop-the-world work buckets.
-pub(crate) struct TracingRootsWorkFactory<
-    VM: VMBinding,
-    DPE: TracePolicy<VM = VM>,
-    PPE: TracePolicy<VM = VM>,
-> {
+pub(crate) struct TracingRootsWorkFactory<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> {
     pub(crate) mmtk: &'static MMTK<VM>,
     phantom: PhantomData<(DPE, PPE)>,
 }
 
-impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>> Clone
+impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> Clone
     for TracingRootsWorkFactory<VM, DPE, PPE>
 {
     fn clone(&self) -> Self {
@@ -580,8 +570,8 @@ pub(crate) enum RootsKind {
     TPINNING = 2,
 }
 
-impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>>
-    RootsWorkFactory<VM::VMSlot> for TracingRootsWorkFactory<VM, DPE, PPE>
+impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> RootsWorkFactory<VM::VMSlot>
+    for TracingRootsWorkFactory<VM, DPE, PPE>
 {
     fn create_process_roots_work(&mut self, slots: Vec<VM::VMSlot>) {
         // Note: We should use the same USDT name "mmtk:roots" for all the three kinds of roots. A
@@ -629,7 +619,7 @@ impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>>
     }
 }
 
-impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>>
+impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>>
     TracingRootsWorkFactory<VM, DPE, PPE>
 {
     pub(crate) fn new(mmtk: &'static MMTK<VM>) -> Self {
@@ -647,13 +637,13 @@ impl<VM: VMBinding, DPE: TracePolicy<VM = VM>, PPE: TracePolicy<VM = VM>>
 /// slots and spawn [`TracingProcessSlots`] work packets to trace them.  For objects that don't
 /// support slot enqueuing, it will immediately trace their slots and spawn other
 /// [`TracingProcessNodes`] work packets to process their newly traced children.
-pub struct TracingProcessNodes<T: TracePolicy> {
+pub struct TracingProcessNodes<T: Trace> {
     policy: T,
     objects: Vec<ObjectReference>,
     bucket: WorkBucketStage,
 }
 
-impl<T: TracePolicy> TracingProcessNodes<T> {
+impl<T: Trace> TracingProcessNodes<T> {
     pub fn new(policy: T, objects: Vec<ObjectReference>, bucket: WorkBucketStage) -> Self {
         Self {
             policy,
@@ -663,7 +653,7 @@ impl<T: TracePolicy> TracingProcessNodes<T> {
     }
 }
 
-impl<T: TracePolicy> GCWork<T::VM> for TracingProcessNodes<T> {
+impl<T: Trace> GCWork<T::VM> for TracingProcessNodes<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         trace!("ScanObjects");
 
@@ -758,28 +748,28 @@ impl<T: TracePolicy> GCWork<T::VM> for TracingProcessNodes<T> {
 ///
 /// After that, it will create work packets for tracing their children.  Those work packets (and the
 /// work packets further created by them) will use `O2OPE` (Object-to-Object Trace Policy) as their
-/// `TracePolicy` implementations.
+/// `Trace` implementations.
 ///
-/// Because `roots` are pinning roots, `R2OTP` must be a `TracePolicy` that never moves any object.
+/// Because `roots` are pinning roots, `R2OTP` must be a `Trace` that never moves any object.
 ///
 /// The choice of `O2OPE` determines whether the `roots` are transitively pinning or not.
 ///
-/// -   If `O2OPE` is set to a `TracePolicy` that never moves objects, no descendents of `roots`
-///     will be moved in this GC.  That implements transitive pinning roots.
+/// -   If `O2OPE` is set to a `Trace` that never moves objects, no descendents of `roots` will be
+///     moved in this GC.  That implements transitive pinning roots.
 /// -   If `O2OPE` may move objects, then this `ProcessRootsNode<VM, R2OTP, O2OPE>` work packet will
 ///     only pin the objects in `roots` (because `R2OTP` must not move objects anyway), but not
 ///     their descendents.
 pub(crate) struct TracingProcessPinningRoots<
     VM: VMBinding,
-    R2OTP: TracePolicy<VM = VM>,
-    O2OTP: TracePolicy<VM = VM>,
+    R2OTP: Trace<VM = VM>,
+    O2OTP: Trace<VM = VM>,
 > {
     phantom: PhantomData<(VM, R2OTP, O2OTP)>,
     roots: Vec<ObjectReference>,
     bucket: WorkBucketStage,
 }
 
-impl<VM: VMBinding, R2OTP: TracePolicy<VM = VM>, O2OTP: TracePolicy<VM = VM>>
+impl<VM: VMBinding, R2OTP: Trace<VM = VM>, O2OTP: Trace<VM = VM>>
     TracingProcessPinningRoots<VM, R2OTP, O2OTP>
 {
     pub fn new(nodes: Vec<ObjectReference>, bucket: WorkBucketStage) -> Self {
@@ -791,7 +781,7 @@ impl<VM: VMBinding, R2OTP: TracePolicy<VM = VM>, O2OTP: TracePolicy<VM = VM>>
     }
 }
 
-impl<VM: VMBinding, R2OTP: TracePolicy<VM = VM>, O2OTP: TracePolicy<VM = VM>> GCWork<VM>
+impl<VM: VMBinding, R2OTP: Trace<VM = VM>, O2OTP: Trace<VM = VM>> GCWork<VM>
     for TracingProcessPinningRoots<VM, R2OTP, O2OTP>
 {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
