@@ -679,10 +679,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
                     .postpone(LXRConcurrentTraceObjects::new(roots.clone(), mmtk));
             }
             if self.pause == Pause::FinalMark || self.pause == Pause::Full {
-                if !root_slots.is_empty()
-                    && self.root_kind != Some(RootKind::Weak)
-                    && self.root_kind != Some(RootKind::MatureWeakRoots)
-                {
+                if !root_slots.is_empty() && self.root_kind != Some(RootKind::Weak) {
                     if self.pause == Pause::FinalMark {
                         let mut w = LXRStopTheWorldProcessEdges::<_, false>::new(
                             root_slots,
