@@ -51,19 +51,18 @@ impl<SL: Slot> SanityChecker<SL> {
 }
 
 pub struct ScheduleSanityGC<P: Plan> {
-    _plan: &'static P,
+    plan: &'static P,
 }
 
 impl<P: Plan> ScheduleSanityGC<P> {
     pub fn new(plan: &'static P) -> Self {
-        ScheduleSanityGC { _plan: plan }
+        ScheduleSanityGC { plan }
     }
 }
 
 impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         let scheduler = worker.scheduler();
-        let plan = mmtk.get_plan();
 
         scheduler.reset_state();
 
@@ -75,13 +74,13 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
 
         // Prepare global/collectors/mutators
         worker.scheduler().work_buckets[WorkBucketStage::Prepare]
-            .add(SanityPrepare::<P>::new(plan.downcast_ref::<P>().unwrap()));
+            .add(SanityPrepare::<P>::new(self.plan));
         // Do the transitive closure
         worker.scheduler().work_buckets[WorkBucketStage::Closure]
-            .add(SanityClosure::<P>::new(plan.downcast_ref::<P>().unwrap()));
+            .add(SanityClosure::<P>::new(self.plan));
         // Release global/collectors/mutators
         worker.scheduler().work_buckets[WorkBucketStage::Release]
-            .add(SanityRelease::<P>::new(plan.downcast_ref::<P>().unwrap()));
+            .add(SanityRelease::<P>::new(self.plan));
     }
 }
 
@@ -170,7 +169,7 @@ impl<P: Plan> GCWork<P::VM> for SanityClosure<P> {
 
             // Let plan check object
             assert!(
-                mmtk.get_plan().sanity_check_object(object),
+                self.plan.sanity_check_object(object),
                 "Invalid reference {:?}",
                 object
             );
