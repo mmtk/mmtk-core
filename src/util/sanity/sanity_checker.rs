@@ -1,12 +1,12 @@
-use crate::plan::tracing::Trace;
 use crate::plan::Plan;
-use crate::scheduler::gc_work::TracingProcessPinningRoots;
-use crate::scheduler::gc_work::TracingProcessSlots;
+use crate::scheduler::GCWork;
+use crate::scheduler::GCWorker;
+use crate::scheduler::WorkBucketStage;
+use crate::util::scanning_helper;
 use crate::util::ObjectReference;
 use crate::vm::slot::Slot;
-use crate::vm::*;
+use crate::vm::{ObjectModel, VMBinding};
 use crate::MMTK;
-use crate::{scheduler::*, ObjectQueue};
 use std::collections::HashSet;
 
 #[allow(dead_code)]
@@ -73,41 +73,12 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
 
         mmtk.sanity_begin(); // Stop & scan mutators (mutator scanning can happen before STW)
 
-        // We use the cached roots for sanity gc, based on the assumption that
-        // the stack scanning triggered by the selected plan is correct and precise.
-        // FIXME(Wenyu,Tianle): When working on eager stack scanning on OpenJDK,
-        // the stack scanning may be broken. Uncomment the following lines to
-        // collect the roots again.
-        // Also, remember to call `DerivedPointerTable::update_pointers(); DerivedPointerTable::clear();`
-        // in openjdk binding before the second round of roots scanning.
-        // for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-        //     scheduler.work_buckets[WorkBucketStage::Prepare]
-        //         .add(ScanMutatorRoots::<SanityGCProcessEdges<P::VM>>(mutator));
-        // }
-        {
-            let sanity_checker = mmtk.sanity_checker.lock().unwrap();
-            for roots in &sanity_checker.root_slots {
-                scheduler.work_buckets[WorkBucketStage::Closure].add(TracingProcessSlots::new(
-                    SanityTrace::from_mmtk(mmtk),
-                    roots.clone(),
-                    true,
-                    WorkBucketStage::Closure,
-                ));
-            }
-            for roots in &sanity_checker.root_nodes {
-                scheduler.work_buckets[WorkBucketStage::Closure].add(TracingProcessPinningRoots::<
-                    P::VM,
-                    SanityTrace<P::VM>,
-                    SanityTrace<P::VM>,
-                >::new(
-                    roots.clone(),
-                    WorkBucketStage::Closure,
-                ));
-            }
-        }
         // Prepare global/collectors/mutators
         worker.scheduler().work_buckets[WorkBucketStage::Prepare]
             .add(SanityPrepare::<P>::new(plan.downcast_ref::<P>().unwrap()));
+        // Do the transitive closure
+        worker.scheduler().work_buckets[WorkBucketStage::Closure]
+            .add(SanityClosure::<P>::new(plan.downcast_ref::<P>().unwrap()));
         // Release global/collectors/mutators
         worker.scheduler().work_buckets[WorkBucketStage::Release]
             .add(SanityRelease::<P>::new(plan.downcast_ref::<P>().unwrap()));
@@ -152,71 +123,72 @@ impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
     }
 }
 
-pub struct SanityTrace<VM: VMBinding> {
-    mmtk: &'static MMTK<VM>,
+pub struct SanityClosure<P: Plan> {
+    pub plan: &'static P,
 }
 
-impl<VM: VMBinding> Clone for SanityTrace<VM> {
-    fn clone(&self) -> Self {
-        Self { mmtk: self.mmtk }
+impl<P: Plan> SanityClosure<P> {
+    pub fn new(plan: &'static P) -> Self {
+        Self { plan }
     }
 }
 
-impl<VM: VMBinding> Trace for SanityTrace<VM> {
-    type VM = VM;
+impl<P: Plan> GCWork<P::VM> for SanityClosure<P> {
+    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+        info!("Sanity GC closure");
+        let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
 
-    fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
-        Self { mmtk }
-    }
+        let mut queue = Vec::new();
 
-    fn trace_object<Q: ObjectQueue>(
-        &mut self,
-        _worker: &mut GCWorker<Self::VM>,
-        object: ObjectReference,
-        queue: &mut Q,
-    ) -> ObjectReference {
-        // TODO: Rewrite the sanity checker as a simple loop in a single work packet.
-        // It is very inefficient to acquire the mutex in every single `trace_object`.
-        let mut sanity_checker = self.mmtk.sanity_checker.lock().unwrap();
-        if !sanity_checker.refs.contains(&object) {
+        // We use the cached roots for sanity gc, based on the assumption that
+        // the stack scanning triggered by the selected plan is correct and precise.
+        // FIXME(Wenyu,Tianle): When working on eager stack scanning on OpenJDK,
+        // the stack scanning may be broken. Uncomment the following lines to
+        // collect the roots again.
+        // Also, remember to call `DerivedPointerTable::update_pointers(); DerivedPointerTable::clear();`
+        // in openjdk binding before the second round of roots scanning.
+        // for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
+        //     scheduler.work_buckets[WorkBucketStage::Prepare]
+        //         .add(ScanMutatorRoots::<SanityGCProcessEdges<P::VM>>(mutator));
+        // }
+        for roots in &sanity_checker.root_slots {
+            queue.extend(roots.iter().flat_map(|slot| slot.load()));
+        }
+        for roots in &sanity_checker.root_nodes {
+            queue.extend(roots);
+        }
+
+        let tls = worker.tls;
+
+        while let Some(object) = queue.pop() {
+            if !sanity_checker.refs.insert(object) {
+                continue;
+            }
+
             // FIXME steveb consider VM-specific integrity check on reference.
             assert!(object.is_sane(), "Invalid reference {:?}", object);
 
             // Let plan check object
             assert!(
-                self.mmtk.get_plan().sanity_check_object(object),
+                mmtk.get_plan().sanity_check_object(object),
                 "Invalid reference {:?}",
                 object
             );
 
             // Let VM check object
             assert!(
-                VM::VMObjectModel::is_object_sane(object),
+                <P::VM as VMBinding>::VMObjectModel::is_object_sane(object),
                 "Invalid reference {:?}",
                 object
             );
 
             // Object is not "marked"
-            sanity_checker.refs.insert(object); // "Mark" it
             trace!("Sanity mark object {}", object);
-            queue.enqueue(object);
+
+            scanning_helper::visit_children_non_moving::<P::VM>(tls, object, &mut |child| {
+                queue.push(child);
+                child
+            });
         }
-
-        // If the valid object (VO) bit metadata is enabled, all live objects should have the VO
-        // bit set when sanity GC starts.
-        #[cfg(feature = "vo_bit")]
-        if !crate::util::metadata::vo_bit::is_vo_bit_set(object) {
-            panic!("VO bit is not set: {}", object);
-        }
-
-        object
-    }
-
-    fn post_scan_object(&mut self, _object: ObjectReference) {
-        // Do nothing
-    }
-
-    fn may_move_objects() -> bool {
-        false
     }
 }
