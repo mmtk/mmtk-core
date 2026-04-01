@@ -109,10 +109,6 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
                 let a = object.to_raw_address() + off;
                 self.test_and_mark(a.to_object_reference::<VM>(), self.mark_state);
             }
-            #[cfg(feature = "lxr_srv_ratio_counter")]
-            crate::plan::lxr::SURVIVAL_RATIO_PREDICTOR
-                .los_alloc_vol
-                .fetch_add(bytes, Ordering::SeqCst);
             let lxr = self.lxr.unwrap();
             if lxr.cm_in_progress() {
                 for off in (0..bytes).step_by(BYTES_IN_PAGE) {

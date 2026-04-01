@@ -1,7 +1,6 @@
 //! Generational plans
 
 use enum_map::EnumMap;
-use spin::Lazy;
 
 use crate::plan::barriers::BarrierSelector;
 use crate::plan::mutator_context::create_allocator_mapping;
@@ -38,41 +37,31 @@ pub(super) mod global;
 ///  - Set `ACTIVE_BARRIER` to `BarrierSelector::NoBarrier`.
 /// ## 2. Object barrier
 ///  - Set `ACTIVE_BARRIER` to `BarrierSelector::ObjectBarrier`.
-pub static ACTIVE_BARRIER: Lazy<BarrierSelector> = Lazy::new(|| {
-    if FULL_NURSERY_GC {
-        match std::env::var("BARRIER") {
-            Ok(s) if s == "ObjectBarrier" => BarrierSelector::ObjectBarrier,
-            Ok(s) if s == "NoBarrier" => BarrierSelector::NoBarrier,
-            Ok(s) if s == "FieldBarrier" => BarrierSelector::FieldBarrier,
-            _ => unreachable!("Please explicitly specify barrier"),
-        }
-    } else {
-        BarrierSelector::ObjectBarrier
-    }
-});
-
+pub const ACTIVE_BARRIER: BarrierSelector = BarrierSelector::ObjectBarrier;
 /// Full heap collection as nursery GC.
 pub const FULL_NURSERY_GC: bool = false;
 
 /// Constraints for generational plans. Each generational plan should overwrite based on this constant.
-pub static GEN_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints {
+pub const GEN_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     needs_log_bit: ACTIVE_BARRIER.equals(BarrierSelector::ObjectBarrier),
     generational: true,
-    needs_field_log_bit: false,
-    barrier: *ACTIVE_BARRIER,
+    barrier: ACTIVE_BARRIER,
     // We may trace duplicate edges in sticky immix (or any plan that uses object remembering barrier). See https://github.com/mmtk/mmtk-core/issues/743.
     may_trace_duplicate_edges: ACTIVE_BARRIER.equals(BarrierSelector::ObjectBarrier),
     max_non_los_default_alloc_bytes:
         crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
     ..PlanConstraints::default()
-});
+};
 
 /// Create global side metadata specs for generational plans. This will call SideMetadataContext::new_global_specs().
 /// So if a plan calls this, it should not call SideMetadataContext::new_global_specs() again.
 pub fn new_generational_global_metadata_specs<VM: VMBinding>() -> Vec<SideMetadataSpec> {
-    let specs =
-        crate::util::metadata::extract_side_metadata(&[*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC]);
+    let specs = if ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
+        crate::util::metadata::extract_side_metadata(&[*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC])
+    } else {
+        vec![]
+    };
     SideMetadataContext::new_global_specs(&specs)
 }
 

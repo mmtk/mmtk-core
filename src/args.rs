@@ -1,9 +1,6 @@
 use crate::{
     policy::immix::{block::Block, line::Line},
-    util::{
-        constants::LOG_BYTES_IN_MBYTE, heap::vm_layout::vm_layout, linear_scan::Region,
-        options::Options,
-    },
+    util::{heap::vm_layout::vm_layout, linear_scan::Region, options::Options},
     BarrierSelector,
 };
 use std::fmt::Debug;
@@ -51,21 +48,8 @@ impl Default for RuntimeArgs {
             incs_limit: env_arg("INCS_LIMIT"),
             no_mutator_line_recycling: env_bool_arg("NO_MUTATOR_LINE_RECYCLING").unwrap_or(false),
             no_line_recycling: env_bool_arg("NO_LINE_RECYCLING").unwrap_or(false),
-            nursery_blocks: env_arg("NURSERY_BLOCKS").or(
-                if cfg!(feature = "lxr_fixed_clean_rc_trigger") {
-                    const BLOCKS_IN_MB: usize = (1 << 20) >> Block::LOG_BYTES;
-                    Some(128 * BLOCKS_IN_MB) // 128 M
-                } else {
-                    None
-                },
-            ),
-            young_limit_mb: env_arg("YOUNG_LIMIT")
-                .or_else(|| env_arg("YOUNG_LIMIT_MB"))
-                .or(if cfg!(feature = "lxr_fixed_rc_trigger") {
-                    Some(128 << LOG_BYTES_IN_MBYTE) // 128 M
-                } else {
-                    None
-                }),
+            nursery_blocks: env_arg("NURSERY_BLOCKS"),
+            young_limit_mb: env_arg("YOUNG_LIMIT").or_else(|| env_arg("YOUNG_LIMIT_MB")),
             nursery_ratio: env_arg("NURSERY_RATIO"),
             lower_concurrent_worker_priority: env_arg("LOWER_CONCURRENT_WORKER_PRIORITY")
                 .unwrap_or(false),
@@ -73,13 +57,7 @@ impl Default for RuntimeArgs {
             max_pause_millis: env_arg("MAX_PAUSE_MILLIS"),
             max_young_evac_size: env_arg("MAX_YOUNG_EVAC_SIZE").unwrap_or(usize::MAX),
             rc_stop_percent: env_arg("RC_STOP_PERCENT").unwrap_or(15),
-            max_survival_mb: if cfg!(feature = "lxr_fixed_rc_trigger")
-                || cfg!(feature = "lxr_fixed_clean_rc_trigger")
-            {
-                usize::MAX
-            } else {
-                env_arg::<usize>("MAX_SURVIVAL_MB").unwrap_or(128)
-            },
+            max_survival_mb: env_arg::<usize>("MAX_SURVIVAL_MB").unwrap_or(128),
             survival_predictor_harmonic_mean: env_bool_arg("SURVIVAL_PREDICTOR_HARMONIC_MEAN")
                 .unwrap_or(false),
             survival_predictor_weighted: env_bool_arg("SURVIVAL_PREDICTOR_WEIGHTED")
@@ -87,11 +65,7 @@ impl Default for RuntimeArgs {
             trace_threshold: env_arg("TRACE_THRESHOLD2")
                 .or_else(|| env_arg("TRACE_THRESHOLD"))
                 .or_else(|| env_arg("CM_THRESHOLD"))
-                .unwrap_or(if cfg!(feature = "lxr_simple_satb_trigger") {
-                    50
-                } else {
-                    20
-                }),
+                .unwrap_or(20),
             min_reuse_lines: env_arg::<usize>("MIN_REUSE_LINES").unwrap_or(1),
             chunk_defarg_percent: env_arg::<usize>("CHUNK_DEFARG_THRESHOLD").unwrap_or(32),
             transparent_hugepage: env_bool_arg("TRANSPARENT_HUGEPAGE")
@@ -117,7 +91,6 @@ impl RuntimeArgs {
 pub const CM_LARGE_ARRAY_OPTIMIZATION: bool = false;
 pub const BUFFER_SIZE: usize = 1024;
 
-pub const HOLE_COUNTING: bool = cfg!(feature = "lxr_hole_counting");
 pub const NO_LAZY_SWEEP_WHEN_STW_CANNOT_RELEASE_ENOUGH_MEMORY: bool = false;
 
 // ---------- Immix flags ---------- //
@@ -135,22 +108,12 @@ pub const LAZY_DECREMENTS: bool = !cfg!(feature = "lxr_no_lazy");
 pub const NO_LAZY_DEC_THRESHOLD: usize = 100;
 pub const RC_NURSERY_EVACUATION: bool = !cfg!(feature = "lxr_no_nursery_evac");
 pub const RC_MATURE_EVACUATION: bool = !cfg!(feature = "lxr_no_mature_evac");
-pub const ENABLE_INITIAL_ALLOC_LIMIT: bool = cfg!(feature = "lxr_enable_initial_alloc_limit");
-
-pub const RC_DONT_EVACUATE_NURSERY_IN_RECYCLED_LINES: bool =
-    !cfg!(feature = "lxr_evacuate_nursery_in_recycled_lines");
 
 // ---------- Debugging flags ---------- //
 pub const HARNESS_PRETTY_PRINT: bool = false || cfg!(feature = "log_gc");
 pub const LOG_WORK_PACKETS: bool = cfg!(feature = "log_work_packets");
-pub const NO_RC_PAUSES_DURING_CONCURRENT_MARKING: bool = cfg!(feature = "lxr_no_rc_in_cm");
 pub const SLOW_CONCURRENT_MARKING: bool = false;
 pub const INC_MAX_COPY_DEPTH: bool = false;
-pub const PREFETCH: bool = !cfg!(feature = "lxr_no_prefetch");
-pub const PREFETCH_HEADER: bool = PREFETCH;
-pub const PREFETCH_MARK: bool = PREFETCH;
-pub const PREFETCH_RC: bool = false;
-pub const PREFETCH_STEP: usize = 8;
 
 macro_rules! dump_feature {
     ($name: literal, $value: expr) => {
@@ -171,9 +134,6 @@ fn dump_features(active_barrier: BarrierSelector, options: &Options) {
     dump_feature!("barrier", format!("{:?}", active_barrier));
     dump_feature!("ix_block_only");
     dump_feature!("ix_no_defrag");
-    dump_feature!("lxr_evacuate_nursery_in_recycled_lines");
-    dump_feature!("lxr_delayed_nursery_evacuation");
-    dump_feature!("lxr_enable_initial_alloc_limit");
     dump_feature!("log_block_size", Block::LOG_BYTES);
     dump_feature!("log_line_size", Line::LOG_BYTES);
     dump_feature!("buffer_size", BUFFER_SIZE);
@@ -189,21 +149,11 @@ fn dump_features(active_barrier: BarrierSelector, options: &Options) {
     );
     dump_feature!("bpr_spin_lock");
     dump_feature!("lxr_no_nursery_evac");
-    dump_feature!("lxr_fixed_young_size");
-    dump_feature!("lxr_no_lazy_young_sweeping");
     dump_feature!("lxr_no_chunk_defrag");
     dump_feature!("lxr_no_lazy");
     dump_feature!("lxr_no_cm");
-    dump_feature!("lxr_srv_ratio_counter");
-    dump_feature!("lxr_release_stage_timer");
-    dump_feature!("lxr_fixed_satb_trigger");
-    dump_feature!("lxr_no_survival_trigger");
     dump_feature!("no_map_fixed_noreplace");
-    dump_feature!("report_worker_sleep_events");
     dump_feature!("no_meta_counting");
-    dump_feature!("lxr_no_srv_copy_reserve");
-    dump_feature!("lxr_abort_on_trace");
-    dump_feature!("lxr_simple_satb_trigger");
     dump_feature!("measure_trace_rate");
     dump_feature!("lxr_no_mature_defrag");
 

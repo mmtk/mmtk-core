@@ -25,7 +25,6 @@ use crate::util::VMWorkerThread;
 use crate::vm::*;
 use crate::ObjectQueue;
 use enum_map::EnumMap;
-use spin::Lazy;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
@@ -44,8 +43,7 @@ pub struct GenCopy<VM: VMBinding> {
 }
 
 /// The plan constraints for the generational copying plan.
-pub static GENCOPY_CONSTRAINTS: Lazy<PlanConstraints> =
-    Lazy::new(|| (*crate::plan::generational::GEN_CONSTRAINTS).clone());
+pub const GENCOPY_CONSTRAINTS: PlanConstraints = crate::plan::generational::GEN_CONSTRAINTS;
 
 impl<VM: VMBinding> Plan for GenCopy<VM> {
     fn constraints(&self) -> &'static PlanConstraints {
@@ -80,7 +78,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         if is_full_heap {
             scheduler.schedule_common_work::<GenCopyGCWorkContext<VM>>(self);
         } else {
-            scheduler.schedule_common_work_no_refs::<GenCopyNurseryGCWorkContext<VM>>(self);
+            scheduler.schedule_common_work::<GenCopyNurseryGCWorkContext<VM>>(self);
         }
     }
 

@@ -85,17 +85,7 @@ impl<VM: VMBinding> GCWork<VM> for SelectDefragBlocks {
                     }
                 }
                 // This is a fragmented block?
-                let score = if crate::args::HOLE_COUNTING {
-                    unreachable!();
-                    // match state {
-                    //     BlockState::Reusable { unavailable_lines } => unavailable_lines as _,
-                    //     _ => block.calc_holes(),
-                    // }
-                } else {
-                    // block.dead_bytes()
-                    // block.calc_dead_bytes::<VM>()
-                    block.calc_dead_lines() << Line::LOG_BYTES
-                };
+                let score = block.calc_dead_lines() << Line::LOG_BYTES;
                 if lxr.current_pause().unwrap() == Pause::Full
                     || cfg!(feature = "aggressive_mature_evac")
                     || score >= (Block::BYTES >> 1)
@@ -399,11 +389,6 @@ pub(super) struct MatureEvacuationSet {
 impl MatureEvacuationSet {
     /// Release all the mature defrag source blocks
     pub fn sweep_mature_evac_candidates<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
-        #[cfg(feature = "lxr_release_stage_timer")]
-        gc_log!([3]
-            "    - ({:.3}ms) sweep_mature_evac_candidates start",
-            crate::gc_start_time_ms(),
-        );
         let mut defrag_blocks: Vec<Block> =
             std::mem::take(&mut *self.defrag_blocks.lock().unwrap());
         if defrag_blocks.is_empty() {
@@ -421,19 +406,9 @@ impl MatureEvacuationSet {
             block.rc_sweep_mature::<VM>(space, true, true);
             assert!(!block.is_defrag_source());
         }
-        #[cfg(feature = "lxr_release_stage_timer")]
-        gc_log!([3]
-            "    - ({:.3}ms) sweep_mature_evac_candidates released {}",
-            crate::gc_start_time_ms(), count
-        );
         if count != 0 {
             space.pr.bulk_release_blocks(count);
         }
-        #[cfg(feature = "lxr_release_stage_timer")]
-        gc_log!([3]
-            "    - ({:.3}ms) sweep_mature_evac_candidates finish",
-            crate::gc_start_time_ms(),
-        );
     }
 
     pub fn schedule_defrag_selection_packets<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {

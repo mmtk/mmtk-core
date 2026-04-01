@@ -87,7 +87,6 @@ pub struct LXR<VM: VMBinding> {
     in_concurrent_marking: AtomicBool,
     pub prev_roots: RwLock<SegQueue<Vec<ObjectReference>>>,
     pub curr_roots: RwLock<SegQueue<Vec<ObjectReference>>>,
-    pub(super) barrier_decs: AtomicUsize,
     pub rc: RefCountHelper<VM>,
     gc_cause: Atomic<GCCause>,
 }

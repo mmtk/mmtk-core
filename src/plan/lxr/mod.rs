@@ -84,10 +84,6 @@ impl Default for SurvivalRatioPredictorLocal {
     fn default() -> Self {
         Self {
             copy_promote_vol: AtomicUsize::new(0),
-            #[cfg(feature = "lxr_srv_ratio_counter")]
-            total_promote_vol: AtomicUsize::new(0),
-            #[cfg(feature = "lxr_srv_ratio_counter")]
-            total_los_promote_vol: AtomicUsize::new(0),
         }
     }
 }
@@ -100,34 +96,10 @@ impl SurvivalRatioPredictorLocal {
         );
     }
 
-    #[cfg(feature = "lxr_srv_ratio_counter")]
-    pub fn record_total_promotion(&self, size: usize, los: bool) {
-        self.total_promote_vol.store(
-            self.total_promote_vol.load(Ordering::Relaxed) + size,
-            Ordering::Relaxed,
-        );
-        if los {
-            self.total_los_promote_vol.store(
-                self.total_los_promote_vol.load(Ordering::Relaxed) + size,
-                Ordering::Relaxed,
-            );
-        }
-    }
-
     pub fn sync(&self) {
         SURVIVAL_RATIO_PREDICTOR.copy_promote_vol.fetch_add(
             self.copy_promote_vol.load(Ordering::Relaxed),
             Ordering::Relaxed,
-        );
-        #[cfg(feature = "lxr_srv_ratio_counter")]
-        SURVIVAL_RATIO_PREDICTOR.total_promote_vol.fetch_add(
-            self.total_promote_vol.load(Ordering::Relaxed),
-            Ordering::SeqCst,
-        );
-        #[cfg(feature = "lxr_srv_ratio_counter")]
-        SURVIVAL_RATIO_PREDICTOR.total_los_promote_vol.fetch_add(
-            self.total_los_promote_vol.load(Ordering::Relaxed),
-            Ordering::SeqCst,
         );
     }
 }

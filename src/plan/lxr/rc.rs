@@ -27,16 +27,6 @@ use atomic::Ordering;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-#[inline]
-fn prefetch_object<VM: VMBinding>(o: ObjectReference, rc: &RefCountHelper<VM>) {
-    if crate::args::PREFETCH_HEADER {
-        o.prefetch_read();
-    }
-    if crate::args::PREFETCH_RC {
-        rc.prefetch_read(o);
-    }
-}
-
 pub struct ProcessIncs<VM: VMBinding, const KIND: EdgeKind> {
     /// Increments to process
     incs: Vec<VM::VMSlot>,
@@ -291,10 +281,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             return true;
         }
         // Skip recycled lines
-        let block = Block::containing(o);
-        if crate::args::RC_DONT_EVACUATE_NURSERY_IN_RECYCLED_LINES && !block.is_nursery() {
-            return true;
-        }
         if cfg!(debug_assertions) {
             let cls = unsafe { (o.to_raw_address() + 8usize).load::<u32>() };
             assert!(cls != 0, "ERROR {:?} rc={}", o, self.rc.count(o));
@@ -431,11 +417,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         Some(new)
     }
 
-    #[inline]
-    fn prefetch_object(&self, o: ObjectReference) {
-        prefetch_object(o, &self.rc);
-    }
-
     fn process_incs<const K: EdgeKind>(
         &mut self,
         mut incs: AddressBuffer<'_, VM::VMSlot>,
@@ -445,19 +426,12 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         if K == EDGE_KIND_ROOT {
             let roots = incs.as_mut_ptr() as *mut ObjectReference;
             let mut num_roots = 0usize;
-            for (i, s) in incs.iter().enumerate() {
+            for s in incs.iter() {
                 if let Some(new) = self.process_slot::<K>(*s, depth, add_root_to_remset) {
                     unsafe {
                         roots.add(num_roots).write(new);
                     }
                     num_roots += 1;
-                }
-                if crate::args::PREFETCH {
-                    if let Some(s) = incs.get(i + crate::args::PREFETCH_STEP) {
-                        if let Some(o) = s.load() {
-                            self.prefetch_object(o);
-                        }
-                    }
                 }
             }
             if num_roots != 0 {
@@ -470,15 +444,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 None
             }
         } else {
-            for (i, s) in incs.iter().enumerate() {
+            for s in incs.iter() {
                 self.process_slot::<K>(*s, depth, false);
-                if crate::args::PREFETCH {
-                    if let Some(s) = incs.get(i + crate::args::PREFETCH_STEP) {
-                        if let Some(o) = s.load() {
-                            self.prefetch_object(o);
-                        }
-                    }
-                }
             }
             None
         }
@@ -489,17 +456,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         slice: VM::VMMemorySlice,
         depth: u32,
     ) -> Option<Vec<ObjectReference>> {
-        let n = slice.len();
-        for (i, s) in slice.iter_slots().enumerate() {
+        for s in slice.iter_slots() {
             self.process_slot::<K>(s, depth, false);
-            if crate::args::PREFETCH {
-                if i + crate::args::PREFETCH_STEP < n {
-                    let s = slice.get(i + crate::args::PREFETCH_STEP);
-                    if let Some(o) = s.load() {
-                        self.prefetch_object(o);
-                    }
-                }
-            }
         }
         None
     }
@@ -809,13 +767,8 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         }
     }
 
-    #[inline]
-    fn prefetch_object(&self, o: ObjectReference) {
-        prefetch_object(o, &self.rc);
-    }
-
     fn process_decs(&mut self, decs: &[ObjectReference], lxr: &LXR<VM>) {
-        for (i, o) in decs.iter().enumerate() {
+        for o in decs.iter() {
             // println!("dec {:?}", o);
             // if o.is_null() {
             //     continue;
@@ -847,11 +800,6 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             });
             if result == Ok(1) && is_los {
                 lxr.los().rc_free(o);
-            }
-            if crate::args::PREFETCH {
-                if let Some(o) = decs.get(i + crate::args::PREFETCH_STEP) {
-                    self.prefetch_object(*o);
-                }
             }
         }
     }

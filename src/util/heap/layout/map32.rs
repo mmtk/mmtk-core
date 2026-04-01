@@ -240,16 +240,6 @@ impl VMMap for Map32 {
         debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = start.chunk_index();
         let freed_chunks = self.free_contiguous_chunks_no_lock(chunk as _);
-        if cfg!(feature = "madv_dontneed") {
-            unsafe {
-                let result = libc::madvise(
-                    start.to_mut_ptr(),
-                    freed_chunks << LOG_BYTES_IN_CHUNK,
-                    libc::MADV_DONTNEED,
-                );
-                assert_ne!(result, -1, "{:?}", std::io::Error::last_os_error());
-            }
-        }
         freed_chunks
     }
 

@@ -55,9 +55,6 @@ impl<VM: VMBinding> EvacuateMatureObjects<VM> {
         if lxr.address_in_defrag(addr) {
             return false;
         }
-        if crate::args::NO_RC_PAUSES_DURING_CONCURRENT_MARKING {
-            return true;
-        }
         // Check if it is a real oop field
         if lxr.immix_space.address_in_space(s.to_address()) {
             let block = Block::of(s.to_address());

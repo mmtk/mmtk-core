@@ -615,31 +615,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn release_rc(&mut self, pause: Pause) {
-        #[cfg(feature = "lxr_release_stage_timer")]
-        gc_log!([3]
-            "    - ({:.3}ms) sweep_nursery_blocks start",
-            crate::gc_start_time_ms(),
-        );
         debug_assert_ne!(pause, Pause::FullDefrag);
         self.block_allocation
             .sweep_nursery_blocks(&self.scheduler, pause);
-        #[cfg(feature = "lxr_release_stage_timer")]
-        gc_log!([3]
-            "    - ({:.3}ms) sweep_mutator_reused_blocks start",
-            crate::gc_start_time_ms(),
-        );
-        #[cfg(feature = "lxr_release_stage_timer")]
-        gc_log!([3]
-            "    - ({:.3}ms) sweep_mutator_reused_blocks finish",
-            crate::gc_start_time_ms(),
-        );
-        if cfg!(feature = "lxr_log_reclaim") {
-            gc_log!([3]
-                " - copy alloc size {}({}M)",
-                self.copy_alloc_bytes.load( Ordering::Relaxed),
-                self.copy_alloc_bytes.load( Ordering::Relaxed) >> 20,
-            );
-        }
         self.flush_page_resource();
         let disable_lasy_dec_for_current_gc = crate::disable_lasy_dec_for_current_gc();
         if disable_lasy_dec_for_current_gc {
@@ -862,12 +840,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 .fetch_add(Block::LINES, Ordering::SeqCst);
         }
 
-        #[cfg(feature = "lxr_srv_ratio_counter")]
-        if !copy {
-            crate::plan::lxr::SURVIVAL_RATIO_PREDICTOR
-                .ix_clean_alloc_vol
-                .fetch_add(Block::BYTES, Ordering::SeqCst);
-        }
         Some(block)
     }
 
@@ -921,12 +893,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             if !self.rc_enabled {
                 self.lines_consumed
                     .fetch_add(Block::LINES, Ordering::SeqCst);
-            }
-            #[cfg(feature = "lxr_srv_ratio_counter")]
-            if !copy {
-                crate::plan::lxr::SURVIVAL_RATIO_PREDICTOR
-                    .ix_clean_alloc_vol
-                    .fetch_add(Block::BYTES, Ordering::SeqCst);
             }
         } else {
             if self.rc_enabled {
@@ -1377,10 +1343,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.reused_lines_consumed
                 .fetch_add(num_lines, Ordering::Relaxed);
         }
-        #[cfg(feature = "lxr_srv_ratio_counter")]
-        crate::plan::lxr::SURVIVAL_RATIO_PREDICTOR
-            .reused_alloc_vol
-            .fetch_add(num_lines << Line::LOG_BYTES, Ordering::SeqCst);
         if self.block_allocation.cm_in_progress_or_final_mark() {
             Line::initialize_mark_table_as_marked::<VM>(start..end);
             Line::inc_reuse_counts::<VM>(start..end);
@@ -1507,9 +1469,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Post copy routine for Immix copy contexts
     fn post_copy(&self, object: ObjectReference, _bytes: usize) {
         if self.rc_enabled {
-            if cfg!(feature = "lxr_log_reclaim") {
-                self.copy_alloc_bytes.fetch_add(_bytes, Ordering::Relaxed);
-            }
             return;
         }
         // Mark the object
