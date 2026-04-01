@@ -4,7 +4,7 @@ use crate::plan::tracing::Trace;
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::gc_work::RootsKind;
-use crate::util::ObjectReference;
+use crate::util::{scanning_helper, ObjectReference};
 use crate::vm::slot::Slot;
 use crate::{
     plan::ObjectQueue,
@@ -81,32 +81,14 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 
         // Loop until the queue is drained.
         while let Some(object) = queue.pop_back() {
-            if VM::VMScanning::support_slot_enqueuing(tls, object) {
-                VM::VMScanning::scan_object(tls, object, &mut |slot: VM::VMSlot| {
-                    if let Some(child) = slot.load() {
-                        let new_child =
-                            self.trace
-                                .trace_object(worker, child, &mut |enqueued_child| {
-                                    debug_assert_eq!(enqueued_child, child);
-                                    queue.push_back(enqueued_child);
-                                    num_queued_objects += 1;
-                                });
-                        debug_assert_eq!(new_child, child);
-                    }
-                });
-            } else {
-                VM::VMScanning::scan_object_and_trace_edges(tls, object, &mut |child| {
-                    let new_child = self
-                        .trace
-                        .trace_object(worker, child, &mut |enqueued_child| {
-                            debug_assert_eq!(enqueued_child, child);
-                            queue.push_back(enqueued_child);
-                            num_queued_objects += 1;
-                        });
-                    debug_assert_eq!(new_child, child);
-                    new_child
-                });
-            }
+            scanning_helper::visit_children_non_moving::<VM>(tls, object, &mut |child| {
+                self.trace
+                    .trace_object(worker, child, &mut |enqueued_child| {
+                        debug_assert_eq!(enqueued_child, child);
+                        queue.push_back(enqueued_child);
+                        num_queued_objects += 1;
+                    })
+            });
             self.trace.post_scan_object(object);
 
             if queue.len() >= Self::CONCURRENT_TRACE_OVERFLOW {
