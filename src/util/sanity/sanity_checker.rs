@@ -164,26 +164,28 @@ impl<P: Plan> GCWork<P::VM> for SanityClosure<P> {
                 continue;
             }
 
+            trace!("Doing sanity check on object {object}");
+
             // FIXME steveb consider VM-specific integrity check on reference.
-            assert!(object.is_sane(), "Invalid reference {:?}", object);
+            assert!(
+                object.is_sane(),
+                "`object.is_sane()` returned false.  object: {object}",
+            );
 
             // Let plan check object
             assert!(
                 self.plan.sanity_check_object(object),
-                "Invalid reference {:?}",
-                object
+                "plan.sanity_check_object(object) returned false. object: {object}",
             );
 
             // Let VM check object
             assert!(
                 <P::VM as VMBinding>::VMObjectModel::is_object_sane(object),
-                "Invalid reference {:?}",
-                object
+                "VMObjectModel::is_object_sane(object) returned false. object: {object}",
             );
 
-            // Object is not "marked"
-            trace!("Sanity mark object {}", object);
-
+            // Enqueue children.  If a child is already visited, it will be skipped at the beginning
+            // of the loop.
             scanning_helper::visit_children_non_moving::<P::VM>(tls, object, &mut |child| {
                 queue.push(child);
                 child
