@@ -28,16 +28,6 @@ pub static SURVIVAL_RATIO_PREDICTOR: SurvivalRatioPredictor = SurvivalRatioPredi
     prev_ratio: Atomic::new(0.01),
     alloc_vol: AtomicUsize::new(0),
     copy_promote_vol: AtomicUsize::new(0),
-    #[cfg(feature = "lxr_srv_ratio_counter")]
-    total_promote_vol: AtomicUsize::new(0),
-    #[cfg(feature = "lxr_srv_ratio_counter")]
-    total_los_promote_vol: AtomicUsize::new(0),
-    #[cfg(feature = "lxr_srv_ratio_counter")]
-    reused_alloc_vol: AtomicUsize::new(0),
-    #[cfg(feature = "lxr_srv_ratio_counter")]
-    los_alloc_vol: AtomicUsize::new(0),
-    #[cfg(feature = "lxr_srv_ratio_counter")]
-    ix_clean_alloc_vol: AtomicUsize::new(0),
     pause_start: crate::Timer::new(),
 };
 
@@ -45,16 +35,6 @@ pub struct SurvivalRatioPredictor {
     prev_ratio: Atomic<f64>,
     alloc_vol: AtomicUsize,
     copy_promote_vol: AtomicUsize,
-    #[cfg(feature = "lxr_srv_ratio_counter")]
-    total_promote_vol: AtomicUsize,
-    #[cfg(feature = "lxr_srv_ratio_counter")]
-    total_los_promote_vol: AtomicUsize,
-    #[cfg(feature = "lxr_srv_ratio_counter")]
-    pub reused_alloc_vol: AtomicUsize,
-    #[cfg(feature = "lxr_srv_ratio_counter")]
-    pub los_alloc_vol: AtomicUsize,
-    #[cfg(feature = "lxr_srv_ratio_counter")]
-    pub ix_clean_alloc_vol: AtomicUsize,
     pub(crate) pause_start: crate::Timer,
 }
 
@@ -71,47 +51,6 @@ impl SurvivalRatioPredictor {
     }
 
     pub fn update_ratio(&self) -> f64 {
-        #[cfg(feature = "lxr_srv_ratio_counter")]
-        {
-            let alloc_vol = self.reused_alloc_vol.load(Ordering::SeqCst)
-                + self.los_alloc_vol.load(Ordering::SeqCst)
-                + self.ix_clean_alloc_vol.load(Ordering::SeqCst);
-            let srv_vol = self.total_promote_vol.load(Ordering::SeqCst);
-            let ix_alloc_vol = self.reused_alloc_vol.load(Ordering::SeqCst)
-                + self.ix_clean_alloc_vol.load(Ordering::SeqCst);
-            let ix_srv_vol = self
-                .total_promote_vol
-                .load(Ordering::SeqCst)
-                .saturating_sub(self.total_los_promote_vol.load(Ordering::SeqCst));
-            let los_alloc_vol = self.los_alloc_vol.load(Ordering::SeqCst);
-            let los_srv_vol = self.total_los_promote_vol.load(Ordering::SeqCst);
-
-            gc_log!([2]
-                " - alloc size = {} ({} los, {} ix-clean, {} ix-reused)",
-                alloc_vol,
-                self.los_alloc_vol.load(Ordering::SeqCst),
-                self.ix_clean_alloc_vol.load(Ordering::SeqCst),
-                self.reused_alloc_vol.load(Ordering::SeqCst),
-            );
-            gc_log!([2]
-                " - srv size = {} ({} los, {} ix-copied)",
-                self.total_promote_vol.load(Ordering::SeqCst),
-                self.total_los_promote_vol.load(Ordering::SeqCst),
-                self.copy_promote_vol.load(Ordering::SeqCst),
-            );
-            gc_log!([2]
-                " - srv rate: total={} ix={} los={}",
-                srv_vol as f64 / alloc_vol as f64,
-                ix_srv_vol as f64 / ix_alloc_vol as f64,
-                los_srv_vol as f64 / los_alloc_vol as f64,
-            );
-
-            self.total_promote_vol.store(0, Ordering::SeqCst);
-            self.total_los_promote_vol.store(0, Ordering::SeqCst);
-            self.reused_alloc_vol.store(0, Ordering::SeqCst);
-            self.los_alloc_vol.store(0, Ordering::SeqCst);
-            self.ix_clean_alloc_vol.store(0, Ordering::SeqCst);
-        }
         if self.alloc_vol.load(Ordering::SeqCst) == 0 {
             self.copy_promote_vol.store(0, Ordering::SeqCst);
             return self.ratio();
@@ -136,7 +75,6 @@ impl SurvivalRatioPredictor {
             (curr * 3f64 + prev) / 4f64
         };
         let ratio = f64::min(ratio, 1.0);
-        crate::add_survival_ratio(curr, prev);
         self.prev_ratio.store(ratio, Ordering::SeqCst);
         self.alloc_vol.store(0, Ordering::SeqCst);
         self.copy_promote_vol.store(0, Ordering::SeqCst);
@@ -146,10 +84,6 @@ impl SurvivalRatioPredictor {
 
 pub struct SurvivalRatioPredictorLocal {
     copy_promote_vol: AtomicUsize,
-    #[cfg(feature = "lxr_srv_ratio_counter")]
-    total_promote_vol: AtomicUsize,
-    #[cfg(feature = "lxr_srv_ratio_counter")]
-    total_los_promote_vol: AtomicUsize,
 }
 
 impl Default for SurvivalRatioPredictorLocal {

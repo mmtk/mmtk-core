@@ -255,7 +255,6 @@ impl<VM: VMBinding> MMTK<VM> {
         );
         self.scheduler.spawn_gc_threads(self, tls);
         self.state.initialized.store(true, Ordering::SeqCst);
-        #[cfg(feature = "tracing")]
         probe!(mmtk, collection_initialized);
     }
 
@@ -301,7 +300,6 @@ impl<VM: VMBinding> MMTK<VM> {
             self.state.is_initialized(),
             "MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
         );
-        #[cfg(feature = "tracing")]
         probe!(mmtk, prepare_to_fork);
         self.scheduler.stop_gc_threads_for_forking();
     }
@@ -320,7 +318,6 @@ impl<VM: VMBinding> MMTK<VM> {
             self.state.is_initialized(),
             "MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
         );
-        #[cfg(feature = "tracing")]
         probe!(mmtk, after_fork);
         self.scheduler.respawn_gc_threads_after_forking(tls);
     }
@@ -329,7 +326,6 @@ impl<VM: VMBinding> MMTK<VM> {
     /// to clear any residual garbage and start collecting statistics for the benchmark.
     /// This is usually called by the benchmark harness as its last step before the actual benchmark.
     pub fn harness_begin(&self, tls: VMMutatorThread) {
-        #[cfg(feature = "tracing")]
         probe!(mmtk, harness_begin);
         self.handle_user_collection_request(tls, true, true);
         if tls.0 .0.is_null() {
@@ -337,7 +333,6 @@ impl<VM: VMBinding> MMTK<VM> {
             VM::VMCollection::block_for_gc(tls);
         }
         self.state.inside_harness.store(true, Ordering::SeqCst);
-        crate::reset_counters();
         self.stats.start_all();
         self.scheduler.enable_stat();
         crate::INSIDE_HARNESS.store(true, Ordering::SeqCst);
@@ -350,7 +345,6 @@ impl<VM: VMBinding> MMTK<VM> {
         self.stats.stop_all(self);
         crate::INSIDE_HARNESS.store(false, Ordering::SeqCst);
         self.state.inside_harness.store(false, Ordering::SeqCst);
-        #[cfg(feature = "tracing")]
         probe!(mmtk, harness_end);
     }
 

@@ -773,7 +773,6 @@ pub trait ProcessEdgesWork:
 
     /// Process all the slots in the work packet.
     fn process_slots(&mut self) {
-        #[cfg(feature = "tracing")]
         probe!(mmtk, process_slots, self.slots.len(), self.is_roots());
         for i in 0..self.slots.len() {
             self.process_slot(self.slots[i])
@@ -900,7 +899,6 @@ impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
         // resulting machine code may not contain all three USDT trace points.  If they have
         // different names, and our `capture.bt` mentions all of them, `bpftrace` may complain that
         // it cannot find one or more of those USDT trace points in the binary.
-        #[cfg(feature = "tracing")]
         probe!(mmtk, roots, RootsKind::NORMAL, slots.len());
         let mut w = DPE::new(
             slots,
@@ -925,7 +923,6 @@ impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
     }
 
     fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
-        #[cfg(feature = "tracing")]
         probe!(mmtk, roots, RootsKind::PINNING, nodes.len());
         // Will process roots within the PinningRootsTrace bucket
         // And put work in the Closure bucket
@@ -937,7 +934,6 @@ impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
     }
 
     fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
-        #[cfg(feature = "tracing")]
         probe!(mmtk, roots, RootsKind::TPINNING, nodes.len());
         crate::memory_manager::add_work_packet(
             self.mmtk,
@@ -1037,7 +1033,8 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
             }
         }
 
-        #[cfg(feature = "tracing")]
+        let total_objects = objects_to_scan.len();
+        let scan_and_trace = scan_later.len();
         probe!(mmtk, scan_objects, total_objects, scan_and_trace);
 
         // If any object does not support slot-enqueuing, we process them now.
@@ -1463,7 +1460,6 @@ impl<VM: VMBinding, R2OPE: ProcessEdgesWork<VM = VM>, O2OPE: ProcessEdgesWork<VM
         };
 
         let num_enqueued_nodes = root_objects_to_scan.len();
-        #[cfg(feature = "tracing")]
         probe!(mmtk, process_root_nodes, num_roots, num_enqueued_nodes);
 
         if !root_objects_to_scan.is_empty() {

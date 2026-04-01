@@ -210,20 +210,7 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
         }
     }
 
-    fn process_dead_object(&mut self, mut o: ObjectReference) {
-        o = o.fix_start_address::<VM>();
-        crate::stat(|s| {
-            s.dead_mature_objects += 1;
-            s.dead_mature_volume += o.get_size::<VM>();
-
-            s.dead_mature_tracing_objects += 1;
-            s.dead_mature_tracing_volume += o.get_size::<VM>();
-
-            if self.rc.is_stuck(o) {
-                s.dead_mature_tracing_stuck_objects += 1;
-                s.dead_mature_tracing_stuck_volume += o.get_size::<VM>();
-            }
-        });
+    fn process_dead_object(&mut self, o: ObjectReference) {
         if ObjectReference::STRICT_VERIFICATION {
             unsafe {
                 o.to_raw_address().store(0xdeadusize);

@@ -227,7 +227,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Add the `ScheduleCollection` packet.  Called by the last parked worker.
     fn add_schedule_collection_packet(&self) {
         // We are still holding the mutex `WorkerMonitor::sync`.  Do not notify now.
-        #[cfg(feature = "tracing")]
         probe!(mmtk, add_schedule_collection_packet);
         self.work_buckets[WorkBucketStage::Unconstrained].add_no_notify(ScheduleCollection);
     }
@@ -482,7 +481,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             }
             debug!("Checking if {:?} can be opened...", id);
             let bucket_opened = bucket.update(self);
-            #[cfg(feature = "tracing")]
             if bucket_opened {
                 probe!(mmtk, bucket_opened, id);
             }
@@ -499,16 +497,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     );
                 }
             }
-            if cfg!(feature = "yield_and_roots_timer")
-                && bucket_opened
-                && id == WorkBucketStage::Prepare
-            {
-                let t = crate::GC_START_TIME.elapsed().as_nanos();
-                crate::counters().roots_nanos.fetch_add(t, Ordering::SeqCst);
-            }
             buckets_updated = buckets_updated || bucket_opened;
             if bucket_opened {
-                #[cfg(feature = "tracing")]
                 probe!(mmtk, bucket_opened, id);
                 new_packets = new_packets || !bucket.is_drained();
                 new_packets = new_packets || bucket.maybe_schedule_sentinel();
@@ -738,7 +728,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
                 // We set the eBPF trace point here so that bpftrace scripts can start recording
                 // work packet events before the `ScheduleCollection` work packet starts.
-                #[cfg(feature = "tracing")]
                 probe!(mmtk, gc_start);
 
                 {
@@ -797,7 +786,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             .downcast_ref::<LXR<VM>>()
             .map(|ix| ix.current_pause().unwrap())
             .unwrap_or(Pause::Full);
-        crate::add_pause_time(pause, pause_time.as_nanos());
         if crate::verbose(2) {
             let _released_n =
                 crate::policy::immix::immixspace::RELEASED_NURSERY_BLOCKS.load(Ordering::SeqCst);
@@ -823,9 +811,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 mmtk.get_plan().get_used_pages() / 256,
                 pause_time
             );
-            if cfg!(feature = "lxr_precise_incs_counter") {
-                crate::RC_STAT.dump(pause, pause_time);
-            }
             crate::RESERVED_PAGES_AT_GC_END
                 .store(mmtk.get_plan().get_reserved_pages(), Ordering::SeqCst);
         }
@@ -869,11 +854,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         mmtk.gc_trigger.policy.on_gc_end(mmtk);
 
         // All other workers are parked, so it is safe to access the Plan instance mutably.
-        #[cfg(feature = "tracing")]
         probe!(mmtk, plan_end_of_gc_begin);
         let plan_mut: &mut dyn Plan<VM = VM> = unsafe { mmtk.get_plan_mut() };
         plan_mut.end_of_gc(worker.tls);
-        #[cfg(feature = "tracing")]
         probe!(mmtk, plan_end_of_gc_end);
 
         // Compute the elapsed time of the GC.
@@ -891,7 +874,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         );
 
         // USDT tracepoint for the end of GC.
-        #[cfg(feature = "tracing")]
         probe!(mmtk, gc_end);
 
         if *mmtk.get_options().count_live_bytes_in_gc {

@@ -23,7 +23,7 @@ use crate::util::analysis::GcHookWork;
 use crate::util::constants::*;
 use crate::util::copy::*;
 use crate::util::heap::layout::vm_layout::*;
-use crate::util::heap::{PageResource, SpaceStats, VMRequest};
+use crate::util::heap::{SpaceStats, VMRequest};
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::MetadataSpec;
 use crate::util::options::{GCTriggerSelector, Options};
@@ -41,13 +41,9 @@ use enum_map::EnumMap;
 use spin::Lazy;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Condvar, Mutex, RwLock};
-use std::time::SystemTime;
 
 const LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER: usize = 1;
 
-static INCS_TRIGGERED: AtomicBool = AtomicBool::new(false);
-static ALLOC_TRIGGERED: AtomicBool = AtomicBool::new(false);
-static SURVIVAL_TRIGGERED: AtomicBool = AtomicBool::new(false);
 static HEAP_AFTER_GC: AtomicUsize = AtomicUsize::new(0);
 
 static RC_PAUSES_BEFORE_SATB: AtomicUsize = AtomicUsize::new(0);
@@ -135,12 +131,9 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         let predicted_survival_mb: usize =
             ((total_young_alloc_pages as f64 * super::SURVIVAL_RATIO_PREDICTOR.ratio()) as usize)
                 << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER;
-        if !cfg!(feature = "lxr_no_survival_trigger") {
-            if predicted_survival_mb >= crate::args().max_survival_mb {
-                SURVIVAL_TRIGGERED.store(true, Ordering::Relaxed);
-                self.gc_cause.store(GCCause::Survival, Ordering::Relaxed);
-                return true;
-            }
+        if predicted_survival_mb >= crate::args().max_survival_mb {
+            self.gc_cause.store(GCCause::Survival, Ordering::Relaxed);
+            return true;
         }
         if !self.immix_space.common().contiguous {
             let available_to_space = (self.immix_space.pr.available_pages()
@@ -213,24 +206,11 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        #[cfg(feature = "nogc_no_zeroing")]
-        if true {
-            unreachable!();
-        }
         if !crate::LazySweepingJobs::all_finished() {
             gc_log!([1] "WARNING: LXR Lazy Sweeping Not Finished");
-            crate::counters()
-                .gc_with_unfinished_lazy_jobs
-                .fetch_add(1, Ordering::Relaxed);
         }
         let pause = self.select_collection_kind();
-        self.update_stats_after_gc_decided(pause);
         // Wait for concurrent packets
-        if self.cm_in_progress() && pause == Pause::RefCount {
-            crate::counters()
-                .rc_during_satb
-                .fetch_add(1, Ordering::SeqCst);
-        }
         // Mark table zeroing
         if pause == Pause::InitialMark || pause == Pause::Full {
             self.schedule_mark_table_zeroing_tasks(Some(pause))
@@ -257,18 +237,8 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         #[cfg(feature = "analysis")]
         scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
         // Resume mutators
-        if cfg!(not(feature = "fragmentation_analysis"))
-            && (pause == Pause::Full || pause == Pause::FinalMark)
-        {
+        if pause == Pause::Full || pause == Pause::FinalMark {
             #[cfg(feature = "sanity")]
-            scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC::<Self>::new(self));
-        }
-
-        #[cfg(feature = "sanity")]
-        if cfg!(feature = "fragmentation_analysis")
-            && pause == Pause::RefCount
-            && crate::frag_exp_enabled()
-        {
             scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC::<Self>::new(self));
         }
     }
@@ -278,16 +248,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {
-        #[cfg(feature = "measure_trace_rate")]
-        if crate::verbose(3) {
-            super::cm::dump_trace_rate();
-        }
         let pause = self.current_pause().unwrap();
-        crate::stat(|s| {
-            if pause == Pause::RefCount {
-                s.rc_pauses += 1
-            }
-        });
         if pause == Pause::FinalMark || pause == Pause::Full {
             self.common.los.is_end_of_satb_or_full_gc = true;
             // release nursery memory before mature evacuation, to reduce the chance of to-space overflow.
@@ -303,35 +264,18 @@ impl<VM: VMBinding> Plan for LXR<VM> {
                 .add(FlushMatureEvacRemsets);
         }
         self.immix_space.prepare_rc(pause);
-        // if pause == Pause::FinalMark {
-        //     self.dump_heap_usage(false);
-        // }
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        #[cfg(feature = "measure_rc_rate")]
-        if crate::verbose(3) {
-            super::rc::dump_rc_rate();
-        }
         let _new_ratio = super::SURVIVAL_RATIO_PREDICTOR.update_ratio();
         let pause = self.current_pause().unwrap();
         if pause == Pause::FinalMark || pause == Pause::Full {
-            #[cfg(feature = "lxr_release_stage_timer")]
-            gc_log!([3]
-                "    - ({:.3}ms) update_weak_processor start",
-                crate::gc_start_time_ms(),
-            );
             VM::VMCollection::update_weak_processor(false);
         }
         let perform_class_unloading = self.current_gc_should_perform_class_unloading();
         if perform_class_unloading {
             gc_log!([3] "    - class unloading");
         }
-        #[cfg(feature = "lxr_release_stage_timer")]
-        gc_log!([3]
-            "    - ({:.3}ms) vm_release start",
-            crate::gc_start_time_ms(),
-        );
         let t = std::time::SystemTime::now();
         <VM as VMBinding>::VMCollection::vm_release(perform_class_unloading);
         let elapsed = t.elapsed().unwrap().as_micros() as f64;
@@ -339,21 +283,9 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             gc_log!([3] "    - class unloading finished in {:.3} ms", elapsed / 1000.0);
         }
         self.common.los.is_end_of_satb_or_full_gc = false;
-        #[cfg(feature = "lxr_release_stage_timer")]
-        gc_log!([3]
-            "    - ({:.3}ms) los release start",
-            crate::gc_start_time_ms(),
-        );
         self.common
             .release(tls, pause == Pause::Full || pause == Pause::FinalMark);
-        #[cfg(feature = "lxr_release_stage_timer")]
-        gc_log!([3]
-            "    - ({:.3}ms) ix release start",
-            crate::gc_start_time_ms(),
-        );
         self.immix_space.release_rc(pause);
-        self.update_fixed_alloc_trigger();
-        self.update_fragmentation_analysis_experiment();
         // swap roots
         let mut prev_roots = self.prev_roots.write().unwrap();
         let mut curr_roots = self.curr_roots.write().unwrap();
@@ -368,13 +300,11 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
-        let survival = if !cfg!(feature = "lxr_no_srv_copy_reserve") {
+        let survival = {
             let predicted_survival = (self.immix_space.block_allocation.clean_nursery_mb() as f64
                 * super::SURVIVAL_RATIO_PREDICTOR.ratio())
                 as usize;
             predicted_survival << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER
-        } else {
-            0
         };
         return survival + self.immix_space.defrag_headroom_pages();
     }
@@ -397,7 +327,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
 
     fn gc_pause_start(&self, _scheduler: &GCWorkScheduler<VM>) {
         Block::update_global_phase_epoch(&self.immix_space);
-        self.dump_heap_usage(true);
         crate::NO_EVAC.store(false, Ordering::SeqCst);
         let pause = self.current_pause().unwrap();
 
@@ -415,19 +344,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
                 mutator.flush();
             }
             self.set_concurrent_marking_state(false);
-            if cfg!(feature = "satb_timer") {
-                let t = crate::SATB_START.elapsed().as_nanos();
-                crate::counters().satb_nanos.fetch_add(t, Ordering::SeqCst);
-            }
-        } else if cfg!(feature = "satb_timer") && pause == Pause::RefCount && self.cm_in_progress()
-        {
-            let t = crate::SATB_START.elapsed().as_nanos();
-            crate::counters().satb_nanos.fetch_add(t, Ordering::SeqCst);
-        }
-
-        if cfg!(feature = "decs_counter") {
-            gc_log!([3] "POSTPONED {} DELETED OBJS FOR DECREMENT", self.barrier_decs.load(Ordering::SeqCst));
-            self.barrier_decs.store(0, Ordering::SeqCst);
         }
     }
 
@@ -438,16 +354,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         if pause == Pause::InitialMark {
             self.set_concurrent_marking_state(true);
             crate::REMSET_RECORDING.store(true, Ordering::SeqCst);
-            if cfg!(feature = "satb_timer") {
-                crate::SATB_START.start();
-            }
-        } else if cfg!(feature = "satb_timer") && pause == Pause::RefCount && self.cm_in_progress()
-        {
-            crate::SATB_START.start();
         }
-        // if pause == Pause::RefCount || pause == Pause::InitialMark {
-        //     self.resize_nursery();
-        // }
         self.previous_pause.store(Some(pause), Ordering::SeqCst);
         self.current_pause.store(None, Ordering::SeqCst);
         crate::LAZY_SWEEPING_JOBS.write().swap();
@@ -462,30 +369,10 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         self.avail_pages_at_end_of_last_gc
             .store(self.get_available_pages(), Ordering::SeqCst);
         HEAP_AFTER_GC.store(self.get_reserved_pages(), Ordering::SeqCst);
-        self.dump_heap_usage(false);
-        if cfg!(feature = "object_size_distribution") {
-            if pause == Pause::FinalMark || pause == Pause::Full {
-                crate::dump_and_reset_obj_dist("Static", &mut crate::OBJ_COUNT.lock().unwrap());
-            }
-        }
-        if cfg!(feature = "lxr_satb_live_bytes_counter") {
-            if pause == Pause::FinalMark || pause == Pause::Full {
-                crate::report_and_reset_live_bytes();
-            }
-        }
         gc_log!([3] " - released young blocks since gc start {}({}M)", self.immix_space.num_clean_blocks_released_young.load(Ordering::Relaxed), self.immix_space.num_clean_blocks_released_young.load(Ordering::Relaxed) >> (LOG_BYTES_IN_MBYTE as usize - Block::LOG_BYTES));
-
-        if cfg!(feature = "fragmentation_analysis") && crate::frag_exp_enabled() {
-            self.dump_memory(pause);
-        }
     }
 
     fn end_of_gc(&mut self, _tls: VMWorkerThread) {}
-
-    #[cfg(feature = "nogc_no_zeroing")]
-    fn handle_user_collection_request(&self, _tls: crate::util::VMMutatorThread, _force: bool) {
-        println!("Warning: User attempted a collection request. The request is ignored.");
-    }
 
     fn no_mutator_prepare_release(&self) -> bool {
         true
@@ -501,8 +388,8 @@ impl<VM: VMBinding> Plan for LXR<VM> {
 
     fn should_process_reference(
         &self,
-        reference: ObjectReference,
-        referent: ObjectReference,
+        _reference: ObjectReference,
+        _referent: ObjectReference,
     ) -> bool {
         true
     }
@@ -580,8 +467,6 @@ impl<VM: VMBinding> LXR<VM> {
             barrier_decs: AtomicUsize::default(),
         });
 
-        lxr.update_fixed_alloc_trigger();
-
         lxr.gc_init(&options);
 
         lxr.verify_side_metadata_sanity();
@@ -609,23 +494,11 @@ impl<VM: VMBinding> LXR<VM> {
 
     fn next_gc_is_cycle_gc(
         &self,
-        total_pages: usize,
+        _total_pages: usize,
         mature_space_pages: usize,
-        cm_threshold: usize,
+        _cm_threshold: usize,
         pause: Pause,
     ) -> bool {
-        if cfg!(feature = "lxr_simple_satb_trigger") {
-            // Do cycle collection if mature space is over 60% of the heap
-            return if !self.cm_in_progress() {
-                if self.cm_enabled() {
-                    mature_space_pages * 100 >= cm_threshold * total_pages
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
-        }
         if pause == Pause::FinalMark || pause == Pause::Full {
             let live_mature_pages = super::MATURE_LIVE_PREDICTOR.update(mature_space_pages);
             gc_log!([3] " - predicted live mature pages: {}", live_mature_pages)
@@ -642,8 +515,7 @@ impl<VM: VMBinding> LXR<VM> {
             mature_space_pages,
             available_pages
         );
-        !cfg!(feature = "lxr_fixed_satb_trigger")
-            && !self.cm_in_progress()
+        !self.cm_in_progress()
             && (self.cm_enabled()
                 && garbage * 100 >= crate::args().trace_threshold as usize * total_pages)
     }
@@ -739,23 +611,6 @@ impl<VM: VMBinding> LXR<VM> {
             self.immix_space.block_allocation.clean_nursery_blocks() << Block::LOG_BYTES >> LOG_BYTES_IN_MBYTE,
             alloc_los >> LOG_BYTES_IN_MBYTE,
         );
-
-        // Counters and logs for special GC triggers
-
-        if cfg!(feature = "lxr_fixed_satb_trigger") {
-            let hours = |hrs: usize| std::time::Duration::from_secs((60 * 60 * hrs) as u64);
-            let date230505 = std::time::SystemTime::UNIX_EPOCH + hours(467575);
-            let d = SystemTime::now().duration_since(date230505).unwrap();
-            let hrs = (d.as_secs() / 3600) % 24;
-            let new_value: usize = match hrs {
-                _ if hrs < 12 => 32,
-                _ => 16,
-            };
-            if new_value != MAX_RC_PAUSES_BEFORE_SATB.load(Ordering::Relaxed) {
-                gc_log!([1] "===>>> Update SATB Trigger: {:?} <<<===", new_value);
-                MAX_RC_PAUSES_BEFORE_SATB.store(new_value, Ordering::Relaxed);
-            }
-        }
     }
 
     fn select_collection_kind(&self) -> Pause {
@@ -786,19 +641,12 @@ impl<VM: VMBinding> LXR<VM> {
         }
 
         // If CM is finished, do a final mark pause
-        if cm_in_progress
-            && (cfg!(feature = "measure_trace_rate")
-                || crate::args::NO_RC_PAUSES_DURING_CONCURRENT_MARKING
-                || cm_packets_drained)
-        {
+        if cm_in_progress && cm_packets_drained {
             return Pause::FinalMark;
         }
 
         // Either final mark pause or full pause for emergency GC
-        if emergency
-            || (user_triggered && !cfg!(feature = "lxr_abort_on_trace"))
-            || hint_emergency_gc
-        {
+        if emergency || user_triggered || hint_emergency_gc {
             return if cm_in_progress {
                 Pause::FinalMark
             } else {
@@ -807,20 +655,6 @@ impl<VM: VMBinding> LXR<VM> {
         }
 
         // Should trigger CM?
-        if cfg!(feature = "lxr_fixed_satb_trigger") {
-            if RC_PAUSES_BEFORE_SATB.load(Ordering::Relaxed) + 1
-                >= MAX_RC_PAUSES_BEFORE_SATB.load(Ordering::Relaxed)
-                && !cm_in_progress
-            {
-                return if self.cm_enabled() {
-                    Pause::InitialMark
-                } else {
-                    Pause::Full
-                };
-            } else {
-                return Pause::RefCount;
-            }
-        }
         if hint_cycle_gc && !cm_in_progress {
             return if self.cm_enabled() {
                 Pause::InitialMark
@@ -830,39 +664,6 @@ impl<VM: VMBinding> LXR<VM> {
         } else {
             return Pause::RefCount;
         }
-    }
-
-    fn update_stats_after_gc_decided(&self, pause: Pause) {
-        let emergency = self.base().global_state.is_emergency_collection();
-        let cm_drained = crate::concurrent_marking_packets_drained();
-        let counters = crate::counters();
-        // cm state counters
-        if pause == Pause::FinalMark && !cm_drained {
-            counters.cm_early_quit.fetch_add(1, Ordering::Relaxed);
-        }
-        // gc type counters
-        if emergency {
-            counters.emergency.fetch_add(1, Ordering::Relaxed);
-        }
-        match pause {
-            Pause::RefCount => counters.rc.fetch_add(1, Ordering::Relaxed),
-            Pause::InitialMark => counters.initial_mark.fetch_add(1, Ordering::Relaxed),
-            Pause::FinalMark => counters.final_mark.fetch_add(1, Ordering::Relaxed),
-            _ => counters.full.fetch_add(1, Ordering::Relaxed),
-        };
-        // gc trigger counters
-        if SURVIVAL_TRIGGERED.load(Ordering::Relaxed) {
-            counters.survival_triggerd.fetch_add(1, Ordering::Relaxed);
-        } else if INCS_TRIGGERED.load(Ordering::Relaxed) {
-            counters.incs_triggerd.fetch_add(1, Ordering::Relaxed);
-        } else if ALLOC_TRIGGERED.load(Ordering::Relaxed) {
-            counters.alloc_triggerd.fetch_add(1, Ordering::Relaxed);
-        } else {
-            counters.overflow_triggerd.fetch_add(1, Ordering::Relaxed);
-        }
-        SURVIVAL_TRIGGERED.store(false, Ordering::Relaxed);
-        INCS_TRIGGERED.store(false, Ordering::Relaxed);
-        ALLOC_TRIGGERED.store(false, Ordering::Relaxed);
     }
 
     fn disable_unnecessary_buckets(&'static self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
@@ -886,18 +687,12 @@ impl<VM: VMBinding> LXR<VM> {
         scheduler.work_buckets[WorkBucketStage::RefForwarding].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::FinalizableForwarding].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::Compact].set_enabled(false);
-        if crate::args::LAZY_DECREMENTS
-            && pause != Pause::Full
-            && !cfg!(feature = "fragmentation_analysis")
-        {
+        if crate::args::LAZY_DECREMENTS && pause != Pause::Full {
             scheduler.work_buckets[WorkBucketStage::STWRCDecsAndSweep].set_enabled(false);
         }
     }
 
     fn schedule_rc_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        if cfg!(feature = "lxr_fixed_satb_trigger") {
-            RC_PAUSES_BEFORE_SATB.fetch_add(1, Ordering::Relaxed);
-        }
         self.disable_unnecessary_buckets(scheduler, Pause::RefCount);
         if self.cm_in_progress() {
             scheduler.pause_concurrent_marking_work_packets_during_gc();
@@ -915,23 +710,7 @@ impl<VM: VMBinding> LXR<VM> {
             .add(Release::<LXRGCWorkContext<UnsupportedProcessEdges<VM>>>::new(self));
     }
 
-    fn dump_memory(&self, pause: Pause) {
-        if pause != Pause::Full {
-            // println!("\n\n\n@@ FRAGMENTATION DISTRIBUTION - Full\n\n");
-            return;
-        }
-        eprintln!("\n\n\n@@ FRAGMENTATION DISTRIBUTION - {:?}\n", pause);
-        eprintln!("heap-size: {}", self.get_total_pages() << 12);
-        self.immix_space.dump_memory(self);
-        self.los().dump_memory(self);
-        eprintln!("\n@@ FRAGMENTATION DISTRIBUTION - {:?} End\n\n", pause);
-        // }
-    }
-
     fn schedule_concurrent_marking_initial_pause(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        if cfg!(feature = "lxr_abort_on_trace") {
-            panic!("ERROR: OutOfMemory");
-        }
         self.disable_unnecessary_buckets(scheduler, Pause::InitialMark);
         self.process_prev_roots(scheduler);
         scheduler.work_buckets[WorkBucketStage::Unconstrained].add_prioritized(Box::new(
@@ -944,12 +723,6 @@ impl<VM: VMBinding> LXR<VM> {
     }
 
     fn schedule_concurrent_marking_final_pause(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        if cfg!(feature = "lxr_abort_on_trace") {
-            panic!("ERROR: OutOfMemory");
-        }
-        if cfg!(feature = "lxr_fixed_satb_trigger") {
-            RC_PAUSES_BEFORE_SATB.store(0, Ordering::Relaxed);
-        }
         self.disable_unnecessary_buckets(scheduler, Pause::FinalMark);
         if self.cm_in_progress() {
             crate::MOVE_CONCURRENT_MARKING_TO_STW.store(true, Ordering::SeqCst);
@@ -970,12 +743,6 @@ impl<VM: VMBinding> LXR<VM> {
         &'static self,
         scheduler: &GCWorkScheduler<VM>,
     ) {
-        if cfg!(feature = "lxr_abort_on_trace") {
-            panic!("ERROR: OutOfMemory");
-        }
-        if cfg!(feature = "lxr_fixed_satb_trigger") {
-            RC_PAUSES_BEFORE_SATB.store(0, Ordering::Relaxed);
-        }
         crate::DISABLE_LASY_DEC_FOR_CURRENT_GC.store(true, Ordering::SeqCst);
         self.disable_unnecessary_buckets(scheduler, Pause::Full);
         // Before start yielding, wrap all the roots from the previous GC with work-packets.
@@ -993,11 +760,9 @@ impl<VM: VMBinding> LXR<VM> {
     }
 
     fn process_prev_roots(&self, scheduler: &GCWorkScheduler<VM>) {
-        let mut count = 0usize;
         let prev_roots = self.prev_roots.write().unwrap();
         let mut work_packets: Vec<Box<dyn GCWork<VM>>> = Vec::with_capacity(prev_roots.len());
         while let Some(decs) = prev_roots.pop() {
-            count += decs.len();
             work_packets.push(Box::new(ProcessDecs::new(
                 decs,
                 LazySweepingJobsCounter::new_decs(),
@@ -1014,9 +779,6 @@ impl<VM: VMBinding> LXR<VM> {
             scheduler.postpone_all_prioritized(work_packets);
         } else {
             scheduler.work_buckets[WorkBucketStage::STWRCDecsAndSweep].bulk_add(work_packets);
-        }
-        if cfg!(feature = "decs_counter") {
-            gc_log!([3] "POSTPONED {} ROOTS FOR DECREMENT", count);
         }
     }
 
@@ -1102,33 +864,10 @@ impl<VM: VMBinding> LXR<VM> {
         );
         gc_log!([3] " - released young blocks since gc start {}({}M)", ix.num_clean_blocks_released_young.load(Ordering::Relaxed), ix.num_clean_blocks_released_young.load(Ordering::Relaxed) >> (LOG_BYTES_IN_MBYTE as usize - Block::LOG_BYTES));
         gc_log!([3] " - released mature blocks {}({}M)", ix.num_clean_blocks_released_mature.load(Ordering::Relaxed), ix.num_clean_blocks_released_mature.load(Ordering::Relaxed) >> (LOG_BYTES_IN_MBYTE as usize - Block::LOG_BYTES));
-        if cfg!(feature = "lxr_log_reclaim") {
-            let rc_killed_ix = ix.rc_killed_bytes.load(Ordering::SeqCst);
-            let rc_killed_los = self.los().rc_killed_bytes.load(Ordering::SeqCst);
-            gc_log!([2]
-                " - rc-killed={}({}M) rc-killed-ix={}({}M) rc-killed-los={}({}M)",
-                (rc_killed_ix + rc_killed_los),
-                (rc_killed_ix + rc_killed_los) / 1024 / 1024,
-                rc_killed_ix,
-                rc_killed_ix / 1024 / 1024,
-                rc_killed_los,
-                rc_killed_los / 1024 / 1024,
-            );
-        }
         gc_log!([2] " - num_clean_blocks_released_lazy = {}", ix.num_clean_blocks_released_lazy.load(Ordering::SeqCst));
         // Update counters
         if !crate::args::LAZY_DECREMENTS {
             HEAP_AFTER_GC.store(self.get_used_pages(), Ordering::SeqCst);
-        }
-        {
-            let used_pages_after_gc = HEAP_AFTER_GC.load(Ordering::Relaxed);
-            let lazy_released_pages =
-                ix.num_clean_blocks_released_lazy.load(Ordering::Relaxed) << Block::LOG_PAGES;
-            let x = used_pages_after_gc.saturating_sub(lazy_released_pages);
-            let c = crate::counters();
-            c.total_used_pages.fetch_add(x, Ordering::Relaxed);
-            c.min_used_pages.fetch_min(x, Ordering::Relaxed);
-            c.max_used_pages.fetch_max(x, Ordering::Relaxed);
         }
         let pause = match self.current_pause() {
             Some(p) => p,
@@ -1177,90 +916,5 @@ impl<VM: VMBinding> LXR<VM> {
 
     pub fn options(&self) -> &Options {
         &self.common.base.options
-    }
-
-    pub fn dump_heap_usage(&self, gc_start: bool) {
-        gc_log!([3]
-            " - reserved={}M (ix-{}M, los-{}M) collection_reserve={}M ix_avail={}M vmmap_avail={}M",
-            self.get_reserved_pages() / 256,
-            self.immix_space.reserved_pages() / 256,
-            self.los().reserved_pages() / 256,
-            self.get_collection_reserved_pages() / 256,
-            self.immix_space.pr.available_pages() / 256,
-            if self.immix_space.common().contiguous {
-                0
-            } else {
-                (VM_MAP.available_chunks() << (LOG_BYTES_IN_CHUNK - LOG_BYTES_IN_PAGE as usize)) / 256
-            },
-        );
-        gc_log!(
-            " - ix-used-size: {}M, ix-virt-size: {}M, los-used-size: {}M,  los-virt-size: {}M",
-            self.immix_space.pr.reserved_pages() * 4 / 1024,
-            self.immix_space.pr.total_chunks.load(Ordering::SeqCst) * 4,
-            self.los().pr.reserved_pages() * 4 / 1024,
-            self.los().pr.total_chunks.load(Ordering::SeqCst) * 4,
-        );
-        crate::rust_mem_counter::dump(gc_start);
-    }
-
-    fn hours_since_monday_0am(&self) -> usize {
-        let hours = |hrs: usize| std::time::Duration::from_secs((60 * 60 * hrs) as u64);
-        let monday_20231106_aedt = std::time::SystemTime::UNIX_EPOCH + hours(471997);
-        let duration = SystemTime::now()
-            .duration_since(monday_20231106_aedt)
-            .unwrap();
-        let hrs = duration.as_secs() as usize / 3600;
-        hrs % (7 * 24)
-    }
-
-    fn update_fragmentation_analysis_experiment(&mut self) {
-        if !cfg!(feature = "periodic_fragmentation_analysis") {
-            return;
-        }
-        let hrs = self.hours_since_monday_0am() % 3;
-        if hrs < 1 {
-            crate::FRAG_EXP_ENABLED.store(true, Ordering::SeqCst)
-        } else {
-            crate::FRAG_EXP_ENABLED.store(false, Ordering::SeqCst)
-        }
-    }
-
-    fn update_fixed_alloc_trigger(&mut self) {
-        if !cfg!(feature = "fixed_alloc_trigger_based_on_system_time")
-            && !cfg!(feature = "fixed_clean_alloc_trigger_based_on_system_time")
-        {
-            return;
-        }
-        let hours = |hrs: usize| std::time::Duration::from_secs((60 * 60 * hrs) as u64);
-        let date230505 = std::time::SystemTime::UNIX_EPOCH + hours(467575);
-        let d = SystemTime::now().duration_since(date230505).unwrap();
-        let hrs = (d.as_secs() / 3600) % 48;
-        if cfg!(feature = "fixed_clean_alloc_trigger_based_on_system_time") {
-            let new_value: usize = match hrs {
-                _ if hrs < 8 => (4 << 30) >> Block::LOG_BYTES,    // 4G
-                _ if hrs < 16 => (2 << 30) >> Block::LOG_BYTES,   // 2G
-                _ if hrs < 24 => (1 << 30) >> Block::LOG_BYTES,   // 1G
-                _ if hrs < 32 => (512 << 20) >> Block::LOG_BYTES, // 512M
-                _ if hrs < 40 => (256 << 20) >> Block::LOG_BYTES, // 256M
-                _ => (128 << 20) >> Block::LOG_BYTES,             // 128M
-            };
-            if new_value != self.nursery_blocks {
-                gc_log!([1] "===>>> Update Fixed Clean Alloc Trigger: {:?} <<<===", new_value);
-                self.nursery_blocks = new_value;
-            }
-        } else if cfg!(feature = "fixed_alloc_trigger_based_on_system_time") {
-            let new_value: usize = match hrs {
-                _ if hrs < 8 => 4096 << LOG_BYTES_IN_MBYTE,  // 4G
-                _ if hrs < 16 => 2048 << LOG_BYTES_IN_MBYTE, // 2G
-                _ if hrs < 24 => 1024 << LOG_BYTES_IN_MBYTE, // 1G
-                _ if hrs < 32 => 512 << LOG_BYTES_IN_MBYTE,  // 512M
-                _ if hrs < 40 => 256 << LOG_BYTES_IN_MBYTE,  // 256M
-                _ => 128 << LOG_BYTES_IN_MBYTE,              // 128M
-            };
-            if new_value != self.young_alloc_trigger {
-                gc_log!([1] "===>>> Update Fixed Alloc Trigger: {:?} <<<===", new_value);
-                self.young_alloc_trigger = new_value;
-            }
-        }
     }
 }

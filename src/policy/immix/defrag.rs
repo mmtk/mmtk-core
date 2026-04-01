@@ -91,7 +91,6 @@ impl Defrag {
             in_defrag = true;
         }
         info!("Defrag: {}", in_defrag);
-        #[cfg(feature = "tracing")]
         probe!(mmtk, immix_defrag, in_defrag);
         self.in_defrag_collection
             .store(in_defrag, Ordering::Release)

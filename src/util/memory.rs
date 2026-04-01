@@ -340,11 +340,7 @@ fn mmap_fixed(
 
 /// Unmap the given memory (in page granularity). This wraps the unsafe libc munmap call.
 pub fn munmap(start: Address, size: usize) -> Result<()> {
-    let result = wrap_libc_call(&|| unsafe { libc::munmap(start.to_mut_ptr(), size) }, 0);
-    if result.is_ok() {
-        crate::rust_mem_counter::record_munmap(size);
-    }
-    result
+    wrap_libc_call(&|| unsafe { libc::munmap(start.to_mut_ptr(), size) }, 0)
 }
 
 /// Properly handle errors from a mmap Result, including invoking the binding code in the case of

@@ -64,15 +64,10 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
 
     fn flush_all(&self, space: &ImmixSpace<VM>) {
         let mut mature_evac_remsets = space.mature_evac_remsets.lock().unwrap();
-        let mut size = self.size.load(Ordering::SeqCst);
         self.size.store(0, Ordering::SeqCst);
         for id in 0..self.gc_buffers.len() {
             if self.gc_buffer(id).len() > 0 {
                 let remset = std::mem::take(self.gc_buffer(id));
-                size += remset.len();
-                if cfg!(feature = "rust_mem_counter") {
-                    crate::rust_mem_counter::MATURE_EVAC_REMSET_COUNTER.sub(remset.len());
-                }
                 mature_evac_remsets.push(Box::new(EvacuateMatureObjects::new(remset)));
             }
         }
@@ -85,9 +80,6 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
                 }
             }
         }
-        if cfg!(feature = "remset_counter") {
-            gc_log!("REMSET ENTRIES: {}", size);
-        }
     }
 
     #[cold]
@@ -95,9 +87,6 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
         if self.gc_buffer(id).len() > 0 {
             let remset = std::mem::take(self.gc_buffer(id));
             self.size.fetch_add(remset.len(), Ordering::SeqCst);
-            if cfg!(feature = "rust_mem_counter") {
-                crate::rust_mem_counter::MATURE_EVAC_REMSET_COUNTER.sub(remset.len());
-            }
             let w = EvacuateMatureObjects::new(remset);
             let packet_buffer = unsafe { &mut *self.local_packets[id].get() };
             packet_buffer.push(Box::new(w));
@@ -105,10 +94,7 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
     }
 
     pub fn record(&self, s: VM::VMSlot, _o: ObjectReference, lxr: &LXR<VM>) {
-        if cfg!(feature = "rust_mem_counter") {
-            crate::rust_mem_counter::MATURE_EVAC_REMSET_COUNTER.add(1);
-        }
-        let id = crate::gc_worker_id().unwrap();
+        let id = crate::scheduler::current_worker_ordinal().unwrap();
         let ix = lxr.immix_space.address_in_space(s.to_address());
         let ooh: bool = !ix && !lxr.los().address_in_space(s.to_address());
         self.gc_buffer(id)

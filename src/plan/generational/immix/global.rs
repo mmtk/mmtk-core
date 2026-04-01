@@ -109,7 +109,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     #[allow(clippy::branches_sharing_code)]
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<Self::VM>) {
         let is_full_heap = self.requires_full_heap_collection();
-        #[cfg(feature = "tracing")]
         probe!(mmtk, gen_full_heap, is_full_heap);
 
         if !is_full_heap {

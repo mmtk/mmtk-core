@@ -171,10 +171,10 @@ impl Stats {
     }
 
     pub fn print_stats<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>) {
-        let scheduler_stat = mmtk.scheduler.statistics();
         println!(
             "============================ MMTk Statistics Totals ============================"
         );
+        let scheduler_stat = mmtk.scheduler.statistics();
         self.print_column_names(&scheduler_stat);
         print!("{}\t", self.get_phase() / 2);
         let counter = self.counters.lock().unwrap();
@@ -192,9 +192,6 @@ impl Stats {
         for value in scheduler_stat.values() {
             print!("{}\t", value);
         }
-        unsafe { crate::RETIRED_COUNTERS.print_values() };
-        #[cfg(feature = "instrumentation")]
-        crate::STAT.lock().print_values();
         println!();
         print!("Total time: ");
         self.total_time.lock().unwrap().print_total(None);
@@ -216,9 +213,6 @@ impl Stats {
         for name in scheduler_stat.keys() {
             print!("{}\t", name);
         }
-        unsafe { crate::RETIRED_COUNTERS.print_keys() };
-        #[cfg(feature = "instrumentation")]
-        crate::STAT.lock().print_keys();
         println!();
     }
 

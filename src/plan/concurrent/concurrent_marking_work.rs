@@ -136,7 +136,6 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
                 iterations += 1;
             }
         }
-        #[cfg(feature = "tracing")]
         probe!(
             mmtk,
             concurrent_trace_objects,

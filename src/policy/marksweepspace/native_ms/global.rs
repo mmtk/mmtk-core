@@ -655,7 +655,6 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             block.sweep::<VM>();
             allocated_blocks += 1;
         }
-        #[cfg(feature = "tracing")]
         probe!(mmtk, sweep_chunk, allocated_blocks);
         // Set this chunk as free if there is not live blocks.
         if allocated_blocks == 0 {

@@ -388,7 +388,6 @@ impl ReferenceProcessor {
 
         let semantics_int = self.semantics as usize;
 
-        #[cfg(feature = "tracing")]
         probe!(
             mmtk,
             reference_scanned,
@@ -442,7 +441,6 @@ impl ReferenceProcessor {
             }
         }
 
-        #[cfg(feature = "tracing")]
         probe!(mmtk, reference_retained, num_refs, num_live, num_retained,);
 
         debug!("Ending ReferenceProcessor.retain({:?})", self.semantics);

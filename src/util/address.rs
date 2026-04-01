@@ -870,10 +870,6 @@ impl ObjectReference {
         // );
     }
 
-    pub fn fix_start_address<VM: VMBinding>(self) -> Self {
-        self
-    }
-
     pub fn verify<VM: VMBinding>(self) {
         if cfg!(debug_assertions) || Self::STRICT_VERIFICATION {
             assert!(

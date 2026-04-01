@@ -47,7 +47,6 @@ delegate = "0.13.2"
 downcast-rs = "2.0.1"
 enum-map = "2.7.3"
 env_logger = { version = "0.11.3", optional = true }
-humantime = "2.1.0"
 is-terminal = "0.4.7"
 itertools = "0.14.0"
 jemalloc-sys = { version = "0.3.2", features = [
@@ -60,17 +59,17 @@ memoffset = "0.9"
 mimalloc-sys = { version = "0.1.6", optional = true }
 num_cpus = "1.15.0"
 num-traits = "0.2"
-pfm = { git = "https://github.com/wenyuzhao/pfm.git", branch = "plm0", optional = true }
-probe = { version = "0.5", optional = true }
+pfm = { version = "0.1.1", optional = true }
 portable-atomic = "1.4.3"
-regex = { version = "1.7.0", optional = true }
+probe = "0.5"
+regex = "1.7.0"
 rustversion = "1.0"
-spin = { version = "0.10.0", features = ["std"] }
-# static_assertions = "1.1.0"
+spin = "0.10.0"
+static_assertions = "1.1.0"
 strum = "0.27.1"
 strum_macros = "0.27.1"
 # sysinfo >=0.37.0 requires MSRV 1.88.0 and Rust edition 2024.
-sysinfo = { version = "0.36.1", optional = true }
+sysinfo = "0.36.1"
 
 [dev-dependencies]
 paste = "1.0.8"
@@ -105,9 +104,6 @@ harness = false
 [features]
 # default = ["sanity"]
 default = [
-    # "perf_counter",
-    "dep:sysinfo",
-    "dep:regex",
     "dep:env_logger",
     "ix_always_defrag",
     # "no_meta_counting",
@@ -242,7 +238,6 @@ lxr_fixed_rc_trigger = []
 fixed_clean_alloc_trigger_based_on_system_time = []
 takerate_measurement = []
 enable_sysinfo = []
-regex = ["dep:regex"]
 
 fixed_alloc_trigger_based_on_system_time = []
 
@@ -253,8 +248,8 @@ bpr_spin_lock = []
 
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts
-perf_counter = ["pfm"]
-perf_counter_plm0 = ["perf_counter", "pfm/plm0"]
+perf_counter = ["dep:pfm"]
+perf_counter_plm0 = ["perf_counter"]
 work_packet_counter = []
 
 # This feature is only used for tests with MockVM.
@@ -403,5 +398,3 @@ marksweep_as_nonmoving = []
 
 # If there are more groups, they should be inserted above this line
 # Group:end
-
-tracing = ["probe"]

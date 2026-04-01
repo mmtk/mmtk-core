@@ -554,12 +554,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `align`: the required alignment in bytes.
     /// * `offset` the required offset in bytes.
     fn alloc_slow_once_traced(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        #[cfg(feature = "tracing")]
         probe!(mmtk, alloc_slow_once_start);
         // probe! expands to an empty block on unsupported platforms
         #[allow(clippy::let_and_return)]
         let ret = self.alloc_slow_once(size, align, offset);
-        #[cfg(feature = "tracing")]
         probe!(mmtk, alloc_slow_once_end);
         ret
     }

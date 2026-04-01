@@ -66,7 +66,6 @@ impl SchedulerStat {
         stat.insert("total-work.count".to_owned(), format!("{}", total_count));
         // Work execution times
         let mut duration_overall: WorkCounterBase = Default::default();
-        let mut total: u128 = 0;
         let mut work_counters = self.work_counters.iter().collect::<Vec<_>>();
         work_counters.sort_by_cached_key(|(t, _)| self.work_id_name_map[t]);
         for (t, vs) in work_counters {
@@ -98,18 +97,6 @@ impl SchedulerStat {
                 *val = f64::min(*val, fold.min);
                 let val = times.entry(pkt_max).or_default();
                 *val = f64::max(*val, fold.max);
-
-                if crate::args::HARNESS_PRETTY_PRINT && name == "time" {
-                    println!(" - {:<35} total={:15}    min={:10}    max={:15}    avg={:15.2}    count={:10}", self.work_name(n), fold.total, fold.min, fold.max, fold.total / self.work_counts[t] as f64, self.work_counts[t]);
-                    total += fold.total as u128;
-                }
-            }
-        }
-
-        if crate::args::HARNESS_PRETTY_PRINT {
-            println!("SUM: {} ns", total);
-            if crate::args::INSTRUMENTATION {
-                crate::STAT.lock().pretty_print();
             }
         }
 

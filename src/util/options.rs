@@ -732,22 +732,6 @@ impl GCTriggerSelector {
 impl FromStr for GCTriggerSelector {
     type Err = String;
 
-    #[cfg(not(feature = "regex"))]
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.is_empty() {
-            return Err("No GC trigger policy is supplied".to_string());
-        }
-
-        if s.starts_with("FixedHeapSize") || s.starts_with("DynamicHeapSize") {
-            unimplemented!()
-        } else if s.starts_with("Delegated") {
-            return Ok(Self::Delegated);
-        }
-
-        Err(format!("Failed to parse the GC trigger option: {:?}", s))
-    }
-
-    #[cfg(feature = "regex")]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use regex::Regex;
         lazy_static! {

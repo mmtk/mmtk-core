@@ -249,7 +249,6 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// * `tls`: The VM-specific thread-local storage for this GC worker thread.
     /// * `mmtk`: A reference to an MMTk instance.
     pub fn run(mut self: Box<Self>, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
-        #[cfg(feature = "tracing")]
         probe!(mmtk, gcworker_run);
         debug!(
             "Worker started. ordinal: {}, {}",
@@ -282,7 +281,6 @@ impl<VM: VMBinding> GCWorker<VM> {
             // execute work (between work and next work_poll).
             // If we have work_start and work_end, we cannot measure the first
             // poll.
-            #[cfg(feature = "tracing")]
             probe!(mmtk, work_poll);
             let Ok(mut work) = self.poll() else {
                 // The worker is asked to exit.  Break from the loop.
@@ -290,7 +288,6 @@ impl<VM: VMBinding> GCWorker<VM> {
             };
             // probe! expands to an empty block on unsupported platforms
             #[allow(unused_variables)]
-            #[cfg(feature = "tracing")]
             let typename = work.get_type_name();
 
             #[cfg(feature = "bpftrace_workaround")]
@@ -299,7 +296,6 @@ impl<VM: VMBinding> GCWorker<VM> {
             // See the "Known issues" section in `tools/tracing/timeline/README.md`
             std::hint::black_box(unsafe { *(typename.as_ptr()) });
 
-            #[cfg(feature = "tracing")]
             probe!(mmtk, work, typename.as_ptr(), typename.len());
             work.do_work_with_stat(&mut self, mmtk);
             std::mem::drop(work);
@@ -310,7 +306,6 @@ impl<VM: VMBinding> GCWorker<VM> {
             self.ordinal,
             crate::util::rust_util::debug_process_thread_id(),
         );
-        #[cfg(feature = "tracing")]
         probe!(mmtk, gcworker_exit);
 
         mmtk.scheduler.surrender_gc_worker(self);

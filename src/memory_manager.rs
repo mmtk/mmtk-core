@@ -32,12 +32,6 @@ use std::time::Instant;
 pub fn report_gc_start<VM: VMBinding>(mmtk: &MMTK<VM>) {
     let t = Instant::now();
     mmtk.stats.start_gc();
-    if cfg!(feature = "yield_and_roots_timer") {
-        let t = t.duration_since(*crate::GC_TRIGGER_TIME).as_nanos();
-        crate::counters()
-            .yield_nanos
-            .fetch_add(t, Ordering::Relaxed);
-    }
 
     gc_log!([3]
         " - ({:.3}ms) Safepoint start. {:.6}ms since gc was triggered",
@@ -198,14 +192,6 @@ pub fn alloc<VM: VMBinding>(
     offset: usize,
     semantics: AllocationSemantics,
 ) -> Address {
-    crate::stat(|s| {
-        s.alloc_objects += 1;
-        s.alloc_volume += size;
-        if semantics == AllocationSemantics::Los {
-            s.alloc_los_objects += 1;
-            s.alloc_los_volume += size;
-        }
-    });
     // MMTk has assumptions about minimal object size.
     // We need to make sure that all allocations comply with the min object size.
     // Ideally, we check the allocation size, and if it is smaller, we transparently allocate the min
@@ -856,7 +842,6 @@ pub fn add_phantom_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReferen
 /// * `tls`: The thread that calls the function (and triggers a collection).
 pub fn harness_begin<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
     mmtk.harness_begin(tls);
-    crate::output_survival_ratios();
 }
 
 /// Generic hook to allow benchmarks to be harnessed. We stop collecting
@@ -865,9 +850,7 @@ pub fn harness_begin<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn harness_end<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
-    crate::stop_counters();
     mmtk.harness_end();
-    crate::output_pause_time();
 }
 
 /// Register a finalizable object. MMTk will retain the liveness of
