@@ -36,15 +36,18 @@ impl<SL: Slot> SanityChecker<SL> {
 
     /// Cache a list of root slots to the sanity checker.
     pub fn add_root_slots(&mut self, roots: Vec<SL>) {
+        debug!("Added {} root slots", roots.len());
         self.root_slots.push(roots)
     }
 
     pub fn add_root_nodes(&mut self, roots: Vec<ObjectReference>) {
+        debug!("Added {} root nodes", roots.len());
         self.root_nodes.push(roots)
     }
 
     /// Reset roots cache at the end of the sanity gc.
     fn clear_roots_cache(&mut self) {
+        debug!("Cleared roots cache");
         self.root_slots.clear();
         self.root_nodes.clear();
     }
