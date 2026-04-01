@@ -420,6 +420,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             };
 
             if !is_mutator {
+                debug_assert!(!result.is_zero());
                 return result;
             }
 
@@ -507,7 +508,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 trace!("fail with oom={}", fail_with_oom);
                 if fail_with_oom {
                     // Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
-                    println!("Throw HeapOutOfMemory!");
+                    trace!("Throw HeapOutOfMemory!");
                     VM::VMCollection::out_of_memory(tls, AllocationError::HeapOutOfMemory);
                     self.get_context()
                         .state

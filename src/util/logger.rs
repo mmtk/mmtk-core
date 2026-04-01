@@ -15,24 +15,24 @@
 /// Attempt to init a env_logger for MMTk.
 /// Does nothing if the "builtin_env_logger" feature is disabled.
 pub(crate) fn try_init() {
-    // cfg_if::cfg_if! {
-    //     if #[cfg(feature = "builtin_env_logger")] {
-    //         let result = env_logger::try_init_from_env(
-    //             // By default, show info level logging.
-    //             env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
-    //         );
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "builtin_env_logger")] {
+            let result = env_logger::try_init_from_env(
+                // By default, show info level logging.
+                env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
+            );
 
-    //         match result {
-    //             Ok(()) => {
-    //                 debug!("MMTk initialized the logger.");
-    //             }
-    //             Err(e) => {
-    //                 // Currently `log::SetLoggerError` can only be raised for one reason: the logger has already been initialized.
-    //                 debug!("MMTk failed to initialize the built-in env_logger: {e}");
-    //             }
-    //         }
-    //     } else {
-    //         debug!("MMTk didn't initialize the built-in env_logger.  The Cargo feature \"builtin_env_logger\" is not enabled.");
-    //     }
-    // }
+            match result {
+                Ok(()) => {
+                    debug!("MMTk initialized the logger.");
+                }
+                Err(e) => {
+                    // Currently `log::SetLoggerError` can only be raised for one reason: the logger has already been initialized.
+                    debug!("MMTk failed to initialize the built-in env_logger: {e}");
+                }
+            }
+        } else {
+            debug!("MMTk didn't initialize the built-in env_logger.  The Cargo feature \"builtin_env_logger\" is not enabled.");
+        }
+    }
 }

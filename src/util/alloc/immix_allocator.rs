@@ -308,7 +308,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     && !self.copy
                     && cfg!(feature = "force_zeroing")
                 {
-                    crate::util::memory::zero_w(
+                    crate::util::memory::zero(
                         self.bump_pointer.cursor,
                         self.bump_pointer.limit - self.bump_pointer.cursor,
                     );

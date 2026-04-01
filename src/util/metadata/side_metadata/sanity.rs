@@ -358,7 +358,7 @@ impl SideMetadataSanity {
             }
         }
 
-        // self.verify_local_specs().unwrap();
+        self.verify_local_specs().unwrap();
     }
 
     #[cfg(test)]

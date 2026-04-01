@@ -28,7 +28,6 @@ pub(crate) struct RuntimeArgs {
     pub(crate) trace_threshold: usize,
     pub(crate) min_reuse_lines: usize,
     pub(crate) chunk_defarg_percent: usize,
-    pub(crate) transparent_hugepage: bool,
 }
 
 impl Default for RuntimeArgs {
@@ -68,9 +67,6 @@ impl Default for RuntimeArgs {
                 .unwrap_or(20),
             min_reuse_lines: env_arg::<usize>("MIN_REUSE_LINES").unwrap_or(1),
             chunk_defarg_percent: env_arg::<usize>("CHUNK_DEFARG_THRESHOLD").unwrap_or(32),
-            transparent_hugepage: env_bool_arg("TRANSPARENT_HUGEPAGE")
-                .or(env_bool_arg("HUGEPAGE"))
-                .unwrap_or(true),
         }
     }
 }

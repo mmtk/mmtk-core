@@ -276,28 +276,26 @@ impl VMMap for Map32 {
         // ]
         /* set up the region map free list */
         if first_chunk != 0 {
-            self_mut.region_map.alloc_first_fit(first_chunk as _); // block out entire bottom of address range
+            self_mut.region_map.alloc(first_chunk as _); // block out entire bottom of address range
         }
         for _ in first_chunk..=last_chunk {
-            self_mut.region_map.alloc_first_fit(1);
+            self_mut.region_map.alloc(1);
         }
         if first_chunk != 0 {
-            self_mut.large_region_map.alloc_first_fit(first_chunk as _); // block out entire bottom of address range
+            self_mut.large_region_map.alloc(first_chunk as _); // block out entire bottom of address range
         }
         for _ in first_chunk..=last_chunk {
-            self_mut.large_region_map.alloc_first_fit(1);
+            self_mut.large_region_map.alloc(1);
         }
         if trailing_chunks != 0 {
-            let alloced_chunk = self_mut.region_map.alloc_first_fit(trailing_chunks as _);
+            let alloced_chunk = self_mut.region_map.alloc(trailing_chunks as _);
             debug_assert!(
                 alloced_chunk == unavail_start_chunk as i32,
                 "{} != {}",
                 alloced_chunk,
                 unavail_start_chunk
             );
-            let alloced_chunk = self_mut
-                .large_region_map
-                .alloc_first_fit(trailing_chunks as _);
+            let alloced_chunk = self_mut.large_region_map.alloc(trailing_chunks as _);
             debug_assert!(
                 alloced_chunk == unavail_start_chunk as i32,
                 "{} != {}",
@@ -317,9 +315,7 @@ impl VMMap for Map32 {
                 self_mut.region_map.free(chunk_index as _, false); // put this chunk on the free list
             }
             self_mut.global_page_map.set_uncoalescable(first_page);
-            let alloced_pages = self_mut
-                .global_page_map
-                .alloc_first_fit(PAGES_IN_CHUNK as _); // populate the global page map
+            let alloced_pages = self_mut.global_page_map.alloc(PAGES_IN_CHUNK as _); // populate the global page map
             debug_assert!(alloced_pages == first_page);
             first_page += PAGES_IN_CHUNK as i32;
         }

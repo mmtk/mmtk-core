@@ -24,7 +24,7 @@ pub trait FreeList: Sync + Downcast {
     fn get_entry(&self, index: i32) -> i32;
     fn set_entry(&mut self, index: i32, value: i32);
 
-    fn alloc_first_fit(&mut self, size: i32) -> i32 {
+    fn alloc(&mut self, size: i32) -> i32 {
         let mut unit = self.head();
         let mut s = 0;
         while ({
@@ -50,34 +50,6 @@ pub trait FreeList: Sync + Downcast {
         } else {
             self.__alloc(size, unit, s)
         }
-    }
-
-    fn alloc_best_fit(&mut self, size: i32) -> i32 {
-        let mut unit = self.head();
-        let mut best_s = i32::MAX;
-        let mut best_unit = i32::MAX;
-        while {
-            unit = self.get_next(unit);
-            unit != self.head()
-        } {
-            let s = self.get_size(unit);
-            if s >= size && s < best_s {
-                best_s = s;
-                best_unit = unit;
-                if s == size {
-                    break;
-                }
-            }
-        }
-        return if best_s == i32::MAX {
-            FAILURE
-        } else {
-            self.__alloc(size, best_unit, best_s)
-        };
-    }
-
-    fn alloc(&mut self, size: i32) -> i32 {
-        self.alloc_first_fit(size)
     }
 
     fn alloc_from_unit(&mut self, size: i32, unit: i32) -> i32 {

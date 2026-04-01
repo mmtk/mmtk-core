@@ -1146,7 +1146,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             )
             .expect("to-space overflow");
             // Transfer RC count
-            new.log_start_address::<VM>();
             if new.get_size::<VM>() > Line::BYTES {
                 self.rc.mark_straddle_object(new);
             }

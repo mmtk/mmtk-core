@@ -9,7 +9,6 @@ use std::sync::atomic::Ordering;
 
 use crate::mmtk::{MMAPPER, SFT_MAP};
 use crate::plan::barriers::LOGGED_VALUE;
-use crate::plan::barriers::UNLOGGED_VALUE;
 use crate::plan::SlotIterator;
 use crate::vm::{ObjectModel, VMBinding};
 
@@ -136,30 +135,11 @@ impl Shl<usize> for Address {
     }
 }
 
-/// Default constructor
-impl Default for Address {
-    fn default() -> Self {
-        Self::ZERO
-    }
-}
-
 impl Address {
     /// The lowest possible address.
     pub const ZERO: Self = Address(0);
     /// The highest possible address.
     pub const MAX: Self = Address(usize::MAX);
-
-    pub fn prefetch_read(self) {
-        unsafe {
-            std::arch::x86_64::_mm_prefetch(self.to_ptr(), std::arch::x86_64::_MM_HINT_NTA);
-        }
-    }
-
-    pub fn prefetch_write(self) {
-        unsafe {
-            std::arch::x86_64::_mm_prefetch(self.to_ptr(), std::arch::x86_64::_MM_HINT_ET0);
-        }
-    }
 
     /// creates Address from a pointer
     pub fn from_ptr<T>(ptr: *const T) -> Address {
@@ -383,45 +363,12 @@ impl Address {
         }
     }
 
-    pub fn attempt_log_field<VM: VMBinding>(self) -> bool {
-        debug_assert!(!self.is_zero());
-        let log_bit = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
-            .as_spec()
-            .extract_side_spec();
-        loop {
-            let old_value: u8 = log_bit.load_atomic(self, Ordering::SeqCst);
-            if old_value == LOGGED_VALUE {
-                return false;
-            }
-            if log_bit
-                .compare_exchange_atomic(
-                    self,
-                    UNLOGGED_VALUE,
-                    LOGGED_VALUE,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                return true;
-            }
-        }
-    }
-
     pub fn log_field<VM: VMBinding>(self) {
         debug_assert!(!self.is_zero());
         VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
             .as_spec()
             .extract_side_spec()
             .store_atomic(self, LOGGED_VALUE, Ordering::Relaxed)
-    }
-
-    pub fn unlog_field<VM: VMBinding>(self) {
-        debug_assert!(!self.is_zero());
-        VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
-            .as_spec()
-            .extract_side_spec()
-            .store_atomic(self, UNLOGGED_VALUE, Ordering::Relaxed)
     }
 
     pub fn unlog_field_relaxed<VM: VMBinding>(self) {
@@ -443,7 +390,6 @@ impl Address {
     pub fn to_object_reference<VM: VMBinding>(self) -> ObjectReference {
         debug_assert!(!self.is_zero());
         unsafe { ObjectReference::from_raw_address_unchecked(self) }
-        // VM::VMObjectModel::ref_to_object_start(self)
     }
 
     /// Returns the intersection of the two address ranges. The returned range could
@@ -720,6 +666,7 @@ impl ObjectReference {
     /// object header, and access the object header. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_header`].
     /// See the comments on [`crate::vm::ObjectModel::ref_to_header`].
     pub fn to_header<VM: VMBinding>(self) -> Address {
+        use crate::vm::ObjectModel;
         VM::VMObjectModel::ref_to_header(self)
     }
 
@@ -727,6 +674,7 @@ impl ObjectReference {
     /// address originally returned from [`crate::memory_manager::alloc`] for the object.
     /// This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_object_start`]. See comments on [`crate::vm::ObjectModel::ref_to_object_start`].
     pub fn to_object_start<VM: VMBinding>(self) -> Address {
+        use crate::vm::ObjectModel;
         let object_start = VM::VMObjectModel::ref_to_object_start(self);
         debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_object_start() returns {}", self, object_start);
         debug_assert!(
@@ -783,10 +731,6 @@ impl ObjectReference {
         unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_live(self)
     }
 
-    pub fn is_live2(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_live(self)
-    }
-
     /// Can the object be moved?
     pub fn is_movable(self) -> bool {
         unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_movable()
@@ -794,14 +738,6 @@ impl ObjectReference {
 
     /// Get forwarding pointer if the object is forwarded.
     pub fn get_forwarded_object(self) -> Option<Self> {
-        debug_assert!({
-            let addr = self.to_raw_address();
-            addr >= vm_layout().heap_start && addr < vm_layout().heap_end
-        });
-        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.get_forwarded_object(self)
-    }
-
-    pub fn get_forwarded_object2(self) -> Option<Self> {
         debug_assert!({
             let addr = self.to_raw_address();
             addr >= vm_layout().heap_start && addr < vm_layout().heap_end
@@ -837,59 +773,8 @@ impl ObjectReference {
         a..a + self.get_size::<VM>()
     }
 
-    pub fn log_start_address<VM: VMBinding>(self) {}
-
     pub fn class_pointer<VM: VMBinding>(self) -> Address {
         VM::VMObjectModel::get_class_pointer(self)
-    }
-
-    pub fn class_is_valid<VM: VMBinding>(self) -> bool {
-        let klass = self.class_pointer::<VM>();
-        let v = klass.as_usize();
-        // if -1 == unsafe { libc::msync((v >> 12 << 12) as *mut libc::c_void, 4096, 0) } {
-        //     println!("Unmapped klass {:?} object {:?}", klass, self);
-        //     return false;
-        // }
-        let valid = if VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
-            klass.is_aligned_to(8) && v >= 0x10000_0000 && v <= 0x20000_0000
-        } else {
-            ((klass.as_usize() & 0xff000_00000000) == 0x7000_00000000) && klass.is_aligned_to(8)
-        };
-        if !valid {
-            println!("invalid klass {:?} for object {:?}", klass, self);
-        }
-        valid
-    }
-
-    fn assert_class_is_valid<VM: VMBinding>(self) {
-        // assert!(
-        //     self.class_is_valid::<VM>(),
-        //     "Invalid class pointer obj={:?} cls={:?}",
-        //     self,
-        //     self.class_pointer::<VM>()
-        // );
-    }
-
-    pub fn verify<VM: VMBinding>(self) {
-        if cfg!(debug_assertions) || Self::STRICT_VERIFICATION {
-            assert!(
-                self.to_raw_address().is_mapped(),
-                "unmapped object {:?}",
-                self
-            );
-            assert!(
-                self.is_in_any_space(),
-                "object {:?} is not in any space",
-                self
-            );
-            assert_ne!(
-                unsafe { self.to_raw_address().load::<usize>() },
-                0xdead,
-                "object {:?} is dead",
-                self
-            );
-            self.assert_class_is_valid::<VM>();
-        }
     }
 
     pub fn iterate_fields<VM: VMBinding, F: FnMut(VM::VMSlot, bool)>(
@@ -923,16 +808,6 @@ impl ObjectReference {
             f,
             Some(klass),
         )
-    }
-
-    /// Prefetch the object reference in preparation for a later load of the object
-    pub fn prefetch_read(self) {
-        self.to_raw_address().prefetch_read();
-    }
-
-    /// Prefetch the object reference in preparation for a later store to the object
-    pub fn prefetch_write(self) {
-        self.to_raw_address().prefetch_write();
     }
 }
 

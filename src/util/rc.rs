@@ -124,14 +124,6 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         RC_TABLE.load_atomic(o.to_raw_address(), Ordering::Relaxed)
     }
 
-    pub fn prefetch_read(&self, o: ObjectReference) {
-        RC_TABLE.prefetch_read(o.to_raw_address())
-    }
-
-    pub fn prefetch_write(&self, o: ObjectReference) {
-        RC_TABLE.prefetch_write(o.to_raw_address())
-    }
-
     pub fn object_or_line_is_dead(&self, o: ObjectReference) -> bool {
         RC_TABLE.load_byte(o.to_raw_address()) == 0
     }
@@ -213,7 +205,6 @@ impl<VM: VMBinding> RefCountHelper<VM> {
     }
 
     pub fn promote(&self, o: ObjectReference) {
-        o.log_start_address::<VM>();
         let size = o.get_size::<VM>();
         if size > Line::BYTES {
             self.mark_straddle_object_with_size(o, size);
@@ -221,7 +212,6 @@ impl<VM: VMBinding> RefCountHelper<VM> {
     }
 
     pub fn promote_with_size(&self, o: ObjectReference, size: usize) {
-        o.log_start_address::<VM>();
         if size > Line::BYTES {
             self.mark_straddle_object_with_size(o, size);
         }

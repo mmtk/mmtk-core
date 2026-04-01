@@ -97,7 +97,7 @@ impl<VM: VMBinding> BlockAllocation<VM> {
         // println!("Alloc {:?} {}", block, copy);
         block.init(copy, false, self.space());
         if self.space().common().zeroed && !copy && cfg!(feature = "force_zeroing") {
-            crate::util::memory::zero_w(block.start(), Block::BYTES);
+            crate::util::memory::zero(block.start(), Block::BYTES);
         }
     }
 }

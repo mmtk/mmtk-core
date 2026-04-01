@@ -149,13 +149,13 @@ impl SideMetadataSpec {
         match log_b {
             _ if log_b < 3 => {
                 assert_eq!(T::LOG2, 3);
-                if let Some(_v) = val {
-                    // assert!(
-                    //     v.to_u8().unwrap() < (1 << (1 << log_b)),
-                    //     "Input value {:?} is invalid for the spec {:?}",
-                    //     v,
-                    //     self
-                    // );
+                if let Some(v) = val {
+                    assert!(
+                        v.to_u8().unwrap() < (1 << (1 << log_b)),
+                        "Input value {:?} is invalid for the spec {:?}",
+                        v,
+                        self
+                    );
                 }
             }
             3..=6 => assert_eq!(T::LOG2, log_b as u32),
@@ -561,16 +561,6 @@ impl SideMetadataSpec {
     pub fn load_byte(&self, data_addr: Address) -> u8 {
         let meta_addr = address_to_meta_address(self, data_addr);
         unsafe { meta_addr.load::<u8>() }
-    }
-
-    pub fn prefetch_read(&self, data_addr: Address) {
-        let meta_addr = address_to_meta_address(self, data_addr);
-        meta_addr.prefetch_read();
-    }
-
-    pub fn prefetch_write(&self, data_addr: Address) {
-        let meta_addr = address_to_meta_address(self, data_addr);
-        meta_addr.prefetch_write();
     }
 
     /// Loads a value from the side metadata for the given address.

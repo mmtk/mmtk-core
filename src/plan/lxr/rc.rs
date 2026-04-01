@@ -113,7 +113,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
     }
 
     fn promote(&mut self, o: ObjectReference, copied: bool, los: bool, depth: u32) {
-        o.verify::<VM>();
         let size = o.get_size::<VM>();
 
         if !los {
@@ -292,7 +291,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
     }
 
     fn process_inc_and_evacuate(&mut self, o: ObjectReference, depth: u32) -> ObjectReference {
-        o.verify::<VM>();
         let los = self.lxr.los().in_space(o);
         if crate::args::RC_NURSERY_EVACUATION
             && !los
@@ -389,7 +387,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
         };
         // println!(" - inc {:?}: {:?} rc={}", s, o, self.rc.count(o));
-        o.verify::<VM>();
         let new = self.process_inc_and_evacuate(o, depth);
         // Put this into remset if this is a mature slot, or a weak root
         if K != EDGE_KIND_ROOT || add_root_to_remset {

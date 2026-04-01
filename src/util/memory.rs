@@ -164,15 +164,6 @@ pub(crate) fn result_is_mapped(result: Result<()>) -> bool {
     }
 }
 
-pub fn prefetch(start: Address, len: usize) {
-    for i in (0..len).step_by(64) {
-        unsafe {
-            let addr = start + i;
-            let _ = std::ptr::read_volatile(addr.to_ptr::<u8>());
-        }
-    }
-}
-
 /// Set a range of memory to 0.
 pub fn zero(start: Address, len: usize) {
     set(start, 0, len);
@@ -183,10 +174,6 @@ pub fn set(start: Address, val: u8, len: usize) {
     unsafe {
         std::ptr::write_bytes::<u8>(start.to_mut_ptr(), val, len);
     }
-}
-
-pub fn zero_w(start: Address, len: usize) {
-    unsafe { std::ptr::write_bytes::<u128>(start.to_mut_ptr(), 0, len >> 4) }
 }
 
 /// Demand-zero mmap:
@@ -212,15 +199,6 @@ pub unsafe fn dzmmap(
     if ret.is_ok() {
         zero(start, size)
     }
-    if cfg!(feature = "sanity") {
-        assert!(
-            ret.is_ok(),
-            "dzmmap failed: start={:?} size={} err={:?}",
-            start,
-            size,
-            ret
-        );
-    }
     ret
 }
 /// Demand-zero mmap (no replace):
@@ -239,15 +217,6 @@ pub fn dzmmap_noreplace(
     #[cfg(not(target_os = "linux"))]
     if ret.is_ok() {
         zero(start, size)
-    }
-    if cfg!(feature = "sanity") {
-        assert!(
-            ret.is_ok(),
-            "dzmmap_noreplace failed: start={:?} size={} err={:?}",
-            start,
-            size,
-            ret
-        );
     }
     ret
 }
@@ -309,10 +278,6 @@ fn mmap_fixed(
         if let Err(e) = result {
             debug!("Error while calling prctl: {e}");
         }
-    }
-
-    if crate::args().transparent_hugepage && matches!(strategy.huge_page, HugePageSupport::No) {
-        let _ = unsafe { libc::madvise(start.to_mut_ptr(), size, libc::MADV_HUGEPAGE) };
     }
 
     match strategy.huge_page {
@@ -426,14 +391,11 @@ pub fn mprotect(start: Address, size: usize) -> Result<()> {
     )
 }
 
-fn wrap_libc_call<T: PartialEq + Debug>(f: &dyn Fn() -> T, expect: T) -> Result<()> {
+fn wrap_libc_call<T: PartialEq>(f: &dyn Fn() -> T, expect: T) -> Result<()> {
     let ret = f();
     if ret == expect {
         Ok(())
     } else {
-        if cfg!(feature = "sanity") {
-            // eprintln!("unexpected libc call result: {:?} vs {:?}", ret, expect);
-        }
         Err(std::io::Error::last_os_error())
     }
 }

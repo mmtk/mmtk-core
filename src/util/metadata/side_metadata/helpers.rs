@@ -12,7 +12,7 @@ use crate::MMAPPER;
 use std::io::Result;
 
 /// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)
-pub(super) const fn address_to_contiguous_meta_address(
+pub(super) fn address_to_contiguous_meta_address(
     metadata_spec: &SideMetadataSpec,
     data_addr: Address,
 ) -> Address {
@@ -21,14 +21,11 @@ pub(super) const fn address_to_contiguous_meta_address(
 
     let shift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
-    let a = if shift >= 0 {
-        metadata_spec.get_absolute_offset().as_usize()
-            + ((data_addr.as_usize() >> log_bytes_in_region) >> shift)
+    if shift >= 0 {
+        metadata_spec.get_absolute_offset() + ((data_addr >> log_bytes_in_region) >> shift)
     } else {
-        metadata_spec.get_absolute_offset().as_usize()
-            + ((data_addr.as_usize() >> log_bytes_in_region) << (-shift))
-    };
-    unsafe { Address::from_usize(a) }
+        metadata_spec.get_absolute_offset() + ((data_addr >> log_bytes_in_region) << (-shift))
+    }
 }
 
 /// Performs reverse address translation from contiguous metadata bits to data addresses.
@@ -164,7 +161,7 @@ pub(super) fn try_mmap_contiguous_metadata_space(
 }
 
 /// Performs the translation of data address (`data_addr`) to metadata address for the specified metadata (`metadata_spec`).
-pub(crate) const fn address_to_meta_address(
+pub(crate) fn address_to_meta_address(
     metadata_spec: &SideMetadataSpec,
     data_addr: Address,
 ) -> Address {
@@ -179,12 +176,12 @@ pub(crate) const fn address_to_meta_address(
     #[cfg(target_pointer_width = "64")]
     let res = { address_to_contiguous_meta_address(metadata_spec, data_addr) };
 
-    // trace!(
-    //     "address_to_meta_address({:?}, addr: {}) -> 0x{:x}",
-    //     metadata_spec,
-    //     data_addr,
-    //     res
-    // );
+    trace!(
+        "address_to_meta_address({:?}, addr: {}) -> 0x{:x}",
+        metadata_spec,
+        data_addr,
+        res
+    );
 
     res
 }
@@ -227,17 +224,17 @@ pub(super) const fn metadata_address_range_size(metadata_spec: &SideMetadataSpec
     1usize << (VMLayout::LOG_ARCH_ADDRESS_SPACE - log_data_meta_ratio(metadata_spec))
 }
 
-pub(super) const fn meta_byte_lshift(metadata_spec: &SideMetadataSpec, data_addr: Address) -> u8 {
+pub(super) fn meta_byte_lshift(metadata_spec: &SideMetadataSpec, data_addr: Address) -> u8 {
     let bits_num_log = metadata_spec.log_num_of_bits as i32;
     if bits_num_log >= 3 {
         return 0;
     }
     let rem_shift = BITS_IN_WORD as i32 - ((LOG_BITS_IN_BYTE as i32) - bits_num_log);
-    ((((data_addr.as_usize() >> metadata_spec.log_bytes_in_region) << rem_shift) >> rem_shift)
-        << bits_num_log) as u8
+    ((((data_addr >> metadata_spec.log_bytes_in_region) << rem_shift) >> rem_shift) << bits_num_log)
+        as u8
 }
 
-pub(super) const fn meta_byte_mask(metadata_spec: &SideMetadataSpec) -> u8 {
+pub(super) fn meta_byte_mask(metadata_spec: &SideMetadataSpec) -> u8 {
     let bits_num_log = metadata_spec.log_num_of_bits;
     ((1usize << (1usize << bits_num_log)) - 1) as u8
 }
