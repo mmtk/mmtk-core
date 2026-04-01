@@ -95,10 +95,6 @@ pub const NO_LAZY_SWEEP_WHEN_STW_CANNOT_RELEASE_ENOUGH_MEMORY: bool = false;
 
 // ---------- Immix flags ---------- //
 pub const CYCLE_TRIGGER_THRESHOLD: usize = 1024;
-/// Mark/sweep memory for block-level only
-pub const BLOCK_ONLY: bool = cfg!(feature = "ix_block_only");
-/// Opportunistic copying
-pub const DEFRAG: bool = !cfg!(feature = "ix_no_defrag");
 /// Mark lines when scanning objects. Otherwise, do it at mark time.
 pub const MARK_LINE_AT_SCAN_TIME: bool = true;
 
@@ -132,8 +128,6 @@ fn dump_features(active_barrier: BarrierSelector, options: &Options) {
     eprintln!("-------------------- Immix Args --------------------");
 
     dump_feature!("barrier", format!("{:?}", active_barrier));
-    dump_feature!("ix_block_only");
-    dump_feature!("ix_no_defrag");
     dump_feature!("log_block_size", Block::LOG_BYTES);
     dump_feature!("log_line_size", Line::LOG_BYTES);
     dump_feature!("buffer_size", BUFFER_SIZE);
@@ -147,14 +141,11 @@ fn dump_features(active_barrier: BarrierSelector, options: &Options) {
         "force_use_contiguous_spaces",
         vm_layout().force_use_contiguous_spaces
     );
-    dump_feature!("bpr_spin_lock");
     dump_feature!("lxr_no_nursery_evac");
     dump_feature!("lxr_no_chunk_defrag");
     dump_feature!("lxr_no_lazy");
     dump_feature!("lxr_no_cm");
-    dump_feature!("no_map_fixed_noreplace");
     dump_feature!("no_meta_counting");
-    dump_feature!("measure_trace_rate");
     dump_feature!("lxr_no_mature_defrag");
 
     eprintln!("\n{:#?}", RuntimeArgs::get());

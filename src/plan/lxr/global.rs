@@ -460,7 +460,6 @@ impl<VM: VMBinding> LXR<VM> {
             curr_roots: Default::default(),
             rc: RefCountHelper::NEW,
             gc_cause: Atomic::new(GCCause::Unknown),
-            barrier_decs: AtomicUsize::default(),
         });
 
         lxr.gc_init(&options);

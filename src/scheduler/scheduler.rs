@@ -485,7 +485,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 probe!(mmtk, bucket_opened, id);
             }
             let verbose = crate::verbose(3);
-            if (verbose || cfg!(feature = "pause_time")) && bucket_opened {
+            if verbose && bucket_opened {
                 if verbose {
                     gc_log!([3]
                         " - ({:.3}ms) Start GC Stage: {:?}",

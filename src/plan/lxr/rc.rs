@@ -751,7 +751,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             },
         );
         let in_ix_space = lxr.immix_space.in_space(o);
-        if !crate::args::BLOCK_ONLY && in_ix_space {
+        if in_ix_space {
             self.rc.unmark_straddle_object(o);
         }
         if cfg!(feature = "sanity") || ObjectReference::STRICT_VERIFICATION {

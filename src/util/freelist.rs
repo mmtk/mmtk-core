@@ -77,11 +77,7 @@ pub trait FreeList: Sync + Downcast {
     }
 
     fn alloc(&mut self, size: i32) -> i32 {
-        if cfg!(feature = "freelist_best_fit_alloc") {
-            self.alloc_best_fit(size)
-        } else {
-            self.alloc_first_fit(size)
-        }
+        self.alloc_first_fit(size)
     }
 
     fn alloc_from_unit(&mut self, size: i32, unit: i32) -> i32 {

@@ -42,12 +42,11 @@ impl<VM: VMBinding> GCWork<VM> for SelectDefragBlocks {
         let is_emergency_gc = lxr.current_pause().unwrap() == Pause::Full;
         const BLOCKS_IN_CHUNK: usize = 1 << (LOG_BYTES_IN_CHUNK - Block::LOG_BYTES);
         let threshold = {
-            let chunk_defarg_percent =
-                if is_emergency_gc || cfg!(feature = "aggressive_mature_evac") {
-                    crate::args().chunk_defarg_percent << 1
-                } else {
-                    crate::args().chunk_defarg_percent
-                };
+            let chunk_defarg_percent = if is_emergency_gc {
+                crate::args().chunk_defarg_percent << 1
+            } else {
+                crate::args().chunk_defarg_percent
+            };
             let chunk_defarg_percent = chunk_defarg_percent.min(100);
             let threshold = BLOCKS_IN_CHUNK * chunk_defarg_percent / 100;
             threshold.max(1)
@@ -86,10 +85,7 @@ impl<VM: VMBinding> GCWork<VM> for SelectDefragBlocks {
                 }
                 // This is a fragmented block?
                 let score = block.calc_dead_lines() << Line::LOG_BYTES;
-                if lxr.current_pause().unwrap() == Pause::Full
-                    || cfg!(feature = "aggressive_mature_evac")
-                    || score >= (Block::BYTES >> 1)
-                {
+                if lxr.current_pause().unwrap() == Pause::Full || score >= (Block::BYTES >> 1) {
                     fragmented_blocks.push((block, score));
                 }
             }
@@ -206,9 +202,7 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
                 o.to_raw_address().store(0xdeadusize);
             }
         }
-        if !crate::args::BLOCK_ONLY {
-            self.rc.unmark_straddle_object(o)
-        }
+        self.rc.unmark_straddle_object(o);
         self.rc.set(o, 0);
     }
 
@@ -221,7 +215,7 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
             cursor = cursor + rc::MIN_OBJECT_SIZE;
             let c = self.rc.count(o);
             if c != 0 && !immix_space.is_marked(o) {
-                if !crate::args::BLOCK_ONLY && Line::is_aligned(o.to_raw_address()) {
+                if Line::is_aligned(o.to_raw_address()) {
                     if c == 1 && self.rc.is_straddle_line(Line::from(o.to_raw_address())) {
                         continue;
                     } else {
@@ -501,9 +495,6 @@ impl MatureEvacuationSet {
             lxr.immix_space.defrag_headroom_pages()
         };
         let max_copy_bytes = available_clean_pages_for_defrag << LOG_BYTES_IN_PAGE;
-        // if cfg!(feature = "aggressive_mature_evac") {
-        //     max_copy_bytes = max_copy_bytes << 2;
-        // }
         gc_log!([3] "max_copy_bytes={} ({}M)", max_copy_bytes, max_copy_bytes >> 20);
         let mut copy_bytes = 0usize;
         let mut selected_blocks = vec![];

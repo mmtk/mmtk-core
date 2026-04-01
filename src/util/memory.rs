@@ -6,9 +6,7 @@ use bytemuck::NoUninit;
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::fmt::Debug;
 use std::io::{Error, Result};
-#[cfg(feature = "enable_sysinfo")]
 use sysinfo::MemoryRefreshKind;
-#[cfg(feature = "enable_sysinfo")]
 use sysinfo::{RefreshKind, System};
 
 #[cfg(target_os = "linux")]
@@ -488,7 +486,6 @@ pub fn get_process_memory_maps() -> String {
 }
 
 /// Returns the total physical memory for the system in bytes.
-#[cfg(feature = "enable_sysinfo")]
 pub(crate) fn get_system_total_memory() -> u64 {
     // TODO: Note that if we want to get system info somewhere else in the future, we should
     // refactor this instance into some global struct. sysinfo recommends sharing one instance of
@@ -505,11 +502,6 @@ pub(crate) fn get_system_total_memory() -> u64 {
         RefreshKind::nothing().with_memory(MemoryRefreshKind::nothing().with_ram()),
     );
     sys.total_memory()
-}
-
-#[cfg(not(feature = "enable_sysinfo"))]
-pub(crate) fn get_system_total_memory() -> u64 {
-    32 << 30
 }
 
 #[cfg(test)]

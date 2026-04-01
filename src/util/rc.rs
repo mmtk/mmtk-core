@@ -171,7 +171,6 @@ impl<VM: VMBinding> RefCountHelper<VM> {
     }
 
     fn mark_straddle_object_with_size(&self, o: ObjectReference, size: usize) {
-        debug_assert!(!crate::args::BLOCK_ONLY);
         debug_assert!(size > Line::BYTES);
         let start_line = Line::containing::<VM>(o).next();
         let end_line = Line::from(Line::align(o.to_raw_address() + size));
@@ -189,7 +188,6 @@ impl<VM: VMBinding> RefCountHelper<VM> {
     }
 
     pub fn unmark_straddle_object(&self, o: ObjectReference) {
-        debug_assert!(!crate::args::BLOCK_ONLY);
         // debug_assert!(crate::args::RC_NURSERY_EVACUATION);
         let size = VM::VMObjectModel::get_current_size(o);
         if size > Line::BYTES {

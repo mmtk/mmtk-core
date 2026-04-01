@@ -1147,7 +1147,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             .expect("to-space overflow");
             // Transfer RC count
             new.log_start_address::<VM>();
-            if !crate::args::BLOCK_ONLY && new.get_size::<VM>() > Line::BYTES {
+            if new.get_size::<VM>() > Line::BYTES {
                 self.rc.mark_straddle_object(new);
             }
             self.rc.set(new, self.rc.count(object));

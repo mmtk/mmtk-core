@@ -474,7 +474,7 @@ impl Block {
             } else {
                 BlockState::Unmarked
             });
-            if !reuse || cfg!(feature = "ix_no_defrag_fix") {
+            if !reuse {
                 Self::DEFRAG_STATE_TABLE.store_atomic::<u8>(self.start(), 0, Ordering::SeqCst);
             }
         }
@@ -712,17 +712,10 @@ impl Block {
                     // Clear mark state.
                     self.set_state(BlockState::Unmarked);
                 }
-                if cfg!(feature = "ix_live_size_based_defrag") {
-                    // Update mark_histogram
-                    mark_histogram[Block::LINES - marked_lines] += marked_lines;
-                    // Record number of holes in block side metadata.
-                    self.set_holes(Block::LINES - marked_lines);
-                } else {
-                    // Update mark_histogram
-                    mark_histogram[holes] += marked_lines;
-                    // Record number of holes in block side metadata.
-                    self.set_holes(holes);
-                }
+                // Update mark_histogram
+                mark_histogram[holes] += marked_lines;
+                // Record number of holes in block side metadata.
+                self.set_holes(holes);
                 #[cfg(feature = "vo_bit")]
                 vo_bit::helper::on_region_swept::<VM, _>(self, true);
                 false

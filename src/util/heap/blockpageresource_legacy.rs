@@ -12,20 +12,13 @@ use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::*;
 use atomic::Ordering;
-#[cfg(feature = "bpr_spin_lock")]
-use spin::RwLock;
 use std::cell::UnsafeCell;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
-#[cfg(not(feature = "bpr_spin_lock"))]
 use std::sync::RwLock;
 
 const UNINITIALIZED_WATER_MARK: i32 = -1;
 const LOCAL_BUFFER_SIZE: usize = 128;
-
-fn enable_flpr_alloc() -> bool {
-    cfg!(feature = "bpr_freelist")
-}
 
 /// A fast PageResource for fixed-size block allocation only.
 pub struct BlockPageResource<VM: VMBinding, B: Region + 'static> {
@@ -52,18 +45,12 @@ impl<VM: VMBinding, B: Region> PageResource<VM> for BlockPageResource<VM, B> {
         required_pages: usize,
         tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail> {
-        if enable_flpr_alloc() {
-            // TODO: Lock-free implementation
-            self.flpr
-                .alloc_pages(space, reserved_pages, required_pages, tls)
-        } else {
-            self.alloc_pages_fast(
-                space.common().descriptor,
-                reserved_pages,
-                required_pages,
-                tls,
-            )
-        }
+        self.alloc_pages_fast(
+            space.common().descriptor,
+            reserved_pages,
+            required_pages,
+            tls,
+        )
     }
 
     fn get_available_physical_pages(&self) -> usize {
@@ -185,15 +172,10 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
     }
 
     pub fn release_block(&self, block: B, _single_thread: bool) {
-        if enable_flpr_alloc() {
-            // TODO: Lock-free implementation
-            self.flpr.release_pages(block.start());
-        } else {
-            let pages = 1 << Self::LOG_PAGES;
-            debug_assert!(pages as usize <= self.common().accounting.get_committed_pages());
-            self.common().accounting.release(pages as _);
-            self.block_queue.push(block)
-        }
+        let pages = 1 << Self::LOG_PAGES;
+        debug_assert!(pages as usize <= self.common().accounting.get_committed_pages());
+        self.common().accounting.release(pages as _);
+        self.block_queue.push(block)
     }
 
     pub fn flush_all(&self) {
@@ -330,9 +312,6 @@ impl<B: Region> BlockPool<B> {
     /// Add a BlockArray to the global pool
     fn add_global_array(&self, array: BlockQueue<B>) {
         self.count.fetch_add(array.len(), Ordering::SeqCst);
-        #[cfg(feature = "bpr_spin_lock")]
-        self.global_freed_blocks.write().1.push(array);
-        #[cfg(not(feature = "bpr_spin_lock"))]
         self.global_freed_blocks.write().unwrap().1.push(array);
     }
 
@@ -351,9 +330,6 @@ impl<B: Region> BlockPool<B> {
             debug_assert!(result.is_ok());
             let old_queue = self.worker_local_freed_blocks[id].replace(queue);
             assert!(!old_queue.is_empty());
-            #[cfg(feature = "bpr_spin_lock")]
-            self.global_freed_blocks.write().1.push(old_queue);
-            #[cfg(not(feature = "bpr_spin_lock"))]
             self.global_freed_blocks.write().unwrap().1.push(old_queue);
         }
     }
@@ -363,17 +339,11 @@ impl<B: Region> BlockPool<B> {
         if self.len() == 0 {
             return None;
         }
-        #[cfg(feature = "bpr_spin_lock")]
-        let free_blocks = self.global_freed_blocks.upgradeable_read();
-        #[cfg(not(feature = "bpr_spin_lock"))]
         let free_blocks = self.global_freed_blocks.read().unwrap();
         if let Some(block) = free_blocks.0.as_ref().and_then(|q| q.pop()) {
             self.count.fetch_sub(1, Ordering::SeqCst);
             Some(block)
         } else {
-            #[cfg(feature = "bpr_spin_lock")]
-            let mut free_blocks = free_blocks.upgrade();
-            #[cfg(not(feature = "bpr_spin_lock"))]
             let mut free_blocks = {
                 std::mem::drop(free_blocks);
                 self.global_freed_blocks.write().unwrap()
@@ -404,9 +374,6 @@ impl<B: Region> BlockPool<B> {
         if !self.worker_local_freed_blocks[id].is_empty() {
             let queue = self.worker_local_freed_blocks[id].replace(BlockQueue::new());
             if !queue.is_empty() {
-                #[cfg(feature = "bpr_spin_lock")]
-                self.global_freed_blocks.write().1.push(queue);
-                #[cfg(not(feature = "bpr_spin_lock"))]
                 self.global_freed_blocks.write().unwrap().1.push(queue);
             }
         }
@@ -429,9 +396,6 @@ impl<B: Region> BlockPool<B> {
 
     /// Iterate all the blocks in the BlockQueue
     pub fn iterate_blocks(&self, f: &mut impl FnMut(B)) {
-        #[cfg(feature = "bpr_spin_lock")]
-        let free_blocks = self.global_freed_blocks.read();
-        #[cfg(not(feature = "bpr_spin_lock"))]
         let free_blocks = self.global_freed_blocks.read().unwrap();
         if let Some(array) = &free_blocks.0 {
             array.iterate_blocks(f)
