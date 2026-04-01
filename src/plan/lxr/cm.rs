@@ -3,7 +3,6 @@ use crate::plan::immix::Pause;
 use crate::plan::VectorQueue;
 use crate::policy::immix::block::Block;
 use crate::policy::immix::line::Line;
-use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::{ScanObjects, SlotOf};
 use crate::scheduler::RootKind;
@@ -329,7 +328,6 @@ impl ProcessModBufSATB {
 
 impl<VM: VMBinding> GCWork<VM> for ProcessModBufSATB {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        debug_assert!(!crate::args::BARRIER_MEASUREMENT);
         let mut w = if let Some(nodes) = self.nodes.take() {
             if nodes.is_empty() {
                 return;
@@ -619,7 +617,6 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
                 slot.store(Some(new_object));
             }
         }
-        super::record_slot_for_validation(slot, Some(new_object));
     }
 
     fn process_slots_impl<const WEAK_ROOT: bool, const REMSET: bool>(

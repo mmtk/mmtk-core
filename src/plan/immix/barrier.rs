@@ -20,7 +20,7 @@ use crate::vm::slot::Slot;
 use crate::vm::*;
 use crate::MMTK;
 
-pub const TAKERATE_MEASUREMENT: bool = crate::args::TAKERATE_MEASUREMENT;
+pub const TAKERATE_MEASUREMENT: bool = crate::plan::barriers::TAKERATE_MEASUREMENT;
 pub static FAST_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub static SLOW_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -118,9 +118,6 @@ impl<VM: VMBinding> ImmixFakeFieldBarrierSemantics<VM> {
         slot: VM::VMSlot,
         _new: Option<ObjectReference>,
     ) {
-        if crate::args::BARRIER_MEASUREMENT_NO_SLOW {
-            return;
-        }
         if TAKERATE_MEASUREMENT && self.mmtk.inside_harness() {
             FAST_COUNT.fetch_add(1, Ordering::SeqCst);
         }
@@ -183,9 +180,6 @@ impl<VM: VMBinding> BarrierSemantics for ImmixFakeFieldBarrierSemantics<VM> {
     }
 
     fn load_weak_reference(&mut self, o: ObjectReference) {
-        if crate::args::BARRIER_MEASUREMENT_NO_SLOW {
-            return;
-        }
         self.refs.push(o);
         if self.refs.is_full() {
             self.flush_weak_refs();

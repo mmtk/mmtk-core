@@ -26,7 +26,6 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::slot::MemorySlice;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
-use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 pub fn report_gc_start<VM: VMBinding>(mmtk: &MMTK<VM>) {

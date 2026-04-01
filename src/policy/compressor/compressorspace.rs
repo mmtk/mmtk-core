@@ -17,7 +17,7 @@ use crate::util::object_enum::{self, ObjectEnumerator};
 use crate::util::{Address, ObjectReference};
 use crate::vm::slot::Slot;
 use crate::MMTK;
-use crate::{policy, vm::*, ObjectQueue};
+use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
 use std::sync::Arc;
 

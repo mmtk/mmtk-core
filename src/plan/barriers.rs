@@ -11,8 +11,8 @@ use crate::{
 use atomic::Ordering;
 use downcast_rs::Downcast;
 
-pub const BARRIER_MEASUREMENT: bool = crate::args::BARRIER_MEASUREMENT;
-pub const TAKERATE_MEASUREMENT: bool = crate::args::TAKERATE_MEASUREMENT;
+pub const BARRIER_MEASUREMENT: bool = false;
+pub const TAKERATE_MEASUREMENT: bool = false;
 pub static FAST_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub static SLOW_COUNT: AtomicUsize = AtomicUsize::new(0);
 

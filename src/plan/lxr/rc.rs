@@ -261,7 +261,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                     }
                     self.record_mature_evac_remset2(obj_in_defrag, slot, target);
                 }
-                super::record_slot_for_validation(slot, Some(target));
             });
         }
     }
@@ -400,7 +399,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         let o = match self.unlog_and_load_rc_object::<K>(s) {
             Some(o) => o,
             _ => {
-                super::record_slot_for_validation(s, ObjectReference::NULL);
                 return None;
             }
         };
@@ -430,7 +428,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             //     K
             // );
         }
-        super::record_slot_for_validation(s, Some(new));
         Some(new)
     }
 

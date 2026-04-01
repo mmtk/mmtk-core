@@ -38,11 +38,7 @@ mod mmtk;
 pub use mmtk::MMTKBuilder;
 use std::{
     cell::UnsafeCell,
-    collections::HashMap,
-    fs::File,
-    io::Write,
     ops::Deref,
-    ptr::{addr_of, addr_of_mut},
     sync::{
         atomic::{AtomicBool, AtomicUsize},
         Arc,
@@ -50,12 +46,11 @@ use std::{
     time::{Instant, SystemTime},
 };
 
-use atomic::{Atomic, Ordering};
-use crossbeam::queue::SegQueue;
+use atomic::Ordering;
 pub(crate) use mmtk::MMAPPER;
 pub use mmtk::MMTK;
 use plan::immix::Pause;
-use spin::{Lazy, Mutex};
+use spin::Lazy;
 type RwLock<T> = spin::rwlock::RwLock<T>;
 
 mod global_state;
@@ -236,7 +231,6 @@ static GC_EPOCH: AtomicUsize = AtomicUsize::new(0);
 static RESERVED_PAGES_AT_GC_START: AtomicUsize = AtomicUsize::new(0);
 static RESERVED_PAGES_AT_GC_END: AtomicUsize = AtomicUsize::new(0);
 static INSIDE_HARNESS: AtomicBool = AtomicBool::new(false);
-static SATB_START: Timer = Timer::new();
 static PAUSE_CONCURRENT_MARKING: AtomicBool = AtomicBool::new(false);
 static MOVE_CONCURRENT_MARKING_TO_STW: AtomicBool = AtomicBool::new(false);
 

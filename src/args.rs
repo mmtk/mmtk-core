@@ -115,19 +115,7 @@ impl RuntimeArgs {
 }
 
 pub const CM_LARGE_ARRAY_OPTIMIZATION: bool = false;
-pub const BUFFER_SIZE: usize = {
-    if cfg!(feature = "lxr_buf_2048") {
-        2048
-    } else if cfg!(feature = "lxr_buf_1024") {
-        1024
-    } else if cfg!(feature = "lxr_buf_512") {
-        512
-    } else if cfg!(feature = "lxr_buf_256") {
-        256
-    } else {
-        1024
-    }
-};
+pub const BUFFER_SIZE: usize = 1024;
 
 pub const HOLE_COUNTING: bool = cfg!(feature = "lxr_hole_counting");
 pub const NO_LAZY_SWEEP_WHEN_STW_CANNOT_RELEASE_ENOUGH_MEMORY: bool = false;
@@ -149,34 +137,8 @@ pub const RC_NURSERY_EVACUATION: bool = !cfg!(feature = "lxr_no_nursery_evac");
 pub const RC_MATURE_EVACUATION: bool = !cfg!(feature = "lxr_no_mature_evac");
 pub const ENABLE_INITIAL_ALLOC_LIMIT: bool = cfg!(feature = "lxr_enable_initial_alloc_limit");
 
-/// One more atomic-store per barrier slow-path if this value is smaller than 6.
-pub const LOG_BYTES_PER_RC_LOCK_BIT: usize = {
-    if cfg!(feature = "lxr_lock_3") {
-        3
-    } else if cfg!(feature = "lxr_lock_4") {
-        4
-    } else if cfg!(feature = "lxr_lock_5") {
-        5
-    } else if cfg!(feature = "lxr_lock_6") {
-        6
-    } else if cfg!(feature = "lxr_lock_7") {
-        7
-    } else if cfg!(feature = "lxr_lock_8") {
-        8
-    } else if cfg!(feature = "lxr_lock_9") {
-        9
-    } else {
-        9
-    }
-};
 pub const RC_DONT_EVACUATE_NURSERY_IN_RECYCLED_LINES: bool =
     !cfg!(feature = "lxr_evacuate_nursery_in_recycled_lines");
-
-// ---------- Barrier flags ---------- //
-pub const BARRIER_MEASUREMENT: bool = cfg!(feature = "barrier_measurement");
-pub const BARRIER_MEASUREMENT_NO_SLOW: bool = cfg!(feature = "barrier_measurement_no_slow");
-pub const TAKERATE_MEASUREMENT: bool = cfg!(feature = "takerate_measurement");
-pub const INSTRUMENTATION: bool = cfg!(feature = "instrumentation");
 
 // ---------- Debugging flags ---------- //
 pub const HARNESS_PRETTY_PRINT: bool = false || cfg!(feature = "log_gc");
@@ -207,8 +169,6 @@ fn dump_features(active_barrier: BarrierSelector, options: &Options) {
     eprintln!("-------------------- Immix Args --------------------");
 
     dump_feature!("barrier", format!("{:?}", active_barrier));
-    dump_feature!("barrier_measurement");
-    dump_feature!("instrumentation");
     dump_feature!("ix_block_only");
     dump_feature!("ix_no_defrag");
     dump_feature!("lxr_evacuate_nursery_in_recycled_lines");
@@ -216,9 +176,7 @@ fn dump_features(active_barrier: BarrierSelector, options: &Options) {
     dump_feature!("lxr_enable_initial_alloc_limit");
     dump_feature!("log_block_size", Block::LOG_BYTES);
     dump_feature!("log_line_size", Line::LOG_BYTES);
-    dump_feature!("log_bytes_per_rc_lock_bit", LOG_BYTES_PER_RC_LOCK_BIT);
     dump_feature!("buffer_size", BUFFER_SIZE);
-    dump_feature!("nontemporal");
     dump_feature!("cm_large_array_optimization", CM_LARGE_ARRAY_OPTIMIZATION);
     dump_feature!("inc_max_copy_depth", INC_MAX_COPY_DEPTH);
     dump_feature!("no_finalizer", *options.no_finalizer);
@@ -238,7 +196,6 @@ fn dump_features(active_barrier: BarrierSelector, options: &Options) {
     dump_feature!("lxr_no_cm");
     dump_feature!("lxr_srv_ratio_counter");
     dump_feature!("lxr_release_stage_timer");
-    dump_feature!("lxr_precise_incs_counter");
     dump_feature!("lxr_fixed_satb_trigger");
     dump_feature!("lxr_no_survival_trigger");
     dump_feature!("no_map_fixed_noreplace");

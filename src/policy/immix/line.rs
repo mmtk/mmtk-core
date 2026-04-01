@@ -18,15 +18,7 @@ use atomic::Ordering;
 pub struct Line(Address);
 
 impl Region for Line {
-    const LOG_BYTES: usize = {
-        if cfg!(feature = "lxr_line_512b") {
-            9
-        } else if cfg!(feature = "lxr_line_1k") {
-            10
-        } else {
-            8
-        }
-    };
+    const LOG_BYTES: usize = 8;
 
     #[allow(clippy::assertions_on_constants)] // make sure line is not used when BLOCK_ONLY is turned on.
     fn from_aligned_address(address: Address) -> Self {

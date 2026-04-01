@@ -7,9 +7,7 @@ pub(super) mod mutator;
 pub mod rc;
 mod remset;
 
-use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
-use std::sync::Mutex;
 
 pub use self::global::LXR;
 pub use self::global::LXR_CONSTRAINTS;
@@ -17,10 +15,6 @@ pub use self::remset::MatureEvecRemSet;
 
 use atomic::Atomic;
 use atomic::Ordering;
-
-use crate::util::Address;
-use crate::util::ObjectReference;
-use crate::vm::slot::Slot;
 
 const CYCLE_TRIGGER_THRESHOLD: usize = crate::args::CYCLE_TRIGGER_THRESHOLD;
 
@@ -161,19 +155,5 @@ impl MatureLivePredictor {
         // crate::add_mature_reclaim(live_pages, prev);
         self.live_pages.store(next, Ordering::Relaxed);
         next
-    }
-}
-
-lazy_static! {
-    static ref LAST_REFERENTS: Mutex<HashMap<Address, Option<ObjectReference>>> =
-        Default::default();
-}
-
-pub fn record_slot_for_validation(slot: impl Slot, obj: Option<ObjectReference>) {
-    if cfg!(feature = "field_barrier_validation") {
-        LAST_REFERENTS
-            .lock()
-            .unwrap()
-            .insert(slot.to_address(), obj);
     }
 }

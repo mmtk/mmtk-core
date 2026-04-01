@@ -18,7 +18,7 @@ use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;
 use crate::util::heap::BlockPageResource;
 use crate::util::heap::PageResource;
-use crate::util::linear_scan::{Region, RegionIterator};
+use crate::util::linear_scan::Region;
 use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::metadata::side_metadata::spec_defs::IX_LINE_REUSE_COUNT;
 use crate::util::metadata::side_metadata::*;
@@ -660,10 +660,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             let disable_lasy_dec_for_current_gc = crate::disable_lasy_dec_for_current_gc();
             let dead_cycle_sweep_packets = self.generate_dead_cycle_sweep_tasks();
             let sweep_los = RCSweepMatureAfterSATBLOS::new(LazySweepingJobsCounter::new_decs());
-            if crate::args::LAZY_DECREMENTS
-                && !disable_lasy_dec_for_current_gc
-                && !cfg!(feature = "fragmentation_analysis")
-            {
+            if crate::args::LAZY_DECREMENTS && !disable_lasy_dec_for_current_gc {
                 debug_assert_ne!(pause, Pause::Full);
                 self.scheduler().postpone_all(dead_cycle_sweep_packets);
                 self.scheduler().postpone(sweep_los);
@@ -675,7 +672,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     }
 
-    pub fn prepare(
+    pub(crate) fn prepare(
         &mut self,
         major_gc: bool,
         initial_mark_pause: bool,
@@ -764,7 +761,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Release for the immix space.
-    pub fn release(&mut self, major_gc: bool, unlog_bits_op: UnlogBitsOperation) {
+    pub(crate) fn release(&mut self, major_gc: bool, unlog_bits_op: UnlogBitsOperation) {
         debug_assert!(!self.rc_enabled);
         if major_gc {
             // Update line_unavail_state for hole searching after this GC.
@@ -1441,7 +1438,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 return self.normal_get_next_available_lines(copy, end);
             };
         }
-        if self.common.needs_log_bit && !crate::args::BARRIER_MEASUREMENT_NO_SLOW {
+        if self.common.needs_log_bit {
             if !copy {
                 Line::clear_field_unlog_table::<VM>(start..end);
             } else {

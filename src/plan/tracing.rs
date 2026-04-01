@@ -4,7 +4,7 @@
 use std::marker::PhantomData;
 
 use crate::scheduler::gc_work::{ProcessEdgesWork, SlotOf};
-use crate::scheduler::{GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
+use crate::scheduler::{GCWorker, WorkBucketStage};
 use crate::util::Address;
 use crate::util::{ObjectReference, VMThread, VMWorkerThread};
 use crate::vm::{Scanning, SlotVisitor, VMBinding};

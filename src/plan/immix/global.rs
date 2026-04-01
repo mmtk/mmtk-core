@@ -48,11 +48,9 @@ pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: !cfg!(feature = "immix_non_moving"),
     // Max immix object size is half of a block.
     max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
-    needs_log_bit: crate::args::BARRIER_MEASUREMENT,
-    needs_field_log_bit: crate::args::BARRIER_MEASUREMENT,
-    barrier: if crate::args::BARRIER_MEASUREMENT
-        && !cfg!(feature = "barrier_measurement_no_barrier")
-    {
+    needs_log_bit: crate::plan::barriers::BARRIER_MEASUREMENT,
+    needs_field_log_bit: crate::plan::barriers::BARRIER_MEASUREMENT,
+    barrier: if crate::plan::barriers::BARRIER_MEASUREMENT {
         BarrierSelector::FieldBarrier
     } else {
         BarrierSelector::NoBarrier
@@ -164,7 +162,7 @@ impl<VM: VMBinding> Immix<VM> {
             constraints: &IMMIX_CONSTRAINTS,
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&immix_specs),
         };
-        if crate::args::BARRIER_MEASUREMENT {
+        if crate::plan::barriers::BARRIER_MEASUREMENT {
             plan_args
                 .global_side_metadata_specs
                 .push(ImmixFakeFieldBarrierSemantics::<VM>::UNLOG_BITS);

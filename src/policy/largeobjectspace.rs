@@ -9,7 +9,6 @@ use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::constants::BYTES_IN_PAGE;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::{FreeListPageResource, PageResource};
 use crate::util::metadata;
 use crate::util::metadata::side_metadata::spec_defs::LOS_PAGE_REUSE_COUNT;
@@ -390,7 +389,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     fn release_object(&self, start: Address) -> usize {
-        if crate::args::BARRIER_MEASUREMENT
+        if crate::plan::barriers::BARRIER_MEASUREMENT
             || (self.common.needs_log_bit && self.common.needs_field_log_bit)
         {
             if self.rc_enabled {
@@ -495,7 +494,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 // We just moved the object out of the logical nursery, mark it as unlogged.
                 if !self.rc_enabled
                     && (self.common.unlog_traced_object || self.common.needs_field_log_bit)
-                    && !crate::args::BARRIER_MEASUREMENT_NO_SLOW
                 {
                     if self.common.needs_field_log_bit {
                         let step = if VM::VMObjectModel::COMPRESSED_PTR_ENABLED {

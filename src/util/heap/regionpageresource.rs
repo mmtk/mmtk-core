@@ -2,7 +2,6 @@ use crate::policy::space::Space;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::pageresource::{CommonPageResource, PRAllocFail, PRAllocResult};
-use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::linear_scan::Region;
 use crate::util::metadata::side_metadata::SideMetadataContext;

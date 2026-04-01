@@ -166,10 +166,7 @@ pub(crate) fn result_is_mapped(result: Result<()>) -> bool {
     }
 }
 
-pub fn prefetch(start: Address, mut len: usize) {
-    if cfg!(feature = "prefetch_1k") {
-        len = usize::max(len, 1024);
-    }
+pub fn prefetch(start: Address, len: usize) {
     for i in (0..len).step_by(64) {
         unsafe {
             let addr = start + i;

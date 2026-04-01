@@ -46,9 +46,6 @@ const LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER: usize = 1;
 
 static HEAP_AFTER_GC: AtomicUsize = AtomicUsize::new(0);
 
-static RC_PAUSES_BEFORE_SATB: AtomicUsize = AtomicUsize::new(0);
-static MAX_RC_PAUSES_BEFORE_SATB: AtomicUsize = AtomicUsize::new(128);
-
 use bytemuck::NoUninit;
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
@@ -775,7 +772,6 @@ impl<VM: VMBinding> LXR<VM> {
             )));
         }
         if crate::args::LAZY_DECREMENTS {
-            debug_assert!(!crate::args::BARRIER_MEASUREMENT);
             scheduler.postpone_all_prioritized(work_packets);
         } else {
             scheduler.work_buckets[WorkBucketStage::STWRCDecsAndSweep].bulk_add(work_packets);

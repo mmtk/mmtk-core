@@ -84,8 +84,4 @@ impl PlanConstraints {
 pub(crate) const DEFAULT_PLAN_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
 
 // Use 16 pages as the size limit for non-LOS objects to avoid copying large objects
-pub const MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN: usize = if cfg!(feature = "ss_los_16m") {
-    16 << LOG_BYTES_IN_MBYTE
-} else {
-    2 << LOG_BYTES_IN_PAGE
-};
+pub const MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN: usize = 2 << LOG_BYTES_IN_PAGE;

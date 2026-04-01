@@ -52,7 +52,7 @@ pub static ACTIVE_BARRIER: Lazy<BarrierSelector> = Lazy::new(|| {
 });
 
 /// Full heap collection as nursery GC.
-pub const FULL_NURSERY_GC: bool = crate::args::BARRIER_MEASUREMENT;
+pub const FULL_NURSERY_GC: bool = false;
 
 /// Constraints for generational plans. Each generational plan should overwrite based on this constant.
 pub static GEN_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints {

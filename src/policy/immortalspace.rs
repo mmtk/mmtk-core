@@ -59,7 +59,7 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         if self.common.unlog_allocated_object {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
-        if crate::args::BARRIER_MEASUREMENT
+        if crate::plan::barriers::BARRIER_MEASUREMENT
             || (self.common.needs_log_bit && self.common.needs_field_log_bit)
         {
             let step = if VM::VMObjectModel::COMPRESSED_PTR_ENABLED {

@@ -10,15 +10,7 @@ pub use immixspace::*;
 use crate::policy::immix::block::Block;
 
 /// The max object size for immix: half of a block
-pub const MAX_IMMIX_OBJECT_SIZE: usize = {
-    if cfg!(feature = "lxr_los_16k") {
-        16 * 1024
-    } else if cfg!(feature = "lxr_los_32k") {
-        32 * 1024
-    } else {
-        Block::BYTES
-    }
-};
+pub const MAX_IMMIX_OBJECT_SIZE: usize = Block::BYTES;
 
 /// Mark/sweep memory for block-level only
 pub const BLOCK_ONLY: bool = crate::args::BLOCK_ONLY;

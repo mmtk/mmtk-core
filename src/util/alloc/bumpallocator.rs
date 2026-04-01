@@ -5,35 +5,12 @@ use crate::util::Address;
 use crate::util::alloc::Allocator;
 
 use crate::policy::space::Space;
-use crate::util::constants::BYTES_IN_MBYTE;
 use crate::util::conversions::bytes_to_pages_up;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 
 const BYTES_IN_PAGE: usize = 1 << 12;
-const BLOCK_SIZE: usize = if cfg!(feature = "ss_tlab_4k") {
-    BYTES_IN_PAGE
-} else if cfg!(feature = "ss_tlab_8k") {
-    2 * BYTES_IN_PAGE
-} else if cfg!(feature = "ss_tlab_16k") {
-    4 * BYTES_IN_PAGE
-} else if cfg!(feature = "ss_tlab_32k") {
-    8 * BYTES_IN_PAGE
-} else if cfg!(feature = "ss_tlab_64k") {
-    16 * BYTES_IN_PAGE
-} else if cfg!(feature = "ss_tlab_128k") {
-    32 * BYTES_IN_PAGE
-} else if cfg!(feature = "ss_tlab_256k") {
-    64 * BYTES_IN_PAGE
-} else if cfg!(feature = "ss_tlab_512k") {
-    128 * BYTES_IN_PAGE
-} else if cfg!(feature = "ss_tlab_1m") {
-    1 * BYTES_IN_MBYTE
-} else if cfg!(feature = "ss_tlab_2m") {
-    2 * BYTES_IN_MBYTE
-} else {
-    8 * BYTES_IN_PAGE
-};
+const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
 const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 
 /// A bump pointer allocator. It keeps a thread local allocation buffer,

@@ -68,24 +68,6 @@ impl BlockState {
     }
 }
 
-/// Data structure to reference an OS 4K page.
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
-pub struct Page(Address);
-
-impl Region for Page {
-    const LOG_BYTES: usize = LOG_BYTES_IN_PAGE as usize;
-
-    fn from_aligned_address(address: Address) -> Self {
-        debug_assert!(address.is_aligned_to(Self::BYTES));
-        Self(address)
-    }
-
-    fn start(&self) -> Address {
-        self.0
-    }
-}
-
 /// Data structure to reference an immix block.
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
@@ -93,25 +75,7 @@ pub struct Block(Address);
 
 impl Region for Block {
     #[cfg(not(feature = "immix_smaller_block"))]
-    const LOG_BYTES: usize = {
-        if cfg!(feature = "lxr_block_16k") {
-            14
-        } else if cfg!(feature = "lxr_block_32k") {
-            15
-        } else if cfg!(feature = "lxr_block_64k") {
-            16
-        } else if cfg!(feature = "lxr_block_128k") {
-            17
-        } else if cfg!(feature = "lxr_block_256k") {
-            18
-        } else if cfg!(feature = "lxr_block_512k") {
-            19
-        } else if cfg!(feature = "lxr_block_1m") {
-            20
-        } else {
-            15
-        }
-    };
+    const LOG_BYTES: usize = 15;
     #[cfg(feature = "immix_smaller_block")]
     const LOG_BYTES: usize = 13;
 

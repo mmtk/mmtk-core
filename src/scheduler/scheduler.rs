@@ -140,24 +140,24 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     pub fn postpone(&self, w: impl GCWork<VM>) {
-        debug_assert!(!crate::args::BARRIER_MEASUREMENT);
+        debug_assert!(!crate::plan::barriers::BARRIER_MEASUREMENT);
         self.postponed_concurrent_work.read().push(Box::new(w))
     }
 
     pub fn postpone_prioritized(&self, w: impl GCWork<VM>) {
-        debug_assert!(!crate::args::BARRIER_MEASUREMENT);
+        debug_assert!(!crate::plan::barriers::BARRIER_MEASUREMENT);
         self.postponed_concurrent_work_prioritized
             .read()
             .push(Box::new(w))
     }
 
     pub fn postpone_dyn(&self, w: Box<dyn GCWork<VM>>) {
-        debug_assert!(!crate::args::BARRIER_MEASUREMENT);
+        debug_assert!(!crate::plan::barriers::BARRIER_MEASUREMENT);
         self.postponed_concurrent_work.read().push(w)
     }
 
     pub fn postpone_dyn_prioritized(&self, w: Box<dyn GCWork<VM>>) {
-        debug_assert!(!crate::args::BARRIER_MEASUREMENT);
+        debug_assert!(!crate::plan::barriers::BARRIER_MEASUREMENT);
         self.postponed_concurrent_work_prioritized.read().push(w)
     }
 

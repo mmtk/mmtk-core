@@ -370,7 +370,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareChunksForFullGC {
                     continue;
                 }
                 // Clear unlog table on CM
-                if crate::args::BARRIER_MEASUREMENT {
+                if crate::plan::barriers::BARRIER_MEASUREMENT {
                     block.initialize_field_unlog_table_as_unlogged::<VM>();
                     unreachable!();
                 }

@@ -228,24 +228,6 @@ impl<B: Region> LockFreeListBlockAlloc<B> {
             self.head.store(new_top, Ordering::Relaxed);
             return Some(B::from_aligned_address(top));
         }
-        if cfg!(feature = "block_alloc_order_1") {
-            // 2. pop from list
-            loop {
-                std::hint::spin_loop();
-                let top = self.head.load(Ordering::Relaxed);
-                if top.is_zero() {
-                    break;
-                }
-                let new_top = unsafe { top.load::<Address>() };
-                if self
-                    .head
-                    .compare_exchange(top, new_top, Ordering::Relaxed, Ordering::Relaxed)
-                    .is_ok()
-                {
-                    return Some(B::from_aligned_address(top));
-                }
-            }
-        }
         // 1. bump the cursor
         if self.cursor.load(Ordering::Relaxed).1 < Self::BLOCKS_IN_CHUNK as u32 {
             let result =
@@ -262,25 +244,22 @@ impl<B: Region> LockFreeListBlockAlloc<B> {
                 return Some(B::from_aligned_address(c + ((b as usize) << B::LOG_BYTES)));
             }
         }
-        if !cfg!(feature = "block_alloc_order_1") {
-            // 2. pop from list
-            loop {
-                std::hint::spin_loop();
-                let top = self.head.load(Ordering::Relaxed);
-                if top.is_zero() {
-                    return None;
-                }
-                let new_top = unsafe { top.load::<Address>() };
-                if self
-                    .head
-                    .compare_exchange(top, new_top, Ordering::Relaxed, Ordering::Relaxed)
-                    .is_ok()
-                {
-                    return Some(B::from_aligned_address(top));
-                }
+        // 2. pop from list
+        loop {
+            std::hint::spin_loop();
+            let top = self.head.load(Ordering::Relaxed);
+            if top.is_zero() {
+                return None;
+            }
+            let new_top = unsafe { top.load::<Address>() };
+            if self
+                .head
+                .compare_exchange(top, new_top, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+            {
+                return Some(B::from_aligned_address(top));
             }
         }
-        None
     }
 
     fn add_chunk(&self, c: Chunk) -> B {
