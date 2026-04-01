@@ -36,7 +36,6 @@ pub struct VMLayout {
     /// For normal 64-bit config, this should be set to true. Each space should own a contiguous piece of virtual memory.
     /// For 32-bit or 64-bit compressed heap, we don't have enough virtual memory, so this should be set to false.
     pub force_use_contiguous_spaces: bool,
-    pub small_chunk_space_size: Option<usize>,
 }
 
 impl VMLayout {
@@ -137,7 +136,6 @@ impl VMLayout {
             heap_end: chunk_align_up(unsafe { Address::from_usize(0xd000_0000) }),
             log_space_extent: 31,
             force_use_contiguous_spaces: false,
-            small_chunk_space_size: None,
         };
         layout32.validate();
         layout32
@@ -153,7 +151,6 @@ impl VMLayout {
             heap_end: chunk_align_up(unsafe { Address::from_usize(0x0000_2200_0000_0000usize) }),
             log_space_extent: 41,
             force_use_contiguous_spaces: true,
-            small_chunk_space_size: None,
         };
         layout64.validate();
         layout64

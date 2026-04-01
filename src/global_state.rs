@@ -111,7 +111,7 @@ impl GlobalState {
     }
 
     pub fn is_emergency_collection(&self) -> bool {
-        self.emergency_collection.load(Ordering::Relaxed) || VM_MAP.out_of_virtual_space()
+        self.emergency_collection.load(Ordering::Relaxed)
     }
 
     /// Return true if this collection was triggered by application code.

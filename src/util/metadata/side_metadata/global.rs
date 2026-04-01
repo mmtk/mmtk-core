@@ -563,6 +563,11 @@ impl SideMetadataSpec {
         unsafe { meta_addr.load::<u8>() }
     }
 
+    pub unsafe fn store_byte_relaxed(&self, data_addr: Address, byte: u8) {
+        let meta_addr = address_to_meta_address(self, data_addr);
+        meta_addr.store::<u8>(byte);
+    }
+
     /// Loads a value from the side metadata for the given address.
     /// This method has similar semantics to `store` in Rust atomics.
     pub fn load_atomic<T: MetadataValue>(&self, data_addr: Address, order: Ordering) -> T {

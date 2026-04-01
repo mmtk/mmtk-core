@@ -383,7 +383,7 @@ impl Address {
             VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
                 .as_spec()
                 .extract_side_spec()
-                .store(a, 0xffu8)
+                .store_byte_relaxed(a, 0xffu8)
         }
     }
 

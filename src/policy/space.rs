@@ -813,8 +813,6 @@ impl<VM: VMBinding> CommonSpace<VM> {
     pub fn vm_map(&self) -> &'static dyn VMMap {
         self.vm_map
     }
-
-    #[allow(unused)]
     pub(crate) fn get_vm_map32(&self) -> &'static crate::util::heap::layout::map32::Map32 {
         unsafe { self.vm_map_32.unwrap_unchecked() }
     }

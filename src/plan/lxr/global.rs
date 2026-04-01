@@ -132,9 +132,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             return true;
         }
         if !self.immix_space.common().contiguous {
-            let available_to_space = (self.immix_space.pr.available_pages()
-                + (VM_MAP.available_chunks() << (LOG_BYTES_IN_CHUNK - LOG_BYTES_IN_PAGE as usize)))
-                >> (LOG_BYTES_IN_MBYTE - LOG_BYTES_IN_PAGE);
+            let available_to_space = self.get_total_pages() - self.get_used_pages();
             if predicted_survival_mb >= available_to_space {
                 self.gc_cause
                     .store(GCCause::ImmixSpaceFull, Ordering::Relaxed);

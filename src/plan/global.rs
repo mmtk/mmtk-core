@@ -718,7 +718,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         // than the heap's total pages. In that case, we will have to do a GC.
         let heap_full = plan.base().gc_trigger.is_heap_full();
 
-        space_full || stress_force_gc || heap_full || VM_MAP.out_of_virtual_space()
+        space_full || stress_force_gc || heap_full
     }
 }
 
@@ -788,7 +788,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {
-        VM_MAP.reset_out_of_virtual_space();
         self.immortal.release();
         self.los.release(full_heap);
         // self.release_nonmoving_space(full_heap);

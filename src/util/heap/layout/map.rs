@@ -1,8 +1,7 @@
-use downcast_rs::Downcast;
-
 use crate::util::freelist::FreeList;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::Address;
+use downcast_rs::Downcast;
 
 /// The result of creating free list.
 ///
@@ -86,16 +85,6 @@ pub trait VMMap: Sync + Downcast {
     /// Get the space descriptor for the given address. Return SpaceDescriptor::UNINITIALIZED if the
     /// address is not within the MMTk heap range, or not within MMTk spaces.
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor;
-
-    fn out_of_virtual_space(&self) -> bool {
-        false
-    }
-
-    fn reset_out_of_virtual_space(&self) {}
-
-    fn available_chunks(&self) -> usize {
-        unimplemented!("map32 only")
-    }
 }
 
 impl_downcast!(VMMap);
