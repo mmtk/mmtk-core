@@ -19,6 +19,7 @@ use crate::util::heap::chunk_map::*;
 use crate::util::heap::BlockPageResource;
 use crate::util::heap::PageResource;
 use crate::util::linear_scan::Region;
+use crate::util::linear_scan::RegionIterator;
 use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::metadata::side_metadata::spec_defs::IX_LINE_REUSE_COUNT;
 use crate::util::metadata::side_metadata::*;
@@ -60,6 +61,8 @@ pub struct ImmixSpace<VM: VMBinding> {
     pub line_mark_state: AtomicU8,
     /// Line mark state in previous GC
     line_unavail_state: AtomicU8,
+    /// A list of all reusable blocks
+    pub reusable_blocks: ReusableBlockPool,
     /// Defrag utilities
     pub(super) defrag: Defrag,
     /// How many lines have been consumed since last GC?
@@ -149,7 +152,8 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
             return true;
         }
         if self.cm_enabled {
-            if Block::containing(object).is_nursery() {
+            let block_state = Block::containing(object).get_state();
+            if block_state == BlockState::Nursery {
                 return true;
             }
         }
@@ -369,27 +373,24 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     fn side_metadata_specs(rc_enabled: bool) -> Vec<SideMetadataSpec> {
         if rc_enabled {
             let meta = vec![
-                // MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 MetadataSpec::OnSide(crate::util::rc::RC_STRADDLE_LINES),
                 MetadataSpec::OnSide(Block::LOG_TABLE),
                 MetadataSpec::OnSide(Block::NURSERY_PROMOTION_STATE_TABLE),
-                MetadataSpec::OnSide(Block::PHASE_EPOCH),
+                MetadataSpec::OnSide(Block::DEAD_WORDS),
                 MetadataSpec::OnSide(IX_LINE_REUSE_COUNT),
             ];
             return metadata::extract_side_metadata(&meta);
         }
         metadata::extract_side_metadata(&if super::BLOCK_ONLY {
             vec![
-                // MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
                 *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
                 #[cfg(feature = "object_pinning")]
                 *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
-                MetadataSpec::OnSide(Block::PHASE_EPOCH),
             ]
         } else {
             vec![
@@ -400,7 +401,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
                 #[cfg(feature = "object_pinning")]
                 *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
-                MetadataSpec::OnSide(Block::PHASE_EPOCH),
             ]
         })
     }
@@ -464,14 +464,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     scheduler.num_workers(),
                     metadata,
                 )
-            }
-            .rc(rc_enabled),
+            },
             common,
             chunk_map: ChunkMap::new(space_index),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
             lines_consumed: AtomicUsize::new(0),
             reused_lines_consumed: AtomicUsize::new(0),
+            reusable_blocks: ReusableBlockPool::new(scheduler.num_workers()),
             defrag: Defrag::default(),
             // Set to the correct mark state when inititialized. We cannot rely on prepare to set it (prepare may get skipped in nursery GCs).
             mark_state: Self::MARKED_STATE,
@@ -526,7 +526,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             collect_whole_heap,
             collection_attempts,
             user_triggered_collection,
-            self.pr.exhausted_reusable_space(),
+            self.reusable_blocks.len() == 0,
             full_heap_system_gc,
             self.cm_enabled,
             self.rc_enabled,
@@ -546,7 +546,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     pub fn rc_eager_prepare(&self, pause: Pause) {
         self.block_allocation.notify_mutator_phase_end();
-        self.pr.prepare_gc();
         if pause == Pause::Full || pause == Pause::InitialMark {
             // Update mark_state
             // if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
@@ -594,8 +593,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
         // Release nursery blocks
         if pause != Pause::RefCount {
-            self.pr.reset_before_mature_evac();
-            if pause == Pause::Full || pause == Pause::FinalMark {
+            if pause == Pause::Full {
                 // Reset worker TLABs.
                 // The block of the current worker TLAB may be selected as part of the mature evacuation set.
                 // So the copied mature objects might be copied into defrag blocks, and get copied out again.
@@ -606,6 +604,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             //     .sweep_nursery_blocks(&self.scheduler, pause);
             self.flush_page_resource();
         }
+        self.block_allocation
+            .reset_block_mark_for_mutator_reused_blocks(pause);
         if pause == Pause::FinalMark {
             crate::REMSET_RECORDING.store(false, Ordering::SeqCst);
             self.is_end_of_satb_or_full_gc = true;
@@ -618,6 +618,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         debug_assert_ne!(pause, Pause::FullDefrag);
         self.block_allocation
             .sweep_nursery_blocks(&self.scheduler, pause);
+        self.block_allocation
+            .sweep_mutator_reused_blocks(&self.scheduler, pause);
         self.flush_page_resource();
         let disable_lasy_dec_for_current_gc = crate::disable_lasy_dec_for_current_gc();
         if disable_lasy_dec_for_current_gc {
@@ -628,11 +630,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.rc.reset_inc_buffer_size();
         self.is_end_of_satb_or_full_gc = false;
         // This cannot be done in parallel in a separate thread
-        self.schedule_post_satb_mature_sweeping(pause);
+        self.schedule_mature_sweeping(pause);
         self.reused_lines_consumed.store(0, Ordering::Relaxed);
     }
 
-    fn schedule_post_satb_mature_sweeping(&self, pause: Pause) {
+    pub fn schedule_mature_sweeping(&self, pause: Pause) {
         if pause == Pause::Full || pause == Pause::FinalMark {
             self.evac_set.sweep_mature_evac_candidates(self);
             let disable_lasy_dec_for_current_gc = crate::disable_lasy_dec_for_current_gc();
@@ -659,7 +661,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     ) {
         self.initial_mark_pause = initial_mark_pause;
         debug_assert!(!self.rc_enabled);
-        self.pr.prepare_gc();
         if major_gc {
             // Update mark_state
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
@@ -750,7 +751,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 );
             }
         }
-        self.pr.reset();
+        // Clear reusable blocks list
+        if !super::BLOCK_ONLY {
+            self.reusable_blocks.reset();
+        }
         // Sweep chunks and blocks
         let work_packets = self.generate_sweep_tasks(unlog_bits_op);
         self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
@@ -813,8 +817,24 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Release a block.
-    pub fn release_block(&self, block: Block) {
+    pub fn release_block(
+        &self,
+        block: Block,
+        nursery: bool,
+        zero_unlog_table: bool,
+        single_thread: bool,
+    ) {
+        if crate::verbose(2) {
+            if nursery {
+                RELEASED_NURSERY_BLOCKS.fetch_add(1, Ordering::SeqCst);
+            }
+            RELEASED_BLOCKS.fetch_add(1, Ordering::SeqCst);
+        }
+        if crate::plan::barriers::BARRIER_MEASUREMENT || zero_unlog_table {
+            block.clear_field_unlog_table::<VM>();
+        }
         block.deinit(self);
+        self.pr.release_block(block, single_thread);
     }
 
     /// Allocate a clean block.
@@ -832,6 +852,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.defrag.notify_new_clean_block(copy);
         }
         let block = Block::from_aligned_address(block_address);
+        if !copy && self.rc_enabled {
+            self.block_allocation.nursery_blocks.push(block);
+        }
         self.block_allocation
             .initialize_new_clean_block(block, copy, self.cm_enabled);
         self.chunk_map.set_allocated(block.chunk(), true);
@@ -843,73 +866,50 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         Some(block)
     }
 
-    /// Get a list of clean or reusable blocks.
-    /// For blocks in a new chunk, they should be mapped before returning.
-    /// No heap accounting should be updated. They are updated when the mutator starts to allocating into them.
-    pub fn acquire_blocks(
-        &self,
-        alloc_count: usize,
-        steal_count: usize,
-        clean: bool,
-        buf: &mut Vec<Block>,
-        copy: bool,
-        owner: VMThread,
-    ) -> bool {
-        debug_assert!(!owner.0.to_address().is_zero());
-        let mature_evac = copy
-            && self.rc_enabled
-            && self.scheduler().work_buckets[WorkBucketStage::Closure].is_open();
-        self.pr.acquire_blocks(
-            alloc_count,
-            steal_count,
-            clean,
-            buf,
-            self,
-            copy,
-            mature_evac,
-            owner,
-        )
-    }
-
-    /// Logically acquire a clean block and poll for GC.
-    /// This does not actually allocate a block, but only updates the heap counter and do GC when necessary.
-    pub fn get_clean_block_logically(&self, tls: VMThread, _copy: bool) -> Result<(), ()> {
-        let success = self.acquire_logically(tls, Block::PAGES);
-        if !success {
-            return Err(());
+    /// Pop a reusable block from the reusable block list.
+    pub fn get_reusable_block(&self, copy: bool) -> Option<Block> {
+        if super::BLOCK_ONLY {
+            return None;
         }
-        Ok(())
-    }
+        loop {
+            if let Some(block) = self.reusable_blocks.pop() {
+                // Skip blocks that should be evacuated.
+                if copy && block.is_defrag_source() {
+                    continue;
+                }
+                if self.rc_enabled {
+                    if crate::args::RC_MATURE_EVACUATION && block.is_defrag_source() {
+                        continue;
+                    }
+                    // Blocks in the `reusable_blocks` queue can be released after some RC collections.
+                    // These blocks can either have `Unallocated` state, or be reallocated again.
+                    // Skip these cases and only return the truly reusable blocks.
+                    if !block.get_state().is_reusable() {
+                        continue;
+                    }
+                    if !copy && !block.attempt_mutator_reuse() {
+                        continue;
+                    }
+                    if !copy {
+                        self.block_allocation.reused_blocks.push(block);
+                    }
+                } else {
+                    // Get available lines. Do this before block.init which will reset block state.
+                    let lines_delta = match block.get_state() {
+                        BlockState::Reusable { unavailable_lines } => {
+                            Block::LINES - unavailable_lines as usize
+                        }
+                        BlockState::Unmarked => Block::LINES,
+                        _ => unreachable!("{:?} {:?}", block, block.get_state()),
+                    };
+                    self.lines_consumed.fetch_add(lines_delta, Ordering::SeqCst);
+                }
 
-    pub fn initialize_new_block(&self, block: Block, clean: bool, copy: bool) {
-        // gc_log!("new-block: {:?} clean={} copy={}", block, clean, copy);
-        if clean {
-            if !self.rc_enabled {
-                self.defrag.notify_new_clean_block(copy);
-            }
-            self.block_allocation
-                .initialize_new_clean_block(block, copy, self.cm_enabled);
-            self.chunk_map.set_allocated(block.chunk(), true);
-            if !self.rc_enabled {
-                self.lines_consumed
-                    .fetch_add(Block::LINES, Ordering::SeqCst);
-            }
-        } else {
-            if self.rc_enabled {
-                // pass
+                block.init(copy, true, self);
+                return Some(block);
             } else {
-                // TODO: we haven't support sticky immix yet
-                // Get available lines. Do this before block.init which will reset block state.
-                // let lines_delta = match block.get_state() {
-                //     BlockState::Reusable { unavailable_lines } => {
-                //         Block::LINES - unavailable_lines as usize
-                //     }
-                //     BlockState::Unmarked => Block::LINES,
-                //     _ => unreachable!("{:?} {:?}", block, block.get_state()),
-                // };
-                // self.lines_consumed.fetch_add(lines_delta, Ordering::SeqCst);
+                return None;
             }
-            block.init(copy, true, self);
         }
     }
 
@@ -971,8 +971,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 } else {
                     let block = Block::containing(object);
                     let state = block.get_state();
-                    if state != BlockState::Marked {
-                        debug_assert_ne!(state, BlockState::Unallocated);
+                    if state != BlockState::Nursery && state != BlockState::Marked {
                         block.set_state(BlockState::Marked);
                     }
                 }
@@ -1074,10 +1073,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
                 new_object
             };
-            debug_assert_eq!(
-                Block::containing(new_object).get_state(),
-                BlockState::Marked
-            );
+            debug_assert!({
+                let state = Block::containing(new_object).get_state();
+                state == BlockState::Marked || state == BlockState::Nursery
+            });
 
             queue.enqueue(new_object);
             debug_assert!(new_object.is_live());
@@ -1342,6 +1341,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.reused_lines_consumed
                 .fetch_add(num_lines, Ordering::Relaxed);
         }
+        block.dec_dead_bytes_sloppy((num_lines as u32) << Line::LOG_BYTES);
         if self.block_allocation.cm_in_progress_or_final_mark() {
             Line::initialize_mark_table_as_marked::<VM>(start..end);
             Line::inc_reuse_counts::<VM>(start..end);
@@ -1575,7 +1575,6 @@ struct SweepChunk<VM: VMBinding> {
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        let mut freed_blocks = 0;
         let mut histogram = self.space.defrag.new_histogram();
         let num_chunks = (self.chunks.end.start() - self.chunks.start.start()) >> Chunk::LOG_BYTES;
         for i in 0..num_chunks {
@@ -1628,8 +1627,6 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
                 if !block.sweep(self.space, &mut histogram, line_mark_state) {
                     // Block is live. Increment the allocated block count.
                     allocated_blocks += 1;
-                } else {
-                    freed_blocks += 1;
                 }
             }
             probe!(mmtk, sweep_chunk, allocated_blocks);
@@ -1638,7 +1635,6 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
                 self.space.chunk_map.set_allocated(chunk, false);
             }
         }
-        self.space.pr.bulk_release_blocks(freed_blocks);
         self.space.defrag.add_completed_mark_histogram(histogram);
 
         self.epilogue.finish_one_work_packet();

@@ -519,16 +519,7 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
                 worker,
             )
         } else {
-            let x = self.lxr.los().trace_object_rc(self, object);
-            debug_assert_ne!(
-                self.lxr.rc.count(x),
-                0,
-                "ERROR Invalid {:?} los={} rc={}",
-                x,
-                self.lxr.los().in_space(x),
-                self.lxr.rc.count(x)
-            );
-            x
+            self.lxr.los().trace_object_rc(self, object)
         };
         if self.should_record_forwarded_roots {
             self.forwarded_roots.push(x)

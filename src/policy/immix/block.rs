@@ -1,18 +1,18 @@
 use super::defrag::Histogram;
 use super::line::{Line, RCArray};
 use super::ImmixSpace;
+use crate::util::constants::*;
 use crate::util::heap::blockpageresource_legacy::BlockPool;
 use crate::util::heap::chunk_map::Chunk;
 use crate::util::linear_scan::{Region, RegionIterator};
-use crate::util::metadata::side_metadata::spec_defs::{BLOCK_IN_USE, BLOCK_OWNER};
 use crate::util::metadata::side_metadata::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
 use crate::util::object_enum::BlockMayHaveObjects;
-use crate::util::{constants::*, OpaquePointer, VMThread};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
-use std::sync::atomic::{AtomicU8, Ordering};
+use bytemuck::NoUninit;
+use std::sync::atomic::Ordering;
 
 /// The block allocation state.
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -20,9 +20,13 @@ pub enum BlockState {
     /// the block is not allocated.
     Unallocated,
     /// the block is a young block.
+    Nursery,
+    /// the block is allocated but not marked.
     Unmarked,
     /// the block is allocated and marked.
     Marked,
+    /// RC mutator recycled blocks.
+    Reusing,
     /// the block is marked as reusable.
     Reusable { unavailable_lines: u8 },
 }
@@ -34,6 +38,8 @@ impl BlockState {
     const MARK_UNMARKED: u8 = u8::MAX;
     /// Private constant
     const MARK_MARKED: u8 = u8::MAX - 1;
+    const MARK_NURSERY: u8 = u8::MAX - 2;
+    const MARK_REUSING: u8 = u8::MAX - 3;
 }
 
 impl From<u8> for BlockState {
@@ -42,6 +48,8 @@ impl From<u8> for BlockState {
             Self::MARK_UNALLOCATED => BlockState::Unallocated,
             Self::MARK_UNMARKED => BlockState::Unmarked,
             Self::MARK_MARKED => BlockState::Marked,
+            Self::MARK_NURSERY => BlockState::Nursery,
+            Self::MARK_REUSING => BlockState::Reusing,
             unavailable_lines => BlockState::Reusable { unavailable_lines },
         }
     }
@@ -53,6 +61,8 @@ impl From<BlockState> for u8 {
             BlockState::Unallocated => BlockState::MARK_UNALLOCATED,
             BlockState::Unmarked => BlockState::MARK_UNMARKED,
             BlockState::Marked => BlockState::MARK_MARKED,
+            BlockState::Nursery => BlockState::MARK_NURSERY,
+            BlockState::Reusing => BlockState::MARK_REUSING,
             BlockState::Reusable { unavailable_lines } => {
                 assert_ne!(unavailable_lines, 0);
                 u8::min(unavailable_lines, u8::MAX - 4)
@@ -70,7 +80,7 @@ impl BlockState {
 
 /// Data structure to reference an immix block.
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, NoUninit)]
 pub struct Block(Address);
 
 impl Region for Block {
@@ -91,8 +101,6 @@ impl Region for Block {
         self.0
     }
 }
-
-static GLOBAL_PHASE_EPOCH: AtomicU8 = AtomicU8::new(1);
 
 impl BlockMayHaveObjects for Block {
     fn may_have_objects(&self) -> bool {
@@ -123,10 +131,33 @@ impl Block {
         crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_MARK;
     pub const LOG_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_LOG;
+    pub const DEAD_WORDS: SideMetadataSpec =
+        crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_DEAD_WORDS;
     pub const NURSERY_PROMOTION_STATE_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::NURSERY_PROMOTION_STATE;
-    pub const PHASE_EPOCH: SideMetadataSpec =
-        crate::util::metadata::side_metadata::spec_defs::PHASE_EPOCH;
+
+    fn inc_dead_bytes_sloppy(&self, bytes: u32) {
+        let max_words = (Self::BYTES as u32) >> LOG_BYTES_IN_WORD;
+        let words = bytes >> LOG_BYTES_IN_WORD;
+        let old: u32 = Self::DEAD_WORDS.load_atomic(self.start(), Ordering::Relaxed);
+        let mut new = old + words;
+        if new >= max_words {
+            new = max_words - 1;
+        }
+        Self::DEAD_WORDS.store_atomic(self.start(), new, Ordering::Relaxed);
+    }
+
+    pub fn dec_dead_bytes_sloppy(&self, bytes: u32) {
+        let words = bytes >> LOG_BYTES_IN_WORD;
+        let old: u32 = Self::DEAD_WORDS.load_atomic(self.start(), Ordering::Relaxed);
+        let new = if old <= words { 0 } else { old - words };
+        Self::DEAD_WORDS.store_atomic(self.start(), new, Ordering::Relaxed);
+    }
+
+    pub fn inc_dead_bytes_sloppy_for_object<VM: VMBinding>(o: ObjectReference) {
+        let block = Block::containing(o);
+        block.inc_dead_bytes_sloppy(o.get_size::<VM>() as u32);
+    }
 
     pub fn calc_dead_lines(&self) -> usize {
         let mut dead_lines = 0;
@@ -147,6 +178,15 @@ impl Block {
             }
         }
         dead_lines
+    }
+
+    pub fn dead_bytes(&self) -> u32 {
+        let v: u32 = Self::DEAD_WORDS.load_atomic(self.start(), Ordering::Relaxed);
+        v << LOG_BYTES_IN_WORD
+    }
+
+    fn reset_dead_bytes(&self) {
+        Self::DEAD_WORDS.store_atomic(self.start(), 0u32, Ordering::Relaxed);
     }
 
     pub const ZERO: Self = Self(Address::ZERO);
@@ -199,169 +239,6 @@ impl Block {
         MetadataByteArrayRef::<{ Block::LINES }>::new(&Line::MARK_TABLE, self.start(), Self::BYTES)
     }
 
-    fn try_lock(&self) -> bool {
-        let result = BLOCK_IN_USE.fetch_update_atomic::<u8, _>(
-            self.start(),
-            Ordering::Relaxed,
-            Ordering::Relaxed,
-            |b| {
-                if b == 1 {
-                    return None;
-                }
-                Some(1)
-            },
-        );
-        result == Ok(0)
-    }
-
-    fn lock_skip_reusing_or_unallocated(&self) -> bool {
-        loop {
-            std::hint::spin_loop();
-            let state = self.get_state();
-            if state == BlockState::Unallocated || (Self::in_mutatar_phase() && self.is_reusing()) {
-                return false;
-            }
-            let result = BLOCK_IN_USE.fetch_update_atomic::<u8, _>(
-                self.start(),
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-                |b| {
-                    if b == 1 {
-                        return None;
-                    }
-                    Some(1)
-                },
-            );
-            if result == Ok(0) {
-                return true;
-            }
-        }
-    }
-
-    pub fn try_lock_with_condition(&self, predicate: impl Fn() -> bool) -> bool {
-        if !predicate() {
-            return false;
-        }
-        let locked = self.try_lock();
-        if !locked {
-            return false;
-        }
-        if !predicate() {
-            self.unlock();
-            return false;
-        }
-        true
-    }
-
-    pub fn is_locked(&self) -> bool {
-        BLOCK_IN_USE.load_atomic::<u8>(self.start(), Ordering::Relaxed) != 0
-    }
-
-    pub fn unlock(&self) {
-        BLOCK_IN_USE.store_atomic::<u8>(self.start(), 0u8, Ordering::Relaxed);
-    }
-
-    pub fn get_owner(&self) -> Option<VMThread> {
-        let ptr = BLOCK_OWNER.load_atomic::<usize>(self.start(), Ordering::Relaxed);
-        if ptr == 0 {
-            None
-        } else {
-            Some(VMThread(OpaquePointer::from_mut_ptr(ptr as *mut ())))
-        }
-    }
-
-    pub fn set_owner(&self, owner: Option<VMThread>) {
-        let ptr = if let Some(owner) = owner {
-            owner.0.to_address().as_usize()
-        } else {
-            0
-        };
-        BLOCK_OWNER.store_atomic(self.start(), ptr, Ordering::Relaxed);
-    }
-
-    /// The block is in one of the copy allocator's local block list.
-    pub fn is_owned_by_copy_allocator(&self) -> bool {
-        let ge = Self::global_phase_epoch();
-        assert_eq!(ge & 1, 0);
-        let e: u8 = self.phase_epoch();
-        ge == e
-    }
-
-    /// The global phase epoch.
-    /// This counter is bumped by one at the end of every mutator and GC phase.
-    /// Any block matching this epoch are used for allocation in the current phase.
-    pub fn global_phase_epoch() -> u8 {
-        GLOBAL_PHASE_EPOCH.load(Ordering::Relaxed)
-    }
-
-    /// Get the current block phase epoch.
-    /// This indicates the last phase that this block is used for object allocation.
-    /// Either as a clean block or a partially-free block.
-    ///
-    /// Odd epoch means the block is in a mutator phase.
-    /// Even epoch means the block is allocated in a GC phase.
-    pub fn phase_epoch(&self) -> u8 {
-        Self::PHASE_EPOCH.load_atomic::<u8>(self.start(), Ordering::Relaxed)
-    }
-
-    pub fn update_phase_epoch(&self) {
-        Self::PHASE_EPOCH.store_atomic::<u8>(
-            self.start(),
-            Self::global_phase_epoch(),
-            Ordering::Relaxed,
-        );
-    }
-
-    pub fn is_reusing(&self) -> bool {
-        self.get_state() != BlockState::Unallocated && self.is_nursery_or_reusing()
-    }
-
-    pub fn is_gc_reusing(&self) -> bool {
-        if self.get_state() == BlockState::Unallocated {
-            return false;
-        }
-        let ge = Self::global_phase_epoch();
-        assert_eq!(ge & 1, 0);
-        let e = self.phase_epoch();
-        e == ge
-    }
-
-    pub fn is_nursery(&self) -> bool {
-        self.get_state() == BlockState::Unallocated && self.is_nursery_or_reusing()
-    }
-
-    pub fn is_nursery_or_reusing(&self) -> bool {
-        let ge = Self::global_phase_epoch();
-        let e = self.phase_epoch();
-        if (ge & 1) == 1 {
-            return e == ge;
-        } else {
-            return e == ge - 1;
-        }
-    }
-
-    fn in_mutatar_phase() -> bool {
-        let ge = Self::global_phase_epoch();
-        (ge & 1) == 1
-    }
-
-    pub fn update_global_phase_epoch<VM: VMBinding>(space: &ImmixSpace<VM>) {
-        let old = GLOBAL_PHASE_EPOCH.load(Ordering::SeqCst);
-        if old == 254 {
-            GLOBAL_PHASE_EPOCH.store(1, Ordering::SeqCst);
-            space.pr.reset_nursery_state();
-        } else {
-            GLOBAL_PHASE_EPOCH.store(old + 1, Ordering::SeqCst);
-        }
-    }
-
-    pub fn is_reusable(&self) -> bool {
-        if crate::args::RC_MATURE_EVACUATION && self.is_defrag_source() {
-            return false;
-        }
-        self.get_state().is_reusable()
-    }
-
     /// Get block mark state.
     pub fn get_state(&self) -> BlockState {
         let byte = Self::MARK_TABLE.load_atomic::<u8>(self.start(), Ordering::SeqCst);
@@ -387,9 +264,9 @@ impl Block {
             .map_err(|x| (x as u8).into())
     }
 
-    fn attempt_dealloc(&self) -> bool {
+    pub fn attempt_dealloc(&self, ignore_reusing_blocks: bool) -> bool {
         self.fetch_update_state(|s| {
-            if (Self::in_mutatar_phase() && self.is_reusing()) || s == BlockState::Unallocated {
+            if (ignore_reusing_blocks && s == BlockState::Reusing) || s == BlockState::Unallocated {
                 None
             } else {
                 Some(BlockState::Unallocated)
@@ -404,24 +281,48 @@ impl Block {
 
     /// Test if the block is marked for defragmentation.
     pub fn is_defrag_source(&self) -> bool {
-        let byte = Self::DEFRAG_STATE_TABLE.load_byte(self.start());
+        let byte = Self::DEFRAG_STATE_TABLE.load_atomic::<u8>(self.start(), Ordering::SeqCst);
         // The byte should be 0 (not defrag source) or 255 (defrag source) if this is a major defrag GC, as we set the values in PrepareBlockState.
         // But it could be any value in a nursery GC.
-        byte != 0
+        byte == Self::DEFRAG_SOURCE_STATE
     }
 
     pub fn in_defrag_block<VM: VMBinding>(o: ObjectReference) -> bool {
-        Self::DEFRAG_STATE_TABLE.load_byte(o.to_raw_address()) != 0
+        Block::containing(o).is_defrag_source()
     }
 
     pub fn address_in_defrag_block(a: Address) -> bool {
-        Self::DEFRAG_STATE_TABLE.load_byte(a) != 0
+        Block::from(Block::align(a)).is_defrag_source()
     }
 
     /// Mark the block for defragmentation.
     pub fn set_as_defrag_source(&self, defrag: bool) {
         let byte = if defrag { Self::DEFRAG_SOURCE_STATE } else { 0 };
         Self::DEFRAG_STATE_TABLE.store_atomic::<u8>(self.start(), byte, Ordering::SeqCst);
+    }
+
+    pub fn attempt_to_set_as_defrag_source(&self) -> bool {
+        loop {
+            let old_value: u8 =
+                Self::DEFRAG_STATE_TABLE.load_atomic(self.start(), Ordering::SeqCst);
+            if old_value == Self::DEFRAG_SOURCE_STATE {
+                return false;
+            }
+
+            if Self::DEFRAG_STATE_TABLE
+                .compare_exchange_atomic(
+                    self.start(),
+                    old_value,
+                    Self::DEFRAG_SOURCE_STATE,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
+                break;
+            }
+        }
+        true
     }
 
     /// Record the number of holes in the block.
@@ -438,35 +339,23 @@ impl Block {
 
     /// Initialize a clean block after acquired from page-resource.
     pub fn init<VM: VMBinding>(&self, copy: bool, reuse: bool, space: &ImmixSpace<VM>) {
-        // println!("Alloc block {:?} copy={} reuse={}", self, copy, reuse);
-        // #[cfg(feature = "sanity")]
-        // if !copy && !reuse && space.rc_enabled {
-        //     self.assert_log_table_cleared::<VM>(super::get_unlog_bit_slow::<VM>());
-        // }
-        self.update_phase_epoch();
         if space.rc_enabled {
             if !reuse {
                 debug_assert_eq!(self.get_state(), BlockState::Unallocated);
             }
             self.clear_in_place_promoted();
-            if copy {
-                debug_assert!((self.phase_epoch() & 1) == 0);
-            } else {
-                debug_assert!((self.phase_epoch() & 1) != 0);
-            }
-            if copy {
+            if !copy && reuse {
+                self.set_state(BlockState::Reusing);
+                debug_assert!(!self.is_defrag_source());
+            } else if copy {
                 if reuse {
                     debug_assert!(!self.is_defrag_source());
                 }
                 self.set_state(BlockState::Unmarked);
                 self.set_as_defrag_source(false);
             } else {
-                if reuse {
-                    debug_assert!(!self.is_defrag_source());
-                } else {
-                    debug_assert_eq!(self.get_state(), BlockState::Unallocated);
-                    self.set_as_defrag_source(false);
-                }
+                self.set_state(BlockState::Nursery);
+                self.set_as_defrag_source(false);
             }
         } else {
             self.set_state(if copy {
@@ -482,12 +371,11 @@ impl Block {
 
     /// Deinitalize a block before releasing.
     pub fn deinit<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
+        if space.rc_enabled {
+            self.reset_dead_bytes();
+        }
         self.set_state(BlockState::Unallocated);
         if space.rc_enabled {
-            self.clear_in_place_promoted();
-        }
-        if space.rc_enabled {
-            BLOCK_OWNER.store_atomic(self.start(), 0usize, Ordering::Relaxed);
             self.set_as_defrag_source(false);
         }
     }
@@ -547,37 +435,19 @@ impl Block {
         }
     }
 
-    pub fn set_as_in_place_promoted<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
+    pub fn set_as_in_place_promoted(&self) {
         if self.is_in_place_promoted() {
             return;
         }
-        loop {
-            let old_value: u8 =
-                Self::NURSERY_PROMOTION_STATE_TABLE.load_atomic(self.start(), Ordering::Relaxed);
-            if old_value == 1 {
-                return;
-            }
-            if Self::NURSERY_PROMOTION_STATE_TABLE
-                .compare_exchange_atomic(self.start(), 0u8, 1u8, Ordering::SeqCst, Ordering::SeqCst)
-                .is_ok()
-            {
-                space
-                    .block_allocation
-                    .in_place_promoted_nursery_blocks
-                    .fetch_add(1, Ordering::Relaxed);
-                self.set_state(BlockState::Unmarked);
-                self.update_phase_epoch();
-                return;
-            }
-        }
+        unsafe { Self::NURSERY_PROMOTION_STATE_TABLE.store(self.start(), 1u8) };
     }
 
     pub fn is_in_place_promoted(&self) -> bool {
         Self::NURSERY_PROMOTION_STATE_TABLE.load_atomic::<u8>(self.start(), Ordering::Relaxed) != 0
     }
 
-    fn clear_in_place_promoted(&self) {
-        Self::NURSERY_PROMOTION_STATE_TABLE.store_atomic(self.start(), 0u8, Ordering::Relaxed);
+    pub fn clear_in_place_promoted(&self) {
+        unsafe { Self::NURSERY_PROMOTION_STATE_TABLE.store(self.start(), 0u8) };
     }
 
     pub fn unlog(&self) {
@@ -650,7 +520,10 @@ impl Block {
                 BlockState::Unmarked => {
                     #[cfg(feature = "vo_bit")]
                     vo_bit::helper::on_region_swept::<VM, _>(self, false);
-                    unimplemented!();
+
+                    // Release the block if it is allocated but not marked by the current GC.
+                    space.release_block(*self, false, false, false);
+                    true
                 }
                 BlockState::Marked => {
                     #[cfg(feature = "vo_bit")]
@@ -699,7 +572,7 @@ impl Block {
                 vo_bit::helper::on_region_swept::<VM, _>(self, false);
 
                 // Release the block if non of its lines are marked.
-                space.release_block(*self);
+                space.release_block(*self, false, false, false);
                 true
             } else {
                 // There are some marked lines. Keep the block live.
@@ -723,27 +596,71 @@ impl Block {
         }
     }
 
-    pub fn rc_sweep_mature<VM: VMBinding>(
+    pub fn rc_sweep_nursery<VM: VMBinding>(
         &self,
         space: &ImmixSpace<VM>,
-        defrag: bool,
-        rc_dead: bool,
+        single_thread: bool,
     ) -> bool {
-        if self.get_state() == BlockState::Unallocated {
+        let is_in_place_promoted = self.is_in_place_promoted();
+        self.clear_in_place_promoted();
+        if is_in_place_promoted {
+            self.set_state(BlockState::Reusable {
+                unavailable_lines: 1 as _,
+            });
+            space.reusable_blocks.push(*self);
+            false
+        } else {
+            debug_assert!(self.rc_dead(), "{:?} has non-zero rc value", self);
+            debug_assert_ne!(self.get_state(), super::block::BlockState::Unallocated);
+            space.release_block(*self, true, false, single_thread);
+            true
+        }
+    }
+
+    pub fn attempt_mutator_reuse(&self) -> bool {
+        self.fetch_update_state(|s| {
+            if let BlockState::Reusable { .. } = s {
+                Some(BlockState::Reusing)
+            } else {
+                None
+            }
+        })
+        .is_ok()
+    }
+
+    pub fn rc_sweep_mature<VM: VMBinding>(&self, space: &ImmixSpace<VM>, defrag: bool) -> bool {
+        if self.get_state() == BlockState::Unallocated || self.get_state() == BlockState::Nursery {
             return false;
         }
-        if defrag || rc_dead || self.rc_dead() {
-            if !self.lock_skip_reusing_or_unallocated() {
-                return false;
+        if defrag || self.rc_dead() {
+            if self.attempt_dealloc(true) {
+                space.release_block(*self, false, true, defrag);
+                return true;
             }
-            let dead = if defrag || self.attempt_dealloc() {
-                self.deinit(space);
-                true
-            } else {
-                false
+        } else if !super::BLOCK_ONLY {
+            // See the caller of this function.
+            // At least one object is dead in the block.
+            let add_as_reusable = {
+                let has_holes = self.has_holes();
+                self.fetch_update_state(|s| {
+                    if s == BlockState::Reusing
+                        || s == BlockState::Unallocated
+                        || s.is_reusable()
+                        || !has_holes
+                    {
+                        None
+                    } else {
+                        Some(BlockState::Reusable {
+                            unavailable_lines: 1 as _,
+                        })
+                    }
+                })
+                .is_ok()
             };
-            self.unlock();
-            return dead;
+            if add_as_reusable {
+                debug_assert!(self.get_state().is_reusable());
+                space.reusable_blocks.push(*self);
+            }
         }
         false
     }
@@ -772,26 +689,6 @@ impl Block {
             }
         }
         false
-    }
-
-    pub fn iter_holes(&self, mut f: impl FnMut(usize)) {
-        let rc_array = RCArray::of(*self);
-        let mut i = 0;
-        while i < Block::LINES {
-            if rc_array.is_dead(i) {
-                let mut j = i + 1;
-                while j < Block::LINES {
-                    if !rc_array.is_dead(j) {
-                        break;
-                    }
-                    j += 1;
-                }
-                f(j - i);
-                i = j;
-            } else {
-                i += 1;
-            }
-        }
     }
 
     pub fn calc_holes(&self) -> usize {

@@ -123,14 +123,6 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         self.immix_space.in_defrag()
     }
 
-    fn gc_pause_start(&self, _scheduler: &GCWorkScheduler<VM>) {
-        Block::update_global_phase_epoch(&self.immix_space);
-    }
-
-    fn gc_pause_end(&self) {
-        Block::update_global_phase_epoch(&self.immix_space);
-    }
-
     fn get_collection_reserved_pages(&self) -> usize {
         self.immix_space.defrag_headroom_pages()
     }

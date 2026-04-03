@@ -106,20 +106,6 @@ impl Line {
         unsafe { Self::MARK_TABLE.load::<u8>(self.start()) == state }
     }
 
-    pub fn is_marked_by_satb<VM: VMBinding>(&self) -> bool {
-        for i in (0..Self::BYTES).step_by(8) {
-            let ptr = self.start() + i;
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-                .extract_side_spec()
-                .load_atomic::<u8>(ptr, Ordering::SeqCst)
-                == 1
-            {
-                return true;
-            }
-        }
-        false
-    }
-
     /// Mark all lines the object is spanned to.
     pub fn mark_lines_for_object<VM: VMBinding>(object: ObjectReference, state: u8) -> usize {
         debug_assert!(!super::BLOCK_ONLY);

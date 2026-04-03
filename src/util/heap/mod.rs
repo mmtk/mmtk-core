@@ -3,7 +3,6 @@ mod accounting;
 pub mod layout;
 mod blockpageresource;
 pub(crate) mod blockpageresource_legacy;
-pub(crate) mod blockpageresource_nosweep;
 pub mod chunk_map;
 pub(crate) mod freelistpageresource;
 pub mod gc_trigger;
@@ -15,7 +14,7 @@ pub(crate) mod space_descriptor;
 mod vmrequest;
 
 pub(crate) use self::accounting::PageAccounting;
-pub(crate) use self::blockpageresource_nosweep::BlockPageResource;
+pub(crate) use self::blockpageresource::BlockPageResource;
 pub(crate) use self::freelistpageresource::FreeListPageResource;
 pub use self::gc_trigger::GCTriggerPolicy;
 pub use self::gc_trigger::SpaceStats;

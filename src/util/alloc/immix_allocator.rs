@@ -3,14 +3,13 @@ use std::sync::Arc;
 
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap, AllocatorContext};
 use super::BumpPointer;
-use crate::policy::immix::block::{Block, BlockState};
+use crate::policy::immix::block::Block;
 use crate::policy::immix::line::*;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::allocator::get_maximum_aligned_size;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
-use crate::util::metadata::side_metadata::spec_defs::BLOCK_OWNER;
 use crate::util::opaque_pointer::VMThread;
 use crate::util::Address;
 use crate::vm::*;
@@ -35,106 +34,36 @@ pub struct ImmixAllocator<VM: VMBinding> {
     request_for_large: bool,
     /// Hole-searching cursor
     line: Option<Line>,
-    block: Option<Block>,
-    large_block: Option<Block>,
     mutator_recycled_blocks: Box<Vec<Block>>,
-    local_clean_blocks: Box<Vec<Block>>,
-    local_reuse_blocks: Box<Vec<Block>>,
-    local_clean_blocks_cursor: usize,
-    local_clean_blocks_cursor_boundary: usize,
-    local_reuse_blocks_cursor: usize,
-    local_reuse_blocks_cursor_boundary: usize,
     mutator_recycled_lines: usize,
     retry: bool,
 }
 
 impl<VM: VMBinding> ImmixAllocator<VM> {
-    fn reset_bump_pointers(&mut self) {
-        self.retire_block();
-        self.retire_large_block();
-        self.bump_pointer.reset(Address::ZERO, Address::ZERO);
-        self.large_bump_pointer.reset(Address::ZERO, Address::ZERO);
-        self.request_for_large = false;
-        self.line = None;
-    }
-
     pub fn reset(&mut self) {
-        if !self.space.rc_enabled {
-            for b in self.local_clean_blocks.iter() {
-                b.set_owner(None)
-            }
-            for b in self.local_reuse_blocks.iter() {
-                b.set_owner(None)
-            }
-        }
-        if !self.copy {
-            *self.local_clean_blocks = self
-                .local_clean_blocks
-                .iter()
-                .filter(|b| {
-                    b.get_state() == BlockState::Unallocated
-                        && BLOCK_OWNER.load_atomic::<usize>(b.start(), Ordering::SeqCst)
-                            == self.tls.0.to_address().as_usize()
-                })
-                .cloned()
-                .collect();
-            self.local_clean_blocks_cursor_boundary = self.local_clean_blocks.len();
-
-            *self.local_reuse_blocks = self
-                .local_reuse_blocks
-                .iter()
-                .filter(|b| {
-                    b.get_state() != BlockState::Unallocated
-                        && BLOCK_OWNER.load_atomic::<usize>(b.start(), Ordering::SeqCst)
-                            == self.tls.0.to_address().as_usize()
-                })
-                .cloned()
-                .collect();
-            self.local_reuse_blocks_cursor_boundary = self.local_reuse_blocks.len();
-        }
-        self.retire_block();
-        self.retire_large_block();
         self.bump_pointer.reset(Address::ZERO, Address::ZERO);
         self.large_bump_pointer.reset(Address::ZERO, Address::ZERO);
         self.request_for_large = false;
         self.line = None;
-        if self.copy || !self.space.rc_enabled {
-            // println!("copy allocator reset");
-            self.local_clean_blocks.clear();
-            self.local_reuse_blocks.clear();
+    }
+
+    fn retry_alloc_slow_hot(&mut self, size: usize, align: usize, offset: usize) -> Address {
+        if get_maximum_aligned_size::<VM>(size, align) > Line::BYTES {
+            return Address::ZERO;
         }
-        self.local_clean_blocks_cursor = 0;
-        self.local_reuse_blocks_cursor = 0;
-    }
-
-    fn retire_block(&mut self) {
-        if let Some(block) = self.block {
-            self.retire_block_impl(block, false)
+        if self.acquire_recyclable_lines(size, align, offset) {
+            let result = align_allocation_no_fill::<VM>(self.bump_pointer.cursor, align, offset);
+            let new_cursor = result + size;
+            if new_cursor > self.bump_pointer.limit {
+                Address::ZERO
+            } else {
+                fill_alignment_gap::<VM>(self.bump_pointer.cursor, result);
+                self.bump_pointer.cursor = new_cursor;
+                result
+            }
+        } else {
+            Address::ZERO
         }
-        self.block = None;
-        self.bump_pointer.reset(Address::ZERO, Address::ZERO);
-    }
-
-    fn retire_large_block(&mut self) {
-        if let Some(block) = self.large_block {
-            self.retire_block_impl(block, true)
-        }
-        self.large_block = None;
-        self.large_bump_pointer.reset(Address::ZERO, Address::ZERO);
-    }
-
-    fn set_allocating_block(&mut self, block: Block) {
-        self.retire_block();
-        self.block = Some(block);
-    }
-
-    fn set_large_allocating_block(&mut self, block: Block) {
-        self.retire_large_block();
-        self.large_block = Some(block);
-    }
-
-    fn retire_block_impl(&self, block: Block, _large: bool) {
-        block.unlock();
     }
 }
 
@@ -156,12 +85,6 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        // debug_assert!(
-        //     size <= crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
-        //     "Trying to allocate a {} bytes object, which is larger than MAX_IMMIX_OBJECT_SIZE {}",
-        //     size,
-        //     crate::policy::immix::MAX_IMMIX_OBJECT_SIZE
-        // );
         let result = align_allocation_no_fill::<VM>(self.bump_pointer.cursor, align, offset);
         let new_cursor = result + size;
 
@@ -237,23 +160,13 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             large_bump_pointer: BumpPointer::default(),
             request_for_large: false,
             line: None,
-            block: None,
-            large_block: None,
             mutator_recycled_blocks: Box::new(vec![]),
             mutator_recycled_lines: 0,
-            local_clean_blocks: Box::new(vec![]),
-            local_reuse_blocks: Box::new(vec![]),
-            local_clean_blocks_cursor: 0,
-            local_clean_blocks_cursor_boundary: 0,
-            local_reuse_blocks_cursor: 0,
-            local_reuse_blocks_cursor_boundary: 0,
             retry: false,
         }
     }
 
-    pub fn flush(&mut self) {
-        self.reset_bump_pointers();
-    }
+    pub fn flush(&mut self) {}
 
     pub(crate) fn immix_space(&self) -> &'static ImmixSpace<VM> {
         self.space
@@ -347,14 +260,11 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         if crate::args().no_line_recycling {
             return false;
         }
-        match self.acquire_block(false) {
+        match self.immix_space().get_reusable_block(self.copy) {
             Some(block) => {
                 trace!("{:?}: acquire_recyclable_block -> {:?}", self.tls, block);
                 // Set the hole-searching cursor to the start of this block.
-
                 self.line = Some(block.start_line());
-                self.set_allocating_block(block);
-
                 true
             }
             _ => false,
@@ -363,7 +273,11 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 
     // Get a clean block from ImmixSpace.
     fn acquire_clean_block(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        match self.acquire_block(true) {
+        match self.immix_space().get_clean_block(
+            self.tls,
+            self.copy,
+            self.get_context().get_alloc_options(),
+        ) {
             None => Address::ZERO,
             Some(block) => {
                 trace!(
@@ -372,126 +286,14 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     block.start(),
                     block.end()
                 );
-                // Bulk clear stale line mark state
-                if !self.space.rc_enabled {
-                    Line::MARK_TABLE
-                        .bzero_metadata(block.start(), crate::policy::immix::block::Block::BYTES);
-                    // mark objects if concurrent marking is active
-                    if self.immix_space().should_allocate_as_live() {
-                        let state = self.space.line_mark_state.load(Ordering::Acquire);
-                        Line::eager_mark_lines::<VM>(state, block.start_line()..block.end_line());
-                    }
-                }
                 if self.request_for_large {
-                    self.set_large_allocating_block(block);
                     self.large_bump_pointer.cursor = block.start();
                     self.large_bump_pointer.limit = block.end();
                 } else {
-                    self.set_allocating_block(block);
                     self.bump_pointer.cursor = block.start();
                     self.bump_pointer.limit = block.end();
                 }
                 self.alloc(size, align, offset)
-            }
-        }
-    }
-
-    fn try_acquire_block(&mut self, clean: bool) -> Option<Block> {
-        if clean {
-            while self.local_clean_blocks_cursor < self.local_clean_blocks.len() {
-                let block = self.local_clean_blocks[self.local_clean_blocks_cursor];
-                self.local_clean_blocks_cursor += 1;
-                if self.copy {
-                    debug_assert_eq!(block.get_state(), BlockState::Unallocated);
-                    self.space.initialize_new_block(block, true, self.copy);
-                    return Some(block);
-                } else {
-                    let locked = block.try_lock_with_condition(|| {
-                        block.get_state() == BlockState::Unallocated
-                            && !block.is_nursery()
-                            && block.get_owner() == Some(self.tls)
-                    });
-                    if !locked {
-                        continue;
-                    }
-                    self.space.initialize_new_block(block, true, self.copy);
-                    return Some(block);
-                }
-            }
-        } else {
-            while self.local_reuse_blocks_cursor < self.local_reuse_blocks.len() {
-                let block = self.local_reuse_blocks[self.local_reuse_blocks_cursor];
-                self.local_reuse_blocks_cursor += 1;
-                if block.get_state() == BlockState::Unallocated || block.is_defrag_source() {
-                    continue;
-                }
-                if self.copy {
-                    let locked = block.try_lock_with_condition(|| {
-                        block.get_state() != BlockState::Unallocated
-                            && !block.is_defrag_source()
-                            && !block.is_reusing()
-                            && !block.is_gc_reusing()
-                    });
-                    if !locked {
-                        continue;
-                    }
-                    self.space.initialize_new_block(block, false, self.copy);
-                    return Some(block);
-                } else {
-                    let locked = block.try_lock_with_condition(|| {
-                        block.get_state() != BlockState::Unallocated
-                            && !block.is_defrag_source()
-                            && block.get_owner() == Some(self.tls)
-                    });
-                    if !locked {
-                        continue;
-                    }
-                    self.space.initialize_new_block(block, false, self.copy);
-                    return Some(block);
-                }
-            }
-        }
-        None
-    }
-
-    fn acquire_block(&mut self, clean: bool) -> Option<Block> {
-        // Clean blocks: Check for GC
-        if clean {
-            self.space
-                .get_clean_block_logically(self.tls, self.copy)
-                .ok()?;
-        }
-        loop {
-            // Try find a block
-            if let Some(block) = self.try_acquire_block(clean) {
-                return Some(block);
-            }
-            // Pull N blocks from page resource
-            let result = if clean {
-                self.space.acquire_blocks(
-                    32,
-                    16,
-                    clean,
-                    &mut self.local_clean_blocks,
-                    self.copy,
-                    self.tls,
-                )
-            } else {
-                self.space.acquire_blocks(
-                    32,
-                    16,
-                    clean,
-                    &mut self.local_reuse_blocks,
-                    self.copy,
-                    self.tls,
-                )
-            };
-            if !result {
-                return None;
-            }
-            // Search for the block again
-            if let Some(b) = self.try_acquire_block(clean) {
-                return Some(b);
             }
         }
     }

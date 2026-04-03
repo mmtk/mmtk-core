@@ -3,6 +3,7 @@ use super::cm::LXRStopTheWorldProcessEdges;
 use super::SurvivalRatioPredictorLocal;
 use super::LXR;
 use crate::plan::VectorQueue;
+use crate::policy::immix::block::BlockState;
 use crate::scheduler::gc_work::RootKind;
 use crate::scheduler::gc_work::ScanObjects;
 use crate::scheduler::gc_work::SlotOf;
@@ -117,8 +118,9 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
 
         if !los {
             let block = Block::containing(o);
-            if !copied && block.is_nursery() {
-                block.set_as_in_place_promoted(&self.lxr.immix_space);
+            let in_nursery_block = block.get_state() == BlockState::Nursery;
+            if !copied && in_nursery_block {
+                block.set_as_in_place_promoted();
             }
             self.rc.promote_with_size(o, size);
             if copied {
@@ -280,6 +282,9 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             return true;
         }
         // Skip recycled lines
+        if Block::containing(o).get_state() != BlockState::Nursery {
+            return true;
+        }
         if cfg!(debug_assertions) {
             let cls = unsafe { (o.to_raw_address() + 8usize).load::<u32>() };
             assert!(cls != 0, "ERROR {:?} rc={}", o, self.rc.count(o));

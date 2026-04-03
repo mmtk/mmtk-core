@@ -161,7 +161,7 @@ impl Defrag {
             if !space.address_in_space(chunk.start()) {
                 continue;
             }
-            for block in chunk.iter_region::<Block>().filter(|b| b.is_reusable()) {
+            for block in chunk.iter_region::<Block>().filter(|b| b.get_state().is_reusable()) {
                 let bucket = block.get_holes();
                 let unavailable_lines = match block.get_state() {
                     BlockState::Reusable { unavailable_lines } => unavailable_lines as usize,
