@@ -153,11 +153,7 @@ impl<VM: VMBinding> Space<VM> for CompressorSpace<VM> {
     }
 
     fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
-        self.common().initialize_sft(
-            self.as_sft(),
-            sft_map,
-            &self.get_page_resource().common().metadata,
-        )
+        self.common().initialize_sft(self.as_sft(), sft_map)
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
@@ -221,14 +217,12 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         ]);
         let is_discontiguous = args.vmrequest.is_discontiguous();
         let scheduler = args.scheduler.clone();
-        let policy_args = args.into_policy_args(true, false, local_specs);
-        let metadata = policy_args.metadata();
-        let common = CommonSpace::new(policy_args);
+        let common = CommonSpace::new(args.into_policy_args(true, false, local_specs));
         CompressorSpace {
             pr: if is_discontiguous {
-                RegionPageResource::new_discontiguous(vm_map, metadata)
+                RegionPageResource::new_discontiguous(vm_map)
             } else {
-                RegionPageResource::new_contiguous(common.start, common.extent, vm_map, metadata)
+                RegionPageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             forwarding: forwarding::ForwardingMetadata::new(),
             common,

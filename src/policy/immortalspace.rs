@@ -53,25 +53,11 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_object_metadata(&self, object: ObjectReference, bytes: usize) {
+    fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize) {
         self.mark_state
             .on_object_metadata_initialization::<VM>(object);
         if self.common.unlog_allocated_object {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
-        }
-        if crate::plan::barriers::BARRIER_MEASUREMENT
-            || (self.common.needs_log_bit && self.common.needs_field_log_bit)
-        {
-            let step = if VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
-                4
-            } else {
-                8
-            };
-            for i in (0..bytes).step_by(step) {
-                let a = object.to_raw_address() + i;
-                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                    .mark_as_unlogged::<VM>(a.to_object_reference::<VM>(), Ordering::SeqCst);
-            }
         }
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(object);
@@ -123,11 +109,7 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
     }
 
     fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
-        self.common().initialize_sft(
-            self.as_sft(),
-            sft_map,
-            &self.get_page_resource().common().metadata,
-        )
+        self.common().initialize_sft(self.as_sft(), sft_map)
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
@@ -175,19 +157,17 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
         let vm_map = args.vm_map;
         let is_discontiguous = args.vmrequest.is_discontiguous();
-        let policy_args = args.into_policy_args(
+        let common = CommonSpace::new(args.into_policy_args(
             false,
             true,
             metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]),
-        );
-        let metadata = policy_args.metadata();
-        let common = CommonSpace::new(policy_args);
+        ));
         ImmortalSpace {
             mark_state: MarkState::new(),
             pr: if is_discontiguous {
-                MonotonePageResource::new_discontiguous(vm_map, metadata)
+                MonotonePageResource::new_discontiguous(vm_map)
             } else {
-                MonotonePageResource::new_contiguous(common.start, common.extent, vm_map, metadata)
+                MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
         }

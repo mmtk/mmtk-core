@@ -240,11 +240,7 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
     }
 
     fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
-        self.common().initialize_sft(
-            self.as_sft(),
-            sft_map,
-            &self.get_page_resource().common().metadata,
-        )
+        self.common().initialize_sft(self.as_sft(), sft_map)
     }
 
     fn common(&self) -> &CommonSpace<VM> {
@@ -322,9 +318,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             ])
         };
-        let policy_args = args.into_policy_args(false, false, local_specs);
-        let metadata = policy_args.metadata();
-        let common = CommonSpace::new(policy_args);
+        let common = CommonSpace::new(args.into_policy_args(false, false, local_specs));
         let space_index = common.descriptor.get_index();
         MarkSweepSpace {
             pr: if is_discontiguous {
@@ -332,7 +326,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                     Block::LOG_PAGES,
                     vm_map,
                     scheduler.num_workers(),
-                    metadata,
                 )
             } else {
                 BlockPageResource::new_contiguous(
@@ -341,7 +334,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                     common.extent,
                     vm_map,
                     scheduler.num_workers(),
-                    metadata,
                 )
             },
             common,
@@ -466,8 +458,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         self.block_clear_metadata(block);
 
         block.deinit();
-        // self.pr.release_block(block);
-        unimplemented!("Release block")
+        self.pr.release_block(block, false);
     }
 
     pub fn block_clear_metadata(&self, block: Block) {

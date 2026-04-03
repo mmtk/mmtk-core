@@ -19,7 +19,6 @@ use crate::util::heap::chunk_map::*;
 use crate::util::heap::BlockPageResource;
 use crate::util::heap::PageResource;
 use crate::util::linear_scan::Region;
-use crate::util::linear_scan::RegionIterator;
 use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::metadata::side_metadata::spec_defs::IX_LINE_REUSE_COUNT;
 use crate::util::metadata::side_metadata::*;
@@ -263,11 +262,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
         &self.common
     }
     fn initialize_sft(&self, sft_map: &mut dyn SFTMap) {
-        self.common().initialize_sft(
-            self.as_sft(),
-            sft_map,
-            &self.get_page_resource().common().metadata,
-        );
+        self.common().initialize_sft(self.as_sft(), sft_map);
         // Initialize the block queues in `reusable_blocks` and `pr`.
         self.block_allocation.init(self);
     }
@@ -443,9 +438,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let vm_map = args.vm_map;
         let scheduler = args.scheduler.clone();
         let rc_enabled = args.constraints.rc_enabled;
-        let policy_args = args.into_policy_args(true, false, Self::side_metadata_specs(rc_enabled));
-        let metadata = policy_args.metadata();
-        let common = CommonSpace::new(policy_args);
+        let common = CommonSpace::new(args.into_policy_args(
+            true,
+            false,
+            Self::side_metadata_specs(rc_enabled),
+        ));
         let space_index = common.descriptor.get_index();
         ImmixSpace {
             pr: if common.vmrequest.is_discontiguous() {
@@ -453,7 +450,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     Block::LOG_PAGES,
                     vm_map,
                     scheduler.num_workers(),
-                    metadata,
                 )
             } else {
                 BlockPageResource::new_contiguous(
@@ -462,7 +458,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     common.extent,
                     vm_map,
                     scheduler.num_workers(),
-                    metadata,
                 )
             },
             common,

@@ -264,11 +264,7 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     }
 
     fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
-        self.common().initialize_sft(
-            self.as_sft(),
-            sft_map,
-            &self.get_page_resource().common().metadata,
-        )
+        self.common().initialize_sft(self.as_sft(), sft_map)
     }
 
     fn common(&self) -> &CommonSpace<VM> {
@@ -352,12 +348,11 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         };
         let policy_args =
             args.into_policy_args(false, false, metadata::extract_side_metadata(&specs));
-        let metadata = policy_args.metadata();
         let common = CommonSpace::new(policy_args);
         let mut pr = if is_discontiguous {
-            FreeListPageResource::new_discontiguous(vm_map, metadata)
+            FreeListPageResource::new_discontiguous(vm_map)
         } else {
-            FreeListPageResource::new_contiguous(common.start, common.extent, vm_map, metadata)
+            FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
         };
         pr.protect_memory_on_release = if protect_memory_on_release {
             Some(common.mmap_strategy().prot)

@@ -2,7 +2,7 @@
 
 use super::PlanConstraints;
 use crate::global_state::GlobalState;
-use crate::mmtk::{MMTK, VM_MAP};
+use crate::mmtk::MMTK;
 use crate::plan::gc_work::{ClearCommonPlanUnlogBits, SetCommonPlanUnlogBits};
 use crate::plan::tracing::ObjectQueue;
 use crate::plan::Mutator;

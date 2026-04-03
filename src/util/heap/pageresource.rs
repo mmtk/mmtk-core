@@ -1,12 +1,9 @@
-use crate::policy::space::Space;
 use crate::util::address::Address;
 use crate::util::conversions;
 use crate::util::freelist::FreeList;
-use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use std::sync::Mutex;
 
-use super::chunk_map::Chunk;
 use super::layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::PageAccounting;
@@ -18,12 +15,12 @@ pub trait PageResource<VM: VMBinding>: 'static {
     /// Return The start of the first page if successful, zero on failure.
     fn get_new_pages(
         &self,
-        space: &dyn Space<VM>,
+        space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
         tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail> {
-        self.alloc_pages(space, reserved_pages, required_pages, tls)
+        self.alloc_pages(space_descriptor, reserved_pages, required_pages, tls)
     }
 
     // XXX: In the original code reserve_pages & clear_request explicitly
@@ -56,7 +53,7 @@ pub trait PageResource<VM: VMBinding>: 'static {
 
     fn alloc_pages(
         &self,
-        space: &dyn Space<VM>,
+        space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
         tls: VMThread,
@@ -112,14 +109,6 @@ pub trait PageResource<VM: VMBinding>: 'static {
     fn update_discontiguous_start(&mut self, _start: Address) {
         // Do nothing.
     }
-
-    fn has_chunk_fragmentation_info(&self) -> bool {
-        false
-    }
-
-    fn get_live_pages_in_chunk(&self, _chunk: Chunk) -> usize {
-        unreachable!()
-    }
 }
 
 pub struct PRAllocResult {
@@ -137,17 +126,10 @@ pub struct CommonPageResource {
 
     pub vm_map: &'static dyn VMMap,
     head_discontiguous_region: Mutex<Address>,
-
-    pub(crate) metadata: SideMetadataContext,
 }
 
 impl CommonPageResource {
-    pub(crate) fn new(
-        contiguous: bool,
-        growable: bool,
-        vm_map: &'static dyn VMMap,
-        metadata: SideMetadataContext,
-    ) -> CommonPageResource {
+    pub fn new(contiguous: bool, growable: bool, vm_map: &'static dyn VMMap) -> CommonPageResource {
         CommonPageResource {
             accounting: PageAccounting::new(),
 
@@ -156,8 +138,6 @@ impl CommonPageResource {
             vm_map,
 
             head_discontiguous_region: Mutex::new(Address::ZERO),
-
-            metadata,
         }
     }
 

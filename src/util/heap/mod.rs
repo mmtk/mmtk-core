@@ -1,8 +1,7 @@
 mod accounting;
 #[macro_use]
 pub mod layout;
-mod blockpageresource;
-pub(crate) mod blockpageresource_legacy;
+pub(crate) mod blockpageresource;
 pub mod chunk_map;
 pub(crate) mod freelistpageresource;
 pub mod gc_trigger;

@@ -11,7 +11,7 @@ use crate::{
     scheduler::{GCWork, GCWorker, WorkBucketStage},
     util::{
         constants::LOG_BYTES_IN_PAGE,
-        heap::{chunk_map::Chunk, layout::vm_layout::LOG_BYTES_IN_CHUNK, PageResource},
+        heap::{chunk_map::Chunk, layout::vm_layout::LOG_BYTES_IN_CHUNK},
         linear_scan::Region,
         rc::{self, RefCountHelper},
         ObjectReference,
@@ -37,23 +37,10 @@ struct SelectDefragBlocks {
 impl<VM: VMBinding> GCWork<VM> for SelectDefragBlocks {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let mut fragmented_blocks = vec![];
-        let mut blocks_in_fragmented_chunks = vec![];
         let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
-        let is_emergency_gc = lxr.current_pause().unwrap() == Pause::Full;
         const BLOCKS_IN_CHUNK: usize = 1 << (LOG_BYTES_IN_CHUNK - Block::LOG_BYTES);
-        let threshold = {
-            let chunk_defarg_percent = if is_emergency_gc {
-                crate::args().chunk_defarg_percent << 1
-            } else {
-                crate::args().chunk_defarg_percent
-            };
-            let chunk_defarg_percent = chunk_defarg_percent.min(100);
-            let threshold = BLOCKS_IN_CHUNK * chunk_defarg_percent / 100;
-            threshold.max(1)
-        };
-        // Iterate over all blocks in this chunk
-        let has_chunk_frag_info = lxr.immix_space.pr.has_chunk_fragmentation_info();
 
+        // Iterate over all blocks in this chunk
         let num_chunks = (self.chunks.end.start() - self.chunks.start.start()) >> Chunk::LOG_BYTES;
         let ix_space = &mmtk
             .get_plan()
@@ -69,19 +56,6 @@ impl<VM: VMBinding> GCWork<VM> for SelectDefragBlocks {
                 // Skip unallocated blocks.
                 if MatureEvacuationSet::skip_block(block) {
                     continue;
-                }
-                // This is a block in a fragmented chunk?
-                if has_chunk_frag_info {
-                    let live_blocks_in_chunk = lxr
-                        .immix_space
-                        .pr
-                        .get_live_pages_in_chunk(Chunk::from_unaligned_address(block.start()))
-                        >> Block::LOG_PAGES;
-                    if live_blocks_in_chunk < threshold {
-                        let dead_blocks = BLOCKS_IN_CHUNK - live_blocks_in_chunk;
-                        blocks_in_fragmented_chunks.push((block, dead_blocks));
-                        continue;
-                    }
                 }
                 // This is a fragmented block?
                 let score = block.calc_dead_lines() << Line::LOG_BYTES;
@@ -100,17 +74,6 @@ impl<VM: VMBinding> GCWork<VM> for SelectDefragBlocks {
                 .evac_set
                 .fragmented_blocks
                 .push(fragmented_blocks);
-        }
-        // Flush to global blocks_in_fragmented_chunks
-        if !blocks_in_fragmented_chunks.is_empty() {
-            lxr.immix_space
-                .evac_set
-                .blocks_in_fragmented_chunks_size
-                .fetch_add(blocks_in_fragmented_chunks.len(), Ordering::SeqCst);
-            lxr.immix_space
-                .evac_set
-                .blocks_in_fragmented_chunks
-                .push(blocks_in_fragmented_chunks);
         }
 
         if SELECT_DEFRAG_BLOCK_JOB_COUNTER.fetch_sub(1, Ordering::SeqCst) == 1 {
@@ -478,13 +441,6 @@ impl MatureEvacuationSet {
         gc_log!([3] "max_copy_bytes={} ({}M)", max_copy_bytes, max_copy_bytes >> 20);
         let mut copy_bytes = 0usize;
         let mut selected_blocks = vec![];
-        if lxr.immix_space.pr.has_chunk_fragmentation_info() {
-            self.select_blocks_in_fragmented_chunks(
-                &mut selected_blocks,
-                &mut copy_bytes,
-                max_copy_bytes,
-            );
-        }
         let count1 = selected_blocks.len();
         self.select_fragmented_blocks(&mut selected_blocks, &mut copy_bytes, max_copy_bytes);
         gc_log!([2]

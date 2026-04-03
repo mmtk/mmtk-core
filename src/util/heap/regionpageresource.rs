@@ -1,10 +1,9 @@
-use crate::policy::space::Space;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::pageresource::{CommonPageResource, PRAllocFail, PRAllocResult};
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::linear_scan::Region;
-use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::Address;
 use crate::util::VMThread;
@@ -58,14 +57,14 @@ impl<VM: VMBinding, R: Region + 'static> PageResource<VM> for RegionPageResource
 
     fn alloc_pages(
         &self,
-        space: &dyn Space<VM>,
+        space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
         tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail> {
         assert!(reserved_pages <= Self::REGION_PAGES);
         assert!(required_pages <= reserved_pages);
-        self.alloc(space, reserved_pages, required_pages, tls)
+        self.alloc(space_descriptor, reserved_pages, required_pages, tls)
     }
 
     fn get_available_physical_pages(&self) -> usize {
@@ -76,19 +75,12 @@ impl<VM: VMBinding, R: Region + 'static> PageResource<VM> for RegionPageResource
 impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
     const REGION_PAGES: usize = R::BYTES / BYTES_IN_PAGE;
 
-    pub fn new_contiguous(
-        start: Address,
-        bytes: usize,
-        vm_map: &'static dyn VMMap,
-        metadata: SideMetadataContext,
-    ) -> Self {
-        Self::new(MonotonePageResource::new_contiguous(
-            start, bytes, vm_map, metadata,
-        ))
+    pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static dyn VMMap) -> Self {
+        Self::new(MonotonePageResource::new_contiguous(start, bytes, vm_map))
     }
 
-    pub fn new_discontiguous(vm_map: &'static dyn VMMap, metadata: SideMetadataContext) -> Self {
-        Self::new(MonotonePageResource::new_discontiguous(vm_map, metadata))
+    pub fn new_discontiguous(vm_map: &'static dyn VMMap) -> Self {
+        Self::new(MonotonePageResource::new_discontiguous(vm_map))
     }
 
     fn new(mpr: MonotonePageResource<VM>) -> Self {
@@ -103,7 +95,7 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
 
     fn alloc(
         &self,
-        space: &dyn Space<VM>,
+        space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
         tls: VMThread,
@@ -131,9 +123,12 @@ impl<VM: VMBinding, R: Region + 'static> RegionPageResource<VM, R> {
         // Else allocate a new region.
         let PRAllocResult {
             start, new_chunk, ..
-        } = self
-            .mpr
-            .alloc_pages(space, Self::REGION_PAGES, Self::REGION_PAGES, tls)?;
+        } = self.mpr.alloc_pages(
+            space_descriptor,
+            Self::REGION_PAGES,
+            Self::REGION_PAGES,
+            tls,
+        )?;
         b.all_regions.push(AllocatedRegion {
             region: R::from_aligned_address(start),
             cursor: Atomic::<Address>::new(start),
