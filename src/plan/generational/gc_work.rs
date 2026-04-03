@@ -62,7 +62,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
         // Note: If `object` is a mature object, `trace_object` will not call `space.trace_object`,
         // but will still return `object`.  In that case, we don't need to write it back.
         if new_object != object {
-            slot.store(Some(new_object));
+            slot.store(new_object);
         }
     }
 

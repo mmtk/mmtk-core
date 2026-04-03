@@ -73,13 +73,10 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> BarrierSem
 
     fn object_reference_write_slow(
         &mut self,
-        src: Option<ObjectReference>,
+        src: ObjectReference,
         _slot: VM::VMSlot,
         _target: Option<ObjectReference>,
     ) {
-        let Some(src) = src else {
-            return;
-        };
         // enqueue the object
         self.modbuf.push(src);
         self.modbuf.is_full().then(|| self.flush_modbuf());

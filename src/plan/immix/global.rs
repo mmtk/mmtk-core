@@ -1,4 +1,3 @@
-use super::barrier::ImmixFakeFieldBarrierSemantics;
 use super::gc_work::ImmixGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
@@ -146,19 +145,11 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
 impl<VM: VMBinding> Immix<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
-        let immix_specs =
-            metadata::extract_side_metadata(&[MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE)]);
-        crate::args::validate_features(IMMIX_CONSTRAINTS.barrier, &args.options);
-        let mut plan_args = CreateSpecificPlanArgs {
+        let plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &IMMIX_CONSTRAINTS,
-            global_side_metadata_specs: SideMetadataContext::new_global_specs(&immix_specs),
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
-        if crate::plan::barriers::BARRIER_MEASUREMENT {
-            plan_args
-                .global_side_metadata_specs
-                .push(ImmixFakeFieldBarrierSemantics::<VM>::UNLOG_BITS);
-        }
         Self::new_with_args(
             plan_args,
             ImmixSpaceArgs {

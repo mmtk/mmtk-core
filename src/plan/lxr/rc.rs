@@ -406,7 +406,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             //     self.rc.count(new),
             //     K
             // );
-            s.store(Some(new))
+            s.store(new)
         } else {
             // gc_log!(
             //     " -- inc {:?}: {:?} rc={} {:?}",

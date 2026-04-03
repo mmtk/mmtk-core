@@ -118,12 +118,12 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 
     fn object_reference_write_slow(
         &mut self,
-        src: Option<ObjectReference>,
+        src: ObjectReference,
         _slot: <Self::VM as VMBinding>::VMSlot,
         _target: Option<ObjectReference>,
     ) {
-        self.object_probable_write_slow(src.unwrap());
-        self.log_object(src.unwrap());
+        self.object_probable_write_slow(src);
+        self.log_object(src);
     }
 
     fn memory_region_copy_slow(

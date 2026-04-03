@@ -131,7 +131,7 @@ pub trait Slot: Copy + Send + Debug + PartialEq + Eq + Hash {
     /// operations have different semantics, and need to be implemented differently if the VM
     /// supports offsetted or tagged references.
     /// See: <https://github.com/mmtk/mmtk-core/issues/1038>
-    fn store(&self, object: Option<ObjectReference>);
+    fn store(&self, object: ObjectReference);
 
     fn compare_exchange(
         &self,
@@ -203,17 +203,8 @@ impl Slot for SimpleSlot {
         ObjectReference::from_raw_address(addr)
     }
 
-    fn store(&self, object: Option<ObjectReference>) {
-        unsafe {
-            (*self.slot_addr).store(
-                if let Some(o) = object {
-                    o.to_raw_address()
-                } else {
-                    Address::ZERO
-                },
-                atomic::Ordering::Relaxed,
-            )
-        }
+    fn store(&self, object: ObjectReference) {
+        unsafe { (*self.slot_addr).store(object.to_raw_address(), atomic::Ordering::Relaxed) }
     }
 }
 
@@ -233,7 +224,7 @@ impl Slot for Address {
         ObjectReference::from_raw_address(addr)
     }
 
-    fn store(&self, object: Option<ObjectReference>) {
+    fn store(&self, object: ObjectReference) {
         unsafe { Address::store(*self, object) }
     }
 

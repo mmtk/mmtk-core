@@ -73,19 +73,19 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
     /// Subsuming barrier for object reference write
     fn object_reference_write(
         &mut self,
-        src: Option<ObjectReference>,
+        src: ObjectReference,
         slot: VM::VMSlot,
-        target: Option<ObjectReference>,
+        target: ObjectReference,
     ) {
-        self.object_reference_write_pre(src, slot, target);
+        self.object_reference_write_pre(src, slot, Some(target));
         slot.store(target);
-        self.object_reference_write_post(src, slot, target);
+        self.object_reference_write_post(src, slot, Some(target));
     }
 
     /// Full pre-barrier for object reference write
     fn object_reference_write_pre(
         &mut self,
-        _src: Option<ObjectReference>,
+        _src: ObjectReference,
         _slot: VM::VMSlot,
         _target: Option<ObjectReference>,
     ) {
@@ -94,7 +94,7 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
     /// Full post-barrier for object reference write
     fn object_reference_write_post(
         &mut self,
-        _src: Option<ObjectReference>,
+        _src: ObjectReference,
         _slot: VM::VMSlot,
         _target: Option<ObjectReference>,
     ) {
@@ -104,13 +104,11 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
     /// This can be called either before or after the store, depend on the concrete barrier implementation.
     fn object_reference_write_slow(
         &mut self,
-        _src: Option<ObjectReference>,
+        _src: ObjectReference,
         _slot: VM::VMSlot,
         _target: Option<ObjectReference>,
     ) {
     }
-
-    fn object_reference_clone_pre(&mut self, _obj: ObjectReference) {}
 
     /// Subsuming barrier for array copy
     fn memory_region_copy(&mut self, src: VM::VMMemorySlice, dst: VM::VMMemorySlice) {
@@ -172,7 +170,7 @@ pub trait BarrierSemantics: 'static + Send {
     /// Slow-path call for object field write operations.
     fn object_reference_write_slow(
         &mut self,
-        src: Option<ObjectReference>,
+        src: ObjectReference,
         slot: <Self::VM as VMBinding>::VMSlot,
         target: Option<ObjectReference>,
     );
@@ -183,8 +181,6 @@ pub trait BarrierSemantics: 'static + Send {
         src: <Self::VM as VMBinding>::VMMemorySlice,
         dst: <Self::VM as VMBinding>::VMMemorySlice,
     );
-
-    fn object_reference_clone_pre(&mut self, _obj: ObjectReference) {}
 
     /// Object will probably be modified
     fn object_probable_write_slow(&mut self, _obj: ObjectReference) {}
@@ -248,30 +244,24 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
 
     fn object_reference_write_post(
         &mut self,
-        src: Option<ObjectReference>,
+        src: ObjectReference,
         slot: <S::VM as VMBinding>::VMSlot,
         target: Option<ObjectReference>,
     ) {
-        let Some(src) = src else {
-            return;
-        };
         if self.object_is_unlogged(src) {
-            self.object_reference_write_slow(Some(src), slot, target);
+            self.object_reference_write_slow(src, slot, target);
         }
     }
 
     fn object_reference_write_slow(
         &mut self,
-        src: Option<ObjectReference>,
+        src: ObjectReference,
         slot: <S::VM as VMBinding>::VMSlot,
         target: Option<ObjectReference>,
     ) {
-        let Some(src) = src else {
-            return;
-        };
         if self.log_object(src) {
             self.semantics
-                .object_reference_write_slow(Some(src), slot, target);
+                .object_reference_write_slow(src, slot, target);
         }
     }
 
@@ -281,10 +271,6 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
         dst: <S::VM as VMBinding>::VMMemorySlice,
     ) {
         self.semantics.memory_region_copy_slow(src, dst);
-    }
-
-    fn object_reference_clone_pre(&mut self, obj: ObjectReference) {
-        self.semantics.object_reference_clone_pre(obj)
     }
 
     fn object_probable_write(&mut self, obj: ObjectReference) {
@@ -314,17 +300,13 @@ impl<S: BarrierSemantics> Barrier<S::VM> for FieldBarrier<S> {
         self.semantics.load_weak_reference(o)
     }
 
-    fn object_reference_clone_pre(&mut self, obj: ObjectReference) {
-        self.semantics.object_reference_clone_pre(obj);
-    }
-
     fn object_probable_write(&mut self, obj: ObjectReference) {
         self.semantics.object_probable_write_slow(obj);
     }
 
     fn object_reference_write_pre(
         &mut self,
-        src: Option<ObjectReference>,
+        src: ObjectReference,
         slot: <S::VM as VMBinding>::VMSlot,
         target: Option<ObjectReference>,
     ) {
@@ -334,7 +316,7 @@ impl<S: BarrierSemantics> Barrier<S::VM> for FieldBarrier<S> {
 
     fn object_reference_write_post(
         &mut self,
-        _src: Option<ObjectReference>,
+        _src: ObjectReference,
         _slot: <S::VM as VMBinding>::VMSlot,
         _target: Option<ObjectReference>,
     ) {
@@ -343,7 +325,7 @@ impl<S: BarrierSemantics> Barrier<S::VM> for FieldBarrier<S> {
 
     fn object_reference_write_slow(
         &mut self,
-        src: Option<ObjectReference>,
+        src: ObjectReference,
         slot: <S::VM as VMBinding>::VMSlot,
         target: Option<ObjectReference>,
     ) {
@@ -413,11 +395,11 @@ impl<S: BarrierSemantics> Barrier<S::VM> for SATBBarrier<S> {
 
     fn object_reference_write_pre(
         &mut self,
-        src: Option<ObjectReference>,
+        src: ObjectReference,
         slot: <S::VM as VMBinding>::VMSlot,
         target: Option<ObjectReference>,
     ) {
-        if self.object_is_unlogged(src.unwrap()) {
+        if self.object_is_unlogged(src) {
             self.semantics
                 .object_reference_write_slow(src, slot, target);
         }
@@ -425,7 +407,7 @@ impl<S: BarrierSemantics> Barrier<S::VM> for SATBBarrier<S> {
 
     fn object_reference_write_post(
         &mut self,
-        _src: Option<ObjectReference>,
+        _src: ObjectReference,
         _slot: <S::VM as VMBinding>::VMSlot,
         _target: Option<ObjectReference>,
     ) {
@@ -434,7 +416,7 @@ impl<S: BarrierSemantics> Barrier<S::VM> for SATBBarrier<S> {
 
     fn object_reference_write_slow(
         &mut self,
-        src: Option<ObjectReference>,
+        src: ObjectReference,
         slot: <S::VM as VMBinding>::VMSlot,
         target: Option<ObjectReference>,
     ) {

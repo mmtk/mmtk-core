@@ -343,7 +343,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         if VM::VMScanning::support_slot_enqueuing(worker.tls, object) {
             VM::VMScanning::scan_object(worker.tls, object, &mut |s: VM::VMSlot| {
                 if let Some(o) = s.load() {
-                    s.store(Some(self.forward(o, false)));
+                    s.store(self.forward(o, false));
                 }
             });
         } else {

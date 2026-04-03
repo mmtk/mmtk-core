@@ -209,11 +209,11 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
 
     fn object_reference_write_slow(
         &mut self,
-        src: Option<ObjectReference>,
+        src: ObjectReference,
         slot: VM::VMSlot,
         target: Option<ObjectReference>,
     ) {
-        self.enqueue_node(src, slot, target);
+        self.enqueue_node(Some(src), slot, target);
     }
 
     fn memory_region_copy_slow(&mut self, _src: VM::VMMemorySlice, dst: VM::VMMemorySlice) {

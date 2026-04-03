@@ -4,8 +4,6 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
 
-use crate::mmtk::VM_MAP;
-
 /// This stores some global states for an MMTK instance.
 /// Some MMTK components like plans and allocators may keep an reference to the struct, and can access it.
 // This used to be a part of the `BasePlan`. In that case, any component that accesses

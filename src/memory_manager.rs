@@ -344,9 +344,9 @@ pub fn post_alloc<VM: VMBinding>(
 #[deprecated = "Use `object_reference_write_pre` and `object_reference_write_post` instead, until this function is redesigned"]
 pub fn object_reference_write<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
-    src: Option<ObjectReference>,
+    src: ObjectReference,
     slot: VM::VMSlot,
-    target: Option<ObjectReference>,
+    target: ObjectReference,
 ) {
     mutator.barrier().object_reference_write(src, slot, target);
 }
@@ -370,7 +370,7 @@ pub fn object_reference_write<VM: VMBinding>(
 ///   reference, a small integer, or special values such as `true`, `false`, `undefined`, etc.
 pub fn object_reference_write_pre<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
-    src: Option<ObjectReference>,
+    src: ObjectReference,
     slot: VM::VMSlot,
     target: Option<ObjectReference>,
 ) {
@@ -398,7 +398,7 @@ pub fn object_reference_write_pre<VM: VMBinding>(
 ///   integers, or a special value such as`true`, `false`, `undefined`, etc., into the slot.
 pub fn object_reference_write_post<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
-    src: Option<ObjectReference>,
+    src: ObjectReference,
     slot: VM::VMSlot,
     target: Option<ObjectReference>,
 ) {
