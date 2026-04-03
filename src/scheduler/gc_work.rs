@@ -1,7 +1,3 @@
-use address::CLDScanPolicy;
-use address::RefScanPolicy;
-use policy::immix::block::Block;
-
 use self::global_state::GcStatus;
 use super::work_bucket::WorkBucketStage;
 use super::*;
@@ -9,8 +5,6 @@ use crate::plan::lxr::LXR;
 use crate::plan::ObjectsClosure;
 use crate::plan::VectorObjectQueue;
 use crate::plan::VectorQueue;
-use crate::util::metadata::side_metadata::address_to_meta_address;
-use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::*;
 use crate::vm::slot::Slot;
 use crate::vm::*;
@@ -1122,36 +1116,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
     }
 }
 
-pub struct UnlogSlots<VM: VMBinding>(pub Vec<VM::VMSlot>);
-
-impl<VM: VMBinding> UnlogSlots<VM> {
-    fn unlog_slots(&self, meta: &SideMetadataSpec) {
-        if !self.0.is_empty() {
-            for slot in &self.0 {
-                let ptr = address_to_meta_address(meta, slot.to_address());
-                unsafe {
-                    ptr.store(0b11111111u8);
-                }
-            }
-        }
-    }
-}
-impl<VM: VMBinding> GCWork<VM> for UnlogSlots<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.unlog_slots(
-            VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
-                .as_spec()
-                .extract_side_spec(),
-        );
-    }
-}
-
-pub struct DummyPacket<T: 'static + Send>(pub T);
-
-impl<T: 'static + Send, VM: VMBinding> GCWork<VM> for DummyPacket<T> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {}
-}
-
 use crate::mmtk::MMTK;
 use crate::plan::Plan;
 use crate::plan::PlanTraceObject;
@@ -1166,7 +1130,6 @@ pub struct PlanProcessEdges<
 > {
     plan: &'static P,
     base: ProcessEdgesBase<VM>,
-    next_slots: Vec<SlotOf<Self>>,
 }
 
 impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKind> ProcessEdgesWork
@@ -1183,25 +1146,20 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
     ) -> Self {
         let base = ProcessEdgesBase::new(slots, roots, mmtk, bucket);
         let plan = base.plan().downcast_ref::<P>().unwrap();
-        Self {
-            plan,
-            base,
-            next_slots: vec![],
-        }
+        Self { plan, base }
     }
 
-    fn create_scan_work(&self, _nodes: Vec<ObjectReference>) -> Self::ScanObjectsWorkType {
-        unreachable!()
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Self::ScanObjectsWorkType {
+        PlanScanObjects::<Self, P>::new(self.plan, nodes, false, false, false, self.bucket)
     }
 
-    #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         // We cannot borrow `self` twice in a call, so we extract `worker` as a local variable.
         let worker = self.worker();
-        self.plan.trace_object::<_, KIND>(self, object, worker)
+        self.plan
+            .trace_object::<VectorObjectQueue, KIND>(&mut self.base.nodes, object, worker)
     }
 
-    #[inline]
     fn process_slot(&mut self, slot: SlotOf<Self>) {
         let Some(object) = slot.load() else {
             // Skip slots that are not holding an object reference.
@@ -1210,82 +1168,6 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
         let new_object = self.trace_object(object);
         if P::may_move_objects::<KIND>() && new_object != object {
             slot.store(new_object);
-        }
-    }
-
-    fn process_slots(&mut self) {
-        let is_immix = self
-            .plan
-            .as_any()
-            .downcast_ref::<crate::plan::immix::Immix<VM>>()
-            .is_some();
-        if is_immix {
-            self.__process_slots::<true>();
-        } else {
-            self.__process_slots::<false>();
-        }
-    }
-
-    fn flush(&mut self) {
-        if !self.next_slots.is_empty() {
-            let slots = std::mem::take(&mut self.next_slots);
-            let w = Self::new(slots, false, self.mmtk, self.bucket);
-            self.worker().add_work(self.bucket, w);
-        }
-    }
-}
-
-impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKind> ObjectQueue
-    for PlanProcessEdges<VM, P, KIND>
-{
-    fn enqueue(&mut self, object: ObjectReference) {
-        object.iterate_fields::<VM, _>(CLDScanPolicy::Claim, RefScanPolicy::Discover, |s, _| {
-            let Some(_) = s.load() else { return };
-            self.next_slots.push(s);
-            if self.next_slots.len() >= crate::args::BUFFER_SIZE {
-                self.flush();
-            }
-        });
-        self.plan.post_scan_object(object);
-    }
-}
-
-impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKind>
-    PlanProcessEdges<VM, P, KIND>
-{
-    #[inline]
-    fn __process_slot<const IX: bool, const WEAK_ROOT: bool>(&mut self, slot: SlotOf<Self>) {
-        let Some(object) = slot.load() else { return };
-        if IX && WEAK_ROOT && !Block::containing(object).is_defrag_source() {
-            return;
-        }
-        let new_object = self.trace_object(object);
-        if P::may_move_objects::<KIND>() && new_object != object {
-            slot.store(new_object);
-        }
-    }
-
-    fn __process_slots<const IX: bool>(&mut self) {
-        if self.roots && self.root_kind == Some(RootKind::Weak) {
-            for i in 0..self.slots.len() {
-                self.__process_slot::<IX, true>(self.slots[i]);
-            }
-        } else {
-            for i in 0..self.slots.len() {
-                self.__process_slot::<IX, false>(self.slots[i]);
-            }
-        }
-        self.roots = false;
-        for i in 0..self.slots.len() {
-            self.__process_slot::<IX, false>(self.slots[i]);
-        }
-        let mut slots = vec![];
-        while !self.next_slots.is_empty() {
-            slots.clear();
-            std::mem::swap(&mut slots, &mut self.next_slots);
-            for s in &slots {
-                self.__process_slot::<IX, false>(*s);
-            }
         }
     }
 }

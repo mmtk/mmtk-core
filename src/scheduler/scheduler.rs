@@ -941,14 +941,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 "barrier.takerate".to_owned(),
                 format!("{}", slow as f64 / fast as f64),
             );
-            if crate::args::HARNESS_PRETTY_PRINT {
-                println!(
-                    "barrier: fast={} slow={} takerate={}",
-                    fast,
-                    slow,
-                    slow as f64 / fast as f64
-                );
-            }
         }
         stat
     }

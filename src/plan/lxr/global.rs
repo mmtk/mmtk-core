@@ -2,7 +2,6 @@ use super::gc_work::{LXRGCWorkContext, LXRWeakRefWorkContext, ReleaseLOSNursery}
 use super::mutator::ALLOCATOR_MAPPING;
 use super::rc::{ProcessDecs, RCImmixCollectRootEdges};
 use super::remset::FlushMatureEvacRemsets;
-use crate::mmtk::VM_MAP;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 use crate::plan::immix::Pause;
@@ -22,7 +21,6 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::analysis::GcHookWork;
 use crate::util::constants::*;
 use crate::util::copy::*;
-use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::{SpaceStats, VMRequest};
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::MetadataSpec;

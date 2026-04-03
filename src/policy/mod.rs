@@ -23,7 +23,6 @@ pub mod sft_map;
 
 pub mod compressor;
 pub mod copyspace;
-#[macro_use]
 pub mod immix;
 pub mod immortalspace;
 pub mod largeobjectspace;

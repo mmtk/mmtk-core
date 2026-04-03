@@ -2,8 +2,7 @@ use super::worker::*;
 use crate::mmtk::MMTK;
 use crate::vm::VMBinding;
 #[cfg(feature = "work_packet_stats")]
-use std::any::TypeId;
-use std::any::{type_name, Any};
+use std::any::{type_name, TypeId};
 
 /// This defines a GC work packet which are assigned to the [`GCWorker`]s by the scheduler.
 /// Work packets carry payloads that indicate the work to be done. For example, a work packet may
@@ -12,7 +11,7 @@ use std::any::{type_name, Any};
 /// of the work packet will need to consider at least two points of tension: the work packet must be large
 /// enough to ensure that the costs of managing the work packets do not dominate, and the packet must be
 /// small enough that good load balancing is achieved.
-pub trait GCWork<VM: VMBinding>: 'static + Send + Any {
+pub trait GCWork<VM: VMBinding>: 'static + Send {
     fn should_defer(&self) -> bool {
         false
     }
@@ -48,10 +47,6 @@ pub trait GCWork<VM: VMBinding>: 'static + Send + Any {
             worker_stat.measure_work(TypeId::of::<Self>(), type_name::<Self>(), mmtk)
         };
 
-        if crate::args::LOG_WORK_PACKETS {
-            println!("{} > {}", worker.ordinal, type_name::<Self>());
-        }
-
         // Do the actual work
         self.do_work(worker, mmtk);
 
@@ -65,8 +60,7 @@ pub trait GCWork<VM: VMBinding>: 'static + Send + Any {
 
     /// Get the compile-time static type name for the work packet.
     fn get_type_name(&self) -> &'static str {
-        let x = std::any::type_name::<Self>();
-        x.split("<").next().unwrap().split("::").last().unwrap()
+        std::any::type_name::<Self>()
     }
 }
 

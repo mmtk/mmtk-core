@@ -11,7 +11,7 @@ use crate::{
     scheduler::{GCWork, GCWorker, WorkBucketStage},
     util::{
         constants::LOG_BYTES_IN_PAGE,
-        heap::{chunk_map::Chunk, layout::vm_layout::LOG_BYTES_IN_CHUNK},
+        heap::chunk_map::Chunk,
         linear_scan::Region,
         rc::{self, RefCountHelper},
         ObjectReference,
@@ -38,7 +38,6 @@ impl<VM: VMBinding> GCWork<VM> for SelectDefragBlocks {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let mut fragmented_blocks = vec![];
         let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
-        const BLOCKS_IN_CHUNK: usize = 1 << (LOG_BYTES_IN_CHUNK - Block::LOG_BYTES);
 
         // Iterate over all blocks in this chunk
         let num_chunks = (self.chunks.end.start() - self.chunks.start.start()) >> Chunk::LOG_BYTES;
@@ -363,32 +362,6 @@ impl MatureEvacuationSet {
     fn skip_block(b: Block) -> bool {
         let s = b.get_state();
         b.is_defrag_source() || s == BlockState::Unallocated || s == BlockState::Nursery
-    }
-
-    fn select_blocks_in_fragmented_chunks(
-        &self,
-        selected_blocks: &mut Vec<Block>,
-        copy_bytes: &mut usize,
-        max_copy_bytes: usize,
-    ) {
-        let mut blocks =
-            Vec::with_capacity(self.blocks_in_fragmented_chunks_size.load(Ordering::SeqCst));
-        while let Some(mut x) = self.blocks_in_fragmented_chunks.pop() {
-            blocks.append(&mut x);
-        }
-        blocks.sort_by_key(|x| x.1);
-        #[cfg(not(feature = "lxr_no_mature_defrag"))]
-        while let Some((block, _)) = blocks.pop() {
-            if Self::skip_block(block) {
-                continue;
-            }
-            block.set_as_defrag_source(true);
-            selected_blocks.push(block);
-            *copy_bytes += (Block::BYTES - (block.calc_dead_lines() << Line::LOG_BYTES)) >> 1;
-            if *copy_bytes >= max_copy_bytes {
-                break;
-            }
-        }
     }
 
     fn select_fragmented_blocks(

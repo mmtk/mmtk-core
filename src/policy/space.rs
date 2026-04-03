@@ -202,7 +202,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     self.get_name(),
                 ))
             {
-                memory::handle_mmap_error::<VM>(mmap_error, tls);
+                memory::handle_mmap_error::<VM>(mmap_error, tls, res.start, bytes);
             }
         };
         let grow_space = || {

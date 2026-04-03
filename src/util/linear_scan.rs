@@ -5,8 +5,6 @@ use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
-use super::metadata::side_metadata::SideMetadataSpec;
-
 // FIXME: MarkCompact uses linear scanning to discover allocated objects in the MarkCompactSpace.
 // It should use a local metadata (specific to the MarkCompactSpace) for that purpose.
 // In the future, we should let MarkCompact do linear scanning using its local metadata instead.
@@ -93,7 +91,6 @@ pub trait Region: Copy + PartialEq + PartialOrd {
     const LOG_BYTES: usize;
     /// The size in bytes for the region.
     const BYTES: usize = 1 << Self::LOG_BYTES;
-    const BPR_ALLOC_TABLE: Option<SideMetadataSpec> = None;
 
     /// Create a region from an address that is aligned to the region boundary. The method should panic if the address
     /// is not properly aligned to the region. For performance, this method should always be inlined.

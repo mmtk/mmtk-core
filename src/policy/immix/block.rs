@@ -89,9 +89,6 @@ impl Region for Block {
     #[cfg(feature = "immix_smaller_block")]
     const LOG_BYTES: usize = 13;
 
-    const BPR_ALLOC_TABLE: Option<SideMetadataSpec> =
-        Some(crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_ALLOC_BITS);
-
     fn from_aligned_address(address: Address) -> Self {
         debug_assert!(address.is_aligned_to(Self::BYTES));
         Self(address)
@@ -680,7 +677,7 @@ impl Block {
                 } else if !found_free_line {
                     found_free_line = true;
                 }
-                if free_lines >= crate::args().min_reuse_lines {
+                if free_lines > 0 {
                     return true;
                 }
             } else {
@@ -737,7 +734,7 @@ impl Block {
         let mut cursor = 0;
         while let Some(end) = search_next_hole(cursor) {
             cursor = end;
-            if end - cursor >= crate::args().min_reuse_lines {
+            if end - cursor > 0 {
                 holes += 1;
             }
         }

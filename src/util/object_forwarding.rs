@@ -55,7 +55,6 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
 ) -> ObjectReference {
     let mut forwarding_bits = forwarding_bits;
     while forwarding_bits == BEING_FORWARDED {
-        std::hint::spin_loop();
         forwarding_bits = get_forwarding_status::<VM>(object);
     }
 

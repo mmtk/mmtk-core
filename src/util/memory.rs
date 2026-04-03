@@ -305,10 +305,15 @@ pub fn munmap(start: Address, size: usize) -> Result<()> {
 
 /// Properly handle errors from a mmap Result, including invoking the binding code in the case of
 /// an OOM error.
-pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
+pub fn handle_mmap_error<VM: VMBinding>(
+    error: Error,
+    tls: VMThread,
+    addr: Address,
+    bytes: usize,
+) -> ! {
     use std::io::ErrorKind;
 
-    // eprintln!("Failed to mmap {}, size {}", addr, bytes);
+    eprintln!("Failed to mmap {}, size {}", addr, bytes);
     eprintln!("{}", get_process_memory_maps());
 
     match error.kind() {
@@ -470,14 +475,11 @@ pub(crate) fn get_system_total_memory() -> u64 {
 mod tests {
     use super::*;
     use crate::util::constants::BYTES_IN_PAGE;
-    use crate::util::test_util::memory_test_region;
+    use crate::util::test_util::MEMORY_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
 
     // In the tests, we will mmap this address. This address should not be in our heap (in case we mess up with other tests)
-    // const START: Address = MEMORY_TEST_REGION.start;
-    lazy_static! {
-        static ref START: Address = memory_test_region().start;
-    }
+    const START: Address = MEMORY_TEST_REGION.start;
 
     #[test]
     fn test_mmap() {
@@ -485,17 +487,17 @@ mod tests {
             with_cleanup(
                 || {
                     let res = unsafe {
-                        dzmmap(*START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
+                        dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
                     };
                     assert!(res.is_ok());
                     // We can overwrite with dzmmap
                     let res = unsafe {
-                        dzmmap(*START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
+                        dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
                     };
                     assert!(res.is_ok());
                 },
                 || {
-                    assert!(munmap(*START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             );
         });
@@ -507,17 +509,17 @@ mod tests {
             with_cleanup(
                 || {
                     let res = dzmmap_noreplace(
-                        *START,
+                        START,
                         BYTES_IN_PAGE,
                         MmapStrategy::TEST,
                         mmap_anno_test!(),
                     );
                     assert!(res.is_ok());
-                    let res = munmap(*START, BYTES_IN_PAGE);
+                    let res = munmap(START, BYTES_IN_PAGE);
                     assert!(res.is_ok());
                 },
                 || {
-                    assert!(munmap(*START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -531,12 +533,12 @@ mod tests {
                 || {
                     // Make sure we mmapped the memory
                     let res = unsafe {
-                        dzmmap(*START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
+                        dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
                     };
                     assert!(res.is_ok());
                     // Use dzmmap_noreplace will fail
                     let res = dzmmap_noreplace(
-                        *START,
+                        START,
                         BYTES_IN_PAGE,
                         MmapStrategy::TEST,
                         mmap_anno_test!(),
@@ -544,7 +546,7 @@ mod tests {
                     assert!(res.is_err());
                 },
                 || {
-                    assert!(munmap(*START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             )
         });
@@ -555,21 +557,17 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let res = mmap_noreserve(
-                        *START,
-                        BYTES_IN_PAGE,
-                        MmapStrategy::TEST,
-                        mmap_anno_test!(),
-                    );
+                    let res =
+                        mmap_noreserve(START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!());
                     assert!(res.is_ok());
                     // Try reserve it
                     let res = unsafe {
-                        dzmmap(*START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
+                        dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST, mmap_anno_test!())
                     };
                     assert!(res.is_ok());
                 },
                 || {
-                    assert!(munmap(*START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -583,10 +581,10 @@ mod tests {
             with_cleanup(
                 || {
                     // We expect this call to panic
-                    panic_if_unmapped(*START, BYTES_IN_PAGE, mmap_anno_test!());
+                    panic_if_unmapped(START, BYTES_IN_PAGE, mmap_anno_test!());
                 },
                 || {
-                    assert!(munmap(*START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -598,16 +596,16 @@ mod tests {
             with_cleanup(
                 || {
                     assert!(dzmmap_noreplace(
-                        *START,
+                        START,
                         BYTES_IN_PAGE,
                         MmapStrategy::TEST,
                         mmap_anno_test!()
                     )
                     .is_ok());
-                    panic_if_unmapped(*START, BYTES_IN_PAGE, mmap_anno_test!());
+                    panic_if_unmapped(START, BYTES_IN_PAGE, mmap_anno_test!());
                 },
                 || {
-                    assert!(munmap(*START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -622,7 +620,7 @@ mod tests {
                 || {
                     // map 1 page from START
                     assert!(dzmmap_noreplace(
-                        *START,
+                        START,
                         BYTES_IN_PAGE,
                         MmapStrategy::TEST,
                         mmap_anno_test!(),
@@ -630,10 +628,10 @@ mod tests {
                     .is_ok());
 
                     // check if the next page is mapped - which should panic
-                    panic_if_unmapped(*START + BYTES_IN_PAGE, BYTES_IN_PAGE, mmap_anno_test!());
+                    panic_if_unmapped(START + BYTES_IN_PAGE, BYTES_IN_PAGE, mmap_anno_test!());
                 },
                 || {
-                    assert!(munmap(*START, BYTES_IN_PAGE * 2).is_ok());
+                    assert!(munmap(START, BYTES_IN_PAGE * 2).is_ok());
                 },
             )
         })
@@ -650,7 +648,7 @@ mod tests {
                 || {
                     // map 1 page from START
                     assert!(dzmmap_noreplace(
-                        *START,
+                        START,
                         BYTES_IN_PAGE,
                         MmapStrategy::TEST,
                         mmap_anno_test!()
@@ -658,10 +656,10 @@ mod tests {
                     .is_ok());
 
                     // check if the 2 pages from START are mapped. The second page is unmapped, so it should panic.
-                    panic_if_unmapped(*START, BYTES_IN_PAGE * 2, mmap_anno_test!());
+                    panic_if_unmapped(START, BYTES_IN_PAGE * 2, mmap_anno_test!());
                 },
                 || {
-                    assert!(munmap(*START, BYTES_IN_PAGE * 2).is_ok());
+                    assert!(munmap(START, BYTES_IN_PAGE * 2).is_ok());
                 },
             )
         })

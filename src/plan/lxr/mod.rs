@@ -53,21 +53,7 @@ impl SurvivalRatioPredictor {
         let curr = self.copy_promote_vol.load(Ordering::SeqCst) as f64
             / self.alloc_vol.load(Ordering::SeqCst) as f64;
         let curr = f64::min(curr, 1.0);
-        let ratio = if crate::args().survival_predictor_weighted {
-            if curr > prev {
-                (curr * 3f64 + prev) / 4f64
-            } else {
-                (curr + 3f64 * prev) / 4f64
-            }
-        } else if crate::args().survival_predictor_harmonic_mean {
-            if curr >= prev {
-                2f64 * curr * prev / (curr + prev)
-            } else {
-                (curr * curr + prev * prev) / (curr + prev)
-            }
-        } else {
-            (curr * 3f64 + prev) / 4f64
-        };
+        let ratio = (curr * 3f64 + prev) / 4f64;
         let ratio = f64::min(ratio, 1.0);
         self.prev_ratio.store(ratio, Ordering::SeqCst);
         self.alloc_vol.store(0, Ordering::SeqCst);

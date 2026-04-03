@@ -289,9 +289,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             let cls = unsafe { (o.to_raw_address() + 8usize).load::<u32>() };
             assert!(cls != 0, "ERROR {:?} rc={}", o, self.rc.count(o));
         }
-        if o.get_size::<VM>() >= crate::args().max_young_evac_size {
-            return true;
-        }
         false
     }
 
@@ -329,8 +326,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             new
         } else {
             let is_nursery = self.rc.count(o) == 0;
-            let copy_depth_reached = crate::args::INC_MAX_COPY_DEPTH && depth > 16;
-            if is_nursery && !self.no_evac && !copy_depth_reached {
+            if is_nursery && !self.no_evac {
                 // Evacuate the object
                 let new = object_forwarding::try_forward_object::<VM>(
                     o,
@@ -370,7 +366,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         &mut self,
         s: VM::VMSlot,
     ) -> Option<ObjectReference> {
-        debug_assert!(!crate::args::EAGER_INCREMENTS);
         let o = s.load();
         // unlog slot
         if K == EDGE_KIND_MATURE {

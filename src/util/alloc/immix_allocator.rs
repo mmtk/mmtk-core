@@ -93,9 +93,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
                 "{:?}: Thread local buffer used up, go to alloc slow path",
                 self.tls
             );
-            if (self.copy || !crate::args().no_mutator_line_recycling)
-                && get_maximum_aligned_size::<VM>(size, align) > Line::BYTES
-            {
+            if get_maximum_aligned_size::<VM>(size, align) > Line::BYTES {
                 // Size larger than a line: do large allocation
                 self.overflow_alloc(size, align, offset)
             } else {
@@ -254,12 +252,6 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 
     /// Get a recyclable block from ImmixSpace.
     fn acquire_recyclable_block(&mut self) -> bool {
-        if crate::args().no_mutator_line_recycling && !self.copy {
-            return false;
-        }
-        if crate::args().no_line_recycling {
-            return false;
-        }
         match self.immix_space().get_reusable_block(self.copy) {
             Some(block) => {
                 trace!("{:?}: acquire_recyclable_block -> {:?}", self.tls, block);
