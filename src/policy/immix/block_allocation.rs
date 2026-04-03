@@ -97,12 +97,7 @@ impl<VM: VMBinding> BlockAllocation<VM> {
         unsafe { *self.space.get() = space as *const ImmixSpace<VM> }
     }
 
-    pub fn reset_block_mark_for_mutator_reused_blocks(&self, pause: Pause) {
-        if cfg!(feature = "mutator_reused_block_state_bug") {
-            if pause == Pause::RefCount || pause == Pause::InitialMark {
-                return;
-            }
-        }
+    pub fn reset_block_mark_for_mutator_reused_blocks(&self, _pause: Pause) {
         // SATB sweep has problem scanning mutator recycled blocks.
         // Remaing the block state as "reusing" and reset them here.
         self.reused_blocks.visit_slice(|blocks| {
@@ -147,12 +142,7 @@ impl<VM: VMBinding> BlockAllocation<VM> {
     /// Reset allocated_block_buffer and free nursery blocks.
     pub fn sweep_nursery_blocks(&self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
         const PARALLEL_STW_SWEEPING: bool = false;
-        let max_stw_sweep_blocks: usize =
-            if cfg!(feature = "lxr_no_lazy") || pause == Pause::FinalMark || pause == Pause::Full {
-                usize::MAX
-            } else {
-                (num_cpus::get() << 20) >> Block::LOG_BYTES // 1M for each core
-            };
+        let max_stw_sweep_blocks: usize = usize::MAX;
         let space = self.space();
         // Sweep nursery blocks
         self.nursery_blocks.visit_slice(|blocks| {
