@@ -264,16 +264,8 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         if pause == Pause::FinalMark || pause == Pause::Full {
             VM::VMCollection::update_weak_processor(false);
         }
-        let perform_class_unloading = self.current_gc_should_perform_class_unloading();
-        if perform_class_unloading {
-            gc_log!([3] "    - class unloading");
-        }
         let t = std::time::SystemTime::now();
-        <VM as VMBinding>::VMCollection::vm_release(perform_class_unloading);
-        let elapsed = t.elapsed().unwrap().as_micros() as f64;
-        if perform_class_unloading {
-            gc_log!([3] "    - class unloading finished in {:.3} ms", elapsed / 1000.0);
-        }
+        <VM as VMBinding>::VMCollection::vm_release();
         self.common.los.is_end_of_satb_or_full_gc = false;
         self.common
             .release(tls, pause == Pause::Full || pause == Pause::FinalMark);
@@ -389,16 +381,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         // They can only be swept by mature sweeping.
         let _ = self.rc.inc(reference);
         let _ = self.rc.inc(referent);
-    }
-
-    fn current_gc_should_prepare_for_class_unloading(&self) -> bool {
-        let pause = self.current_pause().unwrap();
-        pause == Pause::InitialMark || pause == Pause::Full
-    }
-
-    fn current_gc_should_perform_class_unloading(&self) -> bool {
-        let pause = self.current_pause().unwrap();
-        pause == Pause::FinalMark || pause == Pause::Full
     }
 
     fn requires_weak_root_scanning(&self) -> bool {

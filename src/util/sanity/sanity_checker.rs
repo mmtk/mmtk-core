@@ -149,7 +149,6 @@ impl<P: Plan> SanityPrepare<P> {
 impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         Self::update_mark_state();
-        <P::VM as VMBinding>::VMCollection::clear_cld_claimed_marks();
         info!("Sanity GC prepare");
         {
             let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
@@ -250,7 +249,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
 
     #[cfg(feature = "fragmentation_analysis")]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        use crate::util::address::{CLDScanPolicy, RefScanPolicy};
+        use crate::util::address::RefScanPolicy;
         if self.attempt_mark(object) {
             let lxr = self
                 .mmtk()

@@ -237,24 +237,19 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
         const BULK_THREAD_SCAN: bool = true;
         let mut mutators: Vec<VMMutatorThread> = vec![];
         let mut n = 0;
-        <C::VM as VMBinding>::VMCollection::stop_all_mutators(
-            worker.tls,
-            |mutator| {
-                mutator.flush();
-                mutator.prepare(worker.tls);
-                if BULK_THREAD_SCAN {
-                    mutators.push(mutator.get_tls());
-                } else {
-                    // TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
-                    // Should we push to Unconstrained instead?
-                    mmtk.scheduler.work_buckets[WorkBucketStage::RCProcessIncs]
-                        .add(ScanMutatorRoots::<C>(mutator));
-                }
-                n += 1;
-            },
-            mmtk.get_plan()
-                .current_gc_should_prepare_for_class_unloading(),
-        );
+        <C::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
+            mutator.flush();
+            mutator.prepare(worker.tls);
+            if BULK_THREAD_SCAN {
+                mutators.push(mutator.get_tls());
+            } else {
+                // TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
+                // Should we push to Unconstrained instead?
+                mmtk.scheduler.work_buckets[WorkBucketStage::RCProcessIncs]
+                    .add(ScanMutatorRoots::<C>(mutator));
+            }
+            n += 1;
+        });
         mmtk.scheduler.set_in_gc_pause(true);
         gc_log!([3] "Discovered {} mutators", n);
         let is_lxr = mmtk.get_plan().downcast_ref::<LXR<C::VM>>().is_some();
@@ -526,22 +521,6 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanVMSpecificRoots<C> {
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum RootKind {
     Strong,
-    /// Some OpenJDK roots are slow to scan. We only collect newly created or modified ones in the previous mutator phase.
-    ///
-    /// Possible roots:
-    /// * Strong CLD roots
-    /// * Weak CLD roots (weak)
-    /// * CodeCache roots
-    /// * WeakHandle roots (weak)
-    ///
-    /// FOR LXR:
-    /// * Don't apply decrements to these roots
-    /// * Mark them at the start of SATB
-    /// * StrongCLD / CodeCache roots: for SATB correctness, collect the complete set of them at Initial/Final SATB pause, to make sure they are marked and forwarded properly.
-    /// * Mature evac: Add these roots to remset, so that any roots that is modified during the concurrent phase will be scanned.
-    StrongCLDRoots,
-    YoungStrongCLDRoots,
-    YoungWeakCLDRoots,
     YoungCodeCacheRoots,
     YoungWeakHandleRoots,
     /// JDK11 Only
@@ -551,8 +530,7 @@ pub enum RootKind {
 
 impl RootKind {
     pub fn should_record_remset(&self) -> bool {
-        matches!(self, RootKind::YoungWeakCLDRoots)
-            || matches!(self, RootKind::YoungWeakHandleRoots)
+        matches!(self, RootKind::YoungWeakHandleRoots)
             || matches!(self, RootKind::YoungCodeCacheRoots)
     }
 
@@ -565,9 +543,6 @@ impl RootKind {
 
     pub fn should_skip_decs(&self) -> bool {
         matches!(self, RootKind::YoungCodeCacheRoots)
-            || matches!(self, RootKind::StrongCLDRoots)
-            || matches!(self, RootKind::YoungStrongCLDRoots)
-            || matches!(self, RootKind::YoungWeakCLDRoots)
             || matches!(self, RootKind::YoungWeakHandleRoots)
             || matches!(self, RootKind::MatureWeakRoots)
             || matches!(self, RootKind::Weak)
@@ -980,7 +955,6 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         worker: &mut GCWorker<<Self::E as ProcessEdgesWork>::VM>,
         mmtk: &'static MMTK<<Self::E as ProcessEdgesWork>::VM>,
         should_discover_reference: bool,
-        should_claim_and_scan_clds: bool,
     ) {
         let tls = worker.tls;
 
@@ -992,7 +966,6 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
             let mut closure = ObjectsClosure::<Self::E>::new(
                 worker,
                 should_discover_reference,
-                should_claim_and_scan_clds,
                 self.get_bucket(),
             );
 
@@ -1067,7 +1040,6 @@ pub struct ScanObjects<Edges: ProcessEdgesWork> {
     concurrent: bool,
     phantom: PhantomData<Edges>,
     pub discovery: bool,
-    claim_and_scan_clds: bool,
     bucket: WorkBucketStage,
 }
 
@@ -1076,7 +1048,6 @@ impl<Edges: ProcessEdgesWork> ScanObjects<Edges> {
         buffer: Vec<ObjectReference>,
         concurrent: bool,
         discovery: bool,
-        claim_and_scan_clds: bool,
         bucket: WorkBucketStage,
     ) -> Self {
         Self {
@@ -1084,7 +1055,6 @@ impl<Edges: ProcessEdgesWork> ScanObjects<Edges> {
             concurrent,
             phantom: PhantomData,
             discovery,
-            claim_and_scan_clds,
             bucket,
         }
     }
@@ -1105,13 +1075,7 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>> ScanObjectsWork<VM> for ScanOb
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanObjects");
-        self.do_work_common(
-            &self.buffer,
-            worker,
-            mmtk,
-            self.discovery,
-            self.claim_and_scan_clds,
-        );
+        self.do_work_common(&self.buffer, worker, mmtk, self.discovery);
         trace!("ScanObjects End");
     }
 }
@@ -1150,7 +1114,7 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
     }
 
     fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Self::ScanObjectsWorkType {
-        PlanScanObjects::<Self, P>::new(self.plan, nodes, false, false, false, self.bucket)
+        PlanScanObjects::<Self, P>::new(self.plan, nodes, false, false, self.bucket)
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
@@ -1198,7 +1162,6 @@ pub struct PlanScanObjects<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceO
     #[allow(dead_code)]
     concurrent: bool,
     discover_refs: bool,
-    claim_and_scan_clds: bool,
     bucket: WorkBucketStage,
     _p: PhantomData<E>,
 }
@@ -1209,7 +1172,6 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> PlanScan
         buffer: Vec<ObjectReference>,
         concurrent: bool,
         discover_refs: bool,
-        claim_and_scan_clds: bool,
         bucket: WorkBucketStage,
     ) -> Self {
         Self {
@@ -1217,7 +1179,6 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> PlanScan
             buffer,
             concurrent,
             discover_refs,
-            claim_and_scan_clds,
             bucket,
             _p: PhantomData,
         }
@@ -1243,13 +1204,7 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> GCWork<E
 {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("PlanScanObjects");
-        self.do_work_common(
-            &self.buffer,
-            worker,
-            mmtk,
-            self.discover_refs,
-            self.claim_and_scan_clds,
-        );
+        self.do_work_common(&self.buffer, worker, mmtk, self.discover_refs);
         trace!("PlanScanObjects End");
     }
 }

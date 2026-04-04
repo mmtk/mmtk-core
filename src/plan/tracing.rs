@@ -4,8 +4,7 @@
 use std::marker::PhantomData;
 
 use crate::scheduler::gc_work::{ProcessEdgesWork, SlotOf};
-use crate::scheduler::{GCWorker, WorkBucketStage};
-use crate::util::Address;
+use crate::scheduler::{GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
 use crate::util::{ObjectReference, VMThread, VMWorkerThread};
 use crate::vm::{Scanning, SlotVisitor, VMBinding};
 
@@ -34,7 +33,7 @@ impl<T: Clone> VectorQueue<T> {
 
 impl<T> VectorQueue<T> {
     /// Reserve a capacity of this on first enqueue to avoid frequent resizing.
-    const CAPACITY: usize = crate::args::BUFFER_SIZE;
+    const CAPACITY: usize = EDGES_WORK_BUFFER_SIZE;
 
     /// Create an empty `VectorObjectQueue`.
     pub fn new() -> Self {
@@ -107,7 +106,6 @@ pub struct ObjectsClosure<'a, E: ProcessEdgesWork> {
     buffer: VectorQueue<SlotOf<E>>,
     pub(crate) worker: &'a mut GCWorker<E::VM>,
     should_discover_references: bool,
-    should_claim_and_scan_clds: bool,
     bucket: WorkBucketStage,
 }
 
@@ -120,14 +118,12 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
     pub fn new(
         worker: &'a mut GCWorker<E::VM>,
         should_discover_references: bool,
-        should_claim_and_scan_clds: bool,
         bucket: WorkBucketStage,
     ) -> Self {
         Self {
             buffer: VectorQueue::new(),
             worker,
             should_discover_references,
-            should_claim_and_scan_clds,
             bucket,
         }
     }
@@ -147,13 +143,7 @@ impl<E: ProcessEdgesWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'_, E> {
     fn should_discover_references(&self) -> bool {
         self.should_discover_references
     }
-    fn should_claim_clds(&self) -> bool {
-        self.should_claim_and_scan_clds
-    }
-    fn should_follow_clds(&self) -> bool {
-        self.should_claim_and_scan_clds
-    }
-    fn visit_slot(&mut self, slot: SlotOf<E>, _out_of_heap: bool) {
+    fn visit_slot(&mut self, slot: SlotOf<E>) {
         #[cfg(debug_assertions)]
         {
             use crate::vm::slot::Slot;
@@ -179,28 +169,18 @@ impl<E: ProcessEdgesWork> Drop for ObjectsClosure<'_, E> {
     }
 }
 
-struct SlotIteratorImpl<VM: VMBinding, F: FnMut(VM::VMSlot, bool)> {
+struct SlotIteratorImpl<VM: VMBinding, F: FnMut(VM::VMSlot)> {
     f: F,
     should_discover_references: bool,
-    should_claim_clds: bool,
-    should_follow_clds: bool,
     _p: PhantomData<VM>,
 }
 
-impl<VM: VMBinding, F: FnMut(VM::VMSlot, bool)> SlotVisitor<VM::VMSlot>
-    for SlotIteratorImpl<VM, F>
-{
+impl<VM: VMBinding, F: FnMut(VM::VMSlot)> SlotVisitor<VM::VMSlot> for SlotIteratorImpl<VM, F> {
     fn should_discover_references(&self) -> bool {
         self.should_discover_references
     }
-    fn should_claim_clds(&self) -> bool {
-        self.should_claim_clds
-    }
-    fn should_follow_clds(&self) -> bool {
-        self.should_follow_clds
-    }
-    fn visit_slot(&mut self, slot: VM::VMSlot, out_of_heap: bool) {
-        (self.f)(slot, out_of_heap);
+    fn visit_slot(&mut self, slot: VM::VMSlot) {
+        (self.f)(slot);
     }
 }
 
@@ -216,32 +196,18 @@ impl<VM: VMBinding> SlotIterator<VM> {
     pub fn iterate(
         o: ObjectReference,
         should_discover_references: bool,
-        should_claim_clds: bool,
-        should_follow_clds: bool,
-        f: impl FnMut(VM::VMSlot, bool),
-        klass: Option<Address>,
+        f: impl FnMut(VM::VMSlot),
     ) {
         let mut x = SlotIteratorImpl::<VM, _> {
             f,
             should_discover_references,
-            should_claim_clds,
-            should_follow_clds,
             _p: PhantomData,
         };
-        if let Some(klass) = klass {
-            <VM::VMScanning as Scanning<VM>>::scan_object_with_klass(
-                VMWorkerThread(VMThread::UNINITIALIZED),
-                o,
-                &mut x,
-                klass,
-            );
-        } else {
-            <VM::VMScanning as Scanning<VM>>::scan_object(
-                VMWorkerThread(VMThread::UNINITIALIZED),
-                o,
-                &mut x,
-            );
-        }
+        <VM::VMScanning as Scanning<VM>>::scan_object(
+            VMWorkerThread(VMThread::UNINITIALIZED),
+            o,
+            &mut x,
+        );
     }
 
     /// Iterate over the slots of an object by applying a function to each slot.

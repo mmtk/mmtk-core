@@ -6,7 +6,7 @@ use crate::policy::immix::line::Line;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::{ScanObjects, SlotOf};
 use crate::scheduler::RootKind;
-use crate::util::address::{CLDScanPolicy, RefScanPolicy};
+use crate::util::address::RefScanPolicy;
 use crate::util::copy::CopySemantics;
 use crate::util::rc::RefCountHelper;
 use crate::util::{Address, ObjectReference};
@@ -199,28 +199,21 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
     }
 
     fn scan_and_enqueue<const CHECK_REMSET: bool>(&mut self, object: ObjectReference) {
-        object.iterate_fields::<VM, _>(
-            CLDScanPolicy::Claim,
-            RefScanPolicy::Discover,
-            |s, out_of_heap| {
-                let Some(t) = s.load() else {
-                    return;
-                };
-                if crate::args::RC_MATURE_EVACUATION
-                    && (CHECK_REMSET || out_of_heap)
-                    && self.plan.in_defrag(t)
-                {
-                    self.plan
-                        .immix_space
-                        .mature_evac_remset
-                        .record(s, t, self.plan);
-                }
-                self.next_objects.push(t);
-                if self.next_objects.len() > Self::SATB_BUFFER_SIZE {
-                    self.flush_objs();
-                }
-            },
-        );
+        object.iterate_fields::<VM, _>(RefScanPolicy::Discover, |s| {
+            let Some(t) = s.load() else {
+                return;
+            };
+            if crate::args::RC_MATURE_EVACUATION && CHECK_REMSET && self.plan.in_defrag(t) {
+                self.plan
+                    .immix_space
+                    .mature_evac_remset
+                    .record(s, t, self.plan);
+            }
+            self.next_objects.push(t);
+            if self.next_objects.len() > Self::SATB_BUFFER_SIZE {
+                self.flush_objs();
+            }
+        });
     }
 }
 
@@ -647,23 +640,19 @@ impl<VM: VMBinding, const FULL_GC: bool> ObjectQueue for LXRStopTheWorldProcessE
             }
             ObjectKind::ValArray => {}
             _ => {
-                object.iterate_fields::<VM, _>(
-                    CLDScanPolicy::Claim,
-                    RefScanPolicy::Discover,
-                    |s, _| {
-                        let Some(o) = s.load() else {
-                            return;
-                        };
-                        if self.lxr.is_marked(o) && !self.lxr.in_defrag(o) {
-                            return;
-                        }
-                        self.next_slots.push(s);
-                        self.next_slot_count += 1;
-                        if self.next_slot_count as usize >= limit {
-                            self.flush();
-                        }
-                    },
-                );
+                object.iterate_fields::<VM, _>(RefScanPolicy::Discover, |s| {
+                    let Some(o) = s.load() else {
+                        return;
+                    };
+                    if self.lxr.is_marked(o) && !self.lxr.in_defrag(o) {
+                        return;
+                    }
+                    self.next_slots.push(s);
+                    self.next_slot_count += 1;
+                    if self.next_slot_count as usize >= limit {
+                        self.flush();
+                    }
+                });
             }
         }
     }
@@ -773,7 +762,7 @@ impl<VM: VMBinding> ProcessEdgesWork for LXRWeakRefProcessEdges<VM> {
 
 impl<VM: VMBinding> ObjectQueue for LXRWeakRefProcessEdges<VM> {
     fn enqueue(&mut self, object: ObjectReference) {
-        object.iterate_fields::<VM, _>(CLDScanPolicy::Claim, RefScanPolicy::Follow, |s, _| {
+        object.iterate_fields::<VM, _>(RefScanPolicy::Follow, |s| {
             self.next_slots.push(s);
             if self.next_slots.is_full() {
                 self.flush();

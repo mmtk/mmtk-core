@@ -769,13 +769,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         false
     }
 
-    fn do_class_unloading(&self, mmtk: &MMTK<VM>) {
-        let perform_class_unloading = mmtk.get_plan().current_gc_should_perform_class_unloading();
+    fn do_vm_release(&self, mmtk: &MMTK<VM>) {
         if mmtk.get_plan().downcast_ref::<LXR<VM>>().is_none() {
-            if perform_class_unloading {
-                gc_log!([3] "    - class unloading");
-            }
-            <VM as VMBinding>::VMCollection::vm_release(perform_class_unloading);
+            <VM as VMBinding>::VMCollection::vm_release();
         }
     }
 
@@ -843,7 +839,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.close_all_stw_buckets();
         self.debug_assert_all_stw_buckets_closed();
 
-        self.do_class_unloading(worker.mmtk);
+        self.do_vm_release(worker.mmtk);
         self.dump_gc_stats(worker.mmtk);
 
         let mmtk = worker.mmtk;

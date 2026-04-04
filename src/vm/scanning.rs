@@ -2,7 +2,6 @@ use crate::plan::Mutator;
 use crate::scheduler::gc_work::RootKind;
 use crate::scheduler::GCWorker;
 use crate::scheduler::WorkBucketStage;
-use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMMutatorThread;
 use crate::util::VMWorkerThread;
@@ -14,14 +13,8 @@ pub trait SlotVisitor<SL: Slot> {
     fn should_discover_references(&self) -> bool {
         true
     }
-    fn should_follow_clds(&self) -> bool {
-        true
-    }
-    fn should_claim_clds(&self) -> bool {
-        true
-    }
     /// Call this function for each slot.
-    fn visit_slot(&mut self, slot: SL, _out_of_heap: bool);
+    fn visit_slot(&mut self, slot: SL);
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -33,7 +26,7 @@ pub enum ObjectKind {
 
 /// This lets us use closures as SlotVisitor.
 impl<SL: Slot, F: FnMut(SL)> SlotVisitor<SL> for F {
-    fn visit_slot(&mut self, slot: SL, _out_of_heap: bool) {
+    fn visit_slot(&mut self, slot: SL) {
         #[cfg(debug_assertions)]
         trace!(
             "(FunctionClosure) Visit slot {:?} (pointing to {:?})",
@@ -219,13 +212,6 @@ pub trait Scanning<VM: VMBinding> {
         tls: VMWorkerThread,
         object: ObjectReference,
         slot_visitor: &mut impl SlotVisitor<VM::VMSlot>,
-    );
-
-    fn scan_object_with_klass(
-        tls: VMWorkerThread,
-        object: ObjectReference,
-        slot_visitor: &mut impl SlotVisitor<VM::VMSlot>,
-        klass: Address,
     );
 
     /// Delegated scanning of a object, visiting each reference field encountered, and tracing the

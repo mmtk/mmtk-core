@@ -13,15 +13,6 @@ pub enum GCThreadContext<VM: VMBinding> {
 
 /// VM-specific methods for garbage collection.
 pub trait Collection<VM: VMBinding> {
-    /// If true, only the coordinator thread can call stop_all_mutators and the resume_mutators methods.
-    /// If false, any GC thread can call these methods.
-    ///
-    /// This constant exists because some VMs require the thread that resumes a thread to be the same thread that
-    /// stopped it.  The MMTk Core will use the appropriate thread to stop or start the world according to the value of
-    /// this constant.  If a VM does not have such a requirement, the VM binding shall set this to false to reduce an
-    /// unnecessary context switch.
-    const COORDINATOR_ONLY_STW: bool = true;
-
     /// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a GC.
     /// This method should not return until all the threads are yielded.
     /// The actual thread synchronization mechanism is up to the VM, and MMTk does not make assumptions on that.
@@ -31,11 +22,8 @@ pub trait Collection<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The thread pointer for the GC worker.
     /// * `mutator_visitor`: A callback.  Call it with a mutator as argument to notify MMTk that the mutator is ready to be scanned.
-    fn stop_all_mutators<F>(
-        tls: VMWorkerThread,
-        mutator_visitor: F,
-        current_gc_should_unload_classes: bool,
-    ) where
+    fn stop_all_mutators<F>(tls: VMWorkerThread, mutator_visitor: F)
+    where
         F: FnMut(&'static mut Mutator<VM>);
 
     /// Resume all the mutator threads, the opposite of the above. When a GC is finished, MMTk calls this method.
@@ -101,8 +89,6 @@ pub trait Collection<VM: VMBinding> {
 
     fn update_weak_processor(_lxr: bool) {}
 
-    fn clear_cld_claimed_marks() {}
-
     fn set_concurrent_marking_state(_active: bool) {}
 
     /// A hook for the VM to do work after forwarding objects.
@@ -129,7 +115,7 @@ pub trait Collection<VM: VMBinding> {
     fn post_forwarding(_tls: VMWorkerThread) {}
 
     /// Inform the VM to do its VM-specific release work at the end of a GC.
-    fn vm_release(_do_unloading: bool) {}
+    fn vm_release() {}
 
     /// Return the amount of memory (in bytes) which the VM allocated outside the MMTk heap but
     /// wants to include into the current MMTk heap size.  MMTk core will consider the reported

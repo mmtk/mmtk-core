@@ -359,14 +359,6 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         false
     }
 
-    fn current_gc_should_prepare_for_class_unloading(&self) -> bool {
-        true
-    }
-
-    fn current_gc_should_perform_class_unloading(&self) -> bool {
-        true
-    }
-
     fn requires_weak_root_scanning(&self) -> bool {
         self.generational().is_some()
     }

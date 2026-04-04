@@ -777,48 +777,13 @@ impl ObjectReference {
         VM::VMObjectModel::get_class_pointer(self)
     }
 
-    pub fn iterate_fields<VM: VMBinding, F: FnMut(VM::VMSlot, bool)>(
+    pub fn iterate_fields<VM: VMBinding, F: FnMut(VM::VMSlot)>(
         self,
-        cld_scan: CLDScanPolicy,
         ref_scan: RefScanPolicy,
         f: F,
     ) {
-        SlotIterator::<VM>::iterate(
-            self,
-            ref_scan == RefScanPolicy::Discover,
-            cld_scan == CLDScanPolicy::Claim,
-            cld_scan != CLDScanPolicy::Ignore,
-            f,
-            None,
-        )
+        SlotIterator::<VM>::iterate(self, ref_scan == RefScanPolicy::Discover, f)
     }
-
-    pub fn iterate_fields_with_klass<VM: VMBinding, F: FnMut(VM::VMSlot, bool)>(
-        self,
-        cld_scan: CLDScanPolicy,
-        ref_scan: RefScanPolicy,
-        klass: Address,
-        f: F,
-    ) {
-        SlotIterator::<VM>::iterate(
-            self,
-            ref_scan == RefScanPolicy::Discover,
-            cld_scan == CLDScanPolicy::Claim,
-            cld_scan != CLDScanPolicy::Ignore,
-            f,
-            Some(klass),
-        )
-    }
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum CLDScanPolicy {
-    /// Don't scan CLDs
-    Ignore,
-    /// Scan CLDs
-    Follow,
-    /// Scan and mark CLDs. CLDs that are previously marked will be ignored.
-    Claim,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]

@@ -17,7 +17,6 @@ use crate::plan::lxr::rc::ProcessIncs;
 use crate::plan::lxr::rc::EDGE_KIND_MATURE;
 use crate::plan::VectorQueue;
 use crate::scheduler::WorkBucketStage;
-use crate::util::address::CLDScanPolicy;
 use crate::util::address::RefScanPolicy;
 use crate::util::metadata::side_metadata::address_to_meta_address;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
@@ -252,7 +251,7 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
     }
 
     fn object_probable_write_slow(&mut self, obj: ObjectReference) {
-        obj.iterate_fields::<VM, _>(CLDScanPolicy::Ignore, RefScanPolicy::Follow, |s, _| {
+        obj.iterate_fields::<VM, _>(RefScanPolicy::Follow, |s| {
             let _succ = self.enqueue_node(Some(obj), s, None);
         });
     }

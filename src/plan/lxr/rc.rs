@@ -7,7 +7,6 @@ use crate::policy::immix::block::BlockState;
 use crate::scheduler::gc_work::RootKind;
 use crate::scheduler::gc_work::ScanObjects;
 use crate::scheduler::gc_work::SlotOf;
-use crate::util::address::CLDScanPolicy;
 use crate::util::address::RefScanPolicy;
 use crate::util::copy::CopySemantics;
 use crate::util::copy::GCWorkerCopyContext;
@@ -216,7 +215,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
         } else if !is_val_array {
             let obj_in_defrag = !los && Block::in_defrag_block::<VM>(o);
-            o.iterate_fields::<VM, _>(CLDScanPolicy::Ignore, RefScanPolicy::Follow, |slot, _| {
+            o.iterate_fields::<VM, _>(RefScanPolicy::Follow, |slot| {
                 let Some(target) = slot.load() else {
                     return;
                 };
@@ -623,7 +622,6 @@ pub struct ProcessDecs<VM: VMBinding> {
     counter: LazySweepingJobsCounter,
     mark_objects: VectorQueue<ObjectReference>,
     mark_dead_objects: bool,
-    cld_policy: CLDScanPolicy,
     mature_sweeping_in_progress: bool,
     rc: RefCountHelper<VM>,
 }
@@ -643,7 +641,6 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             counter,
             mark_objects: VectorQueue::default(),
             mark_dead_objects: false,
-            cld_policy: CLDScanPolicy::Ignore,
             mature_sweeping_in_progress: false,
             rc: RefCountHelper::NEW,
         }
@@ -657,7 +654,6 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             counter,
             mark_objects: VectorQueue::default(),
             mark_dead_objects: false,
-            cld_policy: CLDScanPolicy::Ignore,
             mature_sweeping_in_progress: false,
             rc: RefCountHelper::NEW,
         }
@@ -715,38 +711,30 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             lxr.mark(o);
         }
         // Recursively decrease field ref counts
-        o.iterate_fields::<VM, _>(
-            self.cld_policy,
-            RefScanPolicy::Follow,
-            |slot, out_of_heap| {
-                if let Some(x) = slot.load() {
-                    // println!(" -- rec dec {:?}.{:?} -> {:?}", o, slot, x);
-                    if !out_of_heap {
-                        let rc = self.rc.count(x);
-                        if rc != MAX_REF_COUNT && rc != 0 {
-                            self.recursive_dec(x);
-                        }
-                    } else {
-                        self.record_mature_evac_remset(lxr, slot, x);
+        o.iterate_fields::<VM, _>(RefScanPolicy::Follow, |slot| {
+            if let Some(x) = slot.load() {
+                // println!(" -- rec dec {:?}.{:?} -> {:?}", o, slot, x);
+                let rc = self.rc.count(x);
+                if rc != MAX_REF_COUNT && rc != 0 {
+                    self.recursive_dec(x);
+                }
+                if self.mark_dead_objects && !lxr.is_marked(x) {
+                    if cfg!(any(feature = "sanity", debug_assertions)) {
+                        assert!(
+                            x.to_raw_address().is_mapped(),
+                            "Invalid object {:?}.{:?} -> {:?}: address is not mapped",
+                            o,
+                            slot,
+                            x
+                        );
                     }
-                    if self.mark_dead_objects && !lxr.is_marked(x) {
-                        if cfg!(any(feature = "sanity", debug_assertions)) {
-                            assert!(
-                                x.to_raw_address().is_mapped(),
-                                "Invalid object {:?}.{:?} -> {:?}: address is not mapped",
-                                o,
-                                slot,
-                                x
-                            );
-                        }
-                        self.mark_objects.push(x);
-                        if self.mark_objects.is_full() {
-                            self.flush();
-                        }
+                    self.mark_objects.push(x);
+                    if self.mark_objects.is_full() {
+                        self.flush();
                     }
                 }
-            },
-        );
+            }
+        });
         let in_ix_space = lxr.immix_space.in_space(o);
         if in_ix_space {
             self.rc.unmark_straddle_object(o);
