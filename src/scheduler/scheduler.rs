@@ -483,14 +483,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             let verbose = crate::verbose(3);
             if verbose && bucket_opened {
                 if verbose {
-                    gc_log!([3]
-                        " - ({:.3}ms) Start GC Stage: {:?}",
-                        crate::GC_START_TIME
-                            .elapsed()
-                            .as_nanos() as f64
-                            / 1000000f64,
-                        id
-                    );
+                    gc_log!([3] " - Start GC Stage: {:?}", id);
                 }
             }
             buckets_updated = buckets_updated || bucket_opened;
@@ -772,7 +765,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     fn dump_gc_stats(&self, mmtk: &MMTK<VM>) {
-        let pause_time = crate::GC_START_TIME.elapsed();
         let pause = mmtk
             .get_plan()
             .downcast_ref::<LXR<VM>>()
@@ -786,7 +778,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             crate::policy::immix::immixspace::RELEASED_NURSERY_BLOCKS.store(0, Ordering::SeqCst);
             crate::policy::immix::immixspace::RELEASED_BLOCKS.store(0, Ordering::SeqCst);
 
-            let pause_time = pause_time.as_micros() as f64 / 1000f64;
             let pause_s = match pause {
                 Pause::RefCount => "RefCount",
                 Pause::InitialMark => "InitialMark",
@@ -794,17 +785,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 _ => "Full",
             };
             gc_log!([2]
-                "GC({}) {} finished. {}M->{}M({}M) used={}M pause-time={:.3}ms",
+                "GC({}) {} finished. {}M({}M) used={}M",
                 crate::GC_EPOCH.load(Ordering::SeqCst),
                 pause_s,
-                crate::RESERVED_PAGES_AT_GC_START.load(Ordering::SeqCst) / 256,
                 mmtk.get_plan().get_reserved_pages() / 256,
                 mmtk.get_plan().get_total_pages() / 256,
                 mmtk.get_plan().get_used_pages() / 256,
-                pause_time
             );
-            crate::RESERVED_PAGES_AT_GC_END
-                .store(mmtk.get_plan().get_reserved_pages(), Ordering::SeqCst);
         }
     }
 
@@ -938,7 +925,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // opening the first STW bucket.  In the future, we should redesign the opening condition
         // of work buckets to make the synchronization more robust,
         first_stw_bucket.open();
-        gc_log!([3] " - ({:.3}ms) Start GC Stage: {:?}", crate::gc_start_time_ms(), WorkBucketStage::FIRST_STW_STAGE);
+        gc_log!([3] " - Start GC Stage: {:?}", WorkBucketStage::FIRST_STW_STAGE);
         if first_stw_bucket.is_empty()
             && self.worker_monitor.parked.load(Ordering::SeqCst) + 1 == self.num_workers()
             && crate::concurrent_marking_packets_drained()
@@ -948,7 +935,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 WorkBucketStage::from_usize(WorkBucketStage::FIRST_STW_STAGE.into_usize() + 1);
             let second_stw_bucket = &self.work_buckets[second_stw_stage];
             second_stw_bucket.open();
-            gc_log!([3] " - ({:.3}ms) Start GC Stage: {:?}", crate::gc_start_time_ms(), second_stw_stage);
+            gc_log!([3] " - Start GC Stage: {:?}", second_stw_stage);
         }
         self.worker_monitor.notify_work_available(true);
     }

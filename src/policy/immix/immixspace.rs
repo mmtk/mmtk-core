@@ -602,7 +602,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.block_allocation
             .reset_block_mark_for_mutator_reused_blocks(pause);
         if pause == Pause::FinalMark {
-            crate::REMSET_RECORDING.store(false, Ordering::SeqCst);
             self.is_end_of_satb_or_full_gc = true;
         } else if pause == Pause::Full {
             self.is_end_of_satb_or_full_gc = true;

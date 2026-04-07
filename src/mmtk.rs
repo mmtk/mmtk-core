@@ -334,7 +334,6 @@ impl<VM: VMBinding> MMTK<VM> {
         self.state.inside_harness.store(true, Ordering::SeqCst);
         self.stats.start_all();
         self.scheduler.enable_stat();
-        crate::INSIDE_HARNESS.store(true, Ordering::SeqCst);
     }
 
     /// Generic hook to allow benchmarks to be harnessed. MMTk will stop collecting
@@ -342,7 +341,6 @@ impl<VM: VMBinding> MMTK<VM> {
     /// This is usually called by the benchmark harness right after the actual benchmark.
     pub fn harness_end(&'static self) {
         self.stats.stop_all(self);
-        crate::INSIDE_HARNESS.store(false, Ordering::SeqCst);
         self.state.inside_harness.store(false, Ordering::SeqCst);
         probe!(mmtk, harness_end);
     }

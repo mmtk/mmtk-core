@@ -17,7 +17,6 @@ pub struct ScheduleCollection;
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        crate::GC_TRIGGER_TIME.start();
         crate::GC_EPOCH.fetch_add(1, Ordering::SeqCst);
         // Tell GC trigger that GC started.
         mmtk.gc_trigger.policy.on_gc_start(mmtk);
@@ -266,11 +265,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
             }
         }
         trace!("stop_all_mutators end");
-        if crate::verbose(2) {
-            crate::RESERVED_PAGES_AT_GC_START
-                .store(mmtk.get_plan().get_reserved_pages(), Ordering::SeqCst);
-        }
-        gc_log!([3] " - ({:.3}ms) Mutators stopped", crate::gc_start_time_ms());
+        gc_log!([3] " - Mutators stopped");
         #[cfg(feature = "sanity")]
         mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
         mmtk.get_plan().gc_pause_start(&mmtk.scheduler);

@@ -26,18 +26,9 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::slot::MemorySlice;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
-use std::time::Instant;
 
 pub fn report_gc_start<VM: VMBinding>(mmtk: &MMTK<VM>) {
-    let t = Instant::now();
     mmtk.stats.start_gc();
-
-    gc_log!([3]
-        " - ({:.3}ms) Safepoint start. {:.6}ms since gc was triggered",
-        0f64,
-        crate::gc_trigger_time_ms(),
-    );
-    crate::GC_START_TIME.set(t);
 }
 
 use std::collections::HashMap;

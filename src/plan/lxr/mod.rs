@@ -22,14 +22,12 @@ pub static SURVIVAL_RATIO_PREDICTOR: SurvivalRatioPredictor = SurvivalRatioPredi
     prev_ratio: Atomic::new(0.01),
     alloc_vol: AtomicUsize::new(0),
     copy_promote_vol: AtomicUsize::new(0),
-    pause_start: crate::Timer::new(),
 };
 
 pub struct SurvivalRatioPredictor {
     prev_ratio: Atomic<f64>,
     alloc_vol: AtomicUsize,
     copy_promote_vol: AtomicUsize,
-    pub(crate) pause_start: crate::Timer,
 }
 
 impl SurvivalRatioPredictor {

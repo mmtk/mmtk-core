@@ -316,7 +316,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
                 .block_allocation
                 .total_young_allocation_in_bytes(),
         );
-        super::SURVIVAL_RATIO_PREDICTOR.pause_start.start();
         self.immix_space.rc_eager_prepare(pause);
 
         for mutator in <VM as VMBinding>::VMActivePlan::mutators() {
@@ -334,7 +333,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         let pause = self.current_pause().unwrap();
         if pause == Pause::InitialMark {
             self.set_concurrent_marking_state(true);
-            crate::REMSET_RECORDING.store(true, Ordering::SeqCst);
         }
         self.previous_pause.store(Some(pause), Ordering::SeqCst);
         self.current_pause.store(None, Ordering::SeqCst);
@@ -780,10 +778,6 @@ impl<VM: VMBinding> LXR<VM> {
     }
 
     fn on_lazy_decs_finished(&self, c: LazySweepingJobsCounter) {
-        gc_log!([2]
-            " - lazy decs finished since-gc-start={:.3}ms",
-            crate::gc_start_time_ms(),
-        );
         self.immix_space.schedule_rc_block_sweeping_tasks(c);
     }
 
@@ -795,8 +789,7 @@ impl<VM: VMBinding> LXR<VM> {
         let total_released_bytes =
             (released_blocks << Block::LOG_BYTES) + (released_los_pages << LOG_BYTES_IN_PAGE);
         gc_log!([2]
-            " - lazy jobs finished since-gc-start={:.3}ms, current-reserved-heap={}M({}M), released-blocks={}, released-los-pages={}, total-released={}",
-            crate::gc_start_time_ms(),
+            " - lazy jobs finished current-reserved-heap={}M({}M), released-blocks={}, released-los-pages={}, total-released={}",
             self.get_reserved_pages() / 256,
             self.get_total_pages() / 256,
             released_blocks,

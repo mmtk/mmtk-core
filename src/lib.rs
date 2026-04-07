@@ -191,46 +191,8 @@ fn disable_lasy_dec_for_current_gc() -> bool {
     crate::DISABLE_LASY_DEC_FOR_CURRENT_GC.load(Ordering::SeqCst)
 }
 
-#[derive(Debug)]
-#[repr(C)]
-pub(crate) struct Timer(UnsafeCell<Option<Instant>>);
-
-impl Timer {
-    const fn new() -> Self {
-        Self(UnsafeCell::new(None))
-    }
-
-    pub fn set(&self, instant: Instant) {
-        unsafe {
-            *self.0.get() = Some(instant);
-        }
-    }
-
-    pub fn start(&self) {
-        unsafe {
-            *self.0.get() = Some(Instant::now());
-        }
-    }
-}
-
-unsafe impl Sync for Timer {}
-
-impl Deref for Timer {
-    type Target = Instant;
-
-    fn deref(&self) -> &Self::Target {
-        let v = unsafe { &*self.0.get() };
-        v.as_ref().unwrap()
-    }
-}
-
-static GC_TRIGGER_TIME: Timer = Timer::new();
-static GC_START_TIME: Timer = Timer::new();
 static BOOT_TIME: spin::Lazy<SystemTime> = spin::Lazy::new(SystemTime::now);
 static GC_EPOCH: AtomicUsize = AtomicUsize::new(0);
-static RESERVED_PAGES_AT_GC_START: AtomicUsize = AtomicUsize::new(0);
-static RESERVED_PAGES_AT_GC_END: AtomicUsize = AtomicUsize::new(0);
-static INSIDE_HARNESS: AtomicBool = AtomicBool::new(false);
 static PAUSE_CONCURRENT_MARKING: AtomicBool = AtomicBool::new(false);
 static MOVE_CONCURRENT_MARKING_TO_STW: AtomicBool = AtomicBool::new(false);
 
@@ -238,20 +200,7 @@ fn boot_time_secs() -> f64 {
     crate::BOOT_TIME.elapsed().unwrap().as_millis() as f64 / 1000f64
 }
 
-fn gc_trigger_time_ms() -> f64 {
-    crate::GC_TRIGGER_TIME.elapsed().as_micros() as f64 / 1000f64
-}
-
-fn gc_start_time_ms() -> f64 {
-    crate::GC_START_TIME.elapsed().as_micros() as f64 / 1000f64
-}
-
-#[allow(unused)]
-fn inside_harness() -> bool {
-    crate::INSIDE_HARNESS.load(Ordering::Relaxed)
-}
 static NO_EVAC: AtomicBool = AtomicBool::new(false);
-static REMSET_RECORDING: AtomicBool = AtomicBool::new(false);
 
 pub(crate) fn args() -> &'static crate::args::RuntimeArgs {
     crate::args::RuntimeArgs::get()
