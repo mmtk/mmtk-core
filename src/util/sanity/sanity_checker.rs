@@ -249,7 +249,6 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
 
     #[cfg(feature = "fragmentation_analysis")]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        use crate::util::address::RefScanPolicy;
         if self.attempt_mark(object) {
             let lxr = self
                 .mmtk()
@@ -370,8 +369,6 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
     }
 
     fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Self::ScanObjectsWorkType {
-        let mut x = ScanObjects::<Self>::new(nodes, false, false, false, WorkBucketStage::Closure);
-        x.discovery = false;
-        x
+        ScanObjects::<Self>::new(nodes, false, WorkBucketStage::Closure)
     }
 }

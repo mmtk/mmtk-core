@@ -73,7 +73,6 @@ impl MMTKBuilder {
     /// Create an MMTK builder with build-in default options, but without reading options from
     /// environment variables.
     pub fn new_no_env_vars() -> Self {
-        std::env::set_var("RUST_BACKTRACE", "1");
         MMTKBuilder {
             options: Options::default(),
         }

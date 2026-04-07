@@ -65,9 +65,9 @@ impl<VM: VMBinding> EvacuateMatureObjects<VM> {
         true
     }
 
-    fn process_slot(&mut self, s: VM::VMSlot, reuse: u8, lxr: &LXR<VM>, ooh: bool) -> bool {
+    fn process_slot(&mut self, s: VM::VMSlot, reuse: u8, lxr: &LXR<VM>) -> bool {
         // Skip slots that does not contain a real oop
-        if !ooh && !self.address_is_valid_oop_slot(s, reuse, lxr) {
+        if !self.address_is_valid_oop_slot(s, reuse, lxr) {
             return false;
         }
         // Skip objects that are dead or out of the collection set.
@@ -98,8 +98,8 @@ impl<VM: VMBinding> EvacuateMatureObjects<VM> {
         let remset = std::mem::take(&mut self.remset);
         let mut slots = vec![];
         for entry in remset {
-            let (s, reuse, ooh) = entry.decode::<VM>();
-            if self.process_slot(s, reuse, lxr, ooh) {
+            let (s, reuse) = entry.decode::<VM>();
+            if self.process_slot(s, reuse, lxr) {
                 slots.push(s);
             }
         }

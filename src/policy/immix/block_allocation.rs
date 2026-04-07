@@ -221,7 +221,7 @@ impl<VM: VMBinding> BlockAllocation<VM> {
             }
         }
         // Initialize unlog table
-        if (self.space().rc_enabled || crate::plan::barriers::BARRIER_MEASUREMENT) && copy {
+        if self.space().rc_enabled && copy {
             block.initialize_field_unlog_table_as_unlogged::<VM>();
         }
         // Initialize mark table

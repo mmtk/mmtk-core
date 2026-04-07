@@ -7,7 +7,6 @@ use crate::policy::immix::block::BlockState;
 use crate::scheduler::gc_work::RootKind;
 use crate::scheduler::gc_work::ScanObjects;
 use crate::scheduler::gc_work::SlotOf;
-use crate::util::address::RefScanPolicy;
 use crate::util::copy::CopySemantics;
 use crate::util::copy::GCWorkerCopyContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
@@ -215,7 +214,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
         } else if !is_val_array {
             let obj_in_defrag = !los && Block::in_defrag_block::<VM>(o);
-            o.iterate_fields::<VM, _>(RefScanPolicy::Follow, |slot| {
+            o.iterate_fields::<VM, _>(|slot| {
                 let Some(target) = slot.load() else {
                     return;
                 };
@@ -490,7 +489,6 @@ impl<S: Slot> DerefMut for AddressBuffer<'_, S> {
 
 impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        debug_assert!(!crate::plan::barriers::BARRIER_MEASUREMENT);
         self.lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
         self.pause = self.lxr.current_pause().unwrap();
         self.in_cm = self.lxr.cm_in_progress();
@@ -696,22 +694,13 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         }
     }
 
-    fn record_mature_evac_remset(&mut self, lxr: &LXR<VM>, s: VM::VMSlot, o: ObjectReference) {
-        if !(crate::args::RC_MATURE_EVACUATION && self.mark_dead_objects) {
-            return;
-        }
-        if !lxr.address_in_defrag(s.to_address()) && lxr.in_defrag(o) {
-            lxr.immix_space.mature_evac_remset.record(s, o, lxr);
-        }
-    }
-
     #[cold]
     fn process_dead_object(&mut self, o: ObjectReference, lxr: &LXR<VM>) -> bool {
         if self.mark_dead_objects {
             lxr.mark(o);
         }
         // Recursively decrease field ref counts
-        o.iterate_fields::<VM, _>(RefScanPolicy::Follow, |slot| {
+        o.iterate_fields::<VM, _>(|slot| {
             if let Some(x) = slot.load() {
                 // println!(" -- rec dec {:?}.{:?} -> {:?}", o, slot, x);
                 let rc = self.rc.count(x);
@@ -805,7 +794,6 @@ impl<VM: VMBinding> GCWork<VM> for ProcessDecs<VM> {
             lxr.current_pause() == Some(Pause::FinalMark)
                 || lxr.current_pause() == Some(Pause::Full)
         };
-        debug_assert!(!crate::plan::barriers::BARRIER_MEASUREMENT);
         if let Some(decs) = std::mem::take(&mut self.decs) {
             self.process_decs(&decs, lxr);
         } else if let Some(decs) = std::mem::take(&mut self.decs_arc) {

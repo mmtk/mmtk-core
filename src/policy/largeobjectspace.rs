@@ -380,9 +380,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     fn release_object(&self, start: Address) -> usize {
-        if crate::plan::barriers::BARRIER_MEASUREMENT
-            || (self.common.needs_log_bit && self.common.needs_field_log_bit)
-        {
+        if self.common.needs_log_bit && self.common.needs_field_log_bit {
             if self.rc_enabled {
                 self.rc.set(start.to_object_reference::<VM>(), 0);
             }

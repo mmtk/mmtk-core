@@ -19,7 +19,7 @@ use crate::scheduler::WorkBucketStage;
 use crate::scheduler::{GCWork, GCWorker};
 use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
@@ -191,19 +191,6 @@ pub fn alloc<VM: VMBinding>(
     offset: usize,
     semantics: AllocationSemantics,
 ) -> Address {
-    // MMTk has assumptions about minimal object size.
-    // We need to make sure that all allocations comply with the min object size.
-    // Ideally, we check the allocation size, and if it is smaller, we transparently allocate the min
-    // object size (the VM does not need to know this). However, for the VM bindings we support at the moment,
-    // their object sizes are all larger than MMTk's min object size, so we simply put an assertion here.
-    // If you plan to use MMTk with a VM with its object size smaller than MMTk's min object size, you should
-    // meet the min object size in the fastpath.
-    debug_assert!(size >= MIN_OBJECT_SIZE);
-    // Assert alignment
-    debug_assert!(align >= VM::MIN_ALIGNMENT);
-    debug_assert!(align <= VM::MAX_ALIGNMENT);
-    // Assert offset
-    debug_assert!(VM::USE_ALLOCATION_OFFSET || offset == 0);
     #[cfg(debug_assertions)]
     crate::util::alloc::allocator::assert_allocation_args::<VM>(size, align, offset);
 

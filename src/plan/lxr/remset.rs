@@ -17,22 +17,20 @@ use atomic::Ordering;
 use std::sync::atomic::AtomicUsize;
 
 #[repr(C)]
-pub(super) struct RemSetEntry(Address, u8, bool);
+pub(super) struct RemSetEntry(Address, u8);
 
 impl RemSetEntry {
-    fn encode<VM: VMBinding>(slot: VM::VMSlot, ix: bool, ooh: bool) -> Self {
+    fn encode<VM: VMBinding>(slot: VM::VMSlot, ix: bool) -> Self {
         let reuse = if ix {
             IX_LINE_REUSE_COUNT.load_atomic::<u8>(slot.to_address(), Ordering::SeqCst)
-        } else if !ooh {
-            LOS_PAGE_REUSE_COUNT.load_atomic::<u8>(slot.to_address(), Ordering::SeqCst)
         } else {
-            0
+            LOS_PAGE_REUSE_COUNT.load_atomic::<u8>(slot.to_address(), Ordering::SeqCst)
         };
-        Self(slot.raw_address(), reuse, ooh)
+        Self(slot.raw_address(), reuse)
     }
 
-    pub fn decode<VM: VMBinding>(&self) -> (VM::VMSlot, u8, bool) {
-        (VM::VMSlot::from_address(self.0), self.1, self.2)
+    pub fn decode<VM: VMBinding>(&self) -> (VM::VMSlot, u8) {
+        (VM::VMSlot::from_address(self.0), self.1)
     }
 }
 
@@ -96,9 +94,7 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
     pub fn record(&self, s: VM::VMSlot, _o: ObjectReference, lxr: &LXR<VM>) {
         let id = crate::scheduler::current_worker_ordinal().unwrap();
         let ix = lxr.immix_space.address_in_space(s.to_address());
-        let ooh: bool = !ix && !lxr.los().address_in_space(s.to_address());
-        self.gc_buffer(id)
-            .push(RemSetEntry::encode::<VM>(s, ix, ooh));
+        self.gc_buffer(id).push(RemSetEntry::encode::<VM>(s, ix));
         if self.gc_buffer(id).len() >= EvacuateMatureObjects::<VM>::CAPACITY {
             self.flush(id)
         }

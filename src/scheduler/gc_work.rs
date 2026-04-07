@@ -392,8 +392,24 @@ impl<E: ProcessEdgesWork> VMProcessWeakRefs<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("VMProcessWeakRefs");
-        <<E::VM as VMBinding>::VMCollection as Collection<E::VM>>::process_weak_refs::<E>(worker);
-        // TODO: Pass a factory/callback to decide what work packet to create.
+
+        let stage = WorkBucketStage::VMRefClosure;
+
+        let need_to_repeat = {
+            let tracer_factory = ProcessEdgesWorkTracerContext::<E> {
+                stage,
+                phantom_data: PhantomData,
+            };
+            <E::VM as VMBinding>::VMScanning::process_weak_refs(worker, tracer_factory)
+        };
+
+        if need_to_repeat {
+            // Schedule Self as the new sentinel so we'll call `process_weak_refs` again after the
+            // current transitive closure.
+            let new_self = Box::new(Self::new());
+
+            worker.scheduler().work_buckets[stage].set_sentinel(new_self);
+        }
     }
 }
 
@@ -522,30 +538,20 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanVMSpecificRoots<C> {
 pub enum RootKind {
     Strong,
     YoungCodeCacheRoots,
-    YoungWeakHandleRoots,
-    /// JDK11 Only
-    MatureWeakRoots,
     Weak,
 }
 
 impl RootKind {
     pub fn should_record_remset(&self) -> bool {
-        matches!(self, RootKind::YoungWeakHandleRoots)
-            || matches!(self, RootKind::YoungCodeCacheRoots)
+        matches!(self, RootKind::YoungCodeCacheRoots)
     }
 
     pub fn should_skip_mark_and_decs(&self) -> bool {
-        matches!(self, RootKind::YoungCodeCacheRoots)
-            || matches!(self, RootKind::YoungWeakHandleRoots)
-            || matches!(self, RootKind::MatureWeakRoots)
-            || matches!(self, RootKind::Weak)
+        matches!(self, RootKind::YoungCodeCacheRoots) || matches!(self, RootKind::Weak)
     }
 
     pub fn should_skip_decs(&self) -> bool {
-        matches!(self, RootKind::YoungCodeCacheRoots)
-            || matches!(self, RootKind::YoungWeakHandleRoots)
-            || matches!(self, RootKind::MatureWeakRoots)
-            || matches!(self, RootKind::Weak)
+        matches!(self, RootKind::YoungCodeCacheRoots) || matches!(self, RootKind::Weak)
     }
 }
 
@@ -809,8 +815,8 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
         sft.sft_trace_object(&mut self.base.nodes, object, worker)
     }
 
-    fn create_scan_work(&self, _nodes: Vec<ObjectReference>) -> ScanObjects<Self> {
-        unimplemented!()
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> ScanObjects<Self> {
+        ScanObjects::<Self>::new(nodes, false, self.bucket)
     }
 }
 
@@ -954,7 +960,6 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         buffer: &[ObjectReference],
         worker: &mut GCWorker<<Self::E as ProcessEdgesWork>::VM>,
         mmtk: &'static MMTK<<Self::E as ProcessEdgesWork>::VM>,
-        should_discover_reference: bool,
     ) {
         let tls = worker.tls;
 
@@ -963,11 +968,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         // Scan the objects in the list that supports slot-enququing.
         let mut scan_later = vec![];
         {
-            let mut closure = ObjectsClosure::<Self::E>::new(
-                worker,
-                should_discover_reference,
-                self.get_bucket(),
-            );
+            let mut closure = ObjectsClosure::<Self::E>::new(worker, self.get_bucket());
 
             // For any object we need to scan, we count its live bytes.
             // Check the option outside the loop for better performance.
@@ -1039,22 +1040,15 @@ pub struct ScanObjects<Edges: ProcessEdgesWork> {
     #[allow(unused)]
     concurrent: bool,
     phantom: PhantomData<Edges>,
-    pub discovery: bool,
     bucket: WorkBucketStage,
 }
 
 impl<Edges: ProcessEdgesWork> ScanObjects<Edges> {
-    pub fn new(
-        buffer: Vec<ObjectReference>,
-        concurrent: bool,
-        discovery: bool,
-        bucket: WorkBucketStage,
-    ) -> Self {
+    pub fn new(buffer: Vec<ObjectReference>, concurrent: bool, bucket: WorkBucketStage) -> Self {
         Self {
             buffer,
             concurrent,
             phantom: PhantomData,
-            discovery,
             bucket,
         }
     }
@@ -1075,7 +1069,7 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>> ScanObjectsWork<VM> for ScanOb
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanObjects");
-        self.do_work_common(&self.buffer, worker, mmtk, self.discovery);
+        self.do_work_common(&self.buffer, worker, mmtk);
         trace!("ScanObjects End");
     }
 }
@@ -1114,7 +1108,7 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
     }
 
     fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Self::ScanObjectsWorkType {
-        PlanScanObjects::<Self, P>::new(self.plan, nodes, false, false, self.bucket)
+        PlanScanObjects::<Self, P>::new(self.plan, nodes, false, self.bucket)
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
@@ -1161,9 +1155,8 @@ pub struct PlanScanObjects<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceO
     buffer: Vec<ObjectReference>,
     #[allow(dead_code)]
     concurrent: bool,
-    discover_refs: bool,
+    phantom: PhantomData<E>,
     bucket: WorkBucketStage,
-    _p: PhantomData<E>,
 }
 
 impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> PlanScanObjects<E, P> {
@@ -1171,16 +1164,14 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> PlanScan
         plan: &'static P,
         buffer: Vec<ObjectReference>,
         concurrent: bool,
-        discover_refs: bool,
         bucket: WorkBucketStage,
     ) -> Self {
         Self {
             plan,
             buffer,
             concurrent,
-            discover_refs,
+            phantom: PhantomData,
             bucket,
-            _p: PhantomData,
         }
     }
 }
@@ -1204,7 +1195,7 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> GCWork<E
 {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("PlanScanObjects");
-        self.do_work_common(&self.buffer, worker, mmtk, self.discover_refs);
+        self.do_work_common(&self.buffer, worker, mmtk);
         trace!("PlanScanObjects End");
     }
 }

@@ -264,7 +264,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         if pause == Pause::FinalMark || pause == Pause::Full {
             VM::VMCollection::update_weak_processor(false);
         }
-        let t = std::time::SystemTime::now();
         <VM as VMBinding>::VMCollection::vm_release();
         self.common.los.is_end_of_satb_or_full_gc = false;
         self.common
@@ -365,26 +364,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn fast_worker_release(&self) -> bool {
-        true
-    }
-
-    fn should_process_reference(
-        &self,
-        _reference: ObjectReference,
-        _referent: ObjectReference,
-    ) -> bool {
-        true
-    }
-
-    fn discover_reference(&self, reference: ObjectReference, referent: ObjectReference) {
-        // Keep weak references and referents alive during SATB.
-        // They can only be swept by mature sweeping.
-        let _ = self.rc.inc(reference);
-        let _ = self.rc.inc(referent);
-    }
-
-    fn requires_weak_root_scanning(&self) -> bool {
-        // Collect weak roots and keep them alive across RC pauses.
         true
     }
 }

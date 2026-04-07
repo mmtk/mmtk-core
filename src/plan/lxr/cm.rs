@@ -6,7 +6,6 @@ use crate::policy::immix::line::Line;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::{ScanObjects, SlotOf};
 use crate::scheduler::RootKind;
-use crate::util::address::RefScanPolicy;
 use crate::util::copy::CopySemantics;
 use crate::util::rc::RefCountHelper;
 use crate::util::{Address, ObjectReference};
@@ -199,7 +198,7 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
     }
 
     fn scan_and_enqueue<const CHECK_REMSET: bool>(&mut self, object: ObjectReference) {
-        object.iterate_fields::<VM, _>(RefScanPolicy::Discover, |s| {
+        object.iterate_fields::<VM, _>(|s| {
             let Some(t) = s.load() else {
                 return;
             };
@@ -447,10 +446,7 @@ impl<VM: VMBinding, const FULL_GC: bool> ProcessEdgesWork
         }
         let slots = std::mem::take(&mut self.slots);
         let slices = std::mem::take(&mut self.array_slices);
-        if self.roots
-            && (self.root_kind == Some(RootKind::Weak)
-                || self.root_kind == Some(RootKind::MatureWeakRoots))
-        {
+        if self.roots && self.root_kind == Some(RootKind::Weak) {
             self.process_slots_impl::<true, false>(&slots, &slices);
         } else if self.remset_recorded_slots {
             self.process_slots_impl::<false, true>(&slots, &slices);
@@ -640,7 +636,7 @@ impl<VM: VMBinding, const FULL_GC: bool> ObjectQueue for LXRStopTheWorldProcessE
             }
             ObjectKind::ValArray => {}
             _ => {
-                object.iterate_fields::<VM, _>(RefScanPolicy::Discover, |s| {
+                object.iterate_fields::<VM, _>(|s| {
                     let Some(o) = s.load() else {
                         return;
                     };
@@ -762,7 +758,7 @@ impl<VM: VMBinding> ProcessEdgesWork for LXRWeakRefProcessEdges<VM> {
 
 impl<VM: VMBinding> ObjectQueue for LXRWeakRefProcessEdges<VM> {
     fn enqueue(&mut self, object: ObjectReference) {
-        object.iterate_fields::<VM, _>(RefScanPolicy::Follow, |s| {
+        object.iterate_fields::<VM, _>(|s| {
             self.next_slots.push(s);
             if self.next_slots.is_full() {
                 self.flush();

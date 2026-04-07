@@ -298,11 +298,6 @@ impl<VM: VMBinding> GCWork<VM> for PrepareChunksForFullGC {
                 if state == BlockState::Unallocated {
                     continue;
                 }
-                // Clear unlog table on CM
-                if crate::plan::barriers::BARRIER_MEASUREMENT {
-                    block.initialize_field_unlog_table_as_unlogged::<VM>();
-                    unreachable!();
-                }
                 // Clear defrag state
                 assert!(!block.is_defrag_source());
                 // Clear block mark data.

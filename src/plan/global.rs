@@ -249,15 +249,6 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         false
     }
 
-    fn should_process_reference(
-        &self,
-        _reference: ObjectReference,
-        _referent: ObjectReference,
-    ) -> bool {
-        true
-    }
-
-    fn discover_reference(&self, _reference: ObjectReference, _referent: ObjectReference) {}
     // Note: The following methods are about page accounting. The default implementation should
     // work fine for non-copying plans. For copying plans, the plan should override any of these methods
     // if necessary.
@@ -357,10 +348,6 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     }
     fn fast_worker_release(&self) -> bool {
         false
-    }
-
-    fn requires_weak_root_scanning(&self) -> bool {
-        self.generational().is_some()
     }
 
     /// Return whether the current GC may move any object.  The VM binding can make use of this

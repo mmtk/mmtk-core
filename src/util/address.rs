@@ -777,21 +777,9 @@ impl ObjectReference {
         VM::VMObjectModel::get_class_pointer(self)
     }
 
-    pub fn iterate_fields<VM: VMBinding, F: FnMut(VM::VMSlot)>(
-        self,
-        ref_scan: RefScanPolicy,
-        f: F,
-    ) {
-        SlotIterator::<VM>::iterate(self, ref_scan == RefScanPolicy::Discover, f)
+    pub fn iterate_fields<VM: VMBinding, F: FnMut(VM::VMSlot)>(self, f: F) {
+        SlotIterator::<VM>::iterate(self, f)
     }
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum RefScanPolicy {
-    /// Treat weak or soft edges as strong
-    Follow,
-    /// Perform weak/soft/phantom/final reference discovery
-    Discover,
 }
 
 /// allows print Address as upper-case hex value

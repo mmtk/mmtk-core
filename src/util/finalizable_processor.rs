@@ -1,7 +1,6 @@
 use crate::plan::is_nursery_gc;
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
-#[allow(unused)]
 use crate::util::reference_processor::RescanReferences;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
@@ -141,8 +140,45 @@ impl<F: Finalizable> FinalizableProcessor<F> {
 pub struct Finalization<E: ProcessEdgesWork>(PhantomData<E>);
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
-        <E::VM as VMBinding>::VMCollection::process_final_refs::<E>(worker);
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        if !*mmtk.options.no_reference_types {
+            // Rescan soft and weak references at the end of the transitive closure from resurrected
+            // objects.  New soft and weak references may be discovered during this.
+            let rescan = Box::new(RescanReferences {
+                soft: true,
+                weak: true,
+                phantom_data: PhantomData,
+            });
+            worker.scheduler().work_buckets[WorkBucketStage::FinalRefClosure].set_sentinel(rescan);
+        }
+
+        let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
+        let num_candidates_begin = finalizable_processor.candidates.len();
+        let num_ready_for_finalize_begin = finalizable_processor.ready_for_finalize.len();
+        debug!(
+            "Finalization, {} objects in candidates, {} objects ready to finalize",
+            num_candidates_begin, num_ready_for_finalize_begin
+        );
+
+        let mut w = E::new(vec![], false, mmtk, WorkBucketStage::FinalRefClosure);
+        w.set_worker(worker);
+        finalizable_processor.scan(worker.tls, &mut w, is_nursery_gc(mmtk.get_plan()));
+
+        let num_candidates_end = finalizable_processor.candidates.len();
+        let num_ready_for_finalize_end = finalizable_processor.ready_for_finalize.len();
+
+        debug!(
+            "Finished finalization, {} objects in candidates, {} objects ready to finalize",
+            num_candidates_end, num_ready_for_finalize_end
+        );
+        probe!(
+            mmtk,
+            finalization,
+            num_candidates_begin,
+            num_candidates_end,
+            num_ready_for_finalize_begin,
+            num_ready_for_finalize_end
+        );
     }
 }
 impl<E: ProcessEdgesWork> Finalization<E> {

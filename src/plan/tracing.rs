@@ -25,12 +25,6 @@ pub struct VectorQueue<T> {
     buffer: Vec<T>,
 }
 
-impl<T: Clone> VectorQueue<T> {
-    pub fn clone_buffer(&self) -> Vec<T> {
-        self.buffer.clone()
-    }
-}
-
 impl<T> VectorQueue<T> {
     /// Reserve a capacity of this on first enqueue to avoid frequent resizing.
     const CAPACITY: usize = EDGES_WORK_BUFFER_SIZE;
@@ -105,7 +99,6 @@ impl ObjectQueue for VectorQueue<ObjectReference> {
 pub struct ObjectsClosure<'a, E: ProcessEdgesWork> {
     buffer: VectorQueue<SlotOf<E>>,
     pub(crate) worker: &'a mut GCWorker<E::VM>,
-    should_discover_references: bool,
     bucket: WorkBucketStage,
 }
 
@@ -115,15 +108,10 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
     /// Arguments:
     /// * `worker`: the current worker. The objects closure should not leave the context of this worker.
     /// * `bucket`: new work generated will be push ed to the bucket.
-    pub fn new(
-        worker: &'a mut GCWorker<E::VM>,
-        should_discover_references: bool,
-        bucket: WorkBucketStage,
-    ) -> Self {
+    pub fn new(worker: &'a mut GCWorker<E::VM>, bucket: WorkBucketStage) -> Self {
         Self {
             buffer: VectorQueue::new(),
             worker,
-            should_discover_references,
             bucket,
         }
     }
@@ -140,9 +128,6 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
 }
 
 impl<E: ProcessEdgesWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'_, E> {
-    fn should_discover_references(&self) -> bool {
-        self.should_discover_references
-    }
     fn visit_slot(&mut self, slot: SlotOf<E>) {
         #[cfg(debug_assertions)]
         {
@@ -171,14 +156,10 @@ impl<E: ProcessEdgesWork> Drop for ObjectsClosure<'_, E> {
 
 struct SlotIteratorImpl<VM: VMBinding, F: FnMut(VM::VMSlot)> {
     f: F,
-    should_discover_references: bool,
     _p: PhantomData<VM>,
 }
 
 impl<VM: VMBinding, F: FnMut(VM::VMSlot)> SlotVisitor<VM::VMSlot> for SlotIteratorImpl<VM, F> {
-    fn should_discover_references(&self) -> bool {
-        self.should_discover_references
-    }
     fn visit_slot(&mut self, slot: VM::VMSlot) {
         (self.f)(slot);
     }
@@ -193,16 +174,8 @@ pub struct SlotIterator<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SlotIterator<VM> {
-    pub fn iterate(
-        o: ObjectReference,
-        should_discover_references: bool,
-        f: impl FnMut(VM::VMSlot),
-    ) {
-        let mut x = SlotIteratorImpl::<VM, _> {
-            f,
-            should_discover_references,
-            _p: PhantomData,
-        };
+    pub fn iterate(o: ObjectReference, f: impl FnMut(VM::VMSlot)) {
+        let mut x = SlotIteratorImpl::<VM, _> { f, _p: PhantomData };
         <VM::VMScanning as Scanning<VM>>::scan_object(
             VMWorkerThread(VMThread::UNINITIALIZED),
             o,

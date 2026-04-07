@@ -1,7 +1,5 @@
 //! Read/Write barrier implementations.
 
-use std::sync::atomic::AtomicUsize;
-
 use crate::vm::slot::{MemorySlice, Slot};
 use crate::vm::ObjectModel;
 use crate::{
@@ -10,11 +8,6 @@ use crate::{
 };
 use atomic::Ordering;
 use downcast_rs::Downcast;
-
-pub const BARRIER_MEASUREMENT: bool = false;
-pub const TAKERATE_MEASUREMENT: bool = false;
-pub static FAST_COUNT: AtomicUsize = AtomicUsize::new(0);
-pub static SLOW_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 /// BarrierSelector describes which barrier to use.
 ///

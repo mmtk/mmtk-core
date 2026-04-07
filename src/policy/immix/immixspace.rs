@@ -825,7 +825,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
             RELEASED_BLOCKS.fetch_add(1, Ordering::SeqCst);
         }
-        if crate::plan::barriers::BARRIER_MEASUREMENT || zero_unlog_table {
+        if zero_unlog_table {
             block.clear_field_unlog_table::<VM>();
         }
         block.deinit(self);

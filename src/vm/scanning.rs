@@ -10,9 +10,6 @@ use crate::vm::VMBinding;
 
 /// Callback trait of scanning functions that report slots.
 pub trait SlotVisitor<SL: Slot> {
-    fn should_discover_references(&self) -> bool {
-        true
-    }
     /// Call this function for each slot.
     fn visit_slot(&mut self, slot: SL);
 }

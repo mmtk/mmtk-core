@@ -140,24 +140,20 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     pub fn postpone(&self, w: impl GCWork<VM>) {
-        debug_assert!(!crate::plan::barriers::BARRIER_MEASUREMENT);
         self.postponed_concurrent_work.read().push(Box::new(w))
     }
 
     pub fn postpone_prioritized(&self, w: impl GCWork<VM>) {
-        debug_assert!(!crate::plan::barriers::BARRIER_MEASUREMENT);
         self.postponed_concurrent_work_prioritized
             .read()
             .push(Box::new(w))
     }
 
     pub fn postpone_dyn(&self, w: Box<dyn GCWork<VM>>) {
-        debug_assert!(!crate::plan::barriers::BARRIER_MEASUREMENT);
         self.postponed_concurrent_work.read().push(w)
     }
 
     pub fn postpone_dyn_prioritized(&self, w: Box<dyn GCWork<VM>>) {
-        debug_assert!(!crate::plan::barriers::BARRIER_MEASUREMENT);
         self.postponed_concurrent_work_prioritized.read().push(w)
     }
 
@@ -279,7 +275,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             // self.work_buckets[WorkBucketStage::WeakRefClosure]
             //     .add(WeakRefProcessing::<C::DefaultProcessEdges>::new());
             self.work_buckets[WorkBucketStage::PhantomRefClosure]
-                .add(PhantomRefProcessing::<C::DefaultProcessEdges>::new());
+                .add(PhantomRefProcessing::<VM>::new());
 
             // VM-specific weak ref processing
             self.work_buckets[WorkBucketStage::WeakRefClosure]
@@ -331,7 +327,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             self.work_buckets[WorkBucketStage::WeakRefClosure]
                 .add(VMProcessWeakRefs::<C::DefaultProcessEdges>::new());
             self.work_buckets[WorkBucketStage::PhantomRefClosure]
-                .add(PhantomRefProcessing::<C::DefaultProcessEdges>::new());
+                .add(PhantomRefProcessing::<VM>::new());
 
             // use crate::util::reference_processor::RefForwarding;
             // if plan.constraints().needs_forward_after_liveness {
@@ -927,18 +923,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             let worker_stat = worker.borrow_stat();
             summary.merge(&worker_stat);
         }
-        let mut stat = summary.harness_stat();
-        if crate::plan::barriers::TAKERATE_MEASUREMENT {
-            let fast = crate::plan::barriers::FAST_COUNT.load(Ordering::SeqCst);
-            let slow = crate::plan::barriers::SLOW_COUNT.load(Ordering::SeqCst);
-            stat.insert("barrier.fast".to_owned(), format!("{:?}", fast));
-            stat.insert("barrier.slow".to_owned(), format!("{:?}", slow));
-            stat.insert(
-                "barrier.takerate".to_owned(),
-                format!("{}", slow as f64 / fast as f64),
-            );
-        }
-        stat
+        summary.harness_stat()
     }
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {

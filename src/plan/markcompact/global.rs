@@ -117,7 +117,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
                 .add(WeakRefProcessing::<VM>::new());
             scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
-                .add(PhantomRefProcessing::<MarkingProcessEdges<VM>>::new());
+                .add(PhantomRefProcessing::<VM>::new());
 
             use crate::util::reference_processor::RefForwarding;
             scheduler.work_buckets[WorkBucketStage::RefForwarding]
@@ -129,17 +129,16 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
 
         // Finalization
         if !*self.base().options.no_finalizer {
-            unimplemented!();
-            // use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
-            // // finalization
-            // // treat finalizable objects as roots and perform a closure (marking)
-            // // must be done before calculating forwarding pointers
-            // scheduler.work_buckets[WorkBucketStage::FinalRefClosure]
-            //     .add(Finalization::<MarkingProcessEdges<VM>>::new());
-            // // update finalizable object references
-            // // must be done before compacting
-            // scheduler.work_buckets[WorkBucketStage::FinalizableForwarding]
-            //     .add(ForwardFinalization::<ForwardingProcessEdges<VM>>::new());
+            use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
+            // finalization
+            // treat finalizable objects as roots and perform a closure (marking)
+            // must be done before calculating forwarding pointers
+            scheduler.work_buckets[WorkBucketStage::FinalRefClosure]
+                .add(Finalization::<MarkingProcessEdges<VM>>::new());
+            // update finalizable object references
+            // must be done before compacting
+            scheduler.work_buckets[WorkBucketStage::FinalizableForwarding]
+                .add(ForwardFinalization::<ForwardingProcessEdges<VM>>::new());
         }
 
         // VM-specific weak ref processing

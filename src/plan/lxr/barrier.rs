@@ -6,10 +6,7 @@ use atomic::Ordering;
 
 use super::LXR;
 use crate::plan::barriers::BarrierSemantics;
-use crate::plan::barriers::LOGGED_VALUE;
-use crate::plan::barriers::TAKERATE_MEASUREMENT;
-use crate::plan::barriers::UNLOGGED_VALUE;
-use crate::plan::barriers::{FAST_COUNT, SLOW_COUNT};
+use crate::plan::barriers::{LOGGED_VALUE, UNLOGGED_VALUE};
 use crate::plan::immix::Pause;
 use crate::plan::lxr::cm::ProcessModBufSATB;
 use crate::plan::lxr::rc::ProcessDecs;
@@ -17,7 +14,6 @@ use crate::plan::lxr::rc::ProcessIncs;
 use crate::plan::lxr::rc::EDGE_KIND_MATURE;
 use crate::plan::VectorQueue;
 use crate::scheduler::WorkBucketStage;
-use crate::util::address::RefScanPolicy;
 use crate::util::metadata::side_metadata::address_to_meta_address;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::*;
@@ -132,13 +128,7 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
         slot: VM::VMSlot,
         _new: Option<ObjectReference>,
     ) -> bool {
-        if TAKERATE_MEASUREMENT && self.mmtk.inside_harness() {
-            FAST_COUNT.fetch_add(1, Ordering::SeqCst);
-        }
         if let Ok(old) = self.log_slot_and_get_old_target(slot) {
-            if TAKERATE_MEASUREMENT && self.mmtk.inside_harness() {
-                SLOW_COUNT.fetch_add(1, Ordering::SeqCst);
-            }
             self.slow(src, slot, old);
             true
         } else {
@@ -251,7 +241,7 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
     }
 
     fn object_probable_write_slow(&mut self, obj: ObjectReference) {
-        obj.iterate_fields::<VM, _>(RefScanPolicy::Follow, |s| {
+        obj.iterate_fields::<VM, _>(|s| {
             let _succ = self.enqueue_node(Some(obj), s, None);
         });
     }
