@@ -214,7 +214,6 @@ impl Defrag {
         }
         // println!("threshold: {}", threshold);
         debug_assert!(threshold >= Self::MIN_SPILL_THRESHOLD);
-        gc_log!([2] "defrag_spill_threshold {}", threshold);
         self.defrag_spill_threshold
             .store(threshold, Ordering::Release);
     }

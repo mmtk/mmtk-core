@@ -406,19 +406,9 @@ impl MatureEvacuationSet {
             lxr.immix_space.defrag_headroom_pages()
         };
         let max_copy_bytes = available_clean_pages_for_defrag << LOG_BYTES_IN_PAGE;
-        gc_log!([3] "max_copy_bytes={} ({}M)", max_copy_bytes, max_copy_bytes >> 20);
         let mut copy_bytes = 0usize;
         let mut selected_blocks = vec![];
-        let count1 = selected_blocks.len();
         self.select_fragmented_blocks(&mut selected_blocks, &mut copy_bytes, max_copy_bytes);
-        gc_log!([2]
-            " - defrag {} mature bytes ({} blocks ({}M), {} blocks in fragmented chunks)",
-            copy_bytes,
-            selected_blocks.len(),
-            selected_blocks.len() << Block::LOG_BYTES >> 20,
-            count1,
-        );
-        // lxr.dump_heap_usage(false);
         self.num_defrag_blocks
             .store(selected_blocks.len(), Ordering::SeqCst);
         let mut defrag_blocks = self.defrag_blocks.lock().unwrap();

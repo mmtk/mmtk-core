@@ -266,13 +266,6 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
     }
     #[cfg(not(feature = "fragmentation_analysis"))]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        // gc_log!(
-        //     "S {:?} -> {:?} r={} kind={:?}",
-        //     self.edge,
-        //     object,
-        //     self.roots,
-        //     self.root_kind
-        // );
         if let Some(_lxr) = self
             .mmtk()
             .get_plan()
@@ -342,9 +335,6 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
                 if lxr.current_pause().unwrap() == crate::plan::immix::Pause::FinalMark
                     || lxr.current_pause().unwrap() == crate::plan::immix::Pause::Full
                 {
-                    if !lxr.is_marked(object) {
-                        flush_logs!()
-                    }
                     assert!(
                         lxr.is_marked(object),
                         "{:?} -> {:?} is not marked, roots={} kind={:?}",

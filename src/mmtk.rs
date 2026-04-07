@@ -136,7 +136,6 @@ unsafe impl<VM: VMBinding> Send for MMTK<VM> {}
 impl<VM: VMBinding> MMTK<VM> {
     /// Create an MMTK instance. This is not public. Bindings should use [`MMTKBuilder::build`].
     pub(crate) fn new(options: Arc<Options>) -> Self {
-        crate::VERBOSE.store(*options.verbose, Ordering::SeqCst);
         // Verify the Mmapper can handle the required address space size.
         vm_layout().validate_address_space();
 

@@ -299,7 +299,6 @@ impl<VM: VMBinding> GCWorker<VM> {
             probe!(mmtk, work, typename.as_ptr(), typename.len());
             work.do_work_with_stat(&mut self, mmtk);
             std::mem::drop(work);
-            flush_logs!();
         }
         debug!(
             "Worker exiting. ordinal: {}, {}",

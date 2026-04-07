@@ -112,9 +112,6 @@ builtin_env_logger = ["dep:env_logger"]
 # Enable this feature if you want to use nightly features and compiler
 nightly = []
 asan = []
-log_gc = []
-log_stages = ["log_gc"]
-log_work_packets = ["log_stages"]
 no_meta_counting = []
 force_zeroing = []
 
@@ -131,7 +128,6 @@ lxr_no_mature_defrag = []
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts
 perf_counter = ["dep:pfm"]
-work_packet_counter = []
 
 # This feature is only used for tests with MockVM.
 # CI scripts run those tests with this feature.

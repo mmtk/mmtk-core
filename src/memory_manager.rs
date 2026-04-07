@@ -87,7 +87,6 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     );
     #[cfg(feature = "extreme_assertions")]
     warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
-    spin::Lazy::force(&crate::BOOT_TIME);
     Box::new(mmtk)
 }
 

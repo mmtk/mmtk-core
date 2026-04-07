@@ -32,8 +32,6 @@ extern crate static_assertions;
 #[macro_use]
 extern crate probe;
 
-#[macro_use]
-pub mod gc_log;
 mod mmtk;
 pub use mmtk::MMTKBuilder;
 use std::{
@@ -43,7 +41,6 @@ use std::{
         atomic::{AtomicBool, AtomicUsize},
         Arc,
     },
-    time::{Instant, SystemTime},
 };
 
 use atomic::Ordering;
@@ -191,14 +188,9 @@ fn disable_lasy_dec_for_current_gc() -> bool {
     crate::DISABLE_LASY_DEC_FOR_CURRENT_GC.load(Ordering::SeqCst)
 }
 
-static BOOT_TIME: spin::Lazy<SystemTime> = spin::Lazy::new(SystemTime::now);
 static GC_EPOCH: AtomicUsize = AtomicUsize::new(0);
 static PAUSE_CONCURRENT_MARKING: AtomicBool = AtomicBool::new(false);
 static MOVE_CONCURRENT_MARKING_TO_STW: AtomicBool = AtomicBool::new(false);
-
-fn boot_time_secs() -> f64 {
-    crate::BOOT_TIME.elapsed().unwrap().as_millis() as f64 / 1000f64
-}
 
 static NO_EVAC: AtomicBool = AtomicBool::new(false);
 
@@ -206,8 +198,3 @@ pub(crate) fn args() -> &'static crate::args::RuntimeArgs {
     crate::args::RuntimeArgs::get()
 }
 
-static VERBOSE: AtomicUsize = AtomicUsize::new(0);
-
-pub fn verbose(level: usize) -> bool {
-    VERBOSE.load(Ordering::Relaxed) >= level
-}

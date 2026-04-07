@@ -32,8 +32,6 @@ pub struct SurvivalRatioPredictor {
 
 impl SurvivalRatioPredictor {
     pub fn set_alloc_size(&self, size: usize) {
-        // println!("set_alloc_size {}", size);
-        gc_log!([2] " - alloc vol = {}", size);
         assert_eq!(self.alloc_vol.load(Ordering::SeqCst), 0);
         self.alloc_vol.store(size, Ordering::SeqCst);
     }

@@ -181,9 +181,6 @@ impl<VM: VMBinding> BlockAllocation<VM> {
             }
         });
         self.nursery_blocks.reset();
-        if !PARALLEL_STW_SWEEPING {
-            gc_log!([3] " - released young blocks since gc start {}({}M)", self.space().num_clean_blocks_released_young.load(Ordering::Relaxed), self.space().num_clean_blocks_released_young.load(Ordering::Relaxed) >> (LOG_BYTES_IN_MBYTE as usize - Block::LOG_BYTES));
-        }
     }
 
     fn parallel_sweep_all_nursery_blocks(

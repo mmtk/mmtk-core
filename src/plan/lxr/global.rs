@@ -199,7 +199,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         if !crate::LazySweepingJobs::all_finished() {
-            gc_log!([1] "WARNING: LXR Lazy Sweeping Not Finished");
+            warn!("LXR Lazy Sweeping Not Finished");
         }
         let pause = self.select_collection_kind();
         // Wait for concurrent packets
@@ -213,8 +213,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         self.current_pause.store(Some(pause), Ordering::SeqCst);
         self.perform_cycle_collection
             .store(pause != Pause::RefCount, Ordering::SeqCst);
-        // Dump stats
-        self.log_gc_start(pause);
         // Schedule work
         match pause {
             Pause::Full => self
@@ -348,7 +346,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         self.avail_pages_at_end_of_last_gc
             .store(self.get_available_pages(), Ordering::SeqCst);
         HEAP_AFTER_GC.store(self.get_reserved_pages(), Ordering::SeqCst);
-        gc_log!([3] " - released young blocks since gc start {}({}M)", self.immix_space.num_clean_blocks_released_young.load(Ordering::Relaxed), self.immix_space.num_clean_blocks_released_young.load(Ordering::Relaxed) >> (LOG_BYTES_IN_MBYTE as usize - Block::LOG_BYTES));
     }
 
     fn end_of_gc(&mut self, _tls: VMWorkerThread) {}
@@ -449,20 +446,12 @@ impl<VM: VMBinding> LXR<VM> {
     ) -> bool {
         if pause == Pause::FinalMark || pause == Pause::Full {
             let live_mature_pages = super::MATURE_LIVE_PREDICTOR.update(mature_space_pages);
-            gc_log!([3] " - predicted live mature pages: {}", live_mature_pages)
         }
         let live_mature_pages = super::MATURE_LIVE_PREDICTOR.live_pages() as usize;
         let garbage = mature_space_pages.saturating_sub(live_mature_pages);
         let total_pages = self.get_total_pages();
         let stop_pages = total_pages * crate::args().rc_stop_percent / 100;
         let available_pages = total_pages.saturating_sub(mature_space_pages);
-        gc_log!(
-            " - total_pages={} stop_pages={} mature_space_pages={} available_pages={}",
-            total_pages,
-            stop_pages,
-            mature_space_pages,
-            available_pages
-        );
         !self.cm_in_progress()
             && (self.cm_enabled()
                 && garbage * 100 >= crate::args().trace_threshold as usize * total_pages)
@@ -532,35 +521,6 @@ impl<VM: VMBinding> LXR<VM> {
         *decide_cycle_collection = false;
     }
 
-    fn log_gc_start(&self, pause: Pause) {
-        let gc_cause = if self.base().global_state.is_emergency_collection() {
-            GCCause::Emergency
-        } else if self.base().global_state.is_user_triggered_collection() {
-            GCCause::UserTriggered
-        } else {
-            self.gc_cause.load(Ordering::SeqCst)
-        };
-        let epoch = crate::GC_EPOCH.load(Ordering::SeqCst);
-        let alloc_ix = self
-            .immix_space
-            .block_allocation
-            .total_young_allocation_in_bytes();
-        let alloc_los = self.los().young_alloc_size.load(Ordering::Relaxed);
-        let alloc_total = alloc_los + alloc_ix;
-        gc_log!([2]
-            "GC({}) {:?} start. cause={:?} incs={} young-alloc={}M young-alloc-ix={}M young-clean-blocks={}({}M)  young-alloc-los={}M",
-            epoch,
-            pause,
-            gc_cause,
-            self.rc.inc_buffer_size(),
-            alloc_total >> LOG_BYTES_IN_MBYTE,
-            alloc_ix >> LOG_BYTES_IN_MBYTE,
-            self.immix_space.block_allocation.clean_nursery_blocks(),
-            self.immix_space.block_allocation.clean_nursery_blocks() << Block::LOG_BYTES >> LOG_BYTES_IN_MBYTE,
-            alloc_los >> LOG_BYTES_IN_MBYTE,
-        );
-    }
-
     fn select_collection_kind(&self) -> Pause {
         self.wait_for_decide_cycle_collection();
 
@@ -570,24 +530,6 @@ impl<VM: VMBinding> LXR<VM> {
         let cm_packets_drained = crate::concurrent_marking_packets_drained();
         let hint_cycle_gc = self.hint_cycle_gc.load(Ordering::SeqCst);
         let hint_emergency_gc = self.hint_emergency_gc.load(Ordering::SeqCst);
-        // Dump stats
-        if crate::verbose(3) {
-            if self.cm_enabled() && cm_in_progress {
-                if cm_packets_drained {
-                    gc_log!([3] "SATB: Concurrent marking is done");
-                } else {
-                    gc_log!([3] "SATB: Concurrent marking is NOT done. {} packets remaining", crate::NUM_CONCURRENT_TRACING_PACKETS.load(Ordering::SeqCst));
-                }
-            }
-            gc_log!([3] "Hint: cycle = {}, emergency = {}", hint_cycle_gc, hint_emergency_gc);
-            gc_log!([3]
-                "Stat: emergency = {}, user_triggered = {}, cm_in_progress = {}, cm_packets = {}, cm_enabled = {}",
-                emergency, user_triggered, cm_in_progress,
-                crate::NUM_CONCURRENT_TRACING_PACKETS.load(Ordering::SeqCst),
-                self.cm_enabled(),
-            );
-        }
-
         // If CM is finished, do a final mark pause
         if cm_in_progress && cm_packets_drained {
             return Pause::FinalMark;
@@ -782,31 +724,7 @@ impl<VM: VMBinding> LXR<VM> {
     }
 
     fn on_lazy_sweeping_finished(&self) {
-        let ix = &self.immix_space;
         self.immix_space.flush_page_resource();
-        let released_blocks = ix.num_clean_blocks_released_lazy.load(Ordering::SeqCst);
-        let released_los_pages = self.los().num_pages_released_lazy.load(Ordering::SeqCst);
-        let total_released_bytes =
-            (released_blocks << Block::LOG_BYTES) + (released_los_pages << LOG_BYTES_IN_PAGE);
-        gc_log!([2]
-            " - lazy jobs finished current-reserved-heap={}M({}M), released-blocks={}, released-los-pages={}, total-released={}",
-            self.get_reserved_pages() / 256,
-            self.get_total_pages() / 256,
-            released_blocks,
-            released_los_pages,
-            if total_released_bytes < BYTES_IN_KBYTE {
-                format!("{}B", total_released_bytes)
-            } else if total_released_bytes < BYTES_IN_MBYTE {
-                format!("{}K", total_released_bytes >> LOG_BYTES_IN_KBYTE)
-            } else if total_released_bytes < (1 << 30) {
-                format!("{}M", total_released_bytes >> LOG_BYTES_IN_MBYTE)
-            } else {
-                format!("{}G", total_released_bytes >> 30)
-            }
-        );
-        gc_log!([3] " - released young blocks since gc start {}({}M)", ix.num_clean_blocks_released_young.load(Ordering::Relaxed), ix.num_clean_blocks_released_young.load(Ordering::Relaxed) >> (LOG_BYTES_IN_MBYTE as usize - Block::LOG_BYTES));
-        gc_log!([3] " - released mature blocks {}({}M)", ix.num_clean_blocks_released_mature.load(Ordering::Relaxed), ix.num_clean_blocks_released_mature.load(Ordering::Relaxed) >> (LOG_BYTES_IN_MBYTE as usize - Block::LOG_BYTES));
-        gc_log!([2] " - num_clean_blocks_released_lazy = {}", ix.num_clean_blocks_released_lazy.load(Ordering::SeqCst));
         // Update counters
         if !crate::args::LAZY_DECREMENTS {
             HEAP_AFTER_GC.store(self.get_used_pages(), Ordering::SeqCst);

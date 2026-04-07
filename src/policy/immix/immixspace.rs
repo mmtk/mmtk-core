@@ -45,9 +45,6 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
 use std::sync::{atomic::AtomicU8, Arc};
 
-pub static RELEASED_NURSERY_BLOCKS: AtomicUsize = AtomicUsize::new(0);
-pub static RELEASED_BLOCKS: AtomicUsize = AtomicUsize::new(0);
-
 pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
 pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
 
@@ -818,12 +815,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         zero_unlog_table: bool,
         single_thread: bool,
     ) {
-        if crate::verbose(2) {
-            if nursery {
-                RELEASED_NURSERY_BLOCKS.fetch_add(1, Ordering::SeqCst);
-            }
-            RELEASED_BLOCKS.fetch_add(1, Ordering::SeqCst);
-        }
         if zero_unlog_table {
             block.clear_field_unlog_table::<VM>();
         }

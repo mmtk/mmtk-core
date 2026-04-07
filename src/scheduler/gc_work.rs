@@ -250,7 +250,6 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
             n += 1;
         });
         mmtk.scheduler.set_in_gc_pause(true);
-        gc_log!([3] "Discovered {} mutators", n);
         let is_lxr = mmtk.get_plan().downcast_ref::<LXR<C::VM>>().is_some();
         if BULK_THREAD_SCAN {
             let n_workers: usize = mmtk.scheduler.num_workers();
@@ -265,7 +264,6 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
             }
         }
         trace!("stop_all_mutators end");
-        gc_log!([3] " - Mutators stopped");
         #[cfg(feature = "sanity")]
         mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
         mmtk.get_plan().gc_pause_start(&mmtk.scheduler);
