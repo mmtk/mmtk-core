@@ -2,14 +2,13 @@ use super::LXR;
 use crate::plan::immix::Pause;
 use crate::plan::VectorQueue;
 use crate::policy::immix::block::Block;
-use crate::policy::immix::line::Line;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::{ScanObjects, SlotOf};
 use crate::scheduler::RootKind;
 use crate::util::copy::CopySemantics;
 use crate::util::rc::RefCountHelper;
-use crate::util::{Address, ObjectReference};
-use crate::vm::slot::{MemorySlice, Slot};
+use crate::util::ObjectReference;
+use crate::vm::slot::Slot;
 use crate::{
     plan::ObjectQueue,
     scheduler::{gc_work::ProcessEdgesBase, GCWork, GCWorker, ProcessEdgesWork, WorkBucketStage},
@@ -25,11 +24,8 @@ pub struct LXRConcurrentTraceObjects<VM: VMBinding> {
     // objects to mark and scan
     objects: Option<Vec<ObjectReference>>,
     objects_arc: Option<Arc<Vec<ObjectReference>>>,
-    ref_arrays: Option<Vec<(ObjectReference, Address, usize, VM::VMMemorySlice)>>,
     // recursively generated objects
     next_objects: VectorQueue<ObjectReference>,
-    next_ref_arrays: VectorQueue<(ObjectReference, Address, usize, VM::VMMemorySlice)>,
-    next_ref_arrays_size: usize,
     rc: RefCountHelper<VM>,
     worker: *mut GCWorker<VM>,
 }
@@ -44,10 +40,7 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
             plan,
             objects: Some(objects),
             objects_arc: None,
-            ref_arrays: None,
             next_objects: VectorQueue::default(),
-            next_ref_arrays: VectorQueue::default(),
-            next_ref_arrays_size: 0,
             rc: RefCountHelper::NEW,
             worker: std::ptr::null_mut(),
         }
@@ -60,29 +53,7 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
             plan,
             objects: None,
             objects_arc: Some(objects),
-            ref_arrays: None,
             next_objects: VectorQueue::default(),
-            next_ref_arrays: VectorQueue::default(),
-            next_ref_arrays_size: 0,
-            rc: RefCountHelper::NEW,
-            worker: std::ptr::null_mut(),
-        }
-    }
-
-    fn new_ref_arrays(
-        arrays: Vec<(ObjectReference, Address, usize, VM::VMMemorySlice)>,
-        mmtk: &'static MMTK<VM>,
-    ) -> Self {
-        let plan = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
-        crate::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
-        Self {
-            plan,
-            objects: None,
-            objects_arc: None,
-            ref_arrays: Some(arrays),
-            next_objects: VectorQueue::default(),
-            next_ref_arrays: VectorQueue::default(),
-            next_ref_arrays_size: 0,
             rc: RefCountHelper::NEW,
             worker: std::ptr::null_mut(),
         }
@@ -90,27 +61,6 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
 
     #[cold]
     fn flush(&mut self) {
-        self.flush_arrs();
-        self.flush_objs();
-    }
-
-    #[cold]
-    fn flush_arrs(&mut self) {
-        if !self.next_ref_arrays.is_empty() {
-            let next_ref_arrays = self.next_ref_arrays.take();
-            let worker = GCWorker::<VM>::current();
-            debug_assert!(self.plan.cm_enabled());
-            let w = Self::new_ref_arrays(next_ref_arrays, worker.mmtk);
-            if self.plan.current_pause() == Some(Pause::RefCount) {
-                worker.scheduler().postpone(w);
-            } else {
-                worker.add_work(WorkBucketStage::Unconstrained, w);
-            }
-        }
-    }
-
-    #[cold]
-    fn flush_objs(&mut self) {
         if !self.next_objects.is_empty() {
             let objects = self.next_objects.take();
             let worker = GCWorker::<VM>::current();
@@ -142,61 +92,6 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
         }
     }
 
-    fn trace_slice<const SRC_IN_DEFRAG: bool, const SRC_IN_IMMIX: bool>(
-        &mut self,
-        slice: &VM::VMMemorySlice,
-    ) {
-        let s = slice.iter_slots().next().unwrap();
-        if SRC_IN_IMMIX
-            && self
-                .plan
-                .immix_space
-                .is_marked(s.to_address().to_object_reference::<VM>())
-        {
-            return;
-        }
-        for s in slice.iter_slots() {
-            let Some(t) = s.load() else {
-                continue;
-            };
-            if SRC_IN_IMMIX
-                && Line::is_aligned(s.to_address())
-                && self.plan.immix_space.line_is_marked(s.to_address())
-            {
-                return;
-            }
-            if crate::args::RC_MATURE_EVACUATION && !SRC_IN_DEFRAG && self.plan.in_defrag(t) {
-                self.plan
-                    .immix_space
-                    .mature_evac_remset
-                    .record(s, t, self.plan);
-            }
-            self.trace_object(t);
-        }
-    }
-
-    fn trace_arrays(&mut self, arrays: &[(ObjectReference, Address, usize, VM::VMMemorySlice)]) {
-        for (o, cls, size, slice) in arrays {
-            if !(o.class_pointer::<VM>() == *cls
-                && o.get_size::<VM>() == *size
-                && !self.rc.object_or_line_is_dead(*o))
-            {
-                continue;
-            }
-            let ix = self.plan.immix_space.in_space(*o);
-            if ix {
-                let src_in_defrag = self.plan.in_defrag(*o);
-                if src_in_defrag {
-                    self.trace_slice::<true, true>(slice)
-                } else {
-                    self.trace_slice::<false, true>(slice)
-                }
-            } else {
-                self.trace_slice::<false, false>(slice)
-            }
-        }
-    }
-
     fn scan_and_enqueue<const CHECK_REMSET: bool>(&mut self, object: ObjectReference) {
         object.iterate_fields::<VM, _>(|s| {
             let Some(t) = s.load() else {
@@ -210,7 +105,7 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
             }
             self.next_objects.push(t);
             if self.next_objects.len() > Self::SATB_BUFFER_SIZE {
-                self.flush_objs();
+                self.flush();
             }
         });
     }
@@ -225,29 +120,11 @@ impl<VM: VMBinding> ObjectQueue for LXRConcurrentTraceObjects<VM> {
                 object
             );
         }
-        match VM::VMScanning::get_obj_kind(object) {
-            ObjectKind::ObjArray(len) if len >= 1024 => {
-                let data = VM::VMScanning::obj_array_data(object);
-                let cls = object.class_pointer::<VM>();
-                let len = object.get_size::<VM>();
-
-                for chunk in data.chunks(1024) {
-                    self.next_ref_arrays_size += chunk.len();
-                    self.next_ref_arrays.push((object, cls, len, chunk));
-                    if self.next_ref_arrays_size > Self::SATB_BUFFER_SIZE {
-                        self.flush_arrs();
-                    }
-                }
-            }
-            ObjectKind::ValArray => {}
-            _ => {
-                let should_check_remset = !self.plan.in_defrag(object);
-                if should_check_remset {
-                    self.scan_and_enqueue::<true>(object)
-                } else {
-                    self.scan_and_enqueue::<false>(object)
-                }
-            }
+        let should_check_remset = !self.plan.in_defrag(object);
+        if should_check_remset {
+            self.scan_and_enqueue::<true>(object)
+        } else {
+            self.scan_and_enqueue::<false>(object)
         }
     }
 }
@@ -269,24 +146,18 @@ impl<VM: VMBinding> GCWork<VM> for LXRConcurrentTraceObjects<VM> {
             self.trace_objects(&objects)
         } else if let Some(objects) = self.objects_arc.take() {
             self.trace_objects(&objects)
-        } else if let Some(arrays) = self.ref_arrays.take() {
-            self.trace_arrays(&arrays)
         }
         let pause_opt = self.plan.current_pause();
         if pause_opt == Some(Pause::FinalMark) || pause_opt.is_none() {
             let mut next_objects = vec![];
-            let mut next_ref_arrays = vec![];
-            while !self.next_ref_arrays.is_empty() || !self.next_objects.is_empty() {
+            while !self.next_objects.is_empty() {
                 let pause_opt = self.plan.current_pause();
                 if !(pause_opt == Some(Pause::FinalMark) || pause_opt.is_none()) {
                     break;
                 }
                 next_objects.clear();
-                next_ref_arrays.clear();
                 self.next_objects.swap(&mut next_objects);
                 self.trace_objects(&next_objects);
-                self.next_ref_arrays.swap(&mut next_ref_arrays);
-                self.trace_arrays(&next_ref_arrays);
             }
         }
         self.flush();
@@ -369,10 +240,8 @@ pub struct LXRStopTheWorldProcessEdges<VM: VMBinding, const FULL_GC: bool> {
     lxr: &'static LXR<VM>,
     pause: Pause,
     base: ProcessEdgesBase<VM>,
-    array_slices: Vec<VM::VMMemorySlice>,
     forwarded_roots: Vec<ObjectReference>,
     next_slots: VectorQueue<SlotOf<Self>>,
-    next_array_slices: VectorQueue<VM::VMMemorySlice>,
     next_slot_count: u32,
     remset_recorded_slots: bool,
     should_record_forwarded_roots: bool,
@@ -406,9 +275,7 @@ impl<VM: VMBinding, const FULL_GC: bool> ProcessEdgesWork
             base,
             pause: Pause::RefCount,
             forwarded_roots: vec![],
-            array_slices: vec![],
             next_slots: VectorQueue::new(),
-            next_array_slices: VectorQueue::new(),
             next_slot_count: 0,
             remset_recorded_slots: false,
             should_record_forwarded_roots: false,
@@ -417,11 +284,9 @@ impl<VM: VMBinding, const FULL_GC: bool> ProcessEdgesWork
 
     #[cold]
     fn flush(&mut self) {
-        if !self.next_slots.is_empty() || !self.next_array_slices.is_empty() {
+        if !self.next_slots.is_empty() {
             let slots = self.next_slots.take();
-            let slices = self.next_array_slices.take();
-            let mut w = Self::new(slots, false, self.mmtk(), self.bucket);
-            w.array_slices = slices;
+            let w = Self::new(slots, false, self.mmtk(), self.bucket);
             self.worker()
                 .add_boxed_work(WorkBucketStage::Unconstrained, Box::new(w));
         }
@@ -445,27 +310,23 @@ impl<VM: VMBinding, const FULL_GC: bool> ProcessEdgesWork
             self.forwarded_roots.reserve(self.slots.len());
         }
         let slots = std::mem::take(&mut self.slots);
-        let slices = std::mem::take(&mut self.array_slices);
         if self.roots && self.root_kind == Some(RootKind::Weak) {
-            self.process_slots_impl::<true, false>(&slots, &slices);
+            self.process_slots_impl::<true, false>(&slots);
         } else if self.remset_recorded_slots {
-            self.process_slots_impl::<false, true>(&slots, &slices);
+            self.process_slots_impl::<false, true>(&slots);
         } else {
-            self.process_slots_impl::<false, false>(&slots, &slices);
+            self.process_slots_impl::<false, false>(&slots);
         }
         self.roots = false;
         self.remset_recorded_slots = false;
         let should_record_forwarded_roots = self.should_record_forwarded_roots;
         self.should_record_forwarded_roots = false;
         let mut slots = vec![];
-        let mut slices = vec![];
-        while !self.next_slots.is_empty() || !self.next_array_slices.is_empty() {
+        while !self.next_slots.is_empty() {
             self.next_slot_count = 0;
             slots.clear();
-            slices.clear();
             self.next_slots.swap(&mut slots);
-            self.next_array_slices.swap(&mut slices);
-            self.process_slots_impl::<false, false>(&slots, &slices);
+            self.process_slots_impl::<false, false>(&slots);
         }
         self.flush();
         if should_record_forwarded_roots {
@@ -602,15 +463,9 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
     fn process_slots_impl<const WEAK_ROOT: bool, const REMSET: bool>(
         &mut self,
         slots: &[VM::VMSlot],
-        slices: &[VM::VMMemorySlice],
     ) {
         for s in slots {
             self.__process_slot::<WEAK_ROOT, REMSET>(*s);
-        }
-        for slice in slices {
-            for s in slice.iter_slots() {
-                self.__process_slot::<false, false>(s);
-            }
         }
     }
 }
@@ -618,39 +473,19 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
 impl<VM: VMBinding, const FULL_GC: bool> ObjectQueue for LXRStopTheWorldProcessEdges<VM, FULL_GC> {
     fn enqueue(&mut self, object: ObjectReference) {
         let limit: usize = if FULL_GC { 8192 } else { 1024 };
-        // Skip primitive array
-        match VM::VMScanning::get_obj_kind(object) {
-            ObjectKind::ObjArray(len) if len >= 1024 => {
-                let data = VM::VMScanning::obj_array_data(object);
-                for chunk in data.chunks(limit) {
-                    let len: usize = chunk.len();
-                    if self.next_slot_count as usize + len >= limit {
-                        self.flush();
-                    }
-                    self.next_slot_count += len as u32;
-                    self.next_array_slices.push(chunk);
-                    if self.next_slot_count as usize >= limit {
-                        self.flush();
-                    }
-                }
+        object.iterate_fields::<VM, _>(|s| {
+            let Some(o) = s.load() else {
+                return;
+            };
+            if self.lxr.is_marked(o) && !self.lxr.in_defrag(o) {
+                return;
             }
-            ObjectKind::ValArray => {}
-            _ => {
-                object.iterate_fields::<VM, _>(|s| {
-                    let Some(o) = s.load() else {
-                        return;
-                    };
-                    if self.lxr.is_marked(o) && !self.lxr.in_defrag(o) {
-                        return;
-                    }
-                    self.next_slots.push(s);
-                    self.next_slot_count += 1;
-                    if self.next_slot_count as usize >= limit {
-                        self.flush();
-                    }
-                });
+            self.next_slots.push(s);
+            self.next_slot_count += 1;
+            if self.next_slot_count as usize >= limit {
+                self.flush();
             }
-        }
+        });
     }
 }
 

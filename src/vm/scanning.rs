@@ -14,13 +14,6 @@ pub trait SlotVisitor<SL: Slot> {
     fn visit_slot(&mut self, slot: SL);
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum ObjectKind {
-    ValArray,
-    ObjArray(u32),
-    Scalar,
-}
-
 /// This lets us use closures as SlotVisitor.
 impl<SL: Slot, F: FnMut(SL)> SlotVisitor<SL> for F {
     fn visit_slot(&mut self, slot: SL) {
@@ -236,22 +229,6 @@ pub trait Scanning<VM: VMBinding> {
         _object_tracer: &mut OT,
     ) {
         unreachable!("scan_object_and_trace_edges() will not be called when support_slot_enqueuing() is always true.")
-    }
-
-    fn obj_array_data(_o: ObjectReference) -> VM::VMMemorySlice {
-        unreachable!()
-    }
-
-    fn is_obj_array(_o: ObjectReference) -> bool {
-        unreachable!()
-    }
-
-    fn is_val_array(_o: ObjectReference) -> bool {
-        unreachable!()
-    }
-
-    fn get_obj_kind(_o: ObjectReference) -> ObjectKind {
-        unreachable!()
     }
 
     /// MMTk calls this method at the first time during a collection that thread's stacks
