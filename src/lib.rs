@@ -188,7 +188,6 @@ fn disable_lasy_dec_for_current_gc() -> bool {
     crate::DISABLE_LASY_DEC_FOR_CURRENT_GC.load(Ordering::SeqCst)
 }
 
-static GC_EPOCH: AtomicUsize = AtomicUsize::new(0);
 static PAUSE_CONCURRENT_MARKING: AtomicBool = AtomicBool::new(false);
 static MOVE_CONCURRENT_MARKING_TO_STW: AtomicBool = AtomicBool::new(false);
 
@@ -197,4 +196,3 @@ static NO_EVAC: AtomicBool = AtomicBool::new(false);
 pub(crate) fn args() -> &'static crate::args::RuntimeArgs {
     crate::args::RuntimeArgs::get()
 }
-

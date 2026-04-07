@@ -128,62 +128,18 @@ impl Block {
         crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_MARK;
     pub const LOG_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_LOG;
-    pub const DEAD_WORDS: SideMetadataSpec =
-        crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_DEAD_WORDS;
     pub const NURSERY_PROMOTION_STATE_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::NURSERY_PROMOTION_STATE;
-
-    fn inc_dead_bytes_sloppy(&self, bytes: u32) {
-        let max_words = (Self::BYTES as u32) >> LOG_BYTES_IN_WORD;
-        let words = bytes >> LOG_BYTES_IN_WORD;
-        let old: u32 = Self::DEAD_WORDS.load_atomic(self.start(), Ordering::Relaxed);
-        let mut new = old + words;
-        if new >= max_words {
-            new = max_words - 1;
-        }
-        Self::DEAD_WORDS.store_atomic(self.start(), new, Ordering::Relaxed);
-    }
-
-    pub fn dec_dead_bytes_sloppy(&self, bytes: u32) {
-        let words = bytes >> LOG_BYTES_IN_WORD;
-        let old: u32 = Self::DEAD_WORDS.load_atomic(self.start(), Ordering::Relaxed);
-        let new = if old <= words { 0 } else { old - words };
-        Self::DEAD_WORDS.store_atomic(self.start(), new, Ordering::Relaxed);
-    }
-
-    pub fn inc_dead_bytes_sloppy_for_object<VM: VMBinding>(o: ObjectReference) {
-        let block = Block::containing(o);
-        block.inc_dead_bytes_sloppy(o.get_size::<VM>() as u32);
-    }
 
     pub fn calc_dead_lines(&self) -> usize {
         let mut dead_lines = 0;
         let rc_array = RCArray::of(*self);
-        // let mut skip_next_dead = false;
         for i in 0..Self::LINES {
             if rc_array.is_dead(i) {
-                // if i == 0 {
-                //     dead_lines += 1;
-                // } else if skip_next_dead {
-                //     skip_next_dead = false;
-                // } else {
-                //     dead_lines += 1;
-                // }
                 dead_lines += 1;
-            } else {
-                // skip_next_dead = true;
             }
         }
         dead_lines
-    }
-
-    pub fn dead_bytes(&self) -> u32 {
-        let v: u32 = Self::DEAD_WORDS.load_atomic(self.start(), Ordering::Relaxed);
-        v << LOG_BYTES_IN_WORD
-    }
-
-    fn reset_dead_bytes(&self) {
-        Self::DEAD_WORDS.store_atomic(self.start(), 0u32, Ordering::Relaxed);
     }
 
     pub const ZERO: Self = Self(Address::ZERO);
@@ -298,30 +254,6 @@ impl Block {
         Self::DEFRAG_STATE_TABLE.store_atomic::<u8>(self.start(), byte, Ordering::SeqCst);
     }
 
-    pub fn attempt_to_set_as_defrag_source(&self) -> bool {
-        loop {
-            let old_value: u8 =
-                Self::DEFRAG_STATE_TABLE.load_atomic(self.start(), Ordering::SeqCst);
-            if old_value == Self::DEFRAG_SOURCE_STATE {
-                return false;
-            }
-
-            if Self::DEFRAG_STATE_TABLE
-                .compare_exchange_atomic(
-                    self.start(),
-                    old_value,
-                    Self::DEFRAG_SOURCE_STATE,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                break;
-            }
-        }
-        true
-    }
-
     /// Record the number of holes in the block.
     pub fn set_holes(&self, holes: usize) {
         Self::DEFRAG_STATE_TABLE.store_atomic::<u8>(self.start(), holes as u8, Ordering::SeqCst);
@@ -368,9 +300,6 @@ impl Block {
 
     /// Deinitalize a block before releasing.
     pub fn deinit<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
-        if space.rc_enabled {
-            self.reset_dead_bytes();
-        }
         self.set_state(BlockState::Unallocated);
         if space.rc_enabled {
             self.set_as_defrag_source(false);
@@ -458,16 +387,6 @@ impl Block {
             .bzero_metadata(self.start(), Block::BYTES);
     }
 
-    pub fn assert_log_table_cleared<VM: VMBinding>(&self, meta: &SideMetadataSpec) {
-        assert!(cfg!(debug_assertions) || cfg!(feature = "sanity"));
-        let start = address_to_meta_address(meta, self.start()).to_ptr::<u128>();
-        let limit = address_to_meta_address(meta, self.end()).to_ptr::<u128>();
-        let table = unsafe { std::slice::from_raw_parts(start, limit.offset_from(start) as _) };
-        for x in table {
-            assert_eq!(*x, 0);
-        }
-    }
-
     pub fn initialize_field_unlog_table_as_unlogged<VM: VMBinding>(&self) {
         let meta = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
             .as_spec()
@@ -517,6 +436,15 @@ impl Block {
                 BlockState::Unmarked => {
                     #[cfg(feature = "vo_bit")]
                     vo_bit::helper::on_region_swept::<VM, _>(self, false);
+
+                    // If the pin bit is not on the side, we cannot bulk zero.
+                    // We shouldn't need to clear it here in that case, since the pin bit
+                    // should be overwritten at each object allocation. The same applies below
+                    // when we are sweeping on a line granularity.
+                    #[cfg(feature = "object_pinning")]
+                    if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC {
+                        side.bzero_metadata(self.start(), Block::BYTES);
+                    }
 
                     // Release the block if it is allocated but not marked by the current GC.
                     space.release_block(*self, false, false, false);
@@ -586,8 +514,10 @@ impl Block {
                 mark_histogram[holes] += marked_lines;
                 // Record number of holes in block side metadata.
                 self.set_holes(holes);
+
                 #[cfg(feature = "vo_bit")]
                 vo_bit::helper::on_region_swept::<VM, _>(self, true);
+
                 false
             }
         }
@@ -688,58 +618,6 @@ impl Block {
         false
     }
 
-    pub fn calc_holes(&self) -> usize {
-        let rc_array = RCArray::of(*self);
-        let search_next_hole = |start: usize| -> Option<usize> {
-            // Find start
-            let first_free_cursor = {
-                let start_cursor = start;
-                let mut first_free_cursor = None;
-                let mut find_free_line = false;
-                for i in start_cursor..Block::LINES {
-                    if rc_array.is_dead(i) {
-                        if i == 0 {
-                            first_free_cursor = Some(i);
-                            break;
-                        } else if !find_free_line {
-                            find_free_line = true;
-                        } else {
-                            first_free_cursor = Some(i);
-                            break;
-                        }
-                    } else {
-                        find_free_line = false;
-                    }
-                }
-                first_free_cursor
-            };
-            let start = match first_free_cursor {
-                Some(c) => c,
-                _ => return None,
-            };
-            // Find limit
-            let end = {
-                let mut cursor = start + 1;
-                while cursor < Block::LINES {
-                    if !rc_array.is_dead(cursor) {
-                        break;
-                    }
-                    cursor += 1;
-                }
-                cursor
-            };
-            Some(end)
-        };
-        let mut holes = 0;
-        let mut cursor = 0;
-        while let Some(end) = search_next_hole(cursor) {
-            cursor = end;
-            if end - cursor > 0 {
-                holes += 1;
-            }
-        }
-        holes
-    }
     /// Clear VO bits metadata for unmarked regions.
     /// This is useful for clearing VO bits during nursery GC for StickyImmix
     /// at which time young objects (allocated in unmarked regions) may die
@@ -778,7 +656,6 @@ pub struct ReusableBlockPool {
     num_workers: usize,
 }
 
-#[allow(unused)]
 impl ReusableBlockPool {
     /// Create empty block list
     pub fn new(num_workers: usize) -> Self {

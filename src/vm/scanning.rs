@@ -3,7 +3,6 @@ use crate::scheduler::gc_work::RootKind;
 use crate::scheduler::GCWorker;
 use crate::scheduler::WorkBucketStage;
 use crate::util::ObjectReference;
-use crate::util::VMMutatorThread;
 use crate::util::VMWorkerThread;
 use crate::vm::slot::Slot;
 use crate::vm::VMBinding;
@@ -102,8 +101,6 @@ pub trait ObjectTracerContext<VM: VMBinding>: Clone + Send + 'static {
 ///     references to variables with limited lifetime (such as local variables), because
 ///     it needs to be moved between threads.
 pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
-    const BUFFER_SIZE: usize = crate::args::BUFFER_SIZE;
-
     fn roots_stage(&self) -> WorkBucketStage {
         WorkBucketStage::Prepare
     }

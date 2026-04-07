@@ -15,7 +15,6 @@ use crate::MMTK;
 use enum_map::EnumMap;
 
 use super::barriers::NoBarrier;
-use super::lxr::LXR;
 
 pub(crate) type SpaceMapping<VM> = Vec<(AllocatorSelector, &'static dyn Space<VM>)>;
 
@@ -156,7 +155,6 @@ impl<VM: VMBinding> MutatorBuilder<VM> {
             mutator_tls: self.mutator_tls,
             plan: self.mmtk.get_plan(),
             config: self.config,
-            _original_pointer: 0,
         }
     }
 }
@@ -177,7 +175,6 @@ pub struct Mutator<VM: VMBinding> {
     pub mutator_tls: VMMutatorThread,
     pub(crate) plan: &'static dyn Plan<VM = VM>,
     pub(crate) config: MutatorConfig<VM>,
-    pub _original_pointer: usize,
 }
 
 impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
@@ -271,12 +268,6 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
 
     fn barrier(&mut self) -> &mut dyn Barrier<VM> {
         &mut *self.barrier
-    }
-    fn flush_remembered_sets(&mut self) {
-        self.barrier().flush();
-        if let Some(_immix) = self.plan.downcast_ref::<LXR<VM>>() {
-            unsafe { self.allocators.immix[0].assume_init_mut().flush() }
-        }
     }
 }
 

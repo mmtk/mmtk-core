@@ -209,16 +209,6 @@ impl Line {
             std::ptr::write_bytes::<u8>(meta_start.to_mut_ptr(), 0xffu8, meta_bytes);
         }
     }
-
-    pub fn clear_mark_table<VM: VMBinding>(lines: Range<Line>) {
-        // FIXME: Performance
-        let start = lines.start.start();
-        let size = Line::steps_between(&lines.start, &lines.end).unwrap() << Line::LOG_BYTES;
-        let mark_bit = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec();
-        for i in (0..size).step_by(1 << LOG_MIN_OBJECT_SIZE) {
-            mark_bit.store_atomic(start + i, 0u8, Ordering::SeqCst);
-        }
-    }
 }
 
 // type UInt<const BITS: usize> =

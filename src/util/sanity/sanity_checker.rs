@@ -1,8 +1,5 @@
 use crate::plan::Plan;
-use crate::policy::immix::block::{Block, BlockState};
-use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::ObjectReference;
 use crate::vm::slot::Slot;
 use crate::vm::*;
@@ -10,14 +7,13 @@ use crate::MMTK;
 use crate::{scheduler::*, ObjectQueue};
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::{AtomicU8, Ordering};
 
 #[allow(dead_code)]
 pub struct SanityChecker<SL: Slot> {
     /// Visited objects
     refs: HashSet<ObjectReference>,
-    /// Cached root edges for sanity root scanning
-    root_slots: Vec<(Vec<SL>, RootKind)>,
+    /// Cached root slots for sanity root scanning
+    root_slots: Vec<Vec<SL>>,
     /// Cached root nodes for sanity root scanning
     root_nodes: Vec<Vec<ObjectReference>>,
 }
@@ -38,8 +34,8 @@ impl<SL: Slot> SanityChecker<SL> {
     }
 
     /// Cache a list of root slots to the sanity checker.
-    pub fn add_root_slots(&mut self, roots: Vec<SL>, kind: RootKind) {
-        self.root_slots.push((roots, kind))
+    pub fn add_root_slots(&mut self, roots: Vec<SL>) {
+        self.root_slots.push(roots)
     }
 
     pub fn add_root_nodes(&mut self, roots: Vec<ObjectReference>) {
@@ -47,7 +43,7 @@ impl<SL: Slot> SanityChecker<SL> {
     }
 
     /// Reset roots cache at the end of the sanity gc.
-    pub(crate) fn clear_roots_cache(&mut self) {
+    fn clear_roots_cache(&mut self) {
         self.root_slots.clear();
         self.root_nodes.clear();
     }
@@ -89,15 +85,15 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
         // }
         {
             let sanity_checker = mmtk.sanity_checker.lock().unwrap();
-            for (roots, kind) in &sanity_checker.root_slots {
-                let mut w = SanityGCProcessEdges::<P::VM>::new(
-                    roots.clone(),
-                    true,
-                    mmtk,
-                    WorkBucketStage::Closure,
+            for roots in &sanity_checker.root_slots {
+                scheduler.work_buckets[WorkBucketStage::Closure].add(
+                    SanityGCProcessEdges::<P::VM>::new(
+                        roots.clone(),
+                        true,
+                        mmtk,
+                        WorkBucketStage::Closure,
+                    ),
                 );
-                w.root_kind = Some(*kind);
-                scheduler.work_buckets[WorkBucketStage::Closure].add(w);
             }
             for roots in &sanity_checker.root_nodes {
                 scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessRootNodes::<
@@ -106,9 +102,6 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
                     SanityGCProcessEdges<P::VM>,
                 >::new(
                     roots.clone(),
-                    false,
-                    false,
-                    false,
                     WorkBucketStage::Closure,
                 ));
             }
@@ -122,10 +115,6 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
     }
 }
 
-static MARK_STATE: AtomicU8 = AtomicU8::new(0);
-const MARK_BITS: SideMetadataSpec =
-    crate::util::metadata::side_metadata::spec_defs::SANITY_MARK_BITS;
-
 pub struct SanityPrepare<P: Plan> {
     pub plan: &'static P,
 }
@@ -134,28 +123,15 @@ impl<P: Plan> SanityPrepare<P> {
     pub fn new(plan: &'static P) -> Self {
         Self { plan }
     }
-
-    fn update_mark_state() {
-        let mut mark_state = MARK_STATE.load(Ordering::SeqCst);
-        if mark_state == 0 || mark_state == 255 {
-            mark_state = 1;
-        } else {
-            mark_state += 1;
-        }
-        MARK_STATE.store(mark_state, Ordering::SeqCst);
-    }
 }
 
 impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
-        Self::update_mark_state();
         info!("Sanity GC prepare");
         {
             let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
             sanity_checker.refs.clear();
         }
-        crate::SANITY_LIVE_SIZE_IX.store(0, Ordering::Relaxed);
-        crate::SANITY_LIVE_SIZE_LOS.store(0, Ordering::Relaxed);
     }
 }
 
@@ -180,7 +156,6 @@ impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
 // #[derive(Default)]
 pub struct SanityGCProcessEdges<VM: VMBinding> {
     base: ProcessEdgesBase<VM>,
-    edge: Option<VM::VMEdge>,
 }
 
 impl<VM: VMBinding> Deref for SanityGCProcessEdges<VM> {
@@ -193,30 +168,6 @@ impl<VM: VMBinding> Deref for SanityGCProcessEdges<VM> {
 impl<VM: VMBinding> DerefMut for SanityGCProcessEdges<VM> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
-    }
-}
-
-impl<VM: VMBinding> SanityGCProcessEdges<VM> {
-    fn attempt_mark(&self, o: ObjectReference) -> bool {
-        let mark_state = MARK_STATE.load(Ordering::SeqCst);
-        loop {
-            let old_value = MARK_BITS.load_atomic::<u8>(o.to_raw_address(), Ordering::SeqCst);
-            if old_value == mark_state {
-                return false;
-            }
-            if MARK_BITS
-                .compare_exchange_atomic::<u8>(
-                    o.to_raw_address(),
-                    old_value,
-                    mark_state,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                return true;
-            }
-        }
     }
 }
 
@@ -234,117 +185,32 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
         Self {
             base: ProcessEdgesBase::new(slots, roots, mmtk, bucket),
             // ..Default::default()
-            edge: None,
         }
     }
 
-    fn process_edge(&mut self, slot: EdgeOf<Self>) {
-        let object = slot.load();
-        self.edge = Some(slot);
-        let new_object = self.trace_object(object);
-        if Self::OVERWRITE_REFERENCE {
-            slot.store(new_object);
-        }
-    }
-
-    #[cfg(feature = "fragmentation_analysis")]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if self.attempt_mark(object) {
-            let lxr = self
-                .mmtk()
-                .get_plan()
-                .downcast_ref::<crate::plan::lxr::LXR<VM>>()
-                .unwrap();
-            if lxr.immix_space.in_space(object) {
-                crate::SANITY_LIVE_SIZE_IX.fetch_add(object.get_size::<VM>(), Ordering::Relaxed);
-            } else {
-                crate::SANITY_LIVE_SIZE_LOS.fetch_add(object.get_size::<VM>(), Ordering::Relaxed);
-            }
-            self.nodes.enqueue(object);
-        }
-        object
-    }
-    #[cfg(not(feature = "fragmentation_analysis"))]
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if let Some(_lxr) = self
-            .mmtk()
-            .get_plan()
-            .downcast_ref::<crate::plan::lxr::LXR<VM>>()
-        {
-            if self.edge.unwrap().to_address().is_mapped() {
-                assert!(
-                    !self.edge.unwrap().to_address().is_field_logged::<VM>(),
-                    "{:?} -> {:?} is logged",
-                    self.edge,
-                    object
-                );
-            }
-        }
-        if object.is_null() {
-            return object;
-        }
-        if self.attempt_mark(object) {
+        let mut sanity_checker = self.mmtk().sanity_checker.lock().unwrap();
+        if !sanity_checker.refs.contains(&object) {
             // FIXME steveb consider VM-specific integrity check on reference.
             assert!(object.is_sane(), "Invalid reference {:?}", object);
 
             // Let plan check object
             assert!(
-                object.to_raw_address().is_mapped(),
-                "Invalid reference {:?} -> {:?}",
-                self.edge,
+                self.mmtk().get_plan().sanity_check_object(object),
+                "Invalid reference {:?}",
                 object
             );
+
+            // Let VM check object
             assert!(
-                object.is_sane(),
-                "Invalid reference {:?} -> {:?}",
-                self.edge,
+                VM::VMObjectModel::is_object_sane(object),
+                "Invalid reference {:?}",
                 object
             );
-            if let Some(lxr) = self
-                .mmtk()
-                .get_plan()
-                .downcast_ref::<crate::plan::lxr::LXR<VM>>()
-            {
-                assert!(
-                    unsafe { object.to_raw_address().load::<usize>() } != 0xdead,
-                    "{:?} -> {:?} is killed by decs",
-                    self.edge,
-                    object
-                );
-                assert!(
-                    lxr.rc.count(object) > 0,
-                    "{:?} -> {:?} has zero rc count",
-                    self.edge,
-                    object
-                );
-                assert!(
-                    !crate::util::object_forwarding::is_forwarded_or_being_forwarded::<VM>(object),
-                    "{:?} -> {:?} is forwarded",
-                    self.edge,
-                    object
-                );
-                if lxr.immix_space.in_space(object) {
-                    assert_ne!(
-                        Block::containing(object).get_state(),
-                        BlockState::Unallocated,
-                        "{:?}->{:?} block is released",
-                        self.edge,
-                        object
-                    )
-                }
-                if lxr.current_pause().unwrap() == crate::plan::immix::Pause::FinalMark
-                    || lxr.current_pause().unwrap() == crate::plan::immix::Pause::Full
-                {
-                    assert!(
-                        lxr.is_marked(object),
-                        "{:?} -> {:?} is not marked, roots={} kind={:?}",
-                        self.edge,
-                        object,
-                        self.roots,
-                        self.root_kind,
-                    )
-                }
-            }
+
+            // Object is not "marked"
+            sanity_checker.refs.insert(object); // "Mark" it
+            trace!("Sanity mark object {}", object);
             self.nodes.enqueue(object);
         }
 

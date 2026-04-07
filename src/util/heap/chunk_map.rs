@@ -30,6 +30,19 @@ impl Chunk {
     /// Chunk constant with zero address
     // FIXME: We use this as an empty value. What if we actually use the first chunk?
     pub const ZERO: Self = Self(Address::ZERO);
+
+    /// Get an iterator for regions within this chunk.
+    pub fn iter_region<R: Region>(&self) -> RegionIterator<R> {
+        // R should be smaller than a chunk
+        debug_assert!(R::LOG_BYTES < Self::LOG_BYTES);
+        // R should be aligned to chunk boundary
+        debug_assert!(R::is_aligned(self.start()));
+        debug_assert!(R::is_aligned(self.end()));
+
+        let start = R::from_aligned_address(self.start());
+        let end = R::from_aligned_address(self.end());
+        RegionIterator::<R>::new(start, end)
+    }
 }
 
 /// The allocation state for a chunk in the chunk map. It includes whether each chunk is allocated or free, and the space the chunk belongs to.

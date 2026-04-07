@@ -488,10 +488,6 @@ pub trait ObjectModel<VM: VMBinding> {
     fn is_object_sane(_object: ObjectReference) -> bool {
         true
     }
-
-    fn dump_object_s(object: ObjectReference) -> String;
-
-    fn get_class_pointer(object: ObjectReference) -> Address;
 }
 
 pub mod specs {

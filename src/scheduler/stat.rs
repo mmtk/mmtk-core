@@ -44,7 +44,6 @@ impl SchedulerStat {
 
     /// Used during statistics printing at [`crate::memory_manager::harness_end`]
     pub fn harness_stat(&self) -> HashMap<String, String> {
-        return Default::default();
         let mut stat = HashMap::new();
         let mut counts = HashMap::<String, usize>::new();
         let mut times = HashMap::<String, f64>::new();
@@ -64,9 +63,7 @@ impl SchedulerStat {
         stat.insert("total-work.count".to_owned(), format!("{}", total_count));
         // Work execution times
         let mut duration_overall: WorkCounterBase = Default::default();
-        let mut work_counters = self.work_counters.iter().collect::<Vec<_>>();
-        work_counters.sort_by_cached_key(|(t, _)| self.work_id_name_map[t]);
-        for (t, vs) in work_counters {
+        for (t, vs) in &self.work_counters {
             // Name of the work packet type
             let n = self.work_id_name_map[t];
             // Iterate through different types of work counters
@@ -97,7 +94,6 @@ impl SchedulerStat {
                 *val = f64::max(*val, fold.max);
             }
         }
-
         // Convert to ms and print out overall execution time
         stat.insert(
             "total-work.time.total".to_owned(),

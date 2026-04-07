@@ -4,7 +4,6 @@ use crate::util::Address;
 use crate::vm::{Collection, VMBinding};
 use bytemuck::NoUninit;
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
-use std::fmt::Debug;
 use std::io::{Error, Result};
 use sysinfo::MemoryRefreshKind;
 use sysinfo::{RefreshKind, System};

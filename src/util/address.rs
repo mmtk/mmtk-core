@@ -10,7 +10,7 @@ use std::sync::atomic::Ordering;
 use crate::mmtk::{MMAPPER, SFT_MAP};
 use crate::plan::barriers::LOGGED_VALUE;
 use crate::plan::SlotIterator;
-use crate::vm::{ObjectModel, VMBinding};
+use crate::vm::ObjectModel;
 
 use super::heap::layout::vm_layout::vm_layout;
 
@@ -515,6 +515,8 @@ mod tests {
     }
 }
 
+use crate::vm::VMBinding;
+
 /// `ObjectReference` represents address for an object. Compared with `Address`, operations allowed
 /// on `ObjectReference` are very limited. No address arithmetics are allowed for `ObjectReference`.
 /// The idea is from the paper [Demystifying Magic: High-level Low-level Programming (VEE09)][FBC09]
@@ -621,8 +623,6 @@ mod tests {
 pub struct ObjectReference(NonZeroUsize);
 
 impl ObjectReference {
-    /// The null object reference, represented as zero.
-    pub const NULL: Option<Self> = None;
     pub const STRICT_VERIFICATION: bool =
         cfg!(debug_assertions) || cfg!(feature = "sanity") || false;
     /// The required minimal alignment for object reference. If the object reference's raw address is not aligned to this value,
@@ -738,43 +738,22 @@ impl ObjectReference {
 
     /// Get forwarding pointer if the object is forwarded.
     pub fn get_forwarded_object(self) -> Option<Self> {
-        debug_assert!({
-            let addr = self.to_raw_address();
-            addr >= vm_layout().heap_start && addr < vm_layout().heap_end
-        });
         unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.get_forwarded_object(self)
     }
 
     /// Is the object in any MMTk spaces?
     pub fn is_in_any_space(self) -> bool {
-        let addr = self.to_raw_address();
-        if addr < vm_layout().heap_start || addr >= vm_layout().heap_end {
-            return false;
-        }
         unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_in_space(self)
     }
 
     /// Is the object sane?
     #[cfg(feature = "sanity")]
     pub fn is_sane(self) -> bool {
-        let addr = self.to_raw_address();
-        if addr < vm_layout().heap_start || addr >= vm_layout().heap_end {
-            return false;
-        }
         unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_sane()
     }
 
     pub fn get_size<VM: VMBinding>(self) -> usize {
         VM::VMObjectModel::get_current_size(self)
-    }
-
-    pub fn range<VM: VMBinding>(self) -> Range<Address> {
-        let a = VM::VMObjectModel::ref_to_object_start(self);
-        a..a + self.get_size::<VM>()
-    }
-
-    pub fn class_pointer<VM: VMBinding>(self) -> Address {
-        VM::VMObjectModel::get_class_pointer(self)
     }
 
     pub fn iterate_fields<VM: VMBinding, F: FnMut(VM::VMSlot)>(self, f: F) {

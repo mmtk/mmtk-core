@@ -1358,9 +1358,6 @@ impl SideMetadataContext {
         #[cfg(feature = "vo_bit")]
         ret.push(VO_BIT_SIDE_METADATA_SPEC);
 
-        #[cfg(feature = "sanity")]
-        ret.push(crate::util::metadata::side_metadata::spec_defs::SANITY_MARK_BITS);
-
         if let Some(spec) = crate::mmtk::SFT_MAP.get_side_metadata() {
             if spec.is_global {
                 ret.push(*spec);
@@ -1608,8 +1605,7 @@ impl<const ENTRIES: usize> MetadataByteArrayRef<ENTRIES> {
     pub fn get(&self, index: usize) -> u8 {
         #[cfg(feature = "extreme_assertions")]
         let _lock = sanity::SANITY_LOCK.lock().unwrap();
-        debug_assert!(index <= self.data.len(), "out of boundary");
-        let value = unsafe { *self.data.get_unchecked(index) };
+        let value = self.data[index];
         #[cfg(feature = "extreme_assertions")]
         {
             let data_addr = self.heap_range_start + (index << self.spec.log_bytes_in_region);

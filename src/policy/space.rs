@@ -316,12 +316,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn address_in_space(&self, start: Address) -> bool {
-        use crate::vm::object_model::ObjectModel;
-        if VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
-            let common = self.common();
-            common.get_vm_map32().get_descriptor_for_address(start) == common.descriptor
+        if !self.common().descriptor.is_contiguous() {
+            self.common().vm_map().get_descriptor_for_address(start) == self.common().descriptor
         } else {
-            debug_assert!(self.common().descriptor.is_contiguous());
             start >= self.common().start && start < self.common().start + self.common().extent
         }
     }
@@ -557,7 +554,6 @@ pub struct CommonSpace<VM: VMBinding> {
     pub extent: usize,
 
     pub vm_map: &'static dyn VMMap,
-    pub vm_map_32: Option<&'static crate::util::heap::layout::map32::Map32>,
     pub mmapper: &'static dyn Mmapper,
 
     pub(crate) metadata: SideMetadataContext,
@@ -640,12 +636,6 @@ impl<VM: VMBinding> CommonSpace<VM> {
             start: unsafe { Address::zero() },
             extent: 0,
             vm_map: args.plan_args.vm_map,
-            vm_map_32: args
-                .plan_args
-                .vm_map
-                .as_any()
-                .downcast_ref::<crate::util::heap::layout::map32::Map32>()
-                .map(|x| unsafe { &*(x as *const crate::util::heap::layout::map32::Map32) }),
             mmapper: args.plan_args.mmapper,
             needs_log_bit: args.plan_args.constraints.needs_log_bit,
             needs_field_log_bit: args.plan_args.constraints.needs_field_log_bit,
@@ -765,10 +755,6 @@ impl<VM: VMBinding> CommonSpace<VM> {
 
     pub fn vm_map(&self) -> &'static dyn VMMap {
         self.vm_map
-    }
-
-    pub(crate) fn get_vm_map32(&self) -> &'static crate::util::heap::layout::map32::Map32 {
-        unsafe { self.vm_map_32.unwrap_unchecked() }
     }
 
     pub fn mmap_strategy(&self) -> MmapStrategy {

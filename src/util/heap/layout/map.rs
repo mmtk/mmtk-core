@@ -1,7 +1,6 @@
 use crate::util::freelist::FreeList;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::Address;
-use downcast_rs::Downcast;
 
 /// The result of creating free list.
 ///
@@ -17,7 +16,7 @@ pub struct CreateFreeListResult {
     pub space_displacement: usize,
 }
 
-pub trait VMMap: Sync + Downcast {
+pub trait VMMap: Sync {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor);
 
     /// Create a free-list for a discontiguous space. Must only be called at boot time.
@@ -86,5 +85,3 @@ pub trait VMMap: Sync + Downcast {
     /// address is not within the MMTk heap range, or not within MMTk spaces.
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor;
 }
-
-impl_downcast!(VMMap);

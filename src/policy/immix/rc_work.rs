@@ -161,7 +161,6 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
                 o.to_raw_address().store(0xdeadusize);
             }
         }
-        Block::inc_dead_bytes_sloppy_for_object::<VM>(o);
         self.rc.unmark_straddle_object(o);
         self.rc.set(o, 0);
     }

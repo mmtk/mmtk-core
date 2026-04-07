@@ -132,9 +132,6 @@ impl<VM: VMBinding> ObjectQueue for LXRConcurrentTraceObjects<VM> {
 unsafe impl<VM: VMBinding> Send for LXRConcurrentTraceObjects<VM> {}
 
 impl<VM: VMBinding> GCWork<VM> for LXRConcurrentTraceObjects<VM> {
-    fn should_defer(&self) -> bool {
-        crate::PAUSE_CONCURRENT_MARKING.load(Ordering::SeqCst)
-    }
     fn is_concurrent_marking_work(&self) -> bool {
         true
     }

@@ -370,7 +370,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(crate::util::rc::RC_STRADDLE_LINES),
                 MetadataSpec::OnSide(Block::LOG_TABLE),
                 MetadataSpec::OnSide(Block::NURSERY_PROMOTION_STATE_TABLE),
-                MetadataSpec::OnSide(Block::DEAD_WORDS),
                 MetadataSpec::OnSide(IX_LINE_REUSE_COUNT),
             ];
             return metadata::extract_side_metadata(&meta);
@@ -1326,12 +1325,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.reused_lines_consumed
                 .fetch_add(num_lines, Ordering::Relaxed);
         }
-        block.dec_dead_bytes_sloppy((num_lines as u32) << Line::LOG_BYTES);
         if self.block_allocation.cm_in_progress_or_final_mark() {
             Line::initialize_mark_table_as_marked::<VM>(start..end);
             Line::inc_reuse_counts::<VM>(start..end);
-        } else {
-            // Line::clear_mark_table::<VM>(start..end);
         }
         // if !_copy {
         //     println!("reuse {:?} copy={}", start..end, copy);

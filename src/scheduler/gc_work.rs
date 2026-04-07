@@ -11,13 +11,11 @@ use crate::vm::*;
 use crate::*;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::Ordering;
 
 pub struct ScheduleCollection;
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        crate::GC_EPOCH.fetch_add(1, Ordering::SeqCst);
         // Tell GC trigger that GC started.
         mmtk.gc_trigger.policy.on_gc_start(mmtk);
 
@@ -60,10 +58,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for Prepare<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Prepare Global");
         // We assume this is the only running work packet that accesses plan at the point of execution
-        #[allow(clippy::cast_ref_to_mut)]
-        #[allow(invalid_reference_casting)]
-        let plan_mut: &mut C::PlanType =
-            unsafe { &mut *(self.plan as *const C::PlanType as *mut C::PlanType) };
+        let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.prepare(worker.tls);
 
         if !plan_mut.no_mutator_prepare_release() && plan_mut.constraints().needs_prepare_mutator {
@@ -89,7 +84,6 @@ pub struct PrepareMutator<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> PrepareMutator<VM> {
-    #[allow(unused)]
     pub fn new(mutator: &'static mut Mutator<VM>) -> Self {
         Self { mutator }
     }
@@ -142,10 +136,8 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
         }
         mmtk.gc_trigger.policy.on_gc_release(mmtk);
         // We assume this is the only running work packet that accesses plan at the point of execution
-        #[allow(clippy::cast_ref_to_mut)]
-        #[allow(invalid_reference_casting)]
-        let plan_mut: &mut C::PlanType =
-            unsafe { &mut *(self.plan as *const C::PlanType as *mut C::PlanType) };
+
+        let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.release(worker.tls);
 
         if !plan_mut.no_mutator_prepare_release() {
@@ -173,7 +165,6 @@ pub struct ReleaseMutator<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> ReleaseMutator<VM> {
-    #[allow(unused)]
     pub fn new(mutator: &'static mut Mutator<VM>) -> Self {
         Self { mutator }
     }
@@ -249,14 +240,11 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
                 mutator.prepare(worker.tls);
             }
             if !self.skip_mutator_roots {
-                mmtk.scheduler.work_buckets[stage]
-                    .add(ScanMutatorRoots::<C>(mutator));
+                mmtk.scheduler.work_buckets[stage].add(ScanMutatorRoots::<C>(mutator));
             }
         });
         mmtk.scheduler.set_in_gc_pause(true);
         trace!("stop_all_mutators end");
-        #[cfg(feature = "sanity")]
-        mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
         mmtk.get_plan().gc_pause_start(&mmtk.scheduler);
         let factory = ProcessEdgesWorkRootsWorkFactory::<
             C::VM,
@@ -462,7 +450,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
         >::new(mmtk);
         <C::VM as VMBinding>::VMScanning::scan_roots_in_mutator_thread(
             worker.tls,
-            unsafe { &mut *(self.0 as *mut Mutator<C::VM>) },
+            unsafe { &mut *(self.0 as *mut _) },
             factory,
         );
         self.0.prepare(worker.tls);
@@ -626,7 +614,7 @@ pub trait ProcessEdgesWork:
     /// Higher capacity means the packet will take longer to finish, and may lead to
     /// bad load balancing. On the other hand, lower capacity would lead to higher cost
     /// on scheduling many small work packets. It is important to find a proper capacity.
-    const CAPACITY: usize = crate::args::BUFFER_SIZE;
+    const CAPACITY: usize = EDGES_WORK_BUFFER_SIZE;
     /// Do we update object reference? This has to be true for a moving GC.
     const OVERWRITE_REFERENCE: bool = true;
     /// If true, we do object scanning in this work packet with the same worker without scheduling overhead.
@@ -811,7 +799,6 @@ impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
 /// For USDT tracepoints for roots.
 /// Keep in sync with `tools/tracing/timeline/visualize.py`.
 #[repr(usize)]
-#[allow(dead_code)]
 enum RootsKind {
     NORMAL = 0,
     PINNING = 1,
@@ -840,26 +827,14 @@ impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
         // different names, and our `capture.bt` mentions all of them, `bpftrace` may complain that
         // it cannot find one or more of those USDT trace points in the binary.
         probe!(mmtk, roots, RootsKind::NORMAL, slots.len());
-        let mut w = DPE::new(
-            slots,
-            true,
-            self.mmtk,
-            if DPE::RC_ROOTS {
-                WorkBucketStage::RCProcessIncs
-            } else {
-                WorkBucketStage::Closure
-            },
-        );
+        let stage = if DPE::RC_ROOTS {
+            WorkBucketStage::RCProcessIncs
+        } else {
+            WorkBucketStage::Closure
+        };
+        let mut w = DPE::new(slots, true, self.mmtk, stage);
         w.root_kind = Some(kind);
-        crate::memory_manager::add_work_packet(
-            self.mmtk,
-            if DPE::RC_ROOTS {
-                WorkBucketStage::RCProcessIncs
-            } else {
-                WorkBucketStage::Closure
-            },
-            w,
-        );
+        crate::memory_manager::add_work_packet(self.mmtk, stage, w);
     }
 
     fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
@@ -1249,7 +1224,7 @@ impl<VM: VMBinding, R2OPE: ProcessEdgesWork<VM = VM>, O2OPE: ProcessEdgesWork<VM
 
             // This contains root objects that are visited the first time.
             // It is sufficient to only scan these objects.
-            VectorQueue::take(&mut process_edges_work.nodes)
+            process_edges_work.nodes.take()
         };
 
         let num_enqueued_nodes = root_objects_to_scan.len();

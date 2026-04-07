@@ -15,7 +15,6 @@ use crate::util::options::AffinityKind;
 use crate::util::reference_processor::PhantomRefProcessing;
 use crate::vm::Collection;
 use crate::vm::VMBinding;
-use crate::Pause;
 use crate::Plan;
 use crossbeam::deque::{Injector, Steal};
 use enum_map::{Enum, EnumMap};
@@ -227,10 +226,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.work_buckets[WorkBucketStage::Unconstrained].add_no_notify(ScheduleCollection);
     }
 
-    pub fn schedule_common_work_no_refs<C: GCWorkContext<VM = VM>>(
-        &self,
-        plan: &'static C::PlanType,
-    ) {
+    /// Schedule all the common work packets
+    pub fn schedule_common_work<C: GCWorkContext<VM = VM>>(&self, plan: &'static C::PlanType) {
         use crate::scheduler::gc_work::*;
         // Stop & scan mutators (mutator scanning can happen before STW)
         self.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<C>::new());
@@ -255,40 +252,26 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             self.work_buckets[WorkBucketStage::Final]
                 .add(ScheduleSanityGC::<C::PlanType>::new(plan));
         }
-    }
 
-    /// Schedule all the common work packets
-    pub fn schedule_common_work<C: GCWorkContext<VM = VM> + 'static>(
-        &self,
-        plan: &'static C::PlanType,
-    ) {
-        self.schedule_common_work_no_refs::<C>(plan);
-
-        use crate::scheduler::gc_work::*;
         // Reference processing
-        if !*plan.base().options.no_reference_types || !*plan.base().options.no_finalizer {
-            // use crate::util::reference_processor::{
-            //     PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
-            // };
-            // self.work_buckets[WorkBucketStage::WeakRefClosure]
-            //     .add(SoftRefProcessing::<C::DefaultProcessEdges>::new());
-            // self.work_buckets[WorkBucketStage::WeakRefClosure]
-            //     .add(WeakRefProcessing::<C::DefaultProcessEdges>::new());
+        if !*plan.base().options.no_reference_types {
+            use crate::util::reference_processor::{
+                PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
+            };
+            self.work_buckets[WorkBucketStage::SoftRefClosure]
+                .add(SoftRefProcessing::<C::DefaultProcessEdges>::new());
+            self.work_buckets[WorkBucketStage::WeakRefClosure].add(WeakRefProcessing::<VM>::new());
             self.work_buckets[WorkBucketStage::PhantomRefClosure]
                 .add(PhantomRefProcessing::<VM>::new());
 
-            // VM-specific weak ref processing
-            self.work_buckets[WorkBucketStage::WeakRefClosure]
-                .add(VMProcessWeakRefs::<C::DefaultProcessEdges>::new());
+            use crate::util::reference_processor::RefForwarding;
+            if plan.constraints().needs_forward_after_liveness {
+                self.work_buckets[WorkBucketStage::RefForwarding]
+                    .add(RefForwarding::<C::DefaultProcessEdges>::new());
+            }
 
-            // use crate::util::reference_processor::RefForwarding;
-            // if plan.constraints().needs_forward_after_liveness {
-            //     self.work_buckets[WorkBucketStage::RefForwarding]
-            //         .add(RefForwarding::<C::DefaultProcessEdges>::new());
-            // }
-
-            // use crate::util::reference_processor::RefEnqueue;
-            // self.work_buckets[WorkBucketStage::Release].add(RefEnqueue::<VM>::new());
+            use crate::util::reference_processor::RefEnqueue;
+            self.work_buckets[WorkBucketStage::Release].add(RefEnqueue::<VM>::new());
         }
 
         // Finalization
@@ -349,7 +332,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             if plan.constraints().needs_forward_after_liveness {
                 self.work_buckets[WorkBucketStage::FinalizableForwarding]
                     .add(ForwardFinalization::<C::DefaultProcessEdges>::new());
-                unimplemented!()
             }
         }
 
@@ -377,11 +359,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // self.work_buckets[WorkBucketStage::VMRefClosure]
         //     .set_sentinel(Box::new(VMProcessWeakRefs::<C::DefaultProcessEdges>::new()));
 
-        // if plan.constraints().needs_forward_after_liveness {
-        //     // VM-specific weak ref forwarding
-        //     self.work_buckets[WorkBucketStage::VMRefForwarding]
-        //         .add(VMForwardWeakRefs::<C::DefaultProcessEdges>::new());
-        // }
+        if plan.constraints().needs_forward_after_liveness {
+            // VM-specific weak ref forwarding
+            self.work_buckets[WorkBucketStage::VMRefForwarding]
+                .add(VMForwardWeakRefs::<C::DefaultProcessEdges>::new());
+        }
 
         // self.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
     }
@@ -533,7 +515,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Check if all the work buckets are empty
-    #[allow(unused)]
     pub(crate) fn assert_all_open_buckets_are_empty(&self) {
         let mut error_example = None;
         for (id, bucket) in self.work_buckets.iter() {
@@ -669,14 +650,18 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     LastParkedResult::WakeAll
                 } else {
                     // GC finished.
-                    let conc_work = self.on_gc_finished(worker);
+                    let concurrent_work_scheduled = self.on_gc_finished(worker);
 
                     // Clear the current goal
                     goals.on_current_goal_completed();
 
-                    if conc_work {
+                    if concurrent_work_scheduled {
+                        // It was the initial mark pause and scheduled concurrent work.
+                        // Wake up all GC workers to do concurrent work.
                         LastParkedResult::WakeAll
                     } else {
+                        // It was an STW GC or the final mark pause of a concurrent GC.
+                        // Respond to another goal.
                         self.respond_to_requests(worker, goals)
                     }
                 }
@@ -756,14 +741,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         }
     }
 
-    fn dump_gc_stats(&self, mmtk: &MMTK<VM>) {
-        let pause = mmtk
-            .get_plan()
-            .downcast_ref::<LXR<VM>>()
-            .map(|ix| ix.current_pause().unwrap())
-            .unwrap_or(Pause::Full);
-    }
-
     fn schedule_postponed_concurrent_packets(
         &self,
     ) -> (Injector<Box<dyn GCWork<VM>>>, Injector<Box<dyn GCWork<VM>>>) {
@@ -792,7 +769,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.debug_assert_all_stw_buckets_closed();
 
         self.do_vm_release(worker.mmtk);
-        self.dump_gc_stats(worker.mmtk);
 
         let mmtk = worker.mmtk;
 

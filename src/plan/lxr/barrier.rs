@@ -226,7 +226,7 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
         }
 
         for s in dst.iter_slots() {
-            let _succ = self.enqueue_node(ObjectReference::NULL, s, None);
+            let _succ = self.enqueue_node(None, s, None);
         }
     }
 
