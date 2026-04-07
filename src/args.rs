@@ -1,8 +1,3 @@
-use crate::{
-    policy::immix::{block::Block, line::Line},
-    util::{heap::vm_layout::vm_layout, linear_scan::Region, options::Options},
-    BarrierSelector,
-};
 use std::fmt::Debug;
 use std::mem::MaybeUninit;
 use std::{env, str::FromStr};
@@ -72,46 +67,3 @@ pub const LAZY_DECREMENTS: bool = !cfg!(feature = "lxr_no_lazy");
 pub const RC_NURSERY_EVACUATION: bool = !cfg!(feature = "lxr_no_nursery_evac");
 pub const RC_MATURE_EVACUATION: bool = !cfg!(feature = "lxr_no_mature_evac");
 
-macro_rules! dump_feature {
-    ($name: literal, $value: expr) => {
-        eprintln!(" * {}: {:?}", $name, $value)
-    };
-    ($name: literal) => {
-        dump_feature!($name, cfg!(feature = $name))
-    };
-}
-
-fn dump_features(active_barrier: BarrierSelector, options: &Options) {
-    if *options.verbose == 0 {
-        return;
-    }
-    eprintln!("JVM Process ID: {}", std::process::id());
-    eprintln!("-------------------- Immix Args --------------------");
-
-    dump_feature!("barrier", format!("{:?}", active_barrier));
-    dump_feature!("log_block_size", Block::LOG_BYTES);
-    dump_feature!("log_line_size", Line::LOG_BYTES);
-    dump_feature!("buffer_size", BUFFER_SIZE);
-    dump_feature!("no_finalizer", *options.no_finalizer);
-    dump_feature!("no_reference_types", *options.no_reference_types);
-    dump_feature!("workers", *options.threads);
-    dump_feature!("conc_workers", *options.conc_threads);
-    dump_feature!(
-        "force_use_contiguous_spaces",
-        vm_layout().force_use_contiguous_spaces
-    );
-    dump_feature!("lxr_no_nursery_evac");
-    dump_feature!("lxr_no_chunk_defrag");
-    dump_feature!("lxr_no_lazy");
-    dump_feature!("lxr_no_cm");
-    dump_feature!("no_meta_counting");
-    dump_feature!("lxr_no_mature_defrag");
-
-    eprintln!("\n{:#?}", RuntimeArgs::get());
-
-    eprintln!("----------------------------------------------------");
-}
-
-pub fn validate_features(active_barrier: BarrierSelector, options: &Options) {
-    dump_features(active_barrier, options);
-}

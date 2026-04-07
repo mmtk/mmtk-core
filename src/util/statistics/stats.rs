@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 /// The default number of phases for statistics.
-pub const DEFAULT_NUM_PHASES: usize = 1 << 14;
+pub const DEFAULT_NUM_PHASES: usize = 1 << 12;
 pub const MAX_COUNTERS: usize = 100;
 
 /// GC stats shared among counters
@@ -200,7 +200,7 @@ impl Stats {
     }
 
     pub fn print_column_names(&self, scheduler_stat: &HashMap<String, String>) {
-        print!("pauses\t");
+        print!("GC\t");
         let counter = self.counters.lock().unwrap();
         for iter in &(*counter) {
             let c = iter.lock().unwrap();

@@ -287,14 +287,6 @@ pub trait Scanning<VM: VMBinding> {
         factory: impl RootsWorkFactory<VM::VMSlot>,
     );
 
-    fn scan_multiple_thread_root(
-        _tls: VMWorkerThread,
-        _mutators: Vec<VMMutatorThread>,
-        _factory: impl RootsWorkFactory<VM::VMSlot>,
-    ) {
-        unimplemented!()
-    }
-
     /// Scan VM-specific roots. The creation of all root scan tasks (except thread scanning)
     /// goes here.
     ///

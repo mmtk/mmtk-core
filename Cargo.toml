@@ -111,9 +111,6 @@ builtin_env_logger = ["dep:env_logger"]
 
 # Enable this feature if you want to use nightly features and compiler
 nightly = []
-asan = []
-no_meta_counting = []
-force_zeroing = []
 
 # LXR Features
 lxr_no_cm = []
@@ -122,8 +119,6 @@ lxr_stw = ["lxr_no_cm", "lxr_no_lazy"]
 lxr_no_nursery_evac = []
 lxr_no_mature_evac = []
 lxr_no_evac = ["lxr_no_nursery_evac", "lxr_no_mature_evac"]
-lxr_no_chunk_defrag = []
-lxr_no_mature_defrag = []
 
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts

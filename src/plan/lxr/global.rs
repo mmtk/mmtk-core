@@ -737,7 +737,6 @@ impl<VM: VMBinding> LXR<VM> {
     }
 
     fn gc_init(&mut self, options: &Options) {
-        crate::args::validate_features(BarrierSelector::FieldBarrier, options);
         self.immix_space.cm_enabled = !cfg!(feature = "lxr_no_cm");
         self.immix_space.rc_enabled = true;
         self.common.los.rc_enabled = true;

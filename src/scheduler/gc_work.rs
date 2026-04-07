@@ -233,36 +233,27 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("stop_all_mutators start");
         mmtk.state.prepare_for_stack_scanning();
-        const BULK_THREAD_SCAN: bool = true;
-        let mut mutators: Vec<VMMutatorThread> = vec![];
-        let mut n = 0;
+        let is_lxr = mmtk.get_plan().downcast_ref::<LXR<C::VM>>().is_some();
+        let stage = if is_lxr {
+            WorkBucketStage::RCProcessIncs
+        } else {
+            WorkBucketStage::Prepare
+        };
         <C::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
-            mutator.flush();
-            mutator.prepare(worker.tls);
-            if BULK_THREAD_SCAN {
-                mutators.push(mutator.get_tls());
-            } else {
-                // TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
-                // Should we push to Unconstrained instead?
-                mmtk.scheduler.work_buckets[WorkBucketStage::RCProcessIncs]
+            // For LXR, we must flush and prepare all mutators before scanning begins.
+            // Flushing processes RC decrement buffers; preparing sets up mutator state for the GC cycle.
+            if is_lxr || self.flush_mutator {
+                mutator.flush();
+            }
+            if is_lxr {
+                mutator.prepare(worker.tls);
+            }
+            if !self.skip_mutator_roots {
+                mmtk.scheduler.work_buckets[stage]
                     .add(ScanMutatorRoots::<C>(mutator));
             }
-            n += 1;
         });
         mmtk.scheduler.set_in_gc_pause(true);
-        let is_lxr = mmtk.get_plan().downcast_ref::<LXR<C::VM>>().is_some();
-        if BULK_THREAD_SCAN {
-            let n_workers: usize = mmtk.scheduler.num_workers();
-            let stage = if is_lxr {
-                WorkBucketStage::RCProcessIncs
-            } else {
-                WorkBucketStage::Prepare
-            };
-            for ms in mutators.chunks(std::cmp::max(mutators.len() / n_workers / 2, 1)) {
-                mmtk.scheduler.work_buckets[stage]
-                    .add(ScanMultipleStacks::<C>(ms.to_vec(), PhantomData));
-            }
-        }
         trace!("stop_all_mutators end");
         #[cfg(feature = "sanity")]
         mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
@@ -483,25 +474,6 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
             );
             mmtk.set_gc_status(GcStatus::GcProper);
         }
-    }
-}
-
-pub struct ScanMultipleStacks<C: GCWorkContext>(Vec<VMMutatorThread>, PhantomData<C>);
-
-unsafe impl<C: GCWorkContext> Send for ScanMultipleStacks<C> {}
-
-impl<C: GCWorkContext> GCWork<C::VM> for ScanMultipleStacks<C> {
-    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
-        let factory = ProcessEdgesWorkRootsWorkFactory::<
-            C::VM,
-            C::DefaultProcessEdges,
-            C::PinningProcessEdges,
-        >::new(mmtk);
-        <C::VM as VMBinding>::VMScanning::scan_multiple_thread_root(
-            worker.tls,
-            std::mem::take(&mut self.0),
-            factory,
-        );
     }
 }
 

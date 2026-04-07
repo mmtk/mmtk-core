@@ -1386,7 +1386,6 @@ impl SideMetadataContext {
     // This could lead to overcount. I think the easier way is to not account
     // when we allocate for sidemetadata, but to calculate the side metadata usage based on
     // how many data pages we use when reporting.
-    #[cfg(not(feature = "no_meta_counting"))]
     pub fn calculate_reserved_pages(&self, data_pages: usize) -> usize {
         let mut total = 0;
         for spec in self.global.iter() {
@@ -1399,11 +1398,6 @@ impl SideMetadataContext {
             total += data_to_meta_size_round_up(spec, data_pages);
         }
         total
-    }
-
-    #[cfg(feature = "no_meta_counting")]
-    pub fn calculate_reserved_pages(&self, _data_pages: usize) -> usize {
-        0
     }
 
     // ** NOTE: **
