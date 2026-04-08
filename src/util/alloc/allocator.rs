@@ -243,9 +243,16 @@ pub(crate) fn assert_allocation_args<VM: VMBinding>(size: usize, align: usize, o
 }
 
 /// The context an allocator needs to access in order to perform allocation.
+///
+/// **Note:** An `AllocatorContext` is a thread-local struct, however, it is
+/// used as `Arc<AllocatorContext>` inside all allocator implementations since
+/// we need the entire struct to be `Send`.
+///
+/// See here for more information: https://github.com/mmtk/mmtk-core/issues/1474
 pub struct AllocatorContext<VM: VMBinding> {
     alloc_options: AllocationOptionsHolder,
     pub state: Arc<GlobalState>,
+    /// Have we thrown an OOM already?
     pub thrown_oom: AtomicBool,
     pub options: Arc<Options>,
     pub gc_trigger: Arc<GCTrigger<VM>>,
