@@ -5,7 +5,7 @@ use crate::util::conversions;
 use crate::util::os::*;
 
 /** log2 of the number of bits used by a free list entry (two entries per unit) */
-const LOG_ENTRY_BITS: usize = LOG_BITS_IN_INT as _;
+const LOG_ENTRY_BITS: usize = i32::BITS.ilog2() as _;
 
 /** log2 of the number of bytes used by a free list entry (two entries per unit) */
 const LOG_BYTES_IN_ENTRY: usize = LOG_ENTRY_BITS - (LOG_BITS_IN_BYTE as usize);
