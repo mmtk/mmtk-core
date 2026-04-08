@@ -7,7 +7,7 @@ use crate::util::options::Options;
 use crate::MMTK;
 
 use std::cell::RefCell;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crate::policy::space::Space;
@@ -246,6 +246,7 @@ pub(crate) fn assert_allocation_args<VM: VMBinding>(size: usize, align: usize, o
 pub struct AllocatorContext<VM: VMBinding> {
     alloc_options: AllocationOptionsHolder,
     pub state: Arc<GlobalState>,
+    pub thrown_oom: AtomicBool,
     pub options: Arc<Options>,
     pub gc_trigger: Arc<GCTrigger<VM>>,
     #[cfg(feature = "analysis")]
@@ -257,6 +258,7 @@ impl<VM: VMBinding> AllocatorContext<VM> {
         Self {
             alloc_options: AllocationOptionsHolder::new(AllocationOptions::default()),
             state: mmtk.state.clone(),
+            thrown_oom: AtomicBool::new(false),
             options: mmtk.options.clone(),
             gc_trigger: mmtk.gc_trigger.clone(),
             #[cfg(feature = "analysis")]
@@ -452,6 +454,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
 
             if !result.is_zero() {
                 // Report allocation success to assist OutOfMemory handling.
+                // Relaxed storing is fine since this is a thread-local boolean.
+                self.get_context()
+                    .thrown_oom
+                    .store(false, Ordering::Relaxed);
                 if !self
                     .get_context()
                     .state
@@ -515,6 +521,17 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 return Address::ZERO;
             }
 
+            // If we have already thrown an OOM for this allocation then return a zero.
+            // Relaxed load and store is fine given this is a thread-local boolean.
+            if self.get_context().thrown_oom.load(Ordering::Relaxed) {
+                // Need to reset the thrown_oom state since we're giving up on this allocation,
+                // that is to say, the thrown_oom state is *per* allocation request
+                self.get_context()
+                    .thrown_oom
+                    .store(false, Ordering::Relaxed);
+                return Address::ZERO;
+            }
+
             // It is possible to have cases where a thread is blocked for another GC (non emergency)
             // immediately after being blocked for a GC (emergency) (e.g. in stress test), that is saying
             // the thread does not leave this loop between the two GCs. The local var 'emergency_collection'
@@ -536,6 +553,8 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                     // Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
                     trace!("Throw HeapOutOfMemory!");
                     VM::VMCollection::out_of_memory(tls, AllocationError::HeapOutOfMemory);
+                    // Relaxed store is fine since this is a thread-local boolean.
+                    self.get_context().thrown_oom.store(true, Ordering::Relaxed);
                     self.get_context()
                         .state
                         .allocation_success
