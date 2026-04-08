@@ -164,9 +164,7 @@ impl<VM: VMBinding> MMTK<VM> {
 
         // Initialize side metadata runtime state and reserve its address range before creating
         // spaces. Plan/space initialization may map side metadata during setup.
-        crate::util::metadata::side_metadata::initialize_side_metadata::<VM>(
-            *options.side_metadata_base_address,
-        );
+        crate::util::metadata::side_metadata::initialize_side_metadata::<VM>(&options);
 
         // We need this during creating spaces, but we do not use this once the MMTk instance is created.
         // So we do not save it in MMTK. This may change in the future.

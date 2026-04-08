@@ -128,11 +128,7 @@ pub fn dzmmap_anywhere(
     strategy: MmapStrategy,
     annotation: &MmapAnnotation<'_>,
 ) -> Result<Address> {
-    let addr = unix_common::mmap_anywhere(
-        size,
-        align,
-        strategy.prot(MmapProtection::NoAccess).reserve(false),
-    )?;
+    let addr = unix_common::mmap_anywhere(size, align, strategy)?;
     if !cfg!(feature = "no_mmap_annotation") {
         set_vma_name(addr, size, annotation);
     }

@@ -5,7 +5,7 @@ use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 #[cfg(target_pointer_width = "64")]
 use crate::util::metadata::side_metadata::side_metadata_offset_after;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::os::{HugePageSupport, MmapAnnotation, MmapStrategy};
+use crate::util::os::{HugePageSupport, MmapAnnotation};
 use crate::util::Address;
 use crate::util::{constants::LOG_BYTES_IN_PAGE, conversions::raw_align_up};
 use crate::MMAPPER;
@@ -50,7 +50,10 @@ pub(super) fn set_vm_side_metadata_specs(specs: &[SideMetadataSpec]) {
 // Step 2: Call `initialize_side_metadata_base()` to reserve address space for side metadata.
 
 /// Initialize the side metadata base address by reserving address space with quarantine mmap.
-pub(super) fn initialize_side_metadata_base(specified_base: Address) {
+pub(super) fn initialize_side_metadata_base(
+    specified_base: Address,
+    huge_page_support: HugePageSupport,
+) {
     SIDE_METADATA_BASE_ADDRESS.get_or_init(|| {
         #[cfg(target_pointer_width = "64")]
         {
@@ -84,11 +87,11 @@ pub(super) fn initialize_side_metadata_base(specified_base: Address) {
         );
         let base = if specified_base.is_zero() {
             MMAPPER
-                .quarantine_address_range_anywhere(pages, MmapStrategy::SIDE_METADATA, &anno)
+                .quarantine_address_range_anywhere(pages, huge_page_support, &anno)
                 .unwrap_or_else(|e| panic!("failed to quarantine side metadata address range: {e}"))
         } else {
             MMAPPER
-                .quarantine_address_range(specified_base, pages, HugePageSupport::No, &anno)
+                .quarantine_address_range(specified_base, pages, huge_page_support, &anno)
                 .unwrap_or_else(|e| {
                     panic!(
                         "failed to quarantine side metadata address range at {}: {e}",

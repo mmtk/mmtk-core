@@ -259,8 +259,15 @@ impl MmapStrategy {
         reserve: true,
     };
 
-    /// The strategy for MMTk side metadata.
-    pub const SIDE_METADATA: Self = Self::INTERNAL_MEMORY;
+    /// The strategy for quarantining address ranges.
+    pub const QUARANTINE: Self = Self {
+        huge_page: HugePageSupport::No,
+        prot: MmapProtection::NoAccess,
+        // In test mode, we allow replacing existing mappings for quarantine,
+        // so that we can reuse the same address range for multiple test cases.
+        replace: cfg!(test),
+        reserve: false,
+    };
 
     /// The strategy for MMTk's test memory
     #[cfg(test)]

@@ -15,12 +15,12 @@ pub(crate) mod spec_defs;
 pub use global::*;
 pub use layout::*;
 
-use crate::util::Address;
+use crate::util::options::Options;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 
 /// Initialize side metadata runtime state and reserve the side metadata address range.
-pub fn initialize_side_metadata<VM: VMBinding>(base: Address) {
+pub fn initialize_side_metadata<VM: VMBinding>(options: &Options) {
     let vm_side_metadata_specs = super::extract_side_metadata(&[
         *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
         *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
@@ -38,13 +38,19 @@ pub fn initialize_side_metadata<VM: VMBinding>(base: Address) {
         debug!("  VM side metadata spec: {:?}", spec);
     }
     set_vm_side_metadata_specs(&vm_side_metadata_specs);
-    initialize_side_metadata_base(base);
+    initialize_side_metadata_base(
+        *options.side_metadata_base_address,
+        options.transparent_hugepages_as_huge_page_support(),
+    );
 }
 
 #[cfg(test)]
 pub(crate) fn core_test_initialize_side_metadata() {
+    use crate::util::os::HugePageSupport;
+    use crate::util::Address;
+
     set_vm_side_metadata_specs(&[]);
-    initialize_side_metadata_base(Address::ZERO);
+    initialize_side_metadata_base(Address::ZERO, HugePageSupport::No);
 }
 
 // Re-export helper functions. Allow unused imports in case there is no function that can be re-exported.

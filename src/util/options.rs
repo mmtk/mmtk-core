@@ -341,6 +341,15 @@ impl Options {
         *self.stress_factor != DEFAULT_STRESS_FACTOR
             || *self.analysis_factor != DEFAULT_STRESS_FACTOR
     }
+
+    /// Turning transparent huge pages into HugePageSupport.
+    pub fn transparent_hugepages_as_huge_page_support(&self) -> HugePageSupport {
+        if *self.transparent_hugepages {
+            HugePageSupport::TransparentHugePages
+        } else {
+            HugePageSupport::No
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

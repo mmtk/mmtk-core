@@ -47,7 +47,8 @@ pub fn side_metadata_address_to_meta_address(
 
 /// Expose side metadata initialization when running `cargo bench`.
 pub fn initialize_side_metadata<VM: VMBinding>() {
-    crate::util::metadata::side_metadata::initialize_side_metadata::<VM>(Address::ZERO)
+    use crate::util::options::Options;
+    crate::util::metadata::side_metadata::initialize_side_metadata::<VM>(&Options::default());
 }
 
 #[cfg(feature = "mock_test")]

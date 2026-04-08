@@ -88,7 +88,7 @@ pub trait Mmapper: Sync {
     fn quarantine_address_range_anywhere(
         &self,
         pages: usize,
-        strategy: MmapStrategy,
+        huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
     ) -> std::io::Result<Address>;
 
