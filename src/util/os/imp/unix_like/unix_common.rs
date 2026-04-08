@@ -1,4 +1,5 @@
 use crate::util::address::Address;
+use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions::raw_align_up;
 use crate::util::os::*;
 use std::io::Result;
@@ -33,6 +34,8 @@ pub fn mmap(
 
 pub fn mmap_anywhere(size: usize, align: usize, strategy: MmapStrategy) -> Result<Address> {
     debug_assert!(align.is_power_of_two());
+    debug_assert!(align % BYTES_IN_PAGE == 0);
+    debug_assert!(size % BYTES_IN_PAGE == 0);
 
     let aligned_size = raw_align_up(size, align);
     let alloc_size = aligned_size + align;
@@ -45,7 +48,23 @@ pub fn mmap_anywhere(size: usize, align: usize, strategy: MmapStrategy) -> Resul
     }
 
     let start = Address::from_mut_ptr(ptr);
-    Ok(start.align_up(align))
+    let aligned_start = start.align_up(align);
+
+    let leading_unaligned_size = aligned_start - start;
+    let trailing_unaligned_size = alloc_size - leading_unaligned_size - size;
+
+    if leading_unaligned_size > 0 {
+        debug_assert!(leading_unaligned_size % BYTES_IN_PAGE == 0);
+        munmap(start, leading_unaligned_size)?;
+    }
+
+    if trailing_unaligned_size > 0 {
+        debug_assert!(trailing_unaligned_size % BYTES_IN_PAGE == 0);
+        let trailing_start = aligned_start + size;
+        munmap(trailing_start, trailing_unaligned_size)?;
+    }
+
+    Ok(aligned_start)
 }
 
 pub fn is_mmap_oom(os_errno: i32) -> bool {
@@ -80,5 +99,56 @@ pub fn wrap_libc_call<T: PartialEq>(f: &dyn Fn() -> T, expect: T) -> Result<()> 
         Ok(())
     } else {
         Err(std::io::Error::last_os_error())
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use super::*;
+    use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
+    use crate::util::test_util::{serial_test, with_cleanup};
+    use std::io::ErrorKind;
+
+    fn assert_mapping_state(start: Address, size: usize, expect_mapped: bool) {
+        let annotation = MmapAnnotation::Misc {
+            name: "mmap_anywhere_test",
+        };
+        match mmap(
+            start,
+            size,
+            MmapStrategy::QUARANTINE.replace(false),
+            &annotation,
+        ) {
+            Ok(_) => {
+                let _ = munmap(start, size);
+                assert!(
+                    !expect_mapped,
+                    "{start} of size {size} should still be mapped"
+                );
+            }
+            Err(e) => {
+                assert_eq!(e.error.kind(), ErrorKind::AlreadyExists);
+                assert!(expect_mapped, "{start} of size {size} should be unmapped");
+            }
+        }
+    }
+
+    #[test]
+    fn mmap_anywhere_unmaps_alignment_padding() {
+        serial_test(|| {
+            let size = BYTES_IN_CHUNK + BYTES_IN_PAGE;
+            let start = mmap_anywhere(size, BYTES_IN_CHUNK, MmapStrategy::QUARANTINE).unwrap();
+
+            with_cleanup(
+                || {
+                    assert!(start.is_aligned_to(BYTES_IN_CHUNK));
+                    assert_mapping_state(start + size - BYTES_IN_PAGE, BYTES_IN_PAGE, true);
+                    assert_mapping_state(start + size, BYTES_IN_PAGE, false);
+                },
+                || {
+                    let _ = munmap(start, size);
+                },
+            );
+        });
     }
 }
