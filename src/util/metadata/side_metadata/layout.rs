@@ -18,6 +18,7 @@ pub(crate) const GLOBAL_SIDE_METADATA_BASE_OFFSET: usize = 0;
 /// The run-time base address for side metadata. This is initialized at startup by mmapping necessary memory address for side metadata,
 /// and should be used as the base when computing actual side metadata addresses.
 /// We use OnceLock to ensure it is only initialized once. To eliminate the cost of accessing OnceLock after initialization, we can use get().unwrap_unchecked().
+/// TODO: use `OncLock::get_unchecked()` once it is stabilized.
 static SIDE_METADATA_BASE_ADDRESS: OnceLock<Address> = OnceLock::new();
 
 /// The upper bound for VM side metadata layout. We need to list all the VM side metadata specs, compute the upper bound, and store it here.
@@ -130,6 +131,9 @@ pub fn global_side_metadata_base_address() -> Address {
         );
     }
 
+    // TODO: use `OncLock::get_unchecked()` once it is stabilized.
+    // Otherwise, even though this uses `unwrap_unchecked`, the compiler still needs to atomically load the
+    // initialization flag inside of `get`. See https://github.com/rust-lang/libs-team/issues/654.
     unsafe { *SIDE_METADATA_BASE_ADDRESS.get().unwrap_unchecked() }
 }
 
