@@ -871,7 +871,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     if !block.get_state().is_reusable() {
                         continue;
                     }
-                    if !copy && !block.attempt_mutator_reuse() {
+                    if !block.attempt_mutator_reuse() {
                         continue;
                     }
                     if !copy {

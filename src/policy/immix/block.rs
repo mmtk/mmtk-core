@@ -546,7 +546,7 @@ impl Block {
 
     pub fn attempt_mutator_reuse(&self) -> bool {
         self.fetch_update_state(|s| {
-            if let BlockState::Reusable { .. } = s {
+            if s.is_reusable() {
                 Some(BlockState::Reusing)
             } else {
                 None
@@ -585,8 +585,6 @@ impl Block {
                 .is_ok()
             };
             if add_as_reusable {
-                // Note: don't assert state is still reusable here — a concurrent
-                // mutator may have already picked up this block via attempt_mutator_reuse().
                 space.reusable_blocks.push(*self);
             }
         }
