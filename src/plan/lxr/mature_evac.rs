@@ -17,14 +17,14 @@ use super::remset::RemSetEntry;
 use super::LXR;
 
 pub struct EvacuateMatureObjects<VM: VMBinding> {
-    remset: Vec<RemSetEntry>,
+    remset: Vec<RemSetEntry<VM>>,
     _p: PhantomData<VM>,
 }
 
 impl<VM: VMBinding> EvacuateMatureObjects<VM> {
     pub const CAPACITY: usize = 1024;
 
-    pub(super) fn new(remset: Vec<RemSetEntry>) -> Self {
+    pub(super) fn new(remset: Vec<RemSetEntry<VM>>) -> Self {
         debug_assert!(crate::args::RC_MATURE_EVACUATION);
         Self {
             remset,
@@ -85,11 +85,6 @@ impl<VM: VMBinding> EvacuateMatureObjects<VM> {
             return true;
         }
         false
-        // Maybe a forwarded nursery or mature object from inc processing.
-        // if object_forwarding::is_forwarded_or_being_forwarded::<VM>(o) {
-        //     return true;
-        // }
-        // rc::count(o) != 0 && Block::in_defrag_block::<VM>(o)
     }
 
     fn process_slots(&mut self, mmtk: &'static MMTK<VM>) -> Option<Box<dyn GCWork<VM>>> {
@@ -98,7 +93,7 @@ impl<VM: VMBinding> EvacuateMatureObjects<VM> {
         let remset = std::mem::take(&mut self.remset);
         let mut slots = vec![];
         for entry in remset {
-            let (s, reuse) = entry.decode::<VM>();
+            let (s, reuse) = entry.decode();
             if self.process_slot(s, reuse, lxr) {
                 slots.push(s);
             }

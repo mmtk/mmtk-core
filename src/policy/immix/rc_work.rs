@@ -156,7 +156,7 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
     }
 
     fn process_dead_object(&mut self, o: ObjectReference) {
-        if ObjectReference::STRICT_VERIFICATION {
+        if RefCountHelper::<VM>::SANITY {
             unsafe {
                 o.to_raw_address().store(0xdeadusize);
             }

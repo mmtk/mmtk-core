@@ -34,19 +34,14 @@ extern crate probe;
 
 mod mmtk;
 pub use mmtk::MMTKBuilder;
-use std::{
-    cell::UnsafeCell,
-    ops::Deref,
-    sync::{
-        atomic::{AtomicBool, AtomicUsize},
-        Arc,
-    },
+use std::sync::{
+    atomic::{AtomicBool, AtomicUsize},
+    Arc,
 };
 
 use atomic::Ordering;
 pub(crate) use mmtk::MMAPPER;
 pub use mmtk::MMTK;
-use plan::immix::Pause;
 use spin::Lazy;
 type RwLock<T> = spin::rwlock::RwLock<T>;
 

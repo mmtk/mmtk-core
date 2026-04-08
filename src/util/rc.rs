@@ -47,6 +47,7 @@ pub struct RefCountHelper<VM: VMBinding>(PhantomData<VM>);
 
 impl<VM: VMBinding> RefCountHelper<VM> {
     pub const NEW: Self = Self(PhantomData);
+    pub const SANITY: bool = cfg!(debug_assertions) || cfg!(feature = "sanity");
 
     pub fn inc_buffer_size(&self) -> usize {
         INC_BUFFER_SIZE.load(Ordering::Relaxed)

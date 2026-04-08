@@ -89,20 +89,6 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
         }
     }
 
-    #[allow(unused)]
-    fn log_slot_and_get_old_target_sloppy(
-        &self,
-        slot: VM::VMSlot,
-    ) -> Result<Option<ObjectReference>, ()> {
-        if !slot.to_address().is_field_logged::<VM>() {
-            let old = slot.load();
-            slot.to_address().log_field::<VM>();
-            Ok(old)
-        } else {
-            Err(())
-        }
-    }
-
     fn slow(
         &mut self,
         _src: Option<ObjectReference>,

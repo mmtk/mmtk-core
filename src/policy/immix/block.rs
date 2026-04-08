@@ -585,7 +585,8 @@ impl Block {
                 .is_ok()
             };
             if add_as_reusable {
-                debug_assert!(self.get_state().is_reusable());
+                // Note: don't assert state is still reusable here — a concurrent
+                // mutator may have already picked up this block via attempt_mutator_reuse().
                 space.reusable_blocks.push(*self);
             }
         }

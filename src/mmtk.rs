@@ -344,10 +344,6 @@ impl<VM: VMBinding> MMTK<VM> {
         probe!(mmtk, harness_end);
     }
 
-    pub fn inside_harness(&'static self) -> bool {
-        self.state.inside_harness.load(Ordering::SeqCst)
-    }
-
     #[cfg(feature = "sanity")]
     pub(crate) fn sanity_begin(&self) {
         self.inside_sanity.store(true, Ordering::Relaxed)

@@ -6,7 +6,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::{fmt::Debug, ops::Range};
 
-use atomic::{Atomic, Ordering};
+use atomic::Atomic;
 
 use crate::util::constants::{BYTES_IN_ADDRESS, LOG_BYTES_IN_ADDRESS};
 use crate::util::{Address, ObjectReference};
@@ -133,16 +133,6 @@ pub trait Slot: Copy + Send + Debug + PartialEq + Eq + Hash {
     /// See: <https://github.com/mmtk/mmtk-core/issues/1038>
     fn store(&self, object: ObjectReference);
 
-    fn compare_exchange(
-        &self,
-        _old_object: Option<ObjectReference>,
-        _new_object: Option<ObjectReference>,
-        _success: Ordering,
-        _failure: Ordering,
-    ) -> Result<Option<ObjectReference>, Option<ObjectReference>> {
-        unimplemented!()
-    }
-
     /// Prefetch the slot so that a subsequent `load` will be faster.
     fn prefetch_load(&self) {
         // no-op by default
@@ -154,14 +144,6 @@ pub trait Slot: Copy + Send + Debug + PartialEq + Eq + Hash {
     }
 
     fn to_address(&self) -> Address {
-        unimplemented!()
-    }
-
-    fn raw_address(&self) -> Address {
-        unimplemented!()
-    }
-
-    fn from_address(_: Address) -> Self {
         unimplemented!()
     }
 }
@@ -231,10 +213,6 @@ impl Slot for Address {
     fn to_address(&self) -> Address {
         *self
     }
-
-    fn from_address(a: Address) -> Self {
-        a
-    }
 }
 
 #[test]
@@ -251,11 +229,8 @@ pub trait MemorySlice: Send + Debug + PartialEq + Eq + Clone + Hash {
     type SlotType: Slot;
     /// The associate type to define how to iterate slots in a memory slice.
     type SlotIterator: Iterator<Item = Self::SlotType>;
-    type ChunkIterator: Iterator<Item = Self>;
     /// Iterate object slots within the slice. If there are non-reference values in the slice, the iterator should skip them.
     fn iter_slots(&self) -> Self::SlotIterator;
-    /// Split the slice into smaller chunks and iterate over them.
-    fn chunks(&self, chunk_size: usize) -> Self::ChunkIterator;
     /// The object which this slice belongs to. If we know the object for the slice, we will check the object state (e.g. mature or not), rather than the slice address.
     /// Normally checking the object and checking the slice does not make a difference, as the slice is part of the object (in terms of memory range). However,
     /// if a slice is in a different location from the object, the object state and the slice can be hugely different, and providing a proper implementation
@@ -267,9 +242,6 @@ pub trait MemorySlice: Send + Debug + PartialEq + Eq + Clone + Hash {
     fn bytes(&self) -> usize;
     /// Memory copy support
     fn copy(src: &Self, tgt: &Self);
-    /// Number of elements in the memory slice
-    fn len(&self) -> usize;
-    fn get(&self, index: usize) -> Self::SlotType;
 }
 
 /// Iterate slots within `Range<Address>`.
@@ -295,17 +267,12 @@ impl Iterator for AddressRangeIterator {
 impl MemorySlice for Range<Address> {
     type SlotType = Address;
     type SlotIterator = AddressRangeIterator;
-    type ChunkIterator = UnimplementedMemorySliceChunkIterator<Self>;
 
     fn iter_slots(&self) -> Self::SlotIterator {
         AddressRangeIterator {
             cursor: self.start,
             limit: self.end,
         }
-    }
-
-    fn chunks(&self, _chunk_size: usize) -> Self::ChunkIterator {
-        unimplemented!()
     }
 
     fn object(&self) -> Option<ObjectReference> {
@@ -335,14 +302,6 @@ impl MemorySlice for Range<Address> {
             std::ptr::copy(src, tgt, words)
         }
     }
-
-    fn len(&self) -> usize {
-        (self.end - self.start) >> LOG_BYTES_IN_ADDRESS
-    }
-
-    fn get(&self, index: usize) -> Self::SlotType {
-        self.start + index * BYTES_IN_ADDRESS
-    }
 }
 
 /// Memory slice type with empty implementations.
@@ -361,26 +320,11 @@ impl<SL: Slot> Iterator for UnimplementedMemorySliceSlotIterator<SL> {
     }
 }
 
-pub struct UnimplementedMemorySliceChunkIterator<S: MemorySlice>(PhantomData<S>);
-
-impl<S: MemorySlice> Iterator for UnimplementedMemorySliceChunkIterator<S> {
-    type Item = S;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        unimplemented!()
-    }
-}
-
 impl<SL: Slot> MemorySlice for UnimplementedMemorySlice<SL> {
     type SlotType = SL;
     type SlotIterator = UnimplementedMemorySliceSlotIterator<SL>;
-    type ChunkIterator = UnimplementedMemorySliceChunkIterator<Self>;
 
     fn iter_slots(&self) -> Self::SlotIterator {
-        unimplemented!()
-    }
-
-    fn chunks(&self, _chunk_size: usize) -> Self::ChunkIterator {
         unimplemented!()
     }
 
@@ -397,14 +341,6 @@ impl<SL: Slot> MemorySlice for UnimplementedMemorySlice<SL> {
     }
 
     fn copy(_src: &Self, _tgt: &Self) {
-        unimplemented!()
-    }
-
-    fn len(&self) -> usize {
-        unimplemented!()
-    }
-
-    fn get(&self, _index: usize) -> Self::SlotType {
         unimplemented!()
     }
 }

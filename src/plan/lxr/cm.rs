@@ -75,7 +75,9 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        // debug_assert!(object.is_in_any_space(), "Invalid object {:?}", object);
+        if self.rc.count(object) == 0 {
+            return object;
+        }
         if self.plan.immix_space.in_space(object) {
             self.plan
                 .immix_space
@@ -437,23 +439,7 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
             self.full_gc_trace_object::<WEAK_ROOT>(object)
         };
         if Self::OVERWRITE_REFERENCE && new_object != object {
-            if !FULL_GC && REMSET {
-                if slot.to_address().is_in_mmtk_heap() {
-                    debug_assert!(self.remset_recorded_slots);
-                    // Don't do the store if the original is already overwritten
-                    let _ = slot.compare_exchange(
-                        Some(object),
-                        Some(new_object),
-                        Ordering::SeqCst,
-                        Ordering::SeqCst,
-                    );
-                } else {
-                    slot.store(new_object);
-                }
-            } else {
-                debug_assert!(!self.remset_recorded_slots);
-                slot.store(new_object);
-            }
+            slot.store(new_object);
         }
     }
 

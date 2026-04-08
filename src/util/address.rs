@@ -12,8 +12,6 @@ use crate::plan::barriers::LOGGED_VALUE;
 use crate::plan::SlotIterator;
 use crate::vm::ObjectModel;
 
-use super::heap::layout::vm_layout::vm_layout;
-
 /// size in bytes
 pub type ByteSize = usize;
 /// offset in byte
@@ -347,11 +345,6 @@ impl Address {
         }
     }
 
-    pub fn is_in_mmtk_heap(self) -> bool {
-        let layout = vm_layout();
-        self >= layout.heap_start && self < layout.heap_end
-    }
-
     pub fn is_field_logged<VM: VMBinding>(self) -> bool {
         debug_assert!(!self.is_zero());
         unsafe {
@@ -361,14 +354,6 @@ impl Address {
                 .load::<u8>(self)
                 == LOGGED_VALUE
         }
-    }
-
-    pub fn log_field<VM: VMBinding>(self) {
-        debug_assert!(!self.is_zero());
-        VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
-            .as_spec()
-            .extract_side_spec()
-            .store_atomic(self, LOGGED_VALUE, Ordering::Relaxed)
     }
 
     pub fn unlog_field_relaxed<VM: VMBinding>(self) {
@@ -623,8 +608,6 @@ use crate::vm::VMBinding;
 pub struct ObjectReference(NonZeroUsize);
 
 impl ObjectReference {
-    pub const STRICT_VERIFICATION: bool =
-        cfg!(debug_assertions) || cfg!(feature = "sanity") || false;
     /// The required minimal alignment for object reference. If the object reference's raw address is not aligned to this value,
     /// you will see an assertion failure in the debug build when constructing an object reference instance.
     pub const ALIGNMENT: usize = crate::util::constants::BYTES_IN_ADDRESS;

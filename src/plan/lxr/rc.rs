@@ -640,7 +640,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         if in_ix_space {
             self.rc.unmark_straddle_object(o);
         }
-        if cfg!(feature = "sanity") || ObjectReference::STRICT_VERIFICATION {
+        if RefCountHelper::<VM>::SANITY {
             unsafe { o.to_raw_address().store(0xdeadusize) };
         }
         if in_ix_space {
