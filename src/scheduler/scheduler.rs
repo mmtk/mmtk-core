@@ -106,7 +106,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 }
             }
         }
-        crate::PAUSE_CONCURRENT_MARKING.store(true, Ordering::SeqCst);
     }
 
     pub fn process_lazy_decrement_packets(&self) {
@@ -402,8 +401,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         queue: Injector<Box<dyn GCWork<VM>>>,
         pqueue: Injector<Box<dyn GCWork<VM>>>,
     ) -> bool {
-        crate::MOVE_CONCURRENT_MARKING_TO_STW.store(false, Ordering::SeqCst);
-        crate::PAUSE_CONCURRENT_MARKING.store(false, Ordering::SeqCst);
         let mut notify = false;
         if !queue.is_empty() {
             let old_queue = self.work_buckets[WorkBucketStage::Unconstrained].swap_queue(queue);
@@ -872,8 +869,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         first_stw_bucket.open();
         if first_stw_bucket.is_empty()
             && self.worker_monitor.parked.load(Ordering::SeqCst) + 1 == self.num_workers()
-            && crate::concurrent_marking_packets_drained()
-            && crate::LazySweepingJobs::all_finished()
+            && crate::plan::lxr::concurrent_marking_packets_drained()
+            && crate::plan::lxr::LazySweepingJobs::all_finished()
         {
             let second_stw_stage =
                 WorkBucketStage::from_usize(WorkBucketStage::FIRST_STW_STAGE.into_usize() + 1);

@@ -1,5 +1,6 @@
 use super::cm::LXRConcurrentTraceObjects;
 use super::cm::LXRStopTheWorldProcessEdges;
+use super::LazySweepingJobsCounter;
 use super::SurvivalRatioPredictorLocal;
 use super::LXR;
 use crate::plan::VectorQueue;
@@ -12,7 +13,6 @@ use crate::util::copy::GCWorkerCopyContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::rc::*;
 use crate::vm::slot::Slot;
-use crate::LazySweepingJobsCounter;
 use crate::{
     plan::immix::Pause,
     policy::{immix::block::Block, space::Space},
@@ -45,7 +45,7 @@ pub struct ProcessIncs<VM: VMBinding, const KIND: EdgeKind> {
 unsafe impl<VM: VMBinding, const KIND: EdgeKind> Send for ProcessIncs<VM, KIND> {}
 
 impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
-    const CAPACITY: usize = crate::args::BUFFER_SIZE;
+    const CAPACITY: usize = 1024;
     const UNLOG_BITS: SideMetadataSpec = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
         .as_spec()
         .extract_side_spec();
@@ -124,7 +124,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         s: VM::VMSlot,
         o: ObjectReference,
     ) {
-        if !(crate::args::RC_MATURE_EVACUATION && (self.in_cm || self.pause == Pause::FinalMark)) {
+        if !(super::MATURE_EVACUATION && (self.in_cm || self.pause == Pause::FinalMark)) {
             return;
         }
         if !slot_in_defrag && self.lxr.in_defrag(o) {
@@ -136,7 +136,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
     }
 
     fn record_mature_evac_remset(&mut self, s: VM::VMSlot, o: ObjectReference) {
-        if !(crate::args::RC_MATURE_EVACUATION && (self.in_cm || self.pause == Pause::FinalMark)) {
+        if !(super::MATURE_EVACUATION && (self.in_cm || self.pause == Pause::FinalMark)) {
             return;
         }
         self.record_mature_evac_remset2(self.lxr.address_in_defrag(s.to_address()), s, o);
@@ -254,7 +254,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
 
     fn process_inc_and_evacuate(&mut self, o: ObjectReference, depth: u32) -> ObjectReference {
         let los = self.lxr.los().in_space(o);
-        if crate::args::RC_NURSERY_EVACUATION
+        if super::NURSERY_EVACUATION
             && !los
             && object_forwarding::is_forwarded_or_being_forwarded::<VM>(o)
         {
@@ -272,7 +272,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
             return new;
         }
-        if !crate::args::RC_NURSERY_EVACUATION || self.dont_evacuate(o, los) {
+        if !super::NURSERY_EVACUATION || self.dont_evacuate(o, los) {
             if self.inc(o) {
                 self.promote(o, false, los, depth);
             }
@@ -305,7 +305,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                     if promoted {
                         self.promote(o, false, los, depth);
                     }
-                    crate::NO_EVAC.store(true, Ordering::Relaxed);
+                    super::NO_EVAC.store(true, Ordering::Relaxed);
                     self.no_evac = true;
                     o
                 }
@@ -428,7 +428,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
         self.pause = self.lxr.current_pause().unwrap();
         self.in_cm = self.lxr.cm_in_progress();
         self.copy_context = self.worker().get_copy_context_mut() as *mut GCWorkerCopyContext<VM>;
-        if crate::NO_EVAC.load(Ordering::Relaxed) {
+        if super::NO_EVAC.load(Ordering::Relaxed) {
             self.no_evac = true;
         } else {
             let over_space = mmtk.get_plan().get_used_pages()
@@ -436,7 +436,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
                 > mmtk.get_plan().get_total_pages();
             if over_space {
                 self.no_evac = true;
-                crate::NO_EVAC.store(true, Ordering::Relaxed);
+                super::NO_EVAC.store(true, Ordering::Relaxed);
             }
         }
         // Process main buffer
@@ -447,10 +447,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
         } else {
             vec![]
         };
-        let add_root_to_remset = self
-            .root_kind
-            .map(|r| r.should_record_remset())
-            .unwrap_or_default();
         let roots = {
             let incs = std::mem::take(&mut self.incs);
             self.process_incs::<KIND>(AddressBuffer::Owned(incs), self.depth, false)
@@ -537,13 +533,13 @@ pub struct ProcessDecs<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> ProcessDecs<VM> {
-    pub const CAPACITY: usize = crate::args::BUFFER_SIZE;
+    pub const CAPACITY: usize = ProcessIncs::<VM, EDGE_KIND_NURSERY>::CAPACITY;
 
     fn worker(&self) -> &mut GCWorker<VM> {
         GCWorker::<VM>::current()
     }
 
-    pub fn new(decs: Vec<ObjectReference>, counter: LazySweepingJobsCounter) -> Self {
+    pub(super) fn new(decs: Vec<ObjectReference>, counter: LazySweepingJobsCounter) -> Self {
         Self {
             decs: Some(decs),
             decs_arc: None,
@@ -556,7 +552,10 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         }
     }
 
-    pub fn new_arc(decs: Arc<Vec<ObjectReference>>, counter: LazySweepingJobsCounter) -> Self {
+    pub(super) fn new_arc(
+        decs: Arc<Vec<ObjectReference>>,
+        counter: LazySweepingJobsCounter,
+    ) -> Self {
         Self {
             decs: None,
             decs_arc: Some(decs),
@@ -598,7 +597,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         if !self.mark_objects.is_empty() {
             let objects = self.mark_objects.take();
             let w = LXRConcurrentTraceObjects::new(objects, mmtk);
-            if crate::args::LAZY_DECREMENTS {
+            if super::LAZY_DECREMENTS {
                 self.worker().add_work(WorkBucketStage::Unconstrained, w);
             } else {
                 self.worker().scheduler().postpone(w);
@@ -655,21 +654,16 @@ impl<VM: VMBinding> ProcessDecs<VM> {
 
     fn process_decs(&mut self, decs: &[ObjectReference], lxr: &LXR<VM>) {
         for o in decs.iter() {
-            // println!("dec {:?}", o);
-            // if o.is_null() {
-            //     continue;
-            // }
             if self.rc.is_dead_or_stuck(*o)
                 || (self.mature_sweeping_in_progress && !lxr.is_marked(*o))
             {
                 continue;
             }
-            let o =
-                if crate::args::RC_MATURE_EVACUATION && object_forwarding::is_forwarded::<VM>(*o) {
-                    object_forwarding::read_forwarding_pointer::<VM>(*o)
-                } else {
-                    *o
-                };
+            let o = if super::MATURE_EVACUATION && object_forwarding::is_forwarded::<VM>(*o) {
+                object_forwarding::read_forwarding_pointer::<VM>(*o)
+            } else {
+                *o
+            };
             let mut dead = false;
             let mut is_los = false;
             let result = self.rc.clone().fetch_update(o, |c| {
@@ -694,12 +688,12 @@ impl<VM: VMBinding> ProcessDecs<VM> {
 impl<VM: VMBinding> GCWork<VM> for ProcessDecs<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
-        self.mark_dead_objects = if crate::args::LAZY_DECREMENTS {
+        self.mark_dead_objects = if super::LAZY_DECREMENTS {
             lxr.cm_in_progress() && lxr.previous_pause() != Some(Pause::InitialMark)
         } else {
             lxr.cm_in_progress() && lxr.current_pause() != Some(Pause::InitialMark)
         };
-        self.mature_sweeping_in_progress = if crate::args::LAZY_DECREMENTS {
+        self.mature_sweeping_in_progress = if super::LAZY_DECREMENTS {
             lxr.previous_pause() == Some(Pause::FinalMark)
                 || lxr.current_pause() == Some(Pause::Full)
         } else {

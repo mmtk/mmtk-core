@@ -4,6 +4,7 @@ use super::line::*;
 use super::rc_work::*;
 use super::{block::*, defrag::Defrag};
 use crate::plan::immix::Pause;
+use crate::plan::lxr::LazySweepingJobsCounter;
 use crate::plan::lxr::MatureEvecRemSet;
 use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::{TraceKind, DEFAULT_TRACE, TRACE_KIND_TRANSITIVE_PIN};
@@ -30,13 +31,13 @@ use crate::util::object_forwarding;
 use crate::util::rc::RefCountHelper;
 use crate::util::{copy::*, epilogue, object_enum};
 use crate::util::{Address, ObjectReference};
+use crate::vm::*;
 use crate::{
     plan::ObjectQueue,
     scheduler::{GCWork, GCWorkScheduler, GCWorker, WorkBucketStage},
     util::opaque_pointer::{VMThread, VMWorkerThread},
     MMTK,
 };
-use crate::{vm::*, LazySweepingJobsCounter};
 use atomic::Ordering;
 use crossbeam::queue::SegQueue;
 use std::mem;
@@ -611,7 +612,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.block_allocation
             .sweep_mutator_reused_blocks(&self.scheduler, pause);
         self.flush_page_resource();
-        let disable_lasy_dec_for_current_gc = crate::disable_lasy_dec_for_current_gc();
+        let disable_lasy_dec_for_current_gc = crate::plan::lxr::disable_lasy_dec_for_current_gc();
         if disable_lasy_dec_for_current_gc {
             self.scheduler().process_lazy_decrement_packets();
         } else {
@@ -627,10 +628,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     pub fn schedule_mature_sweeping(&self, pause: Pause) {
         if pause == Pause::Full || pause == Pause::FinalMark {
             self.evac_set.sweep_mature_evac_candidates(self);
-            let disable_lasy_dec_for_current_gc = crate::disable_lasy_dec_for_current_gc();
+            let disable_lasy_dec_for_current_gc =
+                crate::plan::lxr::disable_lasy_dec_for_current_gc();
             let dead_cycle_sweep_packets = self.generate_dead_cycle_sweep_tasks();
             let sweep_los = RCSweepMatureAfterSATBLOS::new(LazySweepingJobsCounter::new_decs());
-            if crate::args::LAZY_DECREMENTS && !disable_lasy_dec_for_current_gc {
+            if crate::plan::lxr::LAZY_DECREMENTS && !disable_lasy_dec_for_current_gc {
                 debug_assert_ne!(pause, Pause::Full);
                 self.scheduler().postpone_all(dead_cycle_sweep_packets);
                 self.scheduler().postpone(sweep_los);
@@ -862,7 +864,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     continue;
                 }
                 if self.rc_enabled {
-                    if crate::args::RC_MATURE_EVACUATION && block.is_defrag_source() {
+                    if crate::plan::lxr::MATURE_EVACUATION && block.is_defrag_source() {
                         continue;
                     }
                     // Blocks in the `reusable_blocks` queue can be released after some RC collections.
@@ -1078,9 +1080,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         debug_assert!(self.rc_enabled);
-        if crate::args::RC_MATURE_EVACUATION && Block::containing(object).is_defrag_source() {
+        if crate::plan::lxr::MATURE_EVACUATION && Block::containing(object).is_defrag_source() {
             self.trace_forward_rc_mature_object(queue, object, semantics, pause, worker)
-        } else if crate::args::RC_MATURE_EVACUATION {
+        } else if crate::plan::lxr::MATURE_EVACUATION {
             self.trace_mark_rc_mature_object(queue, object, pause, mark)
         } else {
             self.trace_object_without_moving(queue, object)
@@ -1406,7 +1408,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     }
 
-    pub fn schedule_rc_block_sweeping_tasks(&self, counter: LazySweepingJobsCounter) {
+    pub(crate) fn schedule_rc_block_sweeping_tasks(&self, counter: LazySweepingJobsCounter) {
         // while let Some(x) = self.last_mutator_recycled_blocks.pop() {
         //     x.set_state(BlockState::Marked);
         // }

@@ -1,5 +1,6 @@
 use atomic::Ordering;
 
+use crate::plan::lxr::LazySweepingJobsCounter;
 use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
 use crate::policy::sft::GCWorkerMutRef;
@@ -21,7 +22,6 @@ use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use crate::LazySweepingJobsCounter;
 use crossbeam::queue::SegQueue;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;

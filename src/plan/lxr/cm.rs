@@ -35,7 +35,7 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
 
     pub fn new(objects: Vec<ObjectReference>, mmtk: &'static MMTK<VM>) -> Self {
         let plan = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
-        crate::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
+        super::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
         Self {
             plan,
             objects: Some(objects),
@@ -48,7 +48,7 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
 
     pub fn new_arc(objects: Arc<Vec<ObjectReference>>, mmtk: &'static MMTK<VM>) -> Self {
         let plan = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
-        crate::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
+        super::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
         Self {
             plan,
             objects: None,
@@ -99,7 +99,7 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
             let Some(t) = s.load() else {
                 return;
             };
-            if crate::args::RC_MATURE_EVACUATION && CHECK_REMSET && self.plan.in_defrag(t) {
+            if super::MATURE_EVACUATION && CHECK_REMSET && self.plan.in_defrag(t) {
                 self.plan
                     .immix_space
                     .mature_evac_remset
@@ -161,7 +161,7 @@ impl<VM: VMBinding> GCWork<VM> for LXRConcurrentTraceObjects<VM> {
         }
         self.flush();
         // CM: Decrease counter
-        crate::NUM_CONCURRENT_TRACING_PACKETS.fetch_sub(1, Ordering::SeqCst);
+        super::NUM_CONCURRENT_TRACING_PACKETS.fetch_sub(1, Ordering::SeqCst);
         debug_assert!(!mmtk.scheduler.work_buckets[WorkBucketStage::Initial].is_open());
     }
 }
@@ -173,14 +173,14 @@ pub struct ProcessModBufSATB {
 
 impl ProcessModBufSATB {
     pub fn new(nodes: Vec<ObjectReference>) -> Self {
-        // crate::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
+        // super::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
         Self {
             nodes: Some(nodes),
             nodes_arc: None,
         }
     }
     pub fn new_arc(nodes: Arc<Vec<ObjectReference>>) -> Self {
-        // crate::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
+        // super::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
         Self {
             nodes: None,
             nodes_arc: Some(nodes),
@@ -259,7 +259,7 @@ impl<VM: VMBinding, const FULL_GC: bool> ProcessEdgesWork
 {
     type VM = VM;
     type ScanObjectsWorkType = ScanObjects<Self>;
-    const OVERWRITE_REFERENCE: bool = crate::args::RC_MATURE_EVACUATION;
+    const OVERWRITE_REFERENCE: bool = super::MATURE_EVACUATION;
 
     fn new(
         slots: Vec<SlotOf<Self>>,
@@ -495,7 +495,7 @@ pub struct LXRWeakRefProcessEdges<VM: VMBinding> {
 impl<VM: VMBinding> ProcessEdgesWork for LXRWeakRefProcessEdges<VM> {
     type VM = VM;
     type ScanObjectsWorkType = ScanObjects<Self>;
-    const OVERWRITE_REFERENCE: bool = crate::args::RC_MATURE_EVACUATION;
+    const OVERWRITE_REFERENCE: bool = super::MATURE_EVACUATION;
 
     fn new(
         slots: Vec<SlotOf<Self>>,

@@ -7,6 +7,7 @@ use atomic::Ordering;
 use crossbeam::queue::SegQueue;
 
 use crate::{
+    plan::lxr::LazySweepingJobsCounter,
     plan::{immix::Pause, lxr::LXR},
     scheduler::{GCWork, GCWorker, WorkBucketStage},
     util::{
@@ -17,7 +18,7 @@ use crate::{
         ObjectReference,
     },
     vm::{ObjectModel, VMBinding},
-    LazySweepingJobsCounter, Plan, MMTK,
+    Plan, MMTK,
 };
 
 use super::{
@@ -388,7 +389,7 @@ impl MatureEvacuationSet {
         _pause: Pause,
         _total_pages: usize,
     ) {
-        debug_assert!(crate::args::RC_MATURE_EVACUATION);
+        debug_assert!(crate::plan::lxr::MATURE_EVACUATION);
         if lxr.current_pause().unwrap() == Pause::Full {
             // Make sure LOS sweeping finishes before evac selection begin
             // FIXME: This can be done in parallel with SelectDefragBlocksInChunk packets

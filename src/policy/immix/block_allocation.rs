@@ -4,11 +4,12 @@ use crate::plan::immix::Pause;
 use crate::scheduler::WorkBucketStage;
 use crate::util::constants::{LOG_BYTES_IN_MBYTE, LOG_BYTES_IN_PAGE};
 use crate::{
+    plan::lxr::LazySweepingJobsCounter,
     plan::lxr::LXR,
     policy::space::Space,
     scheduler::{GCWork, GCWorkScheduler, GCWorker},
     vm::*,
-    LazySweepingJobsCounter, MMTK,
+    MMTK,
 };
 use atomic::{Atomic, Ordering};
 use std::cell::UnsafeCell;

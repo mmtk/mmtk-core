@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use atomic::Ordering;
 
+use super::LazySweepingJobsCounter;
 use super::LXR;
 use crate::plan::barriers::BarrierSemantics;
 use crate::plan::barriers::{LOGGED_VALUE, UNLOGGED_VALUE};
@@ -20,7 +21,6 @@ use crate::util::*;
 use crate::vm::slot::MemorySlice;
 use crate::vm::slot::Slot;
 use crate::vm::*;
-use crate::LazySweepingJobsCounter;
 use crate::MMTK;
 
 pub struct LXRFieldBarrierSemantics<VM: VMBinding> {
@@ -153,7 +153,7 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
                 let decs = self.decs.take();
                 ProcessDecs::new(decs, LazySweepingJobsCounter::new_decs())
             };
-            if crate::args::LAZY_DECREMENTS {
+            if super::LAZY_DECREMENTS {
                 self.mmtk.scheduler.postpone_prioritized(w);
             } else {
                 self.mmtk.scheduler.work_buckets[WorkBucketStage::STWRCDecsAndSweep].add(w);

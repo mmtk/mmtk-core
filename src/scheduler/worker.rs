@@ -270,8 +270,6 @@ impl<VM: VMBinding> GCWorker<VM> {
         self.scheduler.resolve_affinity(self.ordinal);
         self.tls = tls;
         self.copy = crate::plan::create_gc_worker_context(tls, mmtk);
-        let lower_priority_for_concurrent_work = crate::args().lower_concurrent_worker_priority;
-        assert!(!lower_priority_for_concurrent_work);
         loop {
             // Instead of having work_start and work_end tracepoints, we have
             // one tracepoint before polling for more work and one tracepoint

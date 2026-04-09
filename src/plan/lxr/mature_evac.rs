@@ -25,7 +25,7 @@ impl<VM: VMBinding> EvacuateMatureObjects<VM> {
     pub const CAPACITY: usize = 1024;
 
     pub(super) fn new(remset: Vec<RemSetEntry<VM>>) -> Self {
-        debug_assert!(crate::args::RC_MATURE_EVACUATION);
+        debug_assert!(super::MATURE_EVACUATION);
         Self {
             remset,
             _p: PhantomData,
