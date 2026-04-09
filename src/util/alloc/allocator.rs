@@ -288,13 +288,11 @@ impl<VM: VMBinding> AllocatorContext<VM> {
 }
 
 macro_rules! reset_allocation_state {
-    ($receiver:expr) => {
-        {
-            let context = $receiver.get_context();
-            // Relaxed store is fine since this is a thread-local boolean.
-            context.thrown_oom.store(false, Ordering::Relaxed);
-        }
-    };
+    ($receiver:expr) => {{
+        let context = $receiver.get_context();
+        // Relaxed store is fine since this is a thread-local boolean.
+        context.thrown_oom.store(false, Ordering::Relaxed);
+    }};
 }
 
 /// A trait which implements allocation routines. Every allocator needs to implements this trait.
@@ -475,13 +473,17 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             if !is_mutator {
                 debug_assert!(!result.is_zero());
                 debug_assert!(!self.get_context().thrown_oom.load(Ordering::Relaxed));
-                debug_assert!(!self.get_context().state.allocation_success.load(Ordering::Relaxed));
+                debug_assert!(!self
+                    .get_context()
+                    .state
+                    .allocation_success
+                    .load(Ordering::Relaxed));
                 return result;
             }
 
             if !result.is_zero() {
                 // Report allocation success to assist OutOfMemory handling.
-				if !self
+                if !self
                     .get_context()
                     .state
                     .allocation_success
