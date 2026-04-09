@@ -14,7 +14,7 @@ use crate::util::heap::{PageResource, VMRequest};
 use crate::util::options::Options;
 use crate::vm::{ActivePlan, Collection};
 
-use crate::util::constants::{LOG_BYTES_IN_MBYTE, LOG_BYTES_IN_PAGE};
+use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
 use crate::util::opaque_pointer::*;
 
@@ -54,48 +54,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// Currently after we create a boxed plan, spaces in the plan have a non-moving address.
     fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap);
 
-    /// A check for the obvious out-of-memory case: if the requested size is larger than
-    /// the heap size, it is definitely an OOM. We would like to identify that, and
-    /// allows the binding to deal with OOM. Without this check, we will attempt
-    /// to allocate from the page resource. If the requested size is unrealistically large
-    /// (such as `usize::MAX`), it breaks the assumptions of our implementation of
-    /// page resource, vm map, etc. This check prevents that, and allows us to
-    /// handle the OOM case.
-    /// Each allocator that may request an arbitrary size should call this method before
-    /// acquring memory from the space. For example, bump pointer allocator and large object
-    /// allocator need to call this method. On the other hand, allocators that only allocate
-    /// memory in fixed size blocks do not need to call this method.
-    /// An allocator should call this method before doing any computation on the size to
-    /// avoid arithmatic overflow. If we have to do computation in the allocation fastpath and
-    /// overflow happens there, there is nothing we can do about it.
-    /// Return a boolean to indicate if we will be out of memory, determined by the check.
-    fn will_oom_on_acquire(&self, size: usize) -> bool {
-        let max_pages = self.get_gc_trigger().policy.get_max_heap_size_in_pages();
-        let requested_pages = size >> LOG_BYTES_IN_PAGE;
-        requested_pages > max_pages
-    }
-
-    /// Check if the requested `size` is an obvious out-of-memory case using
-    /// [`Self::will_oom_on_acquire`] and, if it is, call `Collection::out_of_memory`.  Return the
-    /// result of `will_oom_on_acquire`.
-    fn handle_obvious_oom_request(
-        &self,
-        tls: VMThread,
-        size: usize,
-        alloc_options: AllocationOptions,
-    ) -> bool {
-        if self.will_oom_on_acquire(size) {
-            if alloc_options.allow_oom_call {
-                VM::VMCollection::out_of_memory(
-                    tls,
-                    crate::util::alloc::AllocationError::HeapOutOfMemory,
-                );
-            }
-            return true;
-        }
-        false
-    }
-
     fn acquire(&self, tls: VMThread, pages: usize, alloc_options: AllocationOptions) -> Address {
         trace!(
             "Space.acquire, tls={:?}, alloc_options={:?}",
@@ -104,7 +62,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         );
 
         debug_assert!(
-            !self.will_oom_on_acquire(pages << LOG_BYTES_IN_PAGE),
+            !self.get_gc_trigger().will_oom_on_alloc(pages << crate::util::constants::LOG_BYTES_IN_PAGE),
             "The requested pages is larger than the max heap size. Is will_go_oom_on_acquire used before acquring memory?"
         );
 

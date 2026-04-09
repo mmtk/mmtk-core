@@ -253,6 +253,27 @@ impl<VM: VMBinding> GCTrigger<VM> {
     pub fn get_min_nursery_pages(&self) -> usize {
         crate::util::conversions::bytes_to_pages_up(self.get_min_nursery_bytes())
     }
+
+    /// A check for the obvious out-of-memory case: if the requested size is larger than
+    /// the heap size, it is definitely an OOM. We would like to identify that, and
+    /// allows the binding to deal with OOM. Without this check, we will attempt
+    /// to allocate from the page resource. If the requested size is unrealistically large
+    /// (such as `usize::MAX`), it breaks the assumptions of our implementation of
+    /// page resource, vm map, etc. This check prevents that, and allows us to
+    /// handle the OOM case.
+    /// Each allocator that may request an arbitrary size should call this method before
+    /// acquring memory from the space. For example, bump pointer allocator and large object
+    /// allocator need to call this method. On the other hand, allocators that only allocate
+    /// memory in fixed size blocks do not need to call this method.
+    /// An allocator should call this method before doing any computation on the size to
+    /// avoid arithmatic overflow. If we have to do computation in the allocation fastpath and
+    /// overflow happens there, there is nothing we can do about it.
+    /// Return a boolean to indicate if we will be out of memory, determined by the check.
+    pub fn will_oom_on_alloc(&self, size: usize) -> bool {
+        let max_pages = self.policy.get_max_heap_size_in_pages();
+        let requested_pages = size >> crate::util::constants::LOG_BYTES_IN_PAGE;
+        requested_pages > max_pages
+    }
 }
 
 /// Provides statistics about the space. This is exposed to bindings, as it is used

@@ -49,11 +49,7 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, _offset: usize) -> Address {
-        if self.space.handle_obvious_oom_request(
-            self.tls,
-            size,
-            self.get_context().get_alloc_options(),
-        ) {
+        if self.handle_obvious_oom_request(self.tls, size) {
             return Address::ZERO;
         }
 
