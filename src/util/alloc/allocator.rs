@@ -248,7 +248,8 @@ pub(crate) fn assert_allocation_args<VM: VMBinding>(size: usize, align: usize, o
 /// used as `Arc<AllocatorContext>` inside all allocator implementations since
 /// we need the entire struct to be `Send`.
 ///
-/// See here for more information: https://github.com/mmtk/mmtk-core/issues/1474
+/// See doc comment on `impl Sync` for `AllocationOptionsHolder` above.
+/// See here for more information: <https://github.com/mmtk/mmtk-core/issues/1474>
 pub struct AllocatorContext<VM: VMBinding> {
     alloc_options: AllocationOptionsHolder,
     pub state: Arc<GlobalState>,
