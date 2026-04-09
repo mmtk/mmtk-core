@@ -64,7 +64,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
         true
     }
 
-    fn initialize_object_metadata(&self, object: ObjectReference) {
+    fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize) {
         crate::util::metadata::vo_bit::set_vo_bit(object);
     }
 

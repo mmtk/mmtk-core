@@ -191,7 +191,7 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
         true
     }
 
-    fn initialize_object_metadata(&self, _object: crate::util::ObjectReference) {
+    fn initialize_object_metadata(&self, _object: crate::util::ObjectReference, _bytes: usize) {
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(_object);
     }
