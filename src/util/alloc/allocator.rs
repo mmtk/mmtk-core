@@ -330,16 +330,15 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 .get_alloc_options()
                 .allow_oom_call
             {
-                VM::VMCollection::out_of_memory(
-                    tls,
-                    crate::util::alloc::AllocationError::HeapOutOfMemory,
-                );
+                self.out_of_memory(tls);
             }
             return true;
         }
         false
     }
 
+    /// Wrapper around [`Collection::out_of_memory`]. Used to set up relevant state and signal out
+    /// of memory errors.
     fn out_of_memory(&self, tls: VMThread) {
         VM::VMCollection::out_of_memory(tls, AllocationError::HeapOutOfMemory);
         // Relaxed store is fine since this is a thread-local boolean.
