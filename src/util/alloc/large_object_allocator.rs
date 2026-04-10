@@ -56,10 +56,6 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
             self.tls,
             pages << crate::util::constants::LOG_BYTES_IN_PAGE,
         ) {
-            // Relaxed store is fine since this is a thread-local boolean.
-            self.get_context()
-                .thrown_oom
-                .store(true, std::sync::atomic::Ordering::Relaxed);
             return Address::ZERO;
         }
 
