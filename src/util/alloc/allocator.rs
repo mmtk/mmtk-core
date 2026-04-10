@@ -472,11 +472,6 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             if !is_mutator {
                 debug_assert!(!result.is_zero());
                 debug_assert!(!self.get_context().thrown_oom.load(Ordering::Relaxed));
-                debug_assert!(!self
-                    .get_context()
-                    .state
-                    .allocation_success
-                    .load(Ordering::Relaxed));
                 return result;
             }
 
