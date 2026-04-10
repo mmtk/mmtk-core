@@ -287,12 +287,10 @@ impl<VM: VMBinding> AllocatorContext<VM> {
     }
 }
 
-macro_rules! reset_allocation_state {
-    ($receiver:expr) => {{
-        let context = $receiver.get_context();
-        // Relaxed store is fine since this is a thread-local boolean.
-        context.thrown_oom.store(false, Ordering::Relaxed);
-    }};
+fn reset_allocation_state<VM: VMBinding, A: Allocator<VM> + ?Sized>(allocator: &A) {
+    let context = allocator.get_context();
+    // Relaxed store is fine since this is a thread-local boolean.
+    context.thrown_oom.store(false, Ordering::Relaxed);
 }
 
 /// A trait which implements allocation routines. Every allocator needs to implements this trait.
@@ -488,7 +486,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                         .allocation_success
                         .store(true, Ordering::SeqCst);
                 }
-                reset_allocation_state!(self);
+                reset_allocation_state(self);
 
                 // Only update the allocation bytes if we haven't failed a previous allocation in this loop
                 if stress_test && self.get_context().state.is_initialized() && !previous_result_zero
@@ -538,7 +536,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 // the code beyond this point tests OOM conditions and, if not OOM, try to allocate
                 // again.  Since we didn't block for GC, the allocation will fail again if we try
                 // again. So we return null immediately.
-                reset_allocation_state!(self);
+                reset_allocation_state(self);
                 return Address::ZERO;
             }
 
@@ -547,7 +545,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             if self.get_context().thrown_oom.load(Ordering::Relaxed) {
                 // Need to reset the thrown_oom state since we're giving up on this allocation,
                 // that is to say, the thrown_oom state is *per* allocation request
-                reset_allocation_state!(self);
+                reset_allocation_state(self);
                 return Address::ZERO;
             }
 
@@ -572,7 +570,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                     // Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
                     trace!("Throw HeapOutOfMemory!");
                     self.out_of_memory(tls);
-                    reset_allocation_state!(self);
+                    reset_allocation_state(self);
                     self.get_context()
                         .state
                         .allocation_success
