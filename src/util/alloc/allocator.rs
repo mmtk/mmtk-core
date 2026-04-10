@@ -302,6 +302,26 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         unimplemented!()
     }
 
+    /// Check if the requested `size` is an obvious out-of-memory case (requested allocation size is larger than the heap size).
+    /// If it is, call `Collection::out_of_memory`.  Return true if the allocation request is an obvious OOM case, and false otherwise.
+    fn handle_obvious_oom_request(&self, tls: VMThread, size: usize) -> bool {
+        if self.get_context().gc_trigger.will_oom_on_alloc(size) {
+            if self
+                .get_context()
+                .alloc_options
+                .get_alloc_options()
+                .allow_oom_call
+            {
+                VM::VMCollection::out_of_memory(
+                    tls,
+                    crate::util::alloc::AllocationError::HeapOutOfMemory,
+                );
+            }
+            return true;
+        }
+        false
+    }
+
     /// An allocation attempt. The implementation of this function depends on the allocator used.
     /// If an allocator supports thread local allocations, then the allocation will be serviced
     /// from its TLAB, otherwise it will default to using the slowpath, i.e. [`alloc_slow`](Allocator::alloc_slow).
