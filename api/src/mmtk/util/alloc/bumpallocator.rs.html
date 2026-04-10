@@ -194,43 +194,39 @@
 <a href=#194 id=194 data-nosnippet>194</a>        offset: usize,
 <a href=#195 id=195 data-nosnippet>195</a>        stress_test: bool,
 <a href=#196 id=196 data-nosnippet>196</a>    ) -&gt; Address {
-<a href=#197 id=197 data-nosnippet>197</a>        <span class="kw">if </span><span class="self">self</span>.space.handle_obvious_oom_request(
-<a href=#198 id=198 data-nosnippet>198</a>            <span class="self">self</span>.tls,
-<a href=#199 id=199 data-nosnippet>199</a>            size,
-<a href=#200 id=200 data-nosnippet>200</a>            <span class="self">self</span>.get_context().get_alloc_options(),
-<a href=#201 id=201 data-nosnippet>201</a>        ) {
-<a href=#202 id=202 data-nosnippet>202</a>            <span class="kw">return </span>Address::ZERO;
-<a href=#203 id=203 data-nosnippet>203</a>        }
-<a href=#204 id=204 data-nosnippet>204</a>
-<a href=#205 id=205 data-nosnippet>205</a>        <span class="kw">let </span>block_size = (size + BLOCK_MASK) &amp; (!BLOCK_MASK);
-<a href=#206 id=206 data-nosnippet>206</a>        <span class="kw">let </span>acquired_start = <span class="self">self</span>.space.acquire(
-<a href=#207 id=207 data-nosnippet>207</a>            <span class="self">self</span>.tls,
-<a href=#208 id=208 data-nosnippet>208</a>            bytes_to_pages_up(block_size),
-<a href=#209 id=209 data-nosnippet>209</a>            <span class="self">self</span>.get_context().get_alloc_options(),
-<a href=#210 id=210 data-nosnippet>210</a>        );
-<a href=#211 id=211 data-nosnippet>211</a>        <span class="kw">if </span>acquired_start.is_zero() {
-<a href=#212 id=212 data-nosnippet>212</a>            <span class="macro">trace!</span>(<span class="string">"Failed to acquire a new block"</span>);
-<a href=#213 id=213 data-nosnippet>213</a>            acquired_start
-<a href=#214 id=214 data-nosnippet>214</a>        } <span class="kw">else </span>{
-<a href=#215 id=215 data-nosnippet>215</a>            <span class="macro">trace!</span>(
-<a href=#216 id=216 data-nosnippet>216</a>                <span class="string">"Acquired a new block of size {} with start address {}"</span>,
-<a href=#217 id=217 data-nosnippet>217</a>                block_size,
-<a href=#218 id=218 data-nosnippet>218</a>                acquired_start
-<a href=#219 id=219 data-nosnippet>219</a>            );
-<a href=#220 id=220 data-nosnippet>220</a>            <span class="kw">if </span>!stress_test {
-<a href=#221 id=221 data-nosnippet>221</a>                <span class="self">self</span>.set_limit(acquired_start, acquired_start + block_size);
-<a href=#222 id=222 data-nosnippet>222</a>                <span class="self">self</span>.alloc(size, align, offset)
-<a href=#223 id=223 data-nosnippet>223</a>            } <span class="kw">else </span>{
-<a href=#224 id=224 data-nosnippet>224</a>                <span class="comment">// For a stress test, we artificially make the fastpath fail by
-<a href=#225 id=225 data-nosnippet>225</a>                // manipulating the limit as below.
-<a href=#226 id=226 data-nosnippet>226</a>                // The assumption here is that we use an address range such that
-<a href=#227 id=227 data-nosnippet>227</a>                // cursor &gt; block_size always.
-<a href=#228 id=228 data-nosnippet>228</a>                </span><span class="self">self</span>.set_limit(acquired_start, <span class="kw">unsafe </span>{ Address::from_usize(block_size) });
-<a href=#229 id=229 data-nosnippet>229</a>                <span class="comment">// Note that we have just acquired a new block so we know that we don't have to go
-<a href=#230 id=230 data-nosnippet>230</a>                // through the entire allocation sequence again, we can directly call the slow path
-<a href=#231 id=231 data-nosnippet>231</a>                // allocation.
-<a href=#232 id=232 data-nosnippet>232</a>                </span><span class="self">self</span>.alloc_slow_once_precise_stress(size, align, offset, <span class="bool-val">false</span>)
-<a href=#233 id=233 data-nosnippet>233</a>            }
-<a href=#234 id=234 data-nosnippet>234</a>        }
-<a href=#235 id=235 data-nosnippet>235</a>    }
-<a href=#236 id=236 data-nosnippet>236</a>}</code></pre></div></section></main></body></html>
+<a href=#197 id=197 data-nosnippet>197</a>        <span class="kw">if </span><span class="self">self</span>.handle_obvious_oom_request(<span class="self">self</span>.tls, size) {
+<a href=#198 id=198 data-nosnippet>198</a>            <span class="kw">return </span>Address::ZERO;
+<a href=#199 id=199 data-nosnippet>199</a>        }
+<a href=#200 id=200 data-nosnippet>200</a>
+<a href=#201 id=201 data-nosnippet>201</a>        <span class="kw">let </span>block_size = (size + BLOCK_MASK) &amp; (!BLOCK_MASK);
+<a href=#202 id=202 data-nosnippet>202</a>        <span class="kw">let </span>acquired_start = <span class="self">self</span>.space.acquire(
+<a href=#203 id=203 data-nosnippet>203</a>            <span class="self">self</span>.tls,
+<a href=#204 id=204 data-nosnippet>204</a>            bytes_to_pages_up(block_size),
+<a href=#205 id=205 data-nosnippet>205</a>            <span class="self">self</span>.get_context().get_alloc_options(),
+<a href=#206 id=206 data-nosnippet>206</a>        );
+<a href=#207 id=207 data-nosnippet>207</a>        <span class="kw">if </span>acquired_start.is_zero() {
+<a href=#208 id=208 data-nosnippet>208</a>            <span class="macro">trace!</span>(<span class="string">"Failed to acquire a new block"</span>);
+<a href=#209 id=209 data-nosnippet>209</a>            acquired_start
+<a href=#210 id=210 data-nosnippet>210</a>        } <span class="kw">else </span>{
+<a href=#211 id=211 data-nosnippet>211</a>            <span class="macro">trace!</span>(
+<a href=#212 id=212 data-nosnippet>212</a>                <span class="string">"Acquired a new block of size {} with start address {}"</span>,
+<a href=#213 id=213 data-nosnippet>213</a>                block_size,
+<a href=#214 id=214 data-nosnippet>214</a>                acquired_start
+<a href=#215 id=215 data-nosnippet>215</a>            );
+<a href=#216 id=216 data-nosnippet>216</a>            <span class="kw">if </span>!stress_test {
+<a href=#217 id=217 data-nosnippet>217</a>                <span class="self">self</span>.set_limit(acquired_start, acquired_start + block_size);
+<a href=#218 id=218 data-nosnippet>218</a>                <span class="self">self</span>.alloc(size, align, offset)
+<a href=#219 id=219 data-nosnippet>219</a>            } <span class="kw">else </span>{
+<a href=#220 id=220 data-nosnippet>220</a>                <span class="comment">// For a stress test, we artificially make the fastpath fail by
+<a href=#221 id=221 data-nosnippet>221</a>                // manipulating the limit as below.
+<a href=#222 id=222 data-nosnippet>222</a>                // The assumption here is that we use an address range such that
+<a href=#223 id=223 data-nosnippet>223</a>                // cursor &gt; block_size always.
+<a href=#224 id=224 data-nosnippet>224</a>                </span><span class="self">self</span>.set_limit(acquired_start, <span class="kw">unsafe </span>{ Address::from_usize(block_size) });
+<a href=#225 id=225 data-nosnippet>225</a>                <span class="comment">// Note that we have just acquired a new block so we know that we don't have to go
+<a href=#226 id=226 data-nosnippet>226</a>                // through the entire allocation sequence again, we can directly call the slow path
+<a href=#227 id=227 data-nosnippet>227</a>                // allocation.
+<a href=#228 id=228 data-nosnippet>228</a>                </span><span class="self">self</span>.alloc_slow_once_precise_stress(size, align, offset, <span class="bool-val">false</span>)
+<a href=#229 id=229 data-nosnippet>229</a>            }
+<a href=#230 id=230 data-nosnippet>230</a>        }
+<a href=#231 id=231 data-nosnippet>231</a>    }
+<a href=#232 id=232 data-nosnippet>232</a>}</code></pre></div></section></main></body></html>
