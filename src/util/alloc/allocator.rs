@@ -486,7 +486,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                         .allocation_success
                         .store(true, Ordering::SeqCst);
                 }
-                reset_allocation_state(self);
+                debug_assert!(!self.get_context().thrown_oom.load(Ordering::Relaxed));
 
                 // Only update the allocation bytes if we haven't failed a previous allocation in this loop
                 if stress_test && self.get_context().state.is_initialized() && !previous_result_zero
