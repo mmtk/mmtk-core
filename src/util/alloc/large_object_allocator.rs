@@ -49,12 +49,16 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, _offset: usize) -> Address {
-        if self.handle_obvious_oom_request(self.tls, size) {
+        let maxbytes = allocator::get_maximum_aligned_size::<VM>(size, align);
+        let pages = crate::util::conversions::bytes_to_pages_up(maxbytes);
+
+        if self.handle_obvious_oom_request(
+            self.tls,
+            pages << crate::util::constants::LOG_BYTES_IN_PAGE,
+        ) {
             return Address::ZERO;
         }
 
-        let maxbytes = allocator::get_maximum_aligned_size::<VM>(size, align);
-        let pages = crate::util::conversions::bytes_to_pages_up(maxbytes);
         self.space
             .allocate_pages(self.tls, pages, self.get_context().get_alloc_options())
     }
