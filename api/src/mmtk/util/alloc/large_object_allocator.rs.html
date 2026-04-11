@@ -49,27 +49,31 @@
 <a href=#49 id=49 data-nosnippet>49</a>    }
 <a href=#50 id=50 data-nosnippet>50</a>
 <a href=#51 id=51 data-nosnippet>51</a>    <span class="kw">fn </span>alloc_slow_once(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, _offset: usize) -&gt; Address {
-<a href=#52 id=52 data-nosnippet>52</a>        <span class="kw">if </span><span class="self">self</span>.handle_obvious_oom_request(<span class="self">self</span>.tls, size) {
-<a href=#53 id=53 data-nosnippet>53</a>            <span class="kw">return </span>Address::ZERO;
-<a href=#54 id=54 data-nosnippet>54</a>        }
-<a href=#55 id=55 data-nosnippet>55</a>
-<a href=#56 id=56 data-nosnippet>56</a>        <span class="kw">let </span>maxbytes = allocator::get_maximum_aligned_size::&lt;VM&gt;(size, align);
-<a href=#57 id=57 data-nosnippet>57</a>        <span class="kw">let </span>pages = <span class="kw">crate</span>::util::conversions::bytes_to_pages_up(maxbytes);
-<a href=#58 id=58 data-nosnippet>58</a>        <span class="self">self</span>.space
-<a href=#59 id=59 data-nosnippet>59</a>            .allocate_pages(<span class="self">self</span>.tls, pages, <span class="self">self</span>.get_context().get_alloc_options())
-<a href=#60 id=60 data-nosnippet>60</a>    }
-<a href=#61 id=61 data-nosnippet>61</a>}
-<a href=#62 id=62 data-nosnippet>62</a>
-<a href=#63 id=63 data-nosnippet>63</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; LargeObjectAllocator&lt;VM&gt; {
-<a href=#64 id=64 data-nosnippet>64</a>    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
-<a href=#65 id=65 data-nosnippet>65</a>        tls: VMThread,
-<a href=#66 id=66 data-nosnippet>66</a>        space: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>LargeObjectSpace&lt;VM&gt;,
-<a href=#67 id=67 data-nosnippet>67</a>        context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
-<a href=#68 id=68 data-nosnippet>68</a>    ) -&gt; <span class="self">Self </span>{
-<a href=#69 id=69 data-nosnippet>69</a>        LargeObjectAllocator {
-<a href=#70 id=70 data-nosnippet>70</a>            tls,
-<a href=#71 id=71 data-nosnippet>71</a>            space,
-<a href=#72 id=72 data-nosnippet>72</a>            context,
-<a href=#73 id=73 data-nosnippet>73</a>        }
-<a href=#74 id=74 data-nosnippet>74</a>    }
-<a href=#75 id=75 data-nosnippet>75</a>}</code></pre></div></section></main></body></html>
+<a href=#52 id=52 data-nosnippet>52</a>        <span class="kw">let </span>maxbytes = allocator::get_maximum_aligned_size::&lt;VM&gt;(size, align);
+<a href=#53 id=53 data-nosnippet>53</a>        <span class="kw">let </span>pages = <span class="kw">crate</span>::util::conversions::bytes_to_pages_up(maxbytes);
+<a href=#54 id=54 data-nosnippet>54</a>
+<a href=#55 id=55 data-nosnippet>55</a>        <span class="kw">if </span><span class="self">self</span>.handle_obvious_oom_request(
+<a href=#56 id=56 data-nosnippet>56</a>            <span class="self">self</span>.tls,
+<a href=#57 id=57 data-nosnippet>57</a>            pages &lt;&lt; <span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE,
+<a href=#58 id=58 data-nosnippet>58</a>        ) {
+<a href=#59 id=59 data-nosnippet>59</a>            <span class="kw">return </span>Address::ZERO;
+<a href=#60 id=60 data-nosnippet>60</a>        }
+<a href=#61 id=61 data-nosnippet>61</a>
+<a href=#62 id=62 data-nosnippet>62</a>        <span class="self">self</span>.space
+<a href=#63 id=63 data-nosnippet>63</a>            .allocate_pages(<span class="self">self</span>.tls, pages, <span class="self">self</span>.get_context().get_alloc_options())
+<a href=#64 id=64 data-nosnippet>64</a>    }
+<a href=#65 id=65 data-nosnippet>65</a>}
+<a href=#66 id=66 data-nosnippet>66</a>
+<a href=#67 id=67 data-nosnippet>67</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; LargeObjectAllocator&lt;VM&gt; {
+<a href=#68 id=68 data-nosnippet>68</a>    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
+<a href=#69 id=69 data-nosnippet>69</a>        tls: VMThread,
+<a href=#70 id=70 data-nosnippet>70</a>        space: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>LargeObjectSpace&lt;VM&gt;,
+<a href=#71 id=71 data-nosnippet>71</a>        context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
+<a href=#72 id=72 data-nosnippet>72</a>    ) -&gt; <span class="self">Self </span>{
+<a href=#73 id=73 data-nosnippet>73</a>        LargeObjectAllocator {
+<a href=#74 id=74 data-nosnippet>74</a>            tls,
+<a href=#75 id=75 data-nosnippet>75</a>            space,
+<a href=#76 id=76 data-nosnippet>76</a>            context,
+<a href=#77 id=77 data-nosnippet>77</a>        }
+<a href=#78 id=78 data-nosnippet>78</a>    }
+<a href=#79 id=79 data-nosnippet>79</a>}</code></pre></div></section></main></body></html>
