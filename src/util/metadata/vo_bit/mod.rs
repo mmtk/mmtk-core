@@ -71,7 +71,7 @@ cfg_if::cfg_if! {
 /// The base address for VO bit side metadata on 64 bits platforms.
 #[cfg(target_pointer_width = "64")]
 pub fn vo_bit_side_metadata_addr() -> Address {
-    VO_BIT_SIDE_METADATA_SPEC.get_absolute_offset()
+    VO_BIT_SIDE_METADATA_SPEC.get_starting_address()
 }
 
 /// Atomically set the VO bit for an object.

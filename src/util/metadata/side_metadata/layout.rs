@@ -35,7 +35,7 @@ pub(super) fn set_vm_side_metadata_specs(specs: &[SideMetadataSpec]) {
     let _ = VM_SIDE_METADATA_UPPER_BOUND_OFFSET.get_or_init(|| {
         let mut upper_bound = 0usize;
         for spec in specs {
-            if spec.is_absolute_offset() {
+            if spec.uses_contiguous_side_metadata() {
                 upper_bound = upper_bound.max(spec.upper_bound_offset());
             }
         }

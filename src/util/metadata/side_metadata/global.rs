@@ -39,41 +39,35 @@ impl SideMetadataSpec {
         self.is_global || cfg!(target_pointer_width = "64")
     }
 
-    /// Is offset for this spec Address?
-    pub const fn is_absolute_offset(&self) -> bool {
-        self.uses_contiguous_side_metadata()
+    pub const fn uses_chunked_side_metadata(&self) -> bool {
+        !self.uses_contiguous_side_metadata()
     }
 
-    /// If offset for this spec relative? (chunked side metadata for local specs in 32 bits)
-    pub const fn is_rel_offset(&self) -> bool {
-        !self.is_absolute_offset()
-    }
-
-    /// Get the absolute offset for the spec.
-    pub fn get_absolute_offset(&self) -> Address {
-        debug_assert!(self.is_absolute_offset());
+    /// Get the starting address for a spec of contiguous side metadata.
+    pub fn get_starting_address(&self) -> Address {
+        debug_assert!(self.uses_contiguous_side_metadata());
         let base =
             crate::util::metadata::side_metadata::layout::global_side_metadata_base_address();
         base + self.offset
     }
 
-    /// Get the relative offset for the spec.
-    pub const fn get_rel_offset(&self) -> usize {
-        debug_assert!(self.is_rel_offset());
+    /// Get the relative offset for a spec of chunked side metadata.
+    pub const fn get_offset_for_chunked(&self) -> usize {
+        debug_assert!(self.uses_chunked_side_metadata());
         self.offset
     }
 
     /// Return the upperbound offset for the side metadata. The next side metadata should be laid out at this offset.
     #[cfg(target_pointer_width = "64")]
     pub const fn upper_bound_offset(&self) -> usize {
-        debug_assert!(self.is_absolute_offset());
+        debug_assert!(self.uses_contiguous_side_metadata());
         self.offset + crate::util::metadata::side_metadata::metadata_address_range_size(self)
     }
 
     /// Return the upperbound offset for the side metadata. The next side metadata should be laid out at this offset.
     #[cfg(target_pointer_width = "32")]
     pub const fn upper_bound_offset(&self) -> usize {
-        if self.is_absolute_offset() {
+        if self.uses_contiguous_side_metadata() {
             self.offset + crate::util::metadata::side_metadata::metadata_address_range_size(self)
         } else {
             self.offset
@@ -89,8 +83,8 @@ impl SideMetadataSpec {
     /// after this spec. This spec must be a contiguous side metadata spec (which uses address
     /// as offset).
     pub fn upper_bound_address_for_contiguous(&self) -> Address {
-        debug_assert!(self.is_absolute_offset());
-        self.get_absolute_offset()
+        debug_assert!(self.uses_contiguous_side_metadata());
+        self.get_starting_address()
             .add(crate::util::metadata::side_metadata::metadata_address_range_size(self))
     }
 
@@ -100,7 +94,7 @@ impl SideMetadataSpec {
     /// side metadata uses chunked metadata.
     #[cfg(target_pointer_width = "32")]
     pub fn upper_bound_address_for_chunked(&self, data_addr: Address) -> Address {
-        debug_assert!(self.is_rel_offset());
+        debug_assert!(self.uses_chunked_side_metadata());
         address_to_meta_chunk_addr(data_addr).add(self.upper_bound_offset())
     }
 

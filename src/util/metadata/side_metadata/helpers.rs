@@ -21,9 +21,9 @@ pub(super) fn address_to_contiguous_meta_address(
     let shift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
     if shift >= 0 {
-        metadata_spec.get_absolute_offset() + ((data_addr >> log_bytes_in_region) >> shift)
+        metadata_spec.get_starting_address() + ((data_addr >> log_bytes_in_region) >> shift)
     } else {
-        metadata_spec.get_absolute_offset() + ((data_addr >> log_bytes_in_region) << (-shift))
+        metadata_spec.get_starting_address() + ((data_addr >> log_bytes_in_region) << (-shift))
     }
 }
 
@@ -44,7 +44,7 @@ pub(super) fn contiguous_meta_address_to_address(
         (metadata_addr, bit)
     );
     let shift = (LOG_BITS_IN_BYTE as i32) - metadata_spec.log_num_of_bits as i32;
-    let relative_meta_addr = metadata_addr - metadata_spec.get_absolute_offset();
+    let relative_meta_addr = metadata_addr - metadata_spec.get_starting_address();
 
     let data_addr_intermediate = if shift >= 0 {
         relative_meta_addr << shift

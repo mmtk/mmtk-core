@@ -145,7 +145,7 @@ fn verify_no_overlap_contiguous(
     let end_1 = base + super::metadata_address_range_size(spec_1);
     let end_2 = base + super::metadata_address_range_size(spec_2);
 
-    if !(spec_1.get_absolute_offset() >= end_2 || spec_2.get_absolute_offset() >= end_1) {
+    if !(spec_1.get_starting_address() >= end_2 || spec_2.get_starting_address() >= end_1) {
         return Err(Error::new(
             ErrorKind::InvalidInput,
             format!(
@@ -391,7 +391,7 @@ fn verify_metadata_address_bound(spec: &SideMetadataSpec, data_addr: Address) {
 
     let metadata_addr =
         crate::util::metadata::side_metadata::address_to_meta_address(spec, data_addr);
-    let metadata_addr_bound = if spec.is_absolute_offset() {
+    let metadata_addr_bound = if spec.uses_contiguous_side_metadata() {
         spec.upper_bound_address_for_contiguous()
     } else {
         #[cfg(target_pointer_width = "32")]
