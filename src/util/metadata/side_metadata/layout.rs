@@ -32,20 +32,20 @@ static VM_SIDE_METADATA_UPPER_BOUND_OFFSET: OnceLock<usize> = OnceLock::new();
 /// Record VM side metadata layout so startup reservation can cover VM specs.
 /// This must be called before `initialize_side_metadata_base()`.
 pub(super) fn set_vm_side_metadata_specs(specs: &[SideMetadataSpec]) {
-    let _ = VM_SIDE_METADATA_UPPER_BOUND_OFFSET.get_or_init(|| {
-        let mut upper_bound = 0usize;
-        for spec in specs {
-            if spec.uses_contiguous_side_metadata() {
-                upper_bound = upper_bound.max(spec.upper_bound_offset());
-            }
+    let mut upper_bound = 0usize;
+    for spec in specs {
+        if spec.uses_contiguous_side_metadata() {
+            upper_bound = upper_bound.max(spec.upper_bound_offset());
         }
-        debug!(
-            "Registered VM side metadata layout: {} specs, upper_bound={}",
-            specs.len(),
-            upper_bound
-        );
+    }
+    VM_SIDE_METADATA_UPPER_BOUND_OFFSET
+        .set(upper_bound)
+        .unwrap();
+    debug!(
+        "Registered VM side metadata layout: {} specs, upper_bound={}",
+        specs.len(),
         upper_bound
-    });
+    );
 }
 
 // Step 2: Call `initialize_side_metadata_base()` to reserve address space for side metadata.
@@ -55,60 +55,58 @@ pub(super) fn initialize_side_metadata_base(
     specified_base: Address,
     huge_page_support: HugePageSupport,
 ) {
-    SIDE_METADATA_BASE_ADDRESS.get_or_init(|| {
-        #[cfg(target_pointer_width = "64")]
-        {
-            let core_end = super::spec_defs::LAST_LOCAL_SIDE_METADATA_SPEC.upper_bound_offset();
-            let vm_end = *VM_SIDE_METADATA_UPPER_BOUND_OFFSET.get().unwrap();
-            info!(
-                "Initializing side metadata base: vm_specs_registered={} core_end={} vm_end={}",
-                VM_SIDE_METADATA_UPPER_BOUND_OFFSET.get().is_some(),
-                core_end,
-                unsafe { Address::from_usize(vm_end) }
-            );
-            if VM_SIDE_METADATA_UPPER_BOUND_OFFSET.get().is_none() {
-                warn!(
-                    "Initializing side metadata base before VM side metadata layout was registered"
-                );
-                let bt = std::backtrace::Backtrace::capture();
-                debug!("backtrace for early side metadata base initialization:\n{bt}");
-            }
-        }
-        let total_bytes = side_metadata_reserved_bytes();
-        let pages = total_bytes >> LOG_BYTES_IN_PAGE;
-        let anno = MmapAnnotation::SideMeta {
-            space: "side-metadata",
-            meta: "all",
-        };
+    #[cfg(target_pointer_width = "64")]
+    {
+        let core_end = super::spec_defs::LAST_LOCAL_SIDE_METADATA_SPEC.upper_bound_offset();
+        let vm_end = *VM_SIDE_METADATA_UPPER_BOUND_OFFSET.get().unwrap();
         info!(
-            "Quarantine side metadata range: total_bytes=0x{:x}, pages=0x{:x}, granularity=0x{:x}",
-            total_bytes,
-            pages,
-            MMAPPER.granularity()
+            "Initializing side metadata base: vm_specs_registered={} core_end={} vm_end={}",
+            VM_SIDE_METADATA_UPPER_BOUND_OFFSET.get().is_some(),
+            core_end,
+            unsafe { Address::from_usize(vm_end) }
         );
-        let base = if specified_base.is_zero() {
-            MMAPPER
-                .quarantine_address_range_anywhere(pages, huge_page_support, &anno)
-                .unwrap_or_else(|e| panic!("failed to quarantine side metadata address range: {e}"))
-        } else {
-            MMAPPER
-                .quarantine_address_range(specified_base, pages, huge_page_support, &anno)
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "failed to quarantine side metadata address range at {}: {e}",
-                        specified_base
-                    )
-                });
-            specified_base
-        };
-        info!(
-            "Side metadata base initialized at {} (range: {} - {})",
-            base,
-            base,
-            base + total_bytes
-        );
-        base
-    });
+    }
+    let total_bytes = side_metadata_reserved_bytes();
+    let pages = total_bytes >> LOG_BYTES_IN_PAGE;
+    let anno = MmapAnnotation::SideMeta {
+        space: "all",
+        meta: "all-quarantined",
+    };
+    info!(
+        "Quarantine side metadata range: total_bytes=0x{:x}, pages=0x{:x}, granularity=0x{:x}",
+        total_bytes,
+        pages,
+        MMAPPER.granularity()
+    );
+    let base = if specified_base.is_zero() {
+        MMAPPER
+            .quarantine_address_range_anywhere(pages, huge_page_support, &anno)
+            .unwrap_or_else(|e| panic!("failed to quarantine side metadata address range: {e}"))
+    } else {
+        MMAPPER
+            .quarantine_address_range(specified_base, pages, huge_page_support, &anno)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "failed to quarantine side metadata address range at {}: {e}",
+                    specified_base
+                )
+            });
+        specified_base
+    };
+    info!(
+        "Side metadata base initialized at {} (range: {} - {})",
+        base,
+        base,
+        base + total_bytes
+    );
+    SIDE_METADATA_BASE_ADDRESS.set(base).unwrap();
+}
+
+/// Tests need to check if side metadata is initialized so they can avoid attempting to initialize it again.
+#[cfg(test)]
+pub(super) fn is_side_metadata_initialized() -> bool {
+    VM_SIDE_METADATA_UPPER_BOUND_OFFSET.get().is_some()
+        && SIDE_METADATA_BASE_ADDRESS.get().is_some()
 }
 
 // With the above functions called, side metadata is initialized, and the following functions can be used to query side metadata layout and addresses.
@@ -131,7 +129,7 @@ pub fn global_side_metadata_base_address() -> Address {
         );
     }
 
-    // TODO: use `OncLock::get_unchecked()` once it is stabilized.
+    // TODO: use `OnceLock::get_unchecked()` once it is stabilized.
     // Otherwise, even though this uses `unwrap_unchecked`, the compiler still needs to atomically load the
     // initialization flag inside of `get`. See https://github.com/rust-lang/libs-team/issues/654.
     unsafe { *SIDE_METADATA_BASE_ADDRESS.get().unwrap_unchecked() }

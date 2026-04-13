@@ -409,7 +409,6 @@ mod tests {
     }
 
     fn test_round_trip_conversion(spec: &SideMetadataSpec, test_data: &[Address]) {
-        core_test_initialize_side_metadata();
         if should_skip_spec_on_this_target(spec) {
             eprintln!(
                 "Skipping {} on this target: spec ratio is outside global side metadata worst-case bound",
@@ -417,6 +416,8 @@ mod tests {
             );
             return;
         }
+
+        core_test_initialize_side_metadata();
 
         for ref_addr in test_data {
             let addr = *ref_addr;

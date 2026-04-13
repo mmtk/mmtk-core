@@ -66,8 +66,7 @@ pub trait Mmapper: Sync {
     /// Arguments:
     /// * `start`: Address of the first page to be quarantined
     /// * `pages`: Number of pages to quarantine from the start
-    /// * `strategy`: The mmap strategy.  The `prot` field is ignored because we always use
-    ///   `PROT_NONE`.
+    /// * `huge_page_support`: The huge page support option to use when quarantining the address range.
     /// * `anno`: Human-readable annotation to apply to newly mapped memory ranges.
     fn quarantine_address_range(
         &self,
@@ -82,8 +81,7 @@ pub trait Mmapper: Sync {
     ///
     /// Arguments:
     /// * `pages`: Number of pages to quarantine
-    /// * `strategy`: The mmap strategy.  The `prot` field is ignored because we always use
-    ///   `PROT_NONE`.
+    /// * `huge_page_support`: The huge page support option to use when quarantining the address range.
     /// * `anno`: Human-readable annotation to apply to newly mapped memory ranges.
     fn quarantine_address_range_anywhere(
         &self,

@@ -49,6 +49,10 @@ pub(crate) fn core_test_initialize_side_metadata() {
     use crate::util::os::HugePageSupport;
     use crate::util::Address;
 
+    if is_side_metadata_initialized() {
+        return;
+    }
+
     set_vm_side_metadata_specs(&[]);
     initialize_side_metadata_base(Address::ZERO, HugePageSupport::No);
 }

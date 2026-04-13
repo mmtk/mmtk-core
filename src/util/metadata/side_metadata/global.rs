@@ -3,6 +3,7 @@ use crate::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
 use crate::util::conversions::raw_align_up;
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 use crate::util::metadata::metadata_val_traits::*;
+use crate::util::metadata::side_metadata::layout::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::os::*;
@@ -39,6 +40,7 @@ impl SideMetadataSpec {
         self.is_global || cfg!(target_pointer_width = "64")
     }
 
+    /// Is this spec using chunked side metadata? If not, it uses contiguous side metadata.
     pub const fn uses_chunked_side_metadata(&self) -> bool {
         !self.uses_contiguous_side_metadata()
     }
@@ -46,8 +48,7 @@ impl SideMetadataSpec {
     /// Get the starting address for a spec of contiguous side metadata.
     pub fn get_starting_address(&self) -> Address {
         debug_assert!(self.uses_contiguous_side_metadata());
-        let base =
-            crate::util::metadata::side_metadata::layout::global_side_metadata_base_address();
+        let base = global_side_metadata_base_address();
         base + self.offset
     }
 
@@ -61,20 +62,16 @@ impl SideMetadataSpec {
     #[cfg(target_pointer_width = "64")]
     pub const fn upper_bound_offset(&self) -> usize {
         debug_assert!(self.uses_contiguous_side_metadata());
-        self.offset + crate::util::metadata::side_metadata::metadata_address_range_size(self)
+        self.offset + metadata_address_range_size(self)
     }
 
     /// Return the upperbound offset for the side metadata. The next side metadata should be laid out at this offset.
     #[cfg(target_pointer_width = "32")]
     pub const fn upper_bound_offset(&self) -> usize {
         if self.uses_contiguous_side_metadata() {
-            self.offset + crate::util::metadata::side_metadata::metadata_address_range_size(self)
+            self.offset + metadata_address_range_size(self)
         } else {
-            self.offset
-                + crate::util::metadata::side_metadata::metadata_bytes_per_chunk(
-                    self.log_bytes_in_region,
-                    self.log_num_of_bits,
-                )
+            self.offset + metadata_bytes_per_chunk(self.log_bytes_in_region, self.log_num_of_bits)
         }
     }
 
@@ -84,8 +81,7 @@ impl SideMetadataSpec {
     /// as offset).
     pub fn upper_bound_address_for_contiguous(&self) -> Address {
         debug_assert!(self.uses_contiguous_side_metadata());
-        self.get_starting_address()
-            .add(crate::util::metadata::side_metadata::metadata_address_range_size(self))
+        self.get_starting_address() + metadata_address_range_size(self)
     }
 
     /// The upper bound address for metadata address computed for this global spec. The computed metadata address
@@ -95,7 +91,7 @@ impl SideMetadataSpec {
     #[cfg(target_pointer_width = "32")]
     pub fn upper_bound_address_for_chunked(&self, data_addr: Address) -> Address {
         debug_assert!(self.uses_chunked_side_metadata());
-        address_to_meta_chunk_addr(data_addr).add(self.upper_bound_offset())
+        address_to_meta_chunk_addr(data_addr) + self.upper_bound_offset()
     }
 
     /// Used only for debugging.
