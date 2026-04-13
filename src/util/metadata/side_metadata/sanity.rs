@@ -167,12 +167,12 @@ fn verify_no_overlap_contiguous(
 ///
 #[cfg(target_pointer_width = "32")]
 fn verify_no_overlap_chunked(spec_1: &SideMetadataSpec, spec_2: &SideMetadataSpec) -> Result<()> {
-    let end_1 = spec_1.get_rel_offset()
+    let end_1 = spec_1.get_offset_for_chunked()
         + super::metadata_bytes_per_chunk(spec_1.log_bytes_in_region, spec_1.log_num_of_bits);
-    let end_2 = spec_2.get_rel_offset()
+    let end_2 = spec_2.get_offset_for_chunked()
         + super::metadata_bytes_per_chunk(spec_2.log_bytes_in_region, spec_2.log_num_of_bits);
 
-    if !(spec_1.get_rel_offset() >= end_2 || spec_2.get_rel_offset() >= end_1) {
+    if !(spec_1.get_offset_for_chunked() >= end_2 || spec_2.get_offset_for_chunked() >= end_1) {
         return Err(Error::new(
             ErrorKind::InvalidInput,
             format!(
@@ -828,7 +828,7 @@ mod tests {
             name: "spec_2",
             is_global: false,
             // We make up an invalid offset
-            offset: spec_1.get_rel_offset()
+            offset: spec_1.get_offset_for_chunked()
                 + metadata_bytes_per_chunk(spec_1.log_bytes_in_region, spec_1.log_num_of_bits)
                 - 1,
             log_num_of_bits: 0,
