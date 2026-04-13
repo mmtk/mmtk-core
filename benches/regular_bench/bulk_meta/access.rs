@@ -7,7 +7,7 @@ use mmtk::util::{
     conversions::raw_align_up,
     metadata::side_metadata::SideMetadataSpec,
     os::{MmapAnnotation, MmapProtection, MmapStrategy, OSMemory, OS},
-    test_private::side_metadata_address_to_meta_address,
+    test_private::address_to_meta_address,
     Address,
 };
 use std::hint::black_box;
@@ -37,7 +37,7 @@ pub fn bench(c: &mut Criterion) {
         b.iter(|| {
             let mut checksum = 0usize;
             for data_addr in &addrs {
-                let meta_addr = side_metadata_address_to_meta_address(&BENCH_SPEC, *data_addr);
+                let meta_addr = address_to_meta_address(&BENCH_SPEC, *data_addr);
                 checksum ^= meta_addr.as_usize();
             }
             black_box(checksum);
@@ -51,7 +51,7 @@ pub fn bench(c: &mut Criterion) {
         let mut meta_min = Address::MAX;
         let mut meta_max = Address::ZERO;
         for data_addr in &addrs {
-            let meta_addr = side_metadata_address_to_meta_address(&BENCH_SPEC, *data_addr);
+            let meta_addr = address_to_meta_address(&BENCH_SPEC, *data_addr);
             if meta_addr < meta_min {
                 meta_min = meta_addr;
             }

@@ -31,11 +31,7 @@ impl OSMemory for MacOS {
         strategy: MmapStrategy,
         _annotation: &MmapAnnotation<'_>,
     ) -> Result<Address> {
-        unix_common::mmap_anywhere(
-            size,
-            align,
-            strategy.prot(MmapProtection::NoAccess).reserve(false),
-        )
+        unix_common::mmap_anywhere(size, align, strategy)
     }
 
     fn munmap(start: Address, size: usize) -> Result<()> {

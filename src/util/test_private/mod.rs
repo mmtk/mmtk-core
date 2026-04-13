@@ -38,10 +38,7 @@ pub fn set_meta_bits(
 
 /// Expose `address_to_meta_address` when running `cargo bench`.
 #[inline(always)]
-pub fn side_metadata_address_to_meta_address(
-    metadata_spec: &SideMetadataSpec,
-    data_addr: Address,
-) -> Address {
+pub fn address_to_meta_address(metadata_spec: &SideMetadataSpec, data_addr: Address) -> Address {
     crate::util::metadata::side_metadata::address_to_meta_address(metadata_spec, data_addr)
 }
 
