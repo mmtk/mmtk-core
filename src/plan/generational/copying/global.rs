@@ -158,6 +158,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     fn generational(&self) -> Option<&dyn GenerationalPlan<VM = Self::VM>> {
         Some(self)
     }
+
+    fn is_live_object(&self, object: ObjectReference) -> bool {
+        self.gen.is_live_object(object)
+    }
 }
 
 impl<VM: VMBinding> GenerationalPlan for GenCopy<VM> {
