@@ -132,6 +132,15 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        // If concurrent marking is disabled, force a full GC.
+        // Though we have checked in collection_required to not trigger a concurrent GC, it is still possible
+        // that a GC is triggered without going through collection_required, e.g. a user triggered GC, or a GC trigger
+        // implemented at the binding side without calling collection_required.
+        // In those cases, we also want to force a full GC.
+        if self.concurrent_marking_is_disabled() {
+            self.should_do_full_gc.store(true, Ordering::SeqCst);
+        }
+
         let pause = if self.concurrent_marking_in_progress() {
             // FIXME: Currently it is unsafe to bypass `FinalMark` and go directly from `InitialMark` to `Full`.
             // It is related to defragmentation.  See https://github.com/mmtk/mmtk-core/issues/1357 for more details.

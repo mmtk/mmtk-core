@@ -7,7 +7,7 @@ use crate::util::options::Options;
 use crate::MMTK;
 
 use std::cell::RefCell;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crate::policy::space::Space;
@@ -243,9 +243,18 @@ pub(crate) fn assert_allocation_args<VM: VMBinding>(size: usize, align: usize, o
 }
 
 /// The context an allocator needs to access in order to perform allocation.
+///
+/// **Note:** An `AllocatorContext` is a thread-local struct, however, it is
+/// used as `Arc<AllocatorContext>` inside all allocator implementations since
+/// we need the entire struct to be `Send`.
+///
+/// See doc comment on `impl Sync` for `AllocationOptionsHolder` above.
+/// See here for more information: <https://github.com/mmtk/mmtk-core/issues/1474>
 pub struct AllocatorContext<VM: VMBinding> {
     alloc_options: AllocationOptionsHolder,
     pub state: Arc<GlobalState>,
+    /// Have we thrown an OOM already?
+    pub thrown_oom: AtomicBool,
     pub options: Arc<Options>,
     pub gc_trigger: Arc<GCTrigger<VM>>,
     #[cfg(feature = "analysis")]
@@ -257,6 +266,7 @@ impl<VM: VMBinding> AllocatorContext<VM> {
         Self {
             alloc_options: AllocationOptionsHolder::new(AllocationOptions::default()),
             state: mmtk.state.clone(),
+            thrown_oom: AtomicBool::new(false),
             options: mmtk.options.clone(),
             gc_trigger: mmtk.gc_trigger.clone(),
             #[cfg(feature = "analysis")]
@@ -275,6 +285,12 @@ impl<VM: VMBinding> AllocatorContext<VM> {
     pub fn get_alloc_options(&self) -> AllocationOptions {
         self.alloc_options.get_alloc_options()
     }
+}
+
+fn reset_allocation_state<VM: VMBinding, A: Allocator<VM> + ?Sized>(allocator: &A) {
+    let context = allocator.get_context();
+    // Relaxed store is fine since this is a thread-local boolean.
+    context.thrown_oom.store(false, Ordering::Relaxed);
 }
 
 /// A trait which implements allocation routines. Every allocator needs to implements this trait.
@@ -300,6 +316,31 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     fn get_thread_local_buffer_granularity(&self) -> usize {
         assert!(self.does_thread_local_allocation(), "An allocator that does not thread local allocation does not have a buffer granularity.");
         unimplemented!()
+    }
+
+    /// Check if the requested `size` is an obvious out-of-memory case (requested allocation size is larger than the heap size).
+    /// If it is, call `Collection::out_of_memory`.  Return true if the allocation request is an obvious OOM case, and false otherwise.
+    fn handle_obvious_oom_request(&self, tls: VMThread, size: usize) -> bool {
+        if self.get_context().gc_trigger.will_oom_on_alloc(size) {
+            if self
+                .get_context()
+                .alloc_options
+                .get_alloc_options()
+                .allow_oom_call
+            {
+                self.out_of_memory(tls);
+            }
+            return true;
+        }
+        false
+    }
+
+    /// Wrapper around [`Collection::out_of_memory`]. Used to set up relevant state and signal out
+    /// of memory errors.
+    fn out_of_memory(&self, tls: VMThread) {
+        VM::VMCollection::out_of_memory(tls, AllocationError::HeapOutOfMemory);
+        // Relaxed store is fine since this is a thread-local boolean.
+        self.get_context().thrown_oom.store(true, Ordering::Relaxed);
     }
 
     /// An allocation attempt. The implementation of this function depends on the allocator used.
@@ -400,6 +441,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         let tls = self.get_tls();
         let is_mutator = VM::VMActivePlan::is_mutator(tls);
         let stress_test = self.get_context().options.is_stress_test_gc_enabled();
+        assert!(!self.get_context().thrown_oom.load(Ordering::Relaxed), "We should not enter alloc_slow_inline if we have already thrown OOM for this allocation request.");
 
         // Information about the previous collection.
         let mut emergency_collection = false;
@@ -427,6 +469,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
 
             if !is_mutator {
                 debug_assert!(!result.is_zero());
+                debug_assert!(!self.get_context().thrown_oom.load(Ordering::Relaxed));
                 return result;
             }
 
@@ -443,6 +486,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                         .allocation_success
                         .store(true, Ordering::SeqCst);
                 }
+                debug_assert!(!self.get_context().thrown_oom.load(Ordering::Relaxed));
 
                 // Only update the allocation bytes if we haven't failed a previous allocation in this loop
                 if stress_test && self.get_context().state.is_initialized() && !previous_result_zero
@@ -492,6 +536,16 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 // the code beyond this point tests OOM conditions and, if not OOM, try to allocate
                 // again.  Since we didn't block for GC, the allocation will fail again if we try
                 // again. So we return null immediately.
+                reset_allocation_state(self);
+                return Address::ZERO;
+            }
+
+            // If we have already thrown an OOM for this allocation then return a zero.
+            // Relaxed load and store is fine given this is a thread-local boolean.
+            if self.get_context().thrown_oom.load(Ordering::Relaxed) {
+                // Need to reset the thrown_oom state since we're giving up on this allocation,
+                // that is to say, the thrown_oom state is *per* allocation request
+                reset_allocation_state(self);
                 return Address::ZERO;
             }
 
@@ -515,7 +569,8 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 if fail_with_oom {
                     // Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
                     trace!("Throw HeapOutOfMemory!");
-                    VM::VMCollection::out_of_memory(tls, AllocationError::HeapOutOfMemory);
+                    self.out_of_memory(tls);
+                    reset_allocation_state(self);
                     self.get_context()
                         .state
                         .allocation_success
