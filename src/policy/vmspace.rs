@@ -1,5 +1,6 @@
 use crate::mmtk::SFT_MAP;
-use crate::plan::{ObjectQueue, VectorObjectQueue};
+use crate::plan::tracing::OptionObjectQueue;
+use crate::plan::ObjectQueue;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
@@ -84,7 +85,7 @@ impl<VM: VMBinding> SFT for VMSpace<VM> {
     }
     fn sft_trace_object(
         &self,
-        queue: &mut VectorObjectQueue,
+        queue: &mut OptionObjectQueue,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
