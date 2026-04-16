@@ -83,7 +83,7 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
                 .immix_space
                 .trace_object_without_moving_rc(self, object);
         } else {
-            self.plan.los().trace_object_rc(self, object);
+            self.plan.los().trace_object(self, object);
         }
         object
     }
@@ -368,7 +368,7 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
                 worker,
             )
         } else {
-            self.lxr.los().trace_object_rc(self, object)
+            self.lxr.los().trace_object(self, object)
         };
         if self.should_record_forwarded_roots {
             self.forwarded_roots.push(x)

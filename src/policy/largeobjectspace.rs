@@ -23,7 +23,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crossbeam::queue::SegQueue;
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
 
@@ -37,17 +37,15 @@ const LOS_BIT_MASK: u8 = 0b11;
 /// to one Treadmill space.
 pub struct LargeObjectSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
-    pub(crate) pr: FreeListPageResource<VM>,
+    pr: FreeListPageResource<VM>,
     mark_state: u8,
     in_nursery_gc: bool,
     treadmill: TreadMill,
     clear_log_bit_on_sweep: bool,
     trace_in_progress: bool,
     rc_nursery_objects: SegQueue<ObjectReference>,
-    rc_mature_objects: Mutex<HashMap<ObjectReference, usize>>,
+    rc_mature_objects: Mutex<HashSet<ObjectReference>>,
     pub num_pages_released_lazy: AtomicUsize,
-    pub rc_killed_bytes: AtomicUsize,
-    pub young_alloc_size: AtomicUsize,
     pub rc_enabled: bool,
     rc: RefCountHelper<VM>,
     pub is_end_of_satb_or_full_gc: bool,
@@ -100,8 +98,8 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     fn initialize_object_metadata(&self, object: ObjectReference, bytes: usize) {
         // VO bit: Set for all objects.
         if self.rc_enabled {
-            self.young_alloc_size.fetch_add(bytes, Ordering::Relaxed);
-            // Add to object set
+            // Add to treadmill nursery
+            // self.treadmill.add_to_treadmill(object, true);
             self.rc_nursery_objects.push(object);
             // Initialize mark bit
             self.test_and_mark(object, self.mark_state);
@@ -109,6 +107,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
                 let a = object.to_raw_address() + off;
                 self.test_and_mark(a.to_object_reference::<VM>(), self.mark_state);
             }
+            // Update page reuse count for remset validation
             let lxr = self.lxr.unwrap();
             if lxr.cm_in_progress() {
                 for off in (0..bytes).step_by(BYTES_IN_PAGE) {
@@ -271,8 +270,8 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
         &self.common
     }
 
-    fn release_multiple_pages(&mut self, _start: Address) {
-        unreachable!()
+    fn release_multiple_pages(&mut self, start: Address) {
+        self.pr.release_pages(start);
     }
 
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
@@ -370,8 +369,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             rc_nursery_objects: Default::default(),
             rc_mature_objects: Default::default(),
             num_pages_released_lazy: Default::default(),
-            rc_killed_bytes: Default::default(),
-            young_alloc_size: Default::default(),
             rc_enabled: false,
             rc: RefCountHelper::NEW,
             is_end_of_satb_or_full_gc: false,
@@ -398,7 +395,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             if self.rc.count(o) == 0 {
                 self.release_object(o.to_raw_address());
             } else {
-                mature_blocks.insert(o, o.get_size::<VM>());
+                mature_blocks.insert(o);
             }
         }
     }
@@ -409,8 +406,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             self.mark_state = MARK_BIT - self.mark_state;
         }
         self.num_pages_released_lazy.store(0, Ordering::Relaxed);
-        self.rc_killed_bytes.store(0, Ordering::Relaxed);
-        self.young_alloc_size.store(0, Ordering::Relaxed);
         if self.rc_enabled {
             return;
         }
@@ -435,17 +430,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             self.sweep_large_pages(false);
             debug_assert!(self.treadmill.is_from_space_empty());
         }
-    }
-
-    pub fn trace_object_rc<Q: ObjectQueue>(
-        &self,
-        queue: &mut Q,
-        object: ObjectReference,
-    ) -> ObjectReference {
-        if self.test_and_mark(object, self.mark_state) {
-            queue.enqueue(object);
-        }
-        return object;
     }
 
     // Allow nested-if for this function to make it clear that test_and_mark() is only executed
@@ -520,7 +504,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             // Clear log bits for dead objects to prevent a new nursery object having the unlog bit set
             if self.clear_log_bit_on_sweep {
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
-                unreachable!()
             }
             self.release_object(get_super_page(object.to_object_start::<VM>()));
         };
@@ -561,7 +544,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     pub fn rc_free(&self, o: ObjectReference) {
         let mut rc_mature_objects = self.rc_mature_objects.lock().unwrap();
-        if rc_mature_objects.remove(&o).is_some() {
+        if rc_mature_objects.remove(&o) {
             let pages = self.release_object(o.to_raw_address());
             self.num_pages_released_lazy
                 .fetch_add(pages, Ordering::Relaxed);
@@ -573,29 +556,39 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     /// succeeds, the method will return true, meaning the object is marked by this invocation.
     /// Otherwise, it returns false.
     fn test_and_mark(&self, object: ObjectReference, value: u8) -> bool {
-        let mask = if self.rc_enabled {
-            MARK_BIT
-        } else if self.in_nursery_gc {
-            LOS_BIT_MASK
-        } else {
-            MARK_BIT
-        };
-        let result = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
-            .as_spec()
-            .extract_side_spec()
-            .fetch_update_atomic::<u8, _>(
-                object.to_raw_address(),
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-                |old_value| {
-                    let mark_bit = old_value & mask;
-                    if mark_bit == value {
-                        return None;
-                    }
-                    Some(old_value & !LOS_BIT_MASK | value)
-                },
+        loop {
+            let mask = if self.rc_enabled {
+                MARK_BIT
+            } else if self.in_nursery_gc {
+                LOS_BIT_MASK
+            } else {
+                MARK_BIT
+            };
+            let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
+                object,
+                None,
+                Ordering::SeqCst,
             );
-        result.is_ok()
+            let mark_bit = old_value & mask;
+            if mark_bit == value {
+                return false;
+            }
+            // using LOS_BIT_MASK have side effects of clearing nursery bit
+            if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
+                .compare_exchange_metadata::<VM, u8>(
+                    object,
+                    old_value,
+                    old_value & !LOS_BIT_MASK | value,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
+                break;
+            }
+        }
+        true
     }
 
     fn test_mark_bit(&self, object: ObjectReference, value: u8) -> bool {
@@ -620,7 +613,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     pub fn sweep_rc_mature_objects_after_satb(&self, is_live: &impl Fn(ObjectReference) -> bool) {
         let mut mature_objects = self.rc_mature_objects.lock().unwrap();
         let mut released_objects = vec![];
-        for (o, _size) in mature_objects.iter() {
+        for o in mature_objects.iter() {
             if !is_live(*o) {
                 self.rc.set(*o, 0);
                 let pages = self.release_object(o.to_raw_address());
