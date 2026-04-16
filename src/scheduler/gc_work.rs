@@ -501,6 +501,14 @@ impl<T: Trace> TracingProcessSlots<T> {
 
 impl<T: Trace> GCWork<T::VM> for TracingProcessSlots<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
+        #[cfg(feature = "extreme_assertions")]
+        if crate::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {
+            for slot in self.slots.iter() {
+                // log slot, panic if already logged
+                mmtk.slot_logger.log_slot(*slot);
+            }
+        }
+
         let mut queue = VectorObjectQueue::new();
 
         for slot in self.slots.iter() {
