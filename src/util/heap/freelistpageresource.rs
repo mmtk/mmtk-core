@@ -7,7 +7,6 @@ use super::PageResource;
 use crate::mmtk::MMAPPER;
 use crate::util::address::Address;
 use crate::util::alloc::embedded_meta_data::*;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::conversions;
 use crate::util::freelist;
 use crate::util::freelist::FreeList;
@@ -321,32 +320,6 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         /* now return the address space associated with the chunk for global reuse */
 
         self.common.release_discontiguous_chunks(chunk);
-    }
-
-    pub fn release_pages_and_reset_unlog_bits(&self, first: Address) -> usize {
-        debug_assert!(conversions::is_page_aligned(first));
-        let mut sync = self.sync.lock().unwrap();
-        let page_offset = conversions::bytes_to_pages_up(first - sync.start);
-        let pages = sync.free_list.size(page_offset as _);
-        VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
-            .as_spec()
-            .extract_side_spec()
-            .bzero_metadata(first, (pages as usize) << LOG_BYTES_IN_PAGE);
-
-        debug_assert!(pages as usize <= self.common().accounting.get_committed_pages());
-
-        if self.protect_memory_on_release.is_some() {
-            self.mprotect(first, pages as _);
-        }
-
-        self.common().accounting.release(pages as _);
-        let freed = sync.free_list.free(page_offset as _, true);
-        sync.pages_currently_on_freelist += pages as usize;
-        if !self.common().contiguous {
-            // only discontiguous spaces use chunks
-            self.release_free_chunks(first, freed as _, &mut sync);
-        }
-        pages as _
     }
 
     /// Release pages previously allocated by `alloc_pages`.

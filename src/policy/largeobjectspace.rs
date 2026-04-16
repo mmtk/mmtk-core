@@ -100,7 +100,11 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
                 let a = object.to_raw_address() + off;
                 self.test_and_mark(a.to_object_reference::<VM>(), self.mark_state);
             }
-            // Update page reuse count for remset validation
+            // Initialize metadata
+            VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+                .as_spec()
+                .extract_side_spec()
+                .bzero_metadata(object.to_object_start::<VM>(), bytes);
             let lxr = self.lxr.unwrap();
             if lxr.cm_in_progress() {
                 for off in (0..bytes).step_by(BYTES_IN_PAGE) {
@@ -369,14 +373,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     fn release_object(&self, start: Address) -> usize {
-        if self.common.needs_log_bit && self.common.needs_field_log_bit {
-            if self.rc_enabled {
-                self.rc.set(start.to_object_reference::<VM>(), 0);
-            }
-            self.pr.release_pages_and_reset_unlog_bits(start)
-        } else {
-            self.pr.release_pages(start)
+        if self.rc_enabled {
+            self.rc.set(start.to_object_reference::<VM>(), 0);
         }
+        self.pr.release_pages(start)
     }
 
     pub fn release_rc_nursery_objects(&self) {
