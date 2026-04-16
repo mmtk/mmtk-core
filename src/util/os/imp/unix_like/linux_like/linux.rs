@@ -18,6 +18,15 @@ impl OSMemory for Linux {
         linux_common::dzmmap(start, size, strategy, annotation)
     }
 
+    fn dzmmap_anywhere(
+        size: usize,
+        align: usize,
+        strategy: MmapStrategy,
+        annotation: &MmapAnnotation<'_>,
+    ) -> Result<Address> {
+        linux_common::dzmmap_anywhere(size, align, strategy, annotation)
+    }
+
     fn munmap(start: Address, size: usize) -> Result<()> {
         unix_common::munmap(start, size)
     }

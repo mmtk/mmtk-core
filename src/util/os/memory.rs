@@ -72,6 +72,16 @@ pub trait OSMemory {
         annotation: &MmapAnnotation<'_>,
     ) -> MmapResult<Address>;
 
+    /// Perform a no-reserve mmap at any available address, aligned to `align`.
+    ///
+    /// This API is used for reserving address ranges (typically with `PROT_NONE`) before committing.
+    fn dzmmap_anywhere(
+        size: usize,
+        align: usize,
+        strategy: MmapStrategy,
+        annotation: &MmapAnnotation<'_>,
+    ) -> std::io::Result<Address>;
+
     /// Handle mmap errors, possibly by signaling the VM about an out-of-memory condition.
     fn handle_mmap_error<VM: VMBinding>(mmap_error: MmapError, tls: VMThread) {
         use crate::util::alloc::AllocationError;
@@ -247,6 +257,16 @@ impl MmapStrategy {
         prot: MmapProtection::ReadWrite,
         replace: false,
         reserve: true,
+    };
+
+    /// The strategy for quarantining address ranges.
+    pub const QUARANTINE: Self = Self {
+        huge_page: HugePageSupport::No,
+        prot: MmapProtection::NoAccess,
+        // In test mode, we allow replacing existing mappings for quarantine,
+        // so that we can reuse the same address range for multiple test cases.
+        replace: cfg!(test),
+        reserve: false,
     };
 
     /// The strategy for MMTk's test memory
