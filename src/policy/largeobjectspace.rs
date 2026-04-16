@@ -7,7 +7,6 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWork;
-use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::{FreeListPageResource, PageResource};
@@ -22,10 +21,7 @@ use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use crossbeam::queue::SegQueue;
-use std::collections::HashSet;
 use std::sync::atomic::AtomicUsize;
-use std::sync::Mutex;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -43,8 +39,6 @@ pub struct LargeObjectSpace<VM: VMBinding> {
     treadmill: TreadMill,
     clear_log_bit_on_sweep: bool,
     trace_in_progress: bool,
-    rc_nursery_objects: SegQueue<ObjectReference>,
-    rc_mature_objects: Mutex<HashSet<ObjectReference>>,
     pub num_pages_released_lazy: AtomicUsize,
     pub rc_enabled: bool,
     rc: RefCountHelper<VM>,
@@ -99,8 +93,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         // VO bit: Set for all objects.
         if self.rc_enabled {
             // Add to treadmill nursery
-            // self.treadmill.add_to_treadmill(object, true);
-            self.rc_nursery_objects.push(object);
+            self.treadmill.add_to_treadmill(object, true);
             // Initialize mark bit
             self.test_and_mark(object, self.mark_state);
             for off in (0..bytes).step_by(BYTES_IN_PAGE) {
@@ -311,6 +304,7 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     }
 }
 
+use crate::scheduler::GCWorker;
 use crate::util::copy::CopySemantics;
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LargeObjectSpace<VM> {
@@ -366,8 +360,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             treadmill: TreadMill::new(),
             clear_log_bit_on_sweep,
             trace_in_progress: false,
-            rc_nursery_objects: Default::default(),
-            rc_mature_objects: Default::default(),
             num_pages_released_lazy: Default::default(),
             rc_enabled: false,
             rc: RefCountHelper::NEW,
@@ -390,12 +382,11 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     pub fn release_rc_nursery_objects(&self) {
         debug_assert!(self.rc_enabled);
         // promote nursery objects or release dead nursery
-        let mut mature_blocks = self.rc_mature_objects.lock().unwrap();
-        while let Some(o) = self.rc_nursery_objects.pop() {
+        for o in self.treadmill.collect_alloc_nursery() {
             if self.rc.count(o) == 0 {
                 self.release_object(o.to_raw_address());
             } else {
-                mature_blocks.insert(o);
+                self.treadmill.add_to_treadmill(o, false);
             }
         }
     }
@@ -543,8 +534,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     pub fn rc_free(&self, o: ObjectReference) {
-        let mut rc_mature_objects = self.rc_mature_objects.lock().unwrap();
-        if rc_mature_objects.remove(&o) {
+        if self.treadmill.remove_mature(o) {
             let pages = self.release_object(o.to_raw_address());
             self.num_pages_released_lazy
                 .fetch_add(pages, Ordering::Relaxed);
@@ -595,7 +585,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
             object,
             None,
-            Ordering::Relaxed,
+            Ordering::SeqCst,
         ) & MARK_BIT
             == value
     }
@@ -611,20 +601,17 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     pub fn sweep_rc_mature_objects_after_satb(&self, is_live: &impl Fn(ObjectReference) -> bool) {
-        let mut mature_objects = self.rc_mature_objects.lock().unwrap();
-        let mut released_objects = vec![];
-        for o in mature_objects.iter() {
+        self.treadmill.retain_mature(|o| {
             if !is_live(*o) {
                 self.rc.set(*o, 0);
                 let pages = self.release_object(o.to_raw_address());
                 self.num_pages_released_lazy
                     .fetch_add(pages, Ordering::Relaxed);
-                released_objects.push(*o);
+                false
+            } else {
+                true
             }
-        }
-        for o in released_objects {
-            mature_objects.remove(&o);
-        }
+        });
     }
 
     pub fn is_marked(&self, object: ObjectReference) -> bool {
