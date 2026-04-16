@@ -275,16 +275,12 @@ impl<VM: VMBinding> GenImmix<VM> {
             },
         );
 
-        let genimmix = GenImmix {
+        GenImmix {
             gen: CommonGenPlan::new(plan_args),
             immix_space,
             last_gc_was_defrag: AtomicBool::new(false),
             last_gc_was_full_heap: AtomicBool::new(false),
-        };
-
-        genimmix.verify_side_metadata_sanity();
-
-        genimmix
+        }
     }
 
     fn requires_full_heap_collection(&self) -> bool {

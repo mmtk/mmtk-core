@@ -6,12 +6,12 @@ use crate::util::{
     Address,
 };
 
-use super::constants::{
-    LOCAL_SIDE_METADATA_BASE_ADDRESS, LOCAL_SIDE_METADATA_PER_CHUNK,
-    LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
-};
 #[cfg(test)]
 use super::ensure_munmap_metadata;
+use super::layout::{
+    local_side_metadata_base_address, LOCAL_SIDE_METADATA_PER_CHUNK,
+    LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
+};
 use crate::MMAPPER;
 
 pub(super) fn address_to_chunked_meta_address(
@@ -32,7 +32,7 @@ pub(super) fn address_to_chunked_meta_address(
         effective_addr << (-rshift)
     };
 
-    meta_chunk_addr + metadata_spec.get_rel_offset() + second_offset
+    meta_chunk_addr + metadata_spec.get_offset_for_chunked() + second_offset
 }
 
 /// Returns the size in bytes that gets munmapped.
@@ -82,8 +82,8 @@ pub(crate) fn ensure_munmap_chunked_metadata_space(
     }
 }
 
-pub(super) const fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
-    LOCAL_SIDE_METADATA_BASE_ADDRESS
+pub(super) fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
+    local_side_metadata_base_address()
         .add((data_addr.as_usize() & !CHUNK_MASK) >> LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
 }
 

@@ -25,6 +25,15 @@ impl OSMemory for MacOS {
         Ok(addr)
     }
 
+    fn dzmmap_anywhere(
+        size: usize,
+        align: usize,
+        strategy: MmapStrategy,
+        _annotation: &MmapAnnotation<'_>,
+    ) -> Result<Address> {
+        unix_common::mmap_anywhere(size, align, strategy)
+    }
+
     fn munmap(start: Address, size: usize) -> Result<()> {
         unix_common::munmap(start, size)
     }
@@ -44,8 +53,11 @@ impl OSMemory for MacOS {
 
 impl MmapStrategy {
     /// get the flags for POSIX mmap.
-    pub fn get_posix_mmap_flags(&self) -> i32 {
-        let mut flags = libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_FIXED;
+    pub fn get_posix_mmap_flags(&self, fixed: bool) -> i32 {
+        let mut flags = libc::MAP_PRIVATE | libc::MAP_ANONYMOUS;
+        if fixed {
+            flags |= libc::MAP_FIXED;
+        }
         // replace is isgnored on macOS
         if !self.reserve {
             flags |= libc::MAP_NORESERVE;

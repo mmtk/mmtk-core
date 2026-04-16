@@ -42,6 +42,30 @@ feature are now enabled by the "vo_bit" feature.
 API changes: None.  If a VM binding uses the "is_mmtk_object" feature, it should now use the
 "vo_bit" feature if not already using, and existing code should still compile.
 
+### Side metadata base addresses are no longer constants
+
+```admonish tldr
+Side metadata addresses are now chosen at runtime.  The old address constants are removed and
+replaced with accessor functions that must only be called after MMTk is initialized.
+```
+
+API changes:
+
+-   module `util::metadata::side_metadata`
+    +   `GLOBAL_SIDE_METADATA_BASE_ADDRESS`: Removed.
+        *   Use `global_side_metadata_base_address()` instead.
+    +   `GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS`: Removed.
+        *   Use `global_side_metadata_vm_base_address()` instead.
+    +   `VO_BIT_SIDE_METADATA_ADDR`: Removed.
+        *   Use `vo_bit_side_metadata_addr()` instead.
+-   module `util::metadata::vo_bit`
+    +   `VO_BIT_SIDE_METADATA_ADDR`: Removed.
+        *   Use `vo_bit_side_metadata_addr()` instead.
+
+These addresses are no longer constants because MMTk now chooses the side metadata base address at
+boot time. Bindings should fetch them from the accessor functions after MMTk initialization has
+completed. Bindings can assume the addresses will not change once they are initialized.
+
 ## 0.32.0
 
 ### Allocation options changed
