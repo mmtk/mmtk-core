@@ -435,11 +435,11 @@
 <a href=#435 id=435 data-nosnippet>435</a>    /// for the chunk map is mapped, and if it is allocated in the chunk map.
 <a href=#436 id=436 data-nosnippet>436</a>    </span><span class="kw">fn </span>is_meta_space_mapped_for_address(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; bool {
 <a href=#437 id=437 data-nosnippet>437</a>        <span class="kw">let </span>is_chunk_map_mapped = |chunk_start: Address| {
-<a href=#438 id=438 data-nosnippet>438</a>            <span class="kw">const </span>CHUNK_MAP_MAX_META_ADDRESS: Address =
+<a href=#438 id=438 data-nosnippet>438</a>            <span class="kw">let </span>chunk_map_max_meta_address =
 <a href=#439 id=439 data-nosnippet>439</a>                ChunkMap::ALLOC_TABLE.upper_bound_address_for_contiguous();
 <a href=#440 id=440 data-nosnippet>440</a>            <span class="kw">let </span>meta_address =
 <a href=#441 id=441 data-nosnippet>441</a>                side_metadata::address_to_meta_address(<span class="kw-2">&amp;</span>ChunkMap::ALLOC_TABLE, chunk_start);
-<a href=#442 id=442 data-nosnippet>442</a>            <span class="kw">if </span>meta_address &lt; CHUNK_MAP_MAX_META_ADDRESS {
+<a href=#442 id=442 data-nosnippet>442</a>            <span class="kw">if </span>meta_address &lt; chunk_map_max_meta_address {
 <a href=#443 id=443 data-nosnippet>443</a>                meta_address.is_mapped()
 <a href=#444 id=444 data-nosnippet>444</a>            } <span class="kw">else </span>{
 <a href=#445 id=445 data-nosnippet>445</a>                <span class="bool-val">false

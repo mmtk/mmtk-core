@@ -162,443 +162,453 @@
 <a href=#162 id=162 data-nosnippet>162</a>
 <a href=#163 id=163 data-nosnippet>163</a>        <span class="kw">let </span>stats = Arc::new(Stats::new(<span class="kw-2">&amp;</span>options));
 <a href=#164 id=164 data-nosnippet>164</a>
-<a href=#165 id=165 data-nosnippet>165</a>        <span class="comment">// We need this during creating spaces, but we do not use this once the MMTk instance is created.
-<a href=#166 id=166 data-nosnippet>166</a>        // So we do not save it in MMTK. This may change in the future.
-<a href=#167 id=167 data-nosnippet>167</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>heap = HeapMeta::new();
+<a href=#165 id=165 data-nosnippet>165</a>        <span class="comment">// Initialize side metadata runtime state and reserve its address range before creating
+<a href=#166 id=166 data-nosnippet>166</a>        // spaces. Plan/space initialization may map side metadata during setup.
+<a href=#167 id=167 data-nosnippet>167</a>        </span><span class="kw">crate</span>::util::metadata::side_metadata::initialize_side_metadata::&lt;VM&gt;(<span class="kw-2">&amp;</span>options);
 <a href=#168 id=168 data-nosnippet>168</a>
-<a href=#169 id=169 data-nosnippet>169</a>        <span class="kw">let </span><span class="kw-2">mut </span>plan = <span class="kw">crate</span>::plan::create_plan(
-<a href=#170 id=170 data-nosnippet>170</a>            <span class="kw-2">*</span>options.plan,
-<a href=#171 id=171 data-nosnippet>171</a>            CreateGeneralPlanArgs {
-<a href=#172 id=172 data-nosnippet>172</a>                vm_map: VM_MAP.as_ref(),
-<a href=#173 id=173 data-nosnippet>173</a>                mmapper: MMAPPER.as_ref(),
-<a href=#174 id=174 data-nosnippet>174</a>                options: options.clone(),
-<a href=#175 id=175 data-nosnippet>175</a>                state: state.clone(),
-<a href=#176 id=176 data-nosnippet>176</a>                gc_trigger: gc_trigger.clone(),
-<a href=#177 id=177 data-nosnippet>177</a>                scheduler: scheduler.clone(),
-<a href=#178 id=178 data-nosnippet>178</a>                stats: <span class="kw-2">&amp;</span>stats,
-<a href=#179 id=179 data-nosnippet>179</a>                heap: <span class="kw-2">&amp;mut </span>heap,
-<a href=#180 id=180 data-nosnippet>180</a>            },
-<a href=#181 id=181 data-nosnippet>181</a>        );
-<a href=#182 id=182 data-nosnippet>182</a>
-<a href=#183 id=183 data-nosnippet>183</a>        <span class="comment">// We haven't finished creating MMTk. No one is using the GC trigger. We cast the arc into a mutable reference.
-<a href=#184 id=184 data-nosnippet>184</a>        </span>{
-<a href=#185 id=185 data-nosnippet>185</a>            <span class="comment">// TODO: use Arc::get_mut_unchecked() when it is availble.
-<a href=#186 id=186 data-nosnippet>186</a>            </span><span class="kw">let </span>gc_trigger: <span class="kw-2">&amp;mut </span>GCTrigger&lt;VM&gt; =
-<a href=#187 id=187 data-nosnippet>187</a>                <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(Arc::as_ptr(<span class="kw-2">&amp;</span>gc_trigger) <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
-<a href=#188 id=188 data-nosnippet>188</a>            <span class="comment">// We know the plan address will not change. Cast it to a static reference.
-<a href=#189 id=189 data-nosnippet>189</a>            </span><span class="kw">let </span>static_plan: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span>(<span class="kw-2">&amp;*</span>plan <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_</span>) };
-<a href=#190 id=190 data-nosnippet>190</a>            <span class="comment">// Set the plan so we can trigger GC and check GC condition without using plan
-<a href=#191 id=191 data-nosnippet>191</a>            </span>gc_trigger.set_plan(static_plan);
-<a href=#192 id=192 data-nosnippet>192</a>        }
-<a href=#193 id=193 data-nosnippet>193</a>
-<a href=#194 id=194 data-nosnippet>194</a>        <span class="comment">// TODO: This probably does not work if we have multiple MMTk instances.
-<a href=#195 id=195 data-nosnippet>195</a>        // This needs to be called after we create Plan. It needs to use HeapMeta, which is gradually built when we create spaces.
-<a href=#196 id=196 data-nosnippet>196</a>        </span>VM_MAP.finalize_static_space_map(
-<a href=#197 id=197 data-nosnippet>197</a>            heap.get_discontig_start(),
-<a href=#198 id=198 data-nosnippet>198</a>            heap.get_discontig_end(),
-<a href=#199 id=199 data-nosnippet>199</a>            <span class="kw-2">&amp;mut </span>|start_address| {
-<a href=#200 id=200 data-nosnippet>200</a>                plan.for_each_space_mut(<span class="kw-2">&amp;mut </span>|space| {
-<a href=#201 id=201 data-nosnippet>201</a>                    <span class="comment">// If the `VMMap` has a discontiguous memory range, we notify all discontiguous
-<a href=#202 id=202 data-nosnippet>202</a>                    // space that the starting address has been determined.
-<a href=#203 id=203 data-nosnippet>203</a>                    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pr) = space.maybe_get_page_resource_mut() {
-<a href=#204 id=204 data-nosnippet>204</a>                        pr.update_discontiguous_start(start_address);
-<a href=#205 id=205 data-nosnippet>205</a>                    }
-<a href=#206 id=206 data-nosnippet>206</a>                })
-<a href=#207 id=207 data-nosnippet>207</a>            },
-<a href=#208 id=208 data-nosnippet>208</a>        );
-<a href=#209 id=209 data-nosnippet>209</a>
-<a href=#210 id=210 data-nosnippet>210</a>        MMTK {
-<a href=#211 id=211 data-nosnippet>211</a>            options,
-<a href=#212 id=212 data-nosnippet>212</a>            state,
-<a href=#213 id=213 data-nosnippet>213</a>            plan: UnsafeCell::new(plan),
-<a href=#214 id=214 data-nosnippet>214</a>            reference_processors: ReferenceProcessors::new(),
-<a href=#215 id=215 data-nosnippet>215</a>            finalizable_processor: Mutex::new(FinalizableProcessor::&lt;
-<a href=#216 id=216 data-nosnippet>216</a>                &lt;VM::VMReferenceGlue <span class="kw">as </span>ReferenceGlue&lt;VM&gt;&gt;::FinalizableType,
-<a href=#217 id=217 data-nosnippet>217</a>            &gt;::new()),
-<a href=#218 id=218 data-nosnippet>218</a>            scheduler,
-<a href=#219 id=219 data-nosnippet>219</a>            <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
-<a href=#220 id=220 data-nosnippet>220</a>            </span>sanity_checker: Mutex::new(SanityChecker::new()),
-<a href=#221 id=221 data-nosnippet>221</a>            <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
-<a href=#222 id=222 data-nosnippet>222</a>            </span>inside_sanity: AtomicBool::new(<span class="bool-val">false</span>),
-<a href=#223 id=223 data-nosnippet>223</a>            <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
-<a href=#224 id=224 data-nosnippet>224</a>            </span>slot_logger: SlotLogger::new(),
-<a href=#225 id=225 data-nosnippet>225</a>            <span class="attr">#[cfg(feature = <span class="string">"analysis"</span>)]
-<a href=#226 id=226 data-nosnippet>226</a>            </span>analysis_manager: Arc::new(AnalysisManager::new(stats.clone())),
-<a href=#227 id=227 data-nosnippet>227</a>            gc_trigger,
-<a href=#228 id=228 data-nosnippet>228</a>            stats,
-<a href=#229 id=229 data-nosnippet>229</a>        }
-<a href=#230 id=230 data-nosnippet>230</a>    }
-<a href=#231 id=231 data-nosnippet>231</a>
-<a href=#232 id=232 data-nosnippet>232</a>    <span class="doccomment">/// Initialize the GC worker threads that are required for doing garbage collections.
-<a href=#233 id=233 data-nosnippet>233</a>    /// This is a mandatory call for a VM during its boot process once its thread system
-<a href=#234 id=234 data-nosnippet>234</a>    /// is ready.
-<a href=#235 id=235 data-nosnippet>235</a>    ///
-<a href=#236 id=236 data-nosnippet>236</a>    /// Internally, this function will invoke [`Collection::spawn_gc_thread()`] to spawn GC worker
-<a href=#237 id=237 data-nosnippet>237</a>    /// threads.
-<a href=#238 id=238 data-nosnippet>238</a>    ///
-<a href=#239 id=239 data-nosnippet>239</a>    /// # Arguments
-<a href=#240 id=240 data-nosnippet>240</a>    ///
-<a href=#241 id=241 data-nosnippet>241</a>    /// *   `tls`: The thread that wants to enable the collection. This value will be passed back
-<a href=#242 id=242 data-nosnippet>242</a>    ///     to the VM in [`Collection::spawn_gc_thread()`] so that the VM knows the context.
-<a href=#243 id=243 data-nosnippet>243</a>    ///
-<a href=#244 id=244 data-nosnippet>244</a>    /// [`Collection::spawn_gc_thread()`]: crate::vm::Collection::spawn_gc_thread()
-<a href=#245 id=245 data-nosnippet>245</a>    </span><span class="kw">pub fn </span>initialize_collection(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>, tls: VMThread) {
-<a href=#246 id=246 data-nosnippet>246</a>        <span class="macro">assert!</span>(
-<a href=#247 id=247 data-nosnippet>247</a>            !<span class="self">self</span>.state.is_initialized(),
-<a href=#248 id=248 data-nosnippet>248</a>            <span class="string">"MMTk collection has been initialized (was initialize_collection() already called before?)"
-<a href=#249 id=249 data-nosnippet>249</a>        </span>);
-<a href=#250 id=250 data-nosnippet>250</a>        <span class="self">self</span>.scheduler.spawn_gc_threads(<span class="self">self</span>, tls);
-<a href=#251 id=251 data-nosnippet>251</a>        <span class="self">self</span>.state.initialized.store(<span class="bool-val">true</span>, Ordering::SeqCst);
-<a href=#252 id=252 data-nosnippet>252</a>        <span class="macro">probe!</span>(mmtk, collection_initialized);
-<a href=#253 id=253 data-nosnippet>253</a>    }
-<a href=#254 id=254 data-nosnippet>254</a>
-<a href=#255 id=255 data-nosnippet>255</a>    <span class="doccomment">/// Prepare an MMTk instance for calling the `fork()` system call.
-<a href=#256 id=256 data-nosnippet>256</a>    ///
-<a href=#257 id=257 data-nosnippet>257</a>    /// The `fork()` system call is available on Linux and some UNIX variants, and may be emulated
-<a href=#258 id=258 data-nosnippet>258</a>    /// on other platforms by libraries such as Cygwin.  The properties of the `fork()` system call
-<a href=#259 id=259 data-nosnippet>259</a>    /// requires the users to do some preparation before calling it.
-<a href=#260 id=260 data-nosnippet>260</a>    ///
-<a href=#261 id=261 data-nosnippet>261</a>    /// -   **Multi-threading**:  If `fork()` is called when the process has multiple threads, it
-<a href=#262 id=262 data-nosnippet>262</a>    ///     will only duplicate the current thread into the child process, and the child process can
-<a href=#263 id=263 data-nosnippet>263</a>    ///     only call async-signal-safe functions, notably `exec()`.  For VMs that that use
-<a href=#264 id=264 data-nosnippet>264</a>    ///     multi-process concurrency, it is imperative that when calling `fork()`, only one thread may
-<a href=#265 id=265 data-nosnippet>265</a>    ///     exist in the process.
+<a href=#169 id=169 data-nosnippet>169</a>        <span class="comment">// We need this during creating spaces, but we do not use this once the MMTk instance is created.
+<a href=#170 id=170 data-nosnippet>170</a>        // So we do not save it in MMTK. This may change in the future.
+<a href=#171 id=171 data-nosnippet>171</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>heap = HeapMeta::new();
+<a href=#172 id=172 data-nosnippet>172</a>
+<a href=#173 id=173 data-nosnippet>173</a>        <span class="kw">let </span><span class="kw-2">mut </span>plan = <span class="kw">crate</span>::plan::create_plan(
+<a href=#174 id=174 data-nosnippet>174</a>            <span class="kw-2">*</span>options.plan,
+<a href=#175 id=175 data-nosnippet>175</a>            CreateGeneralPlanArgs {
+<a href=#176 id=176 data-nosnippet>176</a>                vm_map: VM_MAP.as_ref(),
+<a href=#177 id=177 data-nosnippet>177</a>                mmapper: MMAPPER.as_ref(),
+<a href=#178 id=178 data-nosnippet>178</a>                options: options.clone(),
+<a href=#179 id=179 data-nosnippet>179</a>                state: state.clone(),
+<a href=#180 id=180 data-nosnippet>180</a>                gc_trigger: gc_trigger.clone(),
+<a href=#181 id=181 data-nosnippet>181</a>                scheduler: scheduler.clone(),
+<a href=#182 id=182 data-nosnippet>182</a>                stats: <span class="kw-2">&amp;</span>stats,
+<a href=#183 id=183 data-nosnippet>183</a>                heap: <span class="kw-2">&amp;mut </span>heap,
+<a href=#184 id=184 data-nosnippet>184</a>            },
+<a href=#185 id=185 data-nosnippet>185</a>        );
+<a href=#186 id=186 data-nosnippet>186</a>
+<a href=#187 id=187 data-nosnippet>187</a>        <span class="comment">// We haven't finished creating MMTk. No one is using the GC trigger. We cast the arc into a mutable reference.
+<a href=#188 id=188 data-nosnippet>188</a>        </span>{
+<a href=#189 id=189 data-nosnippet>189</a>            <span class="comment">// TODO: use Arc::get_mut_unchecked() when it is availble.
+<a href=#190 id=190 data-nosnippet>190</a>            </span><span class="kw">let </span>gc_trigger: <span class="kw-2">&amp;mut </span>GCTrigger&lt;VM&gt; =
+<a href=#191 id=191 data-nosnippet>191</a>                <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(Arc::as_ptr(<span class="kw-2">&amp;</span>gc_trigger) <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
+<a href=#192 id=192 data-nosnippet>192</a>            <span class="comment">// We know the plan address will not change. Cast it to a static reference.
+<a href=#193 id=193 data-nosnippet>193</a>            </span><span class="kw">let </span>static_plan: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span>(<span class="kw-2">&amp;*</span>plan <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_</span>) };
+<a href=#194 id=194 data-nosnippet>194</a>            <span class="comment">// Set the plan so we can trigger GC and check GC condition without using plan
+<a href=#195 id=195 data-nosnippet>195</a>            </span>gc_trigger.set_plan(static_plan);
+<a href=#196 id=196 data-nosnippet>196</a>        }
+<a href=#197 id=197 data-nosnippet>197</a>
+<a href=#198 id=198 data-nosnippet>198</a>        <span class="comment">// TODO: This probably does not work if we have multiple MMTk instances.
+<a href=#199 id=199 data-nosnippet>199</a>        // This needs to be called after we create Plan. It needs to use HeapMeta, which is gradually built when we create spaces.
+<a href=#200 id=200 data-nosnippet>200</a>        </span>VM_MAP.finalize_static_space_map(
+<a href=#201 id=201 data-nosnippet>201</a>            heap.get_discontig_start(),
+<a href=#202 id=202 data-nosnippet>202</a>            heap.get_discontig_end(),
+<a href=#203 id=203 data-nosnippet>203</a>            <span class="kw-2">&amp;mut </span>|start_address| {
+<a href=#204 id=204 data-nosnippet>204</a>                plan.for_each_space_mut(<span class="kw-2">&amp;mut </span>|space| {
+<a href=#205 id=205 data-nosnippet>205</a>                    <span class="comment">// If the `VMMap` has a discontiguous memory range, we notify all discontiguous
+<a href=#206 id=206 data-nosnippet>206</a>                    // space that the starting address has been determined.
+<a href=#207 id=207 data-nosnippet>207</a>                    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pr) = space.maybe_get_page_resource_mut() {
+<a href=#208 id=208 data-nosnippet>208</a>                        pr.update_discontiguous_start(start_address);
+<a href=#209 id=209 data-nosnippet>209</a>                    }
+<a href=#210 id=210 data-nosnippet>210</a>                })
+<a href=#211 id=211 data-nosnippet>211</a>            },
+<a href=#212 id=212 data-nosnippet>212</a>        );
+<a href=#213 id=213 data-nosnippet>213</a>
+<a href=#214 id=214 data-nosnippet>214</a>        <span class="comment">// The order here is important:
+<a href=#215 id=215 data-nosnippet>215</a>        // Initialize side metadat sanity first
+<a href=#216 id=216 data-nosnippet>216</a>        </span>plan.verify_side_metadata_sanity();
+<a href=#217 id=217 data-nosnippet>217</a>        <span class="comment">// Then intiialize SFT because it may use side metadata
+<a href=#218 id=218 data-nosnippet>218</a>        </span>plan.initialize_sft();
+<a href=#219 id=219 data-nosnippet>219</a>
+<a href=#220 id=220 data-nosnippet>220</a>        MMTK {
+<a href=#221 id=221 data-nosnippet>221</a>            options,
+<a href=#222 id=222 data-nosnippet>222</a>            state,
+<a href=#223 id=223 data-nosnippet>223</a>            plan: UnsafeCell::new(plan),
+<a href=#224 id=224 data-nosnippet>224</a>            reference_processors: ReferenceProcessors::new(),
+<a href=#225 id=225 data-nosnippet>225</a>            finalizable_processor: Mutex::new(FinalizableProcessor::&lt;
+<a href=#226 id=226 data-nosnippet>226</a>                &lt;VM::VMReferenceGlue <span class="kw">as </span>ReferenceGlue&lt;VM&gt;&gt;::FinalizableType,
+<a href=#227 id=227 data-nosnippet>227</a>            &gt;::new()),
+<a href=#228 id=228 data-nosnippet>228</a>            scheduler,
+<a href=#229 id=229 data-nosnippet>229</a>            <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
+<a href=#230 id=230 data-nosnippet>230</a>            </span>sanity_checker: Mutex::new(SanityChecker::new()),
+<a href=#231 id=231 data-nosnippet>231</a>            <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
+<a href=#232 id=232 data-nosnippet>232</a>            </span>inside_sanity: AtomicBool::new(<span class="bool-val">false</span>),
+<a href=#233 id=233 data-nosnippet>233</a>            <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
+<a href=#234 id=234 data-nosnippet>234</a>            </span>slot_logger: SlotLogger::new(),
+<a href=#235 id=235 data-nosnippet>235</a>            <span class="attr">#[cfg(feature = <span class="string">"analysis"</span>)]
+<a href=#236 id=236 data-nosnippet>236</a>            </span>analysis_manager: Arc::new(AnalysisManager::new(stats.clone())),
+<a href=#237 id=237 data-nosnippet>237</a>            gc_trigger,
+<a href=#238 id=238 data-nosnippet>238</a>            stats,
+<a href=#239 id=239 data-nosnippet>239</a>        }
+<a href=#240 id=240 data-nosnippet>240</a>    }
+<a href=#241 id=241 data-nosnippet>241</a>
+<a href=#242 id=242 data-nosnippet>242</a>    <span class="doccomment">/// Initialize the GC worker threads that are required for doing garbage collections.
+<a href=#243 id=243 data-nosnippet>243</a>    /// This is a mandatory call for a VM during its boot process once its thread system
+<a href=#244 id=244 data-nosnippet>244</a>    /// is ready.
+<a href=#245 id=245 data-nosnippet>245</a>    ///
+<a href=#246 id=246 data-nosnippet>246</a>    /// Internally, this function will invoke [`Collection::spawn_gc_thread()`] to spawn GC worker
+<a href=#247 id=247 data-nosnippet>247</a>    /// threads.
+<a href=#248 id=248 data-nosnippet>248</a>    ///
+<a href=#249 id=249 data-nosnippet>249</a>    /// # Arguments
+<a href=#250 id=250 data-nosnippet>250</a>    ///
+<a href=#251 id=251 data-nosnippet>251</a>    /// *   `tls`: The thread that wants to enable the collection. This value will be passed back
+<a href=#252 id=252 data-nosnippet>252</a>    ///     to the VM in [`Collection::spawn_gc_thread()`] so that the VM knows the context.
+<a href=#253 id=253 data-nosnippet>253</a>    ///
+<a href=#254 id=254 data-nosnippet>254</a>    /// [`Collection::spawn_gc_thread()`]: crate::vm::Collection::spawn_gc_thread()
+<a href=#255 id=255 data-nosnippet>255</a>    </span><span class="kw">pub fn </span>initialize_collection(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>, tls: VMThread) {
+<a href=#256 id=256 data-nosnippet>256</a>        <span class="macro">assert!</span>(
+<a href=#257 id=257 data-nosnippet>257</a>            !<span class="self">self</span>.state.is_initialized(),
+<a href=#258 id=258 data-nosnippet>258</a>            <span class="string">"MMTk collection has been initialized (was initialize_collection() already called before?)"
+<a href=#259 id=259 data-nosnippet>259</a>        </span>);
+<a href=#260 id=260 data-nosnippet>260</a>        <span class="self">self</span>.scheduler.spawn_gc_threads(<span class="self">self</span>, tls);
+<a href=#261 id=261 data-nosnippet>261</a>        <span class="self">self</span>.state.initialized.store(<span class="bool-val">true</span>, Ordering::SeqCst);
+<a href=#262 id=262 data-nosnippet>262</a>        <span class="macro">probe!</span>(mmtk, collection_initialized);
+<a href=#263 id=263 data-nosnippet>263</a>    }
+<a href=#264 id=264 data-nosnippet>264</a>
+<a href=#265 id=265 data-nosnippet>265</a>    <span class="doccomment">/// Prepare an MMTk instance for calling the `fork()` system call.
 <a href=#266 id=266 data-nosnippet>266</a>    ///
-<a href=#267 id=267 data-nosnippet>267</a>    /// -   **File descriptors**: The child process inherits copies of the parent's set of open
-<a href=#268 id=268 data-nosnippet>268</a>    ///     file descriptors.  This may or may not be desired depending on use cases.
-<a href=#269 id=269 data-nosnippet>269</a>    ///
-<a href=#270 id=270 data-nosnippet>270</a>    /// This function helps VMs that use `fork()` for multi-process concurrency.  It instructs all
-<a href=#271 id=271 data-nosnippet>271</a>    /// GC threads to save their contexts and return from their entry-point functions.  Currently,
-<a href=#272 id=272 data-nosnippet>272</a>    /// such threads only include GC workers, and the entry point is
-<a href=#273 id=273 data-nosnippet>273</a>    /// [`crate::memory_manager::start_worker`].  A subsequent call to `MMTK::after_fork()` will
-<a href=#274 id=274 data-nosnippet>274</a>    /// re-spawn the threads using their saved contexts.  The VM must not allocate objects in the
-<a href=#275 id=275 data-nosnippet>275</a>    /// MMTk heap before calling `MMTK::after_fork()`.
+<a href=#267 id=267 data-nosnippet>267</a>    /// The `fork()` system call is available on Linux and some UNIX variants, and may be emulated
+<a href=#268 id=268 data-nosnippet>268</a>    /// on other platforms by libraries such as Cygwin.  The properties of the `fork()` system call
+<a href=#269 id=269 data-nosnippet>269</a>    /// requires the users to do some preparation before calling it.
+<a href=#270 id=270 data-nosnippet>270</a>    ///
+<a href=#271 id=271 data-nosnippet>271</a>    /// -   **Multi-threading**:  If `fork()` is called when the process has multiple threads, it
+<a href=#272 id=272 data-nosnippet>272</a>    ///     will only duplicate the current thread into the child process, and the child process can
+<a href=#273 id=273 data-nosnippet>273</a>    ///     only call async-signal-safe functions, notably `exec()`.  For VMs that that use
+<a href=#274 id=274 data-nosnippet>274</a>    ///     multi-process concurrency, it is imperative that when calling `fork()`, only one thread may
+<a href=#275 id=275 data-nosnippet>275</a>    ///     exist in the process.
 <a href=#276 id=276 data-nosnippet>276</a>    ///
-<a href=#277 id=277 data-nosnippet>277</a>    /// TODO: Currently, the MMTk core does not keep any files open for a long time.  In the
-<a href=#278 id=278 data-nosnippet>278</a>    /// future, this function and the `after_fork` function may be used for handling open file
-<a href=#279 id=279 data-nosnippet>279</a>    /// descriptors across invocations of `fork()`.  One possible use case is logging GC activities
-<a href=#280 id=280 data-nosnippet>280</a>    /// and statistics to files, such as performing heap dumps across multiple GCs.
-<a href=#281 id=281 data-nosnippet>281</a>    ///
-<a href=#282 id=282 data-nosnippet>282</a>    /// If a VM intends to execute another program by calling `fork()` and immediately calling
-<a href=#283 id=283 data-nosnippet>283</a>    /// `exec`, it may skip this function because the state of the MMTk instance will be irrelevant
-<a href=#284 id=284 data-nosnippet>284</a>    /// in that case.
-<a href=#285 id=285 data-nosnippet>285</a>    ///
-<a href=#286 id=286 data-nosnippet>286</a>    /// # Caution!
-<a href=#287 id=287 data-nosnippet>287</a>    ///
-<a href=#288 id=288 data-nosnippet>288</a>    /// This function sends an asynchronous message to GC threads and returns immediately, but it
-<a href=#289 id=289 data-nosnippet>289</a>    /// is only safe for the VM to call `fork()` after the underlying **native threads** of the GC
-<a href=#290 id=290 data-nosnippet>290</a>    /// threads have exited.  After calling this function, the VM should wait for their underlying
-<a href=#291 id=291 data-nosnippet>291</a>    /// native threads to exit in VM-specific manner before calling `fork()`.
-<a href=#292 id=292 data-nosnippet>292</a>    </span><span class="kw">pub fn </span>prepare_to_fork(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>) {
-<a href=#293 id=293 data-nosnippet>293</a>        <span class="macro">assert!</span>(
-<a href=#294 id=294 data-nosnippet>294</a>            <span class="self">self</span>.state.is_initialized(),
-<a href=#295 id=295 data-nosnippet>295</a>            <span class="string">"MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
-<a href=#296 id=296 data-nosnippet>296</a>        </span>);
-<a href=#297 id=297 data-nosnippet>297</a>        <span class="macro">probe!</span>(mmtk, prepare_to_fork);
-<a href=#298 id=298 data-nosnippet>298</a>        <span class="self">self</span>.scheduler.stop_gc_threads_for_forking();
-<a href=#299 id=299 data-nosnippet>299</a>    }
-<a href=#300 id=300 data-nosnippet>300</a>
-<a href=#301 id=301 data-nosnippet>301</a>    <span class="doccomment">/// Call this function after the VM called the `fork()` system call.
-<a href=#302 id=302 data-nosnippet>302</a>    ///
-<a href=#303 id=303 data-nosnippet>303</a>    /// This function will re-spawn MMTk threads from saved contexts.
-<a href=#304 id=304 data-nosnippet>304</a>    ///
-<a href=#305 id=305 data-nosnippet>305</a>    /// # Arguments
-<a href=#306 id=306 data-nosnippet>306</a>    ///
-<a href=#307 id=307 data-nosnippet>307</a>    /// *   `tls`: The thread that wants to respawn MMTk threads after forking. This value will be
-<a href=#308 id=308 data-nosnippet>308</a>    ///     passed back to the VM in `Collection::spawn_gc_thread()` so that the VM knows the
-<a href=#309 id=309 data-nosnippet>309</a>    ///     context.
-<a href=#310 id=310 data-nosnippet>310</a>    </span><span class="kw">pub fn </span>after_fork(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>, tls: VMThread) {
-<a href=#311 id=311 data-nosnippet>311</a>        <span class="macro">assert!</span>(
-<a href=#312 id=312 data-nosnippet>312</a>            <span class="self">self</span>.state.is_initialized(),
-<a href=#313 id=313 data-nosnippet>313</a>            <span class="string">"MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
-<a href=#314 id=314 data-nosnippet>314</a>        </span>);
-<a href=#315 id=315 data-nosnippet>315</a>        <span class="macro">probe!</span>(mmtk, after_fork);
-<a href=#316 id=316 data-nosnippet>316</a>        <span class="self">self</span>.scheduler.respawn_gc_threads_after_forking(tls);
-<a href=#317 id=317 data-nosnippet>317</a>    }
-<a href=#318 id=318 data-nosnippet>318</a>
-<a href=#319 id=319 data-nosnippet>319</a>    <span class="doccomment">/// Generic hook to allow benchmarks to be harnessed. MMTk will trigger a GC
-<a href=#320 id=320 data-nosnippet>320</a>    /// to clear any residual garbage and start collecting statistics for the benchmark.
-<a href=#321 id=321 data-nosnippet>321</a>    /// This is usually called by the benchmark harness as its last step before the actual benchmark.
-<a href=#322 id=322 data-nosnippet>322</a>    </span><span class="kw">pub fn </span>harness_begin(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMMutatorThread) {
-<a href=#323 id=323 data-nosnippet>323</a>        <span class="macro">probe!</span>(mmtk, harness_begin);
-<a href=#324 id=324 data-nosnippet>324</a>        <span class="self">self</span>.handle_user_collection_request(tls, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
-<a href=#325 id=325 data-nosnippet>325</a>        <span class="self">self</span>.state.inside_harness.store(<span class="bool-val">true</span>, Ordering::SeqCst);
-<a href=#326 id=326 data-nosnippet>326</a>        <span class="self">self</span>.stats.start_all();
-<a href=#327 id=327 data-nosnippet>327</a>        <span class="self">self</span>.scheduler.enable_stat();
-<a href=#328 id=328 data-nosnippet>328</a>    }
-<a href=#329 id=329 data-nosnippet>329</a>
-<a href=#330 id=330 data-nosnippet>330</a>    <span class="doccomment">/// Generic hook to allow benchmarks to be harnessed. MMTk will stop collecting
-<a href=#331 id=331 data-nosnippet>331</a>    /// statistics, and print out the collected statistics in a defined format.
-<a href=#332 id=332 data-nosnippet>332</a>    /// This is usually called by the benchmark harness right after the actual benchmark.
-<a href=#333 id=333 data-nosnippet>333</a>    </span><span class="kw">pub fn </span>harness_end(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>) {
-<a href=#334 id=334 data-nosnippet>334</a>        <span class="self">self</span>.stats.stop_all(<span class="self">self</span>);
-<a href=#335 id=335 data-nosnippet>335</a>        <span class="self">self</span>.state.inside_harness.store(<span class="bool-val">false</span>, Ordering::SeqCst);
-<a href=#336 id=336 data-nosnippet>336</a>        <span class="macro">probe!</span>(mmtk, harness_end);
-<a href=#337 id=337 data-nosnippet>337</a>    }
-<a href=#338 id=338 data-nosnippet>338</a>
-<a href=#339 id=339 data-nosnippet>339</a>    <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
-<a href=#340 id=340 data-nosnippet>340</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>sanity_begin(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-<a href=#341 id=341 data-nosnippet>341</a>        <span class="self">self</span>.inside_sanity.store(<span class="bool-val">true</span>, Ordering::Relaxed)
-<a href=#342 id=342 data-nosnippet>342</a>    }
-<a href=#343 id=343 data-nosnippet>343</a>
-<a href=#344 id=344 data-nosnippet>344</a>    <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
-<a href=#345 id=345 data-nosnippet>345</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>sanity_end(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-<a href=#346 id=346 data-nosnippet>346</a>        <span class="self">self</span>.inside_sanity.store(<span class="bool-val">false</span>, Ordering::Relaxed)
+<a href=#277 id=277 data-nosnippet>277</a>    /// -   **File descriptors**: The child process inherits copies of the parent's set of open
+<a href=#278 id=278 data-nosnippet>278</a>    ///     file descriptors.  This may or may not be desired depending on use cases.
+<a href=#279 id=279 data-nosnippet>279</a>    ///
+<a href=#280 id=280 data-nosnippet>280</a>    /// This function helps VMs that use `fork()` for multi-process concurrency.  It instructs all
+<a href=#281 id=281 data-nosnippet>281</a>    /// GC threads to save their contexts and return from their entry-point functions.  Currently,
+<a href=#282 id=282 data-nosnippet>282</a>    /// such threads only include GC workers, and the entry point is
+<a href=#283 id=283 data-nosnippet>283</a>    /// [`crate::memory_manager::start_worker`].  A subsequent call to `MMTK::after_fork()` will
+<a href=#284 id=284 data-nosnippet>284</a>    /// re-spawn the threads using their saved contexts.  The VM must not allocate objects in the
+<a href=#285 id=285 data-nosnippet>285</a>    /// MMTk heap before calling `MMTK::after_fork()`.
+<a href=#286 id=286 data-nosnippet>286</a>    ///
+<a href=#287 id=287 data-nosnippet>287</a>    /// TODO: Currently, the MMTk core does not keep any files open for a long time.  In the
+<a href=#288 id=288 data-nosnippet>288</a>    /// future, this function and the `after_fork` function may be used for handling open file
+<a href=#289 id=289 data-nosnippet>289</a>    /// descriptors across invocations of `fork()`.  One possible use case is logging GC activities
+<a href=#290 id=290 data-nosnippet>290</a>    /// and statistics to files, such as performing heap dumps across multiple GCs.
+<a href=#291 id=291 data-nosnippet>291</a>    ///
+<a href=#292 id=292 data-nosnippet>292</a>    /// If a VM intends to execute another program by calling `fork()` and immediately calling
+<a href=#293 id=293 data-nosnippet>293</a>    /// `exec`, it may skip this function because the state of the MMTk instance will be irrelevant
+<a href=#294 id=294 data-nosnippet>294</a>    /// in that case.
+<a href=#295 id=295 data-nosnippet>295</a>    ///
+<a href=#296 id=296 data-nosnippet>296</a>    /// # Caution!
+<a href=#297 id=297 data-nosnippet>297</a>    ///
+<a href=#298 id=298 data-nosnippet>298</a>    /// This function sends an asynchronous message to GC threads and returns immediately, but it
+<a href=#299 id=299 data-nosnippet>299</a>    /// is only safe for the VM to call `fork()` after the underlying **native threads** of the GC
+<a href=#300 id=300 data-nosnippet>300</a>    /// threads have exited.  After calling this function, the VM should wait for their underlying
+<a href=#301 id=301 data-nosnippet>301</a>    /// native threads to exit in VM-specific manner before calling `fork()`.
+<a href=#302 id=302 data-nosnippet>302</a>    </span><span class="kw">pub fn </span>prepare_to_fork(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>) {
+<a href=#303 id=303 data-nosnippet>303</a>        <span class="macro">assert!</span>(
+<a href=#304 id=304 data-nosnippet>304</a>            <span class="self">self</span>.state.is_initialized(),
+<a href=#305 id=305 data-nosnippet>305</a>            <span class="string">"MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
+<a href=#306 id=306 data-nosnippet>306</a>        </span>);
+<a href=#307 id=307 data-nosnippet>307</a>        <span class="macro">probe!</span>(mmtk, prepare_to_fork);
+<a href=#308 id=308 data-nosnippet>308</a>        <span class="self">self</span>.scheduler.stop_gc_threads_for_forking();
+<a href=#309 id=309 data-nosnippet>309</a>    }
+<a href=#310 id=310 data-nosnippet>310</a>
+<a href=#311 id=311 data-nosnippet>311</a>    <span class="doccomment">/// Call this function after the VM called the `fork()` system call.
+<a href=#312 id=312 data-nosnippet>312</a>    ///
+<a href=#313 id=313 data-nosnippet>313</a>    /// This function will re-spawn MMTk threads from saved contexts.
+<a href=#314 id=314 data-nosnippet>314</a>    ///
+<a href=#315 id=315 data-nosnippet>315</a>    /// # Arguments
+<a href=#316 id=316 data-nosnippet>316</a>    ///
+<a href=#317 id=317 data-nosnippet>317</a>    /// *   `tls`: The thread that wants to respawn MMTk threads after forking. This value will be
+<a href=#318 id=318 data-nosnippet>318</a>    ///     passed back to the VM in `Collection::spawn_gc_thread()` so that the VM knows the
+<a href=#319 id=319 data-nosnippet>319</a>    ///     context.
+<a href=#320 id=320 data-nosnippet>320</a>    </span><span class="kw">pub fn </span>after_fork(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>, tls: VMThread) {
+<a href=#321 id=321 data-nosnippet>321</a>        <span class="macro">assert!</span>(
+<a href=#322 id=322 data-nosnippet>322</a>            <span class="self">self</span>.state.is_initialized(),
+<a href=#323 id=323 data-nosnippet>323</a>            <span class="string">"MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
+<a href=#324 id=324 data-nosnippet>324</a>        </span>);
+<a href=#325 id=325 data-nosnippet>325</a>        <span class="macro">probe!</span>(mmtk, after_fork);
+<a href=#326 id=326 data-nosnippet>326</a>        <span class="self">self</span>.scheduler.respawn_gc_threads_after_forking(tls);
+<a href=#327 id=327 data-nosnippet>327</a>    }
+<a href=#328 id=328 data-nosnippet>328</a>
+<a href=#329 id=329 data-nosnippet>329</a>    <span class="doccomment">/// Generic hook to allow benchmarks to be harnessed. MMTk will trigger a GC
+<a href=#330 id=330 data-nosnippet>330</a>    /// to clear any residual garbage and start collecting statistics for the benchmark.
+<a href=#331 id=331 data-nosnippet>331</a>    /// This is usually called by the benchmark harness as its last step before the actual benchmark.
+<a href=#332 id=332 data-nosnippet>332</a>    </span><span class="kw">pub fn </span>harness_begin(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMMutatorThread) {
+<a href=#333 id=333 data-nosnippet>333</a>        <span class="macro">probe!</span>(mmtk, harness_begin);
+<a href=#334 id=334 data-nosnippet>334</a>        <span class="self">self</span>.handle_user_collection_request(tls, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
+<a href=#335 id=335 data-nosnippet>335</a>        <span class="self">self</span>.state.inside_harness.store(<span class="bool-val">true</span>, Ordering::SeqCst);
+<a href=#336 id=336 data-nosnippet>336</a>        <span class="self">self</span>.stats.start_all();
+<a href=#337 id=337 data-nosnippet>337</a>        <span class="self">self</span>.scheduler.enable_stat();
+<a href=#338 id=338 data-nosnippet>338</a>    }
+<a href=#339 id=339 data-nosnippet>339</a>
+<a href=#340 id=340 data-nosnippet>340</a>    <span class="doccomment">/// Generic hook to allow benchmarks to be harnessed. MMTk will stop collecting
+<a href=#341 id=341 data-nosnippet>341</a>    /// statistics, and print out the collected statistics in a defined format.
+<a href=#342 id=342 data-nosnippet>342</a>    /// This is usually called by the benchmark harness right after the actual benchmark.
+<a href=#343 id=343 data-nosnippet>343</a>    </span><span class="kw">pub fn </span>harness_end(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>) {
+<a href=#344 id=344 data-nosnippet>344</a>        <span class="self">self</span>.stats.stop_all(<span class="self">self</span>);
+<a href=#345 id=345 data-nosnippet>345</a>        <span class="self">self</span>.state.inside_harness.store(<span class="bool-val">false</span>, Ordering::SeqCst);
+<a href=#346 id=346 data-nosnippet>346</a>        <span class="macro">probe!</span>(mmtk, harness_end);
 <a href=#347 id=347 data-nosnippet>347</a>    }
 <a href=#348 id=348 data-nosnippet>348</a>
 <a href=#349 id=349 data-nosnippet>349</a>    <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
-<a href=#350 id=350 data-nosnippet>350</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_in_sanity(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-<a href=#351 id=351 data-nosnippet>351</a>        <span class="self">self</span>.inside_sanity.load(Ordering::Relaxed)
+<a href=#350 id=350 data-nosnippet>350</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>sanity_begin(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+<a href=#351 id=351 data-nosnippet>351</a>        <span class="self">self</span>.inside_sanity.store(<span class="bool-val">true</span>, Ordering::Relaxed)
 <a href=#352 id=352 data-nosnippet>352</a>    }
 <a href=#353 id=353 data-nosnippet>353</a>
-<a href=#354 id=354 data-nosnippet>354</a>    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>set_gc_status(<span class="kw-2">&amp;</span><span class="self">self</span>, s: GcStatus) {
-<a href=#355 id=355 data-nosnippet>355</a>        <span class="kw">let </span><span class="kw-2">mut </span>gc_status = <span class="self">self</span>.state.gc_status.lock().unwrap();
-<a href=#356 id=356 data-nosnippet>356</a>        <span class="kw">if </span><span class="kw-2">*</span>gc_status == GcStatus::NotInGC {
-<a href=#357 id=357 data-nosnippet>357</a>            <span class="self">self</span>.state.stacks_prepared.store(<span class="bool-val">false</span>, Ordering::SeqCst);
-<a href=#358 id=358 data-nosnippet>358</a>            <span class="comment">// FIXME stats
-<a href=#359 id=359 data-nosnippet>359</a>            </span><span class="self">self</span>.stats.start_gc();
-<a href=#360 id=360 data-nosnippet>360</a>        }
-<a href=#361 id=361 data-nosnippet>361</a>        <span class="kw-2">*</span>gc_status = s;
-<a href=#362 id=362 data-nosnippet>362</a>        <span class="kw">if </span><span class="kw-2">*</span>gc_status == GcStatus::NotInGC {
-<a href=#363 id=363 data-nosnippet>363</a>            <span class="comment">// FIXME stats
-<a href=#364 id=364 data-nosnippet>364</a>            </span><span class="kw">if </span><span class="self">self</span>.stats.get_gathering_stats() {
-<a href=#365 id=365 data-nosnippet>365</a>                <span class="self">self</span>.stats.end_gc();
-<a href=#366 id=366 data-nosnippet>366</a>            }
-<a href=#367 id=367 data-nosnippet>367</a>        }
-<a href=#368 id=368 data-nosnippet>368</a>    }
-<a href=#369 id=369 data-nosnippet>369</a>
-<a href=#370 id=370 data-nosnippet>370</a>    <span class="doccomment">/// Return true if a collection is in progress.
-<a href=#371 id=371 data-nosnippet>371</a>    </span><span class="kw">pub fn </span>gc_in_progress(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-<a href=#372 id=372 data-nosnippet>372</a>        <span class="kw-2">*</span><span class="self">self</span>.state.gc_status.lock().unwrap() != GcStatus::NotInGC
-<a href=#373 id=373 data-nosnippet>373</a>    }
-<a href=#374 id=374 data-nosnippet>374</a>
-<a href=#375 id=375 data-nosnippet>375</a>    <span class="doccomment">/// Return true if a collection is in progress and past the preparatory stage.
-<a href=#376 id=376 data-nosnippet>376</a>    </span><span class="kw">pub fn </span>gc_in_progress_proper(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-<a href=#377 id=377 data-nosnippet>377</a>        <span class="kw-2">*</span><span class="self">self</span>.state.gc_status.lock().unwrap() == GcStatus::GcProper
+<a href=#354 id=354 data-nosnippet>354</a>    <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
+<a href=#355 id=355 data-nosnippet>355</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>sanity_end(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+<a href=#356 id=356 data-nosnippet>356</a>        <span class="self">self</span>.inside_sanity.store(<span class="bool-val">false</span>, Ordering::Relaxed)
+<a href=#357 id=357 data-nosnippet>357</a>    }
+<a href=#358 id=358 data-nosnippet>358</a>
+<a href=#359 id=359 data-nosnippet>359</a>    <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
+<a href=#360 id=360 data-nosnippet>360</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_in_sanity(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#361 id=361 data-nosnippet>361</a>        <span class="self">self</span>.inside_sanity.load(Ordering::Relaxed)
+<a href=#362 id=362 data-nosnippet>362</a>    }
+<a href=#363 id=363 data-nosnippet>363</a>
+<a href=#364 id=364 data-nosnippet>364</a>    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>set_gc_status(<span class="kw-2">&amp;</span><span class="self">self</span>, s: GcStatus) {
+<a href=#365 id=365 data-nosnippet>365</a>        <span class="kw">let </span><span class="kw-2">mut </span>gc_status = <span class="self">self</span>.state.gc_status.lock().unwrap();
+<a href=#366 id=366 data-nosnippet>366</a>        <span class="kw">if </span><span class="kw-2">*</span>gc_status == GcStatus::NotInGC {
+<a href=#367 id=367 data-nosnippet>367</a>            <span class="self">self</span>.state.stacks_prepared.store(<span class="bool-val">false</span>, Ordering::SeqCst);
+<a href=#368 id=368 data-nosnippet>368</a>            <span class="comment">// FIXME stats
+<a href=#369 id=369 data-nosnippet>369</a>            </span><span class="self">self</span>.stats.start_gc();
+<a href=#370 id=370 data-nosnippet>370</a>        }
+<a href=#371 id=371 data-nosnippet>371</a>        <span class="kw-2">*</span>gc_status = s;
+<a href=#372 id=372 data-nosnippet>372</a>        <span class="kw">if </span><span class="kw-2">*</span>gc_status == GcStatus::NotInGC {
+<a href=#373 id=373 data-nosnippet>373</a>            <span class="comment">// FIXME stats
+<a href=#374 id=374 data-nosnippet>374</a>            </span><span class="kw">if </span><span class="self">self</span>.stats.get_gathering_stats() {
+<a href=#375 id=375 data-nosnippet>375</a>                <span class="self">self</span>.stats.end_gc();
+<a href=#376 id=376 data-nosnippet>376</a>            }
+<a href=#377 id=377 data-nosnippet>377</a>        }
 <a href=#378 id=378 data-nosnippet>378</a>    }
 <a href=#379 id=379 data-nosnippet>379</a>
-<a href=#380 id=380 data-nosnippet>380</a>    <span class="doccomment">/// Return true if the current GC is an emergency GC.
-<a href=#381 id=381 data-nosnippet>381</a>    ///
-<a href=#382 id=382 data-nosnippet>382</a>    /// An emergency GC happens when a normal GC cannot reclaim enough memory to satisfy allocation
-<a href=#383 id=383 data-nosnippet>383</a>    /// requests.  Plans may do full-heap GC, defragmentation, etc. during emergency GCs in order to
-<a href=#384 id=384 data-nosnippet>384</a>    /// free up more memory.
-<a href=#385 id=385 data-nosnippet>385</a>    ///
-<a href=#386 id=386 data-nosnippet>386</a>    /// VM bindings can call this function during GC to check if the current GC is an emergency GC.
-<a href=#387 id=387 data-nosnippet>387</a>    /// If it is, the VM binding is recommended to retain fewer objects than normal GCs, to the
-<a href=#388 id=388 data-nosnippet>388</a>    /// extent allowed by the specification of the VM or the language.  For example, the VM binding
-<a href=#389 id=389 data-nosnippet>389</a>    /// may choose not to retain objects used for caching.  Specifically, for Java virtual machines,
-<a href=#390 id=390 data-nosnippet>390</a>    /// that means not retaining referents of [`SoftReference`][java-soft-ref] which is primarily
-<a href=#391 id=391 data-nosnippet>391</a>    /// designed for implementing memory-sensitive caches.
-<a href=#392 id=392 data-nosnippet>392</a>    ///
-<a href=#393 id=393 data-nosnippet>393</a>    /// [java-soft-ref]: https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/ref/SoftReference.html
-<a href=#394 id=394 data-nosnippet>394</a>    </span><span class="kw">pub fn </span>is_emergency_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-<a href=#395 id=395 data-nosnippet>395</a>        <span class="self">self</span>.state.is_emergency_collection()
-<a href=#396 id=396 data-nosnippet>396</a>    }
-<a href=#397 id=397 data-nosnippet>397</a>
-<a href=#398 id=398 data-nosnippet>398</a>    <span class="doccomment">/// Return true if the current GC is trigger manually by the user/binding.
-<a href=#399 id=399 data-nosnippet>399</a>    </span><span class="kw">pub fn </span>is_user_triggered_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-<a href=#400 id=400 data-nosnippet>400</a>        <span class="self">self</span>.state.is_user_triggered_collection()
-<a href=#401 id=401 data-nosnippet>401</a>    }
-<a href=#402 id=402 data-nosnippet>402</a>
-<a href=#403 id=403 data-nosnippet>403</a>    <span class="doccomment">/// The application code has requested a collection. This is just a GC hint, and
-<a href=#404 id=404 data-nosnippet>404</a>    /// we may ignore it.
-<a href=#405 id=405 data-nosnippet>405</a>    ///
-<a href=#406 id=406 data-nosnippet>406</a>    /// Returns whether a GC was ran or not. If MMTk triggers a GC, this method will block the
-<a href=#407 id=407 data-nosnippet>407</a>    /// calling thread and return true when the GC finishes. Otherwise, this method returns
-<a href=#408 id=408 data-nosnippet>408</a>    /// false immediately.
-<a href=#409 id=409 data-nosnippet>409</a>    ///
-<a href=#410 id=410 data-nosnippet>410</a>    /// # Arguments
-<a href=#411 id=411 data-nosnippet>411</a>    /// * `tls`: The mutator thread that requests the GC
-<a href=#412 id=412 data-nosnippet>412</a>    /// * `force`: The request cannot be ignored (except for NoGC)
-<a href=#413 id=413 data-nosnippet>413</a>    /// * `exhaustive`: The requested GC should be exhaustive. This is also a hint.
-<a href=#414 id=414 data-nosnippet>414</a>    </span><span class="kw">pub fn </span>handle_user_collection_request(
-<a href=#415 id=415 data-nosnippet>415</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
-<a href=#416 id=416 data-nosnippet>416</a>        tls: VMMutatorThread,
-<a href=#417 id=417 data-nosnippet>417</a>        force: bool,
-<a href=#418 id=418 data-nosnippet>418</a>        exhaustive: bool,
-<a href=#419 id=419 data-nosnippet>419</a>    ) -&gt; bool {
-<a href=#420 id=420 data-nosnippet>420</a>        <span class="kw">if </span><span class="self">self
-<a href=#421 id=421 data-nosnippet>421</a>            </span>.gc_trigger
-<a href=#422 id=422 data-nosnippet>422</a>            .handle_user_collection_request(force, exhaustive)
-<a href=#423 id=423 data-nosnippet>423</a>        {
-<a href=#424 id=424 data-nosnippet>424</a>            <span class="kw">use </span><span class="kw">crate</span>::vm::Collection;
-<a href=#425 id=425 data-nosnippet>425</a>            VM::VMCollection::block_for_gc(tls);
-<a href=#426 id=426 data-nosnippet>426</a>            <span class="bool-val">true
-<a href=#427 id=427 data-nosnippet>427</a>        </span>} <span class="kw">else </span>{
-<a href=#428 id=428 data-nosnippet>428</a>            <span class="bool-val">false
-<a href=#429 id=429 data-nosnippet>429</a>        </span>}
-<a href=#430 id=430 data-nosnippet>430</a>    }
-<a href=#431 id=431 data-nosnippet>431</a>
-<a href=#432 id=432 data-nosnippet>432</a>    <span class="doccomment">/// MMTK has requested stop-the-world activity (e.g., stw within a concurrent gc).
-<a href=#433 id=433 data-nosnippet>433</a>    </span><span class="attr">#[allow(unused)]
-<a href=#434 id=434 data-nosnippet>434</a>    </span><span class="kw">pub fn </span>trigger_internal_collection_request(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-<a href=#435 id=435 data-nosnippet>435</a>        <span class="self">self</span>.gc_trigger.trigger_internal_collection_request();
-<a href=#436 id=436 data-nosnippet>436</a>    }
-<a href=#437 id=437 data-nosnippet>437</a>
-<a href=#438 id=438 data-nosnippet>438</a>    <span class="doccomment">/// Get a reference to the plan.
-<a href=#439 id=439 data-nosnippet>439</a>    </span><span class="kw">pub fn </span>get_plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
-<a href=#440 id=440 data-nosnippet>440</a>        <span class="kw">unsafe </span>{ <span class="kw-2">&amp;**</span>(<span class="self">self</span>.plan.get()) }
-<a href=#441 id=441 data-nosnippet>441</a>    }
-<a href=#442 id=442 data-nosnippet>442</a>
-<a href=#443 id=443 data-nosnippet>443</a>    <span class="doccomment">/// Get the plan as mutable reference.
-<a href=#444 id=444 data-nosnippet>444</a>    ///
-<a href=#445 id=445 data-nosnippet>445</a>    /// # Safety
-<a href=#446 id=446 data-nosnippet>446</a>    ///
-<a href=#447 id=447 data-nosnippet>447</a>    /// This is unsafe because the caller must ensure that the plan is not used by other threads.
-<a href=#448 id=448 data-nosnippet>448</a>    </span><span class="attr">#[allow(clippy::mut_from_ref)]
-<a href=#449 id=449 data-nosnippet>449</a>    </span><span class="kw">pub unsafe fn </span>get_plan_mut(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
-<a href=#450 id=450 data-nosnippet>450</a>        <span class="kw-2">&amp;mut **</span>(<span class="self">self</span>.plan.get())
+<a href=#380 id=380 data-nosnippet>380</a>    <span class="doccomment">/// Return true if a collection is in progress.
+<a href=#381 id=381 data-nosnippet>381</a>    </span><span class="kw">pub fn </span>gc_in_progress(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#382 id=382 data-nosnippet>382</a>        <span class="kw-2">*</span><span class="self">self</span>.state.gc_status.lock().unwrap() != GcStatus::NotInGC
+<a href=#383 id=383 data-nosnippet>383</a>    }
+<a href=#384 id=384 data-nosnippet>384</a>
+<a href=#385 id=385 data-nosnippet>385</a>    <span class="doccomment">/// Return true if a collection is in progress and past the preparatory stage.
+<a href=#386 id=386 data-nosnippet>386</a>    </span><span class="kw">pub fn </span>gc_in_progress_proper(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#387 id=387 data-nosnippet>387</a>        <span class="kw-2">*</span><span class="self">self</span>.state.gc_status.lock().unwrap() == GcStatus::GcProper
+<a href=#388 id=388 data-nosnippet>388</a>    }
+<a href=#389 id=389 data-nosnippet>389</a>
+<a href=#390 id=390 data-nosnippet>390</a>    <span class="doccomment">/// Return true if the current GC is an emergency GC.
+<a href=#391 id=391 data-nosnippet>391</a>    ///
+<a href=#392 id=392 data-nosnippet>392</a>    /// An emergency GC happens when a normal GC cannot reclaim enough memory to satisfy allocation
+<a href=#393 id=393 data-nosnippet>393</a>    /// requests.  Plans may do full-heap GC, defragmentation, etc. during emergency GCs in order to
+<a href=#394 id=394 data-nosnippet>394</a>    /// free up more memory.
+<a href=#395 id=395 data-nosnippet>395</a>    ///
+<a href=#396 id=396 data-nosnippet>396</a>    /// VM bindings can call this function during GC to check if the current GC is an emergency GC.
+<a href=#397 id=397 data-nosnippet>397</a>    /// If it is, the VM binding is recommended to retain fewer objects than normal GCs, to the
+<a href=#398 id=398 data-nosnippet>398</a>    /// extent allowed by the specification of the VM or the language.  For example, the VM binding
+<a href=#399 id=399 data-nosnippet>399</a>    /// may choose not to retain objects used for caching.  Specifically, for Java virtual machines,
+<a href=#400 id=400 data-nosnippet>400</a>    /// that means not retaining referents of [`SoftReference`][java-soft-ref] which is primarily
+<a href=#401 id=401 data-nosnippet>401</a>    /// designed for implementing memory-sensitive caches.
+<a href=#402 id=402 data-nosnippet>402</a>    ///
+<a href=#403 id=403 data-nosnippet>403</a>    /// [java-soft-ref]: https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/ref/SoftReference.html
+<a href=#404 id=404 data-nosnippet>404</a>    </span><span class="kw">pub fn </span>is_emergency_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#405 id=405 data-nosnippet>405</a>        <span class="self">self</span>.state.is_emergency_collection()
+<a href=#406 id=406 data-nosnippet>406</a>    }
+<a href=#407 id=407 data-nosnippet>407</a>
+<a href=#408 id=408 data-nosnippet>408</a>    <span class="doccomment">/// Return true if the current GC is trigger manually by the user/binding.
+<a href=#409 id=409 data-nosnippet>409</a>    </span><span class="kw">pub fn </span>is_user_triggered_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#410 id=410 data-nosnippet>410</a>        <span class="self">self</span>.state.is_user_triggered_collection()
+<a href=#411 id=411 data-nosnippet>411</a>    }
+<a href=#412 id=412 data-nosnippet>412</a>
+<a href=#413 id=413 data-nosnippet>413</a>    <span class="doccomment">/// The application code has requested a collection. This is just a GC hint, and
+<a href=#414 id=414 data-nosnippet>414</a>    /// we may ignore it.
+<a href=#415 id=415 data-nosnippet>415</a>    ///
+<a href=#416 id=416 data-nosnippet>416</a>    /// Returns whether a GC was ran or not. If MMTk triggers a GC, this method will block the
+<a href=#417 id=417 data-nosnippet>417</a>    /// calling thread and return true when the GC finishes. Otherwise, this method returns
+<a href=#418 id=418 data-nosnippet>418</a>    /// false immediately.
+<a href=#419 id=419 data-nosnippet>419</a>    ///
+<a href=#420 id=420 data-nosnippet>420</a>    /// # Arguments
+<a href=#421 id=421 data-nosnippet>421</a>    /// * `tls`: The mutator thread that requests the GC
+<a href=#422 id=422 data-nosnippet>422</a>    /// * `force`: The request cannot be ignored (except for NoGC)
+<a href=#423 id=423 data-nosnippet>423</a>    /// * `exhaustive`: The requested GC should be exhaustive. This is also a hint.
+<a href=#424 id=424 data-nosnippet>424</a>    </span><span class="kw">pub fn </span>handle_user_collection_request(
+<a href=#425 id=425 data-nosnippet>425</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#426 id=426 data-nosnippet>426</a>        tls: VMMutatorThread,
+<a href=#427 id=427 data-nosnippet>427</a>        force: bool,
+<a href=#428 id=428 data-nosnippet>428</a>        exhaustive: bool,
+<a href=#429 id=429 data-nosnippet>429</a>    ) -&gt; bool {
+<a href=#430 id=430 data-nosnippet>430</a>        <span class="kw">if </span><span class="self">self
+<a href=#431 id=431 data-nosnippet>431</a>            </span>.gc_trigger
+<a href=#432 id=432 data-nosnippet>432</a>            .handle_user_collection_request(force, exhaustive)
+<a href=#433 id=433 data-nosnippet>433</a>        {
+<a href=#434 id=434 data-nosnippet>434</a>            <span class="kw">use </span><span class="kw">crate</span>::vm::Collection;
+<a href=#435 id=435 data-nosnippet>435</a>            VM::VMCollection::block_for_gc(tls);
+<a href=#436 id=436 data-nosnippet>436</a>            <span class="bool-val">true
+<a href=#437 id=437 data-nosnippet>437</a>        </span>} <span class="kw">else </span>{
+<a href=#438 id=438 data-nosnippet>438</a>            <span class="bool-val">false
+<a href=#439 id=439 data-nosnippet>439</a>        </span>}
+<a href=#440 id=440 data-nosnippet>440</a>    }
+<a href=#441 id=441 data-nosnippet>441</a>
+<a href=#442 id=442 data-nosnippet>442</a>    <span class="doccomment">/// MMTK has requested stop-the-world activity (e.g., stw within a concurrent gc).
+<a href=#443 id=443 data-nosnippet>443</a>    </span><span class="attr">#[allow(unused)]
+<a href=#444 id=444 data-nosnippet>444</a>    </span><span class="kw">pub fn </span>trigger_internal_collection_request(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+<a href=#445 id=445 data-nosnippet>445</a>        <span class="self">self</span>.gc_trigger.trigger_internal_collection_request();
+<a href=#446 id=446 data-nosnippet>446</a>    }
+<a href=#447 id=447 data-nosnippet>447</a>
+<a href=#448 id=448 data-nosnippet>448</a>    <span class="doccomment">/// Get a reference to the plan.
+<a href=#449 id=449 data-nosnippet>449</a>    </span><span class="kw">pub fn </span>get_plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
+<a href=#450 id=450 data-nosnippet>450</a>        <span class="kw">unsafe </span>{ <span class="kw-2">&amp;**</span>(<span class="self">self</span>.plan.get()) }
 <a href=#451 id=451 data-nosnippet>451</a>    }
 <a href=#452 id=452 data-nosnippet>452</a>
-<a href=#453 id=453 data-nosnippet>453</a>    <span class="doccomment">/// Get the run time options.
-<a href=#454 id=454 data-nosnippet>454</a>    </span><span class="kw">pub fn </span>get_options(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Options {
-<a href=#455 id=455 data-nosnippet>455</a>        <span class="kw-2">&amp;</span><span class="self">self</span>.options
-<a href=#456 id=456 data-nosnippet>456</a>    }
-<a href=#457 id=457 data-nosnippet>457</a>
-<a href=#458 id=458 data-nosnippet>458</a>    <span class="doccomment">/// Enumerate objects in all spaces in this MMTK instance.
-<a href=#459 id=459 data-nosnippet>459</a>    ///
-<a href=#460 id=460 data-nosnippet>460</a>    /// The call-back function `f` is called for every object that has the valid object bit (VO
-<a href=#461 id=461 data-nosnippet>461</a>    /// bit), i.e. objects that are allocated in the heap of this MMTK instance, but has not been
-<a href=#462 id=462 data-nosnippet>462</a>    /// reclaimed, yet.
-<a href=#463 id=463 data-nosnippet>463</a>    ///
-<a href=#464 id=464 data-nosnippet>464</a>    /// # Notes about object initialization and finalization
-<a href=#465 id=465 data-nosnippet>465</a>    ///
-<a href=#466 id=466 data-nosnippet>466</a>    /// When this function visits an object, it only guarantees that its VO bit must have been set.
-<a href=#467 id=467 data-nosnippet>467</a>    /// It is not guaranteed if the object has been "fully initialized" in the sense of the
-<a href=#468 id=468 data-nosnippet>468</a>    /// programming language the VM is implementing.  For example, the object header and the type
-<a href=#469 id=469 data-nosnippet>469</a>    /// information may not have been written.
-<a href=#470 id=470 data-nosnippet>470</a>    ///
-<a href=#471 id=471 data-nosnippet>471</a>    /// It will also visit objects that have been "finalized" in the sense of the programming
-<a href=#472 id=472 data-nosnippet>472</a>    /// langauge the VM is implementing, as long as the object has not been reclaimed by the GC,
-<a href=#473 id=473 data-nosnippet>473</a>    /// yet.  Be careful.  If the object header is destroyed, it may not be safe to access such
-<a href=#474 id=474 data-nosnippet>474</a>    /// objects in the high-level language.
+<a href=#453 id=453 data-nosnippet>453</a>    <span class="doccomment">/// Get the plan as mutable reference.
+<a href=#454 id=454 data-nosnippet>454</a>    ///
+<a href=#455 id=455 data-nosnippet>455</a>    /// # Safety
+<a href=#456 id=456 data-nosnippet>456</a>    ///
+<a href=#457 id=457 data-nosnippet>457</a>    /// This is unsafe because the caller must ensure that the plan is not used by other threads.
+<a href=#458 id=458 data-nosnippet>458</a>    </span><span class="attr">#[allow(clippy::mut_from_ref)]
+<a href=#459 id=459 data-nosnippet>459</a>    </span><span class="kw">pub unsafe fn </span>get_plan_mut(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
+<a href=#460 id=460 data-nosnippet>460</a>        <span class="kw-2">&amp;mut **</span>(<span class="self">self</span>.plan.get())
+<a href=#461 id=461 data-nosnippet>461</a>    }
+<a href=#462 id=462 data-nosnippet>462</a>
+<a href=#463 id=463 data-nosnippet>463</a>    <span class="doccomment">/// Get the run time options.
+<a href=#464 id=464 data-nosnippet>464</a>    </span><span class="kw">pub fn </span>get_options(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Options {
+<a href=#465 id=465 data-nosnippet>465</a>        <span class="kw-2">&amp;</span><span class="self">self</span>.options
+<a href=#466 id=466 data-nosnippet>466</a>    }
+<a href=#467 id=467 data-nosnippet>467</a>
+<a href=#468 id=468 data-nosnippet>468</a>    <span class="doccomment">/// Enumerate objects in all spaces in this MMTK instance.
+<a href=#469 id=469 data-nosnippet>469</a>    ///
+<a href=#470 id=470 data-nosnippet>470</a>    /// The call-back function `f` is called for every object that has the valid object bit (VO
+<a href=#471 id=471 data-nosnippet>471</a>    /// bit), i.e. objects that are allocated in the heap of this MMTK instance, but has not been
+<a href=#472 id=472 data-nosnippet>472</a>    /// reclaimed, yet.
+<a href=#473 id=473 data-nosnippet>473</a>    ///
+<a href=#474 id=474 data-nosnippet>474</a>    /// # Notes about object initialization and finalization
 <a href=#475 id=475 data-nosnippet>475</a>    ///
-<a href=#476 id=476 data-nosnippet>476</a>    /// # Interaction with allocation and GC
-<a href=#477 id=477 data-nosnippet>477</a>    ///
-<a href=#478 id=478 data-nosnippet>478</a>    /// This function does not mutate the heap.  It is safe if multiple threads execute this
-<a href=#479 id=479 data-nosnippet>479</a>    /// function concurrently during mutator time.
+<a href=#476 id=476 data-nosnippet>476</a>    /// When this function visits an object, it only guarantees that its VO bit must have been set.
+<a href=#477 id=477 data-nosnippet>477</a>    /// It is not guaranteed if the object has been "fully initialized" in the sense of the
+<a href=#478 id=478 data-nosnippet>478</a>    /// programming language the VM is implementing.  For example, the object header and the type
+<a href=#479 id=479 data-nosnippet>479</a>    /// information may not have been written.
 <a href=#480 id=480 data-nosnippet>480</a>    ///
-<a href=#481 id=481 data-nosnippet>481</a>    /// It has *undefined behavior* if allocation or GC happens while this function is being
-<a href=#482 id=482 data-nosnippet>482</a>    /// executed.  The VM binding must ensure no threads are allocating and GC does not start while
-<a href=#483 id=483 data-nosnippet>483</a>    /// executing this function.  One way to do this is stopping all mutators before calling this
-<a href=#484 id=484 data-nosnippet>484</a>    /// function.
+<a href=#481 id=481 data-nosnippet>481</a>    /// It will also visit objects that have been "finalized" in the sense of the programming
+<a href=#482 id=482 data-nosnippet>482</a>    /// langauge the VM is implementing, as long as the object has not been reclaimed by the GC,
+<a href=#483 id=483 data-nosnippet>483</a>    /// yet.  Be careful.  If the object header is destroyed, it may not be safe to access such
+<a href=#484 id=484 data-nosnippet>484</a>    /// objects in the high-level language.
 <a href=#485 id=485 data-nosnippet>485</a>    ///
-<a href=#486 id=486 data-nosnippet>486</a>    /// Some high-level languages may provide an API that allows the user to allocate objects and
-<a href=#487 id=487 data-nosnippet>487</a>    /// trigger GC while enumerating objects.  One example is [`ObjectSpace::each_object`][os_eo] in
-<a href=#488 id=488 data-nosnippet>488</a>    /// Ruby.  The VM binding may use the callback of this function to save all visited object
-<a href=#489 id=489 data-nosnippet>489</a>    /// references and let the user visit those references after this function returns.  Make sure
-<a href=#490 id=490 data-nosnippet>490</a>    /// those saved references are in the root set or in an object that will live through GCs before
-<a href=#491 id=491 data-nosnippet>491</a>    /// the high-level language finishes visiting the saved object references.
-<a href=#492 id=492 data-nosnippet>492</a>    ///
-<a href=#493 id=493 data-nosnippet>493</a>    /// [os_eo]: https://docs.ruby-lang.org/en/master/ObjectSpace.html#method-c-each_object
-<a href=#494 id=494 data-nosnippet>494</a>    </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-<a href=#495 id=495 data-nosnippet>495</a>    </span><span class="kw">pub fn </span>enumerate_objects&lt;F&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, f: F)
-<a href=#496 id=496 data-nosnippet>496</a>    <span class="kw">where
-<a href=#497 id=497 data-nosnippet>497</a>        </span>F: FnMut(ObjectReference),
-<a href=#498 id=498 data-nosnippet>498</a>    {
-<a href=#499 id=499 data-nosnippet>499</a>        <span class="kw">use </span><span class="kw">crate</span>::util::object_enum;
-<a href=#500 id=500 data-nosnippet>500</a>
-<a href=#501 id=501 data-nosnippet>501</a>        <span class="kw">let </span><span class="kw-2">mut </span>enumerator = object_enum::ClosureObjectEnumerator::&lt;<span class="kw">_</span>, VM&gt;::new(f);
-<a href=#502 id=502 data-nosnippet>502</a>        <span class="kw">let </span>plan = <span class="self">self</span>.get_plan();
-<a href=#503 id=503 data-nosnippet>503</a>        plan.for_each_space(<span class="kw-2">&amp;mut </span>|space| {
-<a href=#504 id=504 data-nosnippet>504</a>            space.enumerate_objects(<span class="kw-2">&amp;mut </span>enumerator);
-<a href=#505 id=505 data-nosnippet>505</a>        })
-<a href=#506 id=506 data-nosnippet>506</a>    }
-<a href=#507 id=507 data-nosnippet>507</a>
-<a href=#508 id=508 data-nosnippet>508</a>    <span class="doccomment">/// Aggregate a hash map of live bytes per space with the space stats to produce
-<a href=#509 id=509 data-nosnippet>509</a>    /// a map of live bytes stats for the spaces.
-<a href=#510 id=510 data-nosnippet>510</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>aggregate_live_bytes_in_last_gc(
-<a href=#511 id=511 data-nosnippet>511</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
-<a href=#512 id=512 data-nosnippet>512</a>        live_bytes_per_space: [usize; MAX_SPACES],
-<a href=#513 id=513 data-nosnippet>513</a>    ) -&gt; HashMap&lt;<span class="kw-2">&amp;</span><span class="lifetime">'static </span>str, <span class="kw">crate</span>::LiveBytesStats&gt; {
-<a href=#514 id=514 data-nosnippet>514</a>        <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
-<a href=#515 id=515 data-nosnippet>515</a>        <span class="kw">let </span><span class="kw-2">mut </span>ret = HashMap::new();
-<a href=#516 id=516 data-nosnippet>516</a>        <span class="self">self</span>.get_plan().for_each_space(<span class="kw-2">&amp;mut </span>|space: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;VM&gt;| {
-<a href=#517 id=517 data-nosnippet>517</a>            <span class="kw">let </span>space_name = space.get_name();
-<a href=#518 id=518 data-nosnippet>518</a>            <span class="kw">let </span>space_idx = space.get_descriptor().get_index();
-<a href=#519 id=519 data-nosnippet>519</a>            <span class="kw">let </span>used_pages = space.reserved_pages();
-<a href=#520 id=520 data-nosnippet>520</a>            <span class="kw">if </span>used_pages != <span class="number">0 </span>{
-<a href=#521 id=521 data-nosnippet>521</a>                <span class="kw">let </span>used_bytes = <span class="kw">crate</span>::util::conversions::pages_to_bytes(used_pages);
-<a href=#522 id=522 data-nosnippet>522</a>                <span class="kw">let </span>live_bytes = live_bytes_per_space[space_idx];
-<a href=#523 id=523 data-nosnippet>523</a>                <span class="macro">debug_assert!</span>(
-<a href=#524 id=524 data-nosnippet>524</a>                    live_bytes &lt;= used_bytes,
-<a href=#525 id=525 data-nosnippet>525</a>                    <span class="string">"Live bytes of objects in {} ({} bytes) is larger than used pages ({} bytes), something is wrong."</span>,
-<a href=#526 id=526 data-nosnippet>526</a>                    space_name, live_bytes, used_bytes
-<a href=#527 id=527 data-nosnippet>527</a>                );
-<a href=#528 id=528 data-nosnippet>528</a>                ret.insert(space_name, <span class="kw">crate</span>::LiveBytesStats {
-<a href=#529 id=529 data-nosnippet>529</a>                    live_bytes,
-<a href=#530 id=530 data-nosnippet>530</a>                    used_pages,
-<a href=#531 id=531 data-nosnippet>531</a>                    used_bytes,
-<a href=#532 id=532 data-nosnippet>532</a>                });
-<a href=#533 id=533 data-nosnippet>533</a>            }
-<a href=#534 id=534 data-nosnippet>534</a>        });
-<a href=#535 id=535 data-nosnippet>535</a>        ret
-<a href=#536 id=536 data-nosnippet>536</a>    }
-<a href=#537 id=537 data-nosnippet>537</a>
-<a href=#538 id=538 data-nosnippet>538</a>    <span class="doccomment">/// Print VM maps.  It will print the memory ranges used by spaces as well as some attributes of
-<a href=#539 id=539 data-nosnippet>539</a>    /// the spaces.
-<a href=#540 id=540 data-nosnippet>540</a>    ///
-<a href=#541 id=541 data-nosnippet>541</a>    /// -   "I": The space is immortal.  Its objects will never die.
-<a href=#542 id=542 data-nosnippet>542</a>    /// -   "N": The space is non-movable.  Its objects will never move.
-<a href=#543 id=543 data-nosnippet>543</a>    ///
-<a href=#544 id=544 data-nosnippet>544</a>    /// Arguments:
-<a href=#545 id=545 data-nosnippet>545</a>    /// *   `out`: the place to print the VM maps.
-<a href=#546 id=546 data-nosnippet>546</a>    /// *   `space_name`: If `None`, print all spaces;
-<a href=#547 id=547 data-nosnippet>547</a>    ///     if `Some(n)`, only print the space whose name is `n`.
-<a href=#548 id=548 data-nosnippet>548</a>    </span><span class="kw">pub fn </span>debug_print_vm_maps(
-<a href=#549 id=549 data-nosnippet>549</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
-<a href=#550 id=550 data-nosnippet>550</a>        out: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>std::fmt::Write,
-<a href=#551 id=551 data-nosnippet>551</a>        space_name: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt;,
-<a href=#552 id=552 data-nosnippet>552</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), std::fmt::Error&gt; {
-<a href=#553 id=553 data-nosnippet>553</a>        <span class="kw">let </span><span class="kw-2">mut </span>result_so_far = <span class="prelude-val">Ok</span>(());
-<a href=#554 id=554 data-nosnippet>554</a>        <span class="self">self</span>.get_plan().for_each_space(<span class="kw-2">&amp;mut </span>|space| {
-<a href=#555 id=555 data-nosnippet>555</a>            <span class="kw">if </span>result_so_far.is_ok()
-<a href=#556 id=556 data-nosnippet>556</a>                &amp;&amp; (space_name.is_none() || space_name == <span class="prelude-val">Some</span>(space.get_name()))
-<a href=#557 id=557 data-nosnippet>557</a>            {
-<a href=#558 id=558 data-nosnippet>558</a>                result_so_far = <span class="kw">crate</span>::policy::space::print_vm_map(space, out);
-<a href=#559 id=559 data-nosnippet>559</a>            }
-<a href=#560 id=560 data-nosnippet>560</a>        });
-<a href=#561 id=561 data-nosnippet>561</a>        result_so_far
-<a href=#562 id=562 data-nosnippet>562</a>    }
-<a href=#563 id=563 data-nosnippet>563</a>
-<a href=#564 id=564 data-nosnippet>564</a>    <span class="doccomment">/// Initialize object metadata for a VM space object.
-<a href=#565 id=565 data-nosnippet>565</a>    /// Objects in the VM space are allocated/managed by the binding. This function provides a way for
-<a href=#566 id=566 data-nosnippet>566</a>    /// the binding to set object metadata in MMTk for an object in the space.
-<a href=#567 id=567 data-nosnippet>567</a>    </span><span class="attr">#[cfg(feature = <span class="string">"vm_space"</span>)]
-<a href=#568 id=568 data-nosnippet>568</a>    </span><span class="kw">pub fn </span>initialize_vm_space_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: <span class="kw">crate</span>::util::ObjectReference) {
-<a href=#569 id=569 data-nosnippet>569</a>        <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
-<a href=#570 id=570 data-nosnippet>570</a>        <span class="self">self</span>.get_plan()
-<a href=#571 id=571 data-nosnippet>571</a>            .base()
-<a href=#572 id=572 data-nosnippet>572</a>            .vm_space
-<a href=#573 id=573 data-nosnippet>573</a>            .initialize_object_metadata(object)
-<a href=#574 id=574 data-nosnippet>574</a>    }
-<a href=#575 id=575 data-nosnippet>575</a>}
-<a href=#576 id=576 data-nosnippet>576</a>
-<a href=#577 id=577 data-nosnippet>577</a><span class="doccomment">/// A non-mangled function to print object information for debugging purposes. This function can be directly
-<a href=#578 id=578 data-nosnippet>578</a>/// called from a debugger.
-<a href=#579 id=579 data-nosnippet>579</a></span><span class="attr">#[no_mangle]
-<a href=#580 id=580 data-nosnippet>580</a></span><span class="kw">pub fn </span>mmtk_debug_print_object(object: <span class="kw">crate</span>::util::ObjectReference) {
-<a href=#581 id=581 data-nosnippet>581</a>    <span class="comment">// If the address is unmapped, we cannot access its metadata. Just quit.
-<a href=#582 id=582 data-nosnippet>582</a>    </span><span class="kw">if </span>!object.to_raw_address().is_mapped() {
-<a href=#583 id=583 data-nosnippet>583</a>        <span class="macro">println!</span>(<span class="string">"{} is not mapped in MMTk"</span>, object);
-<a href=#584 id=584 data-nosnippet>584</a>        <span class="kw">return</span>;
-<a href=#585 id=585 data-nosnippet>585</a>    }
+<a href=#486 id=486 data-nosnippet>486</a>    /// # Interaction with allocation and GC
+<a href=#487 id=487 data-nosnippet>487</a>    ///
+<a href=#488 id=488 data-nosnippet>488</a>    /// This function does not mutate the heap.  It is safe if multiple threads execute this
+<a href=#489 id=489 data-nosnippet>489</a>    /// function concurrently during mutator time.
+<a href=#490 id=490 data-nosnippet>490</a>    ///
+<a href=#491 id=491 data-nosnippet>491</a>    /// It has *undefined behavior* if allocation or GC happens while this function is being
+<a href=#492 id=492 data-nosnippet>492</a>    /// executed.  The VM binding must ensure no threads are allocating and GC does not start while
+<a href=#493 id=493 data-nosnippet>493</a>    /// executing this function.  One way to do this is stopping all mutators before calling this
+<a href=#494 id=494 data-nosnippet>494</a>    /// function.
+<a href=#495 id=495 data-nosnippet>495</a>    ///
+<a href=#496 id=496 data-nosnippet>496</a>    /// Some high-level languages may provide an API that allows the user to allocate objects and
+<a href=#497 id=497 data-nosnippet>497</a>    /// trigger GC while enumerating objects.  One example is [`ObjectSpace::each_object`][os_eo] in
+<a href=#498 id=498 data-nosnippet>498</a>    /// Ruby.  The VM binding may use the callback of this function to save all visited object
+<a href=#499 id=499 data-nosnippet>499</a>    /// references and let the user visit those references after this function returns.  Make sure
+<a href=#500 id=500 data-nosnippet>500</a>    /// those saved references are in the root set or in an object that will live through GCs before
+<a href=#501 id=501 data-nosnippet>501</a>    /// the high-level language finishes visiting the saved object references.
+<a href=#502 id=502 data-nosnippet>502</a>    ///
+<a href=#503 id=503 data-nosnippet>503</a>    /// [os_eo]: https://docs.ruby-lang.org/en/master/ObjectSpace.html#method-c-each_object
+<a href=#504 id=504 data-nosnippet>504</a>    </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+<a href=#505 id=505 data-nosnippet>505</a>    </span><span class="kw">pub fn </span>enumerate_objects&lt;F&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, f: F)
+<a href=#506 id=506 data-nosnippet>506</a>    <span class="kw">where
+<a href=#507 id=507 data-nosnippet>507</a>        </span>F: FnMut(ObjectReference),
+<a href=#508 id=508 data-nosnippet>508</a>    {
+<a href=#509 id=509 data-nosnippet>509</a>        <span class="kw">use </span><span class="kw">crate</span>::util::object_enum;
+<a href=#510 id=510 data-nosnippet>510</a>
+<a href=#511 id=511 data-nosnippet>511</a>        <span class="kw">let </span><span class="kw-2">mut </span>enumerator = object_enum::ClosureObjectEnumerator::&lt;<span class="kw">_</span>, VM&gt;::new(f);
+<a href=#512 id=512 data-nosnippet>512</a>        <span class="kw">let </span>plan = <span class="self">self</span>.get_plan();
+<a href=#513 id=513 data-nosnippet>513</a>        plan.for_each_space(<span class="kw-2">&amp;mut </span>|space| {
+<a href=#514 id=514 data-nosnippet>514</a>            space.enumerate_objects(<span class="kw-2">&amp;mut </span>enumerator);
+<a href=#515 id=515 data-nosnippet>515</a>        })
+<a href=#516 id=516 data-nosnippet>516</a>    }
+<a href=#517 id=517 data-nosnippet>517</a>
+<a href=#518 id=518 data-nosnippet>518</a>    <span class="doccomment">/// Aggregate a hash map of live bytes per space with the space stats to produce
+<a href=#519 id=519 data-nosnippet>519</a>    /// a map of live bytes stats for the spaces.
+<a href=#520 id=520 data-nosnippet>520</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>aggregate_live_bytes_in_last_gc(
+<a href=#521 id=521 data-nosnippet>521</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#522 id=522 data-nosnippet>522</a>        live_bytes_per_space: [usize; MAX_SPACES],
+<a href=#523 id=523 data-nosnippet>523</a>    ) -&gt; HashMap&lt;<span class="kw-2">&amp;</span><span class="lifetime">'static </span>str, <span class="kw">crate</span>::LiveBytesStats&gt; {
+<a href=#524 id=524 data-nosnippet>524</a>        <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
+<a href=#525 id=525 data-nosnippet>525</a>        <span class="kw">let </span><span class="kw-2">mut </span>ret = HashMap::new();
+<a href=#526 id=526 data-nosnippet>526</a>        <span class="self">self</span>.get_plan().for_each_space(<span class="kw-2">&amp;mut </span>|space: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;VM&gt;| {
+<a href=#527 id=527 data-nosnippet>527</a>            <span class="kw">let </span>space_name = space.get_name();
+<a href=#528 id=528 data-nosnippet>528</a>            <span class="kw">let </span>space_idx = space.get_descriptor().get_index();
+<a href=#529 id=529 data-nosnippet>529</a>            <span class="kw">let </span>used_pages = space.reserved_pages();
+<a href=#530 id=530 data-nosnippet>530</a>            <span class="kw">if </span>used_pages != <span class="number">0 </span>{
+<a href=#531 id=531 data-nosnippet>531</a>                <span class="kw">let </span>used_bytes = <span class="kw">crate</span>::util::conversions::pages_to_bytes(used_pages);
+<a href=#532 id=532 data-nosnippet>532</a>                <span class="kw">let </span>live_bytes = live_bytes_per_space[space_idx];
+<a href=#533 id=533 data-nosnippet>533</a>                <span class="macro">debug_assert!</span>(
+<a href=#534 id=534 data-nosnippet>534</a>                    live_bytes &lt;= used_bytes,
+<a href=#535 id=535 data-nosnippet>535</a>                    <span class="string">"Live bytes of objects in {} ({} bytes) is larger than used pages ({} bytes), something is wrong."</span>,
+<a href=#536 id=536 data-nosnippet>536</a>                    space_name, live_bytes, used_bytes
+<a href=#537 id=537 data-nosnippet>537</a>                );
+<a href=#538 id=538 data-nosnippet>538</a>                ret.insert(space_name, <span class="kw">crate</span>::LiveBytesStats {
+<a href=#539 id=539 data-nosnippet>539</a>                    live_bytes,
+<a href=#540 id=540 data-nosnippet>540</a>                    used_pages,
+<a href=#541 id=541 data-nosnippet>541</a>                    used_bytes,
+<a href=#542 id=542 data-nosnippet>542</a>                });
+<a href=#543 id=543 data-nosnippet>543</a>            }
+<a href=#544 id=544 data-nosnippet>544</a>        });
+<a href=#545 id=545 data-nosnippet>545</a>        ret
+<a href=#546 id=546 data-nosnippet>546</a>    }
+<a href=#547 id=547 data-nosnippet>547</a>
+<a href=#548 id=548 data-nosnippet>548</a>    <span class="doccomment">/// Print VM maps.  It will print the memory ranges used by spaces as well as some attributes of
+<a href=#549 id=549 data-nosnippet>549</a>    /// the spaces.
+<a href=#550 id=550 data-nosnippet>550</a>    ///
+<a href=#551 id=551 data-nosnippet>551</a>    /// -   "I": The space is immortal.  Its objects will never die.
+<a href=#552 id=552 data-nosnippet>552</a>    /// -   "N": The space is non-movable.  Its objects will never move.
+<a href=#553 id=553 data-nosnippet>553</a>    ///
+<a href=#554 id=554 data-nosnippet>554</a>    /// Arguments:
+<a href=#555 id=555 data-nosnippet>555</a>    /// *   `out`: the place to print the VM maps.
+<a href=#556 id=556 data-nosnippet>556</a>    /// *   `space_name`: If `None`, print all spaces;
+<a href=#557 id=557 data-nosnippet>557</a>    ///     if `Some(n)`, only print the space whose name is `n`.
+<a href=#558 id=558 data-nosnippet>558</a>    </span><span class="kw">pub fn </span>debug_print_vm_maps(
+<a href=#559 id=559 data-nosnippet>559</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#560 id=560 data-nosnippet>560</a>        out: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>std::fmt::Write,
+<a href=#561 id=561 data-nosnippet>561</a>        space_name: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt;,
+<a href=#562 id=562 data-nosnippet>562</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), std::fmt::Error&gt; {
+<a href=#563 id=563 data-nosnippet>563</a>        <span class="kw">let </span><span class="kw-2">mut </span>result_so_far = <span class="prelude-val">Ok</span>(());
+<a href=#564 id=564 data-nosnippet>564</a>        <span class="self">self</span>.get_plan().for_each_space(<span class="kw-2">&amp;mut </span>|space| {
+<a href=#565 id=565 data-nosnippet>565</a>            <span class="kw">if </span>result_so_far.is_ok()
+<a href=#566 id=566 data-nosnippet>566</a>                &amp;&amp; (space_name.is_none() || space_name == <span class="prelude-val">Some</span>(space.get_name()))
+<a href=#567 id=567 data-nosnippet>567</a>            {
+<a href=#568 id=568 data-nosnippet>568</a>                result_so_far = <span class="kw">crate</span>::policy::space::print_vm_map(space, out);
+<a href=#569 id=569 data-nosnippet>569</a>            }
+<a href=#570 id=570 data-nosnippet>570</a>        });
+<a href=#571 id=571 data-nosnippet>571</a>        result_so_far
+<a href=#572 id=572 data-nosnippet>572</a>    }
+<a href=#573 id=573 data-nosnippet>573</a>
+<a href=#574 id=574 data-nosnippet>574</a>    <span class="doccomment">/// Initialize object metadata for a VM space object.
+<a href=#575 id=575 data-nosnippet>575</a>    /// Objects in the VM space are allocated/managed by the binding. This function provides a way for
+<a href=#576 id=576 data-nosnippet>576</a>    /// the binding to set object metadata in MMTk for an object in the space.
+<a href=#577 id=577 data-nosnippet>577</a>    </span><span class="attr">#[cfg(feature = <span class="string">"vm_space"</span>)]
+<a href=#578 id=578 data-nosnippet>578</a>    </span><span class="kw">pub fn </span>initialize_vm_space_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: <span class="kw">crate</span>::util::ObjectReference) {
+<a href=#579 id=579 data-nosnippet>579</a>        <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
+<a href=#580 id=580 data-nosnippet>580</a>        <span class="self">self</span>.get_plan()
+<a href=#581 id=581 data-nosnippet>581</a>            .base()
+<a href=#582 id=582 data-nosnippet>582</a>            .vm_space
+<a href=#583 id=583 data-nosnippet>583</a>            .initialize_object_metadata(object)
+<a href=#584 id=584 data-nosnippet>584</a>    }
+<a href=#585 id=585 data-nosnippet>585</a>}
 <a href=#586 id=586 data-nosnippet>586</a>
-<a href=#587 id=587 data-nosnippet>587</a>    <span class="comment">// If the address is not aligned to the object reference size, it is not an object reference.
-<a href=#588 id=588 data-nosnippet>588</a>    </span><span class="kw">if </span>!object
-<a href=#589 id=589 data-nosnippet>589</a>        .to_raw_address()
-<a href=#590 id=590 data-nosnippet>590</a>        .is_aligned_to(<span class="kw">crate</span>::util::ObjectReference::ALIGNMENT)
-<a href=#591 id=591 data-nosnippet>591</a>    {
-<a href=#592 id=592 data-nosnippet>592</a>        <span class="macro">println!</span>(
-<a href=#593 id=593 data-nosnippet>593</a>            <span class="string">"{} is not properly aligned. It is not an object reference."</span>,
-<a href=#594 id=594 data-nosnippet>594</a>            object
-<a href=#595 id=595 data-nosnippet>595</a>        );
-<a href=#596 id=596 data-nosnippet>596</a>    }
-<a href=#597 id=597 data-nosnippet>597</a>
-<a href=#598 id=598 data-nosnippet>598</a>    <span class="comment">// Forward to the space
-<a href=#599 id=599 data-nosnippet>599</a>    </span><span class="kw">let </span>sft = SFT_MAP.get_checked(object.to_raw_address());
-<a href=#600 id=600 data-nosnippet>600</a>    <span class="comment">// Print the space name
-<a href=#601 id=601 data-nosnippet>601</a>    </span><span class="macro">println!</span>(<span class="string">"In {}:"</span>, sft.name());
-<a href=#602 id=602 data-nosnippet>602</a>    <span class="comment">// Print object information
-<a href=#603 id=603 data-nosnippet>603</a>    </span>sft.debug_print_object_info(object);
-<a href=#604 id=604 data-nosnippet>604</a>}</code></pre></div></section></main></body></html>
+<a href=#587 id=587 data-nosnippet>587</a><span class="doccomment">/// A non-mangled function to print object information for debugging purposes. This function can be directly
+<a href=#588 id=588 data-nosnippet>588</a>/// called from a debugger.
+<a href=#589 id=589 data-nosnippet>589</a></span><span class="attr">#[no_mangle]
+<a href=#590 id=590 data-nosnippet>590</a></span><span class="kw">pub fn </span>mmtk_debug_print_object(object: <span class="kw">crate</span>::util::ObjectReference) {
+<a href=#591 id=591 data-nosnippet>591</a>    <span class="comment">// If the address is unmapped, we cannot access its metadata. Just quit.
+<a href=#592 id=592 data-nosnippet>592</a>    </span><span class="kw">if </span>!object.to_raw_address().is_mapped() {
+<a href=#593 id=593 data-nosnippet>593</a>        <span class="macro">println!</span>(<span class="string">"{} is not mapped in MMTk"</span>, object);
+<a href=#594 id=594 data-nosnippet>594</a>        <span class="kw">return</span>;
+<a href=#595 id=595 data-nosnippet>595</a>    }
+<a href=#596 id=596 data-nosnippet>596</a>
+<a href=#597 id=597 data-nosnippet>597</a>    <span class="comment">// If the address is not aligned to the object reference size, it is not an object reference.
+<a href=#598 id=598 data-nosnippet>598</a>    </span><span class="kw">if </span>!object
+<a href=#599 id=599 data-nosnippet>599</a>        .to_raw_address()
+<a href=#600 id=600 data-nosnippet>600</a>        .is_aligned_to(<span class="kw">crate</span>::util::ObjectReference::ALIGNMENT)
+<a href=#601 id=601 data-nosnippet>601</a>    {
+<a href=#602 id=602 data-nosnippet>602</a>        <span class="macro">println!</span>(
+<a href=#603 id=603 data-nosnippet>603</a>            <span class="string">"{} is not properly aligned. It is not an object reference."</span>,
+<a href=#604 id=604 data-nosnippet>604</a>            object
+<a href=#605 id=605 data-nosnippet>605</a>        );
+<a href=#606 id=606 data-nosnippet>606</a>    }
+<a href=#607 id=607 data-nosnippet>607</a>
+<a href=#608 id=608 data-nosnippet>608</a>    <span class="comment">// Forward to the space
+<a href=#609 id=609 data-nosnippet>609</a>    </span><span class="kw">let </span>sft = SFT_MAP.get_checked(object.to_raw_address());
+<a href=#610 id=610 data-nosnippet>610</a>    <span class="comment">// Print the space name
+<a href=#611 id=611 data-nosnippet>611</a>    </span><span class="macro">println!</span>(<span class="string">"In {}:"</span>, sft.name());
+<a href=#612 id=612 data-nosnippet>612</a>    <span class="comment">// Print object information
+<a href=#613 id=613 data-nosnippet>613</a>    </span>sft.debug_print_object_info(object);
+<a href=#614 id=614 data-nosnippet>614</a>}</code></pre></div></section></main></body></html>

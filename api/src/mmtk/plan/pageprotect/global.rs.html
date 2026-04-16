@@ -106,7 +106,7 @@
 <a href=#106 id=106 data-nosnippet>106</a>            global_side_metadata_specs: SideMetadataContext::new_global_specs(<span class="kw-2">&amp;</span>[]),
 <a href=#107 id=107 data-nosnippet>107</a>        };
 <a href=#108 id=108 data-nosnippet>108</a>
-<a href=#109 id=109 data-nosnippet>109</a>        <span class="kw">let </span>ret = PageProtect {
+<a href=#109 id=109 data-nosnippet>109</a>        PageProtect {
 <a href=#110 id=110 data-nosnippet>110</a>            space: LargeObjectSpace::new(
 <a href=#111 id=111 data-nosnippet>111</a>                plan_args.get_normal_space_args(
 <a href=#112 id=112 data-nosnippet>112</a>                    <span class="string">"pageprotect"</span>,
@@ -118,10 +118,6 @@
 <a href=#118 id=118 data-nosnippet>118</a>                <span class="bool-val">false</span>, <span class="comment">// PageProtect does not use log bit
 <a href=#119 id=119 data-nosnippet>119</a>            </span>),
 <a href=#120 id=120 data-nosnippet>120</a>            common: CommonPlan::new(plan_args),
-<a href=#121 id=121 data-nosnippet>121</a>        };
-<a href=#122 id=122 data-nosnippet>122</a>
-<a href=#123 id=123 data-nosnippet>123</a>        ret.verify_side_metadata_sanity();
-<a href=#124 id=124 data-nosnippet>124</a>
-<a href=#125 id=125 data-nosnippet>125</a>        ret
-<a href=#126 id=126 data-nosnippet>126</a>    }
-<a href=#127 id=127 data-nosnippet>127</a>}</code></pre></div></section></main></body></html>
+<a href=#121 id=121 data-nosnippet>121</a>        }
+<a href=#122 id=122 data-nosnippet>122</a>    }
+<a href=#123 id=123 data-nosnippet>123</a>}</code></pre></div></section></main></body></html>

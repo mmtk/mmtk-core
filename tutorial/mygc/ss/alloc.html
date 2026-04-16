@@ -313,16 +313,12 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.)</li>
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&amp;[]),
         };
 
-        let res = MyGC {
+        MyGC {
             hi: AtomicBool::new(false),
             copyspace0: CopySpace::new(plan_args.get_normal_space_args("copyspace0", true, false, VMRequest::discontiguous()), false),
             copyspace1: CopySpace::new(plan_args.get_normal_space_args("copyspace1", true, false, VMRequest::discontiguous()), true),
             common: CommonPlan::new(plan_args),
-        };
-
-        res.verify_side_metadata_sanity();
-
-        res
+        }
     }
 <span class="boring">}</span></code></pre></pre>
 <h3 id="access-mygc-spaces"><a class="header" href="#access-mygc-spaces">Access MyGC spaces</a></h3>

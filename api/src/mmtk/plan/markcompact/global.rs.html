@@ -205,19 +205,15 @@
 <a href=#205 id=205 data-nosnippet>205</a>            VMRequest::discontiguous(),
 <a href=#206 id=206 data-nosnippet>206</a>        ));
 <a href=#207 id=207 data-nosnippet>207</a>
-<a href=#208 id=208 data-nosnippet>208</a>        <span class="kw">let </span>res = MarkCompact {
+<a href=#208 id=208 data-nosnippet>208</a>        MarkCompact {
 <a href=#209 id=209 data-nosnippet>209</a>            mc_space,
 <a href=#210 id=210 data-nosnippet>210</a>            common: CommonPlan::new(plan_args),
-<a href=#211 id=211 data-nosnippet>211</a>        };
-<a href=#212 id=212 data-nosnippet>212</a>
-<a href=#213 id=213 data-nosnippet>213</a>        res.verify_side_metadata_sanity();
+<a href=#211 id=211 data-nosnippet>211</a>        }
+<a href=#212 id=212 data-nosnippet>212</a>    }
+<a href=#213 id=213 data-nosnippet>213</a>}
 <a href=#214 id=214 data-nosnippet>214</a>
-<a href=#215 id=215 data-nosnippet>215</a>        res
-<a href=#216 id=216 data-nosnippet>216</a>    }
-<a href=#217 id=217 data-nosnippet>217</a>}
-<a href=#218 id=218 data-nosnippet>218</a>
-<a href=#219 id=219 data-nosnippet>219</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; MarkCompact&lt;VM&gt; {
-<a href=#220 id=220 data-nosnippet>220</a>    <span class="kw">pub fn </span>mc_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>MarkCompactSpace&lt;VM&gt; {
-<a href=#221 id=221 data-nosnippet>221</a>        <span class="kw-2">&amp;</span><span class="self">self</span>.mc_space
-<a href=#222 id=222 data-nosnippet>222</a>    }
-<a href=#223 id=223 data-nosnippet>223</a>}</code></pre></div></section></main></body></html>
+<a href=#215 id=215 data-nosnippet>215</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; MarkCompact&lt;VM&gt; {
+<a href=#216 id=216 data-nosnippet>216</a>    <span class="kw">pub fn </span>mc_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>MarkCompactSpace&lt;VM&gt; {
+<a href=#217 id=217 data-nosnippet>217</a>        <span class="kw-2">&amp;</span><span class="self">self</span>.mc_space
+<a href=#218 id=218 data-nosnippet>218</a>    }
+<a href=#219 id=219 data-nosnippet>219</a>}</code></pre></div></section></main></body></html>

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["MetadataByteArrayRef","SideMetadataContext","SideMetadataSpec"],"union":["SideMetadataOffset"]};
+window.SIDEBAR_ITEMS = {"fn":["side_metadata_offset_after"],"struct":["MetadataByteArrayRef","SideMetadataContext","SideMetadataSpec"]};

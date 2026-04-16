@@ -85,7 +85,7 @@
 <a href=#85 id=85 data-nosnippet>85</a>    //
 <a href=#86 id=86 data-nosnippet>86</a>    // Note a number of Global and PolicySpecific side metadata specifications are already reserved by mmtk-core.
 <a href=#87 id=87 data-nosnippet>87</a>    // Any side metadata offset calculation must consider these to prevent overlaps. A binding should start their
-<a href=#88 id=88 data-nosnippet>88</a>    // side metadata from GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS or LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.
+<a href=#88 id=88 data-nosnippet>88</a>    // side metadata from global_side_metadata_vm_base_address() or LOCAL_SIDE_METADATA_VM_BASE_OFFSET.
 <a href=#89 id=89 data-nosnippet>89</a>
 <a href=#90 id=90 data-nosnippet>90</a>    </span><span class="doccomment">/// A global 1-bit metadata used by generational plans to track cross-generational pointers. It is generally
 <a href=#91 id=91 data-nosnippet>91</a>    /// located in side metadata.
@@ -485,7 +485,7 @@
 <a href=#485 id=485 data-nosnippet>485</a>    <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::<span class="kw-2">*</span>;
 <a href=#486 id=486 data-nosnippet>486</a>    <span class="kw">use </span><span class="kw">crate</span>::util::metadata::{
 <a href=#487 id=487 data-nosnippet>487</a>        header_metadata::HeaderMetadataSpec,
-<a href=#488 id=488 data-nosnippet>488</a>        side_metadata::{SideMetadataOffset, SideMetadataSpec},
+<a href=#488 id=488 data-nosnippet>488</a>        side_metadata::{side_metadata_offset_after, SideMetadataSpec},
 <a href=#489 id=489 data-nosnippet>489</a>        MetadataSpec,
 <a href=#490 id=490 data-nosnippet>490</a>    };
 <a href=#491 id=491 data-nosnippet>491</a>
@@ -555,7 +555,7 @@
 <a href=#555 id=555 data-nosnippet>555</a>                    <span class="self">Self</span>(MetadataSpec::OnSide(SideMetadataSpec {
 <a href=#556 id=556 data-nosnippet>556</a>                        name: <span class="macro">stringify!</span>(<span class="macro-nonterminal">$spec_name</span>),
 <a href=#557 id=557 data-nosnippet>557</a>                        is_global: <span class="self">Self</span>::IS_GLOBAL,
-<a href=#558 id=558 data-nosnippet>558</a>                        offset: SideMetadataOffset::layout_after(side_spec),
+<a href=#558 id=558 data-nosnippet>558</a>                        offset: side_metadata_offset_after(side_spec),
 <a href=#559 id=559 data-nosnippet>559</a>                        log_num_of_bits: <span class="self">Self</span>::LOG_NUM_BITS,
 <a href=#560 id=560 data-nosnippet>560</a>                        log_bytes_in_region: <span class="macro-nonterminal">$side_min_obj_size </span><span class="kw">as </span>usize,
 <a href=#561 id=561 data-nosnippet>561</a>                    }))

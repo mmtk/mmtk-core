@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Metadata (OnSide or InHeader) implementation. This is a generic module to work with metadata including side metadata and in-object metadata."><title>mmtk::util::metadata - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.92.0 (ded5c06cf 2025-12-08)" data-channel="1.92.0" data-search-js="search-d69d8955.js" data-stringdex-js="stringdex-c3e638e9.js" data-settings-js="settings-c38705f0.js" ><script src="../../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-ce535bd0.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module metadata</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../mmtk/index.html">mmtk</a><span class="version">0.32.0-e851b2fb209bf13de389f22960581fb08a9ddeaa</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module metadata</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#side-metadata" title="Side Metadata">Side Metadata</a><ul><li><a href="#design" title="Design">Design</a></li></ul></li><li><a href="#how-to-use" title="How to Use">How to Use</a><ul><li><a href="#declare-metadata-specs" title="Declare metadata specs">Declare metadata specs</a></li><li><a href="#create-and-allocate-side-metadata-for-spaces" title="Create and allocate side metadata for spaces">Create and allocate side metadata for spaces</a></li><li><a href="#access-side-metadata" title="Access side metadata">Access side metadata</a></li></ul></li></ul><h3><a href="#modules">Module Items</a></h3><ul class="block"><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#traits" title="Traits">Traits</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In mmtk::<wbr>util</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">mmtk</a>::<wbr><a href="../index.html">util</a></div><h1>Module <span>metadata</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/mmtk/util/metadata/mod.rs.html#1-232">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Metadata (OnSide or InHeader) implementation.
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Metadata (OnSide or InHeader) implementation. This is a generic module to work with metadata including side metadata and in-object metadata."><title>mmtk::util::metadata - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.92.0 (ded5c06cf 2025-12-08)" data-channel="1.92.0" data-search-js="search-d69d8955.js" data-stringdex-js="stringdex-c3e638e9.js" data-settings-js="settings-c38705f0.js" ><script src="../../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-ce535bd0.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module metadata</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../mmtk/index.html">mmtk</a><span class="version">0.32.0-37d81218028d788f7a24158aac0588c3f6925d08</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module metadata</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#side-metadata" title="Side Metadata">Side Metadata</a><ul><li><a href="#design" title="Design">Design</a></li></ul></li><li><a href="#how-to-use" title="How to Use">How to Use</a><ul><li><a href="#declare-metadata-specs" title="Declare metadata specs">Declare metadata specs</a></li><li><a href="#create-and-allocate-side-metadata-for-spaces" title="Create and allocate side metadata for spaces">Create and allocate side metadata for spaces</a></li><li><a href="#access-side-metadata" title="Access side metadata">Access side metadata</a></li></ul></li></ul><h3><a href="#modules">Module Items</a></h3><ul class="block"><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#traits" title="Traits">Traits</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In mmtk::<wbr>util</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">mmtk</a>::<wbr><a href="../index.html">util</a></div><h1>Module <span>metadata</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/mmtk/util/metadata/mod.rs.html#1-232">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Metadata (OnSide or InHeader) implementation.
 This is a generic module to work with metadata including side metadata and in-object metadata.</p>
 <p>This module is designed to enable the implementation of a wide range of GC algorithms for VMs with various combinations of in-object and on-side space for GC-specific metadata (e.g. forwarding bits, marking bit, logging bit, etc.).</p>
 <p>The new metadata design differentiates per-object metadata (e.g. forwarding-bits and marking-bit) from other types of metadata including per-address (e.g. VO bit) and per-X (where X != object size), because the per-object metadata can optionally be kept in the object headers.</p>
@@ -20,10 +20,10 @@ This is a generic module to work with metadata including side metadata and in-ob
 </ol>
 <h4 id="64-bits-targets"><a class="doc-anchor" href="#64-bits-targets">§</a>64-bits targets</h4>
 <p>‌ In 64-bits targets, each MMTk side metadata bit-set is organized as a contiguous space.
-The base address for both the global and the local side metadata are constants (e.g. <code>GLOBAL_SIDE_METADATA_BASE_ADDRESS</code> and <code>LOCAL_SIDE_METADATA_BASE_ADDRESS</code>).</p>
+The base address for the side metadata is chosen at runtime and the offsets are applied to that base.</p>
 <p>In this case, a schematic of the local and global side metadata looks like:</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered"><code> _______________________________ &lt;= global-<span class="number">1 </span>= GLOBAL_SIDE_METADATA_BASE_ADDRESS
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code> _______________________________ &lt;= global-<span class="number">1 </span>= Address::ZERO (compile-time base)
  |                             |
  |        Global-<span class="number">1             </span>|
  |_____________________________| &lt;= global-<span class="number">2 </span>= global-<span class="number">1 </span>+
@@ -34,11 +34,11 @@ The base address for both the global and the local side metadata are constants (
  |                             |                 metadata_address_range_size(global-<span class="number">2</span>)
  |        Not Mapped           |
  |                             |
- |_____________________________| &lt;= global-end = GLOBAL_SIDE_METADATA_BASE_ADDRESS +
+ |_____________________________| &lt;= global-end = Address::ZERO +
  |                             |         MAX_HEAP_SIZE * Global_WCR
  |                             |
  |                             |
- |_____________________________| &lt;= local-<span class="number">1 </span>= LOCAL_SIDE_METADATA_BASE_ADDRESS
+ |_____________________________| &lt;= local-<span class="number">1 </span>= local_side_metadata_base_address()
  |                             |
  |      PolicySpecific-<span class="number">1       </span>|
  |                             |
@@ -51,7 +51,7 @@ The base address for both the global and the local side metadata are constants (
  |         Not Mapped          |
  |                             |
  |                             |
- |_____________________________| &lt;= local-end = LOCAL_SIDE_METADATA_BASE_ADDRESS +
+ |_____________________________| &lt;= local-end = local_side_metadata_base_address() +
                                          MAX_HEAP_SIZE * PolicySpecific_WCR</code></pre></div>
 <p>‌
 ‌ ### 32-bits targets</p>
@@ -59,7 +59,7 @@ The base address for both the global and the local side metadata are constants (
 This means, when a new chunk is mapped, the policy-specific side metadata for the whole chunk is also mapped.</p>
 <p>In this case, a schematic of the local and global side metadata looks like:</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered"><code> _______________________________ &lt;= global-<span class="number">1 </span>= GLOBAL_SIDE_METADATA_BASE_ADDRESS(e.g. <span class="number">0x1000_0000</span>)
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code> _______________________________ &lt;= global-<span class="number">1 </span>= Address::ZERO (compile-time base)
  |                             |
  |        Global-<span class="number">1             </span>|
  |_____________________________| &lt;= global-<span class="number">2 </span>= global-<span class="number">1 </span>+
@@ -70,17 +70,17 @@ This means, when a new chunk is mapped, the policy-specific side metadata for th
  |                             |                 metadata_address_range_size(global-<span class="number">2</span>)
  |        Not Mapped           |
  |                             |
- |_____________________________| &lt;= global-end = GLOBAL_SIDE_METADATA_BASE_ADDRESS +
+ |_____________________________| &lt;= global-end = Address::ZERO +
  |                             |         MAX_HEAP_SIZE * Global_WCR
  |                             |
  |                             |
- |_____________________________| &lt;= LOCAL_SIDE_METADATA_BASE_ADDRESS
+ |_____________________________| &lt;= local_side_metadata_base_address()
  |                             |
  |      PolicySpecific         |
  |                             |
  |                             |
  |                             |
- |_____________________________| &lt;= local-end = LOCAL_SIDE_METADATA_BASE_ADDRESS +
+ |_____________________________| &lt;= local-end = local_side_metadata_base_address() +
                                          MAX_HEAP_SIZE * PolicySpecific_WCR</code></pre></div>
 <p>‌ And inside the PolicySpecific space, each per chunk policy-specific side metadata looks like:</p>
 
@@ -107,13 +107,13 @@ The VM binding decides whether to put these metadata bit-sets in-objects or on-s
 <div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">const </span>GLOBAL_META_1: MetadataSpec = MetadataSpec {
    is_side_metadata: <span class="bool-val">true</span>,
    is_global: <span class="bool-val">true</span>,
-   offset: GLOBAL_SIDE_METADATA_BASE_ADDRESS,
+   offset: Address::ZERO,
    log_num_of_bits: b1,
    log_bytes_in_region: s1,
 };</code></pre></div>
 <p>Here, the number of bits per data is $2^b1$, and the minimum object size is $2^s1$.
 The <code>offset</code> is actually the base address for a global side metadata bit-set.
-For the first bit-set, <code>offset</code> is <code>GLOBAL_SIDE_METADATA_BASE_ADDRESS</code>.</p>
+For the first bit-set, <code>offset</code> is <code>Address::ZERO</code> (compile-time base; runtime address adds the side-metadata base).</p>
 <p>Now, to add a second side metadata bit-set, offset needs to be calculated based-on the first global bit-set:</p>
 
 <div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">const </span>GLOBAL_META_2: MetadataSpec = MetadataSpec {

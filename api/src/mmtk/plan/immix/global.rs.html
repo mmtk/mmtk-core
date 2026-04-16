@@ -143,7 +143,7 @@
 <a href=#143 id=143 data-nosnippet>143</a>        <span class="kw-2">mut </span>plan_args: CreateSpecificPlanArgs&lt;VM&gt;,
 <a href=#144 id=144 data-nosnippet>144</a>        space_args: ImmixSpaceArgs,
 <a href=#145 id=145 data-nosnippet>145</a>    ) -&gt; <span class="self">Self </span>{
-<a href=#146 id=146 data-nosnippet>146</a>        <span class="kw">let </span>immix = Immix {
+<a href=#146 id=146 data-nosnippet>146</a>        Immix {
 <a href=#147 id=147 data-nosnippet>147</a>            immix_space: ImmixSpace::new(
 <a href=#148 id=148 data-nosnippet>148</a>                <span class="kw">if </span>space_args.mixed_age {
 <a href=#149 id=149 data-nosnippet>149</a>                    plan_args.get_mixed_age_space_args(
@@ -164,70 +164,66 @@
 <a href=#164 id=164 data-nosnippet>164</a>            ),
 <a href=#165 id=165 data-nosnippet>165</a>            common: CommonPlan::new(plan_args),
 <a href=#166 id=166 data-nosnippet>166</a>            last_gc_was_defrag: AtomicBool::new(<span class="bool-val">false</span>),
-<a href=#167 id=167 data-nosnippet>167</a>        };
-<a href=#168 id=168 data-nosnippet>168</a>
-<a href=#169 id=169 data-nosnippet>169</a>        immix.verify_side_metadata_sanity();
-<a href=#170 id=170 data-nosnippet>170</a>
-<a href=#171 id=171 data-nosnippet>171</a>        immix
-<a href=#172 id=172 data-nosnippet>172</a>    }
-<a href=#173 id=173 data-nosnippet>173</a>
-<a href=#174 id=174 data-nosnippet>174</a>    <span class="doccomment">/// Schedule a full heap immix collection. This method is used by immix/genimmix/stickyimmix
-<a href=#175 id=175 data-nosnippet>175</a>    /// to schedule a full heap collection. A plan must call set_collection_kind and set_gc_status before this method.
-<a href=#176 id=176 data-nosnippet>176</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>schedule_immix_full_heap_collection&lt;
-<a href=#177 id=177 data-nosnippet>177</a>        PlanType: Plan&lt;VM = VM&gt;,
-<a href=#178 id=178 data-nosnippet>178</a>        FastContext: GCWorkContext&lt;VM = VM, PlanType = PlanType&gt;,
-<a href=#179 id=179 data-nosnippet>179</a>        DefragContext: GCWorkContext&lt;VM = VM, PlanType = PlanType&gt;,
-<a href=#180 id=180 data-nosnippet>180</a>    &gt;(
-<a href=#181 id=181 data-nosnippet>181</a>        plan: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>DefragContext::PlanType,
-<a href=#182 id=182 data-nosnippet>182</a>        immix_space: <span class="kw-2">&amp;</span>ImmixSpace&lt;VM&gt;,
-<a href=#183 id=183 data-nosnippet>183</a>        scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;,
-<a href=#184 id=184 data-nosnippet>184</a>    ) {
-<a href=#185 id=185 data-nosnippet>185</a>        <span class="kw">let </span>in_defrag = immix_space.decide_whether_to_defrag(
-<a href=#186 id=186 data-nosnippet>186</a>            plan.base().global_state.is_emergency_collection(),
-<a href=#187 id=187 data-nosnippet>187</a>            <span class="bool-val">true</span>,
-<a href=#188 id=188 data-nosnippet>188</a>            plan.base()
-<a href=#189 id=189 data-nosnippet>189</a>                .global_state
-<a href=#190 id=190 data-nosnippet>190</a>                .cur_collection_attempts
-<a href=#191 id=191 data-nosnippet>191</a>                .load(Ordering::SeqCst),
-<a href=#192 id=192 data-nosnippet>192</a>            plan.base().global_state.is_user_triggered_collection(),
-<a href=#193 id=193 data-nosnippet>193</a>            <span class="kw-2">*</span>plan.base().options.full_heap_system_gc,
-<a href=#194 id=194 data-nosnippet>194</a>        );
-<a href=#195 id=195 data-nosnippet>195</a>
-<a href=#196 id=196 data-nosnippet>196</a>        <span class="kw">if </span>in_defrag {
-<a href=#197 id=197 data-nosnippet>197</a>            scheduler.schedule_common_work::&lt;DefragContext&gt;(plan);
-<a href=#198 id=198 data-nosnippet>198</a>        } <span class="kw">else </span>{
-<a href=#199 id=199 data-nosnippet>199</a>            scheduler.schedule_common_work::&lt;FastContext&gt;(plan);
-<a href=#200 id=200 data-nosnippet>200</a>        }
+<a href=#167 id=167 data-nosnippet>167</a>        }
+<a href=#168 id=168 data-nosnippet>168</a>    }
+<a href=#169 id=169 data-nosnippet>169</a>
+<a href=#170 id=170 data-nosnippet>170</a>    <span class="doccomment">/// Schedule a full heap immix collection. This method is used by immix/genimmix/stickyimmix
+<a href=#171 id=171 data-nosnippet>171</a>    /// to schedule a full heap collection. A plan must call set_collection_kind and set_gc_status before this method.
+<a href=#172 id=172 data-nosnippet>172</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>schedule_immix_full_heap_collection&lt;
+<a href=#173 id=173 data-nosnippet>173</a>        PlanType: Plan&lt;VM = VM&gt;,
+<a href=#174 id=174 data-nosnippet>174</a>        FastContext: GCWorkContext&lt;VM = VM, PlanType = PlanType&gt;,
+<a href=#175 id=175 data-nosnippet>175</a>        DefragContext: GCWorkContext&lt;VM = VM, PlanType = PlanType&gt;,
+<a href=#176 id=176 data-nosnippet>176</a>    &gt;(
+<a href=#177 id=177 data-nosnippet>177</a>        plan: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>DefragContext::PlanType,
+<a href=#178 id=178 data-nosnippet>178</a>        immix_space: <span class="kw-2">&amp;</span>ImmixSpace&lt;VM&gt;,
+<a href=#179 id=179 data-nosnippet>179</a>        scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;,
+<a href=#180 id=180 data-nosnippet>180</a>    ) {
+<a href=#181 id=181 data-nosnippet>181</a>        <span class="kw">let </span>in_defrag = immix_space.decide_whether_to_defrag(
+<a href=#182 id=182 data-nosnippet>182</a>            plan.base().global_state.is_emergency_collection(),
+<a href=#183 id=183 data-nosnippet>183</a>            <span class="bool-val">true</span>,
+<a href=#184 id=184 data-nosnippet>184</a>            plan.base()
+<a href=#185 id=185 data-nosnippet>185</a>                .global_state
+<a href=#186 id=186 data-nosnippet>186</a>                .cur_collection_attempts
+<a href=#187 id=187 data-nosnippet>187</a>                .load(Ordering::SeqCst),
+<a href=#188 id=188 data-nosnippet>188</a>            plan.base().global_state.is_user_triggered_collection(),
+<a href=#189 id=189 data-nosnippet>189</a>            <span class="kw-2">*</span>plan.base().options.full_heap_system_gc,
+<a href=#190 id=190 data-nosnippet>190</a>        );
+<a href=#191 id=191 data-nosnippet>191</a>
+<a href=#192 id=192 data-nosnippet>192</a>        <span class="kw">if </span>in_defrag {
+<a href=#193 id=193 data-nosnippet>193</a>            scheduler.schedule_common_work::&lt;DefragContext&gt;(plan);
+<a href=#194 id=194 data-nosnippet>194</a>        } <span class="kw">else </span>{
+<a href=#195 id=195 data-nosnippet>195</a>            scheduler.schedule_common_work::&lt;FastContext&gt;(plan);
+<a href=#196 id=196 data-nosnippet>196</a>        }
+<a href=#197 id=197 data-nosnippet>197</a>    }
+<a href=#198 id=198 data-nosnippet>198</a>
+<a href=#199 id=199 data-nosnippet>199</a>    <span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plan) <span class="kw">fn </span>set_last_gc_was_defrag(<span class="kw-2">&amp;</span><span class="self">self</span>, defrag: bool, order: Ordering) {
+<a href=#200 id=200 data-nosnippet>200</a>        <span class="self">self</span>.last_gc_was_defrag.store(defrag, order)
 <a href=#201 id=201 data-nosnippet>201</a>    }
 <a href=#202 id=202 data-nosnippet>202</a>
-<a href=#203 id=203 data-nosnippet>203</a>    <span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plan) <span class="kw">fn </span>set_last_gc_was_defrag(<span class="kw-2">&amp;</span><span class="self">self</span>, defrag: bool, order: Ordering) {
-<a href=#204 id=204 data-nosnippet>204</a>        <span class="self">self</span>.last_gc_was_defrag.store(defrag, order)
-<a href=#205 id=205 data-nosnippet>205</a>    }
-<a href=#206 id=206 data-nosnippet>206</a>
-<a href=#207 id=207 data-nosnippet>207</a>    <span class="doccomment">/// Prepare with unlog-bit operation.
-<a href=#208 id=208 data-nosnippet>208</a>    /// Some Immix-derived plans may need to set/clear unlog bits when preparing.
-<a href=#209 id=209 data-nosnippet>209</a>    </span><span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plan) <span class="kw">fn </span>prepare_inner(
-<a href=#210 id=210 data-nosnippet>210</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-<a href=#211 id=211 data-nosnippet>211</a>        tls: VMWorkerThread,
-<a href=#212 id=212 data-nosnippet>212</a>        unlog_bits_op: UnlogBitsOperation,
-<a href=#213 id=213 data-nosnippet>213</a>    ) {
-<a href=#214 id=214 data-nosnippet>214</a>        <span class="self">self</span>.common.prepare(tls, <span class="bool-val">true</span>);
-<a href=#215 id=215 data-nosnippet>215</a>        <span class="self">self</span>.immix_space.prepare(
-<a href=#216 id=216 data-nosnippet>216</a>            <span class="bool-val">true</span>,
-<a href=#217 id=217 data-nosnippet>217</a>            <span class="prelude-val">Some</span>(<span class="kw">crate</span>::policy::immix::defrag::StatsForDefrag::new(<span class="self">self</span>)),
-<a href=#218 id=218 data-nosnippet>218</a>            unlog_bits_op,
-<a href=#219 id=219 data-nosnippet>219</a>        );
-<a href=#220 id=220 data-nosnippet>220</a>    }
-<a href=#221 id=221 data-nosnippet>221</a>
-<a href=#222 id=222 data-nosnippet>222</a>    <span class="doccomment">/// Release with unlog-bit operation.
-<a href=#223 id=223 data-nosnippet>223</a>    /// Some Immix-derived plans may need to set/clear unlog bits when releasing.
-<a href=#224 id=224 data-nosnippet>224</a>    </span><span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plan) <span class="kw">fn </span>release_inner(
-<a href=#225 id=225 data-nosnippet>225</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-<a href=#226 id=226 data-nosnippet>226</a>        tls: VMWorkerThread,
-<a href=#227 id=227 data-nosnippet>227</a>        unlog_bits_op: UnlogBitsOperation,
-<a href=#228 id=228 data-nosnippet>228</a>    ) {
-<a href=#229 id=229 data-nosnippet>229</a>        <span class="self">self</span>.common.release(tls, <span class="bool-val">true</span>);
-<a href=#230 id=230 data-nosnippet>230</a>        <span class="comment">// release the collected region
-<a href=#231 id=231 data-nosnippet>231</a>        </span><span class="self">self</span>.immix_space.release(<span class="bool-val">true</span>, unlog_bits_op);
-<a href=#232 id=232 data-nosnippet>232</a>    }
-<a href=#233 id=233 data-nosnippet>233</a>}</code></pre></div></section></main></body></html>
+<a href=#203 id=203 data-nosnippet>203</a>    <span class="doccomment">/// Prepare with unlog-bit operation.
+<a href=#204 id=204 data-nosnippet>204</a>    /// Some Immix-derived plans may need to set/clear unlog bits when preparing.
+<a href=#205 id=205 data-nosnippet>205</a>    </span><span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plan) <span class="kw">fn </span>prepare_inner(
+<a href=#206 id=206 data-nosnippet>206</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+<a href=#207 id=207 data-nosnippet>207</a>        tls: VMWorkerThread,
+<a href=#208 id=208 data-nosnippet>208</a>        unlog_bits_op: UnlogBitsOperation,
+<a href=#209 id=209 data-nosnippet>209</a>    ) {
+<a href=#210 id=210 data-nosnippet>210</a>        <span class="self">self</span>.common.prepare(tls, <span class="bool-val">true</span>);
+<a href=#211 id=211 data-nosnippet>211</a>        <span class="self">self</span>.immix_space.prepare(
+<a href=#212 id=212 data-nosnippet>212</a>            <span class="bool-val">true</span>,
+<a href=#213 id=213 data-nosnippet>213</a>            <span class="prelude-val">Some</span>(<span class="kw">crate</span>::policy::immix::defrag::StatsForDefrag::new(<span class="self">self</span>)),
+<a href=#214 id=214 data-nosnippet>214</a>            unlog_bits_op,
+<a href=#215 id=215 data-nosnippet>215</a>        );
+<a href=#216 id=216 data-nosnippet>216</a>    }
+<a href=#217 id=217 data-nosnippet>217</a>
+<a href=#218 id=218 data-nosnippet>218</a>    <span class="doccomment">/// Release with unlog-bit operation.
+<a href=#219 id=219 data-nosnippet>219</a>    /// Some Immix-derived plans may need to set/clear unlog bits when releasing.
+<a href=#220 id=220 data-nosnippet>220</a>    </span><span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plan) <span class="kw">fn </span>release_inner(
+<a href=#221 id=221 data-nosnippet>221</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+<a href=#222 id=222 data-nosnippet>222</a>        tls: VMWorkerThread,
+<a href=#223 id=223 data-nosnippet>223</a>        unlog_bits_op: UnlogBitsOperation,
+<a href=#224 id=224 data-nosnippet>224</a>    ) {
+<a href=#225 id=225 data-nosnippet>225</a>        <span class="self">self</span>.common.release(tls, <span class="bool-val">true</span>);
+<a href=#226 id=226 data-nosnippet>226</a>        <span class="comment">// release the collected region
+<a href=#227 id=227 data-nosnippet>227</a>        </span><span class="self">self</span>.immix_space.release(<span class="bool-val">true</span>, unlog_bits_op);
+<a href=#228 id=228 data-nosnippet>228</a>    }
+<a href=#229 id=229 data-nosnippet>229</a>}</code></pre></div></section></main></body></html>

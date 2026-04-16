@@ -70,167 +70,169 @@
 <a href=#70 id=70 data-nosnippet>70</a>
 <a href=#71 id=71 data-nosnippet>71</a><span class="doccomment">/// The base address for VO bit side metadata on 64 bits platforms.
 <a href=#72 id=72 data-nosnippet>72</a></span><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
-<a href=#73 id=73 data-nosnippet>73</a></span><span class="kw">pub const </span>VO_BIT_SIDE_METADATA_ADDR: Address = VO_BIT_SIDE_METADATA_SPEC.get_absolute_offset();
-<a href=#74 id=74 data-nosnippet>74</a>
-<a href=#75 id=75 data-nosnippet>75</a><span class="doccomment">/// Atomically set the VO bit for an object.
-<a href=#76 id=76 data-nosnippet>76</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>set_vo_bit(object: ObjectReference) {
-<a href=#77 id=77 data-nosnippet>77</a>    <span class="macro">debug_assert!</span>(!is_vo_bit_set(object), <span class="string">"{:x}: VO bit already set"</span>, object);
-<a href=#78 id=78 data-nosnippet>78</a>    VO_BIT_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_raw_address(), <span class="number">1</span>, Ordering::SeqCst);
-<a href=#79 id=79 data-nosnippet>79</a>}
-<a href=#80 id=80 data-nosnippet>80</a>
-<a href=#81 id=81 data-nosnippet>81</a><span class="doccomment">/// Atomically unset the VO bit for an object.
-<a href=#82 id=82 data-nosnippet>82</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>unset_vo_bit(object: ObjectReference) {
-<a href=#83 id=83 data-nosnippet>83</a>    <span class="macro">debug_assert!</span>(is_vo_bit_set(object), <span class="string">"{:x}: VO bit not set"</span>, object);
-<a href=#84 id=84 data-nosnippet>84</a>    VO_BIT_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_raw_address(), <span class="number">0</span>, Ordering::SeqCst);
-<a href=#85 id=85 data-nosnippet>85</a>}
-<a href=#86 id=86 data-nosnippet>86</a>
-<a href=#87 id=87 data-nosnippet>87</a><span class="doccomment">/// Atomically unset the VO bit for an object, regardless whether the bit is set or not.
-<a href=#88 id=88 data-nosnippet>88</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>unset_vo_bit_nocheck(object: ObjectReference) {
-<a href=#89 id=89 data-nosnippet>89</a>    VO_BIT_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_raw_address(), <span class="number">0</span>, Ordering::SeqCst);
-<a href=#90 id=90 data-nosnippet>90</a>}
-<a href=#91 id=91 data-nosnippet>91</a>
-<a href=#92 id=92 data-nosnippet>92</a><span class="doccomment">/// Non-atomically unset the VO bit for an object. The caller needs to ensure the side
-<a href=#93 id=93 data-nosnippet>93</a>/// metadata for the VO bit for the object is accessed by only one thread.
-<a href=#94 id=94 data-nosnippet>94</a>///
-<a href=#95 id=95 data-nosnippet>95</a>/// # Safety
+<a href=#73 id=73 data-nosnippet>73</a></span><span class="kw">pub fn </span>vo_bit_side_metadata_addr() -&gt; Address {
+<a href=#74 id=74 data-nosnippet>74</a>    VO_BIT_SIDE_METADATA_SPEC.get_starting_address()
+<a href=#75 id=75 data-nosnippet>75</a>}
+<a href=#76 id=76 data-nosnippet>76</a>
+<a href=#77 id=77 data-nosnippet>77</a><span class="doccomment">/// Atomically set the VO bit for an object.
+<a href=#78 id=78 data-nosnippet>78</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>set_vo_bit(object: ObjectReference) {
+<a href=#79 id=79 data-nosnippet>79</a>    <span class="macro">debug_assert!</span>(!is_vo_bit_set(object), <span class="string">"{:x}: VO bit already set"</span>, object);
+<a href=#80 id=80 data-nosnippet>80</a>    VO_BIT_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_raw_address(), <span class="number">1</span>, Ordering::SeqCst);
+<a href=#81 id=81 data-nosnippet>81</a>}
+<a href=#82 id=82 data-nosnippet>82</a>
+<a href=#83 id=83 data-nosnippet>83</a><span class="doccomment">/// Atomically unset the VO bit for an object.
+<a href=#84 id=84 data-nosnippet>84</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>unset_vo_bit(object: ObjectReference) {
+<a href=#85 id=85 data-nosnippet>85</a>    <span class="macro">debug_assert!</span>(is_vo_bit_set(object), <span class="string">"{:x}: VO bit not set"</span>, object);
+<a href=#86 id=86 data-nosnippet>86</a>    VO_BIT_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_raw_address(), <span class="number">0</span>, Ordering::SeqCst);
+<a href=#87 id=87 data-nosnippet>87</a>}
+<a href=#88 id=88 data-nosnippet>88</a>
+<a href=#89 id=89 data-nosnippet>89</a><span class="doccomment">/// Atomically unset the VO bit for an object, regardless whether the bit is set or not.
+<a href=#90 id=90 data-nosnippet>90</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>unset_vo_bit_nocheck(object: ObjectReference) {
+<a href=#91 id=91 data-nosnippet>91</a>    VO_BIT_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_raw_address(), <span class="number">0</span>, Ordering::SeqCst);
+<a href=#92 id=92 data-nosnippet>92</a>}
+<a href=#93 id=93 data-nosnippet>93</a>
+<a href=#94 id=94 data-nosnippet>94</a><span class="doccomment">/// Non-atomically unset the VO bit for an object. The caller needs to ensure the side
+<a href=#95 id=95 data-nosnippet>95</a>/// metadata for the VO bit for the object is accessed by only one thread.
 <a href=#96 id=96 data-nosnippet>96</a>///
-<a href=#97 id=97 data-nosnippet>97</a>/// This is unsafe: check the comment on `side_metadata::store`
-<a href=#98 id=98 data-nosnippet>98</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">unsafe fn </span>unset_vo_bit_unsafe(object: ObjectReference) {
-<a href=#99 id=99 data-nosnippet>99</a>    <span class="macro">debug_assert!</span>(is_vo_bit_set(object), <span class="string">"{:x}: VO bit not set"</span>, object);
-<a href=#100 id=100 data-nosnippet>100</a>    VO_BIT_SIDE_METADATA_SPEC.store::&lt;u8&gt;(object.to_raw_address(), <span class="number">0</span>);
-<a href=#101 id=101 data-nosnippet>101</a>}
-<a href=#102 id=102 data-nosnippet>102</a>
-<a href=#103 id=103 data-nosnippet>103</a><span class="doccomment">/// Check if the VO bit is set for an object.
-<a href=#104 id=104 data-nosnippet>104</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_vo_bit_set(object: ObjectReference) -&gt; bool {
-<a href=#105 id=105 data-nosnippet>105</a>    VO_BIT_SIDE_METADATA_SPEC.load_atomic::&lt;u8&gt;(object.to_raw_address(), Ordering::SeqCst) == <span class="number">1
-<a href=#106 id=106 data-nosnippet>106</a></span>}
-<a href=#107 id=107 data-nosnippet>107</a>
-<a href=#108 id=108 data-nosnippet>108</a><span class="doccomment">/// Check if an address can be turned directly into an object reference using the VO bit.
-<a href=#109 id=109 data-nosnippet>109</a>/// If so, return `Some(object)`. Otherwise return `None`.
-<a href=#110 id=110 data-nosnippet>110</a>///
-<a href=#111 id=111 data-nosnippet>111</a>/// The `address` must be word-aligned.
-<a href=#112 id=112 data-nosnippet>112</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_vo_bit_set_for_addr(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-<a href=#113 id=113 data-nosnippet>113</a>    is_vo_bit_set_inner::&lt;<span class="bool-val">true</span>&gt;(address)
-<a href=#114 id=114 data-nosnippet>114</a>}
-<a href=#115 id=115 data-nosnippet>115</a>
-<a href=#116 id=116 data-nosnippet>116</a><span class="doccomment">/// Check if an address can be turned directly into an object reference using the VO bit.
-<a href=#117 id=117 data-nosnippet>117</a>/// If so, return `Some(object)`. Otherwise return `None`. The caller needs to ensure the side
-<a href=#118 id=118 data-nosnippet>118</a>/// metadata for the VO bit for the object is accessed by only one thread.
-<a href=#119 id=119 data-nosnippet>119</a>///
-<a href=#120 id=120 data-nosnippet>120</a>/// The `address` must be word-aligned.
+<a href=#97 id=97 data-nosnippet>97</a>/// # Safety
+<a href=#98 id=98 data-nosnippet>98</a>///
+<a href=#99 id=99 data-nosnippet>99</a>/// This is unsafe: check the comment on `side_metadata::store`
+<a href=#100 id=100 data-nosnippet>100</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">unsafe fn </span>unset_vo_bit_unsafe(object: ObjectReference) {
+<a href=#101 id=101 data-nosnippet>101</a>    <span class="macro">debug_assert!</span>(is_vo_bit_set(object), <span class="string">"{:x}: VO bit not set"</span>, object);
+<a href=#102 id=102 data-nosnippet>102</a>    VO_BIT_SIDE_METADATA_SPEC.store::&lt;u8&gt;(object.to_raw_address(), <span class="number">0</span>);
+<a href=#103 id=103 data-nosnippet>103</a>}
+<a href=#104 id=104 data-nosnippet>104</a>
+<a href=#105 id=105 data-nosnippet>105</a><span class="doccomment">/// Check if the VO bit is set for an object.
+<a href=#106 id=106 data-nosnippet>106</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_vo_bit_set(object: ObjectReference) -&gt; bool {
+<a href=#107 id=107 data-nosnippet>107</a>    VO_BIT_SIDE_METADATA_SPEC.load_atomic::&lt;u8&gt;(object.to_raw_address(), Ordering::SeqCst) == <span class="number">1
+<a href=#108 id=108 data-nosnippet>108</a></span>}
+<a href=#109 id=109 data-nosnippet>109</a>
+<a href=#110 id=110 data-nosnippet>110</a><span class="doccomment">/// Check if an address can be turned directly into an object reference using the VO bit.
+<a href=#111 id=111 data-nosnippet>111</a>/// If so, return `Some(object)`. Otherwise return `None`.
+<a href=#112 id=112 data-nosnippet>112</a>///
+<a href=#113 id=113 data-nosnippet>113</a>/// The `address` must be word-aligned.
+<a href=#114 id=114 data-nosnippet>114</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_vo_bit_set_for_addr(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+<a href=#115 id=115 data-nosnippet>115</a>    is_vo_bit_set_inner::&lt;<span class="bool-val">true</span>&gt;(address)
+<a href=#116 id=116 data-nosnippet>116</a>}
+<a href=#117 id=117 data-nosnippet>117</a>
+<a href=#118 id=118 data-nosnippet>118</a><span class="doccomment">/// Check if an address can be turned directly into an object reference using the VO bit.
+<a href=#119 id=119 data-nosnippet>119</a>/// If so, return `Some(object)`. Otherwise return `None`. The caller needs to ensure the side
+<a href=#120 id=120 data-nosnippet>120</a>/// metadata for the VO bit for the object is accessed by only one thread.
 <a href=#121 id=121 data-nosnippet>121</a>///
-<a href=#122 id=122 data-nosnippet>122</a>/// # Safety
+<a href=#122 id=122 data-nosnippet>122</a>/// The `address` must be word-aligned.
 <a href=#123 id=123 data-nosnippet>123</a>///
-<a href=#124 id=124 data-nosnippet>124</a>/// This is unsafe: check the comment on `side_metadata::load`
-<a href=#125 id=125 data-nosnippet>125</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">unsafe fn </span>is_vo_bit_set_unsafe(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-<a href=#126 id=126 data-nosnippet>126</a>    is_vo_bit_set_inner::&lt;<span class="bool-val">false</span>&gt;(address)
-<a href=#127 id=127 data-nosnippet>127</a>}
-<a href=#128 id=128 data-nosnippet>128</a>
-<a href=#129 id=129 data-nosnippet>129</a><span class="kw">fn </span>is_vo_bit_set_inner&lt;<span class="kw">const </span>ATOMIC: bool&gt;(addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-<a href=#130 id=130 data-nosnippet>130</a>    <span class="macro">debug_assert!</span>(
-<a href=#131 id=131 data-nosnippet>131</a>        addr.is_aligned_to(ObjectReference::ALIGNMENT),
-<a href=#132 id=132 data-nosnippet>132</a>        <span class="string">"Address is not word-aligned: {addr}"
-<a href=#133 id=133 data-nosnippet>133</a>    </span>);
-<a href=#134 id=134 data-nosnippet>134</a>
-<a href=#135 id=135 data-nosnippet>135</a>    <span class="comment">// If we haven't mapped VO bit for the address, it cannot be an object
-<a href=#136 id=136 data-nosnippet>136</a>    </span><span class="kw">if </span>!VO_BIT_SIDE_METADATA_SPEC.is_mapped(addr) {
-<a href=#137 id=137 data-nosnippet>137</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
-<a href=#138 id=138 data-nosnippet>138</a>    }
-<a href=#139 id=139 data-nosnippet>139</a>
-<a href=#140 id=140 data-nosnippet>140</a>    <span class="kw">let </span>vo_bit = <span class="kw">if </span>ATOMIC {
-<a href=#141 id=141 data-nosnippet>141</a>        VO_BIT_SIDE_METADATA_SPEC.load_atomic::&lt;u8&gt;(addr, Ordering::SeqCst)
-<a href=#142 id=142 data-nosnippet>142</a>    } <span class="kw">else </span>{
-<a href=#143 id=143 data-nosnippet>143</a>        <span class="kw">unsafe </span>{ VO_BIT_SIDE_METADATA_SPEC.load::&lt;u8&gt;(addr) }
-<a href=#144 id=144 data-nosnippet>144</a>    };
-<a href=#145 id=145 data-nosnippet>145</a>
-<a href=#146 id=146 data-nosnippet>146</a>    (vo_bit == <span class="number">1</span>).then(|| get_object_ref_for_vo_addr(addr))
-<a href=#147 id=147 data-nosnippet>147</a>}
-<a href=#148 id=148 data-nosnippet>148</a>
-<a href=#149 id=149 data-nosnippet>149</a><span class="doccomment">/// Bulk zero the VO bit.
-<a href=#150 id=150 data-nosnippet>150</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>bzero_vo_bit(start: Address, size: usize) {
-<a href=#151 id=151 data-nosnippet>151</a>    VO_BIT_SIDE_METADATA_SPEC.bzero_metadata(start, size);
-<a href=#152 id=152 data-nosnippet>152</a>}
-<a href=#153 id=153 data-nosnippet>153</a>
-<a href=#154 id=154 data-nosnippet>154</a><span class="doccomment">/// Bulk copy VO bits from side mark bits.
-<a href=#155 id=155 data-nosnippet>155</a>/// Some VMs require the VO bits to be available during tracing.
-<a href=#156 id=156 data-nosnippet>156</a>/// However, some GC algorithms (such as Immix) cannot clear VO bits for dead objects only.
-<a href=#157 id=157 data-nosnippet>157</a>/// As an alternative, this function copies the mark bits metadata to VO bits.
-<a href=#158 id=158 data-nosnippet>158</a>/// The caller needs to ensure the mark bits are set exactly wherever VO bits need to be set before
-<a href=#159 id=159 data-nosnippet>159</a>/// calling this function.
-<a href=#160 id=160 data-nosnippet>160</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>bcopy_vo_bit_from_mark_bit&lt;VM: VMBinding&gt;(start: Address, size: usize) {
-<a href=#161 id=161 data-nosnippet>161</a>    <span class="kw">let </span>mark_bit_spec = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC;
-<a href=#162 id=162 data-nosnippet>162</a>    <span class="macro">debug_assert!</span>(
-<a href=#163 id=163 data-nosnippet>163</a>        mark_bit_spec.is_on_side(),
-<a href=#164 id=164 data-nosnippet>164</a>        <span class="string">"bcopy_vo_bit_from_mark_bits can only be used with on-the-side mark bits."
-<a href=#165 id=165 data-nosnippet>165</a>    </span>);
-<a href=#166 id=166 data-nosnippet>166</a>    <span class="kw">let </span>side_mark_bit_spec = mark_bit_spec.extract_side_spec();
-<a href=#167 id=167 data-nosnippet>167</a>    VO_BIT_SIDE_METADATA_SPEC.bcopy_metadata_contiguous(start, size, side_mark_bit_spec);
-<a href=#168 id=168 data-nosnippet>168</a>}
-<a href=#169 id=169 data-nosnippet>169</a>
-<a href=#170 id=170 data-nosnippet>170</a><span class="kw">use </span><span class="kw">crate</span>::util::constants::{LOG_BITS_IN_BYTE, LOG_BYTES_IN_ADDRESS};
+<a href=#124 id=124 data-nosnippet>124</a>/// # Safety
+<a href=#125 id=125 data-nosnippet>125</a>///
+<a href=#126 id=126 data-nosnippet>126</a>/// This is unsafe: check the comment on `side_metadata::load`
+<a href=#127 id=127 data-nosnippet>127</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">unsafe fn </span>is_vo_bit_set_unsafe(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+<a href=#128 id=128 data-nosnippet>128</a>    is_vo_bit_set_inner::&lt;<span class="bool-val">false</span>&gt;(address)
+<a href=#129 id=129 data-nosnippet>129</a>}
+<a href=#130 id=130 data-nosnippet>130</a>
+<a href=#131 id=131 data-nosnippet>131</a><span class="kw">fn </span>is_vo_bit_set_inner&lt;<span class="kw">const </span>ATOMIC: bool&gt;(addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+<a href=#132 id=132 data-nosnippet>132</a>    <span class="macro">debug_assert!</span>(
+<a href=#133 id=133 data-nosnippet>133</a>        addr.is_aligned_to(ObjectReference::ALIGNMENT),
+<a href=#134 id=134 data-nosnippet>134</a>        <span class="string">"Address is not word-aligned: {addr}"
+<a href=#135 id=135 data-nosnippet>135</a>    </span>);
+<a href=#136 id=136 data-nosnippet>136</a>
+<a href=#137 id=137 data-nosnippet>137</a>    <span class="comment">// If we haven't mapped VO bit for the address, it cannot be an object
+<a href=#138 id=138 data-nosnippet>138</a>    </span><span class="kw">if </span>!VO_BIT_SIDE_METADATA_SPEC.is_mapped(addr) {
+<a href=#139 id=139 data-nosnippet>139</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
+<a href=#140 id=140 data-nosnippet>140</a>    }
+<a href=#141 id=141 data-nosnippet>141</a>
+<a href=#142 id=142 data-nosnippet>142</a>    <span class="kw">let </span>vo_bit = <span class="kw">if </span>ATOMIC {
+<a href=#143 id=143 data-nosnippet>143</a>        VO_BIT_SIDE_METADATA_SPEC.load_atomic::&lt;u8&gt;(addr, Ordering::SeqCst)
+<a href=#144 id=144 data-nosnippet>144</a>    } <span class="kw">else </span>{
+<a href=#145 id=145 data-nosnippet>145</a>        <span class="kw">unsafe </span>{ VO_BIT_SIDE_METADATA_SPEC.load::&lt;u8&gt;(addr) }
+<a href=#146 id=146 data-nosnippet>146</a>    };
+<a href=#147 id=147 data-nosnippet>147</a>
+<a href=#148 id=148 data-nosnippet>148</a>    (vo_bit == <span class="number">1</span>).then(|| get_object_ref_for_vo_addr(addr))
+<a href=#149 id=149 data-nosnippet>149</a>}
+<a href=#150 id=150 data-nosnippet>150</a>
+<a href=#151 id=151 data-nosnippet>151</a><span class="doccomment">/// Bulk zero the VO bit.
+<a href=#152 id=152 data-nosnippet>152</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>bzero_vo_bit(start: Address, size: usize) {
+<a href=#153 id=153 data-nosnippet>153</a>    VO_BIT_SIDE_METADATA_SPEC.bzero_metadata(start, size);
+<a href=#154 id=154 data-nosnippet>154</a>}
+<a href=#155 id=155 data-nosnippet>155</a>
+<a href=#156 id=156 data-nosnippet>156</a><span class="doccomment">/// Bulk copy VO bits from side mark bits.
+<a href=#157 id=157 data-nosnippet>157</a>/// Some VMs require the VO bits to be available during tracing.
+<a href=#158 id=158 data-nosnippet>158</a>/// However, some GC algorithms (such as Immix) cannot clear VO bits for dead objects only.
+<a href=#159 id=159 data-nosnippet>159</a>/// As an alternative, this function copies the mark bits metadata to VO bits.
+<a href=#160 id=160 data-nosnippet>160</a>/// The caller needs to ensure the mark bits are set exactly wherever VO bits need to be set before
+<a href=#161 id=161 data-nosnippet>161</a>/// calling this function.
+<a href=#162 id=162 data-nosnippet>162</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>bcopy_vo_bit_from_mark_bit&lt;VM: VMBinding&gt;(start: Address, size: usize) {
+<a href=#163 id=163 data-nosnippet>163</a>    <span class="kw">let </span>mark_bit_spec = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC;
+<a href=#164 id=164 data-nosnippet>164</a>    <span class="macro">debug_assert!</span>(
+<a href=#165 id=165 data-nosnippet>165</a>        mark_bit_spec.is_on_side(),
+<a href=#166 id=166 data-nosnippet>166</a>        <span class="string">"bcopy_vo_bit_from_mark_bits can only be used with on-the-side mark bits."
+<a href=#167 id=167 data-nosnippet>167</a>    </span>);
+<a href=#168 id=168 data-nosnippet>168</a>    <span class="kw">let </span>side_mark_bit_spec = mark_bit_spec.extract_side_spec();
+<a href=#169 id=169 data-nosnippet>169</a>    VO_BIT_SIDE_METADATA_SPEC.bcopy_metadata_contiguous(start, size, side_mark_bit_spec);
+<a href=#170 id=170 data-nosnippet>170</a>}
 <a href=#171 id=171 data-nosnippet>171</a>
-<a href=#172 id=172 data-nosnippet>172</a><span class="doccomment">/// How many data memory bytes does 1 word in the VO bit side metadata represents?
-<a href=#173 id=173 data-nosnippet>173</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>VO_BIT_WORD_TO_REGION: usize = <span class="number">1
-<a href=#174 id=174 data-nosnippet>174</a>    </span>&lt;&lt; (VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region
-<a href=#175 id=175 data-nosnippet>175</a>        + LOG_BITS_IN_BYTE <span class="kw">as </span>usize
-<a href=#176 id=176 data-nosnippet>176</a>        + LOG_BYTES_IN_ADDRESS <span class="kw">as </span>usize
-<a href=#177 id=177 data-nosnippet>177</a>        - VO_BIT_SIDE_METADATA_SPEC.log_num_of_bits);
-<a href=#178 id=178 data-nosnippet>178</a>
-<a href=#179 id=179 data-nosnippet>179</a><span class="doccomment">/// Bulk check if a VO bit word. Return true if there is any bit set in the word.
-<a href=#180 id=180 data-nosnippet>180</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_raw_vo_bit_word(addr: Address) -&gt; usize {
-<a href=#181 id=181 data-nosnippet>181</a>    <span class="kw">unsafe </span>{ VO_BIT_SIDE_METADATA_SPEC.load_raw_word(addr) }
-<a href=#182 id=182 data-nosnippet>182</a>}
-<a href=#183 id=183 data-nosnippet>183</a>
-<a href=#184 id=184 data-nosnippet>184</a><span class="doccomment">/// Find the base reference to the object from a potential internal pointer.
-<a href=#185 id=185 data-nosnippet>185</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>find_object_from_internal_pointer&lt;VM: VMBinding&gt;(
-<a href=#186 id=186 data-nosnippet>186</a>    start: Address,
-<a href=#187 id=187 data-nosnippet>187</a>    search_limit_bytes: usize,
-<a href=#188 id=188 data-nosnippet>188</a>) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-<a href=#189 id=189 data-nosnippet>189</a>    <span class="kw">if </span>!start.is_mapped() {
-<a href=#190 id=190 data-nosnippet>190</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
-<a href=#191 id=191 data-nosnippet>191</a>    }
-<a href=#192 id=192 data-nosnippet>192</a>
-<a href=#193 id=193 data-nosnippet>193</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>(vo_addr) = <span class="kw">unsafe </span>{
-<a href=#194 id=194 data-nosnippet>194</a>        VO_BIT_SIDE_METADATA_SPEC.find_prev_non_zero_value::&lt;u8&gt;(start, search_limit_bytes)
-<a href=#195 id=195 data-nosnippet>195</a>    } {
-<a href=#196 id=196 data-nosnippet>196</a>        is_internal_ptr_from_vo_bit::&lt;VM&gt;(vo_addr, start)
-<a href=#197 id=197 data-nosnippet>197</a>    } <span class="kw">else </span>{
-<a href=#198 id=198 data-nosnippet>198</a>        <span class="prelude-val">None
-<a href=#199 id=199 data-nosnippet>199</a>    </span>}
-<a href=#200 id=200 data-nosnippet>200</a>}
-<a href=#201 id=201 data-nosnippet>201</a>
-<a href=#202 id=202 data-nosnippet>202</a><span class="doccomment">/// Get the object reference from an aligned address where VO bit is set.
-<a href=#203 id=203 data-nosnippet>203</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_object_ref_for_vo_addr(vo_addr: Address) -&gt; ObjectReference {
-<a href=#204 id=204 data-nosnippet>204</a>    <span class="comment">// VO bit should be set on the address.
-<a href=#205 id=205 data-nosnippet>205</a>    </span><span class="macro">debug_assert!</span>(vo_addr.is_aligned_to(ObjectReference::ALIGNMENT));
-<a href=#206 id=206 data-nosnippet>206</a>    <span class="macro">debug_assert!</span>(<span class="kw">unsafe </span>{ is_vo_addr(vo_addr) });
-<a href=#207 id=207 data-nosnippet>207</a>    <span class="kw">unsafe </span>{ ObjectReference::from_raw_address_unchecked(vo_addr) }
-<a href=#208 id=208 data-nosnippet>208</a>}
-<a href=#209 id=209 data-nosnippet>209</a>
-<a href=#210 id=210 data-nosnippet>210</a><span class="doccomment">/// Check if the address could be an internal pointer in the object.
-<a href=#211 id=211 data-nosnippet>211</a></span><span class="kw">fn </span>is_internal_ptr&lt;VM: VMBinding&gt;(obj: ObjectReference, internal_ptr: Address) -&gt; bool {
-<a href=#212 id=212 data-nosnippet>212</a>    <span class="kw">let </span>obj_start = obj.to_object_start::&lt;VM&gt;();
-<a href=#213 id=213 data-nosnippet>213</a>    <span class="kw">let </span>obj_size = VM::VMObjectModel::get_current_size(obj);
-<a href=#214 id=214 data-nosnippet>214</a>    internal_ptr &lt; obj_start + obj_size
-<a href=#215 id=215 data-nosnippet>215</a>}
-<a href=#216 id=216 data-nosnippet>216</a>
-<a href=#217 id=217 data-nosnippet>217</a><span class="doccomment">/// Check if the address could be an internal pointer based on where VO bit is set.
-<a href=#218 id=218 data-nosnippet>218</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_internal_ptr_from_vo_bit&lt;VM: VMBinding&gt;(
-<a href=#219 id=219 data-nosnippet>219</a>    vo_addr: Address,
-<a href=#220 id=220 data-nosnippet>220</a>    internal_ptr: Address,
-<a href=#221 id=221 data-nosnippet>221</a>) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-<a href=#222 id=222 data-nosnippet>222</a>    <span class="kw">let </span>obj = get_object_ref_for_vo_addr(vo_addr);
-<a href=#223 id=223 data-nosnippet>223</a>    <span class="kw">if </span>is_internal_ptr::&lt;VM&gt;(obj, internal_ptr) {
-<a href=#224 id=224 data-nosnippet>224</a>        <span class="prelude-val">Some</span>(obj)
-<a href=#225 id=225 data-nosnippet>225</a>    } <span class="kw">else </span>{
-<a href=#226 id=226 data-nosnippet>226</a>        <span class="prelude-val">None
-<a href=#227 id=227 data-nosnippet>227</a>    </span>}
-<a href=#228 id=228 data-nosnippet>228</a>}
-<a href=#229 id=229 data-nosnippet>229</a>
-<a href=#230 id=230 data-nosnippet>230</a><span class="doccomment">/// Non-atomically check if the VO bit is set for this address.
-<a href=#231 id=231 data-nosnippet>231</a>///
-<a href=#232 id=232 data-nosnippet>232</a>/// # Safety
-<a href=#233 id=233 data-nosnippet>233</a>/// The caller needs to make sure that no one is modifying VO bit.
-<a href=#234 id=234 data-nosnippet>234</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">unsafe fn </span>is_vo_addr(addr: Address) -&gt; bool {
-<a href=#235 id=235 data-nosnippet>235</a>    VO_BIT_SIDE_METADATA_SPEC.load::&lt;u8&gt;(addr) != <span class="number">0
-<a href=#236 id=236 data-nosnippet>236</a></span>}</code></pre></div></section></main></body></html>
+<a href=#172 id=172 data-nosnippet>172</a><span class="kw">use </span><span class="kw">crate</span>::util::constants::{LOG_BITS_IN_BYTE, LOG_BYTES_IN_ADDRESS};
+<a href=#173 id=173 data-nosnippet>173</a>
+<a href=#174 id=174 data-nosnippet>174</a><span class="doccomment">/// How many data memory bytes does 1 word in the VO bit side metadata represents?
+<a href=#175 id=175 data-nosnippet>175</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>VO_BIT_WORD_TO_REGION: usize = <span class="number">1
+<a href=#176 id=176 data-nosnippet>176</a>    </span>&lt;&lt; (VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region
+<a href=#177 id=177 data-nosnippet>177</a>        + LOG_BITS_IN_BYTE <span class="kw">as </span>usize
+<a href=#178 id=178 data-nosnippet>178</a>        + LOG_BYTES_IN_ADDRESS <span class="kw">as </span>usize
+<a href=#179 id=179 data-nosnippet>179</a>        - VO_BIT_SIDE_METADATA_SPEC.log_num_of_bits);
+<a href=#180 id=180 data-nosnippet>180</a>
+<a href=#181 id=181 data-nosnippet>181</a><span class="doccomment">/// Bulk check if a VO bit word. Return true if there is any bit set in the word.
+<a href=#182 id=182 data-nosnippet>182</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_raw_vo_bit_word(addr: Address) -&gt; usize {
+<a href=#183 id=183 data-nosnippet>183</a>    <span class="kw">unsafe </span>{ VO_BIT_SIDE_METADATA_SPEC.load_raw_word(addr) }
+<a href=#184 id=184 data-nosnippet>184</a>}
+<a href=#185 id=185 data-nosnippet>185</a>
+<a href=#186 id=186 data-nosnippet>186</a><span class="doccomment">/// Find the base reference to the object from a potential internal pointer.
+<a href=#187 id=187 data-nosnippet>187</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>find_object_from_internal_pointer&lt;VM: VMBinding&gt;(
+<a href=#188 id=188 data-nosnippet>188</a>    start: Address,
+<a href=#189 id=189 data-nosnippet>189</a>    search_limit_bytes: usize,
+<a href=#190 id=190 data-nosnippet>190</a>) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+<a href=#191 id=191 data-nosnippet>191</a>    <span class="kw">if </span>!start.is_mapped() {
+<a href=#192 id=192 data-nosnippet>192</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
+<a href=#193 id=193 data-nosnippet>193</a>    }
+<a href=#194 id=194 data-nosnippet>194</a>
+<a href=#195 id=195 data-nosnippet>195</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>(vo_addr) = <span class="kw">unsafe </span>{
+<a href=#196 id=196 data-nosnippet>196</a>        VO_BIT_SIDE_METADATA_SPEC.find_prev_non_zero_value::&lt;u8&gt;(start, search_limit_bytes)
+<a href=#197 id=197 data-nosnippet>197</a>    } {
+<a href=#198 id=198 data-nosnippet>198</a>        is_internal_ptr_from_vo_bit::&lt;VM&gt;(vo_addr, start)
+<a href=#199 id=199 data-nosnippet>199</a>    } <span class="kw">else </span>{
+<a href=#200 id=200 data-nosnippet>200</a>        <span class="prelude-val">None
+<a href=#201 id=201 data-nosnippet>201</a>    </span>}
+<a href=#202 id=202 data-nosnippet>202</a>}
+<a href=#203 id=203 data-nosnippet>203</a>
+<a href=#204 id=204 data-nosnippet>204</a><span class="doccomment">/// Get the object reference from an aligned address where VO bit is set.
+<a href=#205 id=205 data-nosnippet>205</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_object_ref_for_vo_addr(vo_addr: Address) -&gt; ObjectReference {
+<a href=#206 id=206 data-nosnippet>206</a>    <span class="comment">// VO bit should be set on the address.
+<a href=#207 id=207 data-nosnippet>207</a>    </span><span class="macro">debug_assert!</span>(vo_addr.is_aligned_to(ObjectReference::ALIGNMENT));
+<a href=#208 id=208 data-nosnippet>208</a>    <span class="macro">debug_assert!</span>(<span class="kw">unsafe </span>{ is_vo_addr(vo_addr) });
+<a href=#209 id=209 data-nosnippet>209</a>    <span class="kw">unsafe </span>{ ObjectReference::from_raw_address_unchecked(vo_addr) }
+<a href=#210 id=210 data-nosnippet>210</a>}
+<a href=#211 id=211 data-nosnippet>211</a>
+<a href=#212 id=212 data-nosnippet>212</a><span class="doccomment">/// Check if the address could be an internal pointer in the object.
+<a href=#213 id=213 data-nosnippet>213</a></span><span class="kw">fn </span>is_internal_ptr&lt;VM: VMBinding&gt;(obj: ObjectReference, internal_ptr: Address) -&gt; bool {
+<a href=#214 id=214 data-nosnippet>214</a>    <span class="kw">let </span>obj_start = obj.to_object_start::&lt;VM&gt;();
+<a href=#215 id=215 data-nosnippet>215</a>    <span class="kw">let </span>obj_size = VM::VMObjectModel::get_current_size(obj);
+<a href=#216 id=216 data-nosnippet>216</a>    internal_ptr &lt; obj_start + obj_size
+<a href=#217 id=217 data-nosnippet>217</a>}
+<a href=#218 id=218 data-nosnippet>218</a>
+<a href=#219 id=219 data-nosnippet>219</a><span class="doccomment">/// Check if the address could be an internal pointer based on where VO bit is set.
+<a href=#220 id=220 data-nosnippet>220</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_internal_ptr_from_vo_bit&lt;VM: VMBinding&gt;(
+<a href=#221 id=221 data-nosnippet>221</a>    vo_addr: Address,
+<a href=#222 id=222 data-nosnippet>222</a>    internal_ptr: Address,
+<a href=#223 id=223 data-nosnippet>223</a>) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+<a href=#224 id=224 data-nosnippet>224</a>    <span class="kw">let </span>obj = get_object_ref_for_vo_addr(vo_addr);
+<a href=#225 id=225 data-nosnippet>225</a>    <span class="kw">if </span>is_internal_ptr::&lt;VM&gt;(obj, internal_ptr) {
+<a href=#226 id=226 data-nosnippet>226</a>        <span class="prelude-val">Some</span>(obj)
+<a href=#227 id=227 data-nosnippet>227</a>    } <span class="kw">else </span>{
+<a href=#228 id=228 data-nosnippet>228</a>        <span class="prelude-val">None
+<a href=#229 id=229 data-nosnippet>229</a>    </span>}
+<a href=#230 id=230 data-nosnippet>230</a>}
+<a href=#231 id=231 data-nosnippet>231</a>
+<a href=#232 id=232 data-nosnippet>232</a><span class="doccomment">/// Non-atomically check if the VO bit is set for this address.
+<a href=#233 id=233 data-nosnippet>233</a>///
+<a href=#234 id=234 data-nosnippet>234</a>/// # Safety
+<a href=#235 id=235 data-nosnippet>235</a>/// The caller needs to make sure that no one is modifying VO bit.
+<a href=#236 id=236 data-nosnippet>236</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">unsafe fn </span>is_vo_addr(addr: Address) -&gt; bool {
+<a href=#237 id=237 data-nosnippet>237</a>    VO_BIT_SIDE_METADATA_SPEC.load::&lt;u8&gt;(addr) != <span class="number">0
+<a href=#238 id=238 data-nosnippet>238</a></span>}</code></pre></div></section></main></body></html>
