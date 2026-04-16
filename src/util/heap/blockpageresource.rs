@@ -1,4 +1,3 @@
-use super::chunk_map::Chunk;
 use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::{FreeListPageResource, PageResource};
 use crate::util::address::Address;
@@ -11,23 +10,23 @@ use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::*;
 use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::vm::*;
-use atomic::{Atomic, Ordering};
-use crossbeam::queue::SegQueue;
+use atomic::Ordering;
 use spin::RwLock;
 use std::cell::UnsafeCell;
-use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
 
+const UNINITIALIZED_WATER_MARK: i32 = -1;
+const LOCAL_BUFFER_SIZE: usize = 128;
+
 /// A fast PageResource for fixed-size block allocation only.
 pub struct BlockPageResource<VM: VMBinding, B: Region + 'static> {
     flpr: FreeListPageResource<VM>,
-    block_alloc: LockFreeListBlockAlloc<B>,
-    chunk_queue: SegQueue<Chunk>,
+    /// A buffer for storing all the free blocks
+    block_queue: BlockPool<B>,
+    /// Slow-path allocation synchronization
     sync: Mutex<()>,
-    pub(crate) total_chunks: AtomicUsize,
-    _p: PhantomData<B>,
 }
 
 impl<VM: VMBinding, B: Region> PageResource<VM> for BlockPageResource<VM, B> {
@@ -50,16 +49,7 @@ impl<VM: VMBinding, B: Region> PageResource<VM> for BlockPageResource<VM, B> {
         required_pages: usize,
         tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail> {
-        if let Some((block, new_chunk)) = self.block_alloc.alloc(self, space_descriptor) {
-            self.commit_pages(reserved_pages, required_pages, tls);
-            Ok(PRAllocResult {
-                start: block.start(),
-                pages: required_pages,
-                new_chunk,
-            })
-        } else {
-            Err(PRAllocFail)
-        }
+        self.alloc_pages_fast(space_descriptor, reserved_pages, required_pages, tls)
     }
 
     fn get_available_physical_pages(&self) -> usize {
@@ -71,227 +61,121 @@ impl<VM: VMBinding, B: Region> PageResource<VM> for BlockPageResource<VM, B> {
 impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
     /// Block granularity in pages
     const LOG_PAGES: usize = B::LOG_BYTES - LOG_BYTES_IN_PAGE as usize;
-    const BLOCKS_IN_CHUNK: usize = 1 << (Chunk::LOG_BYTES - B::LOG_BYTES);
 
     pub fn new_contiguous(
         log_pages: usize,
         start: Address,
         bytes: usize,
         vm_map: &'static dyn VMMap,
-        _num_workers: usize,
+        num_workers: usize,
     ) -> Self {
         assert!((1 << log_pages) <= PAGES_IN_CHUNK);
         Self {
             flpr: FreeListPageResource::new_contiguous(start, bytes, vm_map),
-            block_alloc: <LockFreeListBlockAlloc<B> as BlockAlloc<VM, B>>::new(),
-            sync: Mutex::default(),
-            chunk_queue: SegQueue::new(),
-            total_chunks: AtomicUsize::new(0),
-            _p: PhantomData,
+            block_queue: BlockPool::new(num_workers),
+            sync: Mutex::new(()),
         }
     }
 
     pub fn new_discontiguous(
         log_pages: usize,
         vm_map: &'static dyn VMMap,
-        _num_workers: usize,
+        num_workers: usize,
     ) -> Self {
         assert!((1 << log_pages) <= PAGES_IN_CHUNK);
         Self {
             flpr: FreeListPageResource::new_discontiguous(vm_map),
-            block_alloc: <LockFreeListBlockAlloc<B> as BlockAlloc<VM, B>>::new(),
-            sync: Mutex::default(),
-            chunk_queue: SegQueue::new(),
-            total_chunks: AtomicUsize::new(0),
-            _p: PhantomData,
+            block_queue: BlockPool::new(num_workers),
+            sync: Mutex::new(()),
         }
     }
 
-    fn alloc_chunk(&self, space_descriptor: SpaceDescriptor) -> Option<Chunk> {
-        if self.common().contiguous {
-            if let Some(chunk) = self.chunk_queue.pop() {
-                self.total_chunks.fetch_add(1, Ordering::SeqCst);
-                return Some(chunk);
+    /// Grow contiguous space
+    fn alloc_pages_slow_sync(
+        &self,
+        space_descriptor: SpaceDescriptor,
+        reserved_pages: usize,
+        required_pages: usize,
+        tls: VMThread,
+    ) -> Result<PRAllocResult, PRAllocFail> {
+        let _guard = self.sync.lock().unwrap();
+        // Retry fast allocation
+        if let Some(block) = self.block_queue.pop() {
+            self.commit_pages(reserved_pages, required_pages, tls);
+            return Result::Ok(PRAllocResult {
+                start: block.start(),
+                pages: required_pages,
+                new_chunk: false,
+            });
+        }
+        // Grow space (a chunk at a time)
+        // 1. Grow space
+        let start: Address = match self.flpr.allocate_one_chunk_no_commit(space_descriptor) {
+            Ok(result) => result.start,
+            err => return err,
+        };
+        assert!(start.is_aligned_to(BYTES_IN_CHUNK));
+        // 2. Take the first block int the chunk as the allocation result
+        let first_block = start;
+        // 3. Push all remaining blocks to one or more block lists
+        let last_block = start + BYTES_IN_CHUNK;
+        let mut array = BlockQueue::new();
+        let mut cursor = start + B::BYTES;
+        while cursor < last_block {
+            let result = unsafe { array.push_relaxed(B::from_aligned_address(cursor)) };
+            if let Err(block) = result {
+                self.block_queue.add_global_array(array);
+                array = BlockQueue::new();
+                let result2 = unsafe { array.push_relaxed(block) };
+                debug_assert!(result2.is_ok());
             }
+            cursor += B::BYTES;
         }
-        let start = self
-            .common()
-            .grow_discontiguous_space(space_descriptor, 1, None);
-        if start.is_zero() {
-            return None;
-        }
-        self.total_chunks.fetch_add(1, Ordering::SeqCst);
-        Some(Chunk::from_aligned_address(start))
+        debug_assert!(!array.is_empty());
+        // 4. Push the block list to the global pool
+        self.block_queue.add_global_array(array);
+        // Finish slow-allocation
+        self.commit_pages(reserved_pages, required_pages, tls);
+        Result::Ok(PRAllocResult {
+            start: first_block,
+            pages: required_pages,
+            new_chunk: true,
+        })
     }
 
-    fn free_chunk(&self, chunk: Chunk) {
-        self.total_chunks.fetch_sub(1, Ordering::SeqCst);
-        if self.common().contiguous {
-            self.chunk_queue.push(chunk);
-        } else {
-            self.common().release_discontiguous_chunks(chunk.start());
+    /// Allocate a block
+    fn alloc_pages_fast(
+        &self,
+        space_descriptor: SpaceDescriptor,
+        reserved_pages: usize,
+        required_pages: usize,
+        tls: VMThread,
+    ) -> Result<PRAllocResult, PRAllocFail> {
+        debug_assert_eq!(reserved_pages, required_pages);
+        debug_assert_eq!(reserved_pages, 1 << Self::LOG_PAGES);
+        // Fast allocate from the blocks list
+        if let Some(block) = self.block_queue.pop() {
+            self.commit_pages(reserved_pages, required_pages, tls);
+            return Result::Ok(PRAllocResult {
+                start: block.start(),
+                pages: required_pages,
+                new_chunk: false,
+            });
         }
+        // Slow-path：we need to grow space
+        self.alloc_pages_slow_sync(space_descriptor, reserved_pages, required_pages, tls)
     }
 
-    pub fn release_block(&self, block: B, single_thread: bool) {
+    pub fn release_block(&self, block: B) {
         let pages = 1 << Self::LOG_PAGES;
+        debug_assert!(pages as usize <= self.common().accounting.get_committed_pages());
         self.common().accounting.release(pages as _);
-        self.block_alloc.free(self, block, single_thread);
+        self.block_queue.push(block)
     }
 
-    pub fn flush_all(&self) {}
-
-    pub fn available_pages(&self) -> usize {
-        let total = self.total_chunks.load(Ordering::SeqCst)
-            << (LOG_BYTES_IN_CHUNK - LOG_BYTES_IN_PAGE as usize);
-        total.saturating_sub(self.reserved_pages())
-    }
-}
-
-pub trait BlockAlloc<VM: VMBinding, B: Region> {
-    fn new() -> Self;
-    fn alloc(
-        &self,
-        bpr: &BlockPageResource<VM, B>,
-        space_descriptor: SpaceDescriptor,
-    ) -> Option<(B, bool)>;
-    fn free(&self, bpr: &BlockPageResource<VM, B>, b: B, single_thread: bool);
-}
-
-#[derive(Copy, Clone)]
-struct Cursor(u32, u32);
-
-unsafe impl bytemuck::NoUninit for Cursor {}
-
-struct LockFreeListBlockAlloc<B: Region> {
-    cursor: Atomic<Cursor>,
-    head: Atomic<Address>,
-    _p: PhantomData<B>,
-}
-
-impl<B: Region> LockFreeListBlockAlloc<B> {
-    const LOG_BLOCKS_IN_CHUNK: usize = Chunk::LOG_BYTES - B::LOG_BYTES;
-    const BLOCKS_IN_CHUNK: usize = 1 << Self::LOG_BLOCKS_IN_CHUNK;
-    const SYNC: bool = false;
-
-    fn alloc_fast(&self) -> Option<B> {
-        if Self::SYNC {
-            // 1. bump the cursor
-            let Cursor(c, b) = self.cursor.load(Ordering::Relaxed);
-            if b < Self::BLOCKS_IN_CHUNK as u32 {
-                self.cursor.store(Cursor(c, b + 1), Ordering::Relaxed);
-                let c = crate::util::conversions::chunk_index_to_address(c as usize);
-                return Some(B::from_aligned_address(c + ((b as usize) << B::LOG_BYTES)));
-            }
-            // 2. pop from list
-            let top = self.head.load(Ordering::Relaxed);
-            if top.is_zero() {
-                return None;
-            }
-            let new_top = unsafe { top.load::<Address>() };
-            self.head.store(new_top, Ordering::Relaxed);
-            return Some(B::from_aligned_address(top));
-        }
-        // 1. bump the cursor
-        if self.cursor.load(Ordering::Relaxed).1 < Self::BLOCKS_IN_CHUNK as u32 {
-            let result =
-                self.cursor
-                    .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |Cursor(c, b)| {
-                        if b < Self::BLOCKS_IN_CHUNK as u32 {
-                            Some(Cursor(c, b + 1))
-                        } else {
-                            None
-                        }
-                    });
-            if let Ok(Cursor(c, b)) = result {
-                let c = crate::util::conversions::chunk_index_to_address(c as usize);
-                return Some(B::from_aligned_address(c + ((b as usize) << B::LOG_BYTES)));
-            }
-        }
-        // 2. pop from list
-        loop {
-            std::hint::spin_loop();
-            let top = self.head.load(Ordering::Relaxed);
-            if top.is_zero() {
-                return None;
-            }
-            let new_top = unsafe { top.load::<Address>() };
-            if self
-                .head
-                .compare_exchange(top, new_top, Ordering::Relaxed, Ordering::Relaxed)
-                .is_ok()
-            {
-                return Some(B::from_aligned_address(top));
-            }
-        }
-    }
-
-    fn add_chunk(&self, c: Chunk) -> B {
-        let new_cursor = c.start() + B::BYTES;
-        let chunk_index = new_cursor.chunk_index() as u32;
-        self.cursor.store(Cursor(chunk_index, 1), Ordering::Relaxed);
-        B::from_aligned_address(c.start())
-    }
-}
-
-impl<VM: VMBinding, B: Region> BlockAlloc<VM, B> for LockFreeListBlockAlloc<B> {
-    fn new() -> Self {
-        Self {
-            head: Atomic::new(Address::ZERO),
-            cursor: Atomic::new(Cursor(0, Self::BLOCKS_IN_CHUNK as _)),
-            _p: PhantomData,
-        }
-    }
-
-    fn alloc(
-        &self,
-        bpr: &BlockPageResource<VM, B>,
-        space_descriptor: SpaceDescriptor,
-    ) -> Option<(B, bool)> {
-        if !Self::SYNC {
-            if let Some(b) = self.alloc_fast() {
-                return Some((b, false));
-            }
-        }
-        let _sync = bpr.sync.lock().unwrap();
-        if let Some(b) = self.alloc_fast() {
-            return Some((b, false));
-        }
-        if let Some(chunk) = bpr.alloc_chunk(space_descriptor) {
-            let block = self.add_chunk(chunk);
-            return Some((block, true));
-        }
-        return None;
-    }
-
-    fn free(&self, bpr: &BlockPageResource<VM, B>, b: B, single_thread: bool) {
-        if single_thread {
-            let old_top = self.head.load(Ordering::Relaxed);
-            unsafe {
-                b.start().store(old_top);
-            }
-            self.head.store(b.start(), Ordering::Relaxed);
-            return;
-        }
-        if Self::SYNC {
-            let _sync = bpr.sync.lock().unwrap();
-            let old_top = self.head.load(Ordering::Relaxed);
-            unsafe { b.start().store(old_top) };
-            self.head.store(b.start(), Ordering::Relaxed);
-            return;
-        }
-        loop {
-            std::hint::spin_loop();
-            let old_top = self.head.load(Ordering::Relaxed);
-            unsafe { b.start().store(old_top) };
-            if self
-                .head
-                .compare_exchange(old_top, b.start(), Ordering::Relaxed, Ordering::Relaxed)
-                .is_ok()
-            {
-                return;
-            }
-        }
+    pub fn flush_all(&self) {
+        self.block_queue.flush_all()
+        // TODO: For 32-bit space, we may want to free some contiguous chunks.
     }
 }
 

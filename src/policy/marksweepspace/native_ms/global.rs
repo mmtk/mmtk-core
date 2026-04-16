@@ -458,7 +458,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         self.block_clear_metadata(block);
 
         block.deinit();
-        self.pr.release_block(block, false);
+        self.pr.release_block(block);
     }
 
     pub fn block_clear_metadata(&self, block: Block) {

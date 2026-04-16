@@ -447,7 +447,7 @@ impl Block {
                     }
 
                     // Release the block if it is allocated but not marked by the current GC.
-                    space.release_block(*self, false, false, false);
+                    space.release_block(*self, false);
                     true
                 }
                 BlockState::Marked => {
@@ -497,7 +497,7 @@ impl Block {
                 vo_bit::helper::on_region_swept::<VM, _>(self, false);
 
                 // Release the block if non of its lines are marked.
-                space.release_block(*self, false, false, false);
+                space.release_block(*self, false);
                 true
             } else {
                 // There are some marked lines. Keep the block live.
@@ -523,11 +523,7 @@ impl Block {
         }
     }
 
-    pub fn rc_sweep_nursery<VM: VMBinding>(
-        &self,
-        space: &ImmixSpace<VM>,
-        single_thread: bool,
-    ) -> bool {
+    pub fn rc_sweep_nursery<VM: VMBinding>(&self, space: &ImmixSpace<VM>) -> bool {
         let is_in_place_promoted = self.is_in_place_promoted();
         self.clear_in_place_promoted();
         if is_in_place_promoted {
@@ -539,7 +535,7 @@ impl Block {
         } else {
             debug_assert!(self.rc_dead(), "{:?} has non-zero rc value", self);
             debug_assert_ne!(self.get_state(), super::block::BlockState::Unallocated);
-            space.release_block(*self, true, false, single_thread);
+            space.release_block(*self, false);
             true
         }
     }
@@ -561,7 +557,7 @@ impl Block {
         }
         if defrag || self.rc_dead() {
             if self.attempt_dealloc(true) {
-                space.release_block(*self, false, true, defrag);
+                space.release_block(*self, true);
                 return true;
             }
         } else if !super::BLOCK_ONLY {

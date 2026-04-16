@@ -2,11 +2,10 @@ use super::block::BlockState;
 use super::{block::Block, ImmixSpace};
 use crate::plan::immix::Pause;
 use crate::scheduler::WorkBucketStage;
-use crate::util::constants::{LOG_BYTES_IN_MBYTE, LOG_BYTES_IN_PAGE};
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::{
     plan::lxr::LazySweepingJobsCounter,
     plan::lxr::LXR,
-    policy::space::Space,
     scheduler::{GCWork, GCWorkScheduler, GCWorker},
     vm::*,
     MMTK,
@@ -161,7 +160,7 @@ impl<VM: VMBinding> BlockAllocation<VM> {
             for b in &blocks[0..stw_limit] {
                 let block = b.load(Ordering::Relaxed);
                 debug_assert_ne!(block.get_state(), super::block::BlockState::Unallocated);
-                if block.rc_sweep_nursery(space, true) {
+                if block.rc_sweep_nursery(space) {
                     num_blocks_released += 1;
                 }
             }
@@ -285,7 +284,7 @@ impl<VM: VMBinding> GCWork<VM> for RCLazySweepNurseryBlocks {
             .immix_space;
         let mut released_blocks = 0;
         for block in &self.blocks {
-            if block.rc_sweep_nursery(space, false) {
+            if block.rc_sweep_nursery(space) {
                 released_blocks += 1;
             }
         }
@@ -321,7 +320,7 @@ impl<VM: VMBinding> GCWork<VM> for RCSTWSweepNurseryBlocks {
             .immix_space;
         let mut num_blocks_released = 0;
         for block in &self.blocks {
-            if block.rc_sweep_nursery(space, false) {
+            if block.rc_sweep_nursery(space) {
                 num_blocks_released += 1;
             }
         }

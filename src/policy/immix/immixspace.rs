@@ -809,18 +809,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Release a block.
-    pub fn release_block(
-        &self,
-        block: Block,
-        nursery: bool,
-        zero_unlog_table: bool,
-        single_thread: bool,
-    ) {
+    pub fn release_block(&self, block: Block, zero_unlog_table: bool) {
         if zero_unlog_table {
             block.clear_field_unlog_table::<VM>();
         }
         block.deinit(self);
-        self.pr.release_block(block, single_thread);
+        self.pr.release_block(block);
     }
 
     /// Allocate a clean block.
@@ -848,7 +842,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.lines_consumed
                 .fetch_add(Block::LINES, Ordering::SeqCst);
         }
-
         Some(block)
     }
 
@@ -919,12 +912,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             } else {
                 false
             };
-
-            // let straddle = self
-            //     .rc
-            //     .is_straddle_line(Line::from(Line::align(object.to_raw_address())));
             if !straddle {
-                // Visit node
                 queue.enqueue(object);
             }
         }
