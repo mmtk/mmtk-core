@@ -456,26 +456,11 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 trace!("LOS object {} is being marked now", object);
                 self.treadmill.copy(object, nursery_object);
                 // We just moved the object out of the logical nursery, mark it as unlogged.
-                if !self.rc_enabled
-                    && (self.common.unlog_traced_object || self.common.needs_field_log_bit)
-                {
-                    if self.common.needs_field_log_bit {
-                        let step = if VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
-                            4
-                        } else {
-                            8
-                        };
-                        for i in (0..object.get_size::<VM>()).step_by(step) {
-                            let a = object.to_raw_address() + i;
-                            VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.mark_as_unlogged::<VM>(
-                                a.to_object_reference::<VM>(),
-                                Ordering::SeqCst,
-                            );
-                        }
-                    } else {
-                        VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                            .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
-                    }
+                // We also unlog mature objects as their unlog bit may have been unset before the
+                // full-heap GC
+                if self.common.unlog_traced_object {
+                    VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                        .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
                 }
                 queue.enqueue(object);
             } else {

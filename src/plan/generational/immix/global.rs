@@ -133,7 +133,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         if full_heap {
             self.immix_space.prepare(
                 full_heap,
-                false,
                 Some(StatsForDefrag::new(self)),
                 // Bulk clear unlog bits so that we will reconstruct them.
                 UnlogBitsOperation::BulkClear,

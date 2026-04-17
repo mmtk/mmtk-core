@@ -128,9 +128,6 @@ impl<VM: VMBinding> GCWork<VM> for SweepBlocksAfterDecs {
                 || mmtk.scheduler.work_buckets[WorkBucketStage::STWRCDecsAndSweep].is_open())
         {
             lxr.immix_space
-                .num_clean_blocks_released_mature
-                .fetch_add(count, Ordering::Relaxed);
-            lxr.immix_space
                 .num_clean_blocks_released_lazy
                 .fetch_add(count, Ordering::Relaxed);
         }

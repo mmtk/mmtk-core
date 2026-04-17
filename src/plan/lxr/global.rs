@@ -45,7 +45,6 @@ const LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER: usize = 1;
 
 static HEAP_AFTER_GC: AtomicUsize = AtomicUsize::new(0);
 
-use bytemuck::NoUninit;
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
 #[derive(HasSpaces, PlanTraceObject)]

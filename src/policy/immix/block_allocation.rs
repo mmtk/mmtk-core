@@ -156,17 +156,11 @@ impl<VM: VMBinding> BlockAllocation<VM> {
                 usize::min(total_nursery_blocks, max_stw_sweep_blocks)
             };
             // 1. STW release a limited number of blocks
-            let mut num_blocks_released = 0;
             for b in &blocks[0..stw_limit] {
                 let block = b.load(Ordering::Relaxed);
                 debug_assert_ne!(block.get_state(), super::block::BlockState::Unallocated);
-                if block.rc_sweep_nursery(space) {
-                    num_blocks_released += 1;
-                }
+                block.rc_sweep_nursery(space);
             }
-            self.space()
-                .num_clean_blocks_released_young
-                .fetch_add(num_blocks_released, Ordering::Relaxed);
             // 2. Release remaining blocks concurrently after the pause
             if total_nursery_blocks > stw_limit {
                 let packets = blocks[stw_limit..total_nursery_blocks]
@@ -289,9 +283,6 @@ impl<VM: VMBinding> GCWork<VM> for RCLazySweepNurseryBlocks {
             }
         }
         space
-            .num_clean_blocks_released_young
-            .fetch_add(released_blocks, Ordering::SeqCst);
-        space
             .num_clean_blocks_released_lazy
             .fetch_add(released_blocks, Ordering::SeqCst);
     }
@@ -318,14 +309,8 @@ impl<VM: VMBinding> GCWork<VM> for RCSTWSweepNurseryBlocks {
             .downcast_ref::<LXR<VM>>()
             .unwrap()
             .immix_space;
-        let mut num_blocks_released = 0;
         for block in &self.blocks {
-            if block.rc_sweep_nursery(space) {
-                num_blocks_released += 1;
-            }
+            block.rc_sweep_nursery(space);
         }
-        space
-            .num_clean_blocks_released_young
-            .fetch_add(num_blocks_released, Ordering::Relaxed);
     }
 }

@@ -117,7 +117,7 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
     }
 
     fn flush(&mut self) {
-        let buf = VectorQueue::take(&mut self.buffer);
+        let buf = self.buffer.take();
         if !buf.is_empty() {
             self.worker.add_work(
                 self.bucket,
@@ -147,9 +147,6 @@ impl<E: ProcessEdgesWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'_, E> {
 
 impl<E: ProcessEdgesWork> Drop for ObjectsClosure<'_, E> {
     fn drop(&mut self) {
-        if self.buffer.is_empty() {
-            return;
-        }
         self.flush();
     }
 }

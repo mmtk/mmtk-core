@@ -120,7 +120,6 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             // Prepare both large object space and immix space
             self.immix.immix_space.prepare(
                 false,
-                false,
                 Some(StatsForDefrag::new(self)),
                 // We don't do anything special to unlog bits during nursery GC
                 // because ProcessModBuf will set the unlog bits back.

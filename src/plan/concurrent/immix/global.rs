@@ -166,7 +166,6 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
                 self.common.prepare(tls, true);
                 self.immix_space.prepare(
                     true,
-                    false,
                     Some(StatsForDefrag::new(self)),
                     // Ignore unlog bits in full GCs because unlog bits should be all 0.
                     UnlogBitsOperation::NoOp,
@@ -175,7 +174,6 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             Pause::InitialMark => {
                 self.immix_space.prepare(
                     true,
-                    false,
                     Some(StatsForDefrag::new(self)),
                     // Bulk set log bits so SATB barrier will be triggered on the existing objects.
                     UnlogBitsOperation::BulkSet,

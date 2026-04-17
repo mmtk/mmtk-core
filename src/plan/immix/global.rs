@@ -214,7 +214,6 @@ impl<VM: VMBinding> Immix<VM> {
         self.common.prepare(tls, true);
         self.immix_space.prepare(
             true,
-            false,
             Some(crate::policy::immix::defrag::StatsForDefrag::new(self)),
             unlog_bits_op,
         );

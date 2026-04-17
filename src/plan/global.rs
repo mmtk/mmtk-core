@@ -846,7 +846,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             } else if #[cfg(feature = "marksweep_as_nonmoving")] {
                 self.nonmoving.prepare(_full_heap);
             } else {
-                self.nonmoving.prepare(_full_heap, false, None, UnlogBitsOperation::NoOp);
+                self.nonmoving.prepare(_full_heap,  None, UnlogBitsOperation::NoOp);
             }
         }
     }
