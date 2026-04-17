@@ -1,3 +1,4 @@
+use super::block_allocation::BlockAllocation;
 use super::gc_work::{LXRGCWorkContext, LXRWeakRefWorkContext, ReleaseLOSNursery};
 use super::mutator::ALLOCATOR_MAPPING;
 use super::rc::{ProcessDecs, RCImmixCollectRootEdges};
@@ -70,6 +71,7 @@ pub struct LXR<VM: VMBinding> {
     pub prev_roots: RwLock<SegQueue<Vec<ObjectReference>>>,
     pub curr_roots: RwLock<SegQueue<Vec<ObjectReference>>>,
     pub rc: RefCountHelper<VM>,
+    block_allocation: BlockAllocation<VM>,
 }
 
 pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints {
@@ -98,11 +100,8 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             return true;
         }
         // Survival limits
-        let total_young_alloc_pages = self
-            .immix_space
-            .block_allocation
-            .total_young_allocation_in_bytes()
-            >> LOG_BYTES_IN_MBYTE;
+        let total_young_alloc_pages =
+            self.block_allocation.total_young_allocation_in_bytes() >> LOG_BYTES_IN_MBYTE;
         let predicted_survival_mb: usize =
             ((total_young_alloc_pages as f64 * super::SURVIVAL_RATIO_PREDICTOR.ratio()) as usize)
                 << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER;
@@ -199,6 +198,8 @@ impl<VM: VMBinding> Plan for LXR<VM> {
                 .add(FlushMatureEvacRemsets);
         }
         self.immix_space.prepare_rc(pause);
+        self.block_allocation
+            .reset_block_mark_for_mutator_reused_blocks(pause);
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
@@ -211,6 +212,10 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         self.common.los.is_end_of_satb_or_full_gc = false;
         self.common
             .release(tls, pause == Pause::Full || pause == Pause::FinalMark);
+        self.block_allocation
+            .sweep_nursery_blocks(self.immix_space.scheduler(), pause);
+        self.block_allocation
+            .sweep_mutator_reused_blocks(self.immix_space.scheduler(), pause);
         self.immix_space.release_rc(pause);
         // swap roots
         let mut prev_roots = self.prev_roots.write().unwrap();
@@ -226,7 +231,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
 
     fn get_collection_reserved_pages(&self) -> usize {
         let survival = {
-            let predicted_survival = (self.immix_space.block_allocation.clean_nursery_mb() as f64
+            let predicted_survival = (self.block_allocation.clean_nursery_mb() as f64
                 * super::SURVIVAL_RATIO_PREDICTOR.ratio())
                 as usize;
             predicted_survival << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER
@@ -254,11 +259,8 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         super::NO_EVAC.store(false, Ordering::SeqCst);
         let pause = self.current_pause().unwrap();
 
-        super::SURVIVAL_RATIO_PREDICTOR.set_alloc_size(
-            self.immix_space
-                .block_allocation
-                .total_young_allocation_in_bytes(),
-        );
+        super::SURVIVAL_RATIO_PREDICTOR
+            .set_alloc_size(self.block_allocation.total_young_allocation_in_bytes());
         self.immix_space.rc_eager_prepare(pause);
 
         for mutator in <VM as VMBinding>::VMActivePlan::mutators() {
@@ -348,6 +350,7 @@ impl<VM: VMBinding> LXR<VM> {
             prev_roots: Default::default(),
             curr_roots: Default::default(),
             rc: RefCountHelper::NEW,
+            block_allocation: BlockAllocation::new(),
         });
 
         lxr.gc_init();
@@ -664,8 +667,9 @@ impl<VM: VMBinding> LXR<VM> {
         self.immix_space.rc_enabled = true;
         self.common.los.rc_enabled = true;
         unsafe {
-            let me = &*(self as *const Self);
-            self.immix_space.block_allocation.lxr = Some(me);
+            let me: &'static Self = &*(self as *const Self);
+            me.block_allocation.init(&me.immix_space, me);
+            me.immix_space.install_hooks(&me.block_allocation);
             self.common.los.lxr = Some(me);
         }
         let mut lazy_sweeping_jobs = LAZY_SWEEPING_JOBS.write();

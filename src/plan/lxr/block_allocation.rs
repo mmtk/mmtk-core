@@ -1,23 +1,19 @@
-use super::block::BlockState;
-use super::{block::Block, ImmixSpace};
-use crate::plan::immix::Pause;
-use crate::scheduler::WorkBucketStage;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
-use crate::{
-    plan::lxr::block_sweeping::{
-        RCLazySweepMutatorReusedBlocks, RCLazySweepNurseryBlocks, RCSTWSweepNurseryBlocks,
-    },
-    plan::lxr::LXR,
-    scheduler::{GCWork, GCWorkScheduler, GCWorker},
-    vm::*,
-    MMTK,
+use super::block_sweeping::{
+    RCLazySweepMutatorReusedBlocks, RCLazySweepNurseryBlocks, RCSTWSweepNurseryBlocks,
 };
+use super::LXR;
+use crate::plan::immix::Pause;
+use crate::policy::immix::block::{Block, BlockState};
+use crate::policy::immix::{ImmixHooks, ImmixSpace};
+use crate::scheduler::{GCWork, GCWorkScheduler, WorkBucketStage};
+use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::vm::VMBinding;
 use atomic::{Atomic, Ordering};
 use std::cell::UnsafeCell;
 use std::sync::atomic::AtomicUsize;
 use std::sync::RwLock;
 
-pub(super) struct BlockCache {
+struct BlockCache {
     cursor: AtomicUsize,
     buffer: RwLock<Vec<Atomic<Block>>>,
 }
@@ -34,13 +30,12 @@ impl BlockCache {
         self.cursor.load(Ordering::SeqCst)
     }
 
-    pub fn push(&self, block: Block) {
+    fn push(&self, block: Block) {
         let i = self.cursor.fetch_add(1, Ordering::SeqCst);
         let buffer = self.buffer.read().unwrap();
         if i < buffer.len() {
             buffer[i].store(block, Ordering::SeqCst);
         } else {
-            // resize
             std::mem::drop(buffer);
             let mut buffer = self.buffer.write().unwrap();
             if i >= buffer.len() {
@@ -61,20 +56,30 @@ impl BlockCache {
     }
 }
 
-pub struct BlockAllocation<VM: VMBinding> {
+pub(super) struct BlockAllocation<VM: VMBinding> {
     space: UnsafeCell<*const ImmixSpace<VM>>,
-    pub(super) nursery_blocks: BlockCache,
-    pub(super) reused_blocks: BlockCache,
-    pub(crate) lxr: Option<&'static LXR<VM>>,
+    lxr: UnsafeCell<*const LXR<VM>>,
+    nursery_blocks: BlockCache,
+    reused_blocks: BlockCache,
 }
 
+unsafe impl<VM: VMBinding> Sync for BlockAllocation<VM> {}
+unsafe impl<VM: VMBinding> Send for BlockAllocation<VM> {}
+
 impl<VM: VMBinding> BlockAllocation<VM> {
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             space: UnsafeCell::new(std::ptr::null()),
+            lxr: UnsafeCell::new(std::ptr::null()),
             nursery_blocks: BlockCache::new(),
             reused_blocks: BlockCache::new(),
-            lxr: None,
+        }
+    }
+
+    pub(super) fn init(&self, space: &ImmixSpace<VM>, lxr: &'static LXR<VM>) {
+        unsafe {
+            *self.space.get() = space as *const ImmixSpace<VM>;
+            *self.lxr.get() = lxr as *const LXR<VM>;
         }
     }
 
@@ -82,24 +87,20 @@ impl<VM: VMBinding> BlockAllocation<VM> {
         unsafe { &**self.space.get() }
     }
 
-    pub fn clean_nursery_blocks(&self) -> usize {
-        self.nursery_blocks.len()
+    fn lxr(&self) -> &'static LXR<VM> {
+        unsafe { &**self.lxr.get() }
     }
 
-    pub fn clean_nursery_mb(&self) -> usize {
-        self.clean_nursery_blocks() << Block::LOG_BYTES >> 20
+    pub(super) fn clean_nursery_mb(&self) -> usize {
+        self.nursery_blocks.len() << Block::LOG_BYTES >> 20
     }
 
-    pub fn total_young_allocation_in_bytes(&self) -> usize {
+    pub(super) fn total_young_allocation_in_bytes(&self) -> usize {
         (self.nursery_blocks.len() << Block::LOG_BYTES)
             + (self.space().get_mutator_recycled_lines_in_pages() << LOG_BYTES_IN_PAGE)
     }
 
-    pub fn init(&self, space: &ImmixSpace<VM>) {
-        unsafe { *self.space.get() = space as *const ImmixSpace<VM> }
-    }
-
-    pub fn reset_block_mark_for_mutator_reused_blocks(&self, _pause: Pause) {
+    pub(super) fn reset_block_mark_for_mutator_reused_blocks(&self, _pause: Pause) {
         // SATB sweep has problem scanning mutator recycled blocks.
         // Remaing the block state as "reusing" and reset them here.
         self.reused_blocks.visit_slice(|blocks| {
@@ -110,7 +111,11 @@ impl<VM: VMBinding> BlockAllocation<VM> {
         });
     }
 
-    pub fn sweep_mutator_reused_blocks(&self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
+    pub(super) fn sweep_mutator_reused_blocks(
+        &self,
+        scheduler: &GCWorkScheduler<VM>,
+        pause: Pause,
+    ) {
         if pause == Pause::Full || pause == Pause::FinalMark {
             self.reused_blocks.reset();
             return;
@@ -119,13 +124,11 @@ impl<VM: VMBinding> BlockAllocation<VM> {
         self.reused_blocks.visit_slice(|blocks| {
             let total_blocks = blocks.len();
             let stw_limit = usize::min(total_blocks, MAX_STW_SWEEP_BLOCKS);
-            // 1. STW release a limited number of blocks
             for b in &blocks[0..stw_limit] {
                 let block = b.load(Ordering::Relaxed);
                 self.space()
                     .add_to_possibly_dead_mature_blocks(block, false);
             }
-            // 2. Release remaining blocks concurrently after the pause
             if total_blocks > stw_limit {
                 let packets = blocks[stw_limit..total_blocks]
                     .chunks(1024)
@@ -142,11 +145,10 @@ impl<VM: VMBinding> BlockAllocation<VM> {
     }
 
     /// Reset allocated_block_buffer and free nursery blocks.
-    pub fn sweep_nursery_blocks(&self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
+    pub(super) fn sweep_nursery_blocks(&self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
         const PARALLEL_STW_SWEEPING: bool = false;
         let max_stw_sweep_blocks: usize = usize::MAX;
         let space = self.space();
-        // Sweep nursery blocks
         self.nursery_blocks.visit_slice(|blocks| {
             if PARALLEL_STW_SWEEPING {
                 return self.parallel_sweep_all_nursery_blocks(scheduler, blocks);
@@ -157,13 +159,11 @@ impl<VM: VMBinding> BlockAllocation<VM> {
             } else {
                 usize::min(total_nursery_blocks, max_stw_sweep_blocks)
             };
-            // 1. STW release a limited number of blocks
             for b in &blocks[0..stw_limit] {
                 let block = b.load(Ordering::Relaxed);
-                debug_assert_ne!(block.get_state(), super::block::BlockState::Unallocated);
+                debug_assert_ne!(block.get_state(), BlockState::Unallocated);
                 block.rc_sweep_nursery(space);
             }
-            // 2. Release remaining blocks concurrently after the pause
             if total_nursery_blocks > stw_limit {
                 let packets = blocks[stw_limit..total_nursery_blocks]
                     .chunks(1024)
@@ -194,38 +194,31 @@ impl<VM: VMBinding> BlockAllocation<VM> {
             .collect();
         scheduler.work_buckets[WorkBucketStage::Unconstrained].bulk_add(packets);
     }
+}
 
-    /// Notify a GC pahse has started
-    pub fn notify_mutator_phase_end(&self) {}
-
-    pub fn cm_in_progress_or_final_mark(&self) -> bool {
-        let lxr = self.lxr.unwrap();
-        lxr.cm_in_progress() || lxr.current_pause() == Some(Pause::FinalMark)
-    }
-
-    pub(super) fn initialize_new_clean_block(&self, block: Block, copy: bool, cm_enabled: bool) {
-        if self.space().in_defrag() {
-            self.space().defrag.notify_new_clean_block(copy);
+impl<VM: VMBinding> ImmixHooks<VM> for BlockAllocation<VM> {
+    fn on_clean_block_acquired(&self, block: Block, copy: bool) {
+        if !copy {
+            self.nursery_blocks.push(block);
         }
-        if cm_enabled && !super::BLOCK_ONLY && !self.space().rc_enabled {
-            let current_state = self.space().line_mark_state.load(Ordering::Acquire);
-            for line in block.lines() {
-                line.mark(current_state);
-            }
-        }
-        // Initialize unlog table
-        if self.space().rc_enabled && copy {
+        if copy {
             block.initialize_field_unlog_table_as_unlogged::<VM>();
         }
-        // Initialize mark table
-        if self.space().rc_enabled {
-            if self.cm_in_progress_or_final_mark() {
-                block.initialize_mark_table_as_marked::<VM>();
-            } else {
-                // TODO: Performance? Is this necessary?
-                block.clear_mark_table::<VM>();
-            }
+        if self.cm_in_progress_or_final_mark() {
+            block.initialize_mark_table_as_marked::<VM>();
+        } else {
+            block.clear_mark_table::<VM>();
         }
-        block.init(copy, false, self.space());
+    }
+
+    fn on_reusable_block_acquired(&self, block: Block, copy: bool) {
+        if !copy {
+            self.reused_blocks.push(block);
+        }
+    }
+
+    fn cm_in_progress_or_final_mark(&self) -> bool {
+        let lxr = self.lxr();
+        lxr.cm_in_progress() || lxr.current_pause() == Some(Pause::FinalMark)
     }
 }

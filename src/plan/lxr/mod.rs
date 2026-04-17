@@ -1,4 +1,5 @@
 mod barrier;
+mod block_allocation;
 pub(crate) mod block_sweeping;
 pub(super) mod cm;
 mod gc_work;

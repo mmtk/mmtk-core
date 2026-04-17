@@ -330,13 +330,13 @@ impl Block {
     }
 
     #[allow(unused)]
-    pub(super) fn clear_mark_table<VM: VMBinding>(&self) {
+    pub(crate) fn clear_mark_table<VM: VMBinding>(&self) {
         VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
             .extract_side_spec()
             .bzero_metadata(self.start(), Self::BYTES);
     }
 
-    pub(super) fn initialize_mark_table_as_marked<VM: VMBinding>(&self) {
+    pub(crate) fn initialize_mark_table_as_marked<VM: VMBinding>(&self) {
         let meta = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec();
         let start: *mut u8 = address_to_meta_address(&meta, self.start()).to_mut_ptr();
         let limit: *mut u8 = address_to_meta_address(&meta, self.end()).to_mut_ptr();

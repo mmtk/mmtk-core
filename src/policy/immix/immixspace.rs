@@ -1,4 +1,3 @@
-use super::block_allocation::BlockAllocation;
 use super::defrag::StatsForDefrag;
 use super::line::*;
 use super::{block::*, defrag::Defrag};
@@ -44,10 +43,27 @@ use std::mem;
 use std::ops::Range;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
+use std::sync::OnceLock;
 use std::sync::{atomic::AtomicU8, Arc};
 
 pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
 pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
+
+/// Plan-level hooks invoked by ImmixSpace during mutator allocation.
+/// Default impls are no-ops; LXR provides the concrete implementation.
+pub trait ImmixHooks<VM: VMBinding>: Send + Sync {
+    /// Called after a fresh clean block is acquired. `copy` distinguishes
+    /// mutator vs. GC-copy allocation. The hook owns any plan-specific
+    /// per-block bookkeeping (e.g. nursery list, mark-table init).
+    fn on_clean_block_acquired(&self, _block: Block, _copy: bool) {}
+    /// Called after a reusable block is handed out to a mutator.
+    fn on_reusable_block_acquired(&self, _block: Block, _copy: bool) {}
+    /// Whether tracing is in progress; consulted on the mutator
+    /// reused-line fast path so newly handed-out lines can be marked.
+    fn cm_in_progress_or_final_mark(&self) -> bool {
+        false
+    }
+}
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -71,7 +87,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     scheduler: Arc<GCWorkScheduler<VM>>,
     /// Some settings for this space
     space_args: ImmixSpaceArgs,
-    pub block_allocation: BlockAllocation<VM>,
+    hooks: OnceLock<&'static dyn ImmixHooks<VM>>,
     possibly_dead_mature_blocks: SegQueue<(Block, bool)>,
     pub mature_evac_remsets: Mutex<Vec<Box<dyn GCWork<VM>>>>,
     pub num_clean_blocks_released_lazy: AtomicUsize,
@@ -250,8 +266,6 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
     fn initialize_sft(&self, sft_map: &mut dyn SFTMap) {
         self.common().initialize_sft(self.as_sft(), sft_map);
-        // Initialize the block queues in `reusable_blocks` and `pr`.
-        self.block_allocation.init(self);
     }
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immixspace only releases pages enmasse")
@@ -459,7 +473,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             mature_evac_remset: MatureEvecRemSet::new(scheduler.num_workers()),
             scheduler,
             space_args,
-            block_allocation: BlockAllocation::new(),
+            hooks: OnceLock::new(),
             possibly_dead_mature_blocks: Default::default(),
             mature_evac_remsets: Default::default(),
             num_clean_blocks_released_lazy: Default::default(),
@@ -516,12 +530,22 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self.scheduler
     }
 
+    /// Install the plan-level hooks. Called once by the owning plan during `gc_init`.
+    pub fn install_hooks(&self, hooks: &'static dyn ImmixHooks<VM>) {
+        self.hooks
+            .set(hooks)
+            .unwrap_or_else(|_| panic!("ImmixSpace::install_hooks called more than once"));
+    }
+
+    fn hooks(&self) -> Option<&'static dyn ImmixHooks<VM>> {
+        self.hooks.get().copied()
+    }
+
     fn schedule_defrag_selection_packets(&self, _pause: Pause) {
         self.evac_set.schedule_defrag_selection_packets(self)
     }
 
     pub fn rc_eager_prepare(&self, pause: Pause) {
-        self.block_allocation.notify_mutator_phase_end();
         if pause == Pause::Full || pause == Pause::InitialMark {
             // Reset block mark and object mark table.
             let work_packets = self.generate_lxr_full_trace_prepare_tasks();
@@ -562,13 +586,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 // So the copied mature objects might be copied into defrag blocks, and get copied out again.
                 crate::scheduler::worker::reset_workers::<VM>();
             }
-            // Release young blocks to reduce to-space overflow
-            // self.block_allocation
-            //     .sweep_nursery_blocks(&self.scheduler, pause);
             self.flush_page_resource();
         }
-        self.block_allocation
-            .reset_block_mark_for_mutator_reused_blocks(pause);
         if pause == Pause::FinalMark {
             self.is_end_of_satb_or_full_gc = true;
         } else if pause == Pause::Full {
@@ -578,10 +597,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     pub fn release_rc(&mut self, pause: Pause) {
         debug_assert_ne!(pause, Pause::FullDefrag);
-        self.block_allocation
-            .sweep_nursery_blocks(&self.scheduler, pause);
-        self.block_allocation
-            .sweep_mutator_reused_blocks(&self.scheduler, pause);
         self.flush_page_resource();
         let disable_lasy_dec_for_current_gc = crate::plan::lxr::disable_lasy_dec_for_current_gc();
         if disable_lasy_dec_for_current_gc {
@@ -796,15 +811,20 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if block_address.is_zero() {
             return None;
         }
-        if !self.rc_enabled {
+        let block = Block::from_aligned_address(block_address);
+        if !self.rc_enabled || self.defrag.in_defrag() {
             self.defrag.notify_new_clean_block(copy);
         }
-        let block = Block::from_aligned_address(block_address);
-        if !copy && self.rc_enabled {
-            self.block_allocation.nursery_blocks.push(block);
+        if !self.rc_enabled && self.cm_enabled && !super::BLOCK_ONLY {
+            let current_state = self.line_mark_state.load(Ordering::Acquire);
+            for line in block.lines() {
+                line.mark(current_state);
+            }
         }
-        self.block_allocation
-            .initialize_new_clean_block(block, copy, self.cm_enabled);
+        if let Some(hooks) = self.hooks() {
+            hooks.on_clean_block_acquired(block, copy);
+        }
+        block.init(copy, false, self);
         self.chunk_map.set_allocated(block.chunk(), true);
         if !self.rc_enabled {
             self.lines_consumed
@@ -837,8 +857,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     if !block.attempt_mutator_reuse() {
                         continue;
                     }
-                    if !copy {
-                        self.block_allocation.reused_blocks.push(block);
+                    if let Some(hooks) = self.hooks() {
+                        hooks.on_reusable_block_acquired(block, copy);
                     }
                 } else {
                     // Get available lines. Do this before block.init which will reset block state.
@@ -1283,7 +1303,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.reused_lines_consumed
                 .fetch_add(num_lines, Ordering::Relaxed);
         }
-        if self.block_allocation.cm_in_progress_or_final_mark() {
+        if self
+            .hooks()
+            .is_some_and(|h| h.cm_in_progress_or_final_mark())
+        {
             Line::initialize_mark_table_as_marked::<VM>(start..end);
             Line::inc_reuse_counts::<VM>(start..end);
         }
