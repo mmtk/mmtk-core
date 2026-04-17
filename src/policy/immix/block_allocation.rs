@@ -4,7 +4,9 @@ use crate::plan::immix::Pause;
 use crate::scheduler::WorkBucketStage;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::{
-    plan::lxr::LazySweepingJobsCounter,
+    plan::lxr::block_sweeping::{
+        RCLazySweepMutatorReusedBlocks, RCLazySweepNurseryBlocks, RCSTWSweepNurseryBlocks,
+    },
     plan::lxr::LXR,
     scheduler::{GCWork, GCWorkScheduler, GCWorker},
     vm::*,
@@ -225,92 +227,5 @@ impl<VM: VMBinding> BlockAllocation<VM> {
             }
         }
         block.init(copy, false, self.space());
-    }
-}
-
-pub struct RCLazySweepMutatorReusedBlocks {
-    blocks: Vec<Block>,
-    _counter: LazySweepingJobsCounter,
-}
-
-impl RCLazySweepMutatorReusedBlocks {
-    pub fn new(blocks: Vec<Block>) -> Self {
-        Self {
-            blocks,
-            _counter: LazySweepingJobsCounter::new_decs(),
-        }
-    }
-}
-
-impl<VM: VMBinding> GCWork<VM> for RCLazySweepMutatorReusedBlocks {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        let space = &mmtk
-            .get_plan()
-            .downcast_ref::<LXR<VM>>()
-            .unwrap()
-            .immix_space;
-        for block in &self.blocks {
-            space.add_to_possibly_dead_mature_blocks(*block, false);
-        }
-    }
-}
-
-pub struct RCLazySweepNurseryBlocks {
-    blocks: Vec<Block>,
-    _counter: LazySweepingJobsCounter,
-}
-
-impl RCLazySweepNurseryBlocks {
-    pub fn new(blocks: Vec<Block>) -> Self {
-        Self {
-            blocks,
-            _counter: LazySweepingJobsCounter::new_decs(),
-        }
-    }
-}
-
-impl<VM: VMBinding> GCWork<VM> for RCLazySweepNurseryBlocks {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        let space = &mmtk
-            .get_plan()
-            .downcast_ref::<LXR<VM>>()
-            .unwrap()
-            .immix_space;
-        let mut released_blocks = 0;
-        for block in &self.blocks {
-            if block.rc_sweep_nursery(space) {
-                released_blocks += 1;
-            }
-        }
-        space
-            .num_clean_blocks_released_lazy
-            .fetch_add(released_blocks, Ordering::SeqCst);
-    }
-}
-
-pub struct RCSTWSweepNurseryBlocks {
-    blocks: Vec<Block>,
-    _counter: LazySweepingJobsCounter,
-}
-
-impl RCSTWSweepNurseryBlocks {
-    pub fn new(blocks: Vec<Block>) -> Self {
-        Self {
-            blocks,
-            _counter: LazySweepingJobsCounter::new_decs(),
-        }
-    }
-}
-
-impl<VM: VMBinding> GCWork<VM> for RCSTWSweepNurseryBlocks {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        let space = &mmtk
-            .get_plan()
-            .downcast_ref::<LXR<VM>>()
-            .unwrap()
-            .immix_space;
-        for block in &self.blocks {
-            block.rc_sweep_nursery(space);
-        }
     }
 }

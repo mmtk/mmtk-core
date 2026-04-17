@@ -1,10 +1,13 @@
 mod barrier;
+pub(crate) mod block_sweeping;
 pub(super) mod cm;
 mod gc_work;
 pub(super) mod global;
+pub(crate) mod los_work;
 mod mature_evac;
 pub(super) mod mutator;
 pub mod rc;
+pub(crate) mod rc_work;
 mod remset;
 
 use std::sync::atomic::{AtomicBool, AtomicUsize};

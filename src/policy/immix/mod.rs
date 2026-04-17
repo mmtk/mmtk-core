@@ -3,7 +3,6 @@ pub mod block_allocation;
 pub mod defrag;
 pub mod immixspace;
 pub mod line;
-pub mod rc_work;
 
 pub use immixspace::*;
 

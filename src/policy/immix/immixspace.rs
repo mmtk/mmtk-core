@@ -1,14 +1,14 @@
 use super::block_allocation::BlockAllocation;
 use super::defrag::StatsForDefrag;
 use super::line::*;
-use super::rc_work::*;
 use super::{block::*, defrag::Defrag};
 use crate::plan::immix::Pause;
+use crate::plan::lxr::los_work::RCSweepMatureAfterSATBLOS;
+use crate::plan::lxr::rc_work::*;
 use crate::plan::lxr::LazySweepingJobsCounter;
 use crate::plan::lxr::MatureEvecRemSet;
 use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::{TraceKind, DEFAULT_TRACE, TRACE_KIND_TRANSITIVE_PIN};
-use crate::policy::largeobjectspace::RCSweepMatureAfterSATBLOS;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::sft_map::SFTMap;
@@ -80,7 +80,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     pub rc_enabled: bool,
     pub is_end_of_satb_or_full_gc: bool,
     pub rc: RefCountHelper<VM>,
-    pub(super) evac_set: MatureEvacuationSet,
+    pub(crate) evac_set: MatureEvacuationSet,
 }
 
 /// Some arguments for Immix Space.

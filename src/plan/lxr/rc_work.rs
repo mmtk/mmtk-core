@@ -21,7 +21,7 @@ use crate::{
     Plan, MMTK,
 };
 
-use super::{
+use crate::policy::immix::{
     block::{Block, BlockState},
     line::Line,
     ImmixSpace,
@@ -88,13 +88,13 @@ impl<VM: VMBinding> GCWork<VM> for SelectDefragBlocks {
     }
 }
 
-pub(super) struct SweepBlocksAfterDecs {
+pub(crate) struct SweepBlocksAfterDecs {
     blocks: Vec<(Block, bool)>,
     _counter: LazySweepingJobsCounter,
 }
 
 impl SweepBlocksAfterDecs {
-    pub fn new(blocks: Vec<(Block, bool)>, counter: LazySweepingJobsCounter) -> Self {
+    pub(crate) fn new(blocks: Vec<(Block, bool)>, counter: LazySweepingJobsCounter) -> Self {
         Self {
             blocks,
             _counter: counter,
@@ -135,7 +135,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepBlocksAfterDecs {
 }
 
 /// Chunk sweeping work packet.
-pub(super) struct SweepDeadCycles<VM: VMBinding> {
+pub(crate) struct SweepDeadCycles<VM: VMBinding> {
     chunks: Range<Chunk>,
     _counter: LazySweepingJobsCounter,
     rc: RefCountHelper<VM>,
@@ -145,7 +145,7 @@ pub(super) struct SweepDeadCycles<VM: VMBinding> {
 impl<VM: VMBinding> SweepDeadCycles<VM> {
     const CAPACITY: usize = 1024;
 
-    pub fn new(chunks: Range<Chunk>, counter: LazySweepingJobsCounter) -> Self {
+    pub(crate) fn new(chunks: Range<Chunk>, counter: LazySweepingJobsCounter) -> Self {
         Self {
             chunks,
             _counter: counter,
@@ -227,7 +227,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepDeadCycles<VM> {
     }
 }
 
-pub(super) struct ConcurrentChunkMetadataZeroing {
+pub(crate) struct ConcurrentChunkMetadataZeroing {
     pub chunks: Range<Chunk>,
 }
 
@@ -261,7 +261,7 @@ impl<VM: VMBinding> GCWork<VM> for ConcurrentChunkMetadataZeroing {
 
 /// A work packet to prepare each block for GC.
 /// Performs the action on a range of chunks.
-pub(super) struct PrepareChunksForFullGC {
+pub(crate) struct PrepareChunksForFullGC {
     pub chunks: Range<Chunk>,
 }
 
@@ -310,7 +310,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareChunksForFullGC {
 }
 
 #[derive(Default)]
-pub(super) struct MatureEvacuationSet {
+pub(crate) struct MatureEvacuationSet {
     fragmented_blocks: SegQueue<Vec<(Block, usize)>>,
     fragmented_blocks_size: AtomicUsize,
     blocks_in_fragmented_chunks: SegQueue<Vec<(Block, usize)>>,
@@ -321,7 +321,7 @@ pub(super) struct MatureEvacuationSet {
 
 impl MatureEvacuationSet {
     /// Release all the mature defrag source blocks
-    pub fn sweep_mature_evac_candidates<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
+    pub(crate) fn sweep_mature_evac_candidates<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
         let mut defrag_blocks: Vec<Block> =
             std::mem::take(&mut *self.defrag_blocks.lock().unwrap());
         if defrag_blocks.is_empty() {
@@ -339,7 +339,7 @@ impl MatureEvacuationSet {
         }
     }
 
-    pub fn schedule_defrag_selection_packets<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
+    pub(crate) fn schedule_defrag_selection_packets<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
         let tasks = space.chunk_map.generate_tasks_batched(|chunks| {
             Box::new(SelectDefragBlocks {
                 chunks,
