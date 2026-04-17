@@ -1,4 +1,3 @@
-use crate::plan::concurrent::concurrent_marking_work::ConcurrentMarkingTrace;
 use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::immix::gc_work::ConcurrentImmixGCWorkContext;
 use crate::plan::concurrent::immix::gc_work::ConcurrentImmixSTWGCWorkContext;
@@ -8,7 +7,6 @@ use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::immix::mutator::ALLOCATOR_MAPPING;
-use crate::plan::tracing::UnsupportedTrace;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -371,23 +369,21 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
         self.set_ref_closure_buckets_enabled(false);
 
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-            ConcurrentImmixGCWorkContext<ConcurrentMarkingTrace<VM, Self, TRACE_KIND_FAST>>,
-        >::new());
+        scheduler.work_buckets[WorkBucketStage::Unconstrained]
+            .add(StopMutators::<ConcurrentImmixGCWorkContext<VM>>::new());
         scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<ConcurrentImmixGCWorkContext<UnsupportedTrace<VM>>>::new(self));
+            .add(Prepare::<ConcurrentImmixGCWorkContext<VM>>::new(self));
     }
 
     fn schedule_concurrent_marking_final_pause(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.set_ref_closure_buckets_enabled(true);
 
         // Skip root scanning in the final mark
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-            ConcurrentImmixGCWorkContext<ConcurrentMarkingTrace<VM, Self, TRACE_KIND_FAST>>,
-        >::new_no_scan_roots());
+        scheduler.work_buckets[WorkBucketStage::Unconstrained]
+            .add(StopMutators::<ConcurrentImmixGCWorkContext<VM>>::new_no_scan_roots());
 
         scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<ConcurrentImmixGCWorkContext<UnsupportedTrace<VM>>>::new(self));
+            .add(Release::<ConcurrentImmixGCWorkContext<VM>>::new(self));
 
         // Sanity
         #[cfg(feature = "sanity")]
