@@ -140,18 +140,6 @@ pub trait Region: Copy + PartialEq + PartialOrd {
     fn includes_address(&self, addr: Address) -> bool {
         Self::align(addr) == self.start()
     }
-    /// Get an iterator for regions within this chunk.
-    fn iter_region<R: Region>(&self) -> RegionIterator<R> {
-        // R should be smaller than a chunk
-        debug_assert!(R::LOG_BYTES < Self::LOG_BYTES);
-        // R should be aligned to chunk boundary
-        debug_assert!(R::is_aligned(self.start()));
-        debug_assert!(R::is_aligned(self.end()));
-
-        let start = R::from_aligned_address(self.start());
-        let end = R::from_aligned_address(self.end());
-        RegionIterator::<R>::new(start, end)
-    }
 }
 
 /// An iterator for contiguous regions.

@@ -8,6 +8,8 @@ use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
+#[cfg(feature = "object_pinning")]
+use crate::util::metadata::MetadataSpec;
 use crate::util::object_enum::BlockMayHaveObjects;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;

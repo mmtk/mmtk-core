@@ -42,7 +42,7 @@ impl StatsForDefrag {
 }
 
 impl Defrag {
-    pub const NUM_BINS: usize = (Block::LINES >> 1) + 1;
+    const NUM_BINS: usize = (Block::LINES >> 1) + 1;
     const DEFRAG_LINE_REUSE_RATIO: f32 = 0.99;
     const MIN_SPILL_THRESHOLD: usize = 2;
 
@@ -72,7 +72,6 @@ impl Defrag {
         user_triggered: bool,
         exhausted_reusable_space: bool,
         full_heap_system_gc: bool,
-        concurrent_marking_enabled: bool,
         rc_enabled: bool,
         stress_defrag: bool,
     ) {
@@ -82,8 +81,7 @@ impl Defrag {
                 || !exhausted_reusable_space
                 || stress_defrag
                 || (collect_whole_heap && user_triggered && full_heap_system_gc))
-            && !rc_enabled
-            && !concurrent_marking_enabled;
+            && !rc_enabled;
         info!("Defrag: {}", in_defrag);
         probe!(mmtk, immix_defrag, in_defrag);
         self.in_defrag_collection
@@ -157,24 +155,16 @@ impl Defrag {
         spill_avail_histograms: &mut Histogram,
     ) -> usize {
         let mut total_available_lines = 0;
-        for chunk in space.chunk_map.all_chunks() {
-            if !space.address_in_space(chunk.start()) {
-                continue;
-            }
-            for block in chunk
-                .iter_region::<Block>()
-                .filter(|b| b.get_state().is_reusable())
-            {
-                let bucket = block.get_holes();
-                let unavailable_lines = match block.get_state() {
-                    BlockState::Reusable { unavailable_lines } => unavailable_lines as usize,
-                    s => unreachable!("{:?} {:?}", block, s),
-                };
-                let available_lines = Block::LINES - unavailable_lines;
-                spill_avail_histograms[bucket] += available_lines;
-                total_available_lines += available_lines;
-            }
-        }
+        space.reusable_blocks.iterate_blocks(|block| {
+            let bucket = block.get_holes();
+            let unavailable_lines = match block.get_state() {
+                BlockState::Reusable { unavailable_lines } => unavailable_lines as usize,
+                s => unreachable!("{:?} {:?}", block, s),
+            };
+            let available_lines = Block::LINES - unavailable_lines;
+            spill_avail_histograms[bucket] += available_lines;
+            total_available_lines += available_lines;
+        });
         total_available_lines
     }
 

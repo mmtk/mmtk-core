@@ -1,7 +1,7 @@
 use std::ops::Range;
 
 use super::block::Block;
-use crate::util::constants::{LOG_BITS_IN_BYTE, LOG_BYTES_IN_WORD, LOG_MIN_OBJECT_SIZE};
+use crate::util::constants::{LOG_BITS_IN_BYTE, LOG_BYTES_IN_WORD};
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::spec_defs::IX_LINE_REUSE_COUNT;
 use crate::util::metadata::side_metadata::*;

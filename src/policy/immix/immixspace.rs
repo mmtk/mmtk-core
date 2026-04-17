@@ -40,7 +40,6 @@ use crate::{
 use atomic::Ordering;
 use crossbeam::queue::SegQueue;
 use std::mem;
-use std::ops::Range;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
 use std::sync::OnceLock;
@@ -92,7 +91,6 @@ pub struct ImmixSpace<VM: VMBinding> {
     pub mature_evac_remsets: Mutex<Vec<Box<dyn GCWork<VM>>>>,
     pub num_clean_blocks_released_lazy: AtomicUsize,
     pub mature_evac_remset: MatureEvecRemSet<VM>,
-    pub cm_enabled: bool,
     pub rc_enabled: bool,
     pub is_end_of_satb_or_full_gc: bool,
     pub rc: RefCountHelper<VM>,
@@ -265,7 +263,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
         &self.common
     }
     fn initialize_sft(&self, sft_map: &mut dyn SFTMap) {
-        self.common().initialize_sft(self.as_sft(), sft_map);
+        self.common().initialize_sft(self.as_sft(), sft_map)
     }
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immixspace only releases pages enmasse")
@@ -477,7 +475,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             possibly_dead_mature_blocks: Default::default(),
             mature_evac_remsets: Default::default(),
             num_clean_blocks_released_lazy: Default::default(),
-            cm_enabled: false,
             rc_enabled,
             is_end_of_satb_or_full_gc: false,
             rc: RefCountHelper::NEW,
@@ -518,7 +515,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             user_triggered_collection,
             self.reusable_blocks.len() == 0,
             full_heap_system_gc,
-            self.cm_enabled,
             self.rc_enabled,
             *self.common.options.immix_always_defrag,
         );
@@ -814,12 +810,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let block = Block::from_aligned_address(block_address);
         if !self.rc_enabled || self.defrag.in_defrag() {
             self.defrag.notify_new_clean_block(copy);
-        }
-        if !self.rc_enabled && self.cm_enabled && !super::BLOCK_ONLY {
-            let current_state = self.line_mark_state.load(Ordering::Acquire);
-            for line in block.lines() {
-                line.mark(current_state);
-            }
         }
         if let Some(hooks) = self.hooks() {
             hooks.on_clean_block_acquired(block, copy);
@@ -1130,16 +1120,16 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if self.common.unlog_traced_object {
             // Make sure the side metadata for the line can fit into one byte. For smaller line size, we should
             // use `mark_as_unlogged` instead to mark the bit.
-            // const_assert!(
-            //     Line::BYTES
-            //         >= (1
-            //             << (crate::util::constants::LOG_BITS_IN_BYTE
-            //                 + crate::util::constants::LOG_MIN_OBJECT_SIZE))
-            // );
-            // const_assert_eq!(
-            //     crate::vm::object_model::specs::VMGlobalLogBitSpec::LOG_NUM_BITS,
-            //     0
-            // ); // We should put this to the addition, but type casting is not allowed in constant assertions.
+            const_assert!(
+                Line::BYTES
+                    >= (1
+                        << (crate::util::constants::LOG_BITS_IN_BYTE
+                            + crate::util::constants::LOG_MIN_OBJECT_SIZE))
+            );
+            const_assert_eq!(
+                crate::vm::object_model::specs::VMGlobalLogBitSpec::LOG_NUM_BITS,
+                0
+            ); // We should put this to the addition, but type casting is not allowed in constant assertions.
 
             // Every immix line is 256 bytes, which is mapped to 4 bytes in the side metadata.
             // If we have one object in the line that is mature, we can assume all the objects in the line are mature objects.
@@ -1161,18 +1151,31 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /// Atomically mark an object.
     pub fn attempt_mark(&self, object: ObjectReference) -> bool {
-        let result = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.fetch_update_metadata::<VM, u8, _>(
-            object,
-            Ordering::Relaxed,
-            Ordering::Relaxed,
-            |v| {
-                if v != 0 {
-                    return None;
-                }
-                Some(1)
-            },
-        );
-        result.is_ok()
+        loop {
+            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
+                object,
+                None,
+                Ordering::SeqCst,
+            );
+            if old_value == self.mark_state {
+                return false;
+            }
+
+            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+                .compare_exchange_metadata::<VM, u8>(
+                    object,
+                    old_value,
+                    self.mark_state,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
+                break;
+            }
+        }
+        true
     }
 
     /// Atomically mark an object.
@@ -1191,20 +1194,17 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         result.is_ok()
     }
 
-    pub fn is_marked(&self, object: ObjectReference) -> bool {
+    fn is_marked_with(&self, object: ObjectReference, mark_state: u8) -> bool {
         let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
             object,
             None,
-            Ordering::Relaxed,
+            Ordering::SeqCst,
         );
-        old_value == 1
+        old_value == mark_state
     }
 
-    pub fn line_is_marked(&self, a: Address) -> bool {
-        let b = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-            .extract_side_spec()
-            .load_byte(a);
-        b == u8::MAX
+    pub(crate) fn is_marked(&self, object: ObjectReference) -> bool {
+        self.is_marked_with(object, self.mark_state)
     }
 
     /// Check if an object is pinned.
@@ -1284,13 +1284,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         };
         let start = Line::from(block.start() + (start << Line::LOG_BYTES));
         let end = Line::from(block.start() + (end << Line::LOG_BYTES));
-        if Line::steps_between(&start, &end).unwrap() < 1 {
-            if end == block.end_line() {
-                return None;
-            } else {
-                return self.rc_get_next_available_lines(copy, end);
-            };
-        }
         if self.common.needs_log_bit {
             if !copy {
                 Line::clear_field_unlog_table::<VM>(start..end);

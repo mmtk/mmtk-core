@@ -1,4 +1,3 @@
-use crate::policy::immix::block::Block;
 use crate::util::constants::*;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::linear_scan::Region;

@@ -66,16 +66,6 @@ pub(crate) struct LazySweepingJobsCounter {
     counter: Arc<AtomicUsize>,
 }
 impl LazySweepingJobsCounter {
-    pub fn new() -> Self {
-        let lazy_sweeping_jobs = LAZY_SWEEPING_JOBS.read();
-        let counter = lazy_sweeping_jobs.curr_counter.as_ref().unwrap();
-        counter.fetch_add(1, Ordering::SeqCst);
-        Self {
-            decs_counter: None,
-            counter: counter.clone(),
-        }
-    }
-
     pub fn new_decs() -> Self {
         let lazy_sweeping_jobs = LAZY_SWEEPING_JOBS.read();
         let decs_counter = lazy_sweeping_jobs.curr_decs_counter.as_ref().unwrap();

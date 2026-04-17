@@ -361,7 +361,7 @@ impl<VM: VMBinding> LXR<VM> {
     }
 
     pub fn cm_enabled(&self) -> bool {
-        self.immix_space.cm_enabled
+        !cfg!(feature = "lxr_no_cm")
     }
 
     pub fn cm_in_progress(&self) -> bool {
@@ -663,7 +663,6 @@ impl<VM: VMBinding> LXR<VM> {
     }
 
     fn gc_init(&mut self) {
-        self.immix_space.cm_enabled = !cfg!(feature = "lxr_no_cm");
         self.immix_space.rc_enabled = true;
         self.common.los.rc_enabled = true;
         unsafe {
