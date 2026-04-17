@@ -71,6 +71,47 @@ pub trait Collection<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The thread pointer for the mutator which failed the allocation and triggered the OOM.
     /// * `err_kind`: The type of OOM error that was encountered.
+    ///
+    /// # Warnings about stack unwinding
+    ///
+    /// Some programming languages throw exceptions when the heap is out of memory.  We recommend
+    /// letting `Collection::out_of_memory` return so that [`crate::memory_manager::alloc`] or
+    /// [`crate::memory_manager::alloc_with_options`] will return `Address::ZERO`.  The VM binding
+    /// then throws exceptions when it detects such a return value.  In the case of
+    /// `alloc_with_option` where it may also return `Address::ZERO` if not at safepoint, the VM
+    /// binding can set some thread-local flags in `Collection::out_of_memory` to distinguish
+    /// between the two different cases that return zero.
+    ///
+    /// It may be tempting to implement throwing exceptions by unwinding the stack from within
+    /// `Collection::out_of_memory`.  But the VM binding developers must be aware that the behavior
+    /// of
+    ///
+    /// 1.  whether any stack frame can be unwound, and
+    /// 2.  whether local variables that implement the [`Drop`] trait will be dropped
+    ///
+    /// depends on many factors, including but not limited to:
+    ///
+    /// -   the unwinding mechanism, such as `panic!()` (Rust), `throw` (C++), `longjmp` (C), etc.
+    /// -   the ABI of the function of each stack frame, such as "Rust", "C-unwind", "C", etc.
+    /// -   inlining decisions made by the compiler
+    /// -   the Rust [panic handler]
+    /// -   the [`panic` codegen option]
+    /// -   whether any native (C/C++/etc.) functions are compiled with `-fno-exceptions`
+    /// -   whether C++ functions have the `noexcept` specifier
+    /// -   the implementation-specified behaviour in C++ where `throw` is executed but no exception
+    ///     handler is found on the stack (the implementation may choose to terminate immediately
+    ///     without unwinding at all)
+    ///
+    /// [panic handler]: https://doc.rust-lang.org/reference/panic.html#r-panic.panic_handler
+    /// [`panic` codegen option]: https://doc.rust-lang.org/rustc/codegen-options/index.html#panic
+    ///
+    /// The Rust Documentation [specifies][rust-unw] that when unwinding across certain ABI
+    /// boundaries, it will result in aborting or [undefined behavior][rust-ub].  The VM binding
+    /// developers need to be extremely careful about those details, but the obvious alternative is
+    /// simply returning from `Collection::out_of_memory`.
+    ///
+    /// [rust-unw]: https://doc.rust-lang.org/reference/items/functions.html#unwinding
+    /// [rust-ub]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     fn out_of_memory(_tls: VMThread, err_kind: AllocationError) {
         panic!("Out of memory with {:?}!", err_kind);
     }
