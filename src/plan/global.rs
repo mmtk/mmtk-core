@@ -245,10 +245,6 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// * `space`: an option to indicate if there is a space that has failed in an allocation.
     fn collection_required(&self, space_full: bool, space: Option<SpaceStats<Self::VM>>) -> bool;
 
-    fn concurrent_collection_required(&self) -> bool {
-        false
-    }
-
     // Note: The following methods are about page accounting. The default implementation should
     // work fine for non-copying plans. For copying plans, the plan should override any of these methods
     // if necessary.
@@ -340,15 +336,6 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
 
     fn gc_pause_start(&self, _scheduler: &GCWorkScheduler<Self::VM>) {}
     fn gc_pause_end(&self) {}
-    fn no_mutator_prepare_release(&self) -> bool {
-        false
-    }
-    fn no_worker_prepare(&self) -> bool {
-        false
-    }
-    fn fast_worker_release(&self) -> bool {
-        false
-    }
 
     /// Return whether the current GC may move any object.  The VM binding can make use of this
     /// information and choose to or not to update some data structures that record the addresses
@@ -846,7 +833,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             } else if #[cfg(feature = "marksweep_as_nonmoving")] {
                 self.nonmoving.prepare(_full_heap);
             } else {
-                self.nonmoving.prepare(_full_heap,  None, UnlogBitsOperation::NoOp);
+                self.nonmoving.prepare(_full_heap, None, UnlogBitsOperation::NoOp);
             }
         }
     }

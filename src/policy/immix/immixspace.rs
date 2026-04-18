@@ -12,6 +12,7 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::sft_map::SFTMap;
 use crate::policy::space::{CommonSpace, Space};
+use crate::scheduler::gc_work::PrepareCollector;
 use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::alloc::allocator::AllocatorContext;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
@@ -578,8 +579,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             if pause == Pause::Full {
                 // Reset worker TLABs.
                 // The block of the current worker TLAB may be selected as part of the mature evacuation set.
-                // So the copied mature objects might be copied into defrag blocks, and get copied out again.
-                crate::scheduler::worker::reset_workers::<VM>();
+                for w in &self.scheduler().worker_group.workers_shared {
+                    let result = w.designated_work.push(Box::new(PrepareCollector));
+                    debug_assert!(result.is_ok());
+                }
             }
             self.flush_page_resource();
         }

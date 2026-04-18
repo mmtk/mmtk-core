@@ -4,7 +4,6 @@ use super::*;
 use crate::plan::lxr::LXR;
 use crate::plan::ObjectsClosure;
 use crate::plan::VectorObjectQueue;
-use crate::plan::VectorQueue;
 use crate::util::*;
 use crate::vm::slot::Slot;
 use crate::vm::*;
@@ -61,17 +60,21 @@ impl<C: GCWorkContext> GCWork<C::VM> for Prepare<C> {
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.prepare(worker.tls);
 
-        if !plan_mut.no_mutator_prepare_release() && plan_mut.constraints().needs_prepare_mutator {
-            for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
-                mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                    .add(PrepareMutator::<C::VM>::new(mutator));
-            }
+        if plan_mut.constraints().needs_prepare_mutator {
+            let prepare_mutator_packets = <C::VM as VMBinding>::VMActivePlan::mutators()
+                .map(|mutator| Box::new(PrepareMutator::<C::VM>::new(mutator)) as _)
+                .collect::<Vec<_>>();
+            // Just in case the VM binding is inconsistent about the number of mutators and the actual mutator list.
+            debug_assert_eq!(
+                prepare_mutator_packets.len(),
+                <C::VM as VMBinding>::VMActivePlan::number_of_mutators()
+            );
+            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].bulk_add(prepare_mutator_packets);
         }
-        if !plan_mut.no_worker_prepare() {
-            for w in &mmtk.scheduler.worker_group.workers_shared {
-                let result = w.designated_work.push(Box::new(PrepareCollector));
-                debug_assert!(result.is_ok());
-            }
+
+        for w in &mmtk.scheduler.worker_group.workers_shared {
+            let result = w.designated_work.push(Box::new(PrepareCollector));
+            debug_assert!(result.is_ok());
         }
     }
 }
@@ -140,19 +143,19 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.release(worker.tls);
 
-        if !plan_mut.no_mutator_prepare_release() {
-            for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
-                mmtk.scheduler.work_buckets[WorkBucketStage::Release]
-                    .add(ReleaseMutator::<C::VM>::new(mutator));
-            }
-        }
-        if !plan_mut.fast_worker_release() {
-            for w in &mmtk.scheduler.worker_group.workers_shared {
-                let result = w.designated_work.push(Box::new(ReleaseCollector));
-                debug_assert!(result.is_ok());
-            }
-        } else {
-            crate::scheduler::worker::reset_workers::<C::VM>();
+        let release_mutator_packets = <C::VM as VMBinding>::VMActivePlan::mutators()
+            .map(|mutator| Box::new(ReleaseMutator::<C::VM>::new(mutator)) as _)
+            .collect::<Vec<_>>();
+        // Just in case the VM binding is inconsistent about the number of mutators and the actual mutator list.
+        debug_assert_eq!(
+            release_mutator_packets.len(),
+            <C::VM as VMBinding>::VMActivePlan::number_of_mutators()
+        );
+        mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(release_mutator_packets);
+
+        for w in &mmtk.scheduler.worker_group.workers_shared {
+            let result = w.designated_work.push(Box::new(ReleaseCollector));
+            debug_assert!(result.is_ok());
         }
     }
 }
@@ -210,6 +213,12 @@ impl<C: GCWorkContext> StopMutators<C> {
         }
     }
 
+    pub fn new_with_flush() -> Self {
+        let mut me = Self::new();
+        me.flush_mutator = true;
+        me
+    }
+
     /// Create a `StopMutators` work packet that does not create `ScanMutatorRoots` work packets for mutators, and will simply flush mutators.
     pub fn new_no_scan_roots() -> Self {
         Self {
@@ -231,19 +240,16 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
             WorkBucketStage::Prepare
         };
         <C::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
-            // For LXR, we must flush and prepare all mutators before scanning begins.
-            // Flushing processes RC decrement buffers; preparing sets up mutator state for the GC cycle.
-            if is_lxr || self.flush_mutator {
+            // TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
+            // Should we push to Unconstrained instead?
+
+            if self.flush_mutator {
                 mutator.flush();
-            }
-            if is_lxr {
-                mutator.prepare(worker.tls);
             }
             if !self.skip_mutator_roots {
                 mmtk.scheduler.work_buckets[stage].add(ScanMutatorRoots::<C>(mutator));
             }
         });
-        mmtk.scheduler.set_in_gc_pause(true);
         trace!("stop_all_mutators end");
         mmtk.get_plan().gc_pause_start(&mmtk.scheduler);
         let factory = ProcessEdgesWorkRootsWorkFactory::<
@@ -711,12 +717,6 @@ pub trait ProcessEdgesWork:
 impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         self.set_worker(worker);
-        #[cfg(feature = "sanity")]
-        let roots = if self.roots {
-            Some(self.slots.clone())
-        } else {
-            None
-        };
         self.process_slots();
         if !self.nodes.is_empty() {
             self.flush();

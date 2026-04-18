@@ -19,7 +19,7 @@ use crate::Plan;
 use crossbeam::deque::{Injector, Steal};
 use enum_map::{Enum, EnumMap};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -34,8 +34,6 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     affinity: AffinityKind,
     pub(super) postponed_concurrent_work: spin::RwLock<Injector<Box<dyn GCWork<VM>>>>,
     pub(super) postponed_concurrent_work_prioritized: spin::RwLock<Injector<Box<dyn GCWork<VM>>>>,
-    in_gc_pause: AtomicBool,
-    bucket_update_progress: AtomicUsize,
 }
 
 // FIXME: GCWorkScheduler should be naturally Sync, but we cannot remove this `impl` yet.
@@ -87,8 +85,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             affinity,
             postponed_concurrent_work: spin::RwLock::new(Injector::new()),
             postponed_concurrent_work_prioritized: spin::RwLock::new(Injector::new()),
-            in_gc_pause: AtomicBool::new(false),
-            bucket_update_progress: AtomicUsize::new(0),
         })
     }
 
@@ -297,28 +293,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
         // Reference processing
         if !*plan.base().options.no_reference_types || !*plan.base().options.no_finalizer {
-            // use crate::util::reference_processor::{
-            //     PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
-            // };
-            // self.work_buckets[WorkBucketStage::WeakRefClosure]
-            //     .add(SoftRefProcessing::<C::DefaultProcessEdges>::new());
-            // self.work_buckets[WorkBucketStage::WeakRefClosure]
-            //     .add(WeakRefProcessing::<C::DefaultProcessEdges>::new());
-
             // VM-specific weak ref processing
             self.work_buckets[WorkBucketStage::WeakRefClosure]
                 .add(VMProcessWeakRefs::<C::DefaultProcessEdges>::new());
             self.work_buckets[WorkBucketStage::PhantomRefClosure]
                 .add(PhantomRefProcessing::<VM>::new());
-
-            // use crate::util::reference_processor::RefForwarding;
-            // if plan.constraints().needs_forward_after_liveness {
-            //     self.work_buckets[WorkBucketStage::RefForwarding]
-            //         .add(RefForwarding::<C::DefaultProcessEdges>::new());
-            // }
-
-            // use crate::util::reference_processor::RefEnqueue;
-            // self.work_buckets[WorkBucketStage::Release].add(RefEnqueue::<VM>::new());
         }
 
         // Finalization
@@ -441,42 +420,35 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         debug!("update_buckets");
         let mut buckets_updated = false;
         let mut new_packets = false;
-        let start_index = self.bucket_update_progress.load(Ordering::SeqCst) + 1;
-        let mut new_progress = WorkBucketStage::LENGTH;
-        for i in start_index..WorkBucketStage::LENGTH {
+        for i in 0..WorkBucketStage::LENGTH {
             let id = WorkBucketStage::from_usize(i);
             if id.is_always_open() {
                 continue;
             }
 
             let bucket = &self.work_buckets[id];
-            if !bucket.is_enabled() || bucket.is_open() {
+            if !bucket.is_enabled() {
                 debug!("Work bucket {:?} is disabled. Skip.", id);
                 continue;
             }
             debug!("Checking if {:?} can be opened...", id);
             let bucket_opened = bucket.update(self);
-            if bucket_opened {
-                probe!(mmtk, bucket_opened, id);
-            }
             buckets_updated = buckets_updated || bucket_opened;
             if bucket_opened {
                 probe!(mmtk, bucket_opened, id);
                 new_packets = new_packets || !bucket.is_drained();
+                if new_packets {
+                    // Quit the loop. There are already new packets in the newly opened buckets.
+                    trace!("Found new packets at stage {:?}.  Break.", id);
+                    break;
+                }
                 new_packets = new_packets || bucket.maybe_schedule_sentinel();
                 if new_packets {
-                    new_progress = i;
                     // Quit the loop. A sentinel packet is added to the newly opened buckets.
                     trace!("Sentinel is scheduled at stage {:?}.  Break.", id);
                     break;
                 }
             }
-        }
-        if buckets_updated && new_packets {
-            self.bucket_update_progress
-                .store(new_progress, Ordering::SeqCst);
-        } else {
-            self.bucket_update_progress.store(0, Ordering::SeqCst);
         }
         buckets_updated && new_packets
     }
@@ -488,7 +460,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 bkt.set_enabled(true);
             }
         });
-        self.bucket_update_progress.store(0, Ordering::SeqCst);
     }
 
     pub fn reset_state(&self) {
@@ -498,7 +469,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 bkt.set_enabled(true);
             }
         });
-        self.bucket_update_progress.store(0, Ordering::SeqCst);
     }
 
     pub fn debug_assert_all_stw_buckets_closed(&self) {
@@ -528,17 +498,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         if let Some(id) = error_example {
             panic!("Some open buckets (such as {:?}) are not empty.", id);
         }
-    }
-
-    pub(super) fn set_in_gc_pause(&self, in_gc_pause: bool) {
-        self.in_gc_pause.store(in_gc_pause, Ordering::SeqCst);
-        for wb in self.work_buckets.values() {
-            wb.set_in_concurrent(!in_gc_pause);
-        }
-    }
-
-    pub fn in_concurrent(&self) -> bool {
-        !self.in_gc_pause.load(Ordering::SeqCst)
     }
 
     /// Get a schedulable work packet without retry.
@@ -834,7 +793,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         mmtk.set_gc_status(GcStatus::NotInGC);
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
 
-        self.set_in_gc_pause(false);
         self.debug_assert_all_stw_buckets_closed();
         self.schedule_concurrent_packets(queue, pqueue)
     }

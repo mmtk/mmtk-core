@@ -106,7 +106,6 @@ pub struct WorkBucket<VM: VMBinding> {
     /// recursively, such as ephemerons and Java-style SoftReference and finalizers.  Sentinels
     /// can be used repeatedly to discover and process more such objects.
     sentinel: Mutex<Option<Box<dyn GCWork<VM>>>>,
-    in_concurrent: AtomicBool,
 }
 
 impl<VM: VMBinding> WorkBucket<VM> {
@@ -120,12 +119,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
             can_open: None,
             sentinel: Mutex::new(None),
             monitor,
-            in_concurrent: AtomicBool::new(true),
         }
-    }
-
-    pub fn set_in_concurrent(&self, in_concurrent: bool) {
-        self.in_concurrent.store(in_concurrent, Ordering::SeqCst);
     }
 
     pub fn set_enabled(&self, enabled: bool) {
