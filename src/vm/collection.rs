@@ -83,8 +83,6 @@ pub trait Collection<VM: VMBinding> {
 
     fn update_weak_processor(_lxr: bool) {}
 
-    fn set_concurrent_marking_state(_active: bool) {}
-
     /// A hook for the VM to do work after forwarding objects.
     ///
     /// This function is called after all of the following have finished:

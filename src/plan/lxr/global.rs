@@ -687,7 +687,6 @@ impl<VM: VMBinding> LXR<VM> {
     }
 
     fn set_concurrent_marking_state(&self, active: bool) {
-        <VM as VMBinding>::VMCollection::set_concurrent_marking_state(active);
         self.in_concurrent_marking.store(active, Ordering::SeqCst);
     }
 
