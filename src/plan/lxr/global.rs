@@ -4,9 +4,10 @@ use super::mutator::ALLOCATOR_MAPPING;
 use super::rc::{ProcessDecs, RCImmixCollectRootEdges};
 use super::remset::FlushMatureEvacRemsets;
 use super::{LazySweepingJobsCounter, LAZY_SWEEPING_JOBS};
+use crate::plan::concurrent::global::ConcurrentPlan;
+use crate::plan::concurrent::Pause;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
-use crate::plan::immix::Pause;
 use crate::plan::lxr::gc_work::FastRCPrepare;
 use crate::plan::AllocationSemantics;
 use crate::plan::MutatorContext;
@@ -63,7 +64,6 @@ pub struct LXR<VM: VMBinding> {
     previous_pause: Atomic<Option<Pause>>,
     hint_cycle_gc: AtomicBool,
     hint_emergency_gc: AtomicBool,
-    last_gc_was_defrag: AtomicBool,
     avail_pages_at_end_of_last_gc: AtomicUsize,
     zeroing_packets_scheduled: AtomicBool,
     decide_cycle_collection: (Mutex<bool>, Condvar),
@@ -96,7 +96,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             return true;
         }
         // SATB is finished
-        if self.cm_in_progress() && super::concurrent_marking_packets_drained() {
+        if self.concurrent_work_in_progress() && super::concurrent_marking_packets_drained() {
             return true;
         }
         // Survival limits
@@ -122,8 +122,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn last_collection_was_exhaustive(&self) -> bool {
-        let x = self.previous_pause.load(Ordering::SeqCst);
-        x == Some(Pause::Full) || x == Some(Pause::FullDefrag)
+        self.previous_pause.load(Ordering::SeqCst) == Some(Pause::Full)
     }
 
     fn constraints(&self) -> &'static PlanConstraints {
@@ -162,7 +161,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         match pause {
             Pause::Full => self
                 .schedule_emergency_full_heap_collection::<RCImmixCollectRootEdges<VM>>(scheduler),
-            Pause::FullDefrag => unreachable!(),
             Pause::RefCount => self.schedule_rc_collection(scheduler),
             Pause::InitialMark => self.schedule_concurrent_marking_initial_pause(scheduler),
             Pause::FinalMark => self.schedule_concurrent_marking_final_pause(scheduler),
@@ -222,11 +220,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         let mut curr_roots = self.curr_roots.write().unwrap();
         std::mem::swap::<SegQueue<_>>(&mut prev_roots, &mut curr_roots);
         debug_assert!(curr_roots.is_empty());
-        // release the collected region
-        self.last_gc_was_defrag.store(
-            self.current_pause().unwrap() == Pause::FullDefrag,
-            Ordering::Relaxed,
-        );
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
@@ -308,6 +301,20 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     fn fast_worker_release(&self) -> bool {
         true
     }
+
+    fn concurrent(&self) -> Option<&dyn ConcurrentPlan<VM = VM>> {
+        Some(self)
+    }
+}
+
+impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
+    fn current_pause(&self) -> Option<Pause> {
+        self.current_pause.load(Ordering::SeqCst)
+    }
+
+    fn concurrent_work_in_progress(&self) -> bool {
+        self.in_concurrent_marking.load(Ordering::Acquire)
+    }
 }
 
 impl<VM: VMBinding> LXR<VM> {
@@ -342,7 +349,6 @@ impl<VM: VMBinding> LXR<VM> {
             hint_emergency_gc: AtomicBool::new(false),
             current_pause: Atomic::new(None),
             previous_pause: Atomic::new(None),
-            last_gc_was_defrag: AtomicBool::new(false),
             avail_pages_at_end_of_last_gc: AtomicUsize::new(0),
             zeroing_packets_scheduled: AtomicBool::new(false),
             decide_cycle_collection: (Mutex::new(true), Condvar::new()),
@@ -364,10 +370,6 @@ impl<VM: VMBinding> LXR<VM> {
         !cfg!(feature = "lxr_no_cm")
     }
 
-    pub fn cm_in_progress(&self) -> bool {
-        self.in_concurrent_marking.load(Ordering::Relaxed)
-    }
-
     fn next_gc_is_emergency_gc(
         &self,
         total_pages: usize,
@@ -387,7 +389,7 @@ impl<VM: VMBinding> LXR<VM> {
         let live_mature_pages = super::MATURE_LIVE_PREDICTOR.live_pages() as usize;
         let garbage = mature_space_pages.saturating_sub(live_mature_pages);
         let total_pages = self.get_total_pages();
-        !self.cm_in_progress()
+        !self.concurrent_work_in_progress()
             && (self.cm_enabled() && garbage * 100 >= super::TRACE_THRESHOLD * total_pages)
     }
 
@@ -459,7 +461,7 @@ impl<VM: VMBinding> LXR<VM> {
 
         let emergency = self.base().global_state.is_emergency_collection();
         let user_triggered = self.base().global_state.is_user_triggered_collection();
-        let cm_in_progress = self.cm_in_progress();
+        let cm_in_progress = self.concurrent_work_in_progress();
         let cm_packets_drained = super::concurrent_marking_packets_drained();
         let hint_cycle_gc = self.hint_cycle_gc.load(Ordering::SeqCst);
         let hint_emergency_gc = self.hint_emergency_gc.load(Ordering::SeqCst);
@@ -517,7 +519,7 @@ impl<VM: VMBinding> LXR<VM> {
 
     fn schedule_rc_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.disable_unnecessary_buckets(scheduler, Pause::RefCount);
-        if self.cm_in_progress() {
+        if self.concurrent_work_in_progress() {
             scheduler.pause_concurrent_marking_work_packets_during_gc();
         }
         type E<VM> = RCImmixCollectRootEdges<VM>;

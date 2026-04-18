@@ -1,7 +1,7 @@
 use super::defrag::StatsForDefrag;
 use super::line::*;
 use super::{block::*, defrag::Defrag};
-use crate::plan::immix::Pause;
+use crate::plan::concurrent::Pause;
 use crate::plan::lxr::los_work::RCSweepMatureAfterSATBLOS;
 use crate::plan::lxr::rc_work::*;
 use crate::plan::lxr::LazySweepingJobsCounter;
@@ -557,7 +557,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     pub fn prepare_rc(&mut self, pause: Pause) {
         self.num_clean_blocks_released_lazy
             .store(0, Ordering::SeqCst);
-        debug_assert_ne!(pause, Pause::FullDefrag);
         if pause == Pause::InitialMark || pause == Pause::Full {
             // Select mature evacuation set
             if !cfg!(feature = "lxr_no_evac") {
@@ -592,7 +591,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn release_rc(&mut self, pause: Pause) {
-        debug_assert_ne!(pause, Pause::FullDefrag);
         self.flush_page_resource();
         let disable_lasy_dec_for_current_gc = crate::plan::lxr::disable_lasy_dec_for_current_gc();
         if disable_lasy_dec_for_current_gc {

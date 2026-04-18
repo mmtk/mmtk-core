@@ -152,6 +152,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             }
             Pause::InitialMark => self.schedule_concurrent_marking_initial_pause(scheduler),
             Pause::FinalMark => self.schedule_concurrent_marking_final_pause(scheduler),
+            Pause::RefCount => unreachable!(),
         }
     }
 
@@ -185,6 +186,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
                     .schedule_unlog_bits_op(UnlogBitsOperation::BulkSet);
             }
             Pause::FinalMark => (),
+            Pause::RefCount => unreachable!(),
         }
     }
 
@@ -192,6 +194,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         let pause = self.current_pause().unwrap();
         match pause {
             Pause::InitialMark => (),
+            Pause::RefCount => unreachable!(),
             Pause::Full | Pause::FinalMark => {
                 self.immix_space.release(
                     true,
@@ -283,6 +286,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
                 }
                 self.set_concurrent_marking_state(false);
             }
+            Pause::RefCount => unreachable!(),
         }
         info!("{:?} start", pause);
     }

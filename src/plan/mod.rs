@@ -45,7 +45,7 @@ mod generational;
 mod sticky;
 
 mod compressor;
-mod concurrent;
+pub mod concurrent;
 pub mod immix;
 pub mod lxr;
 mod markcompact;

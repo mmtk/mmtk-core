@@ -1,6 +1,8 @@
 pub mod barrier;
 pub(super) mod concurrent_marking_work;
-pub(super) mod global;
+pub mod global;
+
+pub use self::global::ConcurrentPlan;
 
 pub mod immix;
 
@@ -22,6 +24,10 @@ pub enum Pause {
     InitialMark,
     /// The pause after concurrent marking.
     FinalMark,
+    /// A reference-counting-only pause. Used by plans that combine reference counting with
+    /// optional concurrent marking (e.g. LXR). Concurrent marking is NOT active during this
+    /// pause — any in-flight concurrent work is postponed.
+    RefCount,
 }
 
 unsafe impl bytemuck::ZeroableInOption for Pause {}

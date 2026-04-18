@@ -8,7 +8,7 @@ use crossbeam::queue::SegQueue;
 
 use crate::{
     plan::lxr::LazySweepingJobsCounter,
-    plan::{immix::Pause, lxr::LXR},
+    plan::{concurrent::Pause, lxr::LXR},
     scheduler::{GCWork, GCWorker, WorkBucketStage},
     util::{
         constants::LOG_BYTES_IN_PAGE,

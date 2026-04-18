@@ -2,7 +2,8 @@ use super::block_sweeping::{
     RCLazySweepMutatorReusedBlocks, RCLazySweepNurseryBlocks, RCSTWSweepNurseryBlocks,
 };
 use super::LXR;
-use crate::plan::immix::Pause;
+use crate::plan::concurrent::global::ConcurrentPlan;
+use crate::plan::concurrent::Pause;
 use crate::policy::immix::block::{Block, BlockState};
 use crate::policy::immix::{ImmixHooks, ImmixSpace};
 use crate::scheduler::{GCWork, GCWorkScheduler, WorkBucketStage};
@@ -219,6 +220,6 @@ impl<VM: VMBinding> ImmixHooks<VM> for BlockAllocation<VM> {
 
     fn cm_in_progress_or_final_mark(&self) -> bool {
         let lxr = self.lxr();
-        lxr.cm_in_progress() || lxr.current_pause() == Some(Pause::FinalMark)
+        lxr.concurrent_work_in_progress() || lxr.current_pause() == Some(Pause::FinalMark)
     }
 }

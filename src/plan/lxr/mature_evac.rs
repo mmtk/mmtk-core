@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use crate::util::metadata::side_metadata::spec_defs::{IX_LINE_REUSE_COUNT, LOS_PAGE_REUSE_COUNT};
 use crate::vm::slot::Slot;
 use crate::{
-    plan::{immix::Pause, lxr::cm::LXRStopTheWorldProcessEdges},
+    plan::{concurrent::Pause, lxr::cm::LXRStopTheWorldProcessEdges},
     policy::{
         immix::block::{Block, BlockState},
         space::Space,

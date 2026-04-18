@@ -14,7 +14,8 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::rc::*;
 use crate::vm::slot::Slot;
 use crate::{
-    plan::immix::Pause,
+    plan::concurrent::global::ConcurrentPlan,
+    plan::concurrent::Pause,
     policy::{immix::block::Block, space::Space},
     scheduler::{gc_work::ProcessEdgesBase, GCWork, GCWorker, ProcessEdgesWork, WorkBucketStage},
     util::{metadata::side_metadata, object_forwarding, ObjectReference},
@@ -426,7 +427,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         self.lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
         self.pause = self.lxr.current_pause().unwrap();
-        self.in_cm = self.lxr.cm_in_progress();
+        self.in_cm = self.lxr.concurrent_work_in_progress();
         self.copy_context = self.worker().get_copy_context_mut() as *mut GCWorkerCopyContext<VM>;
         if super::NO_EVAC.load(Ordering::Relaxed) {
             self.no_evac = true;
@@ -689,9 +690,9 @@ impl<VM: VMBinding> GCWork<VM> for ProcessDecs<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
         self.mark_dead_objects = if super::LAZY_DECREMENTS {
-            lxr.cm_in_progress() && lxr.previous_pause() != Some(Pause::InitialMark)
+            lxr.concurrent_work_in_progress() && lxr.previous_pause() != Some(Pause::InitialMark)
         } else {
-            lxr.cm_in_progress() && lxr.current_pause() != Some(Pause::InitialMark)
+            lxr.concurrent_work_in_progress() && lxr.current_pause() != Some(Pause::InitialMark)
         };
         self.mature_sweeping_in_progress = if super::LAZY_DECREMENTS {
             lxr.previous_pause() == Some(Pause::FinalMark)
