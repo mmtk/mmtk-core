@@ -322,6 +322,13 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         self.common.release_discontiguous_chunks(chunk);
     }
 
+    pub fn get_pages(&self, start: Address) -> usize {
+        debug_assert!(conversions::is_page_aligned(start));
+        let sync = self.sync.lock().unwrap();
+        let page_offset = conversions::bytes_to_pages_up(start - sync.start);
+        sync.free_list.size(page_offset as _) as _
+    }
+
     /// Release pages previously allocated by `alloc_pages`.
     ///
     /// Warning: This method acquires the mutex `self.sync`.  If multiple threads release pages

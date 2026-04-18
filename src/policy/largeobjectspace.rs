@@ -100,10 +100,6 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
                 self.test_and_mark(a.to_object_reference::<VM>(), self.mark_state);
             }
             // Initialize metadata
-            VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
-                .as_spec()
-                .extract_side_spec()
-                .bzero_metadata(object.to_object_start::<VM>(), bytes);
             let lxr = self.lxr.unwrap();
             if lxr.concurrent_work_in_progress() {
                 for off in (0..bytes).step_by(BYTES_IN_PAGE) {
@@ -374,6 +370,11 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     fn release_object(&self, start: Address) -> usize {
         if self.rc_enabled {
             self.rc.set(start.to_object_reference::<VM>(), 0);
+            let pages = self.pr.get_pages(start);
+            VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+                .as_spec()
+                .extract_side_spec()
+                .bzero_metadata(start, pages * BYTES_IN_PAGE);
         }
         self.pr.release_pages(start)
     }
