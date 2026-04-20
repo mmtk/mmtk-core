@@ -130,9 +130,6 @@ impl<VM: VMBinding> ObjectQueue for LXRConcurrentTraceObjects<VM> {
 unsafe impl<VM: VMBinding> Send for LXRConcurrentTraceObjects<VM> {}
 
 impl<VM: VMBinding> GCWork<VM> for LXRConcurrentTraceObjects<VM> {
-    fn is_concurrent_marking_work(&self) -> bool {
-        true
-    }
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         self.worker = worker;
         debug_assert!(!mmtk.scheduler.work_buckets[WorkBucketStage::Initial].is_open());

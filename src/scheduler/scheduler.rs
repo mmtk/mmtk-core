@@ -13,14 +13,12 @@ use crate::plan::concurrent::Pause;
 use crate::plan::lxr::LXR;
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
-use crate::util::reference_processor::PhantomRefProcessing;
 use crate::vm::Collection;
 use crate::vm::VMBinding;
 use crate::Plan;
 use crossbeam::deque::Steal;
 use enum_map::{Enum, EnumMap};
 use std::collections::HashMap;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -218,37 +216,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             if plan.constraints().needs_forward_after_liveness {
                 self.work_buckets[WorkBucketStage::FinalizableForwarding]
                     .add(ForwardFinalization::<C::DefaultProcessEdges>::new());
-                unimplemented!()
-            }
-        }
-    }
-
-    /// Schedule all the common work packets
-    pub fn schedule_ref_proc_work<C: GCWorkContext<VM = VM> + 'static>(
-        &self,
-        plan: &'static C::PlanType,
-    ) {
-        use crate::scheduler::gc_work::*;
-
-        // Reference processing
-        if !*plan.base().options.no_reference_types || !*plan.base().options.no_finalizer {
-            // VM-specific weak ref processing
-            self.work_buckets[WorkBucketStage::WeakRefClosure]
-                .add(VMProcessWeakRefs::<C::DefaultProcessEdges>::new());
-            self.work_buckets[WorkBucketStage::PhantomRefClosure]
-                .add(PhantomRefProcessing::<VM>::new());
-        }
-
-        // Finalization
-        if !*plan.base().options.no_finalizer {
-            use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
-            // finalization
-            self.work_buckets[WorkBucketStage::FinalRefClosure]
-                .add(Finalization::<C::DefaultProcessEdges>::new());
-            // forward refs
-            if plan.constraints().needs_forward_after_liveness {
-                self.work_buckets[WorkBucketStage::FinalizableForwarding]
-                    .add(ForwardFinalization::<C::DefaultProcessEdges>::new());
             }
         }
 
@@ -351,7 +318,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 if new_packets {
                     // Quit the loop. There are already new packets in the newly opened buckets.
                     trace!("Found new packets at stage {:?}.  Break.", id);
-
                     break;
                 }
                 new_packets = new_packets || bucket.maybe_schedule_sentinel();
@@ -723,7 +689,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.gc_trigger.clear_request();
         let first_stw_bucket = &self.work_buckets[WorkBucketStage::FIRST_STW_STAGE];
-        // debug_assert!(!first_stw_bucket.is_open());
+        debug_assert!(!first_stw_bucket.is_open());
         // Note: This is the only place where a bucket is opened without having all workers parked.
         // We usually require all workers to park before opening new buckets because otherwise
         // packets will be executed out of order.  However, since `Prepare` is the first STW
@@ -732,20 +698,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // opening the first STW bucket.  In the future, we should redesign the opening condition
         // of work buckets to make the synchronization more robust,
         first_stw_bucket.open();
-        if first_stw_bucket.is_empty()
-            && self.worker_monitor.parked.load(Ordering::SeqCst) + 1 == self.num_workers()
-            && crate::plan::lxr::concurrent_marking_packets_drained()
-            && crate::plan::lxr::LazySweepingJobs::all_finished()
-        {
-            let second_stw_stage =
-                WorkBucketStage::from_usize(WorkBucketStage::FIRST_STW_STAGE.into_usize() + 1);
-            let second_stw_bucket = &self.work_buckets[second_stw_stage];
-            second_stw_bucket.open();
-        }
-        self.worker_monitor.notify_work_available(true);
-    }
-
-    pub fn wakeup_all_conc_workers(&self) {
         self.worker_monitor.notify_work_available(true);
     }
 

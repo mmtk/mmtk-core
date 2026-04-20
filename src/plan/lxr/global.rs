@@ -538,7 +538,6 @@ impl<VM: VMBinding> LXR<VM> {
             .add(Prepare::<LXRGCWorkContext<UnsupportedProcessEdges<VM>>>::new(self));
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<LXRGCWorkContext<UnsupportedProcessEdges<VM>>>::new(self));
-        scheduler.schedule_ref_proc_work::<LXRWeakRefWorkContext<VM>>(self);
     }
 
     fn schedule_emergency_full_heap_collection<E: ProcessEdgesWork<VM = VM>>(
@@ -558,7 +557,6 @@ impl<VM: VMBinding> LXR<VM> {
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<LXRGCWorkContext<UnsupportedProcessEdges<VM>>>::new(self));
-        scheduler.schedule_ref_proc_work::<LXRWeakRefWorkContext<VM>>(self);
     }
 
     fn process_prev_roots(&self, scheduler: &GCWorkScheduler<VM>) {

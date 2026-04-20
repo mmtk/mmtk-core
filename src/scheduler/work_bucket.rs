@@ -194,9 +194,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
     /// Test if the bucket is drained
     pub fn is_empty(&self) -> bool {
-        if !self.is_enabled() {
-            return true;
-        }
         self.queue.is_empty()
     }
 

@@ -4,9 +4,7 @@
 //! -   letting the last parked worker take action, and
 //! -   letting workers and mutators notify workers when workers are given things to do.
 
-use std::sync::{atomic::AtomicUsize, Condvar, Mutex};
-
-use atomic::Ordering;
+use std::sync::{Condvar, Mutex};
 
 use super::{
     worker::WorkerShouldExit,
@@ -37,7 +35,6 @@ pub(crate) struct WorkerMonitor {
     /// -   any work packets available, and
     /// -   any field in `sync.goals.requests` set to true.
     workers_have_anything_to_do: Condvar,
-    pub(crate) parked: AtomicUsize,
 }
 
 /// The synchronized part of `WorkerMonitor`.
@@ -95,7 +92,6 @@ impl WorkerMonitor {
                 goals: Default::default(),
             }),
             workers_have_anything_to_do: Default::default(),
-            parked: Default::default(),
         }
     }
 
@@ -140,7 +136,6 @@ impl WorkerMonitor {
 
         // Park this worker
         let all_parked = sync.parker.inc_parked_workers();
-        self.parked.fetch_add(1, Ordering::SeqCst);
         trace!(
             "Worker {} parked.  parked/total: {}/{}.  All parked: {}",
             ordinal,
@@ -228,7 +223,6 @@ impl WorkerMonitor {
 
         // Unpark this worker.
         sync.parker.dec_parked_workers();
-        self.parked.fetch_sub(1, Ordering::SeqCst);
         trace!(
             "Worker {} unparked.  parked/total: {}/{}.",
             ordinal,
