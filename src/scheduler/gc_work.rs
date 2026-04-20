@@ -290,7 +290,7 @@ impl<'w, T: Trace> TracingObjectTracer<'w, T> {
     fn flush(&mut self) {
         let next_nodes = self.queue.take();
         assert!(!next_nodes.is_empty());
-        let work_packet = TracingProcessNodes::new(self.trace.clone(), next_nodes, self.stage);
+        let work_packet = TracingProcessNodes::<T>::new(next_nodes, self.stage);
         self.worker.scheduler().work_buckets[self.stage].add(work_packet);
     }
 }
@@ -298,22 +298,17 @@ impl<'w, T: Trace> TracingObjectTracer<'w, T> {
 /// This implementation of [`ObjectTracerContext`] creates the [`TracingObjectTracer`] to expand the
 /// transitive closure during a stop-the-world tracing GC or the final mark pause of a concurrent
 /// GC.  It is used during object scanning as well as weak reference processing.
+#[derive(Clone)]
 pub(crate) struct TracingTracerContext<T: Trace> {
-    trace: T,
     stage: WorkBucketStage,
+    phantom_data: PhantomData<T>,
 }
 
 impl<T: Trace> TracingTracerContext<T> {
-    pub fn new(trace: T, stage: WorkBucketStage) -> Self {
-        Self { trace, stage }
-    }
-}
-
-impl<T: Trace> Clone for TracingTracerContext<T> {
-    fn clone(&self) -> Self {
+    pub fn new(stage: WorkBucketStage) -> Self {
         Self {
-            trace: self.trace.clone(),
-            stage: self.stage,
+            stage,
+            phantom_data: PhantomData,
         }
     }
 }
@@ -327,7 +322,7 @@ impl<T: Trace> ObjectTracerContext<T::VM> for TracingTracerContext<T> {
     {
         let mmtk = worker.mmtk;
 
-        // Cretae the callback tracer.
+        // Create the callback tracer.
         let mut tracer = TracingObjectTracer::new(worker, T::from_mmtk(mmtk), self.stage);
 
         // The caller can use the tracer here.
@@ -360,13 +355,13 @@ impl<T: Trace> VMProcessWeakRefs<T> {
 }
 
 impl<T: Trace> GCWork<T::VM> for VMProcessWeakRefs<T> {
-    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, _mmtk: &'static MMTK<T::VM>) {
         trace!("VMProcessWeakRefs");
 
         let stage = WorkBucketStage::VMRefClosure;
 
         let need_to_repeat = {
-            let tracer_factory = TracingTracerContext::new(T::from_mmtk(mmtk), stage);
+            let tracer_factory = TracingTracerContext::<T>::new(stage);
             <T::VM as VMBinding>::VMScanning::process_weak_refs(worker, tracer_factory)
         };
 
@@ -400,12 +395,12 @@ impl<T: Trace> VMForwardWeakRefs<T> {
 }
 
 impl<T: Trace> GCWork<T::VM> for VMForwardWeakRefs<T> {
-    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, _mmtk: &'static MMTK<T::VM>) {
         trace!("VMForwardWeakRefs");
 
         let stage = WorkBucketStage::VMRefForwarding;
 
-        let tracer_factory = TracingTracerContext::new(T::from_mmtk(mmtk), stage);
+        let tracer_factory = TracingTracerContext::<T>::new(stage);
         <T::VM as VMBinding>::VMScanning::forward_weak_refs(worker, tracer_factory)
     }
 }
@@ -479,7 +474,6 @@ pub type SlotOfTP<E> = <<E as Trace>::VM as VMBinding>::VMSlot;
 /// moved or forwarded.  It will spawn or immediately run the [`DefaultScanObjects`] work packet to
 /// scan newly traced objects.
 pub struct TracingProcessSlots<T: Trace> {
-    trace: T,
     slots: Vec<SlotOfTP<T>>,
     #[allow(unused)] // Only used by sanity
     roots: bool,
@@ -489,9 +483,8 @@ pub struct TracingProcessSlots<T: Trace> {
 impl<T: Trace> TracingProcessSlots<T> {
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
 
-    pub fn new(trace: T, slots: Vec<SlotOfTP<T>>, roots: bool, bucket: WorkBucketStage) -> Self {
+    pub fn new(slots: Vec<SlotOfTP<T>>, roots: bool, bucket: WorkBucketStage) -> Self {
         Self {
-            trace,
             slots,
             roots,
             bucket,
@@ -501,6 +494,8 @@ impl<T: Trace> TracingProcessSlots<T> {
 
 impl<T: Trace> GCWork<T::VM> for TracingProcessSlots<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
+        let mut trace = T::from_mmtk(mmtk);
+
         #[cfg(feature = "extreme_assertions")]
         if crate::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {
             for slot in self.slots.iter() {
@@ -513,7 +508,7 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessSlots<T> {
 
         for slot in self.slots.iter() {
             if let Some(object) = slot.load() {
-                let new_object = self.trace.trace_object(worker, object, &mut queue);
+                let new_object = trace.trace_object(worker, object, &mut queue);
                 if T::may_move_objects() && new_object != object {
                     slot.store(new_object);
                 }
@@ -522,8 +517,7 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessSlots<T> {
 
         if !queue.is_empty() {
             let queued_objects = queue.take();
-            let mut work =
-                TracingProcessNodes::new(self.trace.clone(), queued_objects, self.bucket);
+            let mut work = TracingProcessNodes::<T>::new(queued_objects, self.bucket);
 
             if Self::SCAN_OBJECTS_IMMEDIATELY {
                 work.do_work(worker, mmtk);
@@ -588,12 +582,7 @@ impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> RootsWorkFactory<V
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,
-            TracingProcessSlots::new(
-                DPE::from_mmtk(self.mmtk),
-                slots,
-                true,
-                WorkBucketStage::Closure,
-            ),
+            TracingProcessSlots::<DPE>::new(slots, true, WorkBucketStage::Closure),
         );
     }
 
@@ -656,17 +645,17 @@ impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>>
 /// support slot enqueuing, it will immediately trace their slots and spawn other
 /// [`TracingProcessNodes`] work packets to process their newly traced children.
 pub struct TracingProcessNodes<T: Trace> {
-    trace: T,
     objects: Vec<ObjectReference>,
     bucket: WorkBucketStage,
+    phantom_data: PhantomData<T>,
 }
 
 impl<T: Trace> TracingProcessNodes<T> {
-    pub fn new(trace: T, objects: Vec<ObjectReference>, bucket: WorkBucketStage) -> Self {
+    pub fn new(objects: Vec<ObjectReference>, bucket: WorkBucketStage) -> Self {
         Self {
-            trace,
             objects,
             bucket,
+            phantom_data: PhantomData,
         }
     }
 }
@@ -676,6 +665,7 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessNodes<T> {
         trace!("ScanObjects");
 
         let tls = worker.tls;
+        let mut trace = T::from_mmtk(mmtk);
 
         // Scan the objects in the list that supports slot-enququing.
         let mut scan_later = vec![];
@@ -684,8 +674,7 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessNodes<T> {
 
             let flush = |slots: &mut _, worker: &mut GCWorker<T::VM>| {
                 let buffer = std::mem::take(slots);
-                let work_packet =
-                    TracingProcessSlots::new(T::from_mmtk(mmtk), buffer, false, self.bucket);
+                let work_packet = TracingProcessSlots::<T>::new(buffer, false, self.bucket);
                 worker.add_work(self.bucket, work_packet);
             };
 
@@ -712,7 +701,7 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessNodes<T> {
                             flush(&mut slots, worker);
                         }
                     });
-                    self.trace.post_scan_object(object);
+                    trace.post_scan_object(object);
                 } else {
                     // If an object does not support slot-enqueuing, we have to use
                     // `Scanning::scan_object_and_trace_edges` and offload the job of updating the
@@ -735,7 +724,7 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessNodes<T> {
 
         // If any object does not support slot-enqueuing, we process them now.
         if !scan_later.is_empty() {
-            let object_tracer_context = TracingTracerContext::new(self.trace.clone(), self.bucket);
+            let object_tracer_context = TracingTracerContext::<T>::new(self.bucket);
 
             object_tracer_context.with_tracer(worker, |object_tracer| {
                 // Scan objects and trace their outgoing edges at the same time.
@@ -746,7 +735,7 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessNodes<T> {
                         object,
                         object_tracer,
                     );
-                    self.trace.post_scan_object(object);
+                    trace.post_scan_object(object);
                 }
             });
         }
@@ -836,8 +825,7 @@ impl<VM: VMBinding, R2OT: Trace<VM = VM>, O2OT: Trace<VM = VM>> GCWork<VM>
         probe!(mmtk, process_root_nodes, num_roots, num_enqueued_nodes);
 
         if !root_objects_to_scan.is_empty() {
-            let work =
-                TracingProcessNodes::new(O2OT::from_mmtk(mmtk), root_objects_to_scan, self.bucket);
+            let work = TracingProcessNodes::<O2OT>::new(root_objects_to_scan, self.bucket);
             worker.add_work(self.bucket, work);
         }
 

@@ -559,8 +559,7 @@ impl<T: Trace> GCWork<T::VM> for SoftRefProcessing<T> {
             worker.scheduler().work_buckets[WorkBucketStage::SoftRefClosure].set_sentinel(rescan);
 
             // Retain soft references.  This will expand the transitive closure.
-            let tracer_context =
-                TracingTracerContext::new(T::from_mmtk(mmtk), WorkBucketStage::SoftRefClosure);
+            let tracer_context = TracingTracerContext::<T>::new(WorkBucketStage::SoftRefClosure);
             tracer_context.with_tracer(worker, |tracer| {
                 mmtk.reference_processors.retain_soft_refs(tracer, mmtk);
             });
@@ -607,8 +606,7 @@ impl<VM: VMBinding> PhantomRefProcessing<VM> {
 pub(crate) struct RefForwarding<T: Trace>(PhantomData<T>);
 impl<T: Trace> GCWork<T::VM> for RefForwarding<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
-        let tracer_context =
-            TracingTracerContext::new(T::from_mmtk(mmtk), WorkBucketStage::RefForwarding);
+        let tracer_context = TracingTracerContext::<T>::new(WorkBucketStage::RefForwarding);
         tracer_context.with_tracer(worker, |tracer| {
             mmtk.reference_processors.forward_refs(tracer, mmtk);
         });

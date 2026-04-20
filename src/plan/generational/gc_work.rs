@@ -105,11 +105,7 @@ impl<T: Trace> GCWork<T::VM> for ProcessModBuf<T> {
             // Scan objects in the modbuf and forward pointers
             let modbuf = std::mem::take(&mut self.modbuf);
             GCWork::do_work(
-                &mut TracingProcessNodes::<T>::new(
-                    T::from_mmtk(mmtk),
-                    modbuf,
-                    WorkBucketStage::Closure,
-                ),
+                &mut TracingProcessNodes::<T>::new(modbuf, WorkBucketStage::Closure),
                 worker,
                 mmtk,
             )
@@ -153,12 +149,7 @@ impl<T: Trace> GCWork<T::VM> for ProcessRegionModBuf<T> {
             }
             // Forward entries
             GCWork::do_work(
-                &mut TracingProcessSlots::new(
-                    T::from_mmtk(mmtk),
-                    slots,
-                    false,
-                    WorkBucketStage::Closure,
-                ),
+                &mut TracingProcessSlots::<T>::new(slots, false, WorkBucketStage::Closure),
                 worker,
                 mmtk,
             )

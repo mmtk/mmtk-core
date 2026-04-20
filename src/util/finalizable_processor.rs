@@ -164,8 +164,7 @@ impl<T: Trace> GCWork<T::VM> for Finalization<T> {
             num_candidates_begin, num_ready_for_finalize_begin
         );
 
-        let tracer_context =
-            TracingTracerContext::new(T::from_mmtk(mmtk), WorkBucketStage::FinalRefClosure);
+        let tracer_context = TracingTracerContext::<T>::new(WorkBucketStage::FinalRefClosure);
         let tls = worker.tls;
         tracer_context.with_tracer(worker, |tracer| {
             finalizable_processor.scan::<T::VM, _>(tls, tracer, is_nursery_gc(mmtk.get_plan()));
@@ -203,8 +202,7 @@ impl<T: Trace> GCWork<T::VM> for ForwardFinalization<T> {
         trace!("Forward finalization");
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
 
-        let tracer_context =
-            TracingTracerContext::new(T::from_mmtk(mmtk), WorkBucketStage::FinalizableForwarding);
+        let tracer_context = TracingTracerContext::<T>::new(WorkBucketStage::FinalizableForwarding);
         tracer_context.with_tracer(worker, |tracer| {
             finalizable_processor.forward_candidate(tracer, is_nursery_gc(mmtk.get_plan()));
 

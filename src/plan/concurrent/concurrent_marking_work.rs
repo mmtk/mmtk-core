@@ -20,11 +20,11 @@ pub struct ConcurrentTraceObjects<
     P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,
     const KIND: TraceKind,
 > {
-    trace: ConcurrentMarkingTrace<VM, P, KIND>,
     /// initial objects to mark and scan
     initial_objects: Vec<ObjectReference>,
     /// `true` if the `initial_objects` are already marked.
     already_marked: bool,
+    phantom_data: PhantomData<(VM, P)>,
 }
 
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
@@ -33,15 +33,11 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     const SATB_BUFFER_SIZE: usize = 8192;
     const CONCURRENT_TRACE_OVERFLOW: usize = Self::SATB_BUFFER_SIZE * 2;
 
-    pub fn new(
-        trace: ConcurrentMarkingTrace<VM, P, KIND>,
-        initial_objects: Vec<ObjectReference>,
-        already_marked: bool,
-    ) -> Self {
+    pub fn new(initial_objects: Vec<ObjectReference>, already_marked: bool) -> Self {
         Self {
-            trace,
             initial_objects,
             already_marked,
+            phantom_data: PhantomData,
         }
     }
 }
@@ -54,8 +50,9 @@ unsafe impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, con
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
     GCWork<VM> for ConcurrentTraceObjects<VM, P, KIND>
 {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let tls = worker.tls;
+        let mut trace = ConcurrentMarkingTrace::<VM, P, KIND>::from_mmtk(mmtk);
 
         // These are initial objects.  They may not have been marked.
         let initial_objects = std::mem::take(&mut self.initial_objects);
@@ -70,30 +67,28 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         } else {
             // We scan each object and only enqueue newly visited objects.
             for object in initial_objects {
-                self.trace
-                    .trace_object(worker, object, &mut |enqueued_object| {
-                        debug_assert_eq!(enqueued_object, object);
-                        queue.push_back(enqueued_object);
-                        num_queued_objects += 1;
-                    });
+                trace.trace_object(worker, object, &mut |enqueued_object| {
+                    debug_assert_eq!(enqueued_object, object);
+                    queue.push_back(enqueued_object);
+                    num_queued_objects += 1;
+                });
             }
         }
 
         // Loop until the queue is drained.
         while let Some(object) = queue.pop_back() {
             scanning_helper::visit_children_non_moving::<VM>(tls, object, &mut |child| {
-                self.trace
-                    .trace_object(worker, child, &mut |enqueued_child| {
-                        debug_assert_eq!(enqueued_child, child);
-                        queue.push_back(enqueued_child);
-                        num_queued_objects += 1;
-                    })
+                trace.trace_object(worker, child, &mut |enqueued_child| {
+                    debug_assert_eq!(enqueued_child, child);
+                    queue.push_back(enqueued_child);
+                    num_queued_objects += 1;
+                })
             });
-            self.trace.post_scan_object(object);
+            trace.post_scan_object(object);
 
             if queue.len() >= Self::CONCURRENT_TRACE_OVERFLOW {
                 let offloaded_objects = queue.drain(..Self::SATB_BUFFER_SIZE).collect();
-                let w = Self::new(self.trace.clone(), offloaded_objects, true);
+                let w = Self::new(offloaded_objects, true);
                 worker.add_work(WorkBucketStage::Concurrent, w);
             }
         }
@@ -142,9 +137,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
             }
 
             ConcurrentTraceObjects::<VM, P, KIND>::new(
-                ConcurrentMarkingTrace::from_mmtk(mmtk),
-                nodes,
-                false, // These objects are not marked, yet.
+                nodes, false, // These objects are not marked, yet.
             )
         } else {
             return;
@@ -250,8 +243,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 
     fn create_and_schedule_root_nodes_work(&mut self, nodes: Vec<ObjectReference>) {
         let mmtk = self.mmtk;
-        let trace = ConcurrentMarkingTrace::<VM, P, KIND>::from_mmtk(mmtk);
-        let work_packet = ConcurrentTraceObjects::new(trace, nodes, false);
+        let work_packet = ConcurrentTraceObjects::<VM, P, KIND>::new(nodes, false);
         mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].add_no_notify(work_packet);
     }
 }
