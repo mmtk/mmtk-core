@@ -27,6 +27,9 @@ pub trait Trace: 'static + Send + Clone {
     fn may_move_objects() -> bool;
 }
 
+/// A shorthand for getting the slot type from a [`Trace`] instance.
+pub type SlotOfTrace<T> = <<T as Trace>::VM as VMBinding>::VMSlot;
+
 #[allow(dead_code)]
 #[derive(Default)]
 pub struct SFTTrace<VM: VMBinding> {

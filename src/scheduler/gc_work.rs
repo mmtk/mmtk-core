@@ -1,7 +1,7 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::global_state::GcStatus;
-use crate::plan::tracing::Trace;
+use crate::plan::tracing::{SlotOfTrace, Trace};
 use crate::plan::VectorObjectQueue;
 use crate::util::*;
 use crate::vm::slot::Slot;
@@ -464,9 +464,6 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanVMSpecificRoots<C> {
     }
 }
 
-/// A short-hand for `<E::VM as VMBinding>::VMSlot`.
-pub type SlotOfTP<E> = <<E as Trace>::VM as VMBinding>::VMSlot;
-
 /// A work packet for processing slots during a stop-the-world tracing GC and the final mark pause
 /// of a concurrent GC.
 ///
@@ -474,14 +471,14 @@ pub type SlotOfTP<E> = <<E as Trace>::VM as VMBinding>::VMSlot;
 /// moved or forwarded.  It will spawn or immediately run the [`DefaultScanObjects`] work packet to
 /// scan newly traced objects.
 pub struct TracingProcessSlots<T: Trace> {
-    slots: Vec<SlotOfTP<T>>,
+    slots: Vec<SlotOfTrace<T>>,
     bucket: WorkBucketStage,
 }
 
 impl<T: Trace> TracingProcessSlots<T> {
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
 
-    pub fn new(slots: Vec<SlotOfTP<T>>, bucket: WorkBucketStage) -> Self {
+    pub fn new(slots: Vec<SlotOfTrace<T>>, bucket: WorkBucketStage) -> Self {
         Self { slots, bucket }
     }
 }
