@@ -475,20 +475,14 @@ pub type SlotOfTP<E> = <<E as Trace>::VM as VMBinding>::VMSlot;
 /// scan newly traced objects.
 pub struct TracingProcessSlots<T: Trace> {
     slots: Vec<SlotOfTP<T>>,
-    #[allow(unused)] // Only used by sanity
-    roots: bool,
     bucket: WorkBucketStage,
 }
 
 impl<T: Trace> TracingProcessSlots<T> {
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
 
-    pub fn new(slots: Vec<SlotOfTP<T>>, roots: bool, bucket: WorkBucketStage) -> Self {
-        Self {
-            slots,
-            roots,
-            bucket,
-        }
+    pub fn new(slots: Vec<SlotOfTP<T>>, bucket: WorkBucketStage) -> Self {
+        Self { slots, bucket }
     }
 }
 
@@ -582,7 +576,7 @@ impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> RootsWorkFactory<V
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,
-            TracingProcessSlots::<DPE>::new(slots, true, WorkBucketStage::Closure),
+            TracingProcessSlots::<DPE>::new(slots, WorkBucketStage::Closure),
         );
     }
 
@@ -674,7 +668,7 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessNodes<T> {
 
             let flush = |slots: &mut _, worker: &mut GCWorker<T::VM>| {
                 let buffer = std::mem::take(slots);
-                let work_packet = TracingProcessSlots::<T>::new(buffer, false, self.bucket);
+                let work_packet = TracingProcessSlots::<T>::new(buffer, self.bucket);
                 worker.add_work(self.bucket, work_packet);
             };
 
