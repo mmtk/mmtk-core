@@ -494,7 +494,7 @@ impl<T: Trace> TracingProcessSlots<T> {
 
 impl<T: Trace> GCWork<T::VM> for TracingProcessSlots<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
-        let mut trace = T::from_mmtk(mmtk);
+        let trace = T::from_mmtk(mmtk);
 
         #[cfg(feature = "extreme_assertions")]
         if crate::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {
@@ -665,7 +665,7 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessNodes<T> {
         trace!("ScanObjects");
 
         let tls = worker.tls;
-        let mut trace = T::from_mmtk(mmtk);
+        let trace = T::from_mmtk(mmtk);
 
         // Scan the objects in the list that supports slot-enququing.
         let mut scan_later = vec![];
@@ -807,7 +807,7 @@ impl<VM: VMBinding, R2OT: Trace<VM = VM>, O2OT: Trace<VM = VM>> GCWork<VM>
         let root_objects_to_scan = {
             let mut queue = VectorObjectQueue::new();
 
-            let mut r2o_trace = R2OT::from_mmtk(mmtk);
+            let r2o_trace = R2OT::from_mmtk(mmtk);
 
             for object in self.roots.iter().copied() {
                 let new_object = r2o_trace.trace_object(worker, object, &mut queue);

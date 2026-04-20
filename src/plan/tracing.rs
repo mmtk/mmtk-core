@@ -16,13 +16,13 @@ pub trait Trace: 'static + Send + Clone {
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self;
 
     fn trace_object<Q: ObjectQueue>(
-        &mut self,
+        &self,
         worker: &mut GCWorker<Self::VM>,
         object: ObjectReference,
         queue: &mut Q,
     ) -> ObjectReference;
 
-    fn post_scan_object(&mut self, object: ObjectReference);
+    fn post_scan_object(&self, object: ObjectReference);
 
     fn may_move_objects() -> bool;
 }
@@ -49,7 +49,7 @@ impl<VM: VMBinding> Trace for SFTTrace<VM> {
     }
 
     fn trace_object<Q: ObjectQueue>(
-        &mut self,
+        &self,
         worker: &mut GCWorker<VM>,
         object: ObjectReference,
         queue: &mut Q,
@@ -69,7 +69,7 @@ impl<VM: VMBinding> Trace for SFTTrace<VM> {
         result
     }
 
-    fn post_scan_object(&mut self, _object: ObjectReference) {
+    fn post_scan_object(&self, _object: ObjectReference) {
         // Do nothing.  SFTTrace is only suitable for plans that don't need post_scan_object.
     }
 
@@ -103,7 +103,7 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> Trace for PlanTrac
     }
 
     fn trace_object<Q: ObjectQueue>(
-        &mut self,
+        &self,
         worker: &mut GCWorker<Self::VM>,
         object: ObjectReference,
         queue: &mut Q,
@@ -111,7 +111,7 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> Trace for PlanTrac
         self.plan.trace_object::<Q, KIND>(queue, object, worker)
     }
 
-    fn post_scan_object(&mut self, object: ObjectReference) {
+    fn post_scan_object(&self, object: ObjectReference) {
         self.plan.post_scan_object(object);
     }
 
@@ -141,7 +141,7 @@ impl<VM: VMBinding> Trace for UnsupportedTrace<VM> {
     }
 
     fn trace_object<Q: ObjectQueue>(
-        &mut self,
+        &self,
         _worker: &mut GCWorker<VM>,
         _object: ObjectReference,
         _queue: &mut Q,
@@ -149,7 +149,7 @@ impl<VM: VMBinding> Trace for UnsupportedTrace<VM> {
         unimplemented!()
     }
 
-    fn post_scan_object(&mut self, _object: ObjectReference) {
+    fn post_scan_object(&self, _object: ObjectReference) {
         unimplemented!()
     }
 

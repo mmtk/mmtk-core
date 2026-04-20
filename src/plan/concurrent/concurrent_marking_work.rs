@@ -52,7 +52,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let tls = worker.tls;
-        let mut trace = ConcurrentMarkingTrace::<VM, P, KIND>::from_mmtk(mmtk);
+        let trace = ConcurrentMarkingTrace::<VM, P, KIND>::from_mmtk(mmtk);
 
         // These are initial objects.  They may not have been marked.
         let initial_objects = std::mem::take(&mut self.initial_objects);
@@ -173,7 +173,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 
     fn trace_object<Q: ObjectQueue>(
-        &mut self,
+        &self,
         worker: &mut GCWorker<Self::VM>,
         object: ObjectReference,
         queue: &mut Q,
@@ -181,7 +181,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         self.plan.trace_object::<Q, KIND>(queue, object, worker)
     }
 
-    fn post_scan_object(&mut self, object: ObjectReference) {
+    fn post_scan_object(&self, object: ObjectReference) {
         self.plan.post_scan_object(object);
     }
 

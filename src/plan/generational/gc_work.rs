@@ -46,7 +46,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
     }
 
     fn trace_object<Q: crate::ObjectQueue>(
-        &mut self,
+        &self,
         worker: &mut GCWorker<Self::VM>,
         object: ObjectReference,
         queue: &mut Q,
@@ -55,7 +55,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
             .trace_object_nursery::<_, KIND>(queue, object, worker)
     }
 
-    fn post_scan_object(&mut self, object: ObjectReference) {
+    fn post_scan_object(&self, object: ObjectReference) {
         self.plan.post_scan_object(object);
     }
 
