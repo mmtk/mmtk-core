@@ -466,9 +466,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
                         );
                     }
                 }
-                worker
-                    .scheduler()
-                    .postpone(LXRConcurrentTraceObjects::new(roots.clone(), mmtk));
+                worker.scheduler().work_buckets[WorkBucketStage::ConcurrentResumable]
+                    .add(LXRConcurrentTraceObjects::new(roots.clone(), mmtk));
             }
             if self.pause == Pause::FinalMark || self.pause == Pause::Full {
                 if !root_slots.is_empty() && self.root_kind != Some(RootKind::Weak) {
@@ -576,24 +575,15 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         }
     }
 
-    fn new_work(&self, lxr: &LXR<VM>, w: ProcessDecs<VM>) {
-        if lxr.current_pause().is_none() {
-            self.worker()
-                .add_work_prioritized(WorkBucketStage::Unconstrained, w);
-        } else {
-            self.worker().add_work(WorkBucketStage::Unconstrained, w);
-        }
+    fn new_work(&self, w: ProcessDecs<VM>) {
+        self.worker().add_work(WorkBucketStage::Unconstrained, w);
     }
 
     fn flush(&mut self) {
         let mmtk = GCWorker::<VM>::current().mmtk;
         if !self.new_decs.is_empty() {
             let new_decs = self.new_decs.take();
-            let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
-            self.new_work(
-                lxr,
-                ProcessDecs::new(new_decs, self.counter.clone_with_decs()),
-            );
+            self.new_work(ProcessDecs::new(new_decs, self.counter.clone_with_decs()));
         }
         if !self.mark_objects.is_empty() {
             let objects = self.mark_objects.take();
@@ -601,7 +591,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             if super::LAZY_DECREMENTS {
                 self.worker().add_work(WorkBucketStage::Unconstrained, w);
             } else {
-                self.worker().scheduler().postpone(w);
+                self.worker().scheduler().work_buckets[WorkBucketStage::ConcurrentResumable].add(w);
             }
         }
     }

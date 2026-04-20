@@ -173,19 +173,6 @@ impl<VM: VMBinding> GCWorker<VM> {
 
     const LOCALLY_CACHED_WORK_PACKETS: usize = 16;
 
-    /// Add a work packet to the work queue and mark it with a higher priority.
-    /// If the bucket is open, the packet will be pushed to the local queue, otherwise it will be
-    /// pushed to the global bucket with a higher priority.
-    pub fn add_work_prioritized(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
-        if !self.scheduler().work_buckets[bucket].is_open()
-            || self.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS
-        {
-            self.scheduler.work_buckets[bucket].add_prioritized(Box::new(work));
-            return;
-        }
-        self.local_work_buffer.push(Box::new(work));
-    }
-
     pub fn add_boxed_work(&mut self, bucket: WorkBucketStage, work: Box<dyn GCWork<VM>>) {
         if !self.scheduler().work_buckets[bucket].is_open()
             || self.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS

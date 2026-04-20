@@ -597,7 +597,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.flush_page_resource();
         let disable_lasy_dec_for_current_gc = crate::plan::lxr::disable_lasy_dec_for_current_gc();
         if disable_lasy_dec_for_current_gc {
-            self.scheduler().process_lazy_decrement_packets();
+            self.scheduler().process_concurrent_packets_in_pause();
         } else {
             debug_assert_ne!(pause, Pause::Full);
         }
@@ -617,8 +617,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             let sweep_los = RCSweepMatureAfterSATBLOS::new(LazySweepingJobsCounter::new_decs());
             if crate::plan::lxr::LAZY_DECREMENTS && !disable_lasy_dec_for_current_gc {
                 debug_assert_ne!(pause, Pause::Full);
-                self.scheduler().postpone_all(dead_cycle_sweep_packets);
-                self.scheduler().postpone(sweep_los);
+                let concurrent_bucket = &self.scheduler().work_buckets[WorkBucketStage::Concurrent];
+                concurrent_bucket.bulk_add_deferred(dead_cycle_sweep_packets);
+                concurrent_bucket.add_deferred(Box::new(sweep_los));
             } else {
                 self.scheduler().work_buckets[WorkBucketStage::STWRCDecsAndSweep]
                     .bulk_add(dead_cycle_sweep_packets);
@@ -1384,7 +1385,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 Box::new(SweepBlocksAfterDecs::new(blocks, counter.clone()))
             })
             .collect();
-        self.scheduler().work_buckets[WorkBucketStage::Unconstrained].bulk_add_prioritized(packets);
+        self.scheduler().work_buckets[WorkBucketStage::Unconstrained].bulk_add(packets);
     }
 
     pub(crate) fn get_mutator_recycled_lines_in_pages(&self) -> usize {

@@ -156,7 +156,8 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
                 ProcessDecs::new(decs, LazySweepingJobsCounter::new_decs())
             };
             if super::LAZY_DECREMENTS {
-                self.mmtk.scheduler.postpone_prioritized(w);
+                self.mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent]
+                    .add_deferred(Box::new(w));
             } else {
                 self.mmtk.scheduler.work_buckets[WorkBucketStage::STWRCDecsAndSweep].add(w);
             }

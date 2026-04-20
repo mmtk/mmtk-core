@@ -121,25 +121,11 @@ impl<VM: VMBinding> BlockAllocation<VM> {
             self.reused_blocks.reset();
             return;
         }
-        const MAX_STW_SWEEP_BLOCKS: usize = usize::MAX;
         self.reused_blocks.visit_slice(|blocks| {
-            let total_blocks = blocks.len();
-            let stw_limit = usize::min(total_blocks, MAX_STW_SWEEP_BLOCKS);
-            for b in &blocks[0..stw_limit] {
+            for b in blocks {
                 let block = b.load(Ordering::Relaxed);
                 self.space()
                     .add_to_possibly_dead_mature_blocks(block, false);
-            }
-            if total_blocks > stw_limit {
-                let packets = blocks[stw_limit..total_blocks]
-                    .chunks(1024)
-                    .map(|c| {
-                        let blocks: Vec<Block> =
-                            c.iter().map(|x| x.load(Ordering::Relaxed)).collect();
-                        Box::new(RCLazySweepMutatorReusedBlocks::new(blocks)) as Box<dyn GCWork<VM>>
-                    })
-                    .collect();
-                scheduler.postpone_all_prioritized(packets);
             }
         });
         self.reused_blocks.reset();
@@ -174,7 +160,7 @@ impl<VM: VMBinding> BlockAllocation<VM> {
                         Box::new(RCLazySweepNurseryBlocks::new(blocks)) as Box<dyn GCWork<VM>>
                     })
                     .collect();
-                scheduler.postpone_all_prioritized(packets);
+                scheduler.work_buckets[WorkBucketStage::Concurrent].bulk_add_deferred(packets);
             }
         });
         self.nursery_blocks.reset();

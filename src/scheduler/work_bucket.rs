@@ -4,38 +4,71 @@ use crate::vm::VMBinding;
 use crossbeam::deque::{Injector, Steal, Worker};
 use enum_map::Enum;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 
 pub(super) struct BucketQueue<VM: VMBinding> {
-    // FIXME: Performance!
-    queue: RwLock<Injector<Box<dyn GCWork<VM>>>>,
+    flag: AtomicBool,
+    queue0: Injector<Box<dyn GCWork<VM>>>,
+    queue1: Injector<Box<dyn GCWork<VM>>>,
 }
 
 impl<VM: VMBinding> BucketQueue<VM> {
     fn new() -> Self {
         Self {
-            queue: RwLock::new(Injector::new()),
+            flag: AtomicBool::new(false),
+            queue0: Injector::new(),
+            queue1: Injector::new(),
+        }
+    }
+
+    fn active_queue(&self) -> &Injector<Box<dyn GCWork<VM>>> {
+        if self.flag.load(Ordering::Relaxed) {
+            &self.queue1
+        } else {
+            &self.queue0
+        }
+    }
+
+    fn inactive_queue(&self) -> &Injector<Box<dyn GCWork<VM>>> {
+        if self.flag.load(Ordering::Relaxed) {
+            &self.queue0
+        } else {
+            &self.queue1
         }
     }
 
     fn is_empty(&self) -> bool {
-        self.queue.read().unwrap().is_empty()
+        self.active_queue().is_empty()
+    }
+
+    pub(super) fn steal(&self) -> Steal<Box<dyn GCWork<VM>>> {
+        self.active_queue().steal()
     }
 
     fn steal_batch_and_pop(
         &self,
         dest: &Worker<Box<dyn GCWork<VM>>>,
     ) -> Steal<Box<dyn GCWork<VM>>> {
-        self.queue.read().unwrap().steal_batch_and_pop(dest)
+        self.active_queue().steal_batch_and_pop(dest)
     }
 
     fn push(&self, w: Box<dyn GCWork<VM>>) {
-        self.queue.read().unwrap().push(w);
+        self.active_queue().push(w);
     }
 
     fn push_all(&self, ws: Vec<Box<dyn GCWork<VM>>>) {
         for w in ws {
-            self.queue.read().unwrap().push(w);
+            self.active_queue().push(w);
+        }
+    }
+
+    fn push_inactive(&self, w: Box<dyn GCWork<VM>>) {
+        self.inactive_queue().push(w);
+    }
+
+    fn push_all_inactive(&self, ws: Vec<Box<dyn GCWork<VM>>>) {
+        for w in ws {
+            self.inactive_queue().push(w);
         }
     }
 
@@ -44,7 +77,7 @@ impl<VM: VMBinding> BucketQueue<VM> {
     /// (e.g. when the execution has failed already and the system is going to panic).
     pub fn debug_dump_packets(&self) -> Vec<String> {
         let mut items = Vec::new();
-        let queue = self.queue.write().unwrap();
+        let queue = self.active_queue();
 
         {
             // Drain queue by stealing until empty
@@ -89,7 +122,6 @@ pub struct WorkBucket<VM: VMBinding> {
     /// The stage name of this bucket.
     stage: WorkBucketStage,
     queue: BucketQueue<VM>,
-    prioritized_queue: Option<BucketQueue<VM>>,
     monitor: Arc<WorkerMonitor>,
     /// The open condition for a bucket. If this is `Some`, the bucket will be open
     /// when the condition is met. If this is `None`, the bucket needs to be open manually.
@@ -115,10 +147,9 @@ impl<VM: VMBinding> WorkBucket<VM> {
             enabled: AtomicBool::new(stage.is_enabled_by_default()),
             stage,
             queue: BucketQueue::new(),
-            prioritized_queue: None,
+            monitor,
             can_open: None,
             sentinel: Mutex::new(None),
-            monitor,
         }
     }
 
@@ -130,32 +161,8 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.enabled.load(Ordering::Relaxed)
     }
 
-    pub fn enable_prioritized_queue(&mut self) {
-        self.prioritized_queue = Some(BucketQueue::new());
-    }
-
-    pub fn swap_queue(
-        &self,
-        mut new_queue: Injector<Box<dyn GCWork<VM>>>,
-    ) -> Injector<Box<dyn GCWork<VM>>> {
-        let mut queue = self.queue.queue.write().unwrap();
-        std::mem::swap::<Injector<Box<dyn GCWork<VM>>>>(&mut queue, &mut new_queue);
-        new_queue
-    }
-
-    pub fn swap_queue_prioritized(
-        &self,
-        mut new_queue: Injector<Box<dyn GCWork<VM>>>,
-    ) -> Injector<Box<dyn GCWork<VM>>> {
-        let mut queue = self
-            .prioritized_queue
-            .as_ref()
-            .unwrap()
-            .queue
-            .write()
-            .unwrap();
-        std::mem::swap::<Injector<Box<dyn GCWork<VM>>>>(&mut queue, &mut new_queue);
-        new_queue
+    pub fn flip(&self) {
+        self.queue.flag.fetch_xor(true, Ordering::SeqCst);
     }
 
     fn notify_one_worker(&self) {
@@ -191,11 +198,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
             return true;
         }
         self.queue.is_empty()
-            && self
-                .prioritized_queue
-                .as_ref()
-                .map(|q| q.is_empty())
-                .unwrap_or(true)
     }
 
     pub fn is_drained(&self) -> bool {
@@ -213,14 +215,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
     }
 
     /// Add a work packet to this bucket
-    /// Panic if this bucket cannot receive prioritized packets.
-    pub fn add_prioritized(&self, work: Box<dyn GCWork<VM>>) {
-        debug_assert!(self.is_enabled());
-        self.prioritized_queue.as_ref().unwrap().push(work);
-        self.notify_one_worker();
-    }
-
-    /// Add a work packet to this bucket
     pub fn add<W: GCWork<VM>>(&self, work: W) {
         debug_assert!(self.is_enabled());
         self.queue.push(Box::new(work));
@@ -234,6 +228,16 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.notify_one_worker();
     }
 
+    pub fn add_deferred(&self, work: Box<dyn GCWork<VM>>) {
+        debug_assert!(self.is_enabled());
+        self.queue.push_inactive(work);
+    }
+
+    pub fn bulk_add_deferred(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
+        debug_assert!(self.is_enabled());
+        self.queue.push_all_inactive(work_vec);
+    }
+
     /// Add a work packet to this bucket, but do not notify any workers.
     /// This is useful when the current thread is holding the mutex of `WorkerMonitor` which is
     /// used for notifying workers.  This usually happens if the current thread is the last worker
@@ -245,14 +249,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
     /// Like [`WorkBucket::add_no_notify`], but the work is boxed.
     pub(crate) fn add_boxed_no_notify(&self, work: Box<dyn GCWork<VM>>) {
         self.queue.push(work);
-    }
-
-    /// Add multiple packets with a higher priority.
-    /// Panic if this bucket cannot receive prioritized packets.
-    pub fn bulk_add_prioritized(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
-        debug_assert!(self.is_enabled());
-        self.prioritized_queue.as_ref().unwrap().push_all(work_vec);
-        self.notify_all_workers();
     }
 
     /// Add multiple packets
@@ -277,13 +273,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
         if !self.is_enabled() || !self.is_open() || self.is_empty() {
             return Steal::Empty;
         }
-        if let Some(prioritized_queue) = self.prioritized_queue.as_ref() {
-            prioritized_queue
-                .steal_batch_and_pop(worker)
-                .or_else(|| self.queue.steal_batch_and_pop(worker))
-        } else {
-            self.queue.steal_batch_and_pop(worker)
-        }
+        self.queue.steal_batch_and_pop(worker)
     }
 
     pub fn set_open_condition(
@@ -353,6 +343,7 @@ pub enum WorkBucketStage {
     /// work in the unconstrained bucket will always be consumed during STW. Users can disable this bucket
     /// and cache some concurrent work during STW, and only enable this bucket and allow concurrent execution once a STW is done.
     Concurrent,
+    ConcurrentResumable,
     FinishConcurrentWork,
     Initial,
     /// Preparation work.  Plans, spaces, GC workers, mutators, etc. should be prepared for GC at
@@ -433,13 +424,16 @@ impl WorkBucketStage {
     pub const fn is_open_by_default(&self) -> bool {
         matches!(
             self,
-            WorkBucketStage::Unconstrained | WorkBucketStage::Concurrent
+            WorkBucketStage::Unconstrained
+                | WorkBucketStage::Concurrent
+                | WorkBucketStage::ConcurrentResumable
         )
     }
 
     /// Is this stage enabled by default?
     pub const fn is_enabled_by_default(&self) -> bool {
         !matches!(self, WorkBucketStage::Concurrent)
+            && !matches!(self, WorkBucketStage::ConcurrentResumable)
     }
 
     /// Is this stage sequentially opened? All the stop-the-world stages, except the first one, are sequentially opened.
@@ -456,7 +450,9 @@ impl WorkBucketStage {
     pub const fn is_concurrent(&self) -> bool {
         matches!(
             self,
-            WorkBucketStage::Unconstrained | WorkBucketStage::Concurrent
+            WorkBucketStage::Unconstrained
+                | WorkBucketStage::Concurrent
+                | WorkBucketStage::ConcurrentResumable
         )
     }
 

@@ -66,11 +66,7 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
             let worker = GCWorker::<VM>::current();
             debug_assert!(self.plan.cm_enabled());
             let w = Self::new(objects, worker.mmtk);
-            if self.plan.current_pause() == Some(Pause::RefCount) {
-                worker.scheduler().postpone(w);
-            } else {
-                worker.add_work(WorkBucketStage::Unconstrained, w);
-            }
+            worker.add_work(WorkBucketStage::ConcurrentResumable, w);
         }
     }
 
@@ -228,7 +224,7 @@ impl<VM: VMBinding> GCWork<VM> for ProcessModBufSATB {
             .unwrap()
             .current_pause();
         if current_pause != Some(Pause::FinalMark) {
-            worker.scheduler().postpone(w);
+            worker.scheduler().work_buckets[WorkBucketStage::ConcurrentResumable].add(w);
         } else {
             GCWork::do_work(&mut w, worker, mmtk);
         }
