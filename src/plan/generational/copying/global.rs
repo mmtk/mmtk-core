@@ -103,7 +103,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn prepare_worker(&self, worker: &mut GCWorker<Self::VM>) {
-        unsafe { worker.get_copy_context_mut().copy[0].assume_init_mut() }.rebind(self.tospace());
+        worker.get_copy_context_mut().copy[0]
+            .as_mut()
+            .expect("Copy allocator not initialized")
+            .rebind(self.tospace());
     }
 
     fn release(&mut self, tls: VMWorkerThread) {

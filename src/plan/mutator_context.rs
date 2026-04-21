@@ -193,10 +193,9 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         offset: usize,
         allocator: AllocationSemantics,
     ) -> Address {
-        let allocator = unsafe {
-            self.allocators
-                .get_allocator_mut(self.config.allocator_mapping[allocator])
-        };
+        let allocator = self
+            .allocators
+            .get_allocator_mut(self.config.allocator_mapping[allocator]);
         // The value should be default/unset at the beginning of an allocation request.
         debug_assert!(allocator.get_context().get_alloc_options().is_default());
         allocator.alloc(size, align, offset)
@@ -210,10 +209,9 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         allocator: AllocationSemantics,
         options: AllocationOptions,
     ) -> Address {
-        let allocator = unsafe {
-            self.allocators
-                .get_allocator_mut(self.config.allocator_mapping[allocator])
-        };
+        let allocator = self
+            .allocators
+            .get_allocator_mut(self.config.allocator_mapping[allocator]);
         // The value should be default/unset at the beginning of an allocation request.
         debug_assert!(allocator.get_context().get_alloc_options().is_default());
         allocator.alloc_with_options(size, align, offset, options)
@@ -226,10 +224,9 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         offset: usize,
         allocator: AllocationSemantics,
     ) -> Address {
-        let allocator = unsafe {
-            self.allocators
-                .get_allocator_mut(self.config.allocator_mapping[allocator])
-        };
+        let allocator = self
+            .allocators
+            .get_allocator_mut(self.config.allocator_mapping[allocator]);
         // The value should be default/unset at the beginning of an allocation request.
         debug_assert!(allocator.get_context().get_alloc_options().is_default());
         allocator.alloc_slow(size, align, offset)
@@ -243,10 +240,9 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         allocator: AllocationSemantics,
         options: AllocationOptions,
     ) -> Address {
-        let allocator = unsafe {
-            self.allocators
-                .get_allocator_mut(self.config.allocator_mapping[allocator])
-        };
+        let allocator = self
+            .allocators
+            .get_allocator_mut(self.config.allocator_mapping[allocator]);
         // The value should be default/unset at the beginning of an allocation request.
         debug_assert!(allocator.get_context().get_alloc_options().is_default());
         allocator.alloc_slow_with_options(size, align, offset, options)
@@ -259,12 +255,10 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         _bytes: usize,
         allocator: AllocationSemantics,
     ) {
-        unsafe {
-            self.allocators
-                .get_allocator_mut(self.config.allocator_mapping[allocator])
-        }
-        .get_space()
-        .initialize_object_metadata(refer)
+        self.allocators
+            .get_allocator_mut(self.config.allocator_mapping[allocator])
+            .get_space()
+            .initialize_object_metadata(refer)
     }
 
     fn get_tls(&self) -> VMMutatorThread {
@@ -293,7 +287,9 @@ impl<VM: VMBinding> Mutator<VM> {
     /// Inform each allocator about destroying. Call allocator-specific on destroy methods.
     pub fn on_destroy(&mut self) {
         for selector in self.get_all_allocator_selectors() {
-            unsafe { self.allocators.get_allocator_mut(selector) }.on_mutator_destroy();
+            self.allocators
+                .get_allocator_mut(selector)
+                .on_mutator_destroy();
         }
     }
 
