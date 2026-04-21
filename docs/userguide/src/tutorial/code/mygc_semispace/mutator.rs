@@ -32,13 +32,11 @@ pub fn mygc_mutator_release<VM: VMBinding>(
     _tls: VMWorkerThread,
 ) {
     // rebind the allocation bump pointer to the appropriate semispace
-    let bump_allocator = unsafe {
-        mutator
-            .allocators
-            .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::Default])
-    }
-    .downcast_mut::<BumpAllocator<VM>>()
-    .unwrap();
+    let bump_allocator = mutator
+        .allocators
+        .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::Default])
+        .downcast_mut::<BumpAllocator<VM>>()
+        .unwrap();
     bump_allocator.rebind(
         mutator
             .plan
