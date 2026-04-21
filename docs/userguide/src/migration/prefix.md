@@ -29,6 +29,21 @@ Notes for the mmtk-core developers:
 <div id="api-migration-detail-body"><!-- We use JavaScript to process things within this div. -->
 
 <!-- Insert new versions here -->
+## Unreleased
+### `MaybeUninit` replaced with `Option` in `Allocators` and `GCWorkerCopyContext`
+
+```admonish tldr
+We replaced `MaybeUninit` arrays with `Option` arrays in `Allocators` and `GCWorkerCopyContext`. This removes unsafe code but may affect bindings that mirror the layout of these structs.
+```
+
+API changes:
+
+-   module `util::alloc::allocators`
+    +   `Allocators`: The fields `bump_pointer`, `large_object`, `malloc`, `immix`, `free_list`, and `markcompact` are now arrays of `Option<T>` instead of `MaybeUninit<T>`.
+-   module `util::copy`
+    +   `GCWorkerCopyContext`: The fields `copy`, `immix`, and `immix_hybrid` are now arrays of `Option<T>` instead of `MaybeUninit<T>`.
+
+If your VM binding mirrors the layout of MMTk's `Mutator` (which embeds allocator structs), you must update the shapes and/or types of these fields.
 
 ## 0.33.0
 
