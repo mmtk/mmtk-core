@@ -1,8 +1,9 @@
-use super::cm::LXRConcurrentTraceObjects;
-use super::cm::LXRStopTheWorldProcessEdges;
-use super::LazySweepingJobsCounter;
-use super::SurvivalRatioPredictorLocal;
-use super::LXR;
+use super::super::LazySweepingJobsCounter;
+use super::super::SurvivalRatioPredictorLocal;
+use super::super::LXR;
+use super::super::{LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURSERY_EVACUATION};
+use super::tracing::LXRConcurrentTraceObjects;
+use super::tracing::LXRStopTheWorldProcessEdges;
 use crate::plan::VectorQueue;
 use crate::policy::immix::block::BlockState;
 use crate::scheduler::gc_work::RootKind;
@@ -84,10 +85,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         }
     }
 
-    pub fn new_objects(_objects: Vec<ObjectReference>) -> Self {
-        unreachable!()
-    }
-
     pub fn new(incs: Vec<VM::VMSlot>, lxr: &'static LXR<VM>) -> Self {
         Self {
             incs,
@@ -125,19 +122,16 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         s: VM::VMSlot,
         o: ObjectReference,
     ) {
-        if !(super::MATURE_EVACUATION && (self.in_cm || self.pause == Pause::FinalMark)) {
+        if !(MATURE_EVACUATION && (self.in_cm || self.pause == Pause::FinalMark)) {
             return;
         }
         if !slot_in_defrag && self.lxr.in_defrag(o) {
-            self.lxr
-                .immix_space
-                .mature_evac_remset
-                .record(s, o, self.lxr);
+            self.lxr.mature_evac_remset.record(s, o, self.lxr);
         }
     }
 
     fn record_mature_evac_remset(&mut self, s: VM::VMSlot, o: ObjectReference) {
-        if !(super::MATURE_EVACUATION && (self.in_cm || self.pause == Pause::FinalMark)) {
+        if !(MATURE_EVACUATION && (self.in_cm || self.pause == Pause::FinalMark)) {
             return;
         }
         self.record_mature_evac_remset2(self.lxr.address_in_defrag(s.to_address()), s, o);
@@ -255,9 +249,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
 
     fn process_inc_and_evacuate(&mut self, o: ObjectReference, depth: u32) -> ObjectReference {
         let los = self.lxr.los().in_space(o);
-        if super::NURSERY_EVACUATION
-            && !los
-            && object_forwarding::is_forwarded_or_being_forwarded::<VM>(o)
+        if NURSERY_EVACUATION && !los && object_forwarding::is_forwarded_or_being_forwarded::<VM>(o)
         {
             while object_forwarding::is_being_forwarded::<VM>(o) {
                 std::hint::spin_loop();
@@ -273,7 +265,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
             return new;
         }
-        if !super::NURSERY_EVACUATION || self.dont_evacuate(o, los) {
+        if !NURSERY_EVACUATION || self.dont_evacuate(o, los) {
             if self.inc(o) {
                 self.promote(o, false, los, depth);
             }
@@ -306,7 +298,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                     if promoted {
                         self.promote(o, false, los, depth);
                     }
-                    super::NO_EVAC.store(true, Ordering::Relaxed);
+                    NO_EVAC.store(true, Ordering::Relaxed);
                     self.no_evac = true;
                     o
                 }
@@ -429,7 +421,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
         self.pause = self.lxr.current_pause().unwrap();
         self.in_cm = self.lxr.concurrent_work_in_progress();
         self.copy_context = self.worker().get_copy_context_mut() as *mut GCWorkerCopyContext<VM>;
-        if super::NO_EVAC.load(Ordering::Relaxed) {
+        if NO_EVAC.load(Ordering::Relaxed) {
             self.no_evac = true;
         } else {
             let over_space = mmtk.get_plan().get_used_pages()
@@ -437,7 +429,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
                 > mmtk.get_plan().get_total_pages();
             if over_space {
                 self.no_evac = true;
-                super::NO_EVAC.store(true, Ordering::Relaxed);
+                NO_EVAC.store(true, Ordering::Relaxed);
             }
         }
         // Process main buffer
@@ -533,13 +525,11 @@ pub struct ProcessDecs<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> ProcessDecs<VM> {
-    pub const CAPACITY: usize = ProcessIncs::<VM, EDGE_KIND_NURSERY>::CAPACITY;
-
     fn worker(&self) -> &mut GCWorker<VM> {
         GCWorker::<VM>::current()
     }
 
-    pub(super) fn new(decs: Vec<ObjectReference>, counter: LazySweepingJobsCounter) -> Self {
+    pub fn new(decs: Vec<ObjectReference>, counter: LazySweepingJobsCounter) -> Self {
         Self {
             decs: Some(decs),
             decs_arc: None,
@@ -552,10 +542,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         }
     }
 
-    pub(super) fn new_arc(
-        decs: Arc<Vec<ObjectReference>>,
-        counter: LazySweepingJobsCounter,
-    ) -> Self {
+    pub fn new_arc(decs: Arc<Vec<ObjectReference>>, counter: LazySweepingJobsCounter) -> Self {
         Self {
             decs: None,
             decs_arc: Some(decs),
@@ -588,7 +575,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         if !self.mark_objects.is_empty() {
             let objects = self.mark_objects.take();
             let w = LXRConcurrentTraceObjects::new(objects, mmtk);
-            if super::LAZY_DECREMENTS {
+            if LAZY_DECREMENTS {
                 self.worker().add_work(WorkBucketStage::Unconstrained, w);
             } else {
                 self.worker().scheduler().work_buckets[WorkBucketStage::ConcurrentResumable].add(w);
@@ -635,8 +622,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         }
         if in_ix_space {
             let block = Block::containing(o);
-            lxr.immix_space
-                .add_to_possibly_dead_mature_blocks(block, false);
+            lxr.add_to_possibly_dead_mature_blocks(block, false);
             false
         } else {
             true
@@ -650,7 +636,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             {
                 continue;
             }
-            let o = if super::MATURE_EVACUATION && object_forwarding::is_forwarded::<VM>(*o) {
+            let o = if MATURE_EVACUATION && object_forwarding::is_forwarded::<VM>(*o) {
                 object_forwarding::read_forwarding_pointer::<VM>(*o)
             } else {
                 *o
@@ -679,12 +665,12 @@ impl<VM: VMBinding> ProcessDecs<VM> {
 impl<VM: VMBinding> GCWork<VM> for ProcessDecs<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
-        self.mark_dead_objects = if super::LAZY_DECREMENTS {
+        self.mark_dead_objects = if LAZY_DECREMENTS {
             lxr.concurrent_work_in_progress() && lxr.previous_pause() != Some(Pause::InitialMark)
         } else {
             lxr.concurrent_work_in_progress() && lxr.current_pause() != Some(Pause::InitialMark)
         };
-        self.mature_sweeping_in_progress = if super::LAZY_DECREMENTS {
+        self.mature_sweeping_in_progress = if LAZY_DECREMENTS {
             lxr.previous_pause() == Some(Pause::FinalMark)
                 || lxr.current_pause() == Some(Pause::Full)
         } else {
@@ -706,11 +692,11 @@ impl<VM: VMBinding> GCWork<VM> for ProcessDecs<VM> {
     }
 }
 
-pub struct RCImmixCollectRootEdges<VM: VMBinding> {
+pub struct CollectRoots<VM: VMBinding> {
     base: ProcessEdgesBase<VM>,
 }
 
-impl<VM: VMBinding> ProcessEdgesWork for RCImmixCollectRootEdges<VM> {
+impl<VM: VMBinding> ProcessEdgesWork for CollectRoots<VM> {
     type VM = VM;
     type ScanObjectsWorkType = ScanObjects<Self>;
     const OVERWRITE_REFERENCE: bool = false;
@@ -754,14 +740,14 @@ impl<VM: VMBinding> ProcessEdgesWork for RCImmixCollectRootEdges<VM> {
     }
 }
 
-impl<VM: VMBinding> Deref for RCImmixCollectRootEdges<VM> {
+impl<VM: VMBinding> Deref for CollectRoots<VM> {
     type Target = ProcessEdgesBase<VM>;
     fn deref(&self) -> &Self::Target {
         &self.base
     }
 }
 
-impl<VM: VMBinding> DerefMut for RCImmixCollectRootEdges<VM> {
+impl<VM: VMBinding> DerefMut for CollectRoots<VM> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }

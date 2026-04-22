@@ -1,4 +1,4 @@
-use super::block_sweeping::{RCLazySweepNurseryBlocks, RCSTWSweepNurseryBlocks};
+use super::gc_work::nursery_sweeping::{RCLazySweepNurseryBlocks, RCSTWSweepNurseryBlocks};
 use super::LXR;
 use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::Pause;
@@ -118,8 +118,7 @@ impl<VM: VMBinding> BlockAllocation<VM> {
         self.reused_blocks.visit_slice(|blocks| {
             for b in blocks {
                 let block = b.load(Ordering::Relaxed);
-                self.space()
-                    .add_to_possibly_dead_mature_blocks(block, false);
+                self.lxr().add_to_possibly_dead_mature_blocks(block, false);
             }
         });
         self.reused_blocks.reset();

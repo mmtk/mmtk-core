@@ -1,4 +1,4 @@
-use super::LXR;
+use super::super::LXR;
 use crate::plan::concurrent::Pause;
 use crate::plan::VectorQueue;
 use crate::policy::immix::block::Block;
@@ -35,7 +35,7 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
 
     pub fn new(objects: Vec<ObjectReference>, mmtk: &'static MMTK<VM>) -> Self {
         let plan = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
-        super::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
+        super::super::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
         Self {
             plan,
             objects: Some(objects),
@@ -48,7 +48,7 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
 
     pub fn new_arc(objects: Arc<Vec<ObjectReference>>, mmtk: &'static MMTK<VM>) -> Self {
         let plan = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
-        super::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
+        super::super::NUM_CONCURRENT_TRACING_PACKETS.fetch_add(1, Ordering::SeqCst);
         Self {
             plan,
             objects: None,
@@ -95,11 +95,8 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
             let Some(t) = s.load() else {
                 return;
             };
-            if super::MATURE_EVACUATION && CHECK_REMSET && self.plan.in_defrag(t) {
-                self.plan
-                    .immix_space
-                    .mature_evac_remset
-                    .record(s, t, self.plan);
+            if super::super::MATURE_EVACUATION && CHECK_REMSET && self.plan.in_defrag(t) {
+                self.plan.mature_evac_remset.record(s, t, self.plan);
             }
             self.next_objects.push(t);
             if self.next_objects.len() > Self::SATB_BUFFER_SIZE {
@@ -154,7 +151,7 @@ impl<VM: VMBinding> GCWork<VM> for LXRConcurrentTraceObjects<VM> {
         }
         self.flush();
         // CM: Decrease counter
-        super::NUM_CONCURRENT_TRACING_PACKETS.fetch_sub(1, Ordering::SeqCst);
+        super::super::NUM_CONCURRENT_TRACING_PACKETS.fetch_sub(1, Ordering::SeqCst);
         debug_assert!(!mmtk.scheduler.work_buckets[WorkBucketStage::Initial].is_open());
     }
 }
@@ -252,7 +249,7 @@ impl<VM: VMBinding, const FULL_GC: bool> ProcessEdgesWork
 {
     type VM = VM;
     type ScanObjectsWorkType = ScanObjects<Self>;
-    const OVERWRITE_REFERENCE: bool = super::MATURE_EVACUATION;
+    const OVERWRITE_REFERENCE: bool = super::super::MATURE_EVACUATION;
 
     fn new(
         slots: Vec<SlotOf<Self>>,

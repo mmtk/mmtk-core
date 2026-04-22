@@ -1,22 +1,15 @@
 mod barrier;
 mod block_allocation;
-pub(crate) mod block_sweeping;
-pub(super) mod cm;
 mod gc_work;
 pub(super) mod global;
-pub(crate) mod los_work;
 mod mature_evac;
 pub(super) mod mutator;
-pub mod rc;
-pub(crate) mod rc_work;
-mod remset;
 
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
 pub use self::global::LXR;
 pub use self::global::LXR_CONSTRAINTS;
-pub use self::remset::MatureEvecRemSet;
 
 use atomic::Atomic;
 use atomic::Ordering;
@@ -25,14 +18,14 @@ type RwLock<T> = spin::rwlock::RwLock<T>;
 
 // --- LXR-specific global state ---
 
-pub(crate) static NUM_CONCURRENT_TRACING_PACKETS: AtomicUsize = AtomicUsize::new(0);
-pub(crate) static DISABLE_LASY_DEC_FOR_CURRENT_GC: AtomicBool = AtomicBool::new(false);
-pub(crate) static NO_EVAC: AtomicBool = AtomicBool::new(false);
+static NUM_CONCURRENT_TRACING_PACKETS: AtomicUsize = AtomicUsize::new(0);
+static DISABLE_LASY_DEC_FOR_CURRENT_GC: AtomicBool = AtomicBool::new(false);
+static NO_EVAC: AtomicBool = AtomicBool::new(false);
 
 // --- LXR-specific global constants/flags ---
 
 /// Enable Lazy Decrements
-pub(crate) const LAZY_DECREMENTS: bool = !cfg!(feature = "lxr_no_lazy");
+const LAZY_DECREMENTS: bool = !cfg!(feature = "lxr_no_lazy");
 
 /// Enable Nursery Evacuation
 const NURSERY_EVACUATION: bool = !cfg!(feature = "lxr_no_nursery_evac");
@@ -52,16 +45,17 @@ const TRACE_THRESHOLD: usize = 20;
 /// Start a concurrent marking cycle when the available pages in the previous pause is smaller than this threshold.
 const CYCLE_TRIGGER_THRESHOLD: usize = 1024;
 
-pub(crate) fn concurrent_marking_packets_drained() -> bool {
+fn concurrent_marking_packets_drained() -> bool {
     NUM_CONCURRENT_TRACING_PACKETS.load(Ordering::SeqCst) == 0
 }
 
-pub(crate) fn disable_lasy_dec_for_current_gc() -> bool {
+fn disable_lasy_dec_for_current_gc() -> bool {
     DISABLE_LASY_DEC_FOR_CURRENT_GC.load(Ordering::SeqCst)
 }
+
 // --- Lazy sweeping job counters ---
 
-pub(crate) struct LazySweepingJobsCounter {
+struct LazySweepingJobsCounter {
     decs_counter: Option<Arc<AtomicUsize>>,
     counter: Arc<AtomicUsize>,
 }
@@ -117,7 +111,7 @@ impl Drop for LazySweepingJobsCounter {
     }
 }
 
-pub(crate) struct LazySweepingJobs {
+struct LazySweepingJobs {
     prev_decs_counter: Option<Arc<AtomicUsize>>,
     curr_decs_counter: Option<Arc<AtomicUsize>>,
     prev_counter: Option<Arc<AtomicUsize>>,
@@ -156,16 +150,16 @@ impl LazySweepingJobs {
     }
 }
 
-pub(crate) static LAZY_SWEEPING_JOBS: Lazy<RwLock<LazySweepingJobs>> =
+static LAZY_SWEEPING_JOBS: Lazy<RwLock<LazySweepingJobs>> =
     Lazy::new(|| RwLock::new(LazySweepingJobs::new()));
 
-pub static SURVIVAL_RATIO_PREDICTOR: SurvivalRatioPredictor = SurvivalRatioPredictor {
+static SURVIVAL_RATIO_PREDICTOR: SurvivalRatioPredictor = SurvivalRatioPredictor {
     prev_ratio: Atomic::new(0.01),
     alloc_vol: AtomicUsize::new(0),
     copy_promote_vol: AtomicUsize::new(0),
 };
 
-pub struct SurvivalRatioPredictor {
+struct SurvivalRatioPredictor {
     prev_ratio: Atomic<f64>,
     alloc_vol: AtomicUsize,
     copy_promote_vol: AtomicUsize,
@@ -199,7 +193,7 @@ impl SurvivalRatioPredictor {
     }
 }
 
-pub struct SurvivalRatioPredictorLocal {
+struct SurvivalRatioPredictorLocal {
     copy_promote_vol: AtomicUsize,
 }
 
@@ -227,11 +221,11 @@ impl SurvivalRatioPredictorLocal {
     }
 }
 
-pub static MATURE_LIVE_PREDICTOR: MatureLivePredictor = MatureLivePredictor {
+static MATURE_LIVE_PREDICTOR: MatureLivePredictor = MatureLivePredictor {
     live_pages: Atomic::new(0f64),
 };
 
-pub struct MatureLivePredictor {
+struct MatureLivePredictor {
     live_pages: Atomic<f64>,
 }
 
