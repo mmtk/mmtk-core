@@ -1,6 +1,4 @@
-use super::block_sweeping::{
-    RCLazySweepMutatorReusedBlocks, RCLazySweepNurseryBlocks, RCSTWSweepNurseryBlocks,
-};
+use super::block_sweeping::{RCLazySweepNurseryBlocks, RCSTWSweepNurseryBlocks};
 use super::LXR;
 use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::Pause;
@@ -112,11 +110,7 @@ impl<VM: VMBinding> BlockAllocation<VM> {
         });
     }
 
-    pub(super) fn sweep_mutator_reused_blocks(
-        &self,
-        scheduler: &GCWorkScheduler<VM>,
-        pause: Pause,
-    ) {
+    pub(super) fn sweep_mutator_reused_blocks(&self, pause: Pause) {
         if pause == Pause::Full || pause == Pause::FinalMark {
             self.reused_blocks.reset();
             return;

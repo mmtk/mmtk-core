@@ -6,33 +6,6 @@ use crate::scheduler::{GCWork, GCWorker};
 use crate::vm::VMBinding;
 use crate::MMTK;
 
-pub(crate) struct RCLazySweepMutatorReusedBlocks {
-    blocks: Vec<Block>,
-    _counter: LazySweepingJobsCounter,
-}
-
-impl RCLazySweepMutatorReusedBlocks {
-    pub(crate) fn new(blocks: Vec<Block>) -> Self {
-        Self {
-            blocks,
-            _counter: LazySweepingJobsCounter::new_decs(),
-        }
-    }
-}
-
-impl<VM: VMBinding> GCWork<VM> for RCLazySweepMutatorReusedBlocks {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        let space = &mmtk
-            .get_plan()
-            .downcast_ref::<LXR<VM>>()
-            .unwrap()
-            .immix_space;
-        for block in &self.blocks {
-            space.add_to_possibly_dead_mature_blocks(*block, false);
-        }
-    }
-}
-
 pub(crate) struct RCLazySweepNurseryBlocks {
     blocks: Vec<Block>,
     _counter: LazySweepingJobsCounter,

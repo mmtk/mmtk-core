@@ -1,5 +1,5 @@
 use super::block_allocation::BlockAllocation;
-use super::gc_work::{LXRGCWorkContext, LXRWeakRefWorkContext, ReleaseLOSNursery};
+use super::gc_work::{LXRGCWorkContext, ReleaseLOSNursery};
 use super::mutator::ALLOCATOR_MAPPING;
 use super::rc::{ProcessDecs, RCImmixCollectRootEdges};
 use super::remset::FlushMatureEvacRemsets;
@@ -209,8 +209,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             .release(tls, pause == Pause::Full || pause == Pause::FinalMark);
         self.block_allocation
             .sweep_nursery_blocks(self.immix_space.scheduler(), pause);
-        self.block_allocation
-            .sweep_mutator_reused_blocks(self.immix_space.scheduler(), pause);
+        self.block_allocation.sweep_mutator_reused_blocks(pause);
         self.immix_space.release_rc(pause);
         // swap roots
         let mut prev_roots = self.prev_roots.write().unwrap();

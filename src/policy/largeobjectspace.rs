@@ -95,10 +95,6 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             self.treadmill.add_to_treadmill(object, true);
             // Initialize mark bit
             self.test_and_mark(object, self.mark_state);
-            for off in (0..bytes).step_by(BYTES_IN_PAGE) {
-                let a = object.to_raw_address() + off;
-                self.test_and_mark(a.to_object_reference::<VM>(), self.mark_state);
-            }
             // Initialize metadata
             let lxr = self.lxr.unwrap();
             if lxr.concurrent_work_in_progress() {
