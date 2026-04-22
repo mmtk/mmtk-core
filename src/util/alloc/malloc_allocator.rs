@@ -16,13 +16,13 @@ pub struct MallocAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    space: &'static MallocSpace<VM>,
+    space: &'static dyn Space<VM>,
     context: Arc<AllocatorContext<VM>>,
 }
 
 impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
     fn get_space(&self) -> &'static dyn Space<VM> {
-        self.space as &'static dyn Space<VM>
+        self.space
     }
 
     fn get_context(&self) -> &AllocatorContext<VM> {
@@ -42,14 +42,14 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        self.space.alloc(self.tls, size, align, offset)
+        self.malloc_space().alloc(self.tls, size, align, offset)
     }
 }
 
 impl<VM: VMBinding> MallocAllocator<VM> {
     pub(crate) fn new(
         tls: VMThread,
-        space: &'static MallocSpace<VM>,
+        space: &'static dyn Space<VM>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         MallocAllocator {
@@ -57,5 +57,12 @@ impl<VM: VMBinding> MallocAllocator<VM> {
             space,
             context,
         }
+    }
+
+    #[track_caller]
+    fn malloc_space(&self) -> &'static MallocSpace<VM> {
+        self.space
+            .downcast_ref::<MallocSpace<VM>>()
+            .expect("MallocAllocator is backed by UnusableSpace")
     }
 }

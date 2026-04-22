@@ -16,7 +16,7 @@ pub struct LargeObjectAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    space: &'static LargeObjectSpace<VM>,
+    space: &'static dyn Space<VM>,
     context: Arc<AllocatorContext<VM>>,
 }
 
@@ -30,8 +30,7 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
     }
 
     fn get_space(&self) -> &'static dyn Space<VM> {
-        // Casting the interior of the Option: from &LargeObjectSpace to &dyn Space
-        self.space as &'static dyn Space<VM>
+        self.space
     }
 
     fn does_thread_local_allocation(&self) -> bool {
@@ -59,15 +58,18 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
             return Address::ZERO;
         }
 
-        self.space
-            .allocate_pages(self.tls, pages, self.get_context().get_alloc_options())
+        self.large_object_space().allocate_pages(
+            self.tls,
+            pages,
+            self.get_context().get_alloc_options(),
+        )
     }
 }
 
 impl<VM: VMBinding> LargeObjectAllocator<VM> {
     pub(crate) fn new(
         tls: VMThread,
-        space: &'static LargeObjectSpace<VM>,
+        space: &'static dyn Space<VM>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         LargeObjectAllocator {
@@ -75,5 +77,12 @@ impl<VM: VMBinding> LargeObjectAllocator<VM> {
             space,
             context,
         }
+    }
+
+    #[track_caller]
+    fn large_object_space(&self) -> &'static LargeObjectSpace<VM> {
+        self.space
+            .downcast_ref::<LargeObjectSpace<VM>>()
+            .expect("LargeObjectAllocator is backed by UnusableSpace")
     }
 }

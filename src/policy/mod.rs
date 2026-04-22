@@ -20,6 +20,7 @@ pub mod copy_context;
 pub mod gc_work;
 pub mod sft;
 pub mod sft_map;
+pub(crate) mod unusable_space;
 
 pub mod compressor;
 pub mod copyspace;
