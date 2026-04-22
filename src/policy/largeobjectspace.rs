@@ -61,7 +61,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         true
     }
 
-    fn initialize_object_metadata(&self, object: ObjectReference) {
+    fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize) {
         // VO bit: Set for all objects.
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(object);

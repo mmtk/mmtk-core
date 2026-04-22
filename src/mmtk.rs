@@ -23,6 +23,8 @@ use crate::util::sanity::sanity_checker::SanityChecker;
 #[cfg(feature = "extreme_assertions")]
 use crate::util::slot_logger::SlotLogger;
 use crate::util::statistics::stats::Stats;
+#[cfg(feature = "vm_space")]
+use crate::vm::object_model::ObjectModel;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
@@ -577,10 +579,11 @@ impl<VM: VMBinding> MMTK<VM> {
     #[cfg(feature = "vm_space")]
     pub fn initialize_vm_space_object(&self, object: crate::util::ObjectReference) {
         use crate::policy::sft::SFT;
+        let bytes = VM::VMObjectModel::get_current_size(object);
         self.get_plan()
             .base()
             .vm_space
-            .initialize_object_metadata(object)
+            .initialize_object_metadata(object, bytes)
     }
 }
 
