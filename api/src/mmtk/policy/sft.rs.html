@@ -92,7 +92,7 @@
 <a href=#92 id=92 data-nosnippet>92</a>    ///     to set the metadata for the VM space.
 <a href=#93 id=93 data-nosnippet>93</a>    /// -   Objects in other spaces are allocated by mutators using an MMTk allocator.
 <a href=#94 id=94 data-nosnippet>94</a>    ///     `Mutator::post_alloc` will call this method after allocation.
-<a href=#95 id=95 data-nosnippet>95</a>    </span><span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference);
+<a href=#95 id=95 data-nosnippet>95</a>    </span><span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, _bytes: usize);
 <a href=#96 id=96 data-nosnippet>96</a>
 <a href=#97 id=97 data-nosnippet>97</a>    <span class="doccomment">/// Trace objects through SFT. This along with [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges)
 <a href=#98 id=98 data-nosnippet>98</a>    /// provides an easy way for most plans to trace objects without the need to implement any plan-specific
@@ -185,7 +185,7 @@
 <a href=#185 id=185 data-nosnippet>185</a>        <span class="prelude-val">None
 <a href=#186 id=186 data-nosnippet>186</a>    </span>}
 <a href=#187 id=187 data-nosnippet>187</a>
-<a href=#188 id=188 data-nosnippet>188</a>    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
+<a href=#188 id=188 data-nosnippet>188</a>    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, _bytes: usize) {
 <a href=#189 id=189 data-nosnippet>189</a>        <span class="macro">panic!</span>(
 <a href=#190 id=190 data-nosnippet>190</a>            <span class="string">"Called initialize_object_metadata() on {:x}, which maps to an empty space"</span>,
 <a href=#191 id=191 data-nosnippet>191</a>            object

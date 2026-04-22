@@ -86,7 +86,7 @@
 <a href=#86 id=86 data-nosnippet>86</a>        <span class="bool-val">true
 <a href=#87 id=87 data-nosnippet>87</a>    </span>}
 <a href=#88 id=88 data-nosnippet>88</a>
-<a href=#89 id=89 data-nosnippet>89</a>    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) {
+<a href=#89 id=89 data-nosnippet>89</a>    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference, _bytes: usize) {
 <a href=#90 id=90 data-nosnippet>90</a>        <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
 <a href=#91 id=91 data-nosnippet>91</a>        </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit(_object);
 <a href=#92 id=92 data-nosnippet>92</a>    }

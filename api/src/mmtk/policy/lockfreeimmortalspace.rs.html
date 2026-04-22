@@ -71,7 +71,7 @@
 <a href=#71 id=71 data-nosnippet>71</a>    </span><span class="kw">fn </span>is_sane(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
 <a href=#72 id=72 data-nosnippet>72</a>        <span class="macro">unimplemented!</span>()
 <a href=#73 id=73 data-nosnippet>73</a>    }
-<a href=#74 id=74 data-nosnippet>74</a>    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) {
+<a href=#74 id=74 data-nosnippet>74</a>    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference, _bytes: usize) {
 <a href=#75 id=75 data-nosnippet>75</a>        <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
 <a href=#76 id=76 data-nosnippet>76</a>        </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit(_object);
 <a href=#77 id=77 data-nosnippet>77</a>    }

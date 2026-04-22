@@ -57,7 +57,7 @@
 <a href=#57 id=57 data-nosnippet>57</a>        !<span class="self">self</span>.is_from_space()
 <a href=#58 id=58 data-nosnippet>58</a>    }
 <a href=#59 id=59 data-nosnippet>59</a>
-<a href=#60 id=60 data-nosnippet>60</a>    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) {
+<a href=#60 id=60 data-nosnippet>60</a>    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference, _bytes: usize) {
 <a href=#61 id=61 data-nosnippet>61</a>        <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
 <a href=#62 id=62 data-nosnippet>62</a>        </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit(_object);
 <a href=#63 id=63 data-nosnippet>63</a>    }
