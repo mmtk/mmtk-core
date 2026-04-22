@@ -1,12 +1,9 @@
-use std::mem::MaybeUninit;
 use std::sync::Arc;
 
 use memoffset::offset_of;
 
-use crate::policy::largeobjectspace::LargeObjectSpace;
-use crate::policy::marksweepspace::malloc_ms::MallocSpace;
-use crate::policy::marksweepspace::native_ms::MarkSweepSpace;
 use crate::policy::space::Space;
+use crate::policy::unusable_space::unusable_space;
 use crate::util::alloc::LargeObjectAllocator;
 use crate::util::alloc::MallocAllocator;
 use crate::util::alloc::{Allocator, BumpAllocator, ImmixAllocator};
@@ -32,67 +29,44 @@ pub(crate) const MAX_MARK_COMPACT_ALLOCATORS: usize = 1;
 // We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.
 #[repr(C)]
 pub struct Allocators<VM: VMBinding> {
-    pub bump_pointer: [MaybeUninit<BumpAllocator<VM>>; MAX_BUMP_ALLOCATORS],
-    pub large_object: [MaybeUninit<LargeObjectAllocator<VM>>; MAX_LARGE_OBJECT_ALLOCATORS],
-    pub malloc: [MaybeUninit<MallocAllocator<VM>>; MAX_MALLOC_ALLOCATORS],
-    pub immix: [MaybeUninit<ImmixAllocator<VM>>; MAX_IMMIX_ALLOCATORS],
-    pub free_list: [MaybeUninit<FreeListAllocator<VM>>; MAX_FREE_LIST_ALLOCATORS],
-    pub markcompact: [MaybeUninit<MarkCompactAllocator<VM>>; MAX_MARK_COMPACT_ALLOCATORS],
+    pub bump_pointer: [BumpAllocator<VM>; MAX_BUMP_ALLOCATORS],
+    pub large_object: [LargeObjectAllocator<VM>; MAX_LARGE_OBJECT_ALLOCATORS],
+    pub malloc: [MallocAllocator<VM>; MAX_MALLOC_ALLOCATORS],
+    pub immix: [ImmixAllocator<VM>; MAX_IMMIX_ALLOCATORS],
+    pub free_list: [FreeListAllocator<VM>; MAX_FREE_LIST_ALLOCATORS],
+    pub markcompact: [MarkCompactAllocator<VM>; MAX_MARK_COMPACT_ALLOCATORS],
 }
 
 impl<VM: VMBinding> Allocators<VM> {
-    /// # Safety
-    /// The selector needs to be valid, and points to an allocator that has been initialized.
-    pub unsafe fn get_allocator(&self, selector: AllocatorSelector) -> &dyn Allocator<VM> {
+    pub fn get_allocator(&self, selector: AllocatorSelector) -> &dyn Allocator<VM> {
         match selector {
-            AllocatorSelector::BumpPointer(index) => {
-                self.bump_pointer[index as usize].assume_init_ref()
-            }
-            AllocatorSelector::LargeObject(index) => {
-                self.large_object[index as usize].assume_init_ref()
-            }
-            AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_ref(),
-            AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_ref(),
-            AllocatorSelector::FreeList(index) => self.free_list[index as usize].assume_init_ref(),
-            AllocatorSelector::MarkCompact(index) => {
-                self.markcompact[index as usize].assume_init_ref()
-            }
+            AllocatorSelector::BumpPointer(index) => &self.bump_pointer[index as usize],
+            AllocatorSelector::LargeObject(index) => &self.large_object[index as usize],
+            AllocatorSelector::Malloc(index) => &self.malloc[index as usize],
+            AllocatorSelector::Immix(index) => &self.immix[index as usize],
+            AllocatorSelector::FreeList(index) => &self.free_list[index as usize],
+            AllocatorSelector::MarkCompact(index) => &self.markcompact[index as usize],
             AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
         }
     }
 
-    /// # Safety
-    /// The selector needs to be valid, and points to an allocator that has been initialized.
-    pub unsafe fn get_typed_allocator<T: Allocator<VM>>(&self, selector: AllocatorSelector) -> &T {
+    pub fn get_typed_allocator<T: Allocator<VM>>(&self, selector: AllocatorSelector) -> &T {
         self.get_allocator(selector).downcast_ref().unwrap()
     }
 
-    /// # Safety
-    /// The selector needs to be valid, and points to an allocator that has been initialized.
-    pub unsafe fn get_allocator_mut(
-        &mut self,
-        selector: AllocatorSelector,
-    ) -> &mut dyn Allocator<VM> {
+    pub fn get_allocator_mut(&mut self, selector: AllocatorSelector) -> &mut dyn Allocator<VM> {
         match selector {
-            AllocatorSelector::BumpPointer(index) => {
-                self.bump_pointer[index as usize].assume_init_mut()
-            }
-            AllocatorSelector::LargeObject(index) => {
-                self.large_object[index as usize].assume_init_mut()
-            }
-            AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_mut(),
-            AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_mut(),
-            AllocatorSelector::FreeList(index) => self.free_list[index as usize].assume_init_mut(),
-            AllocatorSelector::MarkCompact(index) => {
-                self.markcompact[index as usize].assume_init_mut()
-            }
+            AllocatorSelector::BumpPointer(index) => &mut self.bump_pointer[index as usize],
+            AllocatorSelector::LargeObject(index) => &mut self.large_object[index as usize],
+            AllocatorSelector::Malloc(index) => &mut self.malloc[index as usize],
+            AllocatorSelector::Immix(index) => &mut self.immix[index as usize],
+            AllocatorSelector::FreeList(index) => &mut self.free_list[index as usize],
+            AllocatorSelector::MarkCompact(index) => &mut self.markcompact[index as usize],
             AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
         }
     }
 
-    /// # Safety
-    /// The selector needs to be valid, and points to an allocator that has been initialized.
-    pub unsafe fn get_typed_allocator_mut<T: Allocator<VM>>(
+    pub fn get_typed_allocator_mut<T: Allocator<VM>>(
         &mut self,
         selector: AllocatorSelector,
     ) -> &mut T {
@@ -104,60 +78,53 @@ impl<VM: VMBinding> Allocators<VM> {
         mmtk: &MMTK<VM>,
         space_mapping: &[(AllocatorSelector, &'static dyn Space<VM>)],
     ) -> Self {
-        let mut ret = Allocators {
-            bump_pointer: unsafe { MaybeUninit::uninit().assume_init() },
-            large_object: unsafe { MaybeUninit::uninit().assume_init() },
-            malloc: unsafe { MaybeUninit::uninit().assume_init() },
-            immix: unsafe { MaybeUninit::uninit().assume_init() },
-            free_list: unsafe { MaybeUninit::uninit().assume_init() },
-            markcompact: unsafe { MaybeUninit::uninit().assume_init() },
-        };
         let context = Arc::new(AllocatorContext::new(mmtk));
+        let mut ret = Allocators {
+            bump_pointer: std::array::from_fn(|_| {
+                BumpAllocator::new(mutator_tls.0, unusable_space(), context.clone())
+            }),
+            large_object: std::array::from_fn(|_| {
+                LargeObjectAllocator::new(mutator_tls.0, unusable_space(), context.clone())
+            }),
+            malloc: std::array::from_fn(|_| {
+                MallocAllocator::new(mutator_tls.0, unusable_space(), context.clone())
+            }),
+            immix: std::array::from_fn(|_| {
+                ImmixAllocator::new(mutator_tls.0, unusable_space(), context.clone(), false)
+            }),
+            free_list: std::array::from_fn(|_| {
+                FreeListAllocator::new(mutator_tls.0, unusable_space(), context.clone())
+            }),
+            markcompact: std::array::from_fn(|_| {
+                MarkCompactAllocator::new(mutator_tls.0, unusable_space(), context.clone())
+            }),
+        };
 
         for &(selector, space) in space_mapping.iter() {
             match selector {
                 AllocatorSelector::BumpPointer(index) => {
-                    ret.bump_pointer[index as usize].write(BumpAllocator::new(
-                        mutator_tls.0,
-                        space,
-                        context.clone(),
-                    ));
+                    ret.bump_pointer[index as usize] =
+                        BumpAllocator::new(mutator_tls.0, space, context.clone());
                 }
                 AllocatorSelector::LargeObject(index) => {
-                    ret.large_object[index as usize].write(LargeObjectAllocator::new(
-                        mutator_tls.0,
-                        space.downcast_ref::<LargeObjectSpace<VM>>().unwrap(),
-                        context.clone(),
-                    ));
+                    ret.large_object[index as usize] =
+                        LargeObjectAllocator::new(mutator_tls.0, space, context.clone());
                 }
                 AllocatorSelector::Malloc(index) => {
-                    ret.malloc[index as usize].write(MallocAllocator::new(
-                        mutator_tls.0,
-                        space.downcast_ref::<MallocSpace<VM>>().unwrap(),
-                        context.clone(),
-                    ));
+                    ret.malloc[index as usize] =
+                        MallocAllocator::new(mutator_tls.0, space, context.clone());
                 }
                 AllocatorSelector::Immix(index) => {
-                    ret.immix[index as usize].write(ImmixAllocator::new(
-                        mutator_tls.0,
-                        Some(space),
-                        context.clone(),
-                        false,
-                    ));
+                    ret.immix[index as usize] =
+                        ImmixAllocator::new(mutator_tls.0, space, context.clone(), false);
                 }
                 AllocatorSelector::FreeList(index) => {
-                    ret.free_list[index as usize].write(FreeListAllocator::new(
-                        mutator_tls.0,
-                        space.downcast_ref::<MarkSweepSpace<VM>>().unwrap(),
-                        context.clone(),
-                    ));
+                    ret.free_list[index as usize] =
+                        FreeListAllocator::new(mutator_tls.0, space, context.clone());
                 }
                 AllocatorSelector::MarkCompact(index) => {
-                    ret.markcompact[index as usize].write(MarkCompactAllocator::new(
-                        mutator_tls.0,
-                        space,
-                        context.clone(),
-                    ));
+                    ret.markcompact[index as usize] =
+                        MarkCompactAllocator::new(mutator_tls.0, space, context.clone());
                 }
                 AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
             }

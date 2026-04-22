@@ -22,7 +22,7 @@ pub struct ImmixAllocator<VM: VMBinding> {
     /// The fastpath bump pointer.
     pub bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    space: &'static ImmixSpace<VM>,
+    space: &'static dyn Space<VM>,
     context: Arc<AllocatorContext<VM>>,
     /// *unused*
     hot: bool,
@@ -47,7 +47,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 
 impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
     fn get_space(&self) -> &'static dyn Space<VM> {
-        self.space as _
+        self.space
     }
 
     fn get_context(&self) -> &AllocatorContext<VM> {
@@ -169,13 +169,13 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
 impl<VM: VMBinding> ImmixAllocator<VM> {
     pub(crate) fn new(
         tls: VMThread,
-        space: Option<&'static dyn Space<VM>>,
+        space: &'static dyn Space<VM>,
         context: Arc<AllocatorContext<VM>>,
         copy: bool,
     ) -> Self {
         ImmixAllocator {
             tls,
-            space: space.unwrap().downcast_ref::<ImmixSpace<VM>>().unwrap(),
+            space,
             context,
             bump_pointer: BumpPointer::default(),
             hot: false,
@@ -186,8 +186,11 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         }
     }
 
+    #[track_caller]
     pub(crate) fn immix_space(&self) -> &'static ImmixSpace<VM> {
         self.space
+            .downcast_ref::<ImmixSpace<VM>>()
+            .expect("ImmixAllocator is backed by UnusableSpace")
     }
 
     /// Large-object (larger than a line) bump allocation.
@@ -268,7 +271,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                 };
                 // mark objects if concurrent marking is active
                 if self.immix_space().should_allocate_as_live() {
-                    let state = self.space.line_mark_state.load(Ordering::Acquire);
+                    let state = self.immix_space().line_mark_state.load(Ordering::Acquire);
                     Line::eager_mark_lines::<VM>(state, start_line..end_line);
                 }
                 return true;
@@ -313,7 +316,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     .bzero_metadata(block.start(), crate::policy::immix::block::Block::BYTES);
                 // mark objects if concurrent marking is active
                 if self.immix_space().should_allocate_as_live() {
-                    let state = self.space.line_mark_state.load(Ordering::Acquire);
+                    let state = self.immix_space().line_mark_state.load(Ordering::Acquire);
                     Line::eager_mark_lines::<VM>(state, block.start_line()..block.end_line());
                 }
                 if self.request_for_large {

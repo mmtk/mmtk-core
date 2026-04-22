@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use super::allocator::AllocatorContext;
 use crate::policy::marksweepspace::native_ms::*;
+use crate::policy::space::Space;
 use crate::util::alloc::allocator;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
@@ -16,7 +17,7 @@ use crate::vm::VMBinding;
 pub struct FreeListAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
-    space: &'static MarkSweepSpace<VM>,
+    space: &'static dyn Space<VM>,
     context: Arc<AllocatorContext<VM>>,
     /// blocks with free space
     pub available_blocks: BlockLists,
@@ -37,7 +38,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         self.tls
     }
 
-    fn get_space(&self) -> &'static dyn crate::policy::space::Space<VM> {
+    fn get_space(&self) -> &'static dyn Space<VM> {
         self.space
     }
 
@@ -122,7 +123,11 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     fn on_mutator_destroy(&mut self) {
-        let mut global = self.space.get_abandoned_block_lists().lock().unwrap();
+        let mut global = self
+            .mark_sweep_space()
+            .get_abandoned_block_lists()
+            .lock()
+            .unwrap();
         self.abandon_blocks(&mut global);
     }
 }
@@ -131,7 +136,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     // New free list allcoator
     pub(crate) fn new(
         tls: VMThread,
-        space: &'static MarkSweepSpace<VM>,
+        space: &'static dyn Space<VM>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         FreeListAllocator {
@@ -143,6 +148,13 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             unswept_blocks: new_empty_block_lists(),
             consumed_blocks: new_empty_block_lists(),
         }
+    }
+
+    #[track_caller]
+    fn mark_sweep_space(&self) -> &'static MarkSweepSpace<VM> {
+        self.space
+            .downcast_ref::<MarkSweepSpace<VM>>()
+            .expect("FreeListAllocator is backed by UnusableSpace")
     }
 
     // Find a free cell within a given block
@@ -295,7 +307,12 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     ) -> Option<Block> {
         let bin = mi_bin::<VM>(size, align);
         loop {
-            match self.space.acquire_block(self.tls, size, align, self.get_context().get_alloc_options()) {
+            match self.mark_sweep_space().acquire_block(
+                self.tls,
+                size,
+                align,
+                self.get_context().get_alloc_options(),
+            ) {
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::Exhausted => {
                     debug!("Acquire global block: None");
                     // GC
@@ -338,7 +355,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     fn init_block(&self, block: Block, cell_size: usize) {
         debug_assert_ne!(cell_size, 0);
-        self.space.record_new_block(block);
+        self.mark_sweep_space().record_new_block(block);
 
         // construct free list
         let block_end = block.start() + Block::BYTES;
@@ -417,6 +434,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     pub(crate) fn prepare(&mut self) {}
 
     pub(crate) fn release(&mut self) {
+        let space = self.mark_sweep_space();
         for bin in 0..MI_BIN_FULL {
             let unswept = self.unswept_blocks.get_mut(bin).unwrap();
 
@@ -425,7 +443,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             debug_assert!(unswept.is_empty());
 
             let mut sweep_later = |list: &mut BlockList| {
-                list.release_blocks(self.space);
+                list.release_blocks(space);
 
                 // For eager sweeping, that's it.  We just release unmarked blocks, and leave marked
                 // blocks to be swept later in the `SweepChunk` work packet.
@@ -445,11 +463,15 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // We abandon block lists immediately.  Otherwise, some mutators will hold lots of blocks
         // locally and prevent other mutators to use.
         {
-            let mut global = self.space.get_abandoned_block_lists_in_gc().lock().unwrap();
+            let mut global = self
+                .mark_sweep_space()
+                .get_abandoned_block_lists_in_gc()
+                .lock()
+                .unwrap();
             self.abandon_blocks(&mut global);
         }
 
-        self.space.release_packet_done();
+        self.mark_sweep_space().release_packet_done();
     }
 
     fn abandon_blocks(&mut self, global: &mut AbandonedBlockLists) {

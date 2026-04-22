@@ -17,13 +17,11 @@ use enum_map::EnumMap;
 
 pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
     // rebind the allocation bump pointer to the appropriate semispace
-    let bump_allocator = unsafe {
-        mutator
-            .allocators
-            .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::Default])
-    }
-    .downcast_mut::<BumpAllocator<VM>>()
-    .unwrap();
+    let bump_allocator = mutator
+        .allocators
+        .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::Default])
+        .downcast_mut::<BumpAllocator<VM>>()
+        .unwrap();
     bump_allocator.rebind(
         mutator
             .plan
