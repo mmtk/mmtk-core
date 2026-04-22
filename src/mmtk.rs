@@ -23,6 +23,8 @@ use crate::util::sanity::sanity_checker::SanityChecker;
 #[cfg(feature = "extreme_assertions")]
 use crate::util::slot_logger::SlotLogger;
 use crate::util::statistics::stats::Stats;
+#[cfg(feature = "vm_space")]
+use crate::vm::object_model::ObjectModel;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
