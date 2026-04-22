@@ -61,13 +61,11 @@ pub fn create_compressor_mutator<VM: VMBinding>(
 
 pub fn compressor_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
     // reset the thread-local allocation bump pointer
-    let bump_allocator = unsafe {
-        mutator
-            .allocators
-            .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::Default])
-    }
-    .downcast_mut::<BumpAllocator<VM>>()
-    .unwrap();
+    let bump_allocator = mutator
+        .allocators
+        .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::Default])
+        .downcast_mut::<BumpAllocator<VM>>()
+        .unwrap();
     bump_allocator.reset();
     common_release_func(mutator, tls);
 }

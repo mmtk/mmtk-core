@@ -86,7 +86,10 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn prepare_worker(&self, worker: &mut GCWorker<VM>) {
-        unsafe { worker.get_copy_context_mut().copy[0].assume_init_mut() }.rebind(self.tospace());
+        worker.get_copy_context_mut().copy[0]
+            .as_mut()
+            .expect("Copy allocator not initialized")
+            .rebind(self.tospace());
     }
 
     fn release(&mut self, tls: VMWorkerThread) {

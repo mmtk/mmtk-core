@@ -29,6 +29,19 @@ Notes for the mmtk-core developers:
 <div id="api-migration-detail-body"><!-- We use JavaScript to process things within this div. -->
 
 <!-- Insert new versions here -->
+## Unreleased
+### `MaybeUninit` replaced with `Option` in `Allocators` and `GCWorkerCopyContext`
+
+```admonish tldr
+We replaced `MaybeUninit` arrays with `Option` arrays in `Allocators` and `GCWorkerCopyContext`. The layout of the old and the new type should be identical, and we added unit tests to check.
+```
+
+API changes:
+
+-   module `util::alloc::allocators`
+    +   `Allocators`: The fields `bump_pointer`, `large_object`, `malloc`, `immix`, `free_list`, and `markcompact` are now arrays of `Option<T>` instead of `MaybeUninit<T>`.
+-   module `util::copy`
+    +   `GCWorkerCopyContext`: The fields `copy`, `immix`, and `immix_hybrid` are now arrays of `Option<T>` instead of `MaybeUninit<T>`.
 
 ## 0.33.0
 
