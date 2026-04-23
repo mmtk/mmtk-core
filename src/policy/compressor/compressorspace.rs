@@ -426,7 +426,7 @@ pub struct CalculateOffsetVector<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for CalculateOffsetVector<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
         self.compressor_space
             .calculate_offset_vector_for_region(self.region, self.cursor);
     }
@@ -453,7 +453,7 @@ pub struct Compact<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
         self.compressor_space.compact_region(worker, self.index);
     }
 }

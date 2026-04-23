@@ -66,7 +66,7 @@ impl ReferenceProcessors {
     /// However, for some plans like mark compact, at the point we do ref scanning, we do not know
     /// the forwarding addresses yet, thus we cannot do forwarding during scan refs. And for those
     /// plans, this separate step is required.
-    pub fn forward_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &'static MMTK<E::VM>) {
+    pub fn forward_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &MMTK<E::VM>) {
         debug_assert!(
             mmtk.get_plan().constraints().needs_forward_after_liveness,
             "A plan with needs_forward_after_liveness=false does not need a separate forward step"
@@ -81,23 +81,23 @@ impl ReferenceProcessors {
 
     // Methods for scanning weak references. It needs to be called in a decreasing order of reference strengths, i.e. soft > weak > phantom
 
-    pub fn retain_soft_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &'static MMTK<E::VM>) {
+    pub fn retain_soft_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &MMTK<E::VM>) {
         self.soft.retain::<E>(trace, is_nursery_gc(mmtk.get_plan()));
     }
 
     /// Scan soft references.
-    pub fn scan_soft_refs<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>) {
+    pub fn scan_soft_refs<VM: VMBinding>(&self, mmtk: &MMTK<VM>) {
         // This will update the references (and the referents).
         self.soft.scan::<VM>(is_nursery_gc(mmtk.get_plan()));
     }
 
     /// Scan weak references.
-    pub fn scan_weak_refs<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>) {
+    pub fn scan_weak_refs<VM: VMBinding>(&self, mmtk: &MMTK<VM>) {
         self.weak.scan::<VM>(is_nursery_gc(mmtk.get_plan()));
     }
 
     /// Scan phantom references.
-    pub fn scan_phantom_refs<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>) {
+    pub fn scan_phantom_refs<VM: VMBinding>(&self, mmtk: &MMTK<VM>) {
         self.phantom.scan::<VM>(is_nursery_gc(mmtk.get_plan()));
     }
 }
@@ -524,7 +524,7 @@ pub(crate) struct RescanReferences<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for RescanReferences<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>) {
         if self.soft {
             mmtk.reference_processors.scan_soft_refs(mmtk);
         }
@@ -537,7 +537,7 @@ impl<VM: VMBinding> GCWork<VM> for RescanReferences<VM> {
 #[derive(Default)]
 pub(crate) struct SoftRefProcessing<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for SoftRefProcessing<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &MMTK<E::VM>) {
         if !mmtk.state.is_emergency_collection() {
             // Postpone the scanning to the end of the transitive closure from strongly reachable
             // soft references.
@@ -550,7 +550,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for SoftRefProcessing<E> {
 
             // Retain soft references.  This will expand the transitive closure.  We create an
             // instance of `E` for this.
-            let mut w = E::new(vec![], false, mmtk, WorkBucketStage::SoftRefClosure);
+            let mut w = E::new(vec![], false, worker.mmtk, WorkBucketStage::SoftRefClosure);
             w.set_worker(worker);
             mmtk.reference_processors.retain_soft_refs(&mut w, mmtk);
             w.flush();
@@ -569,7 +569,7 @@ impl<E: ProcessEdgesWork> SoftRefProcessing<E> {
 #[derive(Default)]
 pub(crate) struct WeakRefProcessing<VM: VMBinding>(PhantomData<VM>);
 impl<VM: VMBinding> GCWork<VM> for WeakRefProcessing<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>) {
         mmtk.reference_processors.scan_weak_refs(mmtk);
     }
 }
@@ -582,7 +582,7 @@ impl<VM: VMBinding> WeakRefProcessing<VM> {
 #[derive(Default)]
 pub(crate) struct PhantomRefProcessing<VM: VMBinding>(PhantomData<VM>);
 impl<VM: VMBinding> GCWork<VM> for PhantomRefProcessing<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>) {
         mmtk.reference_processors.scan_phantom_refs(mmtk);
     }
 }
@@ -595,8 +595,8 @@ impl<VM: VMBinding> PhantomRefProcessing<VM> {
 #[derive(Default)]
 pub(crate) struct RefForwarding<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for RefForwarding<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        let mut w = E::new(vec![], false, mmtk, WorkBucketStage::RefForwarding);
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &MMTK<E::VM>) {
+        let mut w = E::new(vec![], false, worker.mmtk, WorkBucketStage::RefForwarding);
         w.set_worker(worker);
         mmtk.reference_processors.forward_refs(&mut w, mmtk);
         w.flush();
@@ -611,7 +611,7 @@ impl<E: ProcessEdgesWork> RefForwarding<E> {
 #[derive(Default)]
 pub(crate) struct RefEnqueue<VM: VMBinding>(PhantomData<VM>);
 impl<VM: VMBinding> GCWork<VM> for RefEnqueue<VM> {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>) {
         mmtk.reference_processors.enqueue_refs::<VM>(worker.tls);
     }
 }

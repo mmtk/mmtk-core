@@ -899,7 +899,7 @@ pub struct MSSweepChunk<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for MSSweepChunk<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
         self.ms.sweep_chunk(self.chunk);
     }
 }

@@ -824,7 +824,7 @@ pub fn harness_begin<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
-pub fn harness_end<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
+pub fn harness_end<VM: VMBinding>(mmtk: &MMTK<VM>) {
     mmtk.harness_end();
 }
 
@@ -836,7 +836,7 @@ pub fn harness_end<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 /// * `mmtk`: A reference to an MMTk instance
 /// * `object`: The object that has a finalizer
 pub fn add_finalizer<VM: VMBinding>(
-    mmtk: &'static MMTK<VM>,
+    mmtk: &MMTK<VM>,
     object: <VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType,
 ) {
     if *mmtk.options.no_finalizer {
@@ -896,7 +896,7 @@ pub fn is_pinned(object: ObjectReference) -> bool {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn get_finalized_object<VM: VMBinding>(
-    mmtk: &'static MMTK<VM>,
+    mmtk: &MMTK<VM>,
 ) -> Option<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
     if *mmtk.options.no_finalizer {
         warn!("get_finalized_object() is called when no_finalizer = true");
@@ -916,7 +916,7 @@ pub fn get_finalized_object<VM: VMBinding>(
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn get_all_finalizers<VM: VMBinding>(
-    mmtk: &'static MMTK<VM>,
+    mmtk: &MMTK<VM>,
 ) -> Vec<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
     if *mmtk.options.no_finalizer {
         warn!("get_all_finalizers() is called when no_finalizer = true");
@@ -935,7 +935,7 @@ pub fn get_all_finalizers<VM: VMBinding>(
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `object`: the given object that MMTk will pop its finalizers
 pub fn get_finalizers_for<VM: VMBinding>(
-    mmtk: &'static MMTK<VM>,
+    mmtk: &MMTK<VM>,
     object: ObjectReference,
 ) -> Vec<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
     if *mmtk.options.no_finalizer {
@@ -954,7 +954,7 @@ pub fn get_finalizers_for<VM: VMBinding>(
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
-pub fn num_of_workers<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> usize {
+pub fn num_of_workers<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
     mmtk.scheduler.num_workers()
 }
 
@@ -966,7 +966,7 @@ pub fn num_of_workers<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> usize {
 /// * `bucket`: Which work bucket to add this packet to.
 /// * `packet`: The work packet to be added.
 pub fn add_work_packet<VM: VMBinding, W: GCWork<VM>>(
-    mmtk: &'static MMTK<VM>,
+    mmtk: &MMTK<VM>,
     bucket: WorkBucketStage,
     packet: W,
 ) {
@@ -981,7 +981,7 @@ pub fn add_work_packet<VM: VMBinding, W: GCWork<VM>>(
 /// * `bucket`: Which work bucket to add these packets to.
 /// * `packet`: The work packets to be added.
 pub fn add_work_packets<VM: VMBinding>(
-    mmtk: &'static MMTK<VM>,
+    mmtk: &MMTK<VM>,
     bucket: WorkBucketStage,
     packets: Vec<Box<dyn GCWork<VM>>>,
 ) {

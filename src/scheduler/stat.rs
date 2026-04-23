@@ -219,7 +219,7 @@ impl<VM: VMBinding> WorkerLocalStat<VM> {
         &mut self,
         work_id: TypeId,
         work_name: &'static str,
-        mmtk: &'static MMTK<VM>,
+        mmtk: &MMTK<VM>,
     ) -> WorkStat {
         let stat = WorkStat {
             type_id: work_id,
@@ -236,7 +236,7 @@ impl<VM: VMBinding> WorkerLocalStat<VM> {
     }
 
     #[allow(unused_variables, unused_mut)]
-    fn counter_set(mmtk: &'static MMTK<VM>) -> Vec<Box<dyn WorkCounter>> {
+    fn counter_set(mmtk: &MMTK<VM>) -> Vec<Box<dyn WorkCounter>> {
         let mut counters: Vec<Box<dyn WorkCounter>> = vec![Box::new(WorkDuration::new())];
         #[cfg(feature = "perf_counter")]
         for e in &mmtk.options.work_perf_events.events {
