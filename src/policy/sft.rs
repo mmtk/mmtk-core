@@ -92,7 +92,7 @@ pub trait SFT {
     ///     to set the metadata for the VM space.
     /// -   Objects in other spaces are allocated by mutators using an MMTk allocator.
     ///     `Mutator::post_alloc` will call this method after allocation.
-    fn initialize_object_metadata(&self, object: ObjectReference);
+    fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize);
 
     /// Trace objects through SFT. This along with [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges)
     /// provides an easy way for most plans to trace objects without the need to implement any plan-specific
@@ -185,7 +185,7 @@ impl SFT for EmptySpaceSFT {
         None
     }
 
-    fn initialize_object_metadata(&self, object: ObjectReference) {
+    fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize) {
         panic!(
             "Called initialize_object_metadata() on {:x}, which maps to an empty space",
             object

@@ -86,7 +86,7 @@ impl<VM: VMBinding> SFT for CompressorSpace<VM> {
         true
     }
 
-    fn initialize_object_metadata(&self, _object: ObjectReference) {
+    fn initialize_object_metadata(&self, _object: ObjectReference, _bytes: usize) {
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(_object);
     }

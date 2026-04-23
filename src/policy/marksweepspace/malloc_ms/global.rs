@@ -124,7 +124,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         )
     }
 
-    fn initialize_object_metadata(&self, object: ObjectReference) {
+    fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize) {
         trace!("initialize_object_metadata for object {}", object);
         set_vo_bit(object);
     }
