@@ -23,6 +23,8 @@ pub struct GlobalState {
     /// Is the current GC an emergency collection? Emergency means we may run out of memory soon, and we should
     /// attempt to collect as much as we can.
     pub(crate) emergency_collection: AtomicBool,
+    /// Force the next GC to be an emergency collection.
+    pub(crate) force_emergency_collection: AtomicBool,
     /// Is the current GC triggered by the user?
     pub(crate) user_triggered_collection: AtomicBool,
     /// Is the current GC triggered internally by MMTK? This is unused for now. We may have internally triggered GC
@@ -75,10 +77,11 @@ impl GlobalState {
             Ordering::Relaxed,
         );
 
-        let emergency_collection = !self.is_internal_triggered_collection()
-            && last_collection_was_exhaustive
-            && self.cur_collection_attempts.load(Ordering::Relaxed) > 1
-            && !heap_can_grow;
+        let emergency_collection = self.force_emergency_collection.load(Ordering::Relaxed)
+            || (!self.is_internal_triggered_collection()
+                && last_collection_was_exhaustive
+                && self.cur_collection_attempts.load(Ordering::Relaxed) > 1
+                && !heap_can_grow);
         self.emergency_collection
             .store(emergency_collection, Ordering::Relaxed);
 
@@ -117,6 +120,11 @@ impl GlobalState {
         self.user_triggered_collection.load(Ordering::Relaxed)
     }
 
+    pub fn force_emergency_collection(&self) {
+        self.force_emergency_collection
+            .store(true, Ordering::Relaxed);
+    }
+
     /// Reset collection state information.
     pub fn reset_collection_trigger(&self) {
         self.last_internal_triggered_collection.store(
@@ -126,6 +134,8 @@ impl GlobalState {
         self.internal_triggered_collection
             .store(false, Ordering::SeqCst);
         self.user_triggered_collection
+            .store(false, Ordering::Relaxed);
+        self.force_emergency_collection
             .store(false, Ordering::Relaxed);
     }
 
@@ -205,6 +215,7 @@ impl Default for GlobalState {
             gc_start_time: AtomicRefCell::new(None),
             stacks_prepared: AtomicBool::new(false),
             emergency_collection: AtomicBool::new(false),
+            force_emergency_collection: AtomicBool::new(false),
             user_triggered_collection: AtomicBool::new(false),
             internal_triggered_collection: AtomicBool::new(false),
             last_internal_triggered_collection: AtomicBool::new(false),
