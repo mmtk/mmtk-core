@@ -26,7 +26,7 @@ use crossbeam::queue::SegQueue;
 use std::sync::atomic::AtomicUsize;
 
 #[repr(C)]
-pub(super) struct RemSetEntry<VM: VMBinding>(VM::VMSlot, u8);
+pub struct RemSetEntry<VM: VMBinding>(VM::VMSlot, u8);
 
 impl<VM: VMBinding> RemSetEntry<VM> {
     fn encode(slot: VM::VMSlot, ix: bool) -> Self {
@@ -44,8 +44,8 @@ impl<VM: VMBinding> RemSetEntry<VM> {
 }
 
 pub struct MatureEvecRemSet<VM: VMBinding> {
-    pub(super) gc_buffers: Vec<UnsafeCell<Vec<RemSetEntry<VM>>>>,
-    pub(super) global_packets: Mutex<Vec<Box<dyn GCWork<VM>>>>,
+    pub gc_buffers: Vec<UnsafeCell<Vec<RemSetEntry<VM>>>>,
+    pub global_packets: Mutex<Vec<Box<dyn GCWork<VM>>>>,
     local_packets: Vec<UnsafeCell<Vec<Box<dyn GCWork<VM>>>>>,
     _p: PhantomData<VM>,
     size: AtomicUsize,
@@ -74,7 +74,7 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
         unsafe { &mut *self.gc_buffers[id].get() }
     }
 
-    pub(super) fn flush_all(&self) {
+    pub fn flush_all(&self) {
         let mut mature_evac_remsets = self.global_packets.lock().unwrap();
         self.size.store(0, Ordering::SeqCst);
         for id in 0..self.gc_buffers.len() {
@@ -94,7 +94,7 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
         }
     }
 
-    pub(super) fn take_global_packets(&self) -> Vec<Box<dyn GCWork<VM>>> {
+    pub fn take_global_packets(&self) -> Vec<Box<dyn GCWork<VM>>> {
         let mut mature_evac_remsets = self.global_packets.lock().unwrap();
         std::mem::take(&mut *mature_evac_remsets)
     }
@@ -121,7 +121,7 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
 }
 
 #[derive(Default)]
-pub(super) struct MatureEvacuationSet {
+pub struct MatureEvacuationSet {
     pub fragmented_blocks: SegQueue<Vec<(Block, usize)>>,
     pub fragmented_blocks_size: AtomicUsize,
     pub blocks_in_fragmented_chunks: SegQueue<Vec<(Block, usize)>>,

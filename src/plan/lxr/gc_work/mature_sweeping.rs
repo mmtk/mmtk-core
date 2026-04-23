@@ -14,7 +14,7 @@ use crate::vm::VMBinding;
 use crate::MMTK;
 
 /// Chunk sweeping work packet.
-pub(crate) struct SweepDeadCycles<VM: VMBinding> {
+pub struct SweepDeadCycles<VM: VMBinding> {
     chunks: Range<Chunk>,
     _counter: LazySweepingJobsCounter,
     rc: RefCountHelper<VM>,
@@ -24,7 +24,7 @@ pub(crate) struct SweepDeadCycles<VM: VMBinding> {
 impl<VM: VMBinding> SweepDeadCycles<VM> {
     const CAPACITY: usize = 1024;
 
-    pub(crate) fn new(chunks: Range<Chunk>, counter: LazySweepingJobsCounter) -> Self {
+    pub fn new(chunks: Range<Chunk>, counter: LazySweepingJobsCounter) -> Self {
         Self {
             chunks,
             _counter: counter,
@@ -106,12 +106,12 @@ impl<VM: VMBinding> GCWork<VM> for SweepDeadCycles<VM> {
     }
 }
 
-pub(crate) struct RCSweepMatureAfterSATBLOS {
+pub struct RCSweepMatureAfterSATBLOS {
     _counter: LazySweepingJobsCounter,
 }
 
 impl RCSweepMatureAfterSATBLOS {
-    pub(crate) fn new(counter: LazySweepingJobsCounter) -> Self {
+    pub fn new(counter: LazySweepingJobsCounter) -> Self {
         Self { _counter: counter }
     }
 }

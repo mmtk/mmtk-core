@@ -55,7 +55,7 @@ impl BlockCache {
     }
 }
 
-pub(super) struct BlockAllocation<VM: VMBinding> {
+pub struct BlockAllocation<VM: VMBinding> {
     space: UnsafeCell<*const ImmixSpace<VM>>,
     lxr: UnsafeCell<*const LXR<VM>>,
     nursery_blocks: BlockCache,
@@ -66,7 +66,7 @@ unsafe impl<VM: VMBinding> Sync for BlockAllocation<VM> {}
 unsafe impl<VM: VMBinding> Send for BlockAllocation<VM> {}
 
 impl<VM: VMBinding> BlockAllocation<VM> {
-    pub(super) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             space: UnsafeCell::new(std::ptr::null()),
             lxr: UnsafeCell::new(std::ptr::null()),
@@ -75,7 +75,7 @@ impl<VM: VMBinding> BlockAllocation<VM> {
         }
     }
 
-    pub(super) fn init(&self, space: &ImmixSpace<VM>, lxr: &'static LXR<VM>) {
+    pub fn init(&self, space: &ImmixSpace<VM>, lxr: &'static LXR<VM>) {
         unsafe {
             *self.space.get() = space as *const ImmixSpace<VM>;
             *self.lxr.get() = lxr as *const LXR<VM>;
@@ -90,16 +90,16 @@ impl<VM: VMBinding> BlockAllocation<VM> {
         unsafe { &**self.lxr.get() }
     }
 
-    pub(super) fn clean_nursery_mb(&self) -> usize {
+    pub fn clean_nursery_mb(&self) -> usize {
         self.nursery_blocks.len() << Block::LOG_BYTES >> 20
     }
 
-    pub(super) fn total_young_allocation_in_bytes(&self) -> usize {
+    pub fn total_young_allocation_in_bytes(&self) -> usize {
         (self.nursery_blocks.len() << Block::LOG_BYTES)
             + (self.space().get_mutator_recycled_lines_in_pages() << LOG_BYTES_IN_PAGE)
     }
 
-    pub(super) fn reset_block_mark_for_mutator_reused_blocks(&self, _pause: Pause) {
+    pub fn reset_block_mark_for_mutator_reused_blocks(&self, _pause: Pause) {
         // SATB sweep has problem scanning mutator recycled blocks.
         // Remaing the block state as "reusing" and reset them here.
         self.reused_blocks.visit_slice(|blocks| {
@@ -110,7 +110,7 @@ impl<VM: VMBinding> BlockAllocation<VM> {
         });
     }
 
-    pub(super) fn sweep_mutator_reused_blocks(&self, pause: Pause) {
+    pub fn sweep_mutator_reused_blocks(&self, pause: Pause) {
         if pause == Pause::Full || pause == Pause::FinalMark {
             self.reused_blocks.reset();
             return;
@@ -125,7 +125,7 @@ impl<VM: VMBinding> BlockAllocation<VM> {
     }
 
     /// Reset allocated_block_buffer and free nursery blocks.
-    pub(super) fn sweep_nursery_blocks(&self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
+    pub fn sweep_nursery_blocks(&self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
         const PARALLEL_STW_SWEEPING: bool = false;
         let max_stw_sweep_blocks: usize = usize::MAX;
         let space = self.space();

@@ -17,7 +17,7 @@ impl<VM: VMBinding> GCWork<VM> for FastRCPrepare {
     }
 }
 
-pub(crate) struct ConcurrentChunkMetadataZeroing {
+pub struct ConcurrentChunkMetadataZeroing {
     pub chunks: Range<Chunk>,
 }
 
@@ -51,7 +51,7 @@ impl<VM: VMBinding> GCWork<VM> for ConcurrentChunkMetadataZeroing {
 
 /// A work packet to prepare each block for GC.
 /// Performs the action on a range of chunks.
-pub(crate) struct PrepareChunksForFullGC {
+pub struct PrepareChunksForFullGC {
     pub chunks: Range<Chunk>,
 }
 

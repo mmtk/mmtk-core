@@ -237,7 +237,7 @@ pub struct LXRStopTheWorldProcessEdges<VM: VMBinding, const FULL_GC: bool> {
 }
 
 impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC> {
-    pub(super) fn new_remset(slots: Vec<SlotOf<Self>>, mmtk: &'static MMTK<VM>) -> Self {
+    pub fn new_remset(slots: Vec<SlotOf<Self>>, mmtk: &'static MMTK<VM>) -> Self {
         let mut me = Self::new(slots, false, mmtk, WorkBucketStage::Closure);
         me.remset_recorded_slots = true;
         me

@@ -7,13 +7,13 @@ use crate::scheduler::{GCWork, GCWorker};
 use crate::vm::VMBinding;
 use crate::MMTK;
 
-pub(crate) struct RCLazySweepNurseryBlocks {
+pub struct RCLazySweepNurseryBlocks {
     blocks: Vec<Block>,
     _counter: LazySweepingJobsCounter,
 }
 
 impl RCLazySweepNurseryBlocks {
-    pub(crate) fn new(blocks: Vec<Block>) -> Self {
+    pub fn new(blocks: Vec<Block>) -> Self {
         Self {
             blocks,
             _counter: LazySweepingJobsCounter::new_decs(),
@@ -35,13 +35,13 @@ impl<VM: VMBinding> GCWork<VM> for RCLazySweepNurseryBlocks {
     }
 }
 
-pub(crate) struct RCSTWSweepNurseryBlocks {
+pub struct RCSTWSweepNurseryBlocks {
     blocks: Vec<Block>,
     _counter: LazySweepingJobsCounter,
 }
 
 impl RCSTWSweepNurseryBlocks {
-    pub(crate) fn new(blocks: Vec<Block>) -> Self {
+    pub fn new(blocks: Vec<Block>) -> Self {
         Self {
             blocks,
             _counter: LazySweepingJobsCounter::new_decs(),
@@ -62,13 +62,13 @@ impl<VM: VMBinding> GCWork<VM> for RCSTWSweepNurseryBlocks {
     }
 }
 
-pub(crate) struct SweepBlocksAfterDecs {
+pub struct SweepBlocksAfterDecs {
     blocks: Vec<(Block, bool)>,
     _counter: LazySweepingJobsCounter,
 }
 
 impl SweepBlocksAfterDecs {
-    pub(crate) fn new(blocks: Vec<(Block, bool)>, counter: LazySweepingJobsCounter) -> Self {
+    pub fn new(blocks: Vec<(Block, bool)>, counter: LazySweepingJobsCounter) -> Self {
         Self {
             blocks,
             _counter: counter,

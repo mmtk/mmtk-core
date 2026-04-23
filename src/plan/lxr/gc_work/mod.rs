@@ -9,7 +9,7 @@ pub mod prepare;
 pub mod rc;
 pub mod tracing;
 
-pub(super) struct LXRGCWorkContext<E: ProcessEdgesWork>(std::marker::PhantomData<E>);
+pub struct LXRGCWorkContext<E: ProcessEdgesWork>(std::marker::PhantomData<E>);
 
 impl<E: ProcessEdgesWork> crate::scheduler::GCWorkContext for LXRGCWorkContext<E> {
     type VM = E::VM;
