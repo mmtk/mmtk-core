@@ -174,6 +174,9 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
         self
     }
+    fn as_inspector(&self) -> &dyn crate::util::heap::inspection::SpaceInspector {
+        self
+    }
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
@@ -1223,6 +1226,34 @@ impl ClearVOBitsAfterPrepare {
             .filter(|block| block.get_state() != BlockState::Unallocated)
         {
             block.clear_vo_bits_for_unmarked_regions(line_mark_state);
+        }
+    }
+}
+
+mod inspector {
+    use super::*;
+    use crate::util::heap::inspection::{list_sub_regions, RegionInspector, SpaceInspector};
+    impl<VM: VMBinding> SpaceInspector for ImmixSpace<VM> {
+        fn list_top_regions(&self) -> Vec<Box<dyn RegionInspector>> {
+            self.chunk_map
+                .all_chunks()
+                .map(|r: Chunk| Box::new(r) as Box<dyn RegionInspector>)
+                .collect()
+        }
+
+        fn list_sub_regions(
+            &self,
+            parent_region: &dyn RegionInspector,
+        ) -> Vec<Box<dyn RegionInspector>> {
+            if let Some(regions) = list_sub_regions::<Chunk, Block>(parent_region) {
+                return regions;
+            }
+            if !crate::policy::immix::BLOCK_ONLY {
+                if let Some(regions) = list_sub_regions::<Block, Line>(parent_region) {
+                    return regions;
+                }
+            }
+            vec![]
         }
     }
 }
