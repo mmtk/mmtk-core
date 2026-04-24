@@ -194,7 +194,6 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         let pause = self.current_pause().unwrap();
         match pause {
             Pause::InitialMark => (),
-            Pause::RefCount => unreachable!(),
             Pause::Full | Pause::FinalMark => {
                 self.immix_space.release(
                     true,
@@ -216,6 +215,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
                     // we will need to clear the unlog bits at an appropriate place.
                 }
             }
+            Pause::RefCount => unreachable!(),
         }
     }
 
