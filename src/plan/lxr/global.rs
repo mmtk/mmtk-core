@@ -1,5 +1,4 @@
 use super::block_allocation::BlockAllocation;
-use super::gc_work::mature_evac::FlushMatureEvacRemsets;
 use super::gc_work::nursery_sweeping::ReleaseLOSNursery;
 use super::gc_work::prepare::FastRCPrepare;
 use super::gc_work::rc::{CollectRoots, ProcessDecs};
@@ -199,10 +198,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         self.common
             .prepare(tls, pause == Pause::Full || pause == Pause::InitialMark);
         if super::MATURE_EVACUATION && (pause == Pause::FinalMark || pause == Pause::Full) {
-            // FIXME: Duplicate???
             self.process_mature_evacuation_remset();
-            self.immix_space.scheduler().work_buckets[WorkBucketStage::RCEvacuateMature]
-                .add(FlushMatureEvacRemsets);
         }
         if super::MATURE_EVACUATION && (pause == Pause::InitialMark || pause == Pause::Full) {
             // Select mature evacuation set

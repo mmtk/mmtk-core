@@ -175,12 +175,3 @@ impl<VM: VMBinding> GCWork<VM> for EvacuateMatureObjects<VM> {
         worker.add_boxed_work(WorkBucketStage::Closure, work)
     }
 }
-
-pub struct FlushMatureEvacRemsets;
-
-impl<VM: VMBinding> GCWork<VM> for FlushMatureEvacRemsets {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        let lxr = &mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
-        lxr.process_mature_evacuation_remset();
-    }
-}
