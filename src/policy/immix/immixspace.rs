@@ -415,6 +415,16 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.reusable_blocks.len() == 0,
             full_heap_system_gc,
             *self.common.options.immix_always_defrag,
+            if *self.common.options.count_live_bytes_in_gc {
+                let stats = self.common.global_state.live_bytes_in_last_gc.borrow();
+                if let Some(immix_stats) = stats.get(&self.name()) {
+                    Some(immix_stats.live_bytes as f64 / immix_stats.used_bytes as f64)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         );
         self.defrag.in_defrag()
     }
