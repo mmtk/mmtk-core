@@ -9,6 +9,8 @@ pub fn bench(c: &mut Criterion) {
     // Setting a larger heap, although the GC should be disabled in the MockVM
     #[cfg(feature = "vo_bit")]
     let mut fixture = MutatorFixture::create_with_heapsize(1 << 30);
+    #[cfg(feature = "vo_bit")]
+    fixture.mmtk().disable_collection();
 
     // Normal objects
     // 16KB object -- we want to make sure the object can fit into any normal space (e.g. immix space or mark sweep space)
@@ -16,7 +18,6 @@ pub fn bench(c: &mut Criterion) {
     write_mockvm(|mock| {
         *mock = MockVM {
             get_object_size: MockMethod::new_fixed(Box::new(|_| NORMAL_OBJECT_SIZE)),
-            is_collection_enabled: MockMethod::new_fixed(Box::new(|_| false)),
             ..MockVM::default()
         }
     });
@@ -55,7 +56,6 @@ pub fn bench(c: &mut Criterion) {
     write_mockvm(|mock| {
         *mock = MockVM {
             get_object_size: MockMethod::new_fixed(Box::new(|_| LARGE_OBJECT_SIZE)),
-            is_collection_enabled: MockMethod::new_fixed(Box::new(|_| false)),
             ..MockVM::default()
         }
     });
