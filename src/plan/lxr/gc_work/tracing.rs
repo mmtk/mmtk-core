@@ -129,7 +129,7 @@ unsafe impl<VM: VMBinding> Send for LXRConcurrentTraceObjects<VM> {}
 impl<VM: VMBinding> GCWork<VM> for LXRConcurrentTraceObjects<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         self.worker = worker;
-        debug_assert!(!mmtk.scheduler.work_buckets[WorkBucketStage::Initial].is_open());
+        debug_assert!(!mmtk.scheduler.work_buckets[WorkBucketStage::RCProcessIncs].is_open());
         // mark objects
         if let Some(objects) = self.objects.take() {
             self.trace_objects(&objects)
@@ -152,7 +152,7 @@ impl<VM: VMBinding> GCWork<VM> for LXRConcurrentTraceObjects<VM> {
         self.flush();
         // CM: Decrease counter
         super::super::NUM_CONCURRENT_TRACING_PACKETS.fetch_sub(1, Ordering::SeqCst);
-        debug_assert!(!mmtk.scheduler.work_buckets[WorkBucketStage::Initial].is_open());
+        debug_assert!(!mmtk.scheduler.work_buckets[WorkBucketStage::RCProcessIncs].is_open());
     }
 }
 

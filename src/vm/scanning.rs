@@ -101,9 +101,6 @@ pub trait ObjectTracerContext<VM: VMBinding>: Clone + Send + 'static {
 ///     references to variables with limited lifetime (such as local variables), because
 ///     it needs to be moved between threads.
 pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
-    fn roots_stage(&self) -> WorkBucketStage {
-        WorkBucketStage::Prepare
-    }
     // TODO:
     // 1.  Rename the functions and remove the repeating `create_process_` and `_work`.
     // 2.  Rename the functions to reflect both the form (slots / nodes) and the semantics (pinning

@@ -277,7 +277,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         if pause == Pause::Full || pause == Pause::InitialMark {
             // Reset block mark and object mark table.
             let work_packets = self.generate_full_trace_prepare_tasks();
-            self.immix_space.scheduler().work_buckets[WorkBucketStage::Initial]
+            self.immix_space.scheduler().work_buckets[WorkBucketStage::RCProcessIncs]
                 .bulk_add(work_packets);
         }
 
@@ -311,6 +311,10 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         self.avail_pages_at_end_of_last_gc
             .store(self.get_available_pages(), Ordering::SeqCst);
         HEAP_AFTER_GC.store(self.get_reserved_pages(), Ordering::SeqCst);
+    }
+
+    fn root_scanning_stage(&self) -> WorkBucketStage {
+        WorkBucketStage::RCProcessIncs
     }
 
     fn end_of_gc(&mut self, _tls: VMWorkerThread) {}
@@ -597,6 +601,7 @@ impl<VM: VMBinding> LXR<VM> {
 
     fn disable_unnecessary_buckets(&'static self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
         // Set conditional buckets
+        scheduler.work_buckets[WorkBucketStage::RCProcessIncs].set_enabled(true);
         scheduler.work_buckets[WorkBucketStage::Prepare].set_enabled(pause != Pause::RefCount);
         let final_mark_or_full = pause == Pause::FinalMark || pause == Pause::Full;
         scheduler.work_buckets[WorkBucketStage::Closure].set_enabled(final_mark_or_full);

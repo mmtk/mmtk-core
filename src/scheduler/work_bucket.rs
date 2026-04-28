@@ -342,7 +342,7 @@ pub enum WorkBucketStage {
     Concurrent,
     ConcurrentResumable,
     FinishConcurrentWork,
-    Initial,
+    RCProcessIncs,
     /// Preparation work.  Plans, spaces, GC workers, mutators, etc. should be prepared for GC at
     /// this stage.
     Prepare,
@@ -453,6 +453,5 @@ impl WorkBucketStage {
         )
     }
 
-    pub const RCProcessIncs: Self = Self::Initial;
     pub const RCEvacuateMature: Self = Self::Closure;
 }

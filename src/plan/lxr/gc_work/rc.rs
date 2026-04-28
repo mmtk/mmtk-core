@@ -700,7 +700,6 @@ impl<VM: VMBinding> ProcessEdgesWork for CollectRoots<VM> {
     type VM = VM;
     type ScanObjectsWorkType = ScanObjects<Self>;
     const OVERWRITE_REFERENCE: bool = false;
-    const RC_ROOTS: bool = true;
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
 
     fn new(

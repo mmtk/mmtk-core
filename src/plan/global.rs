@@ -337,6 +337,10 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     fn gc_pause_start(&self, _scheduler: &GCWorkScheduler<Self::VM>) {}
     fn gc_pause_end(&self) {}
 
+    fn root_scanning_stage(&self) -> WorkBucketStage {
+        WorkBucketStage::Prepare
+    }
+
     /// Return whether the current GC may move any object.  The VM binding can make use of this
     /// information and choose to or not to update some data structures that record the addresses
     /// of objects.

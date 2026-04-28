@@ -233,12 +233,6 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("stop_all_mutators start");
         mmtk.state.prepare_for_stack_scanning();
-        let is_lxr = mmtk.get_plan().downcast_ref::<LXR<C::VM>>().is_some();
-        let stage = if is_lxr {
-            WorkBucketStage::RCProcessIncs
-        } else {
-            WorkBucketStage::Prepare
-        };
         <C::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
             // TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
             // Should we push to Unconstrained instead?
@@ -247,7 +241,8 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
                 mutator.flush();
             }
             if !self.skip_mutator_roots {
-                mmtk.scheduler.work_buckets[stage].add(ScanMutatorRoots::<C>(mutator));
+                mmtk.scheduler.work_buckets[mmtk.get_plan().root_scanning_stage()]
+                    .add(ScanMutatorRoots::<C>(mutator));
             }
         });
         trace!("stop_all_mutators end");
@@ -627,8 +622,6 @@ pub trait ProcessEdgesWork:
     /// If false, we will add object scanning work packets to the global queue and allow other workers to work on it.
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
 
-    const RC_ROOTS: bool = false;
-
     /// Create a [`ProcessEdgesWork`].
     ///
     /// Arguments:
@@ -808,15 +801,6 @@ enum RootsKind {
 impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = VM>>
     RootsWorkFactory<VM::VMSlot> for ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
 {
-    #[inline(always)]
-    fn roots_stage(&self) -> WorkBucketStage {
-        if DPE::RC_ROOTS {
-            WorkBucketStage::RCProcessIncs
-        } else {
-            WorkBucketStage::Prepare
-        }
-    }
-
     fn create_process_roots_work(&mut self, slots: Vec<VM::VMSlot>, kind: RootKind) {
         // Note: We should use the same USDT name "mmtk:roots" for all the three kinds of roots. A
         // VM binding may not call all of the three methods in this impl. For example, the OpenJDK
@@ -827,11 +811,7 @@ impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
         // different names, and our `capture.bt` mentions all of them, `bpftrace` may complain that
         // it cannot find one or more of those USDT trace points in the binary.
         probe!(mmtk, roots, RootsKind::NORMAL, slots.len());
-        let stage = if DPE::RC_ROOTS {
-            WorkBucketStage::RCProcessIncs
-        } else {
-            WorkBucketStage::Closure
-        };
+        let stage = self.mmtk.get_plan().root_scanning_stage();
         let mut w = DPE::new(slots, true, self.mmtk, stage);
         w.root_kind = Some(kind);
         crate::memory_manager::add_work_packet(self.mmtk, stage, w);
