@@ -8,6 +8,8 @@ BEGIN {
         //always collect data
         @stats_enabled = 1;
     }
+
+    printf("====MMTK:CUT_HERE====\n")
 }
 
 END {
@@ -104,7 +106,7 @@ usdt:$MMTK:mmtk:process_root_nodes {
 
 usdt:$MMTK:mmtk:process_slots {
     if (@enable_print) {
-        printf("process_slots,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+        printf("process_slots,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
     }
 }
 

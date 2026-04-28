@@ -87,12 +87,12 @@ class LogProcessor:
         parts = line.split(",") # Split by comma.
         try:
             name, ph, tid, ts = parts[:4] # Extract the first four columns.
+            tid = int(tid)
+            ts = int(ts)
+            args = parts[4:] # `args` will hold other columns.
         except:
             print("Abnormal line: {}".format(line))
             raise
-        tid = int(tid)
-        ts = int(ts)
-        args = parts[4:] # `args` will hold other columns.
 
         if not self.start_time:
             self.start_time = ts
@@ -253,7 +253,6 @@ class LogProcessor:
                         # work packet may do both if SCAN_OBJECTS_IMMEDIATELY is true.
                         "process_slots": {
                             "num_slots": int(args[0]),
-                            "is_roots": int(args[1]),
                         },
                     }
 
@@ -346,12 +345,16 @@ class LogProcessor:
     def run(self, input_file):
         print("Parsing lines...")
         with open(input_file) as f:
+            started = False
             start_time = None
 
             for line in f.readlines():
                 line = line.strip()
 
-                self.process_line(line)
+                if started:
+                    self.process_line(line)
+                elif line == "====MMTK:CUT_HERE====":
+                    started = True
 
         output_name = input_file + ".json.gz"
 
