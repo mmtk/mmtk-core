@@ -80,13 +80,8 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        // TODO use schedule_common once it can work with markcompact
-        // self.common()
-        //     .schedule_common::<Self, MarkingProcessEdges<VM>, NoCopy<VM>>(
-        //         self,
-        //         &MARKCOMPACT_CONSTRAINTS,
-        //         scheduler,
-        //     );
+        // TODO: Extract a method similar to `GCWorkScheduler::schedule_common_work`
+        // but for compressing plans.
 
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]

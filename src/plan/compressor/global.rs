@@ -79,9 +79,8 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        // TODO use schedule_common once it can work with the Compressor
-        // The main issue there is that we need to ForwardingProcessEdges
-        // in FinalizableForwarding.
+        // TODO: Extract a method similar to `GCWorkScheduler::schedule_common_work`
+        // but for compressing plans.
 
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]

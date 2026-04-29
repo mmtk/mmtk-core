@@ -1,4 +1,6 @@
 use crate::plan::tracing::OptionObjectQueue;
+#[allow(unused)]
+use crate::plan::tracing::SFTTrace;
 use crate::scheduler::GCWorker;
 use crate::util::*;
 use crate::vm::VMBinding;
@@ -94,7 +96,7 @@ pub trait SFT {
     ///     `Mutator::post_alloc` will call this method after allocation.
     fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize);
 
-    /// Trace objects through SFT. This along with [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges)
+    /// Trace objects through SFT. This along with [`SFTTrace`]
     /// provides an easy way for most plans to trace objects without the need to implement any plan-specific
     /// code. However, tracing objects for some policies are more complicated, and they do not provide an
     /// implementation of this method. For example, mark compact space requires trace twice in each GC.
@@ -202,7 +204,7 @@ impl SFT for EmptySpaceSFT {
     ) -> ObjectReference {
         // We do not have the `VM` type parameter here, so we cannot forward the call to the VM.
         panic!(
-            "Call trace_object() on {}, which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().",
+            "Call trace_object() on {}, which maps to an empty space. SFTTrace does not support the fallback to vm_trace_object().",
             object,
         )
     }
