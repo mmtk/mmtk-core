@@ -1,7 +1,7 @@
 use super::defrag::StatsForDefrag;
 use super::line::*;
 use super::{block::*, defrag::Defrag};
-use crate::plan::VectorObjectQueue;
+use crate::plan::tracing::OptionObjectQueue;
 use crate::policy::gc_work::{TraceKind, DEFAULT_TRACE, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
@@ -145,7 +145,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     }
     fn sft_trace_object(
         &self,
-        _queue: &mut VectorObjectQueue,
+        _queue: &mut OptionObjectQueue,
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
@@ -269,8 +269,8 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         } else if KIND == DEFAULT_TRACE {
             // FIXME: This is hacky. When we do a default trace, this should be a nonmoving space.
             // The only exception is the nursery GC for sticky immix, for which, we use default trace.
-            // This function is only used for PlanProcessEdges, and for sticky immix nursery GC, we use
-            // GenNurseryProcessEdges. So it still works. But this is quite hacky anyway.
+            // This function is only used for PlanTrace, and for sticky immix nursery GC, we use
+            // PlanTrace. So it still works. But this is quite hacky anyway.
             // See https://github.com/mmtk/mmtk-core/issues/1314 for details.
             false
         } else {

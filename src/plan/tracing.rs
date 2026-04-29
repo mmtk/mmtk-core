@@ -3,16 +3,191 @@
 
 use std::marker::PhantomData;
 
-use crate::scheduler::gc_work::{ProcessEdgesWork, SlotOf};
-use crate::scheduler::{GCWorker, WorkBucketStage, EDGES_WORK_BUFFER_SIZE};
+use crate::plan::PlanTraceObject;
+use crate::policy::gc_work::TraceKind;
+use crate::scheduler::{GCWorker, EDGES_WORK_BUFFER_SIZE};
 use crate::util::{ObjectReference, VMThread, VMWorkerThread};
-use crate::vm::{Scanning, SlotVisitor, VMBinding};
+use crate::vm::{Scanning, VMBinding};
+use crate::{Plan, MMTK};
+
+pub trait Trace: 'static + Send + Clone {
+    type VM: VMBinding;
+
+    fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self;
+
+    fn trace_object<Q: ObjectQueue>(
+        &self,
+        worker: &mut GCWorker<Self::VM>,
+        object: ObjectReference,
+        queue: &mut Q,
+    ) -> ObjectReference;
+
+    fn post_scan_object(&self, object: ObjectReference);
+
+    fn may_move_objects() -> bool;
+}
+
+/// A shorthand for getting the slot type from a [`Trace`] instance.
+pub type SlotOfTrace<T> = <<T as Trace>::VM as VMBinding>::VMSlot;
+
+#[allow(dead_code)]
+#[derive(Default)]
+pub struct SFTTrace<VM: VMBinding> {
+    phantom_data: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> Clone for SFTTrace<VM> {
+    fn clone(&self) -> Self {
+        Self {
+            phantom_data: PhantomData,
+        }
+    }
+}
+
+impl<VM: VMBinding> Trace for SFTTrace<VM> {
+    type VM = VM;
+
+    fn from_mmtk(_mmtk: &'static MMTK<Self::VM>) -> Self {
+        Default::default()
+    }
+
+    fn trace_object<Q: ObjectQueue>(
+        &self,
+        worker: &mut GCWorker<VM>,
+        object: ObjectReference,
+        queue: &mut Q,
+    ) -> ObjectReference {
+        use crate::policy::sft::GCWorkerMutRef;
+
+        // Erase <VM> type parameter
+        let worker = GCWorkerMutRef::new(worker);
+
+        // Invoke trace object on sft
+        let sft = unsafe { crate::mmtk::SFT_MAP.get_unchecked(object.to_raw_address()) };
+
+        // Because `sft.sft_trace_object` cannot have generic parameters, we can't pass `queue`
+        // directly to it.  Instead we let `sft_trace_object` enqueue to this `tmp_queue` and
+        // forward the enqueued object to `queue`.
+        let mut tmp_queue = None;
+        let result = sft.sft_trace_object(&mut tmp_queue, object, worker);
+        if let Some(queued_object) = tmp_queue {
+            queue.enqueue(queued_object);
+        }
+        result
+    }
+
+    fn post_scan_object(&self, _object: ObjectReference) {
+        // Do nothing.  SFTTrace is only suitable for plans that don't need post_scan_object.
+    }
+
+    fn may_move_objects() -> bool {
+        // We conservatively assume it may move objects.
+        true
+    }
+}
+
+pub struct PlanTrace<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> {
+    plan: &'static P,
+}
+
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> PlanTrace<P, KIND> {
+    pub(crate) fn new(plan: &'static P) -> Self {
+        Self { plan }
+    }
+}
+
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> Clone for PlanTrace<P, KIND> {
+    fn clone(&self) -> Self {
+        Self { plan: self.plan }
+    }
+}
+
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> Trace for PlanTrace<P, KIND> {
+    type VM = P::VM;
+
+    fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
+        let plan = mmtk.get_plan().downcast_ref::<P>().unwrap();
+        Self::new(plan)
+    }
+
+    fn trace_object<Q: ObjectQueue>(
+        &self,
+        worker: &mut GCWorker<Self::VM>,
+        object: ObjectReference,
+        queue: &mut Q,
+    ) -> ObjectReference {
+        self.plan.trace_object::<Q, KIND>(queue, object, worker)
+    }
+
+    fn post_scan_object(&self, object: ObjectReference) {
+        self.plan.post_scan_object(object);
+    }
+
+    fn may_move_objects() -> bool {
+        P::may_move_objects::<KIND>()
+    }
+}
+
+#[derive(Default)]
+pub struct UnsupportedTrace<VM: VMBinding> {
+    phantom_data: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> Clone for UnsupportedTrace<VM> {
+    fn clone(&self) -> Self {
+        Self {
+            phantom_data: PhantomData,
+        }
+    }
+}
+
+impl<VM: VMBinding> Trace for UnsupportedTrace<VM> {
+    type VM = VM;
+
+    fn from_mmtk(_mmtk: &'static MMTK<Self::VM>) -> Self {
+        unimplemented!()
+    }
+
+    fn trace_object<Q: ObjectQueue>(
+        &self,
+        _worker: &mut GCWorker<VM>,
+        _object: ObjectReference,
+        _queue: &mut Q,
+    ) -> ObjectReference {
+        unimplemented!()
+    }
+
+    fn post_scan_object(&self, _object: ObjectReference) {
+        unimplemented!()
+    }
+
+    fn may_move_objects() -> bool {
+        unimplemented!()
+    }
+}
 
 /// This trait represents an object queue to enqueue objects during tracing.
 pub trait ObjectQueue {
     /// Enqueue an object into the queue.
     fn enqueue(&mut self, object: ObjectReference);
 }
+
+impl<F: FnMut(ObjectReference)> ObjectQueue for F {
+    fn enqueue(&mut self, object: ObjectReference) {
+        self(object)
+    }
+}
+
+impl ObjectQueue for Option<ObjectReference> {
+    fn enqueue(&mut self, object: ObjectReference) {
+        debug_assert!(self.is_none());
+        *self = Some(object);
+    }
+}
+
+/// A one-element object queue backed by an `Option<ObjectReference>`.  Used by SFT to decouple the
+/// concrete [`ObjectQueue`] type from the dynamic dispatching.
+pub type OptionObjectQueue = Option<ObjectReference>;
 
 /// A vector queue for object references.
 pub type VectorObjectQueue = VectorQueue<ObjectReference>;
@@ -86,64 +261,6 @@ impl<T> Default for VectorQueue<T> {
 impl ObjectQueue for VectorQueue<ObjectReference> {
     fn enqueue(&mut self, v: ObjectReference) {
         self.push(v);
-    }
-}
-
-/// A transitive closure visitor to collect the slots from objects.
-/// It maintains a buffer for the slots, and flushes slots to a new work packet
-/// if the buffer is full or if the type gets dropped.
-pub struct ObjectsClosure<'a, E: ProcessEdgesWork> {
-    buffer: VectorQueue<SlotOf<E>>,
-    pub(crate) worker: &'a mut GCWorker<E::VM>,
-    bucket: WorkBucketStage,
-}
-
-impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
-    /// Create an [`ObjectsClosure`].
-    ///
-    /// Arguments:
-    /// * `worker`: the current worker. The objects closure should not leave the context of this worker.
-    /// * `bucket`: new work generated will be push ed to the bucket.
-    pub fn new(worker: &'a mut GCWorker<E::VM>, bucket: WorkBucketStage) -> Self {
-        Self {
-            buffer: VectorQueue::new(),
-            worker,
-            bucket,
-        }
-    }
-
-    fn flush(&mut self) {
-        let buf = self.buffer.take();
-        if !buf.is_empty() {
-            self.worker.add_work(
-                self.bucket,
-                E::new(buf, false, self.worker.mmtk, self.bucket),
-            );
-        }
-    }
-}
-
-impl<E: ProcessEdgesWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'_, E> {
-    fn visit_slot(&mut self, slot: SlotOf<E>) {
-        #[cfg(debug_assertions)]
-        {
-            use crate::vm::slot::Slot;
-            trace!(
-                "(ObjectsClosure) Visit slot {:?} (pointing to {:?})",
-                slot,
-                slot.load()
-            );
-        }
-        self.buffer.push(slot);
-        if self.buffer.is_full() {
-            self.flush();
-        }
-    }
-}
-
-impl<E: ProcessEdgesWork> Drop for ObjectsClosure<'_, E> {
-    fn drop(&mut self) {
-        self.flush();
     }
 }
 

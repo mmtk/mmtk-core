@@ -5,6 +5,8 @@ use crate::global_state::GlobalState;
 use crate::mmtk::MMTK;
 use crate::plan::gc_work::{ClearCommonPlanUnlogBits, SetCommonPlanUnlogBits};
 use crate::plan::tracing::ObjectQueue;
+#[allow(unused)] // Used in doc comment.
+use crate::plan::tracing::PlanTrace;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
@@ -893,7 +895,7 @@ pub trait HasSpaces {
     fn for_each_space_mut(&mut self, func: &mut dyn FnMut(&mut dyn Space<Self::VM>));
 }
 
-/// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.
+/// A plan that uses [`PlanTrace`] needs to provide an implementation for this trait.
 /// Generally a plan does not need to manually implement this trait. Instead, we provide
 /// a procedural macro that helps generate an implementation. Please check `macros/trace_object`.
 ///

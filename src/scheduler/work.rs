@@ -1,6 +1,9 @@
 use super::worker::*;
-use crate::mmtk::MMTK;
-use crate::vm::VMBinding;
+#[allow(unused)] // Used in doc comment.
+use crate::plan::tracing::UnsupportedTrace;
+use crate::scheduler::gc_work::TracingRootsWorkFactory;
+use crate::vm::{RootsWorkFactory, VMBinding};
+use crate::{mmtk::MMTK, plan::tracing::Trace};
 #[cfg(feature = "work_packet_stats")]
 use std::any::{type_name, TypeId};
 
@@ -58,7 +61,6 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
     }
 }
 
-use super::gc_work::ProcessEdgesWork;
 use crate::plan::Plan;
 
 /// This trait provides a group of associated types that are needed to
@@ -75,27 +77,33 @@ pub trait GCWorkContext: Send + 'static {
     type VM: VMBinding;
     type PlanType: Plan<VM = Self::VM>;
 
-    // FIXME: We should use `SFTProcessEdges` as the default value for `DefaultProcessEdges`, and
-    // `UnsupportedProcessEdges` for `PinningProcessEdges`.  However, this requires
-    // `associated_type_defaults` which has not yet been stablized.
-    // See: https://github.com/rust-lang/rust/issues/29661
+    // FIXME: We should use `SFTTrace` as the default value for `DefaultTrace`, and
+    // `UnsupportedTrace` for `PinningTrace`.  However, this requires `associated_type_defaults`
+    // which has not yet been stablized. See: https://github.com/rust-lang/rust/issues/29661
 
-    /// The `ProcessEdgesWork` implementation to use for tracing edges that do not have special
-    /// pinning requirements.  Concrete plans and spaces may choose to move or not to move the
-    /// objects the traced edges point to.
-    type DefaultProcessEdges: ProcessEdgesWork<VM = Self::VM>;
+    /// The [`Trace`] implementation to use for tracing edges that do not have special pinning
+    /// requirements.  Concrete plans and spaces may choose to move or not to move the objects the
+    /// traced edges point to.
+    type DefaultTrace: Trace<VM = Self::VM>;
 
-    /// The `ProcessEdgesWork` implementation to use for tracing edges that must not be updated
-    /// (i.e. the objects the traced edges pointed to must not be moved).  This is used for
-    /// implementing pinning roots and transitive pinning roots.
+    /// The [`Trace`] implementation to use for tracing edges that must not be updated (i.e. the
+    /// objects the traced edges pointed to must not be moved).  This is used for implementing
+    /// pinning roots and transitive pinning roots.
     ///
-    /// -   For non-transitive pinning roots, `PinningProcessEdges` will be used to trace the edges
-    ///     from roots to objects, but their descendents will be traced using `DefaultProcessEdges`.
-    /// -   For transitive pinning roots, `PinningProcessEdges` will be used to trace the edges
+    /// -   For non-transitive pinning roots, [`Self::PinningTrace`] will be used to trace the edges
+    ///     from roots to objects, but their descendents will be traced using
+    ///     [`Self::DefaultTrace`].
+    /// -   For transitive pinning roots, [`Self::PinningTrace`] will be used to trace the edges
     ///     from roots to objects, and will also be used to trace the outgoing edges of all objects
     ///     reachable from transitive pinning roots.
     ///
-    /// If a plan does not support object pinning, it should use `UnsupportedProcessEdges` for this
-    /// type member.
-    type PinningProcessEdges: ProcessEdgesWork<VM = Self::VM>;
+    /// If a plan does not support object pinning, it should use [`UnsupportedTrace`] for this type
+    /// member.
+    type PinningTrace: Trace<VM = Self::VM>;
+
+    fn make_roots_work_factory(
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> impl RootsWorkFactory<<Self::VM as VMBinding>::VMSlot> {
+        TracingRootsWorkFactory::<Self::VM, Self::DefaultTrace, Self::PinningTrace>::new(mmtk)
+    }
 }

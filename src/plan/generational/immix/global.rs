@@ -101,11 +101,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         self.gen.collection_required(self, space_full, space)
     }
 
-    // GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }> and GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>
-    // are different types. However, it seems clippy does not recognize the constant type parameter and thinks we have identical blocks
-    // in different if branches.
-    #[allow(clippy::if_same_then_else)]
-    #[allow(clippy::branches_sharing_code)]
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<Self::VM>) {
         let is_full_heap = self.requires_full_heap_collection();
         probe!(mmtk, gen_full_heap, is_full_heap);

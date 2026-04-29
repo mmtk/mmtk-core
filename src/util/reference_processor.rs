@@ -5,10 +5,13 @@ use std::sync::Mutex;
 use std::vec::Vec;
 
 use crate::plan::is_nursery_gc;
-use crate::scheduler::ProcessEdgesWork;
+use crate::plan::tracing::Trace;
+use crate::scheduler::gc_work::TracingTracerContext;
 use crate::scheduler::WorkBucketStage;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
+use crate::vm::ObjectTracer;
+use crate::vm::ObjectTracerContext;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 
@@ -66,23 +69,32 @@ impl ReferenceProcessors {
     /// However, for some plans like mark compact, at the point we do ref scanning, we do not know
     /// the forwarding addresses yet, thus we cannot do forwarding during scan refs. And for those
     /// plans, this separate step is required.
-    pub fn forward_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &'static MMTK<E::VM>) {
+    pub fn forward_refs<VM: VMBinding, OT: ObjectTracer>(
+        &self,
+        trace: &mut OT,
+        mmtk: &'static MMTK<VM>,
+    ) {
         debug_assert!(
             mmtk.get_plan().constraints().needs_forward_after_liveness,
             "A plan with needs_forward_after_liveness=false does not need a separate forward step"
         );
         self.soft
-            .forward::<E>(trace, is_nursery_gc(mmtk.get_plan()));
+            .forward::<VM, OT>(trace, is_nursery_gc(mmtk.get_plan()));
         self.weak
-            .forward::<E>(trace, is_nursery_gc(mmtk.get_plan()));
+            .forward::<VM, OT>(trace, is_nursery_gc(mmtk.get_plan()));
         self.phantom
-            .forward::<E>(trace, is_nursery_gc(mmtk.get_plan()));
+            .forward::<VM, OT>(trace, is_nursery_gc(mmtk.get_plan()));
     }
 
     // Methods for scanning weak references. It needs to be called in a decreasing order of reference strengths, i.e. soft > weak > phantom
 
-    pub fn retain_soft_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &'static MMTK<E::VM>) {
-        self.soft.retain::<E>(trace, is_nursery_gc(mmtk.get_plan()));
+    pub fn retain_soft_refs<VM: VMBinding, OT: ObjectTracer>(
+        &self,
+        trace: &mut OT,
+        mmtk: &'static MMTK<VM>,
+    ) {
+        self.soft
+            .retain::<VM, OT>(trace, is_nursery_gc(mmtk.get_plan()));
     }
 
     /// Scan soft references.
@@ -232,22 +244,22 @@ impl ReferenceProcessor {
     /// -   adds the referent to the tracing queue if not yet reached, so that its children will be
     ///     kept alive, too, and
     /// -   gets the new object reference of the referent if it is moved.
-    fn keep_referent_alive<E: ProcessEdgesWork>(
-        e: &mut E,
+    fn keep_referent_alive<OT: ObjectTracer>(
+        tracer: &mut OT,
         referent: ObjectReference,
     ) -> ObjectReference {
-        e.trace_object(referent)
+        tracer.trace_object(referent)
     }
 
     /// This function is called when forwarding the references and referents (for MarkCompact). It
     /// -   adds the reference or the referent to the tracing queue if not yet reached, so that
     ///     the children of the reference or referent will be visited and forwarded, too, and
     /// -   gets the forwarded object reference of the object.
-    fn trace_forward_object<E: ProcessEdgesWork>(
-        e: &mut E,
+    fn trace_forward_object<OT: ObjectTracer>(
+        tracer: &mut OT,
         referent: ObjectReference,
     ) -> ObjectReference {
-        e.trace_object(referent)
+        tracer.trace_object(referent)
     }
 
     /// Inform the binding to enqueue the weak references whose referents were cleared in this GC.
@@ -294,13 +306,13 @@ impl ReferenceProcessor {
     /// Forward the reference tables in the reference processor. This is only needed if a plan does not forward
     /// objects in their first transitive closure.
     /// nursery is not used for this.
-    pub fn forward<E: ProcessEdgesWork>(&self, trace: &mut E, _nursery: bool) {
+    pub fn forward<VM: VMBinding, OT: ObjectTracer>(&self, trace: &mut OT, _nursery: bool) {
         let mut sync = self.sync.lock().unwrap();
         debug!("Starting ReferenceProcessor.forward({:?})", self.semantics);
 
         // Forward a single reference
-        fn forward_reference<E: ProcessEdgesWork>(
-            trace: &mut E,
+        fn forward_reference<VM: VMBinding, OT: ObjectTracer>(
+            trace: &mut OT,
             reference: ObjectReference,
         ) -> ObjectReference {
             {
@@ -308,15 +320,14 @@ impl ReferenceProcessor {
                 trace!(
                     "Forwarding reference: {} (size: {})",
                     reference,
-                    <E::VM as VMBinding>::VMObjectModel::get_current_size(reference)
+                    <VM as VMBinding>::VMObjectModel::get_current_size(reference)
                 );
             }
 
-            if let Some(old_referent) =
-                <E::VM as VMBinding>::VMReferenceGlue::get_referent(reference)
+            if let Some(old_referent) = <VM as VMBinding>::VMReferenceGlue::get_referent(reference)
             {
                 let new_referent = ReferenceProcessor::trace_forward_object(trace, old_referent);
-                <E::VM as VMBinding>::VMReferenceGlue::set_referent(reference, new_referent);
+                <VM as VMBinding>::VMReferenceGlue::set_referent(reference, new_referent);
 
                 trace!(
                     " referent: {} (forwarded to {})",
@@ -334,13 +345,13 @@ impl ReferenceProcessor {
         sync.references = sync
             .references
             .iter()
-            .map(|reff| forward_reference::<E>(trace, *reff))
+            .map(|reff| forward_reference::<VM, OT>(trace, *reff))
             .collect();
 
         sync.enqueued_references = sync
             .enqueued_references
             .iter()
-            .map(|reff| forward_reference::<E>(trace, *reff))
+            .map(|reff| forward_reference::<VM, OT>(trace, *reff))
             .collect();
 
         debug!("Ending ReferenceProcessor.forward({:?})", self.semantics);
@@ -406,7 +417,7 @@ impl ReferenceProcessor {
     /// It retains the referent if the reference is definitely reachable. This method does
     /// not update reference or referent. So after this method, scan() should be used to update
     /// the references/referents.
-    fn retain<E: ProcessEdgesWork>(&self, trace: &mut E, _nursery: bool) {
+    fn retain<VM: VMBinding, OT: ObjectTracer>(&self, trace: &mut OT, _nursery: bool) {
         debug_assert!(self.semantics == Semantics::SOFT);
 
         let sync = self.sync.lock().unwrap();
@@ -432,8 +443,7 @@ impl ReferenceProcessor {
             }
             num_live += 1;
             // Reference is definitely reachable.  Retain the referent.
-            if let Some(referent) = <E::VM as VMBinding>::VMReferenceGlue::get_referent(*reference)
-            {
+            if let Some(referent) = VM::VMReferenceGlue::get_referent(*reference) {
                 Self::keep_referent_alive(trace, referent);
                 num_retained += 1;
                 trace!(" ~> {:?} (retained)", referent);
@@ -535,9 +545,9 @@ impl<VM: VMBinding> GCWork<VM> for RescanReferences<VM> {
 }
 
 #[derive(Default)]
-pub(crate) struct SoftRefProcessing<E: ProcessEdgesWork>(PhantomData<E>);
-impl<E: ProcessEdgesWork> GCWork<E::VM> for SoftRefProcessing<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+pub(crate) struct SoftRefProcessing<T: Trace>(PhantomData<T>);
+impl<T: Trace> GCWork<T::VM> for SoftRefProcessing<T> {
+    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         if !mmtk.state.is_emergency_collection() {
             // Postpone the scanning to the end of the transitive closure from strongly reachable
             // soft references.
@@ -548,19 +558,19 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for SoftRefProcessing<E> {
             });
             worker.scheduler().work_buckets[WorkBucketStage::SoftRefClosure].set_sentinel(rescan);
 
-            // Retain soft references.  This will expand the transitive closure.  We create an
-            // instance of `E` for this.
-            let mut w = E::new(vec![], false, mmtk, WorkBucketStage::SoftRefClosure);
-            w.set_worker(worker);
-            mmtk.reference_processors.retain_soft_refs(&mut w, mmtk);
-            w.flush();
+            // Retain soft references.  This will expand the transitive closure.
+            let tracer_context = TracingTracerContext::<T>::new(WorkBucketStage::SoftRefClosure);
+            tracer_context.with_tracer(worker, |tracer| {
+                mmtk.reference_processors.retain_soft_refs(tracer, mmtk);
+            });
         } else {
             // Scan soft references immediately without retaining.
             mmtk.reference_processors.scan_soft_refs(mmtk);
         }
     }
 }
-impl<E: ProcessEdgesWork> SoftRefProcessing<E> {
+
+impl<T: Trace> SoftRefProcessing<T> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
@@ -593,16 +603,16 @@ impl<VM: VMBinding> PhantomRefProcessing<VM> {
 }
 
 #[derive(Default)]
-pub(crate) struct RefForwarding<E: ProcessEdgesWork>(PhantomData<E>);
-impl<E: ProcessEdgesWork> GCWork<E::VM> for RefForwarding<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        let mut w = E::new(vec![], false, mmtk, WorkBucketStage::RefForwarding);
-        w.set_worker(worker);
-        mmtk.reference_processors.forward_refs(&mut w, mmtk);
-        w.flush();
+pub(crate) struct RefForwarding<T: Trace>(PhantomData<T>);
+impl<T: Trace> GCWork<T::VM> for RefForwarding<T> {
+    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
+        let tracer_context = TracingTracerContext::<T>::new(WorkBucketStage::RefForwarding);
+        tracer_context.with_tracer(worker, |tracer| {
+            mmtk.reference_processors.forward_refs(tracer, mmtk);
+        });
     }
 }
-impl<E: ProcessEdgesWork> RefForwarding<E> {
+impl<T: Trace> RefForwarding<T> {
     pub fn new() -> Self {
         Self(PhantomData)
     }

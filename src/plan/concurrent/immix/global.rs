@@ -1,4 +1,3 @@
-use crate::plan::concurrent::concurrent_marking_work::ProcessRootSlots;
 use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::immix::gc_work::ConcurrentImmixGCWorkContext;
 use crate::plan::concurrent::immix::gc_work::ConcurrentImmixSTWGCWorkContext;
@@ -18,7 +17,6 @@ use crate::policy::immix::TRACE_KIND_FAST;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::Release;
 use crate::scheduler::gc_work::StopMutators;
-use crate::scheduler::gc_work::UnsupportedProcessEdges;
 use crate::scheduler::gc_work::VMProcessWeakRefs;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -371,37 +369,40 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
         self.set_ref_closure_buckets_enabled(false);
 
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-            ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self, TRACE_KIND_FAST>>,
-        >::new());
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<
-            ConcurrentImmixGCWorkContext<UnsupportedProcessEdges<VM>>,
-        >::new(self));
+        scheduler.work_buckets[WorkBucketStage::Unconstrained]
+            .add(StopMutators::<ConcurrentImmixGCWorkContext<VM>>::new());
+        scheduler.work_buckets[WorkBucketStage::Prepare]
+            .add(Prepare::<ConcurrentImmixGCWorkContext<VM>>::new(self));
     }
 
     fn schedule_concurrent_marking_final_pause(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.set_ref_closure_buckets_enabled(true);
 
         // Skip root scanning in the final mark
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-            ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self, TRACE_KIND_FAST>>,
-        >::new_no_scan_roots());
+        scheduler.work_buckets[WorkBucketStage::Unconstrained]
+            .add(StopMutators::<ConcurrentImmixGCWorkContext<VM>>::new_no_scan_roots());
 
-        scheduler.work_buckets[WorkBucketStage::Release].add(Release::<
-            ConcurrentImmixGCWorkContext<UnsupportedProcessEdges<VM>>,
-        >::new(self));
+        scheduler.work_buckets[WorkBucketStage::Release]
+            .add(Release::<ConcurrentImmixGCWorkContext<VM>>::new(self));
+
+        // Sanity
+        #[cfg(feature = "sanity")]
+        {
+            use crate::util::sanity::sanity_checker::ScheduleSanityGC;
+            scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC::<Self>::new(self));
+        }
 
         // Deal with weak ref and finalizers
         // TODO: Check against schedule_common_work and see if we are still missing any work packet
-        type RefProcessingEdges<VM> =
-            crate::scheduler::gc_work::PlanProcessEdges<VM, ConcurrentImmix<VM>, TRACE_KIND_FAST>;
+        type RefTracePolicy<VM> =
+            crate::plan::tracing::PlanTrace<ConcurrentImmix<VM>, TRACE_KIND_FAST>;
         // Reference processing
         if !*self.base().options.no_reference_types {
             use crate::util::reference_processor::{
                 PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
             };
             scheduler.work_buckets[WorkBucketStage::SoftRefClosure]
-                .add(SoftRefProcessing::<RefProcessingEdges<VM>>::new());
+                .add(SoftRefProcessing::<RefTracePolicy<VM>>::new());
             scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
                 .add(WeakRefProcessing::<VM>::new());
             scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
@@ -416,14 +417,14 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             use crate::util::finalizable_processor::Finalization;
             // finalization
             scheduler.work_buckets[WorkBucketStage::FinalRefClosure]
-                .add(Finalization::<RefProcessingEdges<VM>>::new());
+                .add(Finalization::<RefTracePolicy<VM>>::new());
         }
 
         // VM-specific weak ref processing
         // Note that ConcurrentImmix does not have a separate forwarding stage,
         // so we don't schedule the `VMForwardWeakRefs` work packet.
         scheduler.work_buckets[WorkBucketStage::VMRefClosure]
-            .set_sentinel(Box::new(VMProcessWeakRefs::<RefProcessingEdges<VM>>::new()));
+            .set_sentinel(Box::new(VMProcessWeakRefs::<RefTracePolicy<VM>>::new()));
     }
 
     pub fn concurrent_marking_in_progress(&self) -> bool {

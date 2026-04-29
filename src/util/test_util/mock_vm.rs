@@ -1,10 +1,10 @@
 // Some mock methods may get really complex
 #![allow(clippy::type_complexity)]
 
+use crate::plan::tracing::UnsupportedTrace;
 use crate::plan::ObjectQueue;
-use crate::scheduler::gc_work::ProcessEdgesWorkRootsWorkFactory;
-use crate::scheduler::gc_work::ProcessEdgesWorkTracerContext;
-use crate::scheduler::gc_work::SFTProcessEdges;
+use crate::scheduler::gc_work::TracingRootsWorkFactory;
+use crate::scheduler::gc_work::TracingTracerContext;
 use crate::scheduler::*;
 use crate::util::alloc::AllocationError;
 use crate::util::copy::*;
@@ -176,7 +176,7 @@ pub fn no_cleanup() {}
 /// has a signature of `fn(&mut GCWorker<VM>, impl ObjectTracerContext<VM>`.
 /// `ObjectTracerContext` is not object safe. So we just use `Box<MockAny>`
 /// in `MockVM`, and initiate it with a concrete type of `ObjectTracerContext`, such as
-/// `Box::new((MockMethod::<(&'static mut GCWorker<Self>,ProcessEdgesWorkTracerContext<SFTProcessEdges<Self>>,),bool>::new_unimplemented())`.
+/// `Box::new((MockMethod::<(&'static mut GCWorker<Self>,TracingTracerContext<UnsupportedTrace<Self>>,),bool>::new_unimplemented())`.
 ///
 /// Note that when `MockAny` is used, one needs to make sure that the types of the actual arguments match the argument types used for creating the `MockMethod`.
 /// We provide a default implementation for those `MockAny` methods, and it is very possible that the types in the default implementation do not
@@ -317,7 +317,7 @@ impl Default for MockVM {
             support_slot_enqueuing: MockMethod::new_fixed(Box::new(|_| true)),
             scan_object: MockMethod::new_unimplemented(),
             scan_object_and_trace_edges: MockMethod::new_unimplemented(),
-            // We instantiate a `MockMethod` with the arguments as ProcessEdgesWorkRootsWorkFactory<..., SFTProcessEdges<MockVM>, ...>,
+            // We instantiate a `MockMethod` with the arguments as `TracingRootsWorkFactory<..., UnsupportedTrace<MockVM>, ...>`,
             // thus the mock method expects the actual call arguments to match the type.
             // In most cases, this won't work and this `MockMethod` is just a place holder. It is
             // fine as long as the method is not actually called.
@@ -329,10 +329,10 @@ impl Default for MockVM {
                 (
                     VMWorkerThread,
                     &'static mut Mutator<MockVM>,
-                    ProcessEdgesWorkRootsWorkFactory<
+                    TracingRootsWorkFactory<
                         MockVM,
-                        SFTProcessEdges<MockVM>,
-                        SFTProcessEdges<MockVM>,
+                        UnsupportedTrace<MockVM>,
+                        UnsupportedTrace<MockVM>,
                     >,
                 ),
                 (),
@@ -341,10 +341,10 @@ impl Default for MockVM {
             scan_vm_specific_roots: Box::new(MockMethod::<
                 (
                     VMWorkerThread,
-                    ProcessEdgesWorkRootsWorkFactory<
+                    TracingRootsWorkFactory<
                         MockVM,
-                        SFTProcessEdges<MockVM>,
-                        SFTProcessEdges<MockVM>,
+                        UnsupportedTrace<MockVM>,
+                        UnsupportedTrace<MockVM>,
                     >,
                 ),
                 (),
@@ -356,7 +356,7 @@ impl Default for MockVM {
             process_weak_refs: Box::new(MockMethod::<
                 (
                     &'static mut GCWorker<Self>,
-                    ProcessEdgesWorkTracerContext<SFTProcessEdges<MockVM>>,
+                    TracingTracerContext<UnsupportedTrace<MockVM>>,
                 ),
                 bool,
             >::new_unimplemented()),
@@ -364,7 +364,7 @@ impl Default for MockVM {
             forward_weak_refs: Box::new(MockMethod::<
                 (
                     &'static mut GCWorker<Self>,
-                    ProcessEdgesWorkTracerContext<SFTProcessEdges<MockVM>>,
+                    TracingTracerContext<UnsupportedTrace<MockVM>>,
                 ),
                 (),
             >::new_default()),

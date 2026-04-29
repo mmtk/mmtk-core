@@ -1,4 +1,6 @@
 use crate::global_state::GlobalState;
+#[allow(unused)]
+use crate::plan::tracing::SFTTrace;
 use crate::plan::PlanConstraints;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::conversions::*;
@@ -375,7 +377,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn release_multiple_pages(&mut self, start: Address);
 
     /// What copy semantic we should use for this space if we copy objects from this space.
-    /// This is only needed for plans that use SFTProcessEdges
+    /// This is only needed for plans that use [`SFTTrace`].
     fn set_copy_for_sft_trace(&mut self, _semantics: Option<CopySemantics>) {
         panic!("A copying space should override this method")
     }

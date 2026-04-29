@@ -20,8 +20,7 @@ use crate::{
 #[cfg(feature = "vo_bit")]
 use crate::util::Address;
 
-use crate::plan::ObjectQueue;
-use crate::plan::VectorObjectQueue;
+use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::alloc::allocator::AllocationOptions;
@@ -214,7 +213,7 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
 
     fn sft_trace_object(
         &self,
-        queue: &mut VectorObjectQueue,
+        queue: &mut OptionObjectQueue,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {

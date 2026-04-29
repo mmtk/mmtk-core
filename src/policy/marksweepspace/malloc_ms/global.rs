@@ -1,6 +1,5 @@
 use super::metadata::*;
-use crate::plan::ObjectQueue;
-use crate::plan::VectorObjectQueue;
+use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::CommonSpace;
@@ -132,7 +131,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     fn sft_trace_object(
         &self,
-        queue: &mut VectorObjectQueue,
+        queue: &mut OptionObjectQueue,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
