@@ -254,7 +254,7 @@ pub(crate) struct TracingObjectTracer<'w, T: Trace> {
 }
 
 impl<'w, T: Trace> ObjectTracer for TracingObjectTracer<'w, T> {
-    /// Forward the `trace_object` call to the underlying `ProcessEdgesWork`,
+    /// Forward the `trace_object` call to the underlying `Trace`,
     /// and flush as soon as the underlying buffer of `process_edges_work` is full.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         let result = self
@@ -468,7 +468,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanVMSpecificRoots<C> {
 /// of a concurrent GC.
 ///
 /// It will call `trace_object` on the value of each slot, and updates the slot if the object is
-/// moved or forwarded.  It will spawn or immediately run the [`DefaultScanObjects`] work packet to
+/// moved or forwarded.  It will spawn or immediately run the [`TracingProcessNodes`] work packet to
 /// scan newly traced objects.
 pub struct TracingProcessSlots<T: Trace> {
     slots: Vec<SlotOfTrace<T>>,
@@ -506,15 +506,17 @@ impl<T: Trace> TracingProcessSlots<T> {
         worker: &mut GCWorker<T::VM>,
         mut queue: plan::VectorQueue<ObjectReference>,
     ) {
-        if !queue.is_empty() {
-            let queued_objects = queue.take();
-            let mut work = TracingProcessNodes::<T>::new(queued_objects, self.bucket);
+        if queue.is_empty() {
+            return;
+        }
 
-            if Self::SCAN_OBJECTS_IMMEDIATELY {
-                work.do_work(worker, worker.mmtk);
-            } else {
-                worker.add_work(self.bucket, work);
-            }
+        let queued_objects = queue.take();
+        let mut work = TracingProcessNodes::<T>::new(queued_objects, self.bucket);
+
+        if Self::SCAN_OBJECTS_IMMEDIATELY {
+            work.do_work(worker, worker.mmtk);
+        } else {
+            worker.add_work(self.bucket, work);
         }
     }
 }
@@ -576,11 +578,11 @@ impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> RootsWorkFactory<V
         // Note: We should use the same USDT name "mmtk:roots" for all the three kinds of roots. A
         // VM binding may not call all of the three methods in this impl. For example, the OpenJDK
         // binding only calls `create_process_roots_work`, and the Ruby binding only calls
-        // `create_process_pinning_roots_work`. Because `ProcessEdgesWorkRootsWorkFactory<VM, DPE,
-        // PPE>` is a generic type, the Rust compiler emits the function bodies on demand, so the
-        // resulting machine code may not contain all three USDT trace points.  If they have
-        // different names, and our `capture.bt` mentions all of them, `bpftrace` may complain that
-        // it cannot find one or more of those USDT trace points in the binary.
+        // `create_process_pinning_roots_work`. Because `TracingRootsWorkFactory<VM, DPE, PPE>` is a
+        // generic type, the Rust compiler emits the function bodies on demand, so the resulting
+        // machine code may not contain all three USDT trace points.  If they have different names,
+        // and our `capture.bt` mentions all of them, `bpftrace` may complain that it cannot find
+        // one or more of those USDT trace points in the binary.
         probe!(mmtk, roots, RootsKind::NORMAL, slots.len());
 
         #[cfg(feature = "sanity")]
@@ -716,8 +718,8 @@ impl<T: Trace> TracingProcessNodes<T> {
                 // `Scanning::scan_object_and_trace_edges` and offload the job of updating the
                 // reference field to the VM.
                 //
-                // However, at this point, `closure` is borrowing `worker`.
-                // So we postpone the processing of objects that needs object enqueuing
+                // TODO: We may refactor this work packet to do slot-enqueuing and node-enqueuing in
+                // one loop.
                 scan_later.push(object);
             }
         }
@@ -736,6 +738,10 @@ impl<T: Trace> TracingProcessNodes<T> {
         trace: T,
         scan_later: Vec<ObjectReference>,
     ) {
+        if scan_later.is_empty() {
+            return;
+        }
+
         let object_tracer_context = TracingTracerContext::<T>::new(self.bucket);
 
         object_tracer_context.with_tracer(worker, |object_tracer| {
@@ -760,17 +766,15 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessNodes<T> {
         let tls = worker.tls;
         let trace = T::from_mmtk(mmtk);
 
-        // Scan the objects in the list that supports slot-enququing.
+        // Go through the object list and scan objects that supports slot-enququing.
         let scan_later = self.try_enqueue_slots(worker, tls, &trace);
 
         let total_objects = self.objects.len();
         let scan_and_trace = scan_later.len();
         probe!(mmtk, scan_objects, total_objects, scan_and_trace);
 
-        if !scan_later.is_empty() {
-            // If any objects do not support slot-enqueuing, we process them now.
-            self.do_node_enqueuing_tracing(worker, tls, trace, scan_later);
-        }
+        // If any objects do not support slot-enqueuing, we process them now.
+        self.do_node_enqueuing_tracing(worker, tls, trace, scan_later);
 
         trace!("ScanObjects End");
     }

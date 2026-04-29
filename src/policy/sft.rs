@@ -101,8 +101,10 @@ pub trait SFT {
     /// Immix has defrag trace and fast trace.
     fn sft_trace_object(
         &self,
-        // We use concrete type for `queue` because SFT doesn't support generic parameters,
-        // and SFTProcessEdges uses `VectorObjectQueue`.
+        // We use `OptionObjectQueue`, the simplest `ObjectQueue` implementation, for `queue`
+        // because SFT doesn't support generic parameters.  The generic `SFTTrace::trace_object`
+        // method wraps `SFT::sft_trace_object` and forwards the enqueued object to the actual
+        // queue.
         queue: &mut OptionObjectQueue,
         object: ObjectReference,
         worker: GCWorkerMutRef,

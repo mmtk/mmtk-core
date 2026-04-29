@@ -64,6 +64,10 @@ impl<VM: VMBinding> Trace for SFTTrace<VM> {
 
         // Invoke trace object on sft
         let sft = unsafe { crate::mmtk::SFT_MAP.get_unchecked(object.to_raw_address()) };
+
+        // Because `sft.sft_trace_object` cannot have generic parameters, we can't pass `queue`
+        // directly to it.  Instead we let `sft_trace_object` enqueue to this `tmp_queue` and
+        // forward the enqueued object to `queue`.
         let mut tmp_queue = None;
         let result = sft.sft_trace_object(&mut tmp_queue, object, worker);
         if let Some(queued_object) = tmp_queue {
@@ -77,6 +81,7 @@ impl<VM: VMBinding> Trace for SFTTrace<VM> {
     }
 
     fn may_move_objects() -> bool {
+        // We conservatively assume it may move objects.
         true
     }
 }

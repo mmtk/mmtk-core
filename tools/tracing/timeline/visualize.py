@@ -249,7 +249,7 @@ class LogProcessor:
 
                 case "process_slots":
                     wp["args"] |= {
-                        # Group args by "process_slots" and "scan_objects" because a ProcessEdgesWork
+                        # Group args by "process_slots" and "scan_objects" because a TracingProcessSlots
                         # work packet may do both if SCAN_OBJECTS_IMMEDIATELY is true.
                         "process_slots": {
                             "num_slots": int(args[0]),
@@ -354,6 +354,8 @@ class LogProcessor:
                 if started:
                     self.process_line(line)
                 elif line == "====MMTK:CUT_HERE====":
+                    # Some recent versions of bpftrace print warning messages in the beginning of stdout.
+                    # We skip lines until we see the marker.
                     started = True
 
         output_name = input_file + ".json.gz"

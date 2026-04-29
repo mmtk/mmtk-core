@@ -9,6 +9,8 @@ BEGIN {
         @stats_enabled = 1;
     }
 
+    // Some recent versions of bpftrace print warning messages in the beginning of stdout.
+    // We print a marker so that visualize.py knows where to start parsing.
     printf("====MMTK:CUT_HERE====\n")
 }
 

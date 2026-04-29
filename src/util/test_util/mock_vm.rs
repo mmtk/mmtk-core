@@ -176,7 +176,7 @@ pub fn no_cleanup() {}
 /// has a signature of `fn(&mut GCWorker<VM>, impl ObjectTracerContext<VM>`.
 /// `ObjectTracerContext` is not object safe. So we just use `Box<MockAny>`
 /// in `MockVM`, and initiate it with a concrete type of `ObjectTracerContext`, such as
-/// `Box::new((MockMethod::<(&'static mut GCWorker<Self>,ProcessEdgesWorkTracerContext<SFTProcessEdges<Self>>,),bool>::new_unimplemented())`.
+/// `Box::new((MockMethod::<(&'static mut GCWorker<Self>,TracingTracerContext<UnsupportedTrace<Self>>,),bool>::new_unimplemented())`.
 ///
 /// Note that when `MockAny` is used, one needs to make sure that the types of the actual arguments match the argument types used for creating the `MockMethod`.
 /// We provide a default implementation for those `MockAny` methods, and it is very possible that the types in the default implementation do not
