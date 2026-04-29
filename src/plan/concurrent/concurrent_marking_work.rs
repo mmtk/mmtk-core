@@ -1,13 +1,12 @@
 use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::Pause;
-use crate::plan::tracing::Trace;
+use crate::plan::tracing::{PlanTrace, Trace};
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::gc_work::RootsKind;
 use crate::util::{scanning_helper, ObjectReference};
 use crate::vm::slot::Slot;
 use crate::{
-    plan::ObjectQueue,
     scheduler::{GCWork, GCWorker, WorkBucketStage},
     vm::*,
     MMTK,
@@ -52,7 +51,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let tls = worker.tls;
-        let trace = ConcurrentMarkingTrace::<VM, P, KIND>::from_mmtk(mmtk);
+        let trace = PlanTrace::<P, KIND>::from_mmtk(mmtk);
 
         // These are initial objects.  They may not have been marked.
         let initial_objects = std::mem::take(&mut self.initial_objects);
@@ -143,51 +142,6 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
             return;
         };
         GCWork::do_work(&mut w, worker, mmtk);
-    }
-}
-
-pub struct ConcurrentMarkingTrace<
-    VM: VMBinding,
-    P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,
-    const KIND: TraceKind,
-> {
-    plan: &'static P,
-}
-
-impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind> Clone
-    for ConcurrentMarkingTrace<VM, P, KIND>
-{
-    fn clone(&self) -> Self {
-        Self { plan: self.plan }
-    }
-}
-
-impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind> Trace
-    for ConcurrentMarkingTrace<VM, P, KIND>
-{
-    type VM = VM;
-
-    fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
-        let plan = mmtk.get_plan().downcast_ref::<P>().unwrap();
-        Self { plan }
-    }
-
-    fn trace_object<Q: ObjectQueue>(
-        &self,
-        worker: &mut GCWorker<Self::VM>,
-        object: ObjectReference,
-        queue: &mut Q,
-    ) -> ObjectReference {
-        self.plan.trace_object::<Q, KIND>(queue, object, worker)
-    }
-
-    fn post_scan_object(&self, object: ObjectReference) {
-        self.plan.post_scan_object(object);
-    }
-
-    fn may_move_objects() -> bool {
-        // Concurrent marking never moves objects.
-        false
     }
 }
 
