@@ -32,6 +32,36 @@ Notes for the mmtk-core developers:
 
 ## 0.33.0
 
+### The `<'w>` lifetime in `ObjectTracerContext`
+
+```admonish tldr
+Your existing source code probably still works.
+```
+
+API changes:
+
+-   module `vm::scanning`
+    +   `ObjectTracerContext::TracerType`: Now has a `<'w>` lifetime parameter
+    +   `ObjectTracerContext::with_tracer`: Now has a `<'w>` lifetime parameter
+        *   `'w` is the lifetime of the `worker` argument, and is passed to the
+            `Self::TracerType<'w>` argument of the `func` callback.  It basically means the
+            `ObjectTracer` provided to the `func` callback borrows the `worker` during the callback.
+            This has always been true, but we now made it explicit through the lifetime parameter.
+
+### Type argument changes in `Finalizable::keep_alive` module
+
+```admonish tldr
+`Finalizable::keep_alive` now has the `<OT: ObjectTracer>` type parameter.
+```
+
+API changes:
+
+-   module `vm::reference_glue`
+    +   `Finalizable::keep_alive`: Now has the `<OT: ObjectTracer>` type parameter instead of
+        `<E: ProcessEdgesWork>`.  The `trace` parameter is now `&mut OT`.  It still has the
+        `trace_object` method like the old `ProcessEdgesWork` trait, and is supposed to be used the
+        same way.
+
 ### The Cargo feature "is_mmtk_object" is removed
 
 ```admonish tldr
