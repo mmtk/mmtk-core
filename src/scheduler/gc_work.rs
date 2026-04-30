@@ -253,7 +253,7 @@ pub(crate) struct TracingObjectTracer<'w, T: Trace> {
     stage: WorkBucketStage,
 }
 
-impl<'w, T: Trace> ObjectTracer for TracingObjectTracer<'w, T> {
+impl<T: Trace> ObjectTracer for TracingObjectTracer<'_, T> {
     /// Forward the `trace_object` call to the underlying `Trace`,
     /// and flush as soon as the underlying buffer of `process_edges_work` is full.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
