@@ -101,7 +101,7 @@ pub type SlotOfTrace<T> = <<T as Trace>::VM as VMBinding>::VMSlot;
 /// [`SFT::sft_trace_object`] using the Space Function Table (SFT).
 ///
 /// Because SFT methods cannot be general, `SFTTrace` cannot be used for plans that needs multiple
-/// traces.  It is sufficient for simple plans such as `MarkSweep`, `MarkCompact` and `SemiSpace`.
+/// traces.  It is sufficient for simple plans such as `MarkSweep` and `SemiSpace`.
 #[allow(dead_code)]
 #[derive(Default)]
 pub struct SFTTrace<VM: VMBinding> {
