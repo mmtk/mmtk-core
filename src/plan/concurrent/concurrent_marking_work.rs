@@ -184,19 +184,14 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         }
     }
 
-    fn is_final_mark(&mut self) -> bool {
-        let pause = self
-            .mmtk
-            .get_plan()
-            .concurrent()
-            .unwrap()
-            .current_pause()
-            .unwrap();
-        debug_assert!(
-            pause == Pause::InitialMark || pause == Pause::FinalMark,
-            "pause is neither InitialMark nor FinalMark.  pause: {pause:?}"
+    fn debug_assert_initial_mark(&self) {
+        let pause = self.mmtk.get_plan().concurrent().unwrap().current_pause();
+
+        debug_assert_eq!(
+            pause,
+            Some(Pause::InitialMark),
+            "Concurrent marking only scans roots during InitialMark."
         );
-        pause == Pause::FinalMark
     }
 
     fn create_and_schedule_root_nodes_work(&mut self, nodes: Vec<ObjectReference>) {
@@ -212,9 +207,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     fn create_process_roots_work(&mut self, slots: Vec<VM::VMSlot>) {
         probe!(mmtk, roots, RootsKind::NORMAL, slots.len());
 
-        if self.is_final_mark() {
-            return;
-        }
+        self.debug_assert_initial_mark();
 
         // We don't divide the `slots` vector into smaller chunks here.  We assume the VM binding
         // respects the constant `EDGES_WORK_BUFFER_SIZE` and provides lists of slots in reasonable
@@ -240,9 +233,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         probe!(mmtk, roots, RootsKind::PINNING, nodes.len());
 
-        if self.is_final_mark() {
-            return;
-        }
+        self.debug_assert_initial_mark();
 
         #[cfg(feature = "sanity")]
         self.mmtk
@@ -257,9 +248,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         probe!(mmtk, roots, RootsKind::TPINNING, nodes.len());
 
-        if self.is_final_mark() {
-            return;
-        }
+        self.debug_assert_initial_mark();
 
         #[cfg(feature = "sanity")]
         self.mmtk
