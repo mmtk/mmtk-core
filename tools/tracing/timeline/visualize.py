@@ -249,20 +249,20 @@ class LogProcessor:
 
                 case "process_slots":
                     wp["args"] |= {
-                        # Group args by "process_slots" and "scan_objects" because a TracingProcessSlots
+                        # Group args by "process_slots" and "process_nodes" because a TracingProcessSlots
                         # work packet may do both if SCAN_OBJECTS_IMMEDIATELY is true.
                         "process_slots": {
                             "num_slots": int(args[0]),
                         },
                     }
 
-                case "scan_objects":
+                case "process_nodes":
                     total_scanned = int(args[0])
                     scan_and_trace = int(args[1])
                     scan_for_slots = total_scanned - scan_and_trace
                     wp["args"] |= {
                         # Put args in a group.  See comments in "process_slots".
-                        "scan_objects": {
+                        "process_nodes": {
                             "total_scanned": total_scanned,
                             "scan_for_slots": scan_for_slots,
                             "scan_and_trace": scan_and_trace,
@@ -270,17 +270,13 @@ class LogProcessor:
                     }
 
                 case "concurrent_trace_objects":
-                    objects = int(args[0])
-                    next_objects = int(args[1])
-                    iterations = int(args[2])
-                    total_objects = objects + next_objects
+                    initial = int(args[0])
+                    queued = int(args[1])
                     wp["args"] |= {
                         # Put args in a group.  See comments in "process_slots".
-                        "scan_objects": {
-                            "objects": objects,
-                            "next_objects": next_objects,
-                            "total_objects": total_objects,
-                            "iterations": iterations,
+                        "concurrent_trace_objects": {
+                            "initial": initial,
+                            "queued": queued,
                         }
                     }
 

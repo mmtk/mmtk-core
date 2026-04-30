@@ -112,9 +112,9 @@ usdt:$MMTK:mmtk:process_slots {
     }
 }
 
-usdt:$MMTK:mmtk:scan_objects {
+usdt:$MMTK:mmtk:process_nodes {
     if (@enable_print) {
-        printf("scan_objects,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+        printf("process_nodes,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
     }
 }
 
@@ -138,7 +138,7 @@ usdt:$MMTK:mmtk:sweep_chunk {
 
 usdt:$MMTK:mmtk:concurrent_trace_objects {
     if (@enable_print) {
-        printf("concurrent_trace_objects,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
+        printf("concurrent_trace_objects,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
     }
 }
 

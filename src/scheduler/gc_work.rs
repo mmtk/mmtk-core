@@ -771,7 +771,7 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessNodes<T> {
 
         let total_objects = self.objects.len();
         let scan_and_trace = scan_later.len();
-        probe!(mmtk, scan_objects, total_objects, scan_and_trace);
+        probe!(mmtk, process_nodes, total_objects, scan_and_trace);
 
         // If any objects do not support slot-enqueuing, we process them now.
         self.do_node_enqueuing_tracing(worker, tls, trace, scan_later);

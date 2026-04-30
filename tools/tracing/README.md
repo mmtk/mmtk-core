@@ -35,13 +35,12 @@ Currently, the core provides the following tracepoints.
 -   `mmtk:roots(kind: int, len: int)`: reporing roots to mmtk-core during root scanning.  `kind` can
     be 0, 1 or 2 for normal roots, pinning roots and transitively pinning roots, respectively.
     `len` is the number of slots or nodes reported.
--   `mmtk:process_root_nodes(num_roots: int, num_enqueued_nodes: int)`: a ProcessRootNodes work
+-   `mmtk:process_root_nodes(num_roots: int, num_enqueued_nodes: int)`: a TracingProcessPinningRoots work
     packet which processes root edges represented as object references to the target objects.
--   `mmtk:process_slots(num_slots: int, is_roots: bool)`: an invocation of the `process_slots`
-    method. The first argument is the number of slots to be processed, and the second argument is
-    whether these slots are root slots.
--   `mmtk:scan_objects(total_objects: int, scan_and_trace: int)`: an invocation of the
-    `ScanObjectsWork::do_work_common` method.  `total_objects` is the total number of objects in the
+-   `mmtk:process_slots(num_slots: int)`: an invocation of the `process_slots`
+    method. The argument is the number of slots to be processed.
+-   `mmtk:process_nodes(total_objects: int, scan_and_trace: int)`: an invocation of the
+    `TracingProcessNodes::do_work` method.  `total_objects` is the total number of objects in the
     work packet, and `scan_and_trace` is the number of objects scanned using the
     `Scanning::scan_object_and_trace_edges` method. Other objects are scanned using
     `Scanning::scan_object`.
