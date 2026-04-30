@@ -644,12 +644,41 @@ impl<VM: VMBinding> CommonSpace<VM> {
             extent
         );
 
+        let anno = MmapAnnotation::Space { name: rtn.name };
+        let huge_page_option = args
+            .plan_args
+            .options
+            .transparent_hugepages_as_huge_page_support();
+
         let start = if let VMRequest::Fixed { start: _start, .. } = vmrequest {
+            if let Err(mmap_error) = args.plan_args.mmapper.quarantine_address_range(
+                _start,
+                bytes_to_pages_up(extent),
+                huge_page_option,
+                &anno,
+            ) {
+                panic!(
+                    "Failed to quarantine fixed contiguous space {} [{}, {}) for {} bytes: {}",
+                    rtn.name,
+                    _start,
+                    _start + extent,
+                    extent,
+                    mmap_error
+                );
+            }
             _start
         } else {
             // FIXME
             //if (HeapLayout.vmMap.isFinalized()) VM.assertions.fail("heap is narrowed after regionMap is finalized: " + name);
-            args.plan_args.heap.reserve(extent, top)
+            args.plan_args
+                .heap
+                .reserve_quarantined(extent, top, args.plan_args.mmapper, huge_page_option, &anno)
+                .unwrap_or_else(|mmap_error| {
+                    panic!(
+                        "Failed to quarantine contiguous space {} for {} bytes: {}",
+                        rtn.name, extent, mmap_error
+                    )
+                })
         };
         assert!(
             start == chunk_align_up(start),

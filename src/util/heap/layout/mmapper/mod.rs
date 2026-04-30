@@ -90,6 +90,16 @@ pub trait Mmapper: Sync {
         anno: &MmapAnnotation,
     ) -> std::io::Result<Address>;
 
+    /// Quarantine/reserve an address range, using `start` as a preferred address. The OS may return
+    /// another address, and the returned address is the actual quarantined range start.
+    fn quarantine_address_range_preferred(
+        &self,
+        start: Address,
+        pages: usize,
+        huge_page_option: HugePageSupport,
+        anno: &MmapAnnotation,
+    ) -> MmapResult<Address>;
+
     /// Ensure that a range of pages is mmapped (or equivalent).  If the
     /// pages are not yet mapped, demand-zero map them. Note that mapping
     /// occurs at chunk granularity, not page granularity.

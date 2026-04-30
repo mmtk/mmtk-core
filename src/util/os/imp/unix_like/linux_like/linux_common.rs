@@ -135,6 +135,21 @@ pub fn dzmmap_anywhere(
     Ok(addr)
 }
 
+pub fn dzmmap_preferred(
+    start: Address,
+    size: usize,
+    align: usize,
+    strategy: MmapStrategy,
+    annotation: &MmapAnnotation<'_>,
+) -> MmapResult<Address> {
+    let addr = unix_common::mmap_preferred(start, size, align, strategy, annotation)?;
+    if !cfg!(feature = "no_mmap_annotation") {
+        set_vma_name(addr, size, annotation);
+    }
+    set_hugepage(addr, size, strategy.huge_page).expect("Failed to set huge page option");
+    Ok(addr)
+}
+
 pub fn panic_if_unmapped(start: Address, size: usize) {
     let strategy = MmapStrategy {
         huge_page: HugePageSupport::No,

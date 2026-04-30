@@ -82,6 +82,16 @@ pub trait OSMemory {
         annotation: &MmapAnnotation<'_>,
     ) -> std::io::Result<Address>;
 
+    /// Perform a mmap with `start` as the preferred address. The OS may return a different address.
+    /// The returned range is aligned to `align`.
+    fn dzmmap_preferred(
+        start: Address,
+        size: usize,
+        align: usize,
+        strategy: MmapStrategy,
+        annotation: &MmapAnnotation<'_>,
+    ) -> MmapResult<Address>;
+
     /// Handle mmap errors, possibly by signaling the VM about an out-of-memory condition.
     fn handle_mmap_error<VM: VMBinding>(mmap_error: MmapError, tls: VMThread) {
         use crate::util::alloc::AllocationError;
