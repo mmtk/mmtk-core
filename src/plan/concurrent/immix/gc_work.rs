@@ -5,9 +5,11 @@ use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::immix::TRACE_KIND_FAST;
 use crate::vm::VMBinding;
 
+/// The `GCWorkContext` implementation for the fall-back stop-the-world GC in ConcurrentImmix.
 pub(super) struct ConcurrentImmixSTWGCWorkContext<VM: VMBinding, const KIND: TraceKind>(
     std::marker::PhantomData<VM>,
 );
+
 impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
     for ConcurrentImmixSTWGCWorkContext<VM, KIND>
 {
@@ -16,6 +18,9 @@ impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
     type DefaultTrace = PlanTrace<ConcurrentImmix<VM>, KIND>;
     type PinningTrace = PlanTrace<ConcurrentImmix<VM>, TRACE_KIND_TRANSITIVE_PIN>;
 }
+
+/// The `GCWorkContext` implementation for concurrent marking.  Note that it overrides the
+/// `RootsWorkFactory`.
 pub(super) struct ConcurrentImmixGCWorkContext<VM>(std::marker::PhantomData<VM>);
 
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for ConcurrentImmixGCWorkContext<VM> {

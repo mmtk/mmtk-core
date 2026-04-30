@@ -145,6 +145,10 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 }
 
+/// A custom implementation of [`RootsWorkFactory`] for concurrent marking.
+///
+/// Slot roots are loaded immediately and represented as root nodes, just like pinning roots.  All
+/// roots are handled by the [`ConcurrentTraceObjects`] work packets.
 pub(crate) struct ConcurrentMarkingRootsWorkFactory<
     VM: VMBinding,
     P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,

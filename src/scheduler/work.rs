@@ -101,6 +101,11 @@ pub trait GCWorkContext: Send + 'static {
     /// member.
     type PinningTrace: Trace<VM = Self::VM>;
 
+    /// Create an instance of [`RootsWorkFactory`] for root scanning in the current GC.
+    ///
+    /// The default implementation creates [`TracingRootsWorkFactory`] which is sufficient for
+    /// stop-the-world tracing GC.  Plans that need custom [`RootsWorkFactory`] implementations can
+    /// override this method.
     fn make_roots_work_factory(
         mmtk: &'static MMTK<Self::VM>,
     ) -> impl RootsWorkFactory<<Self::VM as VMBinding>::VMSlot> {

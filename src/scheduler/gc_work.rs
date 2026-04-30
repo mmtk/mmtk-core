@@ -544,8 +544,11 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessSlots<T> {
 /// An implementation of [`RootsWorkFactory`] for stop-the-world tracing GC, i.e. finding the
 /// transitive closure from roots, with all mutators stopped.
 ///
-/// It will create relevant work packets for tpinning, pinning and non-pinning roots, and put them
-/// into the stop-the-world work buckets.
+/// It creates the [`TracingProcessSlots`] work packet to handle non-pinning roots, and
+/// [`TracingProcessPinningRoots`] to handle pinning roots (transitive or not).  The work packets
+/// will be added to the [`WorkBucketStage::TPinningClosure`],
+/// [`WorkBucketStage::PinningRootsTrace`] and [`WorkBucketStage::Closure`] buckets depending on the
+/// kinds of roots.
 pub(crate) struct TracingRootsWorkFactory<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> {
     pub(crate) mmtk: &'static MMTK<VM>,
     phantom: PhantomData<(DPE, PPE)>,
