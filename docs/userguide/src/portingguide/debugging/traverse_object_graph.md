@@ -27,6 +27,11 @@ These breakpoints help you detect if replay takes you into a different GC than t
 
 ## Step 2: Identify the Slot that Loaded the Object
 
+```admonish note
+This example uses an old version of MMTk, but the principles are still applicable.
+**The current work packet that loads from slots is `TracingProcessSlots`.**
+```
+
 Object references are usually loaded from slots in [`ProcessEdgesWork::process_slot`](https://docs.mmtk.io/api/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html#method.process_slot).
 Most MMTk plans use [`PlanProcessEdges` which implements this method like this](https://docs.mmtk.io/api/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html#method.process_slot):
 
