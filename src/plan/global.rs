@@ -6,7 +6,7 @@ use crate::mmtk::MMTK;
 use crate::plan::gc_work::{ClearCommonPlanUnlogBits, SetCommonPlanUnlogBits};
 use crate::plan::tracing::ObjectQueue;
 #[allow(unused)] // Used in doc comment.
-use crate::plan::tracing::PlanTrace;
+use crate::plan::tracing::{PlanTrace, Trace};
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
@@ -902,14 +902,9 @@ pub trait HasSpaces {
 /// A plan could also manually implement this trait. For the sake of performance, the implementation
 /// of this trait should mark methods as `[inline(always)]`.
 pub trait PlanTraceObject<VM: VMBinding> {
-    /// Trace objects in the plan. Generally one needs to figure out
-    /// which space an object resides in, and invokes the corresponding policy
-    /// trace object method.
+    /// Trace objects in the plan.
     ///
-    /// Arguments:
-    /// * `trace`: the current transitive closure
-    /// * `object`: the object to trace.
-    /// * `worker`: the GC worker that is tracing this object.
+    /// See [`Trace::trace_object`].
     fn trace_object<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
         queue: &mut Q,
@@ -917,15 +912,14 @@ pub trait PlanTraceObject<VM: VMBinding> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference;
 
-    /// Post-scan objects in the plan. Each object is scanned by `VM::VMScanning::scan_object()`, and this function
-    /// will be called after the `VM::VMScanning::scan_object()` as a hook to invoke possible policy post scan method.
-    /// If a plan does not have any policy that needs post scan, this method can be implemented as empty.
-    /// If a plan has a policy that has some policy specific behaviors for scanning (e.g. mark lines in Immix),
-    /// this method should also invoke those policy specific methods for objects in that space.
+    /// Post-scan objects in the plan.
+    ///
+    /// See [`Trace::post_scan_object`].
     fn post_scan_object(&self, object: ObjectReference);
 
-    /// Whether objects in this plan may move. If any of the spaces used by the plan may move objects, this should
-    /// return true.
+    /// Whether objects in this plan may move.
+    ///
+    /// See [`Trace::post_scan_object`].
     fn may_move_objects<const KIND: TraceKind>() -> bool;
 }
 

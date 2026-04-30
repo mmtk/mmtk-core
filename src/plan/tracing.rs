@@ -8,13 +8,63 @@ use crate::policy::gc_work::TraceKind;
 use crate::scheduler::{GCWorker, EDGES_WORK_BUFFER_SIZE};
 use crate::util::{ObjectReference, VMThread, VMWorkerThread};
 use crate::vm::{Scanning, VMBinding};
+#[allow(unused)] // Used in doc comment.
+use crate::{
+    plan::generational::gc_work::GenNurseryTrace,
+    policy::{immix::ImmixSpace, sft::SFT},
+    scheduler::work::GCWorkContext,
+};
 use crate::{Plan, MMTK};
 
+/// This trait provides methods used during a trace.  The most important method is
+/// [`Self::trace_object`] which provides the way to trace an object during the current trace.  Many
+/// work packets depend on this trait to trace objects.
+///
+/// We need different implementations of this trait for the different behaviors in
+///
+/// -   different plans
+/// -   different traces of the same plan (e.g. marking trace and forwarding trace; nursery GC and
+///     mature GC; fast GC and defrag GC; etc.), and
+/// -   pinning (transitive or not) roots and regular edges.
+///
+/// Therefore, each GC selects one [`GCWorkContext`], and each [`GCWorkContext`] selects two
+/// [`Trace`] implementations for default edges and pinning edges, respectively.
+///
+/// A type of this trait shall be stateless and immutable.  It shall be cheap to instantiate from an
+/// [`MMTK`] instance.
+///
+/// This trait requires the [`Clone`] trait, and cloned instances behave exactly the same.
 pub trait Trace: 'static + Send + Clone {
+    /// The VM binding type this type serves.
     type VM: VMBinding;
 
+    /// Instantiate from an [`MMTK`] instance.
+    ///
+    /// Note that values of this trait are usually instantiated in work packets that use it. It
+    /// should be reasonably cheap to instantiate.  Most types (such as [`PlanTrace`] and
+    /// [`GenNurseryTrace`]) only need a reference to the plan which can be downcasted from
+    /// [`MMTK::plan`].
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self;
 
+    /// Trace the `object`
+    ///
+    /// If it is the first time the `object` is traced during a transitive closure, add it to the
+    /// `queue`. It may enqueue at most one object to the `queue`, and the object can be either
+    /// `object` or the new address `object` is moved to.
+    ///
+    /// Its implementation generally needs to figure out which space an object resides in, and
+    /// invoke the right "trace object" method of the space for the current trace.
+    ///
+    /// # Note
+    ///
+    /// Note that `FnMut(ObjectReference)` implements the [`ObjectQueue`] trait.  This means you can
+    /// use a lambda expression at the place of the `queue` argument.  For example,
+    ///
+    /// ```rust
+    /// trace.trace_object(worker, object, &mut |enqueued_object| {
+    ///     // Process the enqueued_object here...
+    /// });
+    /// ```
     fn trace_object<Q: ObjectQueue>(
         &self,
         worker: &mut GCWorker<Self::VM>,
@@ -22,14 +72,36 @@ pub trait Trace: 'static + Send + Clone {
         queue: &mut Q,
     ) -> ObjectReference;
 
+    /// The post-scan hook to be call after scanning `object`.
+    ///
+    /// Each object is scanned by [`Scanning::scan_object`] or
+    /// [`Scanning::scan_object_and_trace_edges`], and this function will be called after scanning
+    /// an object as a hook to invoke possible policy-specific post-scan methods.  If `object` is in
+    /// a space that needs such a hook, this method should call such hook of the space.  Otherwise,
+    /// this method may do nothing.
+    ///
+    /// Currently, only [`ImmixSpace`] needs this hook to mark the line.
     fn post_scan_object(&self, object: ObjectReference);
 
+    /// Return `true` if [`Self::trace_object`] may move any object.  If any space of the current
+    /// plan may move objects during this trace, this method should return `true`.
+    ///
+    /// If it returns `false`, it means [`Self::trace_object`] is guaranteed not to move the
+    /// `object`, and it is safe to elide updating a slot after tracing the reference in the slot.
+    /// It is always correct to conservatively return `true`.
+    ///
+    /// Note that this method is called very frequently, so it must be efficient.
     fn may_move_objects() -> bool;
 }
 
 /// A shorthand for getting the slot type from a [`Trace`] instance.
 pub type SlotOfTrace<T> = <<T as Trace>::VM as VMBinding>::VMSlot;
 
+/// A [`Trace`] implementation that dispatches the `trace_object` method through
+/// [`SFT::sft_trace_object`] using the Space Function Table (SFT).
+///
+/// Because SFT methods cannot be general, `SFTTrace` cannot be used for plans that needs multiple
+/// traces.  It is sufficient for simple plans such as `MarkSweep`, `MarkCompact` and `SemiSpace`.
 #[allow(dead_code)]
 #[derive(Default)]
 pub struct SFTTrace<VM: VMBinding> {
@@ -86,6 +158,12 @@ impl<VM: VMBinding> Trace for SFTTrace<VM> {
     }
 }
 
+/// A [`Trace`] implementation that dispatches the `trace_object` method through
+/// [`PlanTraceObject::trace_object`].  It is applicable to all plans that implement
+/// [`PlanTraceObject`].
+///
+/// Plans usually don't implement `PlanTraceObject` directly, but use the
+/// `#[derive(PlanTraceObject)]` macro. See [`PlanTraceObject`] for more details.
 pub struct PlanTrace<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> {
     plan: &'static P,
 }
@@ -128,6 +206,8 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> Trace for PlanTrac
     }
 }
 
+/// A placeholder for unsupported traces.  For example, it can be used for
+/// [`GCWorkContext::PinningTrace`] for plans that don't support object pinning.
 #[derive(Default)]
 pub struct UnsupportedTrace<VM: VMBinding> {
     phantom_data: PhantomData<VM>,

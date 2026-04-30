@@ -13,6 +13,9 @@ use std::marker::PhantomData;
 
 use super::global::GenerationalPlanExt;
 
+/// A [`Trace`] implementation that dispatches the `trace_object` method through
+/// [`GenerationalPlanExt::trace_object_nursery`].  It is applicable to all plans that implement
+/// [`GenerationalPlanExt`].
 pub struct GenNurseryTrace<
     VM: VMBinding,
     P: GenerationalPlanExt<VM> + PlanTraceObject<VM>,
