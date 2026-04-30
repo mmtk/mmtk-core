@@ -47,7 +47,8 @@ Run the command and it will prompt you for root password because the script inte
 like:
 
 ```
-Attaching 48 probes...
+Attached 26 probes
+====MMTK:CUT_HERE====
 ```
 
 Then open another terminal, and run OpenJDK with MMTk.
@@ -59,21 +60,29 @@ Then open another terminal, and run OpenJDK with MMTk.
 You should see logs showing in the terminal that runs `./capture.py`, like this:
 
 ```
+gc_requested,i,81621,23530711969792
+GC,B,81628,23530712031697
+add_schedule_collection_packet,i,81628,23530712042052
+WORK,B,81628,23530712046413,139801561592885,44
+gen_full_heap,meta,81628,23530712053620,0
+WORK,E,81628,23530712057071,139801561592885
+WORK,B,81628,23530712059090,139801561444032,136
+WORK,B,81633,23530712182083,139801561431210,131
 ...
-WORK,E,23151,19072307551777,140188748267562
-WORK,B,23162,19072307551916,140188748272882,143
-WORK,E,23160,19072307551959,140188748279315
-WORK,B,23150,19072307552199,140188748259188,42
-WORK,B,23151,19072307552801,140188748259188,42
-WORK,E,23150,19072307553295,140188748259188
-WORK,B,23160,19072307553315,140188748259188,42
-WORK,E,23151,19072307553701,140188748259188
-WORK,E,23160,19072307554493,140188748259188
-WORK,E,23156,19072307554636,140188748272882
-WORK,B,23151,19072307554917,140188748272882,143
-WORK,B,23150,19072307555142,140188748327402,406
-WORK,E,23162,19072307555309,140188748272882
-Lost 2027780 events
+WORK,E,81637,23534112126760,139801561516259
+WORK,B,81640,23534112130184,139801561516259,42
+WORK,B,81630,23534112130313,139801561516259,42
+WORK,E,81640,23534112131817,139801561516259
+WORK,E,81630,23534112131818,139801561516259
+BUCKET_OPEN,i,81630,23534112135373,18
+plan_end_of_gc,B,81630,23534112136790
+plan_end_of_gc,E,81630,23534112139765
+GC,E,81630,23534112142610
+gc_requested,i,81673,23534124187313
+GC,B,81636,23534124204359
+add_schedule_collection_packet,i,81636,23534124207776
+gen_full_heap,meta,81636,23534124216466,0
+GC,E,81638,23534125346548
 ```
 
 Then press CTRL+C in the terminal that runs `./capture.py`.  It should print additional logs and
@@ -81,12 +90,13 @@ then exit, like this:
 
 ```
 ...
-@type_name[140188748468414]: mmtk::util::finalizable_processor::Finalization<mmtk::plan::gen
-@type_name[140188748468841]: mmtk::util::finalizable_processor::Finalization<mmtk::scheduler
-@type_name[140188748470271]: mmtk::util::finalizable_processor::Finalization<mmtk::scheduler
-@type_name[140188748475639]: mmtk::plan::generational::gc_work::ProcessModBuf<mmtk::plan::ge
-@type_name[140188748476795]: mmtk::plan::generational::gc_work::ProcessRegionModBuf<mmtk::pl
-@type_name[140188748477674]: mmtk::plan::generational::gc_work::GenNurseryProcessEdges<mmtk_
+@type_name[139801561591736]: mmtk::scheduler::gc_work::VMProcessWeakRefs<mmtk::plan::generational::gc_work::GenNurseryTrace<mmtk_openjdk::OpenJDK<true>, mmtk::plan::sticky::immix::global::StickyImmix<mmtk_openjdk::OpenJDK<true>>, u8::MAX>
+@type_name[139801561592885]: mmtk::scheduler::gc_work::ScheduleCollectio
+@type_name[139801561596177]: mmtk::scheduler::gc_work::VMProcessWeakRefs<mmtk::plan::generational::gc_work::GenNurseryTrace<mmtk_openjdk::OpenJDK<true>, mmtk::plan::sticky::immix::global::StickyImmix<mmtk_openjdk::OpenJDK<true>>, 0>
+@type_name[139801561597584]: mmtk::util::reference_processor::RescanReferences<mmtk_openjdk::OpenJDK<true>
+@type_name[139801561601410]: mmtk_openjdk::gc_work::FixRelocation
+@type_name[139801561602765]: mmtk::scheduler::gc_work::TracingProcessSlots<mmtk::plan::generational::gc_work::GenNurseryTrace<mmtk_openjdk::OpenJDK<true>, mmtk::plan::sticky::immix::global::StickyImmix<mmtk_openjdk::OpenJDK<true>>, 0>
+@type_name[139801561607531]: mmtk::scheduler::gc_work::TracingProcessSlots<mmtk::plan::generational::gc_work::GenNurseryTrace<mmtk_openjdk::OpenJDK<true>, mmtk::plan::sticky::immix::global::StickyImmix<mmtk_openjdk::OpenJDK<true>>, u8::MAX>
 ```
 
 This means things are working properly.  Now re-run `./capture.py` again, but pipe the STDOUT into a

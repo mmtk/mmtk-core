@@ -76,7 +76,7 @@ Each sub-directory contains a set of scripts.
 
 -   `performance`: Print various GC-related statistics, such as the distribution of time spent in
     allocation slow path, the time spent in each GC stages, and the distribution of the
-    `ProcessEdgesWork` packet sizes.
+    `TracingProcessSlots` packet sizes.
 -   `timeline`: Record the start and end time of each GC and each work packet, and visualize them on
     a timeline in Perfetto UI.
 
