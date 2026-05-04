@@ -219,13 +219,14 @@ impl Mmapper for ChunkStateMmapper {
     fn quarantine_address_range_anywhere(
         &self,
         pages: usize,
+        align: Option<usize>,
         huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
     ) -> std::io::Result<Address> {
         let _guard = self.transition_lock.lock().unwrap();
 
         let bytes = pages << LOG_BYTES_IN_PAGE;
-        let align = BYTES_IN_CHUNK;
+        let align = align.unwrap_or(BYTES_IN_CHUNK);
         let mmap_strategy = MmapStrategy::QUARANTINE.huge_page(huge_page_option);
         let start = OS::dzmmap_anywhere(bytes, align, mmap_strategy, anno)?;
         self.record_quarantined_range(start, bytes, anno)
@@ -237,13 +238,18 @@ impl Mmapper for ChunkStateMmapper {
         &self,
         start: Address,
         pages: usize,
+        align: Option<usize>,
         huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
     ) -> MmapResult<Address> {
         let _guard = self.transition_lock.lock().unwrap();
 
         let bytes = pages << LOG_BYTES_IN_PAGE;
-        let align = BYTES_IN_CHUNK;
+        let align = align.unwrap_or(BYTES_IN_CHUNK);
+        assert!(
+            start.is_aligned_to(align),
+            "Preferred start {start} is not aligned to {align}"
+        );
         let mmap_strategy = MmapStrategy::QUARANTINE.huge_page(huge_page_option);
         let actual_start = OS::dzmmap_preferred(start, bytes, align, mmap_strategy, anno)?;
         self.record_quarantined_range(actual_start, bytes, anno)?;

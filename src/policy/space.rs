@@ -625,15 +625,16 @@ impl<VM: VMBinding> CommonSpace<VM> {
             return rtn;
         }
 
-        let (extent, top) = match vmrequest {
-            VMRequest::Fraction { frac, top: _top } => (get_frac_available(frac), _top),
+        let (extent, align, top) = match vmrequest {
+            VMRequest::Fraction { frac, top: _top } => (get_frac_available(frac), None, _top),
             VMRequest::Extent {
                 extent: _extent,
                 top: _top,
-            } => (_extent, _top),
+            } => (_extent, None, _top),
+            VMRequest::AlignedExtent { align, extent, top } => (extent, Some(align), top),
             VMRequest::Fixed {
                 extent: _extent, ..
-            } => (_extent, false),
+            } => (_extent, None, false),
             _ => unreachable!(),
         };
 
@@ -672,7 +673,14 @@ impl<VM: VMBinding> CommonSpace<VM> {
             //if (HeapLayout.vmMap.isFinalized()) VM.assertions.fail("heap is narrowed after regionMap is finalized: " + name);
             args.plan_args
                 .heap
-                .reserve_quarantined(extent, top, args.plan_args.mmapper, huge_page_option, &anno)
+                .reserve_quarantined(
+                    extent,
+                    align,
+                    top,
+                    args.plan_args.mmapper,
+                    huge_page_option,
+                    &anno,
+                )
                 .unwrap_or_else(|mmap_error| {
                     panic!(
                         "Failed to quarantine contiguous space {} for {} bytes: {}",

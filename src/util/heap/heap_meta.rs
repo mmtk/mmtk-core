@@ -40,6 +40,7 @@ impl HeapMeta {
     pub fn reserve_quarantined(
         &mut self,
         extent: usize,
+        align: Option<usize>,
         top: bool,
         mmapper: &dyn Mmapper,
         huge_page_option: HugePageSupport,
@@ -54,6 +55,7 @@ impl HeapMeta {
         let actual = mmapper.quarantine_address_range_preferred(
             preferred,
             crate::util::conversions::bytes_to_pages_up(extent),
+            align,
             huge_page_option,
             anno,
         )?;
