@@ -89,7 +89,7 @@ pub trait Mmapper: Sync {
         align: Option<usize>,
         huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
-    ) -> std::io::Result<Address>;
+    ) -> MmapResult<Address>;
 
     /// Quarantine/reserve an address range, using `start` as a preferred address. The OS may return
     /// another address, and the returned address is the actual quarantined range start.

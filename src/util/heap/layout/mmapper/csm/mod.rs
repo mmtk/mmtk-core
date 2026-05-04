@@ -222,15 +222,14 @@ impl Mmapper for ChunkStateMmapper {
         align: Option<usize>,
         huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
-    ) -> std::io::Result<Address> {
+    ) -> MmapResult<Address> {
         let _guard = self.transition_lock.lock().unwrap();
 
         let bytes = pages << LOG_BYTES_IN_PAGE;
         let align = align.unwrap_or(BYTES_IN_CHUNK);
         let mmap_strategy = MmapStrategy::QUARANTINE.huge_page(huge_page_option);
         let start = OS::dzmmap_anywhere(bytes, align, mmap_strategy, anno)?;
-        self.record_quarantined_range(start, bytes, anno)
-            .map_err(|e| e.error)?;
+        self.record_quarantined_range(start, bytes, anno)?;
         Ok(start)
     }
 

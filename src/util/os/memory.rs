@@ -80,7 +80,7 @@ pub trait OSMemory {
         align: usize,
         strategy: MmapStrategy,
         annotation: &MmapAnnotation<'_>,
-    ) -> std::io::Result<Address>;
+    ) -> MmapResult<Address>;
 
     /// Perform a mmap with `start` as the preferred address. The OS may return a different address.
     /// The returned range is aligned to `align`.

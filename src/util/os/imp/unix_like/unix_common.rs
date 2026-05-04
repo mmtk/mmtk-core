@@ -32,11 +32,13 @@ pub fn mmap(
     Ok(start)
 }
 
-pub fn mmap_anywhere(size: usize, align: usize, strategy: MmapStrategy) -> Result<Address> {
-    let (aligned_start, leading, trailing) =
-        mmap_aligned(std::ptr::null_mut(), size, align, strategy)?;
-    trim_unaligned_mmap_edges(aligned_start, leading, trailing).map_err(|e| e.error)?;
-    Ok(aligned_start)
+pub fn mmap_anywhere(
+    size: usize,
+    align: usize,
+    strategy: MmapStrategy,
+    annotation: &MmapAnnotation<'_>,
+) -> MmapResult<Address> {
+    mmap_aligned(Address::ZERO, size, align, strategy, annotation)
 }
 
 pub fn mmap_preferred(
@@ -46,20 +48,16 @@ pub fn mmap_preferred(
     strategy: MmapStrategy,
     annotation: &MmapAnnotation<'_>,
 ) -> MmapResult<Address> {
-    let (aligned_start, leading, trailing) =
-        mmap_aligned(start.to_mut_ptr(), size, align, strategy)
-            .map_err(|e| MmapError::new(start, raw_align_up(size, align) + align, annotation, e))?;
-    trim_unaligned_mmap_edges(aligned_start, leading, trailing)
-        .map_err(|e| MmapError::new(e.start, e.size, annotation, e.error))?;
-    Ok(aligned_start)
+    mmap_aligned(start, size, align, strategy, annotation)
 }
 
 fn mmap_aligned(
-    preferred_start: *mut libc::c_void,
+    preferred_start: Address,
     size: usize,
     align: usize,
     strategy: MmapStrategy,
-) -> Result<(Address, Option<(Address, usize)>, Option<(Address, usize)>)> {
+    annotation: &MmapAnnotation<'_>,
+) -> MmapResult<Address> {
     debug_assert!(align.is_power_of_two());
     debug_assert!(align % BYTES_IN_PAGE == 0);
     debug_assert!(size % BYTES_IN_PAGE == 0);
@@ -69,9 +67,14 @@ fn mmap_aligned(
     let prot = strategy.prot.get_native_flags();
     let flags = strategy.get_posix_mmap_flags(false);
 
-    let ptr = unsafe { libc::mmap(preferred_start, alloc_size, prot, flags, -1, 0) };
+    let ptr = unsafe { libc::mmap(preferred_start.to_mut_ptr(), alloc_size, prot, flags, -1, 0) };
     if ptr == libc::MAP_FAILED {
-        return Err(std::io::Error::last_os_error());
+        return Err(MmapError::new(
+            preferred_start,
+            alloc_size,
+            annotation,
+            std::io::Error::last_os_error(),
+        ));
     }
 
     let start = Address::from_mut_ptr(ptr);
@@ -84,7 +87,10 @@ fn mmap_aligned(
     let trailing =
         (trailing_unaligned_size > 0).then_some((aligned_start + size, trailing_unaligned_size));
 
-    Ok((aligned_start, leading, trailing))
+    trim_unaligned_mmap_edges(aligned_start, leading, trailing)
+        .map_err(|e| MmapError::new(e.start, e.size, annotation, e.error))?;
+
+    Ok(aligned_start)
 }
 
 struct MunmapFailure {
@@ -181,7 +187,13 @@ mod tests {
     fn mmap_anywhere_unmaps_alignment_padding() {
         serial_test(|| {
             let size = BYTES_IN_CHUNK + BYTES_IN_PAGE;
-            let start = mmap_anywhere(size, BYTES_IN_CHUNK, MmapStrategy::QUARANTINE).unwrap();
+            let start = mmap_anywhere(
+                size,
+                BYTES_IN_CHUNK,
+                MmapStrategy::QUARANTINE,
+                mmap_anno_test!(),
+            )
+            .unwrap();
 
             with_cleanup(
                 || {
