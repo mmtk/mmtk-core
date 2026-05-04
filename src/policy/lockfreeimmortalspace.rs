@@ -234,21 +234,16 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         // Create a VM request of fixed size
         let vmrequest = VMRequest::fixed_size(aligned_total_bytes);
         // Reserve the space
-        let VMRequest::AlignedExtent { extent, align, top } = vmrequest else {
-            unreachable!()
+        let (extent, align, top) = match vmrequest {
+            VMRequest::Extent { extent, top } => (extent, None, top),
+            VMRequest::AlignedExtent { extent, align, top } => (extent, Some(align), top),
+            _ => unreachable!(),
         };
         let anno = MmapAnnotation::Space { name: args.name };
         let huge_page_option = args.options.transparent_hugepages_as_huge_page_support();
         let start = args
             .heap
-            .reserve_quarantined(
-                extent,
-                Some(align),
-                top,
-                args.mmapper,
-                huge_page_option,
-                &anno,
-            )
+            .reserve_quarantined(extent, align, top, args.mmapper, huge_page_option, &anno)
             .unwrap_or_else(|mmap_error| {
                 panic!(
                     "Failed to quarantine contiguous space {} for {} bytes: {}",
