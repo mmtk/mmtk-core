@@ -269,6 +269,15 @@ impl MmapStrategy {
         reserve: true,
     };
 
+    /// The strategy for raw memory freelist
+    pub const RAW_MEMORY_FREELIST: Self = Self {
+        huge_page: HugePageSupport::No,
+        prot: MmapProtection::ReadWrite,
+        // Raw memory freelist will mmap the address ranges quarantined for the spaces. So we have to allow replace.
+        replace: true,
+        reserve: true,
+    };
+
     /// The strategy for quarantining address ranges.
     pub const QUARANTINE: Self = Self {
         huge_page: HugePageSupport::No,
