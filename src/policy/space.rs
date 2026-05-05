@@ -669,8 +669,6 @@ impl<VM: VMBinding> CommonSpace<VM> {
             }
             _start
         } else {
-            // FIXME
-            //if (HeapLayout.vmMap.isFinalized()) VM.assertions.fail("heap is narrowed after regionMap is finalized: " + name);
             args.plan_args
                 .heap
                 .reserve_quarantined(

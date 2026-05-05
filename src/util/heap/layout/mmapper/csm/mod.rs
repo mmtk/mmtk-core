@@ -120,6 +120,7 @@ impl ChunkStateMmapper {
         }
     }
 
+    /// Update the underlying storage to quarantined for the given range.
     fn record_quarantined_range(
         &self,
         start: Address,

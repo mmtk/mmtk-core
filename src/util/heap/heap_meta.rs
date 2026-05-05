@@ -16,27 +16,6 @@ impl HeapMeta {
         }
     }
 
-    pub fn reserve(&mut self, extent: usize, top: bool) -> Address {
-        let ret = if top {
-            self.heap_limit -= extent;
-            self.heap_limit
-        } else {
-            let start = self.heap_cursor;
-            self.heap_cursor += extent;
-            start
-        };
-
-        assert!(
-            self.heap_cursor <= self.heap_limit,
-            "Out of virtual address space at {} ({} > {})",
-            self.heap_cursor - extent,
-            self.heap_cursor,
-            self.heap_limit
-        );
-
-        ret
-    }
-
     pub fn reserve_quarantined(
         &mut self,
         extent: usize,
