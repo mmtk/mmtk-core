@@ -219,7 +219,7 @@ impl<VM: VMBinding> Trace for UnsupportedTrace<VM> {
     type VM = VM;
 
     fn from_mmtk(_mmtk: &'static MMTK<Self::VM>) -> Self {
-        unimplemented!()
+        panic!("UnsupportedTrace cannot be constructed.")
     }
 
     fn trace_object<Q: ObjectQueue>(
@@ -228,15 +228,15 @@ impl<VM: VMBinding> Trace for UnsupportedTrace<VM> {
         _object: ObjectReference,
         _queue: &mut Q,
     ) -> ObjectReference {
-        unimplemented!()
+        panic!("UnsupportedTrace::trace_object must not be called.")
     }
 
     fn post_scan_object(&self, _object: ObjectReference) {
-        unimplemented!()
+        panic!("UnsupportedTrace::post_scan_object must not be called.")
     }
 
     fn may_move_objects() -> bool {
-        unimplemented!()
+        panic!("UnsupportedTrace::may_move_objects must not be called.")
     }
 }
 
