@@ -44,11 +44,18 @@ pub trait Trace: 'static + Send + Clone {
     /// [`GenNurseryTrace`]: crate::plan::generational::gc_work::GenNurseryTrace
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self;
 
-    /// Trace the `object`
+    /// Trace the `object`.  More precisely, it visits an object graph *edge* that points to
+    /// `object`.
     ///
-    /// If it is the first time the `object` is traced during a transitive closure, add it to the
-    /// `queue`. It may enqueue at most one object to the `queue`, and the object can be either
-    /// `object` or the new address `object` is moved to.
+    /// It may add `object` (or the new object reference for `object` in a moving GC) into the
+    /// `queue`, which means its children needs to be recursively traversed.
+    ///
+    /// If the object graph edge needs to be updated, this function returns the new object reference
+    /// of `object`.  Otherwise it returns `object`.
+    ///
+    /// Note that the return value may be different from the enqueued value.  For example, during
+    /// the forwarding stage of MarkCompact, it returns the new object reference, but enqueues the
+    /// old `object` because the object has not been moved, yet.
     ///
     /// Its implementation generally needs to figure out which space an object resides in, and
     /// invoke the right "trace object" method of the space for the current trace.
@@ -56,7 +63,10 @@ pub trait Trace: 'static + Send + Clone {
     /// # Note
     ///
     /// Note that `FnMut(ObjectReference)` implements the [`ObjectQueue`] trait.  This means you can
-    /// use a lambda expression at the place of the `queue` argument.  For example,
+    /// use a lambda expression at the place of the `queue` argument.  For example, you can scan the
+    /// object immediately instead of adding the object reference into a container.
+    ///
+    /// Example:
     ///
     /// ```rust
     /// trace.trace_object(worker, object, &mut |enqueued_object| {
