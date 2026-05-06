@@ -168,12 +168,6 @@ pub struct PlanTrace<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> {
     plan: &'static P,
 }
 
-impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> PlanTrace<P, KIND> {
-    pub(crate) fn new(plan: &'static P) -> Self {
-        Self { plan }
-    }
-}
-
 impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> Clone for PlanTrace<P, KIND> {
     fn clone(&self) -> Self {
         Self { plan: self.plan }
@@ -185,7 +179,7 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> Trace for PlanTrac
 
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self {
         let plan = mmtk.get_plan().downcast_ref::<P>().unwrap();
-        Self::new(plan)
+        Self { plan }
     }
 
     fn trace_object<Q: ObjectQueue>(
