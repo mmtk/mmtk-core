@@ -5,8 +5,6 @@ use crate::global_state::GlobalState;
 use crate::mmtk::MMTK;
 use crate::plan::gc_work::{ClearCommonPlanUnlogBits, SetCommonPlanUnlogBits};
 use crate::plan::tracing::ObjectQueue;
-#[allow(unused)] // Used in doc comment.
-use crate::plan::tracing::{PlanTrace, Trace};
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
@@ -901,10 +899,12 @@ pub trait HasSpaces {
 ///
 /// A plan could also manually implement this trait. For the sake of performance, the implementation
 /// of this trait should mark methods as `[inline(always)]`.
+///
+/// [`PlanTrace`]: crate::plan::tracing::PlanTrace
 pub trait PlanTraceObject<VM: VMBinding> {
     /// Trace objects in the plan.
     ///
-    /// See [`Trace::trace_object`].
+    /// See [`crate::plan::tracing::Trace::trace_object`].
     fn trace_object<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
         queue: &mut Q,
@@ -914,12 +914,12 @@ pub trait PlanTraceObject<VM: VMBinding> {
 
     /// Post-scan objects in the plan.
     ///
-    /// See [`Trace::post_scan_object`].
+    /// See [`crate::plan::tracing::Trace::post_scan_object`].
     fn post_scan_object(&self, object: ObjectReference);
 
     /// Whether objects in this plan may move.
     ///
-    /// See [`Trace::post_scan_object`].
+    /// See [`crate::plan::tracing::Trace::post_scan_object`].
     fn may_move_objects<const KIND: TraceKind>() -> bool;
 }
 

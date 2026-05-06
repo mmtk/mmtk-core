@@ -8,12 +8,6 @@ use crate::policy::gc_work::TraceKind;
 use crate::scheduler::{GCWorker, EDGES_WORK_BUFFER_SIZE};
 use crate::util::{ObjectReference, VMThread, VMWorkerThread};
 use crate::vm::{Scanning, VMBinding};
-#[allow(unused)] // Used in doc comment.
-use crate::{
-    plan::generational::gc_work::GenNurseryTrace,
-    policy::{immix::ImmixSpace, sft::SFT},
-    scheduler::work::GCWorkContext,
-};
 use crate::{Plan, MMTK};
 
 /// This trait provides methods used during a trace.  The most important method is
@@ -34,6 +28,8 @@ use crate::{Plan, MMTK};
 /// [`MMTK`] instance.
 ///
 /// This trait requires the [`Clone`] trait, and cloned instances behave exactly the same.
+///
+/// [`GCWorkContext`]: crate::scheduler::work::GCWorkContext
 pub trait Trace: 'static + Send + Clone {
     /// The VM binding type this type serves.
     type VM: VMBinding;
@@ -44,6 +40,8 @@ pub trait Trace: 'static + Send + Clone {
     /// should be reasonably cheap to instantiate.  Most types (such as [`PlanTrace`] and
     /// [`GenNurseryTrace`]) only need a reference to the plan which can be downcasted from
     /// [`MMTK::plan`].
+    ///
+    /// [`GenNurseryTrace`]: crate::plan::generational::gc_work::GenNurseryTrace
     fn from_mmtk(mmtk: &'static MMTK<Self::VM>) -> Self;
 
     /// Trace the `object`
@@ -81,6 +79,8 @@ pub trait Trace: 'static + Send + Clone {
     /// this method may do nothing.
     ///
     /// Currently, only [`ImmixSpace`] needs this hook to mark the line.
+    ///
+    /// [`ImmixSpace`]: crate::policy::immix::ImmixSpace
     fn post_scan_object(&self, object: ObjectReference);
 
     /// Return `true` if [`Self::trace_object`] may move any object.  If any space of the current
@@ -98,7 +98,7 @@ pub trait Trace: 'static + Send + Clone {
 pub type SlotOfTrace<T> = <<T as Trace>::VM as VMBinding>::VMSlot;
 
 /// A [`Trace`] implementation that dispatches the `trace_object` method through
-/// [`SFT::sft_trace_object`] using the Space Function Table (SFT).
+/// [`crate::policy::sft::SFT::sft_trace_object`] using the Space Function Table (SFT).
 ///
 /// Because SFT methods cannot be general, `SFTTrace` cannot be used for plans that needs multiple
 /// traces.  It is sufficient for simple plans such as `MarkSweep` and `SemiSpace`.
@@ -207,7 +207,7 @@ impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> Trace for PlanTrac
 }
 
 /// A placeholder for unsupported traces.  For example, it can be used for
-/// [`GCWorkContext::PinningTrace`] for plans that don't support object pinning.
+/// [`crate::scheduler::GCWorkContext::PinningTrace`] for plans that don't support object pinning.
 #[derive(Default)]
 pub struct UnsupportedTrace<VM: VMBinding> {
     phantom_data: PhantomData<VM>,

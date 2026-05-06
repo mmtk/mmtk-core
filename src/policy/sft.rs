@@ -1,6 +1,4 @@
 use crate::plan::tracing::OptionObjectQueue;
-#[allow(unused)]
-use crate::plan::tracing::SFTTrace;
 use crate::scheduler::GCWorker;
 use crate::util::*;
 use crate::vm::VMBinding;
@@ -96,7 +94,7 @@ pub trait SFT {
     ///     `Mutator::post_alloc` will call this method after allocation.
     fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize);
 
-    /// Trace objects through SFT. This along with [`SFTTrace`]
+    /// Trace objects through SFT. This along with [`crate::plan::tracing::SFTTrace`]
     /// provides an easy way for most plans to trace objects without the need to implement any plan-specific
     /// code. However, tracing objects for some policies are more complicated, and they do not provide an
     /// implementation of this method. For example, mark compact space requires trace twice in each GC.

@@ -1,6 +1,4 @@
 use super::worker::*;
-#[allow(unused)] // Used in doc comment.
-use crate::plan::tracing::UnsupportedTrace;
 use crate::scheduler::gc_work::TracingRootsWorkFactory;
 use crate::vm::{RootsWorkFactory, VMBinding};
 use crate::{mmtk::MMTK, plan::tracing::Trace};
@@ -99,6 +97,8 @@ pub trait GCWorkContext: Send + 'static {
     ///
     /// If a plan does not support object pinning, it should use [`UnsupportedTrace`] for this type
     /// member.
+    ///
+    /// [`UnsupportedTrace`]: crate::plan::tracing::UnsupportedTrace
     type PinningTrace: Trace<VM = Self::VM>;
 
     /// Create an instance of [`RootsWorkFactory`] for root scanning in the current GC.
