@@ -63,6 +63,9 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
     }
 
     fn may_move_objects() -> bool {
+        // This is conservative.  Some nursery GCs do not move objects.
+        // For example, StickyImmix will not move objects during nursery GC
+        // if the "sticky_immix_non_moving_nursery" feature is enabled.
         true
     }
 }
