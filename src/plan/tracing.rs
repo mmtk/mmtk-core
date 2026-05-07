@@ -47,23 +47,29 @@ pub trait Trace: 'static + Send + Clone {
     /// Trace the `object`.  More precisely, it visits an object graph *edge* that points to
     /// `object`.
     ///
-    /// It may add `object` (or the new object reference for `object` in a moving GC) into the
+    /// It may add `object` (or the new [`ObjectReference`] for `object` in a moving GC) into the
     /// `queue`, which means its children needs to be recursively traversed.
     ///
-    /// If the object graph edge needs to be updated, this function returns the new object reference
-    /// of `object`.  Otherwise it returns `object`.
-    ///
-    /// Note that the return value may be different from the enqueued value.  For example, during
-    /// the forwarding stage of MarkCompact, it returns the new object reference, but enqueues the
-    /// old `object` because the object has not been moved, yet.
+    /// In non-moving GC, the return value is always `object`.  In moving GC, the return value may
+    /// be `object` or the new [`ObjectReference`] for the `object`.  If the return value is not
+    /// `object`, the slot that represents the object graph edge needs to be updated to hold the
+    /// return value instead.
     ///
     /// Its implementation generally needs to figure out which space an object resides in, and
     /// invoke the right "trace object" method of the space for the current trace.
     ///
-    /// # Note
+    /// # Notes
     ///
-    /// Note that `FnMut(ObjectReference)` implements the [`ObjectQueue`] trait.  This means you can
-    /// use a lambda expression at the place of the `queue` argument.  For example, you can scan the
+    /// ## The enqueued value and the return value
+    ///
+    /// The return value may be different from the enqueued value.  For example, during the
+    /// forwarding stage of MarkCompact, it returns the new object reference, but enqueues the old
+    /// `object` because the object has not been moved, yet.
+    ///
+    /// ## The `queue` can be a callback instead of a collection
+    ///
+    /// `FnMut(ObjectReference)` implements the [`ObjectQueue`] trait.  This means you can use a
+    /// lambda expression at the place of the `queue` argument.  For example, you can scan the
     /// object immediately instead of adding the object reference into a container.
     ///
     /// Example:
