@@ -26,9 +26,19 @@ impl HeapMeta {
         anno: &MmapAnnotation,
     ) -> MmapResult<Address> {
         let preferred = if top {
-            self.heap_limit - extent
+            let raw_start = self.heap_limit - extent;
+            if let Some(align) = align {
+                raw_start.align_down(align)
+            } else {
+                raw_start
+            }
         } else {
-            self.heap_cursor
+            let raw_start = self.heap_cursor;
+            if let Some(align) = align {
+                raw_start.align_up(align)
+            } else {
+                raw_start
+            }
         };
 
         let actual = mmapper.quarantine_address_range_preferred(

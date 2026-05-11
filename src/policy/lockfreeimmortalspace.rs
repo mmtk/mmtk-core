@@ -240,14 +240,28 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             _ => unreachable!(),
         };
         let anno = MmapAnnotation::Space { name: args.name };
-        let huge_page_option = args.options.transparent_hugepages_as_huge_page_support();
+        let huge_page_option: HugePageSupport =
+            args.options.transparent_hugepages_as_huge_page_support();
+        let reasonable_extent = CommonSpace::estimate_reasonable_contiguous_extent(
+            &args.options,
+            &args.gc_trigger,
+            args.vm_map,
+            extent,
+        );
         let start = args
             .heap
-            .reserve_quarantined(extent, align, top, args.mmapper, huge_page_option, &anno)
+            .reserve_quarantined(
+                reasonable_extent,
+                align,
+                top,
+                args.mmapper,
+                huge_page_option,
+                &anno,
+            )
             .unwrap_or_else(|mmap_error| {
                 panic!(
                     "Failed to quarantine contiguous space {} for {} bytes: {}",
-                    args.name, extent, mmap_error
+                    args.name, reasonable_extent, mmap_error
                 )
             });
 

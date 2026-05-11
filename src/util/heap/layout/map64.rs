@@ -55,6 +55,7 @@ impl VMMap for Map64 {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
         debug_assert!(Self::is_space_start(start));
         debug_assert!(extent <= vm_layout().space_size_64());
+        debug_assert!(extent >= self.min_contiguous_extent());
         // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
         // as each space will update different indices.
         let self_mut = unsafe { self.mut_self() };
@@ -74,6 +75,8 @@ impl VMMap for Map64 {
         grain: i32,
     ) -> CreateFreeListResult {
         debug_assert!(start.is_aligned_to(BYTES_IN_CHUNK));
+
+        assert!(units >= conversions::bytes_to_pages_up(self.min_contiguous_extent()));
 
         // This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
         let self_mut = unsafe { self.mut_self() };
@@ -203,6 +206,13 @@ impl VMMap for Map64 {
         } else {
             SpaceDescriptor::UNINITIALIZED
         }
+    }
+
+    fn min_contiguous_extent(&self) -> usize {
+        // The underlying RawMemoryFreeList will occupy a portion of address range as its own metadata from
+        // the space extent. As we always allocate in the granularity of chunks, for one chunk of space,
+        // we would need a small fraction as the metadata. So make the minimal space size allowed to be two chunks.
+        BYTES_IN_CHUNK * 2
     }
 }
 
