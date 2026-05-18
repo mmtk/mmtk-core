@@ -855,7 +855,7 @@ impl<VM: VMBinding, R2OT: Trace<VM = VM>, O2OT: Trace<VM = VM>> GCWork<VM>
         };
 
         let num_enqueued_nodes = root_objects_to_scan.len();
-        probe!(mmtk, process_root_nodes, num_roots, num_enqueued_nodes);
+        probe!(mmtk, process_pinning_roots, num_roots, num_enqueued_nodes);
 
         if !root_objects_to_scan.is_empty() {
             let work = ProcessNodes::<O2OT>::new(root_objects_to_scan, self.bucket);

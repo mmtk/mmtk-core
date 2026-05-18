@@ -35,8 +35,8 @@ Currently, the core provides the following tracepoints.
 -   `mmtk:roots(kind: int, len: int)`: reporing roots to mmtk-core during root scanning.  `kind` can
     be 0, 1 or 2 for normal roots, pinning roots and transitively pinning roots, respectively.
     `len` is the number of slots or nodes reported.
--   `mmtk:process_root_nodes(num_roots: int, num_enqueued_nodes: int)`: a ProcessPinningRoots work
-    packet which processes root edges represented as object references to the target objects.
+-   `mmtk:process_pinning_roots(num_roots: int, num_enqueued_nodes: int)`: a ProcessPinningRoots work
+    packet which processes pinning root edges represented as object references to the target objects.
 -   `mmtk:process_slots(num_slots: int)`: an invocation of the `process_slots`
     method. The argument is the number of slots to be processed.
 -   `mmtk:process_nodes(total_objects: int, scan_and_trace: int)`: an invocation of the
