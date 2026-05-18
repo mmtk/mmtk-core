@@ -249,7 +249,7 @@ class LogProcessor:
 
                 case "process_slots":
                     wp["args"] |= {
-                        # Group args by "process_slots" and "process_nodes" because a TracingProcessSlots
+                        # Group args by "process_slots" and "process_nodes" because a ProcessSlots
                         # work packet may do both if SCAN_OBJECTS_IMMEDIATELY is true.
                         "process_slots": {
                             "num_slots": int(args[0]),

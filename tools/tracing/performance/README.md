@@ -152,12 +152,11 @@ If you can't tell which lock instance is for which lock in MMTk, you can trace
 the allocation of the Mutex and record the stack trace (note that you might want
 to compile MMTk with `force-frame-pointers` to obtain better stack traces).
 
-### Measuring the distribution of `TracingProcessSlots` packet sizes (`packet_size`)
+### Measuring the distribution of `ProcessSlots` packet sizes (`packet_size`)
 
 Most of the GC time is spend in the transitive closure for tracing-based GCs, and MMTk performs
-transitive closure via the `TracingProcessSlots` work packet which visits slots in objects.
-This tool measures the distribution of the sizes (as the number of slots) of these work
-packets.
+transitive closure via the `ProcessSlots` work packet which visits slots in objects. This tool
+measures the distribution of the sizes (as the number of slots) of these work packets.
 
 Sample output:
 ```

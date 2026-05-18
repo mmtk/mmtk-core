@@ -35,12 +35,12 @@ Currently, the core provides the following tracepoints.
 -   `mmtk:roots(kind: int, len: int)`: reporing roots to mmtk-core during root scanning.  `kind` can
     be 0, 1 or 2 for normal roots, pinning roots and transitively pinning roots, respectively.
     `len` is the number of slots or nodes reported.
--   `mmtk:process_root_nodes(num_roots: int, num_enqueued_nodes: int)`: a TracingProcessPinningRoots work
+-   `mmtk:process_root_nodes(num_roots: int, num_enqueued_nodes: int)`: a ProcessPinningRoots work
     packet which processes root edges represented as object references to the target objects.
 -   `mmtk:process_slots(num_slots: int)`: an invocation of the `process_slots`
     method. The argument is the number of slots to be processed.
 -   `mmtk:process_nodes(total_objects: int, scan_and_trace: int)`: an invocation of the
-    `TracingProcessNodes::do_work` method.  `total_objects` is the total number of objects in the
+    `ProcessNodes::do_work` method.  `total_objects` is the total number of objects in the
     work packet, and `scan_and_trace` is the number of objects scanned using the
     `Scanning::scan_object_and_trace_edges` method. Other objects are scanned using
     `Scanning::scan_object`.
@@ -76,7 +76,7 @@ Each sub-directory contains a set of scripts.
 
 -   `performance`: Print various GC-related statistics, such as the distribution of time spent in
     allocation slow path, the time spent in each GC stages, and the distribution of the
-    `TracingProcessSlots` packet sizes.
+    `ProcessSlots` packet sizes.
 -   `timeline`: Record the start and end time of each GC and each work packet, and visualize them on
     a timeline in Perfetto UI.
 
