@@ -144,7 +144,11 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             // It is related to defragmentation.  See https://github.com/mmtk/mmtk-core/issues/1357 for more details.
             // We currently force `FinalMark` to happen if the last pause is `InitialMark`.
             Pause::FinalMark
-        } else if self.should_do_full_gc.load(Ordering::SeqCst) {
+        } else if self.should_do_full_gc.load(Ordering::SeqCst)
+            // For user-triggered GCs, we don't want a simple initial pause which reclaims nothing.
+            // We do a full STW collection for user triggered collection instead.
+            || self.base().global_state.is_user_triggered_collection()
+        {
             Pause::Full
         } else {
             Pause::InitialMark
