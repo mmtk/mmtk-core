@@ -51,7 +51,7 @@ method `schedule_common_work()` that will add common work packets for you.
 To use `schedule_common_work()`, first we need to create a type `MyGCWorkContext` and implement the trait `GCWorkContext` for it.
 We create `gc_work.rs` and add the following implementation.
 Note that we don't override the `GCWorkContext::make_roots_work_factory` method.
-By default, it will use the `TracingRootsWorkFactory` which is sufficient for stop-the-world tracing GC.
+By default, it will use the `DefaultRootsWorkFactory` which is sufficient for stop-the-world tracing GC.
 Also note that we will use the default [`SFTTrace`] which provides a general way to trace object.
 For plans like semispace, `SFTTrace` is sufficient.
 For more complex GC plans, one can create their own implementaitons of the [`Trace`] trait.

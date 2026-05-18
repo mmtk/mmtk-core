@@ -1,5 +1,5 @@
 use super::worker::*;
-use crate::scheduler::gc_work::TracingRootsWorkFactory;
+use crate::scheduler::gc_work::DefaultRootsWorkFactory;
 use crate::vm::{RootsWorkFactory, VMBinding};
 use crate::{mmtk::MMTK, plan::tracing::Trace};
 #[cfg(feature = "work_packet_stats")]
@@ -103,12 +103,12 @@ pub trait GCWorkContext: Send + 'static {
 
     /// Create an instance of [`RootsWorkFactory`] for root scanning in the current GC.
     ///
-    /// The default implementation creates [`TracingRootsWorkFactory`] which is sufficient for
+    /// The default implementation creates [`DefaultRootsWorkFactory`] which is sufficient for
     /// stop-the-world tracing GC.  Plans that need custom [`RootsWorkFactory`] implementations can
     /// override this method.
     fn make_roots_work_factory(
         mmtk: &'static MMTK<Self::VM>,
     ) -> impl RootsWorkFactory<<Self::VM as VMBinding>::VMSlot> {
-        TracingRootsWorkFactory::<Self::VM, Self::DefaultTrace, Self::PinningTrace>::new(mmtk)
+        DefaultRootsWorkFactory::<Self::VM, Self::DefaultTrace, Self::PinningTrace>::new(mmtk)
     }
 }

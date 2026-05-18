@@ -1,6 +1,6 @@
 use crate::plan::is_nursery_gc;
 use crate::plan::tracing::Trace;
-use crate::scheduler::gc_work::TracingTracerContext;
+use crate::scheduler::gc_work::DefaultObjectTracerContext;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
 use crate::util::reference_processor::RescanReferences;
 use crate::util::ObjectReference;
@@ -164,7 +164,7 @@ impl<T: Trace> GCWork<T::VM> for Finalization<T> {
             num_candidates_begin, num_ready_for_finalize_begin
         );
 
-        let tracer_context = TracingTracerContext::<T>::new(WorkBucketStage::FinalRefClosure);
+        let tracer_context = DefaultObjectTracerContext::<T>::new(WorkBucketStage::FinalRefClosure);
         let tls = worker.tls;
         tracer_context.with_tracer(worker, |tracer| {
             finalizable_processor.scan::<T::VM, _>(tls, tracer, is_nursery_gc(mmtk.get_plan()));
@@ -202,7 +202,8 @@ impl<T: Trace> GCWork<T::VM> for ForwardFinalization<T> {
         trace!("Forward finalization");
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
 
-        let tracer_context = TracingTracerContext::<T>::new(WorkBucketStage::FinalizableForwarding);
+        let tracer_context =
+            DefaultObjectTracerContext::<T>::new(WorkBucketStage::FinalizableForwarding);
         tracer_context.with_tracer(worker, |tracer| {
             finalizable_processor.forward_candidate(tracer, is_nursery_gc(mmtk.get_plan()));
 

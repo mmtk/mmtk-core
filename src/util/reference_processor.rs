@@ -6,7 +6,7 @@ use std::vec::Vec;
 
 use crate::plan::is_nursery_gc;
 use crate::plan::tracing::Trace;
-use crate::scheduler::gc_work::TracingTracerContext;
+use crate::scheduler::gc_work::DefaultObjectTracerContext;
 use crate::scheduler::WorkBucketStage;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
@@ -559,7 +559,8 @@ impl<T: Trace> GCWork<T::VM> for SoftRefProcessing<T> {
             worker.scheduler().work_buckets[WorkBucketStage::SoftRefClosure].set_sentinel(rescan);
 
             // Retain soft references.  This will expand the transitive closure.
-            let tracer_context = TracingTracerContext::<T>::new(WorkBucketStage::SoftRefClosure);
+            let tracer_context =
+                DefaultObjectTracerContext::<T>::new(WorkBucketStage::SoftRefClosure);
             tracer_context.with_tracer(worker, |tracer| {
                 mmtk.reference_processors.retain_soft_refs(tracer, mmtk);
             });
@@ -606,7 +607,7 @@ impl<VM: VMBinding> PhantomRefProcessing<VM> {
 pub(crate) struct RefForwarding<T: Trace>(PhantomData<T>);
 impl<T: Trace> GCWork<T::VM> for RefForwarding<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
-        let tracer_context = TracingTracerContext::<T>::new(WorkBucketStage::RefForwarding);
+        let tracer_context = DefaultObjectTracerContext::<T>::new(WorkBucketStage::RefForwarding);
         tracer_context.with_tracer(worker, |tracer| {
             mmtk.reference_processors.forward_refs(tracer, mmtk);
         });

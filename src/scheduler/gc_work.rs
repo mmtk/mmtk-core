@@ -246,14 +246,14 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
 
 /// This implementation of [`ObjectTracer`] queues newly visited objects and create the
 /// [`TracingProcessNodes`] work packets to scan and trace objects.
-pub(crate) struct TracingObjectTracer<'w, T: Trace> {
+pub(crate) struct DefaultObjectTracer<'w, T: Trace> {
     worker: &'w mut GCWorker<T::VM>,
     trace: T,
     queue: VectorObjectQueue,
     stage: WorkBucketStage,
 }
 
-impl<T: Trace> ObjectTracer for TracingObjectTracer<'_, T> {
+impl<T: Trace> ObjectTracer for DefaultObjectTracer<'_, T> {
     /// Forward the `trace_object` call to the underlying `Trace`,
     /// and flush as soon as the underlying buffer of `process_edges_work` is full.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
@@ -265,7 +265,7 @@ impl<T: Trace> ObjectTracer for TracingObjectTracer<'_, T> {
     }
 }
 
-impl<'w, T: Trace> TracingObjectTracer<'w, T> {
+impl<'w, T: Trace> DefaultObjectTracer<'w, T> {
     fn new(worker: &'w mut GCWorker<T::VM>, trace: T, stage: WorkBucketStage) -> Self {
         Self {
             worker,
@@ -295,16 +295,16 @@ impl<'w, T: Trace> TracingObjectTracer<'w, T> {
     }
 }
 
-/// This implementation of [`ObjectTracerContext`] creates the [`TracingObjectTracer`] to expand the
+/// This implementation of [`ObjectTracerContext`] creates the [`DefaultObjectTracer`] to expand the
 /// transitive closure during a stop-the-world tracing GC or the final mark pause of a concurrent
 /// GC.  It is used during object scanning as well as weak reference processing.
 #[derive(Clone)]
-pub(crate) struct TracingTracerContext<T: Trace> {
+pub(crate) struct DefaultObjectTracerContext<T: Trace> {
     stage: WorkBucketStage,
     phantom_data: PhantomData<T>,
 }
 
-impl<T: Trace> TracingTracerContext<T> {
+impl<T: Trace> DefaultObjectTracerContext<T> {
     pub fn new(stage: WorkBucketStage) -> Self {
         Self {
             stage,
@@ -313,8 +313,8 @@ impl<T: Trace> TracingTracerContext<T> {
     }
 }
 
-impl<T: Trace> ObjectTracerContext<T::VM> for TracingTracerContext<T> {
-    type TracerType<'w> = TracingObjectTracer<'w, T>;
+impl<T: Trace> ObjectTracerContext<T::VM> for DefaultObjectTracerContext<T> {
+    type TracerType<'w> = DefaultObjectTracer<'w, T>;
 
     fn with_tracer<'w, R, F>(&self, worker: &'w mut GCWorker<T::VM>, func: F) -> R
     where
@@ -323,7 +323,7 @@ impl<T: Trace> ObjectTracerContext<T::VM> for TracingTracerContext<T> {
         let mmtk = worker.mmtk;
 
         // Create the callback tracer.
-        let mut tracer = TracingObjectTracer::new(worker, T::from_mmtk(mmtk), self.stage);
+        let mut tracer = DefaultObjectTracer::new(worker, T::from_mmtk(mmtk), self.stage);
 
         // The caller can use the tracer here.
         let result = func(&mut tracer);
@@ -361,7 +361,7 @@ impl<T: Trace> GCWork<T::VM> for VMProcessWeakRefs<T> {
         let stage = WorkBucketStage::VMRefClosure;
 
         let need_to_repeat = {
-            let tracer_factory = TracingTracerContext::<T>::new(stage);
+            let tracer_factory = DefaultObjectTracerContext::<T>::new(stage);
             <T::VM as VMBinding>::VMScanning::process_weak_refs(worker, tracer_factory)
         };
 
@@ -400,7 +400,7 @@ impl<T: Trace> GCWork<T::VM> for VMForwardWeakRefs<T> {
 
         let stage = WorkBucketStage::VMRefForwarding;
 
-        let tracer_factory = TracingTracerContext::<T>::new(stage);
+        let tracer_factory = DefaultObjectTracerContext::<T>::new(stage);
         <T::VM as VMBinding>::VMScanning::forward_weak_refs(worker, tracer_factory)
     }
 }
@@ -549,13 +549,13 @@ impl<T: Trace> GCWork<T::VM> for TracingProcessSlots<T> {
 /// will be added to the [`WorkBucketStage::TPinningClosure`],
 /// [`WorkBucketStage::PinningRootsTrace`] and [`WorkBucketStage::Closure`] buckets depending on the
 /// kinds of roots.
-pub(crate) struct TracingRootsWorkFactory<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> {
+pub(crate) struct DefaultRootsWorkFactory<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> {
     pub(crate) mmtk: &'static MMTK<VM>,
     phantom: PhantomData<(DPE, PPE)>,
 }
 
 impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> Clone
-    for TracingRootsWorkFactory<VM, DPE, PPE>
+    for DefaultRootsWorkFactory<VM, DPE, PPE>
 {
     fn clone(&self) -> Self {
         Self {
@@ -575,13 +575,13 @@ pub(crate) enum RootsKind {
 }
 
 impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> RootsWorkFactory<VM::VMSlot>
-    for TracingRootsWorkFactory<VM, DPE, PPE>
+    for DefaultRootsWorkFactory<VM, DPE, PPE>
 {
     fn create_process_roots_work(&mut self, slots: Vec<VM::VMSlot>) {
         // Note: We should use the same USDT name "mmtk:roots" for all the three kinds of roots. A
         // VM binding may not call all of the three methods in this impl. For example, the OpenJDK
         // binding only calls `create_process_roots_work`, and the Ruby binding only calls
-        // `create_process_pinning_roots_work`. Because `TracingRootsWorkFactory<VM, DPE, PPE>` is a
+        // `create_process_pinning_roots_work`. Because `DefaultRootsWorkFactory<VM, DPE, PPE>` is a
         // generic type, the Rust compiler emits the function bodies on demand, so the resulting
         // machine code may not contain all three USDT trace points.  If they have different names,
         // and our `capture.bt` mentions all of them, `bpftrace` may complain that it cannot find
@@ -643,7 +643,7 @@ impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> RootsWorkFactory<V
 }
 
 impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>>
-    TracingRootsWorkFactory<VM, DPE, PPE>
+    DefaultRootsWorkFactory<VM, DPE, PPE>
 {
     pub(crate) fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
@@ -745,7 +745,7 @@ impl<T: Trace> TracingProcessNodes<T> {
             return;
         }
 
-        let object_tracer_context = TracingTracerContext::<T>::new(self.bucket);
+        let object_tracer_context = DefaultObjectTracerContext::<T>::new(self.bucket);
 
         object_tracer_context.with_tracer(worker, |object_tracer| {
             // Scan objects and trace their outgoing edges at the same time.
