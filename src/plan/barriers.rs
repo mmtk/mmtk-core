@@ -192,10 +192,9 @@ impl<S: BarrierSemantics> ObjectBarrier<S> {
         Self { semantics }
     }
 
-    /// Attempt to atomically log an object.
-    /// Returns true if the object is not logged previously.
+    /// Returns true if the object is not logged.
     fn object_is_unlogged(&self, object: ObjectReference) -> bool {
-        unsafe { S::UNLOG_BIT_SPEC.load::<S::VM, u8>(object, None) != 0 }
+        S::UNLOG_BIT_SPEC.load_atomic::<S::VM, u8>(object, None, Ordering::SeqCst) != 0
     }
 
     /// Attempt to atomically log an object.
