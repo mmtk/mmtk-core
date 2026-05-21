@@ -270,7 +270,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
             // FIXME: This is hacky. When we do a default trace, this should be a nonmoving space.
             // The only exception is the nursery GC for sticky immix, for which, we use default trace.
             // This function is only used for PlanTrace, and for sticky immix nursery GC, we use
-            // PlanTrace. So it still works. But this is quite hacky anyway.
+            // GenNurseryTrace. So it still works. But this is quite hacky anyway.
             // See https://github.com/mmtk/mmtk-core/issues/1314 for details.
             false
         } else {
