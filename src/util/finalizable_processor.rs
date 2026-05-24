@@ -140,7 +140,7 @@ impl<F: Finalizable> FinalizableProcessor<F> {
 pub struct Finalization<E: ProcessEdgesWork>(PhantomData<E>);
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &MMTK<E::VM>) {
         if !*mmtk.options.no_reference_types {
             // Rescan soft and weak references at the end of the transitive closure from resurrected
             // objects.  New soft and weak references may be discovered during this.
@@ -160,7 +160,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
             num_candidates_begin, num_ready_for_finalize_begin
         );
 
-        let mut w = E::new(vec![], false, mmtk, WorkBucketStage::FinalRefClosure);
+        let mut w = E::new(vec![], false, worker.mmtk, WorkBucketStage::FinalRefClosure);
         w.set_worker(worker);
         finalizable_processor.scan(worker.tls, &mut w, is_nursery_gc(mmtk.get_plan()));
 
@@ -191,10 +191,15 @@ impl<E: ProcessEdgesWork> Finalization<E> {
 pub struct ForwardFinalization<E: ProcessEdgesWork>(PhantomData<E>);
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ForwardFinalization<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &MMTK<E::VM>) {
         trace!("Forward finalization");
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
-        let mut w = E::new(vec![], false, mmtk, WorkBucketStage::FinalizableForwarding);
+        let mut w = E::new(
+            vec![],
+            false,
+            worker.mmtk,
+            WorkBucketStage::FinalizableForwarding,
+        );
         w.set_worker(worker);
         finalizable_processor.forward_candidate(&mut w, is_nursery_gc(mmtk.get_plan()));
 

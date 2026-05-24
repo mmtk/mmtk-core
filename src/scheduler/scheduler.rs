@@ -641,7 +641,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         summary.harness_stat()
     }
 
-    pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
+    pub fn notify_mutators_paused(&self, mmtk: &MMTK<VM>) {
         mmtk.gc_trigger.clear_request();
         let first_stw_bucket = &self.work_buckets[WorkBucketStage::FIRST_STW_STAGE];
         debug_assert!(!first_stw_bucket.is_open());

@@ -938,7 +938,7 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>) {
         // Clear object mark table for this chunk
         self.reset_object_mark();
         // Iterate over all blocks in this chunk
@@ -984,7 +984,7 @@ struct SweepChunk<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>) {
         assert!(self.space.chunk_map.get(self.chunk).unwrap().is_allocated());
 
         let mut histogram = self.space.defrag.new_histogram();
@@ -1199,7 +1199,7 @@ struct ClearVOBitsAfterPrepare {
 
 #[cfg(feature = "vo_bit")]
 impl<VM: VMBinding> GCWork<VM> for ClearVOBitsAfterPrepare {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
         match self.scope {
             VOBitsClearingScope::FullGC => {
                 vo_bit::bzero_vo_bit(self.chunk.start(), Chunk::BYTES);

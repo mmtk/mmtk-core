@@ -108,7 +108,7 @@ impl<E: ProcessEdgesWork> ProcessModBuf<E> {
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &MMTK<E::VM>) {
         // Process and scan modbuf only if the current GC is a nursery GC
         let gen = mmtk.get_plan().generational().unwrap();
         if gen.is_current_gc_nursery() {
@@ -157,7 +157,7 @@ impl<E: ProcessEdgesWork> ProcessRegionModBuf<E> {
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &MMTK<E::VM>) {
         // Scan modbuf only if the current GC is a nursery GC
         if mmtk
             .get_plan()
@@ -174,7 +174,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
             }
             // Forward entries
             GCWork::do_work(
-                &mut E::new(slots, false, mmtk, WorkBucketStage::Closure),
+                &mut E::new(slots, false, worker.mmtk, WorkBucketStage::Closure),
                 worker,
                 mmtk,
             )

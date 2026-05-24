@@ -17,7 +17,7 @@ pub struct GenerateWork<VM: VMBinding, F: Fn(&'static CompressorSpace<VM>) + Sen
 impl<VM: VMBinding, F: Fn(&'static CompressorSpace<VM>) + Send + 'static> GCWork<VM>
     for GenerateWork<VM, F>
 {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
         (self.f)(self.compressor_space);
     }
 }
@@ -40,7 +40,7 @@ pub struct UpdateReferences<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Send for UpdateReferences<VM> {}
 
 impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>) {
         // The following needs to be done right before the second round of root scanning
         VM::VMScanning::prepare_for_roots_re_scanning();
         mmtk.state.prepare_for_stack_scanning();
@@ -71,7 +71,7 @@ pub struct AfterCompact<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for AfterCompact<VM> {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &MMTK<VM>) {
         self.compressor_space.after_compact(worker, self.los);
     }
 }

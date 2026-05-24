@@ -24,7 +24,7 @@ use self::obj_size::PerSizeClassObjectCounter;
 ///
 pub trait RtAnalysis<VM: VMBinding> {
     fn alloc_hook(&mut self, _size: usize, _align: usize, _offset: usize) {}
-    fn gc_hook(&mut self, _mmtk: &'static MMTK<VM>) {}
+    fn gc_hook(&mut self, _mmtk: &MMTK<VM>) {}
     fn set_running(&mut self, running: bool);
 }
 
@@ -32,7 +32,7 @@ pub trait RtAnalysis<VM: VMBinding> {
 pub struct GcHookWork;
 
 impl<VM: VMBinding> GCWork<VM> for GcHookWork {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &MMTK<VM>) {
         mmtk.analysis_manager.gc_hook(mmtk);
     }
 }
@@ -78,7 +78,7 @@ impl<VM: VMBinding> AnalysisManager<VM> {
         }
     }
 
-    pub fn gc_hook(&self, mmtk: &'static MMTK<VM>) {
+    pub fn gc_hook(&self, mmtk: &MMTK<VM>) {
         let routines = self.routines.lock().unwrap();
         for r in &*routines {
             r.lock().unwrap().gc_hook(mmtk);

@@ -170,7 +170,7 @@ impl Stats {
         self.shared.increment_phase();
     }
 
-    pub fn print_stats<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>) {
+    pub fn print_stats<VM: VMBinding>(&self, mmtk: &MMTK<VM>) {
         println!(
             "============================ MMTk Statistics Totals ============================"
         );
@@ -231,7 +231,7 @@ impl Stats {
         }
     }
 
-    pub fn stop_all<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>) {
+    pub fn stop_all<VM: VMBinding>(&self, mmtk: &MMTK<VM>) {
         self.stop_all_counters();
         self.print_stats(mmtk);
     }
