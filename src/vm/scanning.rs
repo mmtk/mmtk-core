@@ -1,6 +1,7 @@
 use crate::plan::Mutator;
 use crate::scheduler::GCWorker;
 use crate::util::ObjectReference;
+use crate::util::VMThread;
 use crate::util::VMWorkerThread;
 use crate::vm::slot::Slot;
 use crate::vm::VMBinding;
@@ -41,6 +42,29 @@ impl<F: FnMut(ObjectReference) -> ObjectReference> ObjectTracer for F {
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         self(object)
     }
+}
+
+/// This type specifies how object-scanning functions ([`Scanning::scan_object`] and
+/// [`Scanning::scan_object_and_trace_edges`]) should handle strong and weak reference fields.
+///
+/// Note that it is the VM and the VM binding that ultimately decides *which* reference is strong
+/// and *which* reference is weak.  Particularly, the VM binding is allowed to conservatively report
+/// weak references as strong.  For example,
+///
+/// -   A VM binding can report all weak references as strong during nursery collections or
+///     concurrent collections to avoid expensive weak reference processing.
+/// -   The VM binding of a JVM (e.g. mmtk-openjdk) can report the weak reference field in
+///     `SoftReference` as strong during non-emergency GCs, and weak during emergency GCs.
+pub trait RefScanPolicy {
+    /// True if the reference scanning function should visit strong reference fields in the object using
+    /// callbacks.
+    const VISIT_STRONG: bool;
+    /// True if the reference scanning function should visit weak reference fields in the object using
+    /// callbacks.
+    const VISIT_WEAK: bool;
+    /// True if the reference scanning function should discover weak reference fields in VM-specific
+    /// ways.
+    const DISCOVER_WEAK: bool;
 }
 
 /// An `ObjectTracerContext` gives a GC worker temporary access to an `ObjectTracer`, allowing
@@ -168,7 +192,7 @@ pub trait Scanning<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
-    fn support_slot_enqueuing(_tls: VMWorkerThread, _object: ObjectReference) -> bool {
+    fn support_slot_enqueuing(_tls: VMThread, _object: ObjectReference) -> bool {
         true
     }
 
@@ -190,10 +214,10 @@ pub trait Scanning<VM: VMBinding> {
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
     /// * `slot_visitor`: Called back for each field.
-    fn scan_object<SV: SlotVisitor<VM::VMSlot>>(
-        tls: VMWorkerThread,
+    fn scan_object<R: RefScanPolicy>(
+        tls: VMThread,
         object: ObjectReference,
-        slot_visitor: &mut SV,
+        slot_visitor: &mut impl SlotVisitor<VM::VMSlot>,
     );
 
     /// Delegated scanning of a object, visiting each reference field encountered, and tracing the
@@ -215,10 +239,10 @@ pub trait Scanning<VM: VMBinding> {
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
     /// * `object_tracer`: Called back for the object reference held in each field.
-    fn scan_object_and_trace_edges<OT: ObjectTracer>(
-        _tls: VMWorkerThread,
+    fn scan_object_and_trace_edges<R: RefScanPolicy>(
+        _tls: VMThread,
         _object: ObjectReference,
-        _object_tracer: &mut OT,
+        _object_tracer: &mut impl ObjectTracer,
     ) {
         unreachable!("scan_object_and_trace_edges() will not be called when support_slot_enqueuing() is always true.")
     }

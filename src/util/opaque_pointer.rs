@@ -59,9 +59,23 @@ impl VMThread {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct VMMutatorThread(pub VMThread);
 
+/// Allow unchecked explicit conversion from [VMMutatorThread] to [VMThread]
+impl From<VMMutatorThread> for VMThread {
+    fn from(value: VMMutatorThread) -> Self {
+        value.0
+    }
+}
+
 /// A VMWorkerThread is a VMThread that is associates with a [`crate::scheduler::GCWorker`].
 /// When a VMWorkerThread is used as an argument or a field of a type, it generally means
 /// the function or the functions for the type is executed in the context of the mutator thread.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct VMWorkerThread(pub VMThread);
+
+/// Allow unchecked explicit conversion from [VMWorkerThread] to [VMThread]
+impl From<VMWorkerThread> for VMThread {
+    fn from(value: VMWorkerThread) -> Self {
+        value.0
+    }
+}

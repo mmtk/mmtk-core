@@ -15,6 +15,7 @@ use crate::vm::object_model::specs::*;
 use crate::vm::GCThreadContext;
 use crate::vm::ObjectTracer;
 use crate::vm::ObjectTracerContext;
+use crate::vm::RefScanPolicy;
 use crate::vm::RootsWorkFactory;
 use crate::vm::SlotVisitor;
 use crate::vm::VMBinding;
@@ -243,23 +244,17 @@ pub struct MockVM {
     pub weakref_get_referent: MockMethod<ObjectReference, Option<ObjectReference>>,
     pub weakref_enqueue_references: MockMethod<(&'static [ObjectReference], VMWorkerThread), ()>,
     // scanning
-    pub support_slot_enqueuing: MockMethod<(VMWorkerThread, ObjectReference), bool>,
+    pub support_slot_enqueuing: MockMethod<(VMThread, ObjectReference), bool>,
     pub scan_object: MockMethod<
         (
-            VMWorkerThread,
+            VMThread,
             ObjectReference,
             &'static mut dyn SlotVisitor<<MockVM as VMBinding>::VMSlot>,
         ),
         (),
     >,
-    pub scan_object_and_trace_edges: MockMethod<
-        (
-            VMWorkerThread,
-            ObjectReference,
-            &'static mut dyn ObjectTracer,
-        ),
-        (),
-    >,
+    pub scan_object_and_trace_edges:
+        MockMethod<(VMThread, ObjectReference, &'static mut dyn ObjectTracer), ()>,
     pub scan_roots_in_mutator_thread: Box<dyn MockAny>,
     pub scan_vm_specific_roots: Box<dyn MockAny>,
     pub notify_initial_thread_scan_complete: MockMethod<(bool, VMWorkerThread), ()>,
@@ -552,13 +547,13 @@ impl crate::vm::ReferenceGlue<MockVM> for MockVM {
 }
 
 impl crate::vm::Scanning<MockVM> for MockVM {
-    fn support_slot_enqueuing(tls: VMWorkerThread, object: ObjectReference) -> bool {
+    fn support_slot_enqueuing(tls: VMThread, object: ObjectReference) -> bool {
         mock!(support_slot_enqueuing(tls, object))
     }
-    fn scan_object<SV: SlotVisitor<<MockVM as VMBinding>::VMSlot>>(
-        tls: VMWorkerThread,
+    fn scan_object<R: RefScanPolicy>(
+        tls: VMThread,
         object: ObjectReference,
-        slot_visitor: &mut SV,
+        slot_visitor: &mut impl SlotVisitor<<MockVM as VMBinding>::VMSlot>,
     ) {
         mock!(scan_object(
             tls,
@@ -566,10 +561,10 @@ impl crate::vm::Scanning<MockVM> for MockVM {
             lifetime!(slot_visitor as &mut dyn SlotVisitor<<MockVM as VMBinding>::VMSlot>)
         ))
     }
-    fn scan_object_and_trace_edges<OT: ObjectTracer>(
-        tls: VMWorkerThread,
+    fn scan_object_and_trace_edges<R: RefScanPolicy>(
+        tls: VMThread,
         object: ObjectReference,
-        object_tracer: &mut OT,
+        object_tracer: &mut impl ObjectTracer,
     ) {
         mock!(scan_object_and_trace_edges(
             tls,
