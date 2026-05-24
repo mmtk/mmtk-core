@@ -73,13 +73,15 @@ impl Defrag {
         exhausted_reusable_space: bool,
         full_heap_system_gc: bool,
         stress_defrag: bool,
+        immix_util: Option<f64>,
     ) {
         let in_defrag = defrag_enabled
             && (emergency_collection
                 || (collection_attempts > 1)
                 || !exhausted_reusable_space
                 || stress_defrag
-                || (collect_whole_heap && user_triggered && full_heap_system_gc));
+                || (collect_whole_heap && user_triggered && full_heap_system_gc))
+                || (immix_util.is_some() && immix_util.unwrap() < 0.2);
         info!("Defrag: {}", in_defrag);
         probe!(mmtk, immix_defrag, in_defrag);
         self.in_defrag_collection
