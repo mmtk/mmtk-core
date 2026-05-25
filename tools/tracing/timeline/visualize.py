@@ -298,9 +298,13 @@ class LogProcessor:
 
                 case "reference_scanned":
                     semantics_int = int(args[0])
-                    if semantics_int in Semantics:
+                    try:
                         semantics_str = Semantics(semantics_int).name
-                    else:
+                    except ValueError:
+                        print(
+                            f"Unexpected reference_scanned semantics value: {semantics_int}",
+                            file=sys.stderr,
+                        )
                         semantics_str = "(Unknown)"
                     if "reference_scanned" not in wp["args"]:
                         wp["args"]["reference_scanned"] = []
