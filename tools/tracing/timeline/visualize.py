@@ -27,7 +27,7 @@ class Pause(enum.Enum):
     INITIAL_MARK = 2
     FINAL_MARK = 3
 
-class ImmixSpaceDefragDecision(enum.Flag):
+class DefragDecisionWord(enum.Flag):
     # Note: Keep in sync with ``Defrag::decide_whether_to_defrag``
     defrag_enabled              = enum.auto()
     emergency_collection        = enum.auto()
@@ -213,13 +213,13 @@ class LogProcessor:
 
                 case "immix_defrag":
                     decision_word = int(args[2])
-                    decision_flags = ImmixSpaceDefragDecision(decision_word)
-                    decisions = {f.name : (f in decision_flags) for f in ImmixSpaceDefragDecision}
+                    decision_flags = DefragDecisionWord(decision_word)
+                    desicion_details = {f.name : (f in decision_flags) for f in DefragDecisionWord}
                     gc["args"] |= {
                         "immix_is_defrag_gc": bool(int(args[0])),
                         "collection_attempts": int(args[1]),
                         "decision_word": decision_word,
-                        "decisions": decisions,
+                        "desicion_details": desicion_details,
                     }
 
                 case "concurrent_pause_determined":
