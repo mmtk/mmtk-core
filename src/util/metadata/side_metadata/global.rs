@@ -1123,6 +1123,163 @@ impl SideMetadataSpec {
             .filter(|addr| *addr >= start_addr && *addr < end_addr)
     }
 
+    /// Search forwards for a data address that has a non zero value in the side metadata. The search starts from the given data
+    /// address (including this address), and iterates forwards for the given bytes (non inclusive) before the data address.
+    ///
+    /// The data_addr and the corresponding side metadata address may not be mapped. Thus when this function checks the given data address, and
+    /// when it searches back, it needs to check if the address is mapped or not to avoid loading from an unmapped address.
+    ///
+    /// This function returns an address that is aligned to the region of this side metadata (`log_bytes_per_region`), and the side metadata
+    /// for the address is non zero.
+    ///
+    /// # Safety
+    ///
+    /// This function uses non-atomic load for the side metadata. The user needs to make sure
+    /// that there is no other thread that is mutating the side metadata.
+    #[allow(clippy::let_and_return)]
+    pub unsafe fn find_next_non_zero_value<T: MetadataValue>(
+        &self,
+        data_addr: Address,
+        search_limit_bytes: usize,
+    ) -> Option<Address> {
+        debug_assert!(search_limit_bytes > 0);
+
+        if self.uses_contiguous_side_metadata() {
+            // Contiguous side metadata
+            let result = self.find_next_non_zero_value_fast::<T>(data_addr, search_limit_bytes);
+            #[cfg(debug_assertions)]
+            {
+                // Double check if the implementation is correct
+                let result2 =
+                    self.find_next_non_zero_value_simple::<T>(data_addr, search_limit_bytes);
+                assert_eq!(
+                    result,
+                    result2,
+                    "find_next_non_zero_value_fast returned a different result from the naive implementation. data_addr {}, search_limit_bytes {}",
+                    data_addr, search_limit_bytes,
+                );
+            }
+            result
+        } else {
+            // TODO: We should be able to optimize further for this case. However, we need to be careful that the side metadata
+            // is not contiguous, and we need to skip to the next chunk's side metadata when we search to a different chunk.
+            // This won't be used for VO bit, as VO bit is global and is always contiguous. So for now, I am not bothered to do it.
+            warn!("We are trying to search non zero bits in an discontiguous side metadata. The performance is slow, as MMTk does not optimize for this case.");
+            self.find_next_non_zero_value_simple::<T>(data_addr, search_limit_bytes)
+        }
+    }
+
+    fn find_next_non_zero_value_simple<T: MetadataValue>(
+        &self,
+        data_addr: Address,
+        search_limit_bytes: usize,
+    ) -> Option<Address> {
+        let region_bytes = 1 << self.log_bytes_in_region;
+        // Figure out the range that we need to search.
+        let start_addr = data_addr.align_down(region_bytes);
+        let end_addr = data_addr + search_limit_bytes - 1usize;
+
+        let mut cursor = start_addr;
+        while cursor < end_addr {
+            // We encounter an unmapped address. Just return None.
+            if !cursor.is_mapped() {
+                return None;
+            }
+            // If we find non-zero value, just return it.
+            if !unsafe { self.load::<T>(cursor).is_zero() } {
+                return Some(cursor);
+            }
+            cursor += region_bytes;
+        }
+        None
+    }
+
+    fn find_next_non_zero_value_fast<T: MetadataValue>(
+        &self,
+        data_addr: Address,
+        search_limit_bytes: usize,
+    ) -> Option<Address> {
+        debug_assert!(self.uses_contiguous_side_metadata());
+
+        // Quick check if the data address is mapped at all.
+        if !data_addr.is_mapped() {
+            return None;
+        }
+        // Quick check if the current data_addr has a non zero value.
+        if !unsafe { self.load::<T>(data_addr).is_zero() } {
+            return Some(data_addr.align_down(1 << self.log_bytes_in_region));
+        }
+
+        // Figure out the start and end data address.
+        let start_addr = data_addr.align_down(1 << self.log_bytes_in_region);
+        let end_addr = data_addr + search_limit_bytes - 1usize;
+
+        // Then figure out the start and end metadata address and bits.
+        // The start bit may not be accurate, as we map any address in the region to the same bit.
+        // We will filter the result at the end to make sure the found address is in the search range.
+        let start_meta_addr = address_to_contiguous_meta_address(self, start_addr);
+        let start_meta_shift = meta_byte_lshift(self, start_addr);
+        let end_meta_addr = address_to_contiguous_meta_address(self, end_addr);
+        let end_meta_shift = meta_byte_lshift(self, end_addr);
+
+        let mut res = None;
+
+        let mut visitor = |range: BitByteRange| {
+            match range {
+                BitByteRange::Bytes { start, end } => {
+                    match helpers::find_first_non_zero_bit_in_metadata_bytes(start, end) {
+                        helpers::FindMetaBitResult::Found { addr, bit } => {
+                            let (addr, bit) = align_metadata_address(self, addr, bit);
+                            res = Some(contiguous_meta_address_to_address(self, addr, bit));
+                            // Return true to abort the search. We found the bit.
+                            true
+                        }
+                        // If we see unmapped metadata, we don't need to search any more.
+                        helpers::FindMetaBitResult::UnmappedMetadata => true,
+                        // Return false to continue searching.
+                        helpers::FindMetaBitResult::NotFound => false,
+                    }
+                }
+                BitByteRange::BitsInByte {
+                    addr,
+                    bit_start,
+                    bit_end,
+                } => {
+                    match helpers::find_first_non_zero_bit_in_metadata_bits(
+                        addr, bit_start, bit_end,
+                    ) {
+                        helpers::FindMetaBitResult::Found { addr, bit } => {
+                            let (addr, bit) = align_metadata_address(self, addr, bit);
+                            res = Some(contiguous_meta_address_to_address(self, addr, bit));
+                            // Return true to abort the search. We found the bit.
+                            true
+                        }
+                        // If we see unmapped metadata, we don't need to search any more.
+                        helpers::FindMetaBitResult::UnmappedMetadata => true,
+                        // Return false to continue searching.
+                        helpers::FindMetaBitResult::NotFound => false,
+                    }
+                }
+            }
+        };
+
+        ranges::break_bit_range(
+            start_meta_addr,
+            start_meta_shift,
+            end_meta_addr,
+            end_meta_shift,
+            true,
+            &mut visitor,
+        );
+
+        // We have to filter the result. We search between [start_addr, end_addr). But we actually
+        // search with metadata bits. It is possible the metadata bit for start_addr is the same bit
+        // as an address that is before start_addr. E.g. 0x2010f026360 and 0x2010f026361 are mapped
+        // to the same bit, 0x2010f026361 is the start address and 0x2010f026360 is outside the search range.
+        res.map(|addr| addr.align_down(1 << self.log_bytes_in_region))
+            .filter(|addr| *addr >= start_addr && *addr < end_addr)
+    }
+
     /// Search for data addresses that have non zero values in the side metadata.  This method is
     /// primarily used for heap traversal by scanning the VO bits.
     ///
