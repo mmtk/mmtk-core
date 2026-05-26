@@ -89,7 +89,7 @@ usdt:$MMTK:mmtk:gen_full_heap {
 }
 
 usdt:$MMTK:mmtk:immix_defrag {
-    printf("immix_defrag,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+    printf("immix_defrag,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
 }
 
 usdt:$MMTK:mmtk:roots {
@@ -132,7 +132,7 @@ usdt:$MMTK:mmtk:plan_end_of_gc_end {
 
 usdt:$MMTK:mmtk:sweep_chunk {
     if (@enable_print) {
-        printf("sweep_chunk,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+        printf("sweep_chunk,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
     }
 }
 

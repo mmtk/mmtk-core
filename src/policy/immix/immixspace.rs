@@ -996,8 +996,14 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
         // Hints for clearing side forwarding bits.
         let is_moving_gc = mmtk.get_plan().current_gc_may_move_object();
         let is_defrag_gc = self.space.defrag.in_defrag();
-        // number of allocated blocks.
-        let mut allocated_blocks = 0;
+
+        // number of swept (completely free) blocks.
+        let mut swept_blocks = 0;
+        // number of reused blocks.
+        let mut reused_blocks = 0;
+        // number of non-free blocks that cannot be reused (e.g. full, or non-empty when block-only).
+        let mut unreused_blocks = 0;
+
         // Iterate over all allocated blocks in this chunk.
         for block in self
             .chunk
@@ -1028,12 +1034,18 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
                 }
             }
 
-            if !block.sweep(self.space, &mut histogram, line_mark_state) {
-                // Block is live. Increment the allocated block count.
-                allocated_blocks += 1;
+            match block.sweep(self.space, &mut histogram, line_mark_state) {
+                BlockSweepResult::Swept => swept_blocks += 1,
+                BlockSweepResult::Reused => reused_blocks += 1,
+                BlockSweepResult::NoReuse => unreused_blocks += 1,
             }
         }
-        probe!(mmtk, sweep_chunk, allocated_blocks);
+
+        probe!(mmtk, sweep_chunk, swept_blocks, reused_blocks, unreused_blocks);
+
+        // number of allocated blocks.
+        let allocated_blocks = reused_blocks + unreused_blocks;
+
         // Set this chunk as free if there is not live blocks.
         if allocated_blocks == 0 {
             self.space.chunk_map.set_allocated(self.chunk, false)

@@ -6,26 +6,36 @@ import json
 import re
 import sys
 from collections import defaultdict
-from enum import Enum
+import enum
 from importlib.machinery import SourceFileLoader
 
 RE_TYPE_ID = re.compile(r"\d+")
 UNKNOWN_TYPE = "(unknown)"
 
-class RootsKind(Enum):
+class RootsKind(enum.Enum):
     NORMAL = 0
     PINNING = 1
     TPINNING = 2
 
-class Semantics(Enum):
+class Semantics(enum.Enum):
     SOFT = 0
     WEAK = 1
     PHANTOM = 2
 
-class Pause(Enum):
+class Pause(enum.Enum):
     FULL = 1
     INITIAL_MARK = 2
     FINAL_MARK = 3
+
+class ImmixSpaceDefragDecision(enum.Flag):
+    # Note: Keep in sync with ``Defrag::decide_whether_to_defrag``
+    defrag_enabled              = enum.auto()
+    emergency_collection        = enum.auto()
+    collect_whole_heap          = enum.auto()
+    user_triggered              = enum.auto()
+    exhausted_reusable_space    = enum.auto()
+    full_heap_system_gc         = enum.auto()
+    stress_defrag               = enum.auto()
 
 def get_args():
     parser = argparse.ArgumentParser(
@@ -202,8 +212,14 @@ class LogProcessor:
                     }
 
                 case "immix_defrag":
+                    decision_word = int(args[2])
+                    decision_flags = ImmixSpaceDefragDecision(decision_word)
+                    decisions = {f.name : (f in decision_flags) for f in ImmixSpaceDefragDecision}
                     gc["args"] |= {
                         "immix_is_defrag_gc": bool(int(args[0])),
+                        "collection_attempts": int(args[1]),
+                        "decision_word": decision_word,
+                        "decisions": decisions,
                     }
 
                 case "concurrent_pause_determined":
@@ -282,7 +298,9 @@ class LogProcessor:
 
                 case "sweep_chunk":
                     wp["args"] |= {
-                        "allocated_blocks": int(args[0]),
+                        "swept_blocks": int(args[0]),
+                        "reused_blocks": int(args[1]),
+                        "unreused_blocks": int(args[2]),
                     }
 
                 case "finalization":
