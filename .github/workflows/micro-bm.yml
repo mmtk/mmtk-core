@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CI_PERF_KIT_VERSION: 0.8.7
+  CI_PERF_KIT_VERSION: 0.8.8
 
 jobs:
   openjdk-microbm:
