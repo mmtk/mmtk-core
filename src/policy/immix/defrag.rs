@@ -85,7 +85,7 @@ impl Defrag {
             // These details are useful for debugging why a debug GC is triggered or not triggered.
             // We encode those conditions into a bitfield because we can't pass too many args to the
             // eBPF tracer via the USDT arguments.
-            let decision_word = (defrag_enabled as u32) << 0
+            let decision_word = (defrag_enabled as u32)
                 | (emergency_collection as u32) << 1
                 | (collect_whole_heap as u32) << 2
                 | (user_triggered as u32) << 3
