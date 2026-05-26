@@ -360,11 +360,12 @@ pub fn find_first_non_zero_bit_in_metadata_bytes(
     let mut mapped_grain = Address::ZERO;
     while cursor < meta_end {
         // If we can check the whole word, set step to word size. Otherwise, the step is 1 (byte) and we check byte.
-        let step = if cursor.is_aligned_to(BYTES_IN_ADDRESS) && cursor + BYTES_IN_ADDRESS <= meta_end {
-            BYTES_IN_ADDRESS
-        } else {
-            1
-        };
+        let step =
+            if cursor.is_aligned_to(BYTES_IN_ADDRESS) && cursor + BYTES_IN_ADDRESS <= meta_end {
+                BYTES_IN_ADDRESS
+            } else {
+                1
+            };
         // The value we check has to be in the range.
         debug_assert!(
             cursor >= meta_start && cursor < meta_end,
