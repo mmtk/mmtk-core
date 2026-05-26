@@ -1,4 +1,5 @@
 use crate::plan::generational::gc_work::GenNurseryTrace;
+use crate::plan::tracing::PlanTrace;
 use crate::policy::gc_work::TraceKind;
 use crate::policy::gc_work::DEFAULT_TRACE;
 use crate::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
@@ -23,6 +24,6 @@ impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
 {
     type VM = VM;
     type PlanType = StickyImmix<VM>;
-    type DefaultTrace = GenNurseryTrace<VM, Self::PlanType, KIND>;
-    type PinningTrace = GenNurseryTrace<VM, Self::PlanType, TRACE_KIND_TRANSITIVE_PIN>;
+    type DefaultTrace = PlanTrace<Self::PlanType, KIND>;
+    type PinningTrace = PlanTrace<Self::PlanType, TRACE_KIND_TRANSITIVE_PIN>;
 }
