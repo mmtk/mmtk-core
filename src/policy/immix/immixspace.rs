@@ -1041,7 +1041,13 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             }
         }
 
-        probe!(mmtk, sweep_chunk, swept_blocks, reused_blocks, unreused_blocks);
+        probe!(
+            mmtk,
+            sweep_chunk,
+            swept_blocks,
+            reused_blocks,
+            unreused_blocks
+        );
 
         // number of allocated blocks.
         let allocated_blocks = reused_blocks + unreused_blocks;

@@ -255,7 +255,7 @@ pub(crate) struct DefaultObjectTracer<'w, T: Trace> {
 
 impl<T: Trace> ObjectTracer for DefaultObjectTracer<'_, T> {
     /// Forward the `trace_object` call to the underlying `Trace`,
-    /// and flush as soon as the underlying buffer of `process_edges_work` is full.
+    /// and flush as soon as `self.queue` is full.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         let result = self
             .trace
@@ -545,17 +545,18 @@ impl<T: Trace> GCWork<T::VM> for ProcessSlots<T> {
 /// transitive closure from roots, with all mutators stopped.
 ///
 /// It creates the [`ProcessSlots`] work packet to handle non-pinning roots, and
-/// [`ProcessPinningRoots`] to handle pinning roots (transitive or not).  The work packets
-/// will be added to the [`WorkBucketStage::TPinningClosure`],
-/// [`WorkBucketStage::PinningRootsTrace`] and [`WorkBucketStage::Closure`] buckets depending on the
-/// kinds of roots.
-pub(crate) struct DefaultRootsWorkFactory<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> {
+/// [`ProcessPinningRoots`] to handle pinning roots (transitive or not).  The work packets will be
+/// added to the [`WorkBucketStage::TPinningClosure`], [`WorkBucketStage::PinningRootsTrace`] and
+/// [`WorkBucketStage::Closure`] buckets depending on the kinds of roots.
+///
+/// `DT` and `PT` are the [`Trace`] types for the default trace and pinning trace, respectively.
+pub(crate) struct DefaultRootsWorkFactory<VM: VMBinding, DT: Trace<VM = VM>, PT: Trace<VM = VM>> {
     pub(crate) mmtk: &'static MMTK<VM>,
-    phantom: PhantomData<(DPE, PPE)>,
+    phantom: PhantomData<(DT, PT)>,
 }
 
-impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> Clone
-    for DefaultRootsWorkFactory<VM, DPE, PPE>
+impl<VM: VMBinding, DT: Trace<VM = VM>, PT: Trace<VM = VM>> Clone
+    for DefaultRootsWorkFactory<VM, DT, PT>
 {
     fn clone(&self) -> Self {
         Self {
@@ -574,14 +575,14 @@ pub(crate) enum RootsKind {
     TPINNING = 2,
 }
 
-impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> RootsWorkFactory<VM::VMSlot>
-    for DefaultRootsWorkFactory<VM, DPE, PPE>
+impl<VM: VMBinding, DT: Trace<VM = VM>, PT: Trace<VM = VM>> RootsWorkFactory<VM::VMSlot>
+    for DefaultRootsWorkFactory<VM, DT, PT>
 {
     fn create_process_roots_work(&mut self, slots: Vec<VM::VMSlot>) {
         // Note: We should use the same USDT name "mmtk:roots" for all the three kinds of roots. A
         // VM binding may not call all of the three methods in this impl. For example, the OpenJDK
         // binding only calls `create_process_roots_work`, and the Ruby binding only calls
-        // `create_process_pinning_roots_work`. Because `DefaultRootsWorkFactory<VM, DPE, PPE>` is a
+        // `create_process_pinning_roots_work`. Because `DefaultRootsWorkFactory<VM, DT, PT>` is a
         // generic type, the Rust compiler emits the function bodies on demand, so the resulting
         // machine code may not contain all three USDT trace points.  If they have different names,
         // and our `capture.bt` mentions all of them, `bpftrace` may complain that it cannot find
@@ -598,7 +599,7 @@ impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> RootsWorkFactory<V
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,
-            ProcessSlots::<DPE>::new(slots, WorkBucketStage::Closure),
+            ProcessSlots::<DT>::new(slots, WorkBucketStage::Closure),
         );
     }
 
@@ -617,7 +618,7 @@ impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> RootsWorkFactory<V
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::PinningRootsTrace,
-            ProcessPinningRoots::<VM, PPE, DPE>::new(nodes, WorkBucketStage::Closure),
+            ProcessPinningRoots::<VM, PT, DT>::new(nodes, WorkBucketStage::Closure),
         );
     }
 
@@ -634,14 +635,12 @@ impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>> RootsWorkFactory<V
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::TPinningClosure,
-            ProcessPinningRoots::<VM, PPE, PPE>::new(nodes, WorkBucketStage::TPinningClosure),
+            ProcessPinningRoots::<VM, PT, PT>::new(nodes, WorkBucketStage::TPinningClosure),
         );
     }
 }
 
-impl<VM: VMBinding, DPE: Trace<VM = VM>, PPE: Trace<VM = VM>>
-    DefaultRootsWorkFactory<VM, DPE, PPE>
-{
+impl<VM: VMBinding, DT: Trace<VM = VM>, PT: Trace<VM = VM>> DefaultRootsWorkFactory<VM, DT, PT> {
     pub(crate) fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
             mmtk,
