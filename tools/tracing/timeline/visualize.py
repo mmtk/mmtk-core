@@ -296,7 +296,12 @@ class LogProcessor:
                         }
                     }
 
-                case "sweep_chunk":
+                case "sweep_chunk_ms":
+                    wp["args"] |= {
+                        "allocated_blocks": int(args[0]),
+                    }
+
+                case "sweep_chunk_immix":
                     wp["args"] |= {
                         "swept_blocks": int(args[0]),
                         "reused_blocks": int(args[1]),

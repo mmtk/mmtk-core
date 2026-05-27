@@ -645,7 +645,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             block.sweep::<VM>();
             allocated_blocks += 1;
         }
-        probe!(mmtk, sweep_chunk, allocated_blocks);
+        probe!(mmtk, sweep_chunk_ms, allocated_blocks);
         // Set this chunk as free if there is not live blocks.
         if allocated_blocks == 0 {
             self.space.chunk_map.set_allocated(self.chunk, false);

@@ -1043,7 +1043,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
 
         probe!(
             mmtk,
-            sweep_chunk,
+            sweep_chunk_immix,
             swept_blocks,
             reused_blocks,
             unreused_blocks

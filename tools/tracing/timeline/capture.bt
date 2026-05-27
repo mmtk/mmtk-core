@@ -130,9 +130,17 @@ usdt:$MMTK:mmtk:plan_end_of_gc_end {
     }
 }
 
-usdt:$MMTK:mmtk:sweep_chunk {
+//////// BEGIN:SWEEP_CHUNK_MS
+usdt:$MMTK:mmtk:sweep_chunk_ms {
     if (@enable_print) {
-        printf("sweep_chunk,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
+        printf("sweep_chunk_ms,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+    }
+}
+//////// END:SWEEP_CHUNK_MS
+
+usdt:$MMTK:mmtk:sweep_chunk_immix {
+    if (@enable_print) {
+        printf("sweep_chunk_immix,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
     }
 }
 
