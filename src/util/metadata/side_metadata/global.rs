@@ -1177,11 +1177,7 @@ impl SideMetadataSpec {
         let region_bytes = 1 << self.log_bytes_in_region;
         // Figure out the range that we need to search.
         let start_addr = data_addr.align_down(region_bytes);
-        // We need to align the end_address up because the metadata might be stored right at
-        // the end address otherwise. Our loop in `find_first_non_zero_bit_in_metadata_byte`
-        // will not load from this end address, resulting in us potentially not finding the
-        // correct address for the next set bit.
-        let end_addr = (data_addr + search_limit_bytes).align_up(region_bytes);
+        let end_addr = data_addr + search_limit_bytes;
 
         let mut cursor = start_addr;
         while cursor < end_addr {
