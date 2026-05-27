@@ -1212,6 +1212,10 @@ impl SideMetadataSpec {
 
         // Figure out the start and end data address.
         let start_addr = data_addr.align_down(1 << self.log_bytes_in_region);
+        // We need to align the end_address up because the metadata might be stored right at
+        // the end address otherwise. Our loop in `find_first_non_zero_bit_in_metadata_byte`
+        // will not load from this end address, resulting in us potentially not finding the
+        // correct address for the next set bit.
         let end_addr = (data_addr + search_limit_bytes).align_up(1 << self.log_bytes_in_region);
 
         // Then figure out the start and end metadata address and bits.

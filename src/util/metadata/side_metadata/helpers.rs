@@ -358,9 +358,7 @@ pub fn find_first_non_zero_bit_in_metadata_bytes(
     // the `Mmapper` to reduce the number of checks.  This records the start of a grain that is
     // tested to be mapped.
     let mut mapped_grain = Address::ZERO;
-    // We need to check the metadata end because the metadata might be stored right at the end address
-    // and we may miss loading from it, yielding and incorrect address for the next set bit.
-    while cursor <= meta_end {
+    while cursor < meta_end {
         // If we can check the whole word, set step to word size. Otherwise, the step is 1 (byte) and we check byte.
         let step =
             if cursor.is_aligned_to(BYTES_IN_ADDRESS) && cursor + BYTES_IN_ADDRESS <= meta_end {
@@ -370,8 +368,8 @@ pub fn find_first_non_zero_bit_in_metadata_bytes(
             };
         // The value we check has to be in the range.
         debug_assert!(
-            cursor >= meta_start && cursor <= meta_end,
-            "Check metadata value at meta address {}, which is not in the range of [{}, {}]",
+            cursor >= meta_start && cursor < meta_end,
+            "Check metadata value at meta address {}, which is not in the range of [{}, {})",
             cursor,
             meta_start,
             meta_end
