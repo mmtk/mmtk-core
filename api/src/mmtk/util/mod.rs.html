@@ -65,24 +65,25 @@
 <a href=#65 id=65 data-nosnippet>65</a><span class="doccomment">/// Sanity checker for GC.
 <a href=#66 id=66 data-nosnippet>66</a></span><span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
 <a href=#67 id=67 data-nosnippet>67</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>sanity;
-<a href=#68 id=68 data-nosnippet>68</a><span class="doccomment">/// Logging slots to check duplicated edges in GC.
-<a href=#69 id=69 data-nosnippet>69</a></span><span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
-<a href=#70 id=70 data-nosnippet>70</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>slot_logger;
-<a href=#71 id=71 data-nosnippet>71</a><span class="doccomment">/// Utils for collecting statistics.
-<a href=#72 id=72 data-nosnippet>72</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>statistics;
-<a href=#73 id=73 data-nosnippet>73</a><span class="doccomment">/// A treadmill implementation.
-<a href=#74 id=74 data-nosnippet>74</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>treadmill;
-<a href=#75 id=75 data-nosnippet>75</a>
-<a href=#76 id=76 data-nosnippet>76</a><span class="comment">// These modules are private. They are only used by other util modules.
-<a href=#77 id=77 data-nosnippet>77</a>
-<a href=#78 id=78 data-nosnippet>78</a></span><span class="doccomment">/// A very simple, generic malloc-free allocator
-<a href=#79 id=79 data-nosnippet>79</a></span><span class="kw">mod </span>freelist;
-<a href=#80 id=80 data-nosnippet>80</a><span class="doccomment">/// Implementation of GenericFreeList by an int vector.
-<a href=#81 id=81 data-nosnippet>81</a></span><span class="kw">mod </span>int_array_freelist;
-<a href=#82 id=82 data-nosnippet>82</a><span class="doccomment">/// Implementation of GenericFreeList backed by raw memory, allocated
-<a href=#83 id=83 data-nosnippet>83</a>/// on demand direct from the OS (via mmap).
-<a href=#84 id=84 data-nosnippet>84</a></span><span class="kw">mod </span>raw_memory_freelist;
-<a href=#85 id=85 data-nosnippet>85</a>
-<a href=#86 id=86 data-nosnippet>86</a><span class="kw">pub use </span><span class="self">self</span>::address::Address;
-<a href=#87 id=87 data-nosnippet>87</a><span class="kw">pub use </span><span class="self">self</span>::address::ObjectReference;
-<a href=#88 id=88 data-nosnippet>88</a><span class="kw">pub use </span><span class="self">self</span>::opaque_pointer::<span class="kw-2">*</span>;</code></pre></div></section></main></body></html>
+<a href=#68 id=68 data-nosnippet>68</a><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>scanning_helper;
+<a href=#69 id=69 data-nosnippet>69</a><span class="doccomment">/// Logging slots to check duplicated edges in GC.
+<a href=#70 id=70 data-nosnippet>70</a></span><span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
+<a href=#71 id=71 data-nosnippet>71</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>slot_logger;
+<a href=#72 id=72 data-nosnippet>72</a><span class="doccomment">/// Utils for collecting statistics.
+<a href=#73 id=73 data-nosnippet>73</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>statistics;
+<a href=#74 id=74 data-nosnippet>74</a><span class="doccomment">/// A treadmill implementation.
+<a href=#75 id=75 data-nosnippet>75</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>treadmill;
+<a href=#76 id=76 data-nosnippet>76</a>
+<a href=#77 id=77 data-nosnippet>77</a><span class="comment">// These modules are private. They are only used by other util modules.
+<a href=#78 id=78 data-nosnippet>78</a>
+<a href=#79 id=79 data-nosnippet>79</a></span><span class="doccomment">/// A very simple, generic malloc-free allocator
+<a href=#80 id=80 data-nosnippet>80</a></span><span class="kw">mod </span>freelist;
+<a href=#81 id=81 data-nosnippet>81</a><span class="doccomment">/// Implementation of GenericFreeList by an int vector.
+<a href=#82 id=82 data-nosnippet>82</a></span><span class="kw">mod </span>int_array_freelist;
+<a href=#83 id=83 data-nosnippet>83</a><span class="doccomment">/// Implementation of GenericFreeList backed by raw memory, allocated
+<a href=#84 id=84 data-nosnippet>84</a>/// on demand direct from the OS (via mmap).
+<a href=#85 id=85 data-nosnippet>85</a></span><span class="kw">mod </span>raw_memory_freelist;
+<a href=#86 id=86 data-nosnippet>86</a>
+<a href=#87 id=87 data-nosnippet>87</a><span class="kw">pub use </span><span class="self">self</span>::address::Address;
+<a href=#88 id=88 data-nosnippet>88</a><span class="kw">pub use </span><span class="self">self</span>::address::ObjectReference;
+<a href=#89 id=89 data-nosnippet>89</a><span class="kw">pub use </span><span class="self">self</span>::opaque_pointer::<span class="kw-2">*</span>;</code></pre></div></section></main></body></html>

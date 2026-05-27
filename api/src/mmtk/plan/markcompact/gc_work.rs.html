@@ -1,7 +1,7 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/plan/markcompact/gc_work.rs`."><title>gc_work.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.92.0 (ded5c06cf 2025-12-08)" data-channel="1.92.0" data-search-js="search-d69d8955.js" data-stringdex-js="stringdex-c3e638e9.js" data-settings-js="settings-c38705f0.js" ><script src="../../../../static.files/storage-e2aeef58.js"></script><script defer src="../../../../static.files/src-script-813739b1.js"></script><script defer src="../../../../src-files.js"></script><script defer src="../../../../static.files/main-ce535bd0.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">mmtk/plan/markcompact/</div>gc_work.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span><span class="kw">super</span>::global::MarkCompact;
-<a href=#2 id=2 data-nosnippet>2</a><span class="kw">use </span><span class="kw">crate</span>::policy::markcompactspace::MarkCompactSpace;
-<a href=#3 id=3 data-nosnippet>3</a><span class="kw">use </span><span class="kw">crate</span>::policy::markcompactspace::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
-<a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::PlanProcessEdges;
+<a href=#2 id=2 data-nosnippet>2</a><span class="kw">use </span><span class="kw">crate</span>::plan::tracing::{PlanTrace, UnsupportedTrace};
+<a href=#3 id=3 data-nosnippet>3</a><span class="kw">use </span><span class="kw">crate</span>::policy::markcompactspace::MarkCompactSpace;
+<a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span><span class="kw">crate</span>::policy::markcompactspace::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
 <a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::<span class="kw-2">*</span>;
 <a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWork;
 <a href=#7 id=7 data-nosnippet>7</a><span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
@@ -93,22 +93,22 @@
 <a href=#93 id=93 data-nosnippet>93</a>}
 <a href=#94 id=94 data-nosnippet>94</a>
 <a href=#95 id=95 data-nosnippet>95</a><span class="doccomment">/// Marking trace
-<a href=#96 id=96 data-nosnippet>96</a></span><span class="kw">pub type </span>MarkingProcessEdges&lt;VM&gt; = PlanProcessEdges&lt;VM, MarkCompact&lt;VM&gt;, TRACE_KIND_MARK&gt;;
+<a href=#96 id=96 data-nosnippet>96</a></span><span class="kw">pub type </span>MarkingTrace&lt;VM&gt; = PlanTrace&lt;MarkCompact&lt;VM&gt;, TRACE_KIND_MARK&gt;;
 <a href=#97 id=97 data-nosnippet>97</a><span class="doccomment">/// Forwarding trace
-<a href=#98 id=98 data-nosnippet>98</a></span><span class="kw">pub type </span>ForwardingProcessEdges&lt;VM&gt; = PlanProcessEdges&lt;VM, MarkCompact&lt;VM&gt;, TRACE_KIND_FORWARD&gt;;
+<a href=#98 id=98 data-nosnippet>98</a></span><span class="kw">pub type </span>ForwardingTrace&lt;VM&gt; = PlanTrace&lt;MarkCompact&lt;VM&gt;, TRACE_KIND_FORWARD&gt;;
 <a href=#99 id=99 data-nosnippet>99</a>
 <a href=#100 id=100 data-nosnippet>100</a><span class="kw">pub struct </span>MarkCompactGCWorkContext&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
 <a href=#101 id=101 data-nosnippet>101</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; <span class="kw">crate</span>::scheduler::GCWorkContext <span class="kw">for </span>MarkCompactGCWorkContext&lt;VM&gt; {
 <a href=#102 id=102 data-nosnippet>102</a>    <span class="kw">type </span>VM = VM;
 <a href=#103 id=103 data-nosnippet>103</a>    <span class="kw">type </span>PlanType = MarkCompact&lt;VM&gt;;
-<a href=#104 id=104 data-nosnippet>104</a>    <span class="kw">type </span>DefaultProcessEdges = MarkingProcessEdges&lt;VM&gt;;
-<a href=#105 id=105 data-nosnippet>105</a>    <span class="kw">type </span>PinningProcessEdges = UnsupportedProcessEdges&lt;VM&gt;;
+<a href=#104 id=104 data-nosnippet>104</a>    <span class="kw">type </span>DefaultTrace = MarkingTrace&lt;VM&gt;;
+<a href=#105 id=105 data-nosnippet>105</a>    <span class="kw">type </span>PinningTrace = UnsupportedTrace&lt;VM&gt;;
 <a href=#106 id=106 data-nosnippet>106</a>}
 <a href=#107 id=107 data-nosnippet>107</a>
 <a href=#108 id=108 data-nosnippet>108</a><span class="kw">pub struct </span>MarkCompactForwardingGCWorkContext&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
 <a href=#109 id=109 data-nosnippet>109</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; <span class="kw">crate</span>::scheduler::GCWorkContext <span class="kw">for </span>MarkCompactForwardingGCWorkContext&lt;VM&gt; {
 <a href=#110 id=110 data-nosnippet>110</a>    <span class="kw">type </span>VM = VM;
 <a href=#111 id=111 data-nosnippet>111</a>    <span class="kw">type </span>PlanType = MarkCompact&lt;VM&gt;;
-<a href=#112 id=112 data-nosnippet>112</a>    <span class="kw">type </span>DefaultProcessEdges = ForwardingProcessEdges&lt;VM&gt;;
-<a href=#113 id=113 data-nosnippet>113</a>    <span class="kw">type </span>PinningProcessEdges = UnsupportedProcessEdges&lt;VM&gt;;
+<a href=#112 id=112 data-nosnippet>112</a>    <span class="kw">type </span>DefaultTrace = ForwardingTrace&lt;VM&gt;;
+<a href=#113 id=113 data-nosnippet>113</a>    <span class="kw">type </span>PinningTrace = UnsupportedTrace&lt;VM&gt;;
 <a href=#114 id=114 data-nosnippet>114</a>}</code></pre></div></section></main></body></html>

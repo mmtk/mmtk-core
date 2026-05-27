@@ -2,7 +2,7 @@
 <a href=#2 id=2 data-nosnippet>2</a>
 <a href=#3 id=3 data-nosnippet>3</a><span class="kw">use </span><span class="kw">super</span>::sft::SFT;
 <a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span><span class="kw">super</span>::space::{CommonSpace, Space};
-<a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
+<a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span><span class="kw">crate</span>::plan::tracing::{ObjectQueue, OptionObjectQueue};
 <a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 <a href=#7 id=7 data-nosnippet>7</a><span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
 <a href=#8 id=8 data-nosnippet>8</a><span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
@@ -13,7 +13,7 @@
 <a href=#13 id=13 data-nosnippet>13</a><span class="kw">use </span><span class="kw">crate</span>::util::metadata::{extract_side_metadata, vo_bit};
 <a href=#14 id=14 data-nosnippet>14</a><span class="kw">use </span><span class="kw">crate</span>::util::object_enum::{<span class="self">self</span>, ObjectEnumerator};
 <a href=#15 id=15 data-nosnippet>15</a><span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
-<a href=#16 id=16 data-nosnippet>16</a><span class="kw">use crate</span>::{vm::<span class="kw-2">*</span>, ObjectQueue};
+<a href=#16 id=16 data-nosnippet>16</a><span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
 <a href=#17 id=17 data-nosnippet>17</a><span class="kw">use </span>atomic::Ordering;
 <a href=#18 id=18 data-nosnippet>18</a>
 <a href=#19 id=19 data-nosnippet>19</a><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>TRACE_KIND_MARK: TraceKind = <span class="number">0</span>;
@@ -92,7 +92,7 @@
 <a href=#92 id=92 data-nosnippet>92</a>
 <a href=#93 id=93 data-nosnippet>93</a>    <span class="kw">fn </span>sft_trace_object(
 <a href=#94 id=94 data-nosnippet>94</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
-<a href=#95 id=95 data-nosnippet>95</a>        _queue: <span class="kw-2">&amp;mut </span>VectorObjectQueue,
+<a href=#95 id=95 data-nosnippet>95</a>        _queue: <span class="kw-2">&amp;mut </span>OptionObjectQueue,
 <a href=#96 id=96 data-nosnippet>96</a>        _object: ObjectReference,
 <a href=#97 id=97 data-nosnippet>97</a>        _worker: GCWorkerMutRef,
 <a href=#98 id=98 data-nosnippet>98</a>    ) -&gt; ObjectReference {

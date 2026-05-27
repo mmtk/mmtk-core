@@ -1075,13 +1075,13 @@ will invoke code from the bindings to scan threads and other roots, and those
 scanning work will further push work for a transitive closure.</p>
 <p>Though you can add those work packets by yourself, <code>GCWorkScheduler</code> provides a
 method <code>schedule_common_work()</code> that will add common work packets for you.</p>
-<p>To use <code>schedule_common_work()</code>, first we need to create a type <code>MyGCWorkContext</code>
-and implement the trait <code>GCWorkContext</code> for it. We create <code>gc_work.rs</code> and add the
-following implementation. Note that we will use the default
-<a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html"><code>SFTProcessEdges</code></a>,
-which is a general work packet that a plan can use to trace objects. For plans
-like semispace, <code>SFTProcessEdges</code> is sufficient. For more complex GC plans,
-one can create and write their own work packet that implements the <code>ProcessEdgesWork</code> trait.
+<p>To use <code>schedule_common_work()</code>, first we need to create a type <code>MyGCWorkContext</code> and implement the trait <code>GCWorkContext</code> for it.
+We create <code>gc_work.rs</code> and add the following implementation.
+Note that we don't override the <code>GCWorkContext::make_roots_work_factory</code> method.
+By default, it will use the <code>DefaultRootsWorkFactory</code> which is sufficient for stop-the-world tracing GC.
+Also note that we will use the default <a href="https://docs.mmtk.io/api/mmtk/plan/tracing/struct.SFTTrace.html"><code>SFTTrace</code></a> which provides a general way to trace object.
+For plans like semispace, <code>SFTTrace</code> is sufficient.
+For more complex GC plans, one can create their own implementaitons of the <a href="https://docs.mmtk.io/api/mmtk/plan/tracing/trait.Trace.html"><code>Trace</code></a> trait.
 We will discuss about this later, and discuss the alternatives.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -1089,8 +1089,8 @@ We will discuss about this later, and discuss the alternatives.</p>
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt;VM&gt; {
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
-    type DefaultProcessEdges = SFTProcessEdges&lt;Self::VM&gt;;
-    type PinningProcessEdges = UnsupportedProcessEdges&lt;Self::VM&gt;;
+    type DefaultTrace = SFTTrace&lt;Self::VM&gt;;
+    type PinningTrace = UnsupportedTrace&lt;Self::VM&gt;;
 }
 <span class="boring">}</span></code></pre></pre>
 <p>Then we implement <code>schedule_collection()</code> using <code>MyGCWorkContext</code> and <code>schedule_common_work()</code>.</p>
@@ -1130,7 +1130,7 @@ call, and add the following code:</p>
 spaces in the common plan, flips the definitions for which space is 'to'
 and which is 'from', then prepares the copyspaces with the new definition.</p>
 <p>Note that we call <code>set_copy_for_sft_trace()</code> for both spaces. This step is required
-when using <code>SFTProcessEdges</code> to tell the spaces which copy semantic to use for copying.
+when using <code>SFTTrace</code> to tell the spaces which copy semantic to use for copying.
 For fromspace, we use the <code>DefaultCopy</code> semantic, which we have defined earlier in our <code>CopyConfig</code>.
 So for objects in fromspace that need to be copied, the policy will use the copy context that binds with
 <code>DefaultCopy</code> (which allocates to the tospace) in the GC worker. For tospace, we set its
@@ -1217,27 +1217,22 @@ allocation semantics to the new tospace. When the mutator threads resume, any ne
         self.common.end_of_gc(tls);
     }
 <span class="boring">}</span></code></pre></pre>
-<h2 id="processedgeswork-for-mygc"><a class="header" href="#processedgeswork-for-mygc">ProcessEdgesWork for MyGC</a></h2>
-<p><a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html"><code>ProcessEdgesWork</code></a>
-is the key work packet for tracing objects in a GC. A <code>ProcessEdgesWork</code> implementation
-defines how to trace objects, and how to generate more work packets based on the current tracing
-to finish the object closure.</p>
-<p><code>GCWorkContext</code> specifies a type
-that implements <code>ProcessEdgesWork</code>, and we used <code>SFTProcessEdges</code> earlier. In
-this section, we discuss what <code>SFTProcessEdges</code> does, and what the alternatives
-are.</p>
-<h3 id="approach-1-use-sftprocessedges"><a class="header" href="#approach-1-use-sftprocessedges">Approach 1: Use <code>SFTProcessEdges</code></a></h3>
-<p><a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html"><code>SFTProcessEdges</code></a> dispatches
-the tracing of objects to their respective spaces through <a href="https://docs.mmtk.io/api/mmtk/policy/sft/trait.SFT.html">Space Function Table (SFT)</a>.
-As long as all the policies in a plan provide an implementation of <code>sft_trace_object()</code> in their SFT implementations,
-the plan can use <code>SFTProcessEdges</code>. Currently most policies provide an implementation for <code>sft_trace_object()</code>, except
-mark compact and immix. Those two policies use multiple GC traces, and due to the limitation of SFT, SFT does not allow
+<h2 id="implementing-the-trace-trait-for-mygc"><a class="header" href="#implementing-the-trace-trait-for-mygc">Implementing the Trace trait for MyGC</a></h2>
+<p>The <a href="https://docs.mmtk.io/api/mmtk/plan/tracing/trait.Trace.html"><code>Trace</code></a> trait is key for tracing objects in a GC.
+A <code>Trace</code> implementation defines how to trace objects.</p>
+<p><code>GCWorkContext</code> specifies a type that implements <code>Trace</code>, and we used <code>SFTTrace</code> earlier.
+In this section, we discuss what <code>Trace</code> does, and what the alternatives are.</p>
+<h3 id="approach-1-use-sfttrace"><a class="header" href="#approach-1-use-sfttrace">Approach 1: Use <code>SFTTrace</code></a></h3>
+<p><a href="https://docs.mmtk.io/api/mmtk/plan/tracing/struct.SFTTrace.html"><code>SFTTrace</code></a> dispatches the tracing of objects to their respective spaces through <a href="https://docs.mmtk.io/api/mmtk/policy/sft/trait.SFT.html">Space Function Table (SFT)</a>.
+As long as all the policies in a plan provide an implementation of <code>sft_trace_object()</code> in their SFT implementations, the plan can use <code>SFTTrace</code>.
+Currently most policies provide an implementation for <code>sft_trace_object()</code>, except mark compact and immix.
+Those two policies use multiple GC traces, and due to the limitation of SFT, SFT does not allow
 multiple <code>sft_trace_object()</code> for a policy.</p>
-<p><code>SFTProcessEdges</code> is the simplest approach when all the policies support it. Fortunately, we can use it for our GC, semispace.</p>
-<h3 id="approach-2-derive-plantraceobject-and-use-planprocessedges"><a class="header" href="#approach-2-derive-plantraceobject-and-use-planprocessedges">Approach 2: Derive <code>PlanTraceObject</code> and use <code>PlanProcessEdges</code></a></h3>
-<p><code>PlanProcessEdges</code> is another general <code>ProcessEdgesWork</code> implementation that can be used by most plans. When a plan
-implements the <a href="https://docs.mmtk.io/api/mmtk/plan/global/trait.PlanTraceObject.html"><code>PlanTraceObject</code></a>,
-it can use <code>PlanProcessEdges</code>.</p>
+<p><code>SFTTrace</code> is the simplest approach when all the policies support it.
+Fortunately, we can use it for our GC, semispace.</p>
+<h3 id="approach-2-derive-plantraceobject-and-use-plantrace"><a class="header" href="#approach-2-derive-plantraceobject-and-use-plantrace">Approach 2: Derive <code>PlanTraceObject</code> and use <code>PlanTrace</code></a></h3>
+<p><a href="https://docs.mmtk.io/api/mmtk/plan/tracing/struct.PlanTrace.html"><code>PlanTrace</code></a> is another general <code>Trace</code> implementation that can be used by most plans.
+When a plan implements the <a href="https://docs.mmtk.io/api/mmtk/plan/global/trait.PlanTraceObject.html"><code>PlanTraceObject</code></a>, it can use <code>PlanTrace</code>.</p>
 <p>You can manually provide an implementation of <code>PlanTraceObject</code> for <code>MyGC</code>. But you can also use the derive macro MMTK provides,
 and the macro will generate an implementation of <code>PlanTraceObject</code>:</p>
 <ul>
@@ -1272,60 +1267,70 @@ pub struct MyGC&lt;VM: VMBinding&gt; {
     pub common: CommonPlan&lt;VM&gt;,
 }
 <span class="boring">}</span></code></pre></pre>
-<p>Once this is done, you can specify <code>PlanProcessEdges</code> as the <code>DefaultProcessEdges</code> in your GC work context:</p>
+<p>Once this is done, you can specify <code>PlanTrace</code> as the <code>DefaultTrace</code> in your GC work context:</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use crate::policy::gc_work::DEFAULT_TRACE;
-use crate::scheduler::gc_work::PlanProcessEdges;
+</span>use crate::plan::tracing::PlanTrace;
+use crate::policy::gc_work::DEFAULT_TRACE;
 pub struct MyGCWorkContext2&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext2&lt;VM&gt; {
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
-    type DefaultProcessEdges = PlanProcessEdges&lt;Self::VM, MyGC&lt;VM&gt;, DEFAULT_TRACE&gt;;
-    type PinningProcessEdges = UnsupportedProcessEdges&lt;Self::VM&gt;;
+    type DefaultTrace = PlanTrace&lt;MyGC&lt;VM&gt;, DEFAULT_TRACE&gt;;
+    type PinningTrace = UnsupportedTrace&lt;Self::VM&gt;;
 }
 <span class="boring">}</span></code></pre></pre>
-<h3 id="approach-3-implement-your-own-processedgeswork"><a class="header" href="#approach-3-implement-your-own-processedgeswork">Approach 3: Implement your own <code>ProcessEdgesWork</code></a></h3>
-<p>Apart from the two approaches above, you can always implement your own <code>ProcessEdgesWork</code>. This is
-an overkill for simple plans like semi space, but might be necessary for more complex plans.
+<h3 id="approach-3-implement-your-own-trace"><a class="header" href="#approach-3-implement-your-own-trace">Approach 3: Implement your own <code>Trace</code></a></h3>
+<p>Apart from the two approaches above, you can always implement your own <code>Trace</code>.
+This is an overkill for simple plans like semi space, but might be necessary for more complex plans.
 We discuss how to implement it for <code>MyGC</code>.</p>
-<p>Create a struct <code>MyGCProcessEdges&lt;VM: VMBinding&gt;</code> in the <code>gc_work</code> module. It includes a reference
-back to the plan, and a <code>ProcessEdgesBase</code> field:</p>
+<p>Create a struct <code>MyGCTrace&lt;VM: VMBinding&gt;</code> in the <code>gc_work</code> module.
+It includes only a reference back to the plan.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>pub struct MyGCProcessEdges&lt;VM: VMBinding&gt; {
+</span>pub struct MyGCTrace&lt;VM: VMBinding&gt; {
     plan: &amp;'static MyGC&lt;VM&gt;,
-    base: ProcessEdgesBase&lt;VM&gt;,
 }
 <span class="boring">}</span></code></pre></pre>
-<p>Implement <code>ProcessEdgesWork</code> for <code>MyGCProcessEdges</code>. As most methods in the trait have a default
-implemetation, we only need to implement <code>new()</code> and <code>trace_object()</code> for our plan. However, this
-may not be true when you implement it for other GC plans. It would be better to check the default
-implementation of <code>ProcessEdgesWork</code>.</p>
+<p>The <code>Trace</code> trait requires the <code>Clone</code> trait,
+but you usually can't use <code>#[derive(Clone)]</code> because <code>&lt;VM: VMBinding&gt;</code> does not implement <code>Clone</code>.
+You have to implement <code>Clone</code> manually, but it is trivial to do.</p>
+<pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl&lt;VM: VMBinding&gt; Clone for MyGCTrace&lt;VM&gt; {
+    fn clone(&amp;self) -&gt; Self {
+        Self { plan: self.plan }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Then implement <code>Trace</code> for <code>MyGCTrace</code>.
+It has a <code>VM</code> type member and several methods.
+See the comments in the example code below for more details.</p>
 <p>For <code>trace_object()</code>, what we do is similar to the approach above (except that we need to write the code
 ourselves rather than letting the macro to generate it for us). We try to figure out
 which space the object is in, and invoke <code>trace_object()</code> for the object on that space. If the
 object is not in any of the semi spaces in the plan, we forward the call to <code>CommonPlan</code>.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>impl&lt;VM: VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
+</span>impl&lt;VM: VMBinding&gt; Trace for MyGCTrace&lt;VM&gt; {
     type VM = VM;
-    type ScanObjectsWorkType = ScanObjects&lt;Self&gt;;
 
-    fn new(
-        slots: Vec&lt;SlotOf&lt;Self&gt;&gt;,
-        roots: bool,
-        mmtk: &amp;'static MMTK&lt;VM&gt;,
-        bucket: WorkBucketStage,
-    ) -&gt; Self {
-        let base = ProcessEdgesBase::new(slots, roots, mmtk, bucket);
-        let plan = base.plan().downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
-        Self { base, plan }
+    fn from_mmtk(mmtk: &amp;'static MMTK&lt;Self::VM&gt;) -&gt; Self {
+        // Instantiate `MyGCTrace` from a reference to `MMTK`.
+        // We need to extract the plan reference, and it is sufficient to use downcast.
+        Self {
+            plan: mmtk.get_plan().downcast_ref().unwrap(),
+        }
     }
 
-    fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
-        let worker = self.worker();
-        let queue = &amp;mut self.base.nodes;
+    fn trace_object&lt;Q: crate::ObjectQueue&gt;(
+        &amp;self,
+        worker: &amp;mut crate::scheduler::GCWorker&lt;Self::VM&gt;,
+        object: ObjectReference,
+        queue: &amp;mut Q,
+    ) -&gt; ObjectReference {
+        // We figure out which space the `object` is in,
+        // and call the `trace_object` method of that space.
         if self.plan.tospace().in_space(object) {
             self.plan.tospace().trace_object(
                 queue,
@@ -1341,43 +1346,42 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
                 worker,
             )
         } else {
+            // If the `object` is in neither the fromspace nor the tospace,
+            // we delegate to the `CommonPlan`.
             use crate::plan::PlanTraceObject;
             use crate::policy::gc_work::DEFAULT_TRACE;
-            self.plan.common.trace_object::&lt;_, DEFAULT_TRACE&gt;(queue, object, worker)
+            self.plan
+                .common
+                .trace_object::&lt;_, DEFAULT_TRACE&gt;(queue, object, worker)
         }
     }
 
-    fn create_scan_work(&amp;self, nodes: Vec&lt;ObjectReference&gt;) -&gt; Option&lt;ScanObjects&lt;Self&gt;&gt; {
-        Some(ScanObjects::&lt;Self&gt;::new(nodes, false, self.bucket))
-    }
-}
-<span class="boring">}</span></code></pre></pre>
-<p>We would also need to implement <code>Deref</code> and <code>DerefMut</code> to our <code>ProcessEdgesWork</code> impl to be
-dereferenced as <code>ProcessEdgesBase</code>.</p>
-<pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>impl&lt;VM: VMBinding&gt; Deref for MyGCProcessEdges&lt;VM&gt; {
-    type Target = ProcessEdgesBase&lt;VM&gt;;
-    fn deref(&amp;self) -&gt; &amp;Self::Target {
-        &amp;self.base
-    }
-}
+    fn post_scan_object(&amp;self, object: ObjectReference) {
+        // Currently only `ImmixSpace` needs `post_scan_object`.
+        // `CopySpace` does not need the `post_scan_object` method,
+        // so we don't need to call `post_scan_object` on the fromspace or the tospace.
 
-impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
-    fn deref_mut(&amp;mut self) -&gt; &amp;mut Self::Target {
-        &amp;mut self.base
+        // We need to call the `post_scan_object` method of the common plan
+        // because by default the non-moving space is an `ImmixSpace`.
+        use crate::plan::PlanTraceObject;
+        self.plan.common.post_scan_object(object);
+    }
+
+    fn may_move_objects() -&gt; bool {
+        // We return `true` because SemiSpace moves every single reachable object in the from space.
+        true
     }
 }
 <span class="boring">}</span></code></pre></pre>
-<p>In the end, use <code>MyGCProcessEdges</code> as <code>DefaultProcessEdges</code> in the <code>GCWorkContext</code>:</p>
+<p>In the end, use <code>MyGCTrace</code> as <code>DefaultTrace</code> in the <code>GCWorkContext</code>:</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct MyGCWorkContext3&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext3&lt;VM&gt; {
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
-    type DefaultProcessEdges = MyGCProcessEdges&lt;Self::VM&gt;;
-    type PinningProcessEdges = UnsupportedProcessEdges&lt;Self::VM&gt;;
+    type DefaultTrace = MyGCTrace&lt;Self::VM&gt;;
+    type PinningTrace = UnsupportedTrace&lt;Self::VM&gt;;
 }
 <span class="boring">}</span></code></pre></pre>
 <h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
@@ -2065,6 +2069,18 @@ Then, to ensure you know which GC cycle you’re in, set breakpoints at the star
 </code></pre>
 <p>These breakpoints help you detect if replay takes you into a different GC than the one that crashed.</p>
 <h2 id="step-2-identify-the-slot-that-loaded-the-object"><a class="header" href="#step-2-identify-the-slot-that-loaded-the-object">Step 2: Identify the Slot that Loaded the Object</a></h2>
+<div id="admonition-note" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-title">
+<div class="admonition-title">
+<div id="admonition-note-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="portingguide/debugging/traverse_object_graph.html#admonition-note"></a>
+</div>
+<div>
+<p>This example uses an old version of MMTk, but the principles are still applicable.
+<strong>The current work packet that loads from slots is <code>ProcessSlots</code>.</strong></p>
+</div>
+</div>
 <p>Object references are usually loaded from slots in <a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html#method.process_slot"><code>ProcessEdgesWork::process_slot</code></a>.
 Most MMTk plans use <a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html#method.process_slot"><code>PlanProcessEdges</code> which implements this method like this</a>:</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
@@ -3171,13 +3187,64 @@ Notes for the mmtk-core developers:
 <div id="api-migration-detail-body"><!-- We use JavaScript to process things within this div. -->
 <!-- Insert new versions here -->
 <h2 id="0330"><a class="header" href="#0330">0.33.0</a></h2>
-<h3 id="the-cargo-feature-is_mmtk_object-is-removed"><a class="header" href="#the-cargo-feature-is_mmtk_object-is-removed">The Cargo feature "is_mmtk_object" is removed</a></h3>
+<h3 id="the-w-lifetime-in-objecttracercontext"><a class="header" href="#the-w-lifetime-in-objecttracercontext">The <code>&lt;'w&gt;</code> lifetime in <code>ObjectTracerContext</code></a></h3>
 <div id="admonition-tldr" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-title">
 <div class="admonition-title">
 <div id="admonition-tldr-title">
 <p>TL;DR</p>
 </div>
 <a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr"></a>
+</div>
+<div>
+<p>Your existing source code probably still works.</p>
+</div>
+</div>
+<p>API changes:</p>
+<ul>
+<li>module <code>vm::scanning</code>
+<ul>
+<li><code>ObjectTracerContext::TracerType</code>: Now has a <code>&lt;'w&gt;</code> lifetime parameter</li>
+<li><code>ObjectTracerContext::with_tracer</code>: Now has a <code>&lt;'w&gt;</code> lifetime parameter
+<ul>
+<li><code>'w</code> is the lifetime of the <code>worker</code> argument, and is passed to the
+<code>Self::TracerType&lt;'w&gt;</code> argument of the <code>func</code> callback.  It basically means the
+<code>ObjectTracer</code> provided to the <code>func</code> callback borrows the <code>worker</code> during the callback.
+This has always been true, but we now made it explicit through the lifetime parameter.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="type-argument-changes-in-finalizablekeep_alive-module"><a class="header" href="#type-argument-changes-in-finalizablekeep_alive-module">Type argument changes in <code>Finalizable::keep_alive</code> module</a></h3>
+<div id="admonition-tldr-1" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-1-title">
+<div class="admonition-title">
+<div id="admonition-tldr-1-title">
+<p>TL;DR</p>
+</div>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-1"></a>
+</div>
+<div>
+<p><code>Finalizable::keep_alive</code> now has the <code>&lt;OT: ObjectTracer&gt;</code> type parameter.</p>
+</div>
+</div>
+<p>API changes:</p>
+<ul>
+<li>module <code>vm::reference_glue</code>
+<ul>
+<li><code>Finalizable::keep_alive</code>: Now has the <code>&lt;OT: ObjectTracer&gt;</code> type parameter instead of
+<code>&lt;E: ProcessEdgesWork&gt;</code>.  The <code>trace</code> parameter is now <code>&amp;mut OT</code>.  It still has the
+<code>trace_object</code> method like the old <code>ProcessEdgesWork</code> trait, and is supposed to be used the
+same way.</li>
+</ul>
+</li>
+</ul>
+<h3 id="the-cargo-feature-is_mmtk_object-is-removed"><a class="header" href="#the-cargo-feature-is_mmtk_object-is-removed">The Cargo feature "is_mmtk_object" is removed</a></h3>
+<div id="admonition-tldr-2" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-2-title">
+<div class="admonition-title">
+<div id="admonition-tldr-2-title">
+<p>TL;DR</p>
+</div>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-2"></a>
 </div>
 <div>
 <p>The "is_mmtk_object" cargo feature is removed.  Anything previously enabled by the "is_mmtk_object"
@@ -3187,12 +3254,12 @@ feature are now enabled by the "vo_bit" feature.</p>
 <p>API changes: None.  If a VM binding uses the "is_mmtk_object" feature, it should now use the
 "vo_bit" feature if not already using, and existing code should still compile.</p>
 <h3 id="side-metadata-base-addresses-are-no-longer-constants"><a class="header" href="#side-metadata-base-addresses-are-no-longer-constants">Side metadata base addresses are no longer constants</a></h3>
-<div id="admonition-tldr-1" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-1-title">
+<div id="admonition-tldr-3" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-3-title">
 <div class="admonition-title">
-<div id="admonition-tldr-1-title">
+<div id="admonition-tldr-3-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-1"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-3"></a>
 </div>
 <div>
 <p>Side metadata addresses are now chosen at runtime.  The old address constants are removed and
@@ -3235,12 +3302,12 @@ boot time. Bindings should fetch them from the accessor functions after MMTk ini
 completed. Bindings can assume the addresses will not change once they are initialized.</p>
 <h2 id="0320"><a class="header" href="#0320">0.32.0</a></h2>
 <h3 id="allocation-options-changed"><a class="header" href="#allocation-options-changed">Allocation options changed</a></h3>
-<div id="admonition-tldr-2" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-2-title">
+<div id="admonition-tldr-4" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-4-title">
 <div class="admonition-title">
-<div id="admonition-tldr-2-title">
+<div id="admonition-tldr-4-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-2"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-4"></a>
 </div>
 <div>
 <p><code>AllocationOptions</code> now has multiple boolean fields instead of one <code>OnAllocationFail</code> field.  Now
@@ -3278,12 +3345,12 @@ possible.</p>
 <li>PR: <a href="https://github.com/mmtk/mmtk-core/pull/1400">https://github.com/mmtk/mmtk-core/pull/1400</a></li>
 </ul>
 <h3 id="removed-the-notion-of-mmap-chunk"><a class="header" href="#removed-the-notion-of-mmap-chunk">Removed the notion of "mmap chunk"</a></h3>
-<div id="admonition-tldr-3" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-3-title">
+<div id="admonition-tldr-5" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-5-title">
 <div class="admonition-title">
-<div id="admonition-tldr-3-title">
+<div id="admonition-tldr-5-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-3"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-5"></a>
 </div>
 <div>
 <p>Constants such as <code>MMAP_CHUNK_BYTES</code> were related to the implementation details of the memory
@@ -3306,12 +3373,12 @@ mapper, and should not have been exposed.</p>
 </li>
 </ul>
 <h3 id="options-no-longer-differentiates-between-environment-variables-and-command-line-arguments"><a class="header" href="#options-no-longer-differentiates-between-environment-variables-and-command-line-arguments"><code>Options</code> no longer differentiates between environment variables and command line arguments.</a></h3>
-<div id="admonition-tldr-4" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-4-title">
+<div id="admonition-tldr-6" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-6-title">
 <div class="admonition-title">
-<div id="admonition-tldr-4-title">
+<div id="admonition-tldr-6-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-4"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-6"></a>
 </div>
 <div>
 <p>We replaced both <code>Options::set_from_command_line</code> and <code>Options::set_from_env_var</code> with
@@ -3348,12 +3415,12 @@ example, <code>options.plan.set(user_input.parse()?);</code>.</li>
 </li>
 </ul>
 <h3 id="the-feature-immix_stress_copying-is-removed"><a class="header" href="#the-feature-immix_stress_copying-is-removed">The feature <code>immix_stress_copying</code> is removed.</a></h3>
-<div id="admonition-tldr-5" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-5-title">
+<div id="admonition-tldr-7" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-7-title">
 <div class="admonition-title">
-<div id="admonition-tldr-5-title">
+<div id="admonition-tldr-7-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-5"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-7"></a>
 </div>
 <div>
 <p>The feature <code>immix_stress_copying</code> is removed. Bindings can use MMTk options with the following values
@@ -3377,12 +3444,12 @@ to achieve the same behavior as before: <code>immix_always_defrag=true,immix_def
 </ul>
 <h2 id="0300"><a class="header" href="#0300">0.30.0</a></h2>
 <h3 id="live_bytes_in_last_gc-becomes-a-runtime-option-and-returns-a-map-for-live-bytes-in-each-space"><a class="header" href="#live_bytes_in_last_gc-becomes-a-runtime-option-and-returns-a-map-for-live-bytes-in-each-space"><code>live_bytes_in_last_gc</code> becomes a runtime option, and returns a map for live bytes in each space</a></h3>
-<div id="admonition-tldr-6" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-6-title">
+<div id="admonition-tldr-8" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-8-title">
 <div class="admonition-title">
-<div id="admonition-tldr-6-title">
+<div id="admonition-tldr-8-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-6"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-8"></a>
 </div>
 <div>
 <p><code>count_live_bytes_in_gc</code> is now a runtime option instead of a features (build-time), and we collect
@@ -3410,12 +3477,12 @@ strings for space names, and the values are statistics for live bytes in the spa
 <li>PR: <a href="https://github.com/mmtk/mmtk-core/pull/1238">https://github.com/mmtk/mmtk-core/pull/1238</a></li>
 </ul>
 <h3 id="mmap-related-functions-require-annotation"><a class="header" href="#mmap-related-functions-require-annotation">mmap-related functions require annotation</a></h3>
-<div id="admonition-tldr-7" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-7-title">
+<div id="admonition-tldr-9" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-9-title">
 <div class="admonition-title">
-<div id="admonition-tldr-7-title">
+<div id="admonition-tldr-9-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-7"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-9"></a>
 </div>
 <div>
 <p>Memory-mapping functions in <code>mmtk::util::memory</code> now take an additional <code>MmapAnnotation</code> argument.</p>
@@ -3437,12 +3504,12 @@ strings for space names, and the values are statistics for live bytes in the spa
 </ul>
 <h2 id="0280"><a class="header" href="#0280">0.28.0</a></h2>
 <h3 id="handle_user_collection_request-returns-bool"><a class="header" href="#handle_user_collection_request-returns-bool"><code>handle_user_collection_request</code> returns <code>bool</code></a></h3>
-<div id="admonition-tldr-8" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-8-title">
+<div id="admonition-tldr-10" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-10-title">
 <div class="admonition-title">
-<div id="admonition-tldr-8-title">
+<div id="admonition-tldr-10-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-8"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-10"></a>
 </div>
 <div>
 <p><code>memory_manager::handle_user_collection_request</code> now returns a boolean value to indicate whether a GC
@@ -3469,12 +3536,12 @@ Bindings may use the value, or simply ignore it.</li>
 </li>
 </ul>
 <h3 id="objectreference-must-point-inside-an-object"><a class="header" href="#objectreference-must-point-inside-an-object"><code>ObjectReference</code> must point inside an object</a></h3>
-<div id="admonition-tldr-9" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-9-title">
+<div id="admonition-tldr-11" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-11-title">
 <div class="admonition-title">
-<div id="admonition-tldr-9-title">
+<div id="admonition-tldr-11-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-9"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-11"></a>
 </div>
 <div>
 <p><code>ObjectReference</code> is now required to be an address within an object.  The concept of "in-object
@@ -3552,12 +3619,12 @@ filter out such illegal values.</li>
 </ul>
 <h2 id="0270"><a class="header" href="#0270">0.27.0</a></h2>
 <h3 id="is_mmtk_object-returns-optionobjectreference"><a class="header" href="#is_mmtk_object-returns-optionobjectreference"><code>is_mmtk_object</code> returns <code>Option&lt;ObjectReference&gt;</code></a></h3>
-<div id="admonition-tldr-10" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-10-title">
+<div id="admonition-tldr-12" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-12-title">
 <div class="admonition-title">
-<div id="admonition-tldr-10-title">
+<div id="admonition-tldr-12-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-10"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-12"></a>
 </div>
 <div>
 <p><code>memory_manager::is_mmtk_object</code> now returns <code>Option&lt;ObjectReference&gt;</code> instead of <code>bool</code>.
@@ -3578,12 +3645,12 @@ Bindings can use the returned object reference instead of computing the object r
 <li>Example: <a href="https://github.com/mmtk/mmtk-ruby/pull/86">https://github.com/mmtk/mmtk-ruby/pull/86</a></li>
 </ul>
 <h3 id="introduce-objectmodelin_object_address_offset"><a class="header" href="#introduce-objectmodelin_object_address_offset">Introduce <code>ObjectModel::IN_OBJECT_ADDRESS_OFFSET</code></a></h3>
-<div id="admonition-tldr-11" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-11-title">
+<div id="admonition-tldr-13" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-13-title">
 <div class="admonition-title">
-<div id="admonition-tldr-11-title">
+<div id="admonition-tldr-13-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-11"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-13"></a>
 </div>
 <div>
 <p>We used to have <code>ObjectModel::ref_to_address</code> and <code>ObjectModel::address_to_ref</code>, and require
@@ -3614,12 +3681,12 @@ to the word size. This is checked in debug builds when an <code>ObjectReference<
 </ul>
 <h2 id="0260"><a class="header" href="#0260">0.26.0</a></h2>
 <h3 id="rename-edge-to-slot"><a class="header" href="#rename-edge-to-slot">Rename "edge" to "slot"</a></h3>
-<div id="admonition-tldr-12" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-12-title">
+<div id="admonition-tldr-14" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-14-title">
 <div class="admonition-title">
-<div id="admonition-tldr-12-title">
+<div id="admonition-tldr-14-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-12"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-14"></a>
 </div>
 <div>
 <p>The word "edge" <strong>in many identifiers</strong> have been changed to "slot" if it actaully means slot.
@@ -3688,12 +3755,12 @@ the refactoring/renaming tools in IDEs should be helpful.</p>
 </ul>
 <h2 id="0250"><a class="header" href="#0250">0.25.0</a></h2>
 <h3 id="objectreference-is-no-longer-nullable"><a class="header" href="#objectreference-is-no-longer-nullable"><code>ObjectReference</code> is no longer nullable</a></h3>
-<div id="admonition-tldr-13" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-13-title">
+<div id="admonition-tldr-15" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-15-title">
 <div class="admonition-title">
-<div id="admonition-tldr-13-title">
+<div id="admonition-tldr-15-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-13"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-15"></a>
 </div>
 <div>
 <p><code>ObjectReference</code> can no longer represent a NULL reference.  Some methods of <code>ObjectReference</code> and
@@ -3832,12 +3899,12 @@ by wrapping them into <code>extern "C"</code> functions that return <code>Object
 <li>Example: <a href="https://github.com/mmtk/mmtk-openjdk/pull/273">https://github.com/mmtk/mmtk-openjdk/pull/273</a> (for write barriers)</li>
 </ul>
 <h3 id="instance-methods-of-objectreference-changed"><a class="header" href="#instance-methods-of-objectreference-changed">Instance methods of <code>ObjectReference</code> changed</a></h3>
-<div id="admonition-tldr-14" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-14-title">
+<div id="admonition-tldr-16" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-16-title">
 <div class="admonition-title">
-<div id="admonition-tldr-14-title">
+<div id="admonition-tldr-16-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-14"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-16"></a>
 </div>
 <div>
 <p>Some methods of <code>ObjectReference</code> now have a type parameter <code>&lt;VM&gt;</code>.  <code>ObjectReference::value()</code> is
@@ -3872,12 +3939,12 @@ removed.</p>
 <li>Example: <a href="https://github.com/mmtk/mmtk-openjdk/pull/272">https://github.com/mmtk/mmtk-openjdk/pull/272</a></li>
 </ul>
 <h3 id="the-gc-controller-aka-coordinator-is-removed"><a class="header" href="#the-gc-controller-aka-coordinator-is-removed">The GC controller (a.k.a. coordinator) is removed</a></h3>
-<div id="admonition-tldr-15" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-15-title">
+<div id="admonition-tldr-17" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-17-title">
 <div class="admonition-title">
-<div id="admonition-tldr-15-title">
+<div id="admonition-tldr-17-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-15"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-17"></a>
 </div>
 <div>
 <p>The GC controller thread is removed from MMTk core.  The VM binding needs to re-implement

@@ -196,85 +196,85 @@
 <a href=#196 id=196 data-nosnippet>196</a>    }
 <a href=#197 id=197 data-nosnippet>197</a>
 <a href=#198 id=198 data-nosnippet>198</a>    <span class="doccomment">/// Sweep this block.
-<a href=#199 id=199 data-nosnippet>199</a>    /// Return true if the block is swept.
-<a href=#200 id=200 data-nosnippet>200</a>    </span><span class="kw">pub fn </span>sweep&lt;VM: VMBinding&gt;(
-<a href=#201 id=201 data-nosnippet>201</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
-<a href=#202 id=202 data-nosnippet>202</a>        space: <span class="kw-2">&amp;</span>ImmixSpace&lt;VM&gt;,
-<a href=#203 id=203 data-nosnippet>203</a>        mark_histogram: <span class="kw-2">&amp;mut </span>Histogram,
-<a href=#204 id=204 data-nosnippet>204</a>        line_mark_state: <span class="prelude-ty">Option</span>&lt;u8&gt;,
-<a href=#205 id=205 data-nosnippet>205</a>    ) -&gt; bool {
-<a href=#206 id=206 data-nosnippet>206</a>        <span class="kw">if </span><span class="kw">super</span>::BLOCK_ONLY {
-<a href=#207 id=207 data-nosnippet>207</a>            <span class="kw">match </span><span class="self">self</span>.get_state() {
-<a href=#208 id=208 data-nosnippet>208</a>                BlockState::Unallocated =&gt; <span class="bool-val">false</span>,
-<a href=#209 id=209 data-nosnippet>209</a>                BlockState::Unmarked =&gt; {
-<a href=#210 id=210 data-nosnippet>210</a>                    <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-<a href=#211 id=211 data-nosnippet>211</a>                    </span>vo_bit::helper::on_region_swept::&lt;VM, <span class="kw">_</span>&gt;(<span class="self">self</span>, <span class="bool-val">false</span>);
-<a href=#212 id=212 data-nosnippet>212</a>
-<a href=#213 id=213 data-nosnippet>213</a>                    <span class="comment">// If the pin bit is not on the side, we cannot bulk zero.
-<a href=#214 id=214 data-nosnippet>214</a>                    // We shouldn't need to clear it here in that case, since the pin bit
-<a href=#215 id=215 data-nosnippet>215</a>                    // should be overwritten at each object allocation. The same applies below
-<a href=#216 id=216 data-nosnippet>216</a>                    // when we are sweeping on a line granularity.
-<a href=#217 id=217 data-nosnippet>217</a>                    </span><span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
-<a href=#218 id=218 data-nosnippet>218</a>                    </span><span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC {
-<a href=#219 id=219 data-nosnippet>219</a>                        side.bzero_metadata(<span class="self">self</span>.start(), Block::BYTES);
-<a href=#220 id=220 data-nosnippet>220</a>                    }
-<a href=#221 id=221 data-nosnippet>221</a>
-<a href=#222 id=222 data-nosnippet>222</a>                    <span class="comment">// Release the block if it is allocated but not marked by the current GC.
-<a href=#223 id=223 data-nosnippet>223</a>                    </span>space.release_block(<span class="kw-2">*</span><span class="self">self</span>);
-<a href=#224 id=224 data-nosnippet>224</a>                    <span class="bool-val">true
-<a href=#225 id=225 data-nosnippet>225</a>                </span>}
-<a href=#226 id=226 data-nosnippet>226</a>                BlockState::Marked =&gt; {
-<a href=#227 id=227 data-nosnippet>227</a>                    <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-<a href=#228 id=228 data-nosnippet>228</a>                    </span>vo_bit::helper::on_region_swept::&lt;VM, <span class="kw">_</span>&gt;(<span class="self">self</span>, <span class="bool-val">true</span>);
-<a href=#229 id=229 data-nosnippet>229</a>
-<a href=#230 id=230 data-nosnippet>230</a>                    <span class="comment">// The block is live.
-<a href=#231 id=231 data-nosnippet>231</a>                    </span><span class="bool-val">false
-<a href=#232 id=232 data-nosnippet>232</a>                </span>}
-<a href=#233 id=233 data-nosnippet>233</a>                <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(),
-<a href=#234 id=234 data-nosnippet>234</a>            }
-<a href=#235 id=235 data-nosnippet>235</a>        } <span class="kw">else </span>{
-<a href=#236 id=236 data-nosnippet>236</a>            <span class="comment">// Calculate number of marked lines and holes.
-<a href=#237 id=237 data-nosnippet>237</a>            </span><span class="kw">let </span><span class="kw-2">mut </span>marked_lines = <span class="number">0</span>;
-<a href=#238 id=238 data-nosnippet>238</a>            <span class="kw">let </span><span class="kw-2">mut </span>holes = <span class="number">0</span>;
-<a href=#239 id=239 data-nosnippet>239</a>            <span class="kw">let </span><span class="kw-2">mut </span>prev_line_is_marked = <span class="bool-val">true</span>;
-<a href=#240 id=240 data-nosnippet>240</a>            <span class="kw">let </span>line_mark_state = line_mark_state.unwrap();
-<a href=#241 id=241 data-nosnippet>241</a>
-<a href=#242 id=242 data-nosnippet>242</a>            <span class="kw">for </span>line <span class="kw">in </span><span class="self">self</span>.lines() {
-<a href=#243 id=243 data-nosnippet>243</a>                <span class="kw">if </span>line.is_marked(line_mark_state) {
-<a href=#244 id=244 data-nosnippet>244</a>                    marked_lines += <span class="number">1</span>;
-<a href=#245 id=245 data-nosnippet>245</a>                    prev_line_is_marked = <span class="bool-val">true</span>;
-<a href=#246 id=246 data-nosnippet>246</a>                } <span class="kw">else </span>{
-<a href=#247 id=247 data-nosnippet>247</a>                    <span class="kw">if </span>prev_line_is_marked {
-<a href=#248 id=248 data-nosnippet>248</a>                        holes += <span class="number">1</span>;
-<a href=#249 id=249 data-nosnippet>249</a>                    }
-<a href=#250 id=250 data-nosnippet>250</a>                    <span class="comment">// We need to clear the line mark state at least twice in every 128 GC
-<a href=#251 id=251 data-nosnippet>251</a>                    // otherwise, the line mark state of the last GC will stick around
-<a href=#252 id=252 data-nosnippet>252</a>                    </span><span class="kw">if </span>line_mark_state &gt; Line::MAX_MARK_STATE - <span class="number">2 </span>{
-<a href=#253 id=253 data-nosnippet>253</a>                        line.mark(<span class="number">0</span>);
-<a href=#254 id=254 data-nosnippet>254</a>                    }
-<a href=#255 id=255 data-nosnippet>255</a>                    <span class="attr">#[cfg(feature = <span class="string">"immix_zero_on_release"</span>)]
-<a href=#256 id=256 data-nosnippet>256</a>                    </span><span class="kw">crate</span>::util::memory::zero(line.start(), Line::BYTES);
-<a href=#257 id=257 data-nosnippet>257</a>
-<a href=#258 id=258 data-nosnippet>258</a>                    <span class="comment">// We need to clear the pin bit if it is on the side, as this line can be reused
-<a href=#259 id=259 data-nosnippet>259</a>                    </span><span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
-<a href=#260 id=260 data-nosnippet>260</a>                    </span><span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC {
-<a href=#261 id=261 data-nosnippet>261</a>                        side.bzero_metadata(line.start(), Line::BYTES);
-<a href=#262 id=262 data-nosnippet>262</a>                    }
-<a href=#263 id=263 data-nosnippet>263</a>
-<a href=#264 id=264 data-nosnippet>264</a>                    prev_line_is_marked = <span class="bool-val">false</span>;
-<a href=#265 id=265 data-nosnippet>265</a>                }
-<a href=#266 id=266 data-nosnippet>266</a>            }
-<a href=#267 id=267 data-nosnippet>267</a>
-<a href=#268 id=268 data-nosnippet>268</a>            <span class="kw">if </span>marked_lines == <span class="number">0 </span>{
-<a href=#269 id=269 data-nosnippet>269</a>                <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-<a href=#270 id=270 data-nosnippet>270</a>                </span>vo_bit::helper::on_region_swept::&lt;VM, <span class="kw">_</span>&gt;(<span class="self">self</span>, <span class="bool-val">false</span>);
-<a href=#271 id=271 data-nosnippet>271</a>
-<a href=#272 id=272 data-nosnippet>272</a>                <span class="comment">// Release the block if non of its lines are marked.
-<a href=#273 id=273 data-nosnippet>273</a>                </span>space.release_block(<span class="kw-2">*</span><span class="self">self</span>);
-<a href=#274 id=274 data-nosnippet>274</a>                <span class="bool-val">true
-<a href=#275 id=275 data-nosnippet>275</a>            </span>} <span class="kw">else </span>{
-<a href=#276 id=276 data-nosnippet>276</a>                <span class="comment">// There are some marked lines. Keep the block live.
-<a href=#277 id=277 data-nosnippet>277</a>                </span><span class="kw">if </span>marked_lines != Block::LINES {
+<a href=#199 id=199 data-nosnippet>199</a>    </span><span class="kw">pub fn </span>sweep&lt;VM: VMBinding&gt;(
+<a href=#200 id=200 data-nosnippet>200</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#201 id=201 data-nosnippet>201</a>        space: <span class="kw-2">&amp;</span>ImmixSpace&lt;VM&gt;,
+<a href=#202 id=202 data-nosnippet>202</a>        mark_histogram: <span class="kw-2">&amp;mut </span>Histogram,
+<a href=#203 id=203 data-nosnippet>203</a>        line_mark_state: <span class="prelude-ty">Option</span>&lt;u8&gt;,
+<a href=#204 id=204 data-nosnippet>204</a>    ) -&gt; BlockSweepResult {
+<a href=#205 id=205 data-nosnippet>205</a>        <span class="kw">if </span><span class="kw">super</span>::BLOCK_ONLY {
+<a href=#206 id=206 data-nosnippet>206</a>            <span class="kw">match </span><span class="self">self</span>.get_state() {
+<a href=#207 id=207 data-nosnippet>207</a>                BlockState::Unallocated =&gt; <span class="macro">unreachable!</span>(<span class="string">"Must not sweep unallocated block."</span>),
+<a href=#208 id=208 data-nosnippet>208</a>                BlockState::Unmarked =&gt; {
+<a href=#209 id=209 data-nosnippet>209</a>                    <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+<a href=#210 id=210 data-nosnippet>210</a>                    </span>vo_bit::helper::on_region_swept::&lt;VM, <span class="kw">_</span>&gt;(<span class="self">self</span>, <span class="bool-val">false</span>);
+<a href=#211 id=211 data-nosnippet>211</a>
+<a href=#212 id=212 data-nosnippet>212</a>                    <span class="comment">// If the pin bit is not on the side, we cannot bulk zero.
+<a href=#213 id=213 data-nosnippet>213</a>                    // We shouldn't need to clear it here in that case, since the pin bit
+<a href=#214 id=214 data-nosnippet>214</a>                    // should be overwritten at each object allocation. The same applies below
+<a href=#215 id=215 data-nosnippet>215</a>                    // when we are sweeping on a line granularity.
+<a href=#216 id=216 data-nosnippet>216</a>                    </span><span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
+<a href=#217 id=217 data-nosnippet>217</a>                    </span><span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC {
+<a href=#218 id=218 data-nosnippet>218</a>                        side.bzero_metadata(<span class="self">self</span>.start(), Block::BYTES);
+<a href=#219 id=219 data-nosnippet>219</a>                    }
+<a href=#220 id=220 data-nosnippet>220</a>
+<a href=#221 id=221 data-nosnippet>221</a>                    <span class="comment">// Release the block if it is allocated but not marked by the current GC.
+<a href=#222 id=222 data-nosnippet>222</a>                    </span>space.release_block(<span class="kw-2">*</span><span class="self">self</span>);
+<a href=#223 id=223 data-nosnippet>223</a>                    BlockSweepResult::Swept
+<a href=#224 id=224 data-nosnippet>224</a>                }
+<a href=#225 id=225 data-nosnippet>225</a>                BlockState::Marked =&gt; {
+<a href=#226 id=226 data-nosnippet>226</a>                    <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+<a href=#227 id=227 data-nosnippet>227</a>                    </span>vo_bit::helper::on_region_swept::&lt;VM, <span class="kw">_</span>&gt;(<span class="self">self</span>, <span class="bool-val">true</span>);
+<a href=#228 id=228 data-nosnippet>228</a>
+<a href=#229 id=229 data-nosnippet>229</a>                    <span class="comment">// The block is live.
+<a href=#230 id=230 data-nosnippet>230</a>                    </span>BlockSweepResult::NoReuse
+<a href=#231 id=231 data-nosnippet>231</a>                }
+<a href=#232 id=232 data-nosnippet>232</a>                <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(),
+<a href=#233 id=233 data-nosnippet>233</a>            }
+<a href=#234 id=234 data-nosnippet>234</a>        } <span class="kw">else </span>{
+<a href=#235 id=235 data-nosnippet>235</a>            <span class="comment">// Calculate number of marked lines and holes.
+<a href=#236 id=236 data-nosnippet>236</a>            </span><span class="kw">let </span><span class="kw-2">mut </span>marked_lines = <span class="number">0</span>;
+<a href=#237 id=237 data-nosnippet>237</a>            <span class="kw">let </span><span class="kw-2">mut </span>holes = <span class="number">0</span>;
+<a href=#238 id=238 data-nosnippet>238</a>            <span class="kw">let </span><span class="kw-2">mut </span>prev_line_is_marked = <span class="bool-val">true</span>;
+<a href=#239 id=239 data-nosnippet>239</a>            <span class="kw">let </span>line_mark_state = line_mark_state.unwrap();
+<a href=#240 id=240 data-nosnippet>240</a>
+<a href=#241 id=241 data-nosnippet>241</a>            <span class="kw">for </span>line <span class="kw">in </span><span class="self">self</span>.lines() {
+<a href=#242 id=242 data-nosnippet>242</a>                <span class="kw">if </span>line.is_marked(line_mark_state) {
+<a href=#243 id=243 data-nosnippet>243</a>                    marked_lines += <span class="number">1</span>;
+<a href=#244 id=244 data-nosnippet>244</a>                    prev_line_is_marked = <span class="bool-val">true</span>;
+<a href=#245 id=245 data-nosnippet>245</a>                } <span class="kw">else </span>{
+<a href=#246 id=246 data-nosnippet>246</a>                    <span class="kw">if </span>prev_line_is_marked {
+<a href=#247 id=247 data-nosnippet>247</a>                        holes += <span class="number">1</span>;
+<a href=#248 id=248 data-nosnippet>248</a>                    }
+<a href=#249 id=249 data-nosnippet>249</a>                    <span class="comment">// We need to clear the line mark state at least twice in every 128 GC
+<a href=#250 id=250 data-nosnippet>250</a>                    // otherwise, the line mark state of the last GC will stick around
+<a href=#251 id=251 data-nosnippet>251</a>                    </span><span class="kw">if </span>line_mark_state &gt; Line::MAX_MARK_STATE - <span class="number">2 </span>{
+<a href=#252 id=252 data-nosnippet>252</a>                        line.mark(<span class="number">0</span>);
+<a href=#253 id=253 data-nosnippet>253</a>                    }
+<a href=#254 id=254 data-nosnippet>254</a>                    <span class="attr">#[cfg(feature = <span class="string">"immix_zero_on_release"</span>)]
+<a href=#255 id=255 data-nosnippet>255</a>                    </span><span class="kw">crate</span>::util::memory::zero(line.start(), Line::BYTES);
+<a href=#256 id=256 data-nosnippet>256</a>
+<a href=#257 id=257 data-nosnippet>257</a>                    <span class="comment">// We need to clear the pin bit if it is on the side, as this line can be reused
+<a href=#258 id=258 data-nosnippet>258</a>                    </span><span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
+<a href=#259 id=259 data-nosnippet>259</a>                    </span><span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC {
+<a href=#260 id=260 data-nosnippet>260</a>                        side.bzero_metadata(line.start(), Line::BYTES);
+<a href=#261 id=261 data-nosnippet>261</a>                    }
+<a href=#262 id=262 data-nosnippet>262</a>
+<a href=#263 id=263 data-nosnippet>263</a>                    prev_line_is_marked = <span class="bool-val">false</span>;
+<a href=#264 id=264 data-nosnippet>264</a>                }
+<a href=#265 id=265 data-nosnippet>265</a>            }
+<a href=#266 id=266 data-nosnippet>266</a>
+<a href=#267 id=267 data-nosnippet>267</a>            <span class="kw">if </span>marked_lines == <span class="number">0 </span>{
+<a href=#268 id=268 data-nosnippet>268</a>                <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+<a href=#269 id=269 data-nosnippet>269</a>                </span>vo_bit::helper::on_region_swept::&lt;VM, <span class="kw">_</span>&gt;(<span class="self">self</span>, <span class="bool-val">false</span>);
+<a href=#270 id=270 data-nosnippet>270</a>
+<a href=#271 id=271 data-nosnippet>271</a>                <span class="comment">// Release the block if non of its lines are marked.
+<a href=#272 id=272 data-nosnippet>272</a>                </span>space.release_block(<span class="kw-2">*</span><span class="self">self</span>);
+<a href=#273 id=273 data-nosnippet>273</a>                BlockSweepResult::Swept
+<a href=#274 id=274 data-nosnippet>274</a>            } <span class="kw">else </span>{
+<a href=#275 id=275 data-nosnippet>275</a>                <span class="comment">// There are some marked lines. Keep the block live.
+<a href=#276 id=276 data-nosnippet>276</a>                </span><span class="kw">let </span>is_reusable = marked_lines != Block::LINES;
+<a href=#277 id=277 data-nosnippet>277</a>                <span class="kw">if </span>is_reusable {
 <a href=#278 id=278 data-nosnippet>278</a>                    <span class="comment">// There are holes. Mark the block as reusable.
 <a href=#279 id=279 data-nosnippet>279</a>                    </span><span class="self">self</span>.set_state(BlockState::Reusable {
 <a href=#280 id=280 data-nosnippet>280</a>                        unavailable_lines: marked_lines <span class="kw">as _</span>,
@@ -292,85 +292,100 @@
 <a href=#292 id=292 data-nosnippet>292</a>                <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
 <a href=#293 id=293 data-nosnippet>293</a>                </span>vo_bit::helper::on_region_swept::&lt;VM, <span class="kw">_</span>&gt;(<span class="self">self</span>, <span class="bool-val">true</span>);
 <a href=#294 id=294 data-nosnippet>294</a>
-<a href=#295 id=295 data-nosnippet>295</a>                <span class="bool-val">false
-<a href=#296 id=296 data-nosnippet>296</a>            </span>}
-<a href=#297 id=297 data-nosnippet>297</a>        }
-<a href=#298 id=298 data-nosnippet>298</a>    }
-<a href=#299 id=299 data-nosnippet>299</a>
-<a href=#300 id=300 data-nosnippet>300</a>    <span class="doccomment">/// Clear VO bits metadata for unmarked regions.
-<a href=#301 id=301 data-nosnippet>301</a>    /// This is useful for clearing VO bits during nursery GC for StickyImmix
-<a href=#302 id=302 data-nosnippet>302</a>    /// at which time young objects (allocated in unmarked regions) may die
-<a href=#303 id=303 data-nosnippet>303</a>    /// but we always consider old objects (in marked regions) as live.
-<a href=#304 id=304 data-nosnippet>304</a>    </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-<a href=#305 id=305 data-nosnippet>305</a>    </span><span class="kw">pub fn </span>clear_vo_bits_for_unmarked_regions(<span class="kw-2">&amp;</span><span class="self">self</span>, line_mark_state: <span class="prelude-ty">Option</span>&lt;u8&gt;) {
-<a href=#306 id=306 data-nosnippet>306</a>        <span class="kw">match </span>line_mark_state {
-<a href=#307 id=307 data-nosnippet>307</a>            <span class="prelude-val">None </span>=&gt; {
-<a href=#308 id=308 data-nosnippet>308</a>                <span class="kw">match </span><span class="self">self</span>.get_state() {
-<a href=#309 id=309 data-nosnippet>309</a>                    BlockState::Unmarked =&gt; {
-<a href=#310 id=310 data-nosnippet>310</a>                        <span class="comment">// It may contain young objects.  Clear it.
-<a href=#311 id=311 data-nosnippet>311</a>                        </span>vo_bit::bzero_vo_bit(<span class="self">self</span>.start(), <span class="self">Self</span>::BYTES);
-<a href=#312 id=312 data-nosnippet>312</a>                    }
-<a href=#313 id=313 data-nosnippet>313</a>                    BlockState::Marked =&gt; {
-<a href=#314 id=314 data-nosnippet>314</a>                        <span class="comment">// It contains old objects.  Skip it.
-<a href=#315 id=315 data-nosnippet>315</a>                    </span>}
-<a href=#316 id=316 data-nosnippet>316</a>                    <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(),
-<a href=#317 id=317 data-nosnippet>317</a>                }
-<a href=#318 id=318 data-nosnippet>318</a>            }
-<a href=#319 id=319 data-nosnippet>319</a>            <span class="prelude-val">Some</span>(state) =&gt; {
-<a href=#320 id=320 data-nosnippet>320</a>                <span class="comment">// With lines.
-<a href=#321 id=321 data-nosnippet>321</a>                </span><span class="kw">for </span>line <span class="kw">in </span><span class="self">self</span>.lines() {
-<a href=#322 id=322 data-nosnippet>322</a>                    <span class="kw">if </span>!line.is_marked(state) {
-<a href=#323 id=323 data-nosnippet>323</a>                        <span class="comment">// It may contain young objects.  Clear it.
-<a href=#324 id=324 data-nosnippet>324</a>                        </span>vo_bit::bzero_vo_bit(line.start(), Line::BYTES);
-<a href=#325 id=325 data-nosnippet>325</a>                    }
-<a href=#326 id=326 data-nosnippet>326</a>                }
-<a href=#327 id=327 data-nosnippet>327</a>            }
-<a href=#328 id=328 data-nosnippet>328</a>        }
-<a href=#329 id=329 data-nosnippet>329</a>    }
-<a href=#330 id=330 data-nosnippet>330</a>}
-<a href=#331 id=331 data-nosnippet>331</a>
-<a href=#332 id=332 data-nosnippet>332</a><span class="doccomment">/// A non-block single-linked list to store blocks.
-<a href=#333 id=333 data-nosnippet>333</a></span><span class="kw">pub struct </span>ReusableBlockPool {
-<a href=#334 id=334 data-nosnippet>334</a>    queue: BlockPool&lt;Block&gt;,
-<a href=#335 id=335 data-nosnippet>335</a>    num_workers: usize,
-<a href=#336 id=336 data-nosnippet>336</a>}
-<a href=#337 id=337 data-nosnippet>337</a>
-<a href=#338 id=338 data-nosnippet>338</a><span class="kw">impl </span>ReusableBlockPool {
-<a href=#339 id=339 data-nosnippet>339</a>    <span class="doccomment">/// Create empty block list
-<a href=#340 id=340 data-nosnippet>340</a>    </span><span class="kw">pub fn </span>new(num_workers: usize) -&gt; <span class="self">Self </span>{
-<a href=#341 id=341 data-nosnippet>341</a>        <span class="self">Self </span>{
-<a href=#342 id=342 data-nosnippet>342</a>            queue: BlockPool::new(num_workers),
-<a href=#343 id=343 data-nosnippet>343</a>            num_workers,
-<a href=#344 id=344 data-nosnippet>344</a>        }
-<a href=#345 id=345 data-nosnippet>345</a>    }
-<a href=#346 id=346 data-nosnippet>346</a>
-<a href=#347 id=347 data-nosnippet>347</a>    <span class="doccomment">/// Get number of blocks in this list.
-<a href=#348 id=348 data-nosnippet>348</a>    </span><span class="kw">pub fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-<a href=#349 id=349 data-nosnippet>349</a>        <span class="self">self</span>.queue.len()
-<a href=#350 id=350 data-nosnippet>350</a>    }
-<a href=#351 id=351 data-nosnippet>351</a>
-<a href=#352 id=352 data-nosnippet>352</a>    <span class="doccomment">/// Add a block to the list.
-<a href=#353 id=353 data-nosnippet>353</a>    </span><span class="kw">pub fn </span>push(<span class="kw-2">&amp;</span><span class="self">self</span>, block: Block) {
-<a href=#354 id=354 data-nosnippet>354</a>        <span class="self">self</span>.queue.push(block)
-<a href=#355 id=355 data-nosnippet>355</a>    }
-<a href=#356 id=356 data-nosnippet>356</a>
-<a href=#357 id=357 data-nosnippet>357</a>    <span class="doccomment">/// Pop a block out of the list.
-<a href=#358 id=358 data-nosnippet>358</a>    </span><span class="kw">pub fn </span>pop(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Block&gt; {
-<a href=#359 id=359 data-nosnippet>359</a>        <span class="self">self</span>.queue.pop()
-<a href=#360 id=360 data-nosnippet>360</a>    }
-<a href=#361 id=361 data-nosnippet>361</a>
-<a href=#362 id=362 data-nosnippet>362</a>    <span class="doccomment">/// Clear the list.
-<a href=#363 id=363 data-nosnippet>363</a>    </span><span class="kw">pub fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-<a href=#364 id=364 data-nosnippet>364</a>        <span class="self">self</span>.queue = BlockPool::new(<span class="self">self</span>.num_workers);
-<a href=#365 id=365 data-nosnippet>365</a>    }
-<a href=#366 id=366 data-nosnippet>366</a>
-<a href=#367 id=367 data-nosnippet>367</a>    <span class="doccomment">/// Iterate all the blocks in the queue. Call the visitor for each reported block.
-<a href=#368 id=368 data-nosnippet>368</a>    </span><span class="kw">pub fn </span>iterate_blocks(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>f: <span class="kw">impl </span>FnMut(Block)) {
-<a href=#369 id=369 data-nosnippet>369</a>        <span class="self">self</span>.queue.iterate_blocks(<span class="kw-2">&amp;mut </span>f);
-<a href=#370 id=370 data-nosnippet>370</a>    }
-<a href=#371 id=371 data-nosnippet>371</a>
-<a href=#372 id=372 data-nosnippet>372</a>    <span class="doccomment">/// Flush the block queue
-<a href=#373 id=373 data-nosnippet>373</a>    </span><span class="kw">pub fn </span>flush_all(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-<a href=#374 id=374 data-nosnippet>374</a>        <span class="self">self</span>.queue.flush_all();
-<a href=#375 id=375 data-nosnippet>375</a>    }
-<a href=#376 id=376 data-nosnippet>376</a>}</code></pre></div></section></main></body></html>
+<a href=#295 id=295 data-nosnippet>295</a>                <span class="kw">if </span>is_reusable {
+<a href=#296 id=296 data-nosnippet>296</a>                    BlockSweepResult::Reused
+<a href=#297 id=297 data-nosnippet>297</a>                } <span class="kw">else </span>{
+<a href=#298 id=298 data-nosnippet>298</a>                    BlockSweepResult::NoReuse
+<a href=#299 id=299 data-nosnippet>299</a>                }
+<a href=#300 id=300 data-nosnippet>300</a>            }
+<a href=#301 id=301 data-nosnippet>301</a>        }
+<a href=#302 id=302 data-nosnippet>302</a>    }
+<a href=#303 id=303 data-nosnippet>303</a>
+<a href=#304 id=304 data-nosnippet>304</a>    <span class="doccomment">/// Clear VO bits metadata for unmarked regions.
+<a href=#305 id=305 data-nosnippet>305</a>    /// This is useful for clearing VO bits during nursery GC for StickyImmix
+<a href=#306 id=306 data-nosnippet>306</a>    /// at which time young objects (allocated in unmarked regions) may die
+<a href=#307 id=307 data-nosnippet>307</a>    /// but we always consider old objects (in marked regions) as live.
+<a href=#308 id=308 data-nosnippet>308</a>    </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+<a href=#309 id=309 data-nosnippet>309</a>    </span><span class="kw">pub fn </span>clear_vo_bits_for_unmarked_regions(<span class="kw-2">&amp;</span><span class="self">self</span>, line_mark_state: <span class="prelude-ty">Option</span>&lt;u8&gt;) {
+<a href=#310 id=310 data-nosnippet>310</a>        <span class="kw">match </span>line_mark_state {
+<a href=#311 id=311 data-nosnippet>311</a>            <span class="prelude-val">None </span>=&gt; {
+<a href=#312 id=312 data-nosnippet>312</a>                <span class="kw">match </span><span class="self">self</span>.get_state() {
+<a href=#313 id=313 data-nosnippet>313</a>                    BlockState::Unmarked =&gt; {
+<a href=#314 id=314 data-nosnippet>314</a>                        <span class="comment">// It may contain young objects.  Clear it.
+<a href=#315 id=315 data-nosnippet>315</a>                        </span>vo_bit::bzero_vo_bit(<span class="self">self</span>.start(), <span class="self">Self</span>::BYTES);
+<a href=#316 id=316 data-nosnippet>316</a>                    }
+<a href=#317 id=317 data-nosnippet>317</a>                    BlockState::Marked =&gt; {
+<a href=#318 id=318 data-nosnippet>318</a>                        <span class="comment">// It contains old objects.  Skip it.
+<a href=#319 id=319 data-nosnippet>319</a>                    </span>}
+<a href=#320 id=320 data-nosnippet>320</a>                    <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(),
+<a href=#321 id=321 data-nosnippet>321</a>                }
+<a href=#322 id=322 data-nosnippet>322</a>            }
+<a href=#323 id=323 data-nosnippet>323</a>            <span class="prelude-val">Some</span>(state) =&gt; {
+<a href=#324 id=324 data-nosnippet>324</a>                <span class="comment">// With lines.
+<a href=#325 id=325 data-nosnippet>325</a>                </span><span class="kw">for </span>line <span class="kw">in </span><span class="self">self</span>.lines() {
+<a href=#326 id=326 data-nosnippet>326</a>                    <span class="kw">if </span>!line.is_marked(state) {
+<a href=#327 id=327 data-nosnippet>327</a>                        <span class="comment">// It may contain young objects.  Clear it.
+<a href=#328 id=328 data-nosnippet>328</a>                        </span>vo_bit::bzero_vo_bit(line.start(), Line::BYTES);
+<a href=#329 id=329 data-nosnippet>329</a>                    }
+<a href=#330 id=330 data-nosnippet>330</a>                }
+<a href=#331 id=331 data-nosnippet>331</a>            }
+<a href=#332 id=332 data-nosnippet>332</a>        }
+<a href=#333 id=333 data-nosnippet>333</a>    }
+<a href=#334 id=334 data-nosnippet>334</a>}
+<a href=#335 id=335 data-nosnippet>335</a>
+<a href=#336 id=336 data-nosnippet>336</a><span class="doccomment">/// A non-block single-linked list to store blocks.
+<a href=#337 id=337 data-nosnippet>337</a></span><span class="kw">pub struct </span>ReusableBlockPool {
+<a href=#338 id=338 data-nosnippet>338</a>    queue: BlockPool&lt;Block&gt;,
+<a href=#339 id=339 data-nosnippet>339</a>    num_workers: usize,
+<a href=#340 id=340 data-nosnippet>340</a>}
+<a href=#341 id=341 data-nosnippet>341</a>
+<a href=#342 id=342 data-nosnippet>342</a><span class="kw">impl </span>ReusableBlockPool {
+<a href=#343 id=343 data-nosnippet>343</a>    <span class="doccomment">/// Create empty block list
+<a href=#344 id=344 data-nosnippet>344</a>    </span><span class="kw">pub fn </span>new(num_workers: usize) -&gt; <span class="self">Self </span>{
+<a href=#345 id=345 data-nosnippet>345</a>        <span class="self">Self </span>{
+<a href=#346 id=346 data-nosnippet>346</a>            queue: BlockPool::new(num_workers),
+<a href=#347 id=347 data-nosnippet>347</a>            num_workers,
+<a href=#348 id=348 data-nosnippet>348</a>        }
+<a href=#349 id=349 data-nosnippet>349</a>    }
+<a href=#350 id=350 data-nosnippet>350</a>
+<a href=#351 id=351 data-nosnippet>351</a>    <span class="doccomment">/// Get number of blocks in this list.
+<a href=#352 id=352 data-nosnippet>352</a>    </span><span class="kw">pub fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+<a href=#353 id=353 data-nosnippet>353</a>        <span class="self">self</span>.queue.len()
+<a href=#354 id=354 data-nosnippet>354</a>    }
+<a href=#355 id=355 data-nosnippet>355</a>
+<a href=#356 id=356 data-nosnippet>356</a>    <span class="doccomment">/// Add a block to the list.
+<a href=#357 id=357 data-nosnippet>357</a>    </span><span class="kw">pub fn </span>push(<span class="kw-2">&amp;</span><span class="self">self</span>, block: Block) {
+<a href=#358 id=358 data-nosnippet>358</a>        <span class="self">self</span>.queue.push(block)
+<a href=#359 id=359 data-nosnippet>359</a>    }
+<a href=#360 id=360 data-nosnippet>360</a>
+<a href=#361 id=361 data-nosnippet>361</a>    <span class="doccomment">/// Pop a block out of the list.
+<a href=#362 id=362 data-nosnippet>362</a>    </span><span class="kw">pub fn </span>pop(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Block&gt; {
+<a href=#363 id=363 data-nosnippet>363</a>        <span class="self">self</span>.queue.pop()
+<a href=#364 id=364 data-nosnippet>364</a>    }
+<a href=#365 id=365 data-nosnippet>365</a>
+<a href=#366 id=366 data-nosnippet>366</a>    <span class="doccomment">/// Clear the list.
+<a href=#367 id=367 data-nosnippet>367</a>    </span><span class="kw">pub fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+<a href=#368 id=368 data-nosnippet>368</a>        <span class="self">self</span>.queue = BlockPool::new(<span class="self">self</span>.num_workers);
+<a href=#369 id=369 data-nosnippet>369</a>    }
+<a href=#370 id=370 data-nosnippet>370</a>
+<a href=#371 id=371 data-nosnippet>371</a>    <span class="doccomment">/// Iterate all the blocks in the queue. Call the visitor for each reported block.
+<a href=#372 id=372 data-nosnippet>372</a>    </span><span class="kw">pub fn </span>iterate_blocks(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>f: <span class="kw">impl </span>FnMut(Block)) {
+<a href=#373 id=373 data-nosnippet>373</a>        <span class="self">self</span>.queue.iterate_blocks(<span class="kw-2">&amp;mut </span>f);
+<a href=#374 id=374 data-nosnippet>374</a>    }
+<a href=#375 id=375 data-nosnippet>375</a>
+<a href=#376 id=376 data-nosnippet>376</a>    <span class="doccomment">/// Flush the block queue
+<a href=#377 id=377 data-nosnippet>377</a>    </span><span class="kw">pub fn </span>flush_all(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+<a href=#378 id=378 data-nosnippet>378</a>        <span class="self">self</span>.queue.flush_all();
+<a href=#379 id=379 data-nosnippet>379</a>    }
+<a href=#380 id=380 data-nosnippet>380</a>}
+<a href=#381 id=381 data-nosnippet>381</a>
+<a href=#382 id=382 data-nosnippet>382</a><span class="doccomment">/// The result of sweeping a block.  Mainly used for statistics.
+<a href=#383 id=383 data-nosnippet>383</a></span><span class="kw">pub enum </span>BlockSweepResult {
+<a href=#384 id=384 data-nosnippet>384</a>    <span class="doccomment">/// The block is completely free.
+<a href=#385 id=385 data-nosnippet>385</a>    </span>Swept,
+<a href=#386 id=386 data-nosnippet>386</a>    <span class="doccomment">/// The block is partially free, and is reused.
+<a href=#387 id=387 data-nosnippet>387</a>    </span>Reused,
+<a href=#388 id=388 data-nosnippet>388</a>    <span class="doccomment">/// The block cannot be reused.  When [`super::BLOCK_ONLY`] is true, it is returned whenever a
+<a href=#389 id=389 data-nosnippet>389</a>    /// block is not completely free.  Otherwise it is returned when a block is full.
+<a href=#390 id=390 data-nosnippet>390</a>    </span>NoReuse,
+<a href=#391 id=391 data-nosnippet>391</a>}</code></pre></div></section></main></body></html>

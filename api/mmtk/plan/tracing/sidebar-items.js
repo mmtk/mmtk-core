@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["ObjectsClosure","SlotIterator","VectorQueue"],"trait":["ObjectQueue"],"type":["VectorObjectQueue"]};
+window.SIDEBAR_ITEMS = {"struct":["PlanTrace","SFTTrace","SlotIterator","UnsupportedTrace","VectorQueue"],"trait":["ObjectQueue","Trace"],"type":["OptionObjectQueue","SlotOfTrace","VectorObjectQueue"]};

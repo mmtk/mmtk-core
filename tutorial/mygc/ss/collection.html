@@ -237,13 +237,13 @@ will invoke code from the bindings to scan threads and other roots, and those
 scanning work will further push work for a transitive closure.</p>
 <p>Though you can add those work packets by yourself, <code>GCWorkScheduler</code> provides a
 method <code>schedule_common_work()</code> that will add common work packets for you.</p>
-<p>To use <code>schedule_common_work()</code>, first we need to create a type <code>MyGCWorkContext</code>
-and implement the trait <code>GCWorkContext</code> for it. We create <code>gc_work.rs</code> and add the
-following implementation. Note that we will use the default
-<a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html"><code>SFTProcessEdges</code></a>,
-which is a general work packet that a plan can use to trace objects. For plans
-like semispace, <code>SFTProcessEdges</code> is sufficient. For more complex GC plans,
-one can create and write their own work packet that implements the <code>ProcessEdgesWork</code> trait.
+<p>To use <code>schedule_common_work()</code>, first we need to create a type <code>MyGCWorkContext</code> and implement the trait <code>GCWorkContext</code> for it.
+We create <code>gc_work.rs</code> and add the following implementation.
+Note that we don't override the <code>GCWorkContext::make_roots_work_factory</code> method.
+By default, it will use the <code>DefaultRootsWorkFactory</code> which is sufficient for stop-the-world tracing GC.
+Also note that we will use the default <a href="https://docs.mmtk.io/api/mmtk/plan/tracing/struct.SFTTrace.html"><code>SFTTrace</code></a> which provides a general way to trace object.
+For plans like semispace, <code>SFTTrace</code> is sufficient.
+For more complex GC plans, one can create their own implementaitons of the <a href="https://docs.mmtk.io/api/mmtk/plan/tracing/trait.Trace.html"><code>Trace</code></a> trait.
 We will discuss about this later, and discuss the alternatives.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -251,8 +251,8 @@ We will discuss about this later, and discuss the alternatives.</p>
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt;VM&gt; {
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
-    type DefaultProcessEdges = SFTProcessEdges&lt;Self::VM&gt;;
-    type PinningProcessEdges = UnsupportedProcessEdges&lt;Self::VM&gt;;
+    type DefaultTrace = SFTTrace&lt;Self::VM&gt;;
+    type PinningTrace = UnsupportedTrace&lt;Self::VM&gt;;
 }
 <span class="boring">}</span></code></pre></pre>
 <p>Then we implement <code>schedule_collection()</code> using <code>MyGCWorkContext</code> and <code>schedule_common_work()</code>.</p>
@@ -292,7 +292,7 @@ call, and add the following code:</p>
 spaces in the common plan, flips the definitions for which space is 'to'
 and which is 'from', then prepares the copyspaces with the new definition.</p>
 <p>Note that we call <code>set_copy_for_sft_trace()</code> for both spaces. This step is required
-when using <code>SFTProcessEdges</code> to tell the spaces which copy semantic to use for copying.
+when using <code>SFTTrace</code> to tell the spaces which copy semantic to use for copying.
 For fromspace, we use the <code>DefaultCopy</code> semantic, which we have defined earlier in our <code>CopyConfig</code>.
 So for objects in fromspace that need to be copied, the policy will use the copy context that binds with
 <code>DefaultCopy</code> (which allocates to the tospace) in the GC worker. For tospace, we set its
@@ -379,27 +379,22 @@ allocation semantics to the new tospace. When the mutator threads resume, any ne
         self.common.end_of_gc(tls);
     }
 <span class="boring">}</span></code></pre></pre>
-<h2 id="processedgeswork-for-mygc"><a class="header" href="#processedgeswork-for-mygc">ProcessEdgesWork for MyGC</a></h2>
-<p><a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html"><code>ProcessEdgesWork</code></a>
-is the key work packet for tracing objects in a GC. A <code>ProcessEdgesWork</code> implementation
-defines how to trace objects, and how to generate more work packets based on the current tracing
-to finish the object closure.</p>
-<p><code>GCWorkContext</code> specifies a type
-that implements <code>ProcessEdgesWork</code>, and we used <code>SFTProcessEdges</code> earlier. In
-this section, we discuss what <code>SFTProcessEdges</code> does, and what the alternatives
-are.</p>
-<h3 id="approach-1-use-sftprocessedges"><a class="header" href="#approach-1-use-sftprocessedges">Approach 1: Use <code>SFTProcessEdges</code></a></h3>
-<p><a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html"><code>SFTProcessEdges</code></a> dispatches
-the tracing of objects to their respective spaces through <a href="https://docs.mmtk.io/api/mmtk/policy/sft/trait.SFT.html">Space Function Table (SFT)</a>.
-As long as all the policies in a plan provide an implementation of <code>sft_trace_object()</code> in their SFT implementations,
-the plan can use <code>SFTProcessEdges</code>. Currently most policies provide an implementation for <code>sft_trace_object()</code>, except
-mark compact and immix. Those two policies use multiple GC traces, and due to the limitation of SFT, SFT does not allow
+<h2 id="implementing-the-trace-trait-for-mygc"><a class="header" href="#implementing-the-trace-trait-for-mygc">Implementing the Trace trait for MyGC</a></h2>
+<p>The <a href="https://docs.mmtk.io/api/mmtk/plan/tracing/trait.Trace.html"><code>Trace</code></a> trait is key for tracing objects in a GC.
+A <code>Trace</code> implementation defines how to trace objects.</p>
+<p><code>GCWorkContext</code> specifies a type that implements <code>Trace</code>, and we used <code>SFTTrace</code> earlier.
+In this section, we discuss what <code>Trace</code> does, and what the alternatives are.</p>
+<h3 id="approach-1-use-sfttrace"><a class="header" href="#approach-1-use-sfttrace">Approach 1: Use <code>SFTTrace</code></a></h3>
+<p><a href="https://docs.mmtk.io/api/mmtk/plan/tracing/struct.SFTTrace.html"><code>SFTTrace</code></a> dispatches the tracing of objects to their respective spaces through <a href="https://docs.mmtk.io/api/mmtk/policy/sft/trait.SFT.html">Space Function Table (SFT)</a>.
+As long as all the policies in a plan provide an implementation of <code>sft_trace_object()</code> in their SFT implementations, the plan can use <code>SFTTrace</code>.
+Currently most policies provide an implementation for <code>sft_trace_object()</code>, except mark compact and immix.
+Those two policies use multiple GC traces, and due to the limitation of SFT, SFT does not allow
 multiple <code>sft_trace_object()</code> for a policy.</p>
-<p><code>SFTProcessEdges</code> is the simplest approach when all the policies support it. Fortunately, we can use it for our GC, semispace.</p>
-<h3 id="approach-2-derive-plantraceobject-and-use-planprocessedges"><a class="header" href="#approach-2-derive-plantraceobject-and-use-planprocessedges">Approach 2: Derive <code>PlanTraceObject</code> and use <code>PlanProcessEdges</code></a></h3>
-<p><code>PlanProcessEdges</code> is another general <code>ProcessEdgesWork</code> implementation that can be used by most plans. When a plan
-implements the <a href="https://docs.mmtk.io/api/mmtk/plan/global/trait.PlanTraceObject.html"><code>PlanTraceObject</code></a>,
-it can use <code>PlanProcessEdges</code>.</p>
+<p><code>SFTTrace</code> is the simplest approach when all the policies support it.
+Fortunately, we can use it for our GC, semispace.</p>
+<h3 id="approach-2-derive-plantraceobject-and-use-plantrace"><a class="header" href="#approach-2-derive-plantraceobject-and-use-plantrace">Approach 2: Derive <code>PlanTraceObject</code> and use <code>PlanTrace</code></a></h3>
+<p><a href="https://docs.mmtk.io/api/mmtk/plan/tracing/struct.PlanTrace.html"><code>PlanTrace</code></a> is another general <code>Trace</code> implementation that can be used by most plans.
+When a plan implements the <a href="https://docs.mmtk.io/api/mmtk/plan/global/trait.PlanTraceObject.html"><code>PlanTraceObject</code></a>, it can use <code>PlanTrace</code>.</p>
 <p>You can manually provide an implementation of <code>PlanTraceObject</code> for <code>MyGC</code>. But you can also use the derive macro MMTK provides,
 and the macro will generate an implementation of <code>PlanTraceObject</code>:</p>
 <ul>
@@ -434,60 +429,70 @@ pub struct MyGC&lt;VM: VMBinding&gt; {
     pub common: CommonPlan&lt;VM&gt;,
 }
 <span class="boring">}</span></code></pre></pre>
-<p>Once this is done, you can specify <code>PlanProcessEdges</code> as the <code>DefaultProcessEdges</code> in your GC work context:</p>
+<p>Once this is done, you can specify <code>PlanTrace</code> as the <code>DefaultTrace</code> in your GC work context:</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use crate::policy::gc_work::DEFAULT_TRACE;
-use crate::scheduler::gc_work::PlanProcessEdges;
+</span>use crate::plan::tracing::PlanTrace;
+use crate::policy::gc_work::DEFAULT_TRACE;
 pub struct MyGCWorkContext2&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext2&lt;VM&gt; {
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
-    type DefaultProcessEdges = PlanProcessEdges&lt;Self::VM, MyGC&lt;VM&gt;, DEFAULT_TRACE&gt;;
-    type PinningProcessEdges = UnsupportedProcessEdges&lt;Self::VM&gt;;
+    type DefaultTrace = PlanTrace&lt;MyGC&lt;VM&gt;, DEFAULT_TRACE&gt;;
+    type PinningTrace = UnsupportedTrace&lt;Self::VM&gt;;
 }
 <span class="boring">}</span></code></pre></pre>
-<h3 id="approach-3-implement-your-own-processedgeswork"><a class="header" href="#approach-3-implement-your-own-processedgeswork">Approach 3: Implement your own <code>ProcessEdgesWork</code></a></h3>
-<p>Apart from the two approaches above, you can always implement your own <code>ProcessEdgesWork</code>. This is
-an overkill for simple plans like semi space, but might be necessary for more complex plans.
+<h3 id="approach-3-implement-your-own-trace"><a class="header" href="#approach-3-implement-your-own-trace">Approach 3: Implement your own <code>Trace</code></a></h3>
+<p>Apart from the two approaches above, you can always implement your own <code>Trace</code>.
+This is an overkill for simple plans like semi space, but might be necessary for more complex plans.
 We discuss how to implement it for <code>MyGC</code>.</p>
-<p>Create a struct <code>MyGCProcessEdges&lt;VM: VMBinding&gt;</code> in the <code>gc_work</code> module. It includes a reference
-back to the plan, and a <code>ProcessEdgesBase</code> field:</p>
+<p>Create a struct <code>MyGCTrace&lt;VM: VMBinding&gt;</code> in the <code>gc_work</code> module.
+It includes only a reference back to the plan.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>pub struct MyGCProcessEdges&lt;VM: VMBinding&gt; {
+</span>pub struct MyGCTrace&lt;VM: VMBinding&gt; {
     plan: &amp;'static MyGC&lt;VM&gt;,
-    base: ProcessEdgesBase&lt;VM&gt;,
 }
 <span class="boring">}</span></code></pre></pre>
-<p>Implement <code>ProcessEdgesWork</code> for <code>MyGCProcessEdges</code>. As most methods in the trait have a default
-implemetation, we only need to implement <code>new()</code> and <code>trace_object()</code> for our plan. However, this
-may not be true when you implement it for other GC plans. It would be better to check the default
-implementation of <code>ProcessEdgesWork</code>.</p>
+<p>The <code>Trace</code> trait requires the <code>Clone</code> trait,
+but you usually can't use <code>#[derive(Clone)]</code> because <code>&lt;VM: VMBinding&gt;</code> does not implement <code>Clone</code>.
+You have to implement <code>Clone</code> manually, but it is trivial to do.</p>
+<pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl&lt;VM: VMBinding&gt; Clone for MyGCTrace&lt;VM&gt; {
+    fn clone(&amp;self) -&gt; Self {
+        Self { plan: self.plan }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Then implement <code>Trace</code> for <code>MyGCTrace</code>.
+It has a <code>VM</code> type member and several methods.
+See the comments in the example code below for more details.</p>
 <p>For <code>trace_object()</code>, what we do is similar to the approach above (except that we need to write the code
 ourselves rather than letting the macro to generate it for us). We try to figure out
 which space the object is in, and invoke <code>trace_object()</code> for the object on that space. If the
 object is not in any of the semi spaces in the plan, we forward the call to <code>CommonPlan</code>.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>impl&lt;VM: VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
+</span>impl&lt;VM: VMBinding&gt; Trace for MyGCTrace&lt;VM&gt; {
     type VM = VM;
-    type ScanObjectsWorkType = ScanObjects&lt;Self&gt;;
 
-    fn new(
-        slots: Vec&lt;SlotOf&lt;Self&gt;&gt;,
-        roots: bool,
-        mmtk: &amp;'static MMTK&lt;VM&gt;,
-        bucket: WorkBucketStage,
-    ) -&gt; Self {
-        let base = ProcessEdgesBase::new(slots, roots, mmtk, bucket);
-        let plan = base.plan().downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
-        Self { base, plan }
+    fn from_mmtk(mmtk: &amp;'static MMTK&lt;Self::VM&gt;) -&gt; Self {
+        // Instantiate `MyGCTrace` from a reference to `MMTK`.
+        // We need to extract the plan reference, and it is sufficient to use downcast.
+        Self {
+            plan: mmtk.get_plan().downcast_ref().unwrap(),
+        }
     }
 
-    fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
-        let worker = self.worker();
-        let queue = &amp;mut self.base.nodes;
+    fn trace_object&lt;Q: crate::ObjectQueue&gt;(
+        &amp;self,
+        worker: &amp;mut crate::scheduler::GCWorker&lt;Self::VM&gt;,
+        object: ObjectReference,
+        queue: &amp;mut Q,
+    ) -&gt; ObjectReference {
+        // We figure out which space the `object` is in,
+        // and call the `trace_object` method of that space.
         if self.plan.tospace().in_space(object) {
             self.plan.tospace().trace_object(
                 queue,
@@ -503,43 +508,42 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
                 worker,
             )
         } else {
+            // If the `object` is in neither the fromspace nor the tospace,
+            // we delegate to the `CommonPlan`.
             use crate::plan::PlanTraceObject;
             use crate::policy::gc_work::DEFAULT_TRACE;
-            self.plan.common.trace_object::&lt;_, DEFAULT_TRACE&gt;(queue, object, worker)
+            self.plan
+                .common
+                .trace_object::&lt;_, DEFAULT_TRACE&gt;(queue, object, worker)
         }
     }
 
-    fn create_scan_work(&amp;self, nodes: Vec&lt;ObjectReference&gt;) -&gt; Option&lt;ScanObjects&lt;Self&gt;&gt; {
-        Some(ScanObjects::&lt;Self&gt;::new(nodes, false, self.bucket))
-    }
-}
-<span class="boring">}</span></code></pre></pre>
-<p>We would also need to implement <code>Deref</code> and <code>DerefMut</code> to our <code>ProcessEdgesWork</code> impl to be
-dereferenced as <code>ProcessEdgesBase</code>.</p>
-<pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>impl&lt;VM: VMBinding&gt; Deref for MyGCProcessEdges&lt;VM&gt; {
-    type Target = ProcessEdgesBase&lt;VM&gt;;
-    fn deref(&amp;self) -&gt; &amp;Self::Target {
-        &amp;self.base
-    }
-}
+    fn post_scan_object(&amp;self, object: ObjectReference) {
+        // Currently only `ImmixSpace` needs `post_scan_object`.
+        // `CopySpace` does not need the `post_scan_object` method,
+        // so we don't need to call `post_scan_object` on the fromspace or the tospace.
 
-impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
-    fn deref_mut(&amp;mut self) -&gt; &amp;mut Self::Target {
-        &amp;mut self.base
+        // We need to call the `post_scan_object` method of the common plan
+        // because by default the non-moving space is an `ImmixSpace`.
+        use crate::plan::PlanTraceObject;
+        self.plan.common.post_scan_object(object);
+    }
+
+    fn may_move_objects() -&gt; bool {
+        // We return `true` because SemiSpace moves every single reachable object in the from space.
+        true
     }
 }
 <span class="boring">}</span></code></pre></pre>
-<p>In the end, use <code>MyGCProcessEdges</code> as <code>DefaultProcessEdges</code> in the <code>GCWorkContext</code>:</p>
+<p>In the end, use <code>MyGCTrace</code> as <code>DefaultTrace</code> in the <code>GCWorkContext</code>:</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct MyGCWorkContext3&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext3&lt;VM&gt; {
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
-    type DefaultProcessEdges = MyGCProcessEdges&lt;Self::VM&gt;;
-    type PinningProcessEdges = UnsupportedProcessEdges&lt;Self::VM&gt;;
+    type DefaultTrace = MyGCTrace&lt;Self::VM&gt;;
+    type PinningTrace = UnsupportedTrace&lt;Self::VM&gt;;
 }
 <span class="boring">}</span></code></pre></pre>
 <h2 id="summary"><a class="header" href="#summary">Summary</a></h2>

@@ -893,67 +893,63 @@
 <a href=#893 id=893 data-nosnippet>893</a>    </span><span class="kw">fn </span>for_each_space_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>, func: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(<span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;));
 <a href=#894 id=894 data-nosnippet>894</a>}
 <a href=#895 id=895 data-nosnippet>895</a>
-<a href=#896 id=896 data-nosnippet>896</a><span class="doccomment">/// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.
+<a href=#896 id=896 data-nosnippet>896</a><span class="doccomment">/// A plan that uses [`PlanTrace`] needs to provide an implementation for this trait.
 <a href=#897 id=897 data-nosnippet>897</a>/// Generally a plan does not need to manually implement this trait. Instead, we provide
 <a href=#898 id=898 data-nosnippet>898</a>/// a procedural macro that helps generate an implementation. Please check `macros/trace_object`.
 <a href=#899 id=899 data-nosnippet>899</a>///
 <a href=#900 id=900 data-nosnippet>900</a>/// A plan could also manually implement this trait. For the sake of performance, the implementation
 <a href=#901 id=901 data-nosnippet>901</a>/// of this trait should mark methods as `[inline(always)]`.
-<a href=#902 id=902 data-nosnippet>902</a></span><span class="kw">pub trait </span>PlanTraceObject&lt;VM: VMBinding&gt; {
-<a href=#903 id=903 data-nosnippet>903</a>    <span class="doccomment">/// Trace objects in the plan. Generally one needs to figure out
-<a href=#904 id=904 data-nosnippet>904</a>    /// which space an object resides in, and invokes the corresponding policy
-<a href=#905 id=905 data-nosnippet>905</a>    /// trace object method.
+<a href=#902 id=902 data-nosnippet>902</a>///
+<a href=#903 id=903 data-nosnippet>903</a>/// [`PlanTrace`]: crate::plan::tracing::PlanTrace
+<a href=#904 id=904 data-nosnippet>904</a></span><span class="kw">pub trait </span>PlanTraceObject&lt;VM: VMBinding&gt; {
+<a href=#905 id=905 data-nosnippet>905</a>    <span class="doccomment">/// Trace objects in the plan.
 <a href=#906 id=906 data-nosnippet>906</a>    ///
-<a href=#907 id=907 data-nosnippet>907</a>    /// Arguments:
-<a href=#908 id=908 data-nosnippet>908</a>    /// * `trace`: the current transitive closure
-<a href=#909 id=909 data-nosnippet>909</a>    /// * `object`: the object to trace.
-<a href=#910 id=910 data-nosnippet>910</a>    /// * `worker`: the GC worker that is tracing this object.
-<a href=#911 id=911 data-nosnippet>911</a>    </span><span class="kw">fn </span>trace_object&lt;Q: ObjectQueue, <span class="kw">const </span>KIND: TraceKind&gt;(
-<a href=#912 id=912 data-nosnippet>912</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
-<a href=#913 id=913 data-nosnippet>913</a>        queue: <span class="kw-2">&amp;mut </span>Q,
-<a href=#914 id=914 data-nosnippet>914</a>        object: ObjectReference,
-<a href=#915 id=915 data-nosnippet>915</a>        worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
-<a href=#916 id=916 data-nosnippet>916</a>    ) -&gt; ObjectReference;
-<a href=#917 id=917 data-nosnippet>917</a>
-<a href=#918 id=918 data-nosnippet>918</a>    <span class="doccomment">/// Post-scan objects in the plan. Each object is scanned by `VM::VMScanning::scan_object()`, and this function
-<a href=#919 id=919 data-nosnippet>919</a>    /// will be called after the `VM::VMScanning::scan_object()` as a hook to invoke possible policy post scan method.
-<a href=#920 id=920 data-nosnippet>920</a>    /// If a plan does not have any policy that needs post scan, this method can be implemented as empty.
-<a href=#921 id=921 data-nosnippet>921</a>    /// If a plan has a policy that has some policy specific behaviors for scanning (e.g. mark lines in Immix),
-<a href=#922 id=922 data-nosnippet>922</a>    /// this method should also invoke those policy specific methods for objects in that space.
-<a href=#923 id=923 data-nosnippet>923</a>    </span><span class="kw">fn </span>post_scan_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference);
-<a href=#924 id=924 data-nosnippet>924</a>
-<a href=#925 id=925 data-nosnippet>925</a>    <span class="doccomment">/// Whether objects in this plan may move. If any of the spaces used by the plan may move objects, this should
-<a href=#926 id=926 data-nosnippet>926</a>    /// return true.
-<a href=#927 id=927 data-nosnippet>927</a>    </span><span class="kw">fn </span>may_move_objects&lt;<span class="kw">const </span>KIND: TraceKind&gt;() -&gt; bool;
-<a href=#928 id=928 data-nosnippet>928</a>}
-<a href=#929 id=929 data-nosnippet>929</a>
-<a href=#930 id=930 data-nosnippet>930</a><span class="kw">use </span>enum_map::Enum;
-<a href=#931 id=931 data-nosnippet>931</a><span class="doccomment">/// Allocation semantics that MMTk provides.
-<a href=#932 id=932 data-nosnippet>932</a>/// Each allocation request requires a desired semantic for the object to allocate.
-<a href=#933 id=933 data-nosnippet>933</a></span><span class="attr">#[repr(i32)]
-<a href=#934 id=934 data-nosnippet>934</a>#[derive(Clone, Copy, Debug, Enum, PartialEq, Eq)]
-<a href=#935 id=935 data-nosnippet>935</a></span><span class="kw">pub enum </span>AllocationSemantics {
-<a href=#936 id=936 data-nosnippet>936</a>    <span class="doccomment">/// The default semantic. This means there is no specific requirement for the allocation.
-<a href=#937 id=937 data-nosnippet>937</a>    /// The actual semantic of the default will depend on the GC plan in use.
-<a href=#938 id=938 data-nosnippet>938</a>    </span>Default = <span class="number">0</span>,
-<a href=#939 id=939 data-nosnippet>939</a>    <span class="doccomment">/// Immortal objects will not be reclaimed. MMTk still traces immortal objects, but will not
-<a href=#940 id=940 data-nosnippet>940</a>    /// reclaim the objects even if they are dead.
-<a href=#941 id=941 data-nosnippet>941</a>    </span>Immortal = <span class="number">1</span>,
-<a href=#942 id=942 data-nosnippet>942</a>    <span class="doccomment">/// Large objects. It is usually desirable to allocate large objects specially. Large objects
-<a href=#943 id=943 data-nosnippet>943</a>    /// are allocated with page granularity and will not be moved.
-<a href=#944 id=944 data-nosnippet>944</a>    /// Each plan provides `max_non_los_default_alloc_bytes` (see [`crate::plan::PlanConstraints`]),
-<a href=#945 id=945 data-nosnippet>945</a>    /// which defines a threshold for objects that can be allocated with the default semantic. Any object that is larger than the
-<a href=#946 id=946 data-nosnippet>946</a>    /// threshold must be allocated with the `Los` semantic.
-<a href=#947 id=947 data-nosnippet>947</a>    /// This semantic may get removed and MMTk will transparently allocate into large object space for large objects.
-<a href=#948 id=948 data-nosnippet>948</a>    </span>Los = <span class="number">2</span>,
-<a href=#949 id=949 data-nosnippet>949</a>    <span class="doccomment">/// Code objects have execution permission.
-<a href=#950 id=950 data-nosnippet>950</a>    /// Note that this is a place holder for now. Currently all the memory MMTk allocates has execution permission.
-<a href=#951 id=951 data-nosnippet>951</a>    </span>Code = <span class="number">3</span>,
-<a href=#952 id=952 data-nosnippet>952</a>    <span class="doccomment">/// Read-only objects cannot be mutated once it is initialized.
-<a href=#953 id=953 data-nosnippet>953</a>    /// Note that this is a place holder for now. It does not provide read only semantic.
-<a href=#954 id=954 data-nosnippet>954</a>    </span>ReadOnly = <span class="number">4</span>,
-<a href=#955 id=955 data-nosnippet>955</a>    <span class="doccomment">/// Los + Code.
-<a href=#956 id=956 data-nosnippet>956</a>    </span>LargeCode = <span class="number">5</span>,
-<a href=#957 id=957 data-nosnippet>957</a>    <span class="doccomment">/// Non moving objects will not be moved by GC.
-<a href=#958 id=958 data-nosnippet>958</a>    </span>NonMoving = <span class="number">6</span>,
-<a href=#959 id=959 data-nosnippet>959</a>}</code></pre></div></section></main></body></html>
+<a href=#907 id=907 data-nosnippet>907</a>    /// See [`crate::plan::tracing::Trace::trace_object`].
+<a href=#908 id=908 data-nosnippet>908</a>    </span><span class="kw">fn </span>trace_object&lt;Q: ObjectQueue, <span class="kw">const </span>KIND: TraceKind&gt;(
+<a href=#909 id=909 data-nosnippet>909</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#910 id=910 data-nosnippet>910</a>        queue: <span class="kw-2">&amp;mut </span>Q,
+<a href=#911 id=911 data-nosnippet>911</a>        object: ObjectReference,
+<a href=#912 id=912 data-nosnippet>912</a>        worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
+<a href=#913 id=913 data-nosnippet>913</a>    ) -&gt; ObjectReference;
+<a href=#914 id=914 data-nosnippet>914</a>
+<a href=#915 id=915 data-nosnippet>915</a>    <span class="doccomment">/// Post-scan objects in the plan.
+<a href=#916 id=916 data-nosnippet>916</a>    ///
+<a href=#917 id=917 data-nosnippet>917</a>    /// See [`crate::plan::tracing::Trace::post_scan_object`].
+<a href=#918 id=918 data-nosnippet>918</a>    </span><span class="kw">fn </span>post_scan_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference);
+<a href=#919 id=919 data-nosnippet>919</a>
+<a href=#920 id=920 data-nosnippet>920</a>    <span class="doccomment">/// Whether objects in this plan may move.
+<a href=#921 id=921 data-nosnippet>921</a>    ///
+<a href=#922 id=922 data-nosnippet>922</a>    /// See [`crate::plan::tracing::Trace::post_scan_object`].
+<a href=#923 id=923 data-nosnippet>923</a>    </span><span class="kw">fn </span>may_move_objects&lt;<span class="kw">const </span>KIND: TraceKind&gt;() -&gt; bool;
+<a href=#924 id=924 data-nosnippet>924</a>}
+<a href=#925 id=925 data-nosnippet>925</a>
+<a href=#926 id=926 data-nosnippet>926</a><span class="kw">use </span>enum_map::Enum;
+<a href=#927 id=927 data-nosnippet>927</a><span class="doccomment">/// Allocation semantics that MMTk provides.
+<a href=#928 id=928 data-nosnippet>928</a>/// Each allocation request requires a desired semantic for the object to allocate.
+<a href=#929 id=929 data-nosnippet>929</a></span><span class="attr">#[repr(i32)]
+<a href=#930 id=930 data-nosnippet>930</a>#[derive(Clone, Copy, Debug, Enum, PartialEq, Eq)]
+<a href=#931 id=931 data-nosnippet>931</a></span><span class="kw">pub enum </span>AllocationSemantics {
+<a href=#932 id=932 data-nosnippet>932</a>    <span class="doccomment">/// The default semantic. This means there is no specific requirement for the allocation.
+<a href=#933 id=933 data-nosnippet>933</a>    /// The actual semantic of the default will depend on the GC plan in use.
+<a href=#934 id=934 data-nosnippet>934</a>    </span>Default = <span class="number">0</span>,
+<a href=#935 id=935 data-nosnippet>935</a>    <span class="doccomment">/// Immortal objects will not be reclaimed. MMTk still traces immortal objects, but will not
+<a href=#936 id=936 data-nosnippet>936</a>    /// reclaim the objects even if they are dead.
+<a href=#937 id=937 data-nosnippet>937</a>    </span>Immortal = <span class="number">1</span>,
+<a href=#938 id=938 data-nosnippet>938</a>    <span class="doccomment">/// Large objects. It is usually desirable to allocate large objects specially. Large objects
+<a href=#939 id=939 data-nosnippet>939</a>    /// are allocated with page granularity and will not be moved.
+<a href=#940 id=940 data-nosnippet>940</a>    /// Each plan provides `max_non_los_default_alloc_bytes` (see [`crate::plan::PlanConstraints`]),
+<a href=#941 id=941 data-nosnippet>941</a>    /// which defines a threshold for objects that can be allocated with the default semantic. Any object that is larger than the
+<a href=#942 id=942 data-nosnippet>942</a>    /// threshold must be allocated with the `Los` semantic.
+<a href=#943 id=943 data-nosnippet>943</a>    /// This semantic may get removed and MMTk will transparently allocate into large object space for large objects.
+<a href=#944 id=944 data-nosnippet>944</a>    </span>Los = <span class="number">2</span>,
+<a href=#945 id=945 data-nosnippet>945</a>    <span class="doccomment">/// Code objects have execution permission.
+<a href=#946 id=946 data-nosnippet>946</a>    /// Note that this is a place holder for now. Currently all the memory MMTk allocates has execution permission.
+<a href=#947 id=947 data-nosnippet>947</a>    </span>Code = <span class="number">3</span>,
+<a href=#948 id=948 data-nosnippet>948</a>    <span class="doccomment">/// Read-only objects cannot be mutated once it is initialized.
+<a href=#949 id=949 data-nosnippet>949</a>    /// Note that this is a place holder for now. It does not provide read only semantic.
+<a href=#950 id=950 data-nosnippet>950</a>    </span>ReadOnly = <span class="number">4</span>,
+<a href=#951 id=951 data-nosnippet>951</a>    <span class="doccomment">/// Los + Code.
+<a href=#952 id=952 data-nosnippet>952</a>    </span>LargeCode = <span class="number">5</span>,
+<a href=#953 id=953 data-nosnippet>953</a>    <span class="doccomment">/// Non moving objects will not be moved by GC.
+<a href=#954 id=954 data-nosnippet>954</a>    </span>NonMoving = <span class="number">6</span>,
+<a href=#955 id=955 data-nosnippet>955</a>}</code></pre></div></section></main></body></html>

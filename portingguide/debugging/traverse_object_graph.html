@@ -204,6 +204,18 @@ Then, to ensure you know which GC cycle you’re in, set breakpoints at the star
 </code></pre>
 <p>These breakpoints help you detect if replay takes you into a different GC than the one that crashed.</p>
 <h2 id="step-2-identify-the-slot-that-loaded-the-object"><a class="header" href="#step-2-identify-the-slot-that-loaded-the-object">Step 2: Identify the Slot that Loaded the Object</a></h2>
+<div id="admonition-note" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-title">
+<div class="admonition-title">
+<div id="admonition-note-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-note"></a>
+</div>
+<div>
+<p>This example uses an old version of MMTk, but the principles are still applicable.
+<strong>The current work packet that loads from slots is <code>ProcessSlots</code>.</strong></p>
+</div>
+</div>
 <p>Object references are usually loaded from slots in <a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html#method.process_slot"><code>ProcessEdgesWork::process_slot</code></a>.
 Most MMTk plans use <a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html#method.process_slot"><code>PlanProcessEdges</code> which implements this method like this</a>:</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]

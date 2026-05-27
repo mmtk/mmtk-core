@@ -168,7 +168,7 @@
 <a href=#168 id=168 data-nosnippet>168</a>                PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
 <a href=#169 id=169 data-nosnippet>169</a>            };
 <a href=#170 id=170 data-nosnippet>170</a>            <span class="self">self</span>.work_buckets[WorkBucketStage::SoftRefClosure]
-<a href=#171 id=171 data-nosnippet>171</a>                .add(SoftRefProcessing::&lt;C::DefaultProcessEdges&gt;::new());
+<a href=#171 id=171 data-nosnippet>171</a>                .add(SoftRefProcessing::&lt;C::DefaultTrace&gt;::new());
 <a href=#172 id=172 data-nosnippet>172</a>            <span class="self">self</span>.work_buckets[WorkBucketStage::WeakRefClosure].add(WeakRefProcessing::&lt;VM&gt;::new());
 <a href=#173 id=173 data-nosnippet>173</a>            <span class="self">self</span>.work_buckets[WorkBucketStage::PhantomRefClosure]
 <a href=#174 id=174 data-nosnippet>174</a>                .add(PhantomRefProcessing::&lt;VM&gt;::new());
@@ -176,7 +176,7 @@
 <a href=#176 id=176 data-nosnippet>176</a>            <span class="kw">use </span><span class="kw">crate</span>::util::reference_processor::RefForwarding;
 <a href=#177 id=177 data-nosnippet>177</a>            <span class="kw">if </span>plan.constraints().needs_forward_after_liveness {
 <a href=#178 id=178 data-nosnippet>178</a>                <span class="self">self</span>.work_buckets[WorkBucketStage::RefForwarding]
-<a href=#179 id=179 data-nosnippet>179</a>                    .add(RefForwarding::&lt;C::DefaultProcessEdges&gt;::new());
+<a href=#179 id=179 data-nosnippet>179</a>                    .add(RefForwarding::&lt;C::DefaultTrace&gt;::new());
 <a href=#180 id=180 data-nosnippet>180</a>            }
 <a href=#181 id=181 data-nosnippet>181</a>
 <a href=#182 id=182 data-nosnippet>182</a>            <span class="kw">use </span><span class="kw">crate</span>::util::reference_processor::RefEnqueue;
@@ -188,11 +188,11 @@
 <a href=#188 id=188 data-nosnippet>188</a>            <span class="kw">use </span><span class="kw">crate</span>::util::finalizable_processor::{Finalization, ForwardFinalization};
 <a href=#189 id=189 data-nosnippet>189</a>            <span class="comment">// finalization
 <a href=#190 id=190 data-nosnippet>190</a>            </span><span class="self">self</span>.work_buckets[WorkBucketStage::FinalRefClosure]
-<a href=#191 id=191 data-nosnippet>191</a>                .add(Finalization::&lt;C::DefaultProcessEdges&gt;::new());
+<a href=#191 id=191 data-nosnippet>191</a>                .add(Finalization::&lt;C::DefaultTrace&gt;::new());
 <a href=#192 id=192 data-nosnippet>192</a>            <span class="comment">// forward refs
 <a href=#193 id=193 data-nosnippet>193</a>            </span><span class="kw">if </span>plan.constraints().needs_forward_after_liveness {
 <a href=#194 id=194 data-nosnippet>194</a>                <span class="self">self</span>.work_buckets[WorkBucketStage::FinalizableForwarding]
-<a href=#195 id=195 data-nosnippet>195</a>                    .add(ForwardFinalization::&lt;C::DefaultProcessEdges&gt;::new());
+<a href=#195 id=195 data-nosnippet>195</a>                    .add(ForwardFinalization::&lt;C::DefaultTrace&gt;::new());
 <a href=#196 id=196 data-nosnippet>196</a>            }
 <a href=#197 id=197 data-nosnippet>197</a>        }
 <a href=#198 id=198 data-nosnippet>198</a>
@@ -218,12 +218,12 @@
 <a href=#218 id=218 data-nosnippet>218</a>        // because there are no other packets in the bucket.  We set it as sentinel for
 <a href=#219 id=219 data-nosnippet>219</a>        // consistency.
 <a href=#220 id=220 data-nosnippet>220</a>        </span><span class="self">self</span>.work_buckets[WorkBucketStage::VMRefClosure]
-<a href=#221 id=221 data-nosnippet>221</a>            .set_sentinel(Box::new(VMProcessWeakRefs::&lt;C::DefaultProcessEdges&gt;::new()));
+<a href=#221 id=221 data-nosnippet>221</a>            .set_sentinel(Box::new(VMProcessWeakRefs::&lt;C::DefaultTrace&gt;::new()));
 <a href=#222 id=222 data-nosnippet>222</a>
 <a href=#223 id=223 data-nosnippet>223</a>        <span class="kw">if </span>plan.constraints().needs_forward_after_liveness {
 <a href=#224 id=224 data-nosnippet>224</a>            <span class="comment">// VM-specific weak ref forwarding
 <a href=#225 id=225 data-nosnippet>225</a>            </span><span class="self">self</span>.work_buckets[WorkBucketStage::VMRefForwarding]
-<a href=#226 id=226 data-nosnippet>226</a>                .add(VMForwardWeakRefs::&lt;C::DefaultProcessEdges&gt;::new());
+<a href=#226 id=226 data-nosnippet>226</a>                .add(VMForwardWeakRefs::&lt;C::DefaultTrace&gt;::new());
 <a href=#227 id=227 data-nosnippet>227</a>        }
 <a href=#228 id=228 data-nosnippet>228</a>
 <a href=#229 id=229 data-nosnippet>229</a>        <span class="self">self</span>.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::&lt;VM&gt;::default());

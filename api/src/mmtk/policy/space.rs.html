@@ -375,7 +375,7 @@
 <a href=#375 id=375 data-nosnippet>375</a>    <span class="kw">fn </span>release_multiple_pages(<span class="kw-2">&amp;mut </span><span class="self">self</span>, start: Address);
 <a href=#376 id=376 data-nosnippet>376</a>
 <a href=#377 id=377 data-nosnippet>377</a>    <span class="doccomment">/// What copy semantic we should use for this space if we copy objects from this space.
-<a href=#378 id=378 data-nosnippet>378</a>    /// This is only needed for plans that use SFTProcessEdges
+<a href=#378 id=378 data-nosnippet>378</a>    /// This is only needed for plans that use [`crate::plan::tracing::SFTTrace`].
 <a href=#379 id=379 data-nosnippet>379</a>    </span><span class="kw">fn </span>set_copy_for_sft_trace(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _semantics: <span class="prelude-ty">Option</span>&lt;CopySemantics&gt;) {
 <a href=#380 id=380 data-nosnippet>380</a>        <span class="macro">panic!</span>(<span class="string">"A copying space should override this method"</span>)
 <a href=#381 id=381 data-nosnippet>381</a>    }

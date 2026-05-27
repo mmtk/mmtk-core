@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["ConcurrentTraceObjects","ProcessModBufSATB","ProcessRootSlots"]};
+window.SIDEBAR_ITEMS = {"struct":["ConcurrentMarkingRootsWorkFactory","ConcurrentTraceObjects","ProcessModBufSATB"]};

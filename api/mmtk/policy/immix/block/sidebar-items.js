@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["BlockState"],"struct":["Block","ReusableBlockPool"]};
+window.SIDEBAR_ITEMS = {"enum":["BlockState","BlockSweepResult"],"struct":["Block","ReusableBlockPool"]};
