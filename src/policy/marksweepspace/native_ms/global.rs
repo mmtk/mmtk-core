@@ -20,8 +20,7 @@ use crate::{
 #[cfg(feature = "vo_bit")]
 use crate::util::Address;
 
-use crate::plan::ObjectQueue;
-use crate::plan::VectorObjectQueue;
+use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::alloc::allocator::AllocationOptions;
@@ -214,7 +213,7 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
 
     fn sft_trace_object(
         &self,
-        queue: &mut VectorObjectQueue,
+        queue: &mut OptionObjectQueue,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
@@ -646,7 +645,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             block.sweep::<VM>();
             allocated_blocks += 1;
         }
-        probe!(mmtk, sweep_chunk, allocated_blocks);
+        probe!(mmtk, sweep_chunk_ms, allocated_blocks);
         // Set this chunk as free if there is not live blocks.
         if allocated_blocks == 0 {
             self.space.chunk_map.set_allocated(self.chunk, false);

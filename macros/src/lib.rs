@@ -31,7 +31,7 @@ pub fn derive_has_spaces(input: TokenStream) -> TokenStream {
 }
 
 /// The macro will generate an implementation of `PlanTraceObject` for the plan. With
-/// `PlanTraceObject`, the plan will be able to use `PlanProcessEdges` for GC tracing.
+/// `PlanTraceObject`, the plan will be able to use `PlanTrace` for GC tracing.
 ///
 /// The user should add `#[space]` and `#[parent]` attributes to fields as specified by the
 /// `HasSpaces` trait.  When using this derive macro, all spaces must implement the

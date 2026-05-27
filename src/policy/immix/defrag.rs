@@ -80,8 +80,35 @@ impl Defrag {
                 || !exhausted_reusable_space
                 || stress_defrag
                 || (collect_whole_heap && user_triggered && full_heap_system_gc));
-        info!("Defrag: {}", in_defrag);
-        probe!(mmtk, immix_defrag, in_defrag);
+
+        {
+            // These details are useful for debugging why a debug GC is triggered or not triggered.
+            // We encode those conditions into a bitfield because we can't pass too many args to the
+            // eBPF tracer via the USDT arguments.
+            let decision_word = (defrag_enabled as u32)
+                | (emergency_collection as u32) << 1
+                | (collect_whole_heap as u32) << 2
+                | (user_triggered as u32) << 3
+                | (exhausted_reusable_space as u32) << 4
+                | (full_heap_system_gc as u32) << 5
+                | (stress_defrag as u32) << 6;
+
+            info!(
+                "Defrag: {i}, collection_attempts: {c}, decision_word: 0b{d:b}",
+                i = in_defrag,
+                c = collection_attempts,
+                d = decision_word,
+            );
+
+            probe!(
+                mmtk,
+                immix_defrag,
+                in_defrag,
+                collection_attempts,
+                decision_word
+            );
+        }
+
         self.in_defrag_collection
             .store(in_defrag, Ordering::Release)
     }

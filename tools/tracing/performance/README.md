@@ -152,48 +152,28 @@ If you can't tell which lock instance is for which lock in MMTk, you can trace
 the allocation of the Mutex and record the stack trace (note that you might want
 to compile MMTk with `force-frame-pointers` to obtain better stack traces).
 
-### Measuring the distribution of `ProcessEdgesWork` packet sizes (`packet_size`)
+### Measuring the distribution of `ProcessSlots` packet sizes (`packet_size`)
 
 Most of the GC time is spend in the transitive closure for tracing-based GCs, and MMTk performs
-transitive closure via work packets that implement `ProcessEdgesWork` and call the `process_slots`
-method. This tool measures the distribution of the sizes (as the number of slots) of these work
-packets, and also counts root slots separately.
+transitive closure via the `ProcessSlots` work packet which visits slots in objects. This tool
+measures the distribution of the sizes (as the number of slots) of these work packets.
 
 Sample output:
 ```
-@process_edges_work_packet_size:
-[1]                  238 |@@@@@                                               |
-[2, 4)               806 |@@@@@@@@@@@@@@@@@                                   |
-[4, 8)              1453 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                     |
-[8, 16)             1105 |@@@@@@@@@@@@@@@@@@@@@@@                             |
-[16, 32)            2410 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|
-[32, 64)            1317 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@                        |
-[64, 128)           1252 |@@@@@@@@@@@@@@@@@@@@@@@@@@@                         |
-[128, 256)          1131 |@@@@@@@@@@@@@@@@@@@@@@@@                            |
-[256, 512)          2017 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@         |
-[512, 1K)           1270 |@@@@@@@@@@@@@@@@@@@@@@@@@@@                         |
-[1K, 2K)            1028 |@@@@@@@@@@@@@@@@@@@@@@                              |
-[2K, 4K)             874 |@@@@@@@@@@@@@@@@@@                                  |
-[4K, 8K)            1024 |@@@@@@@@@@@@@@@@@@@@@@                              |
-[8K, 16K)             58 |@                                                   |
-[16K, 32K)             5 |                                                    |
-
-@process_edges_work_root_packet_size:
-[1]                   71 |@@@@@@@                                             |
-[2, 4)                 4 |                                                    |
-[4, 8)               276 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@                        |
-[8, 16)              495 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|
-[16, 32)             477 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  |
-[32, 64)             344 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                |
-[64, 128)            242 |@@@@@@@@@@@@@@@@@@@@@@@@@                           |
-[128, 256)           109 |@@@@@@@@@@@                                         |
-[256, 512)            31 |@@@                                                 |
-[512, 1K)             33 |@@@                                                 |
-[1K, 2K)              75 |@@@@@@@                                             |
-[2K, 4K)              75 |@@@@@@@                                             |
-[4K, 8K)             336 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                 |
-[8K, 16K)             56 |@@@@@                                               |
-[16K, 32K)             3 |                                                    |
+@process_slots_work_packet_size:
+[1]                15144 |@@@@@@@@@@@@@@@@                                    |
+[2, 4)             14540 |@@@@@@@@@@@@@@@                                     |
+[4, 8)             16861 |@@@@@@@@@@@@@@@@@@                                  |
+[8, 16)            24268 |@@@@@@@@@@@@@@@@@@@@@@@@@@                          |
+[16, 32)           48300 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|
+[32, 64)           29524 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                     |
+[64, 128)          20160 |@@@@@@@@@@@@@@@@@@@@@                               |
+[128, 256)         10694 |@@@@@@@@@@@                                         |
+[256, 512)         15610 |@@@@@@@@@@@@@@@@                                    |
+[512, 1K)          14104 |@@@@@@@@@@@@@@@                                     |
+[1K, 2K)            2252 |@@                                                  |
+[2K, 4K)            2128 |@@                                                  |
+[4K, 8K)            3488 |@@@                                                 |
 ```
 
 In the above output, we can see that overall, the number of slots processed by a invocation of

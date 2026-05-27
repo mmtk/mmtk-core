@@ -6,26 +6,36 @@ import json
 import re
 import sys
 from collections import defaultdict
-from enum import Enum
+import enum
 from importlib.machinery import SourceFileLoader
 
 RE_TYPE_ID = re.compile(r"\d+")
 UNKNOWN_TYPE = "(unknown)"
 
-class RootsKind(Enum):
+class RootsKind(enum.Enum):
     NORMAL = 0
     PINNING = 1
     TPINNING = 2
 
-class Semantics(Enum):
+class Semantics(enum.Enum):
     SOFT = 0
     WEAK = 1
     PHANTOM = 2
 
-class Pause(Enum):
+class Pause(enum.Enum):
     FULL = 1
     INITIAL_MARK = 2
     FINAL_MARK = 3
+
+class DefragDecisionWord(enum.Flag):
+    # Note: Keep in sync with ``Defrag::decide_whether_to_defrag``
+    defrag_enabled              = enum.auto()
+    emergency_collection        = enum.auto()
+    collect_whole_heap          = enum.auto()
+    user_triggered              = enum.auto()
+    exhausted_reusable_space    = enum.auto()
+    full_heap_system_gc         = enum.auto()
+    stress_defrag               = enum.auto()
 
 def get_args():
     parser = argparse.ArgumentParser(
@@ -87,12 +97,12 @@ class LogProcessor:
         parts = line.split(",") # Split by comma.
         try:
             name, ph, tid, ts = parts[:4] # Extract the first four columns.
+            tid = int(tid)
+            ts = int(ts)
+            args = parts[4:] # `args` will hold other columns.
         except:
             print("Abnormal line: {}".format(line))
             raise
-        tid = int(tid)
-        ts = int(ts)
-        args = parts[4:] # `args` will hold other columns.
 
         if not self.start_time:
             self.start_time = ts
@@ -202,8 +212,14 @@ class LogProcessor:
                     }
 
                 case "immix_defrag":
+                    decision_word = int(args[2])
+                    decision_flags = DefragDecisionWord(decision_word)
+                    desicion_details = {f.name : (f in decision_flags) for f in DefragDecisionWord}
                     gc["args"] |= {
                         "immix_is_defrag_gc": bool(int(args[0])),
+                        "collection_attempts": int(args[1]),
+                        "decision_word": decision_word,
+                        "desicion_details": desicion_details,
                     }
 
                 case "concurrent_pause_determined":
@@ -249,21 +265,20 @@ class LogProcessor:
 
                 case "process_slots":
                     wp["args"] |= {
-                        # Group args by "process_slots" and "scan_objects" because a ProcessEdgesWork
+                        # Group args by "process_slots" and "process_nodes" because a ProcessSlots
                         # work packet may do both if SCAN_OBJECTS_IMMEDIATELY is true.
                         "process_slots": {
                             "num_slots": int(args[0]),
-                            "is_roots": int(args[1]),
                         },
                     }
 
-                case "scan_objects":
+                case "process_nodes":
                     total_scanned = int(args[0])
                     scan_and_trace = int(args[1])
                     scan_for_slots = total_scanned - scan_and_trace
                     wp["args"] |= {
                         # Put args in a group.  See comments in "process_slots".
-                        "scan_objects": {
+                        "process_nodes": {
                             "total_scanned": total_scanned,
                             "scan_for_slots": scan_for_slots,
                             "scan_and_trace": scan_and_trace,
@@ -271,23 +286,26 @@ class LogProcessor:
                     }
 
                 case "concurrent_trace_objects":
-                    objects = int(args[0])
-                    next_objects = int(args[1])
-                    iterations = int(args[2])
-                    total_objects = objects + next_objects
+                    initial = int(args[0])
+                    queued = int(args[1])
                     wp["args"] |= {
                         # Put args in a group.  See comments in "process_slots".
-                        "scan_objects": {
-                            "objects": objects,
-                            "next_objects": next_objects,
-                            "total_objects": total_objects,
-                            "iterations": iterations,
+                        "concurrent_trace_objects": {
+                            "initial": initial,
+                            "queued": queued,
                         }
                     }
 
-                case "sweep_chunk":
+                case "sweep_chunk_ms":
                     wp["args"] |= {
                         "allocated_blocks": int(args[0]),
+                    }
+
+                case "sweep_chunk_immix":
+                    wp["args"] |= {
+                        "swept_blocks": int(args[0]),
+                        "reused_blocks": int(args[1]),
+                        "unreused_blocks": int(args[2]),
                     }
 
                 case "finalization":
@@ -350,12 +368,18 @@ class LogProcessor:
     def run(self, input_file):
         print("Parsing lines...")
         with open(input_file) as f:
+            started = False
             start_time = None
 
             for line in f.readlines():
                 line = line.strip()
 
-                self.process_line(line)
+                if started:
+                    self.process_line(line)
+                elif line == "====MMTK:CUT_HERE====":
+                    # Some recent versions of bpftrace print warning messages in the beginning of stdout.
+                    # We skip lines until we see the marker.
+                    started = True
 
         output_name = input_file + ".json.gz"
 
