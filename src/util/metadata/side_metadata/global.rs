@@ -1177,7 +1177,11 @@ impl SideMetadataSpec {
         let region_bytes = 1 << self.log_bytes_in_region;
         // Figure out the range that we need to search.
         let start_addr = data_addr.align_down(region_bytes);
-        let end_addr = data_addr + search_limit_bytes - 1usize;
+        // We need to align the end_address up because the metadata might be stored right at
+        // the end address otherwise. Our loop in `find_first_non_zero_bit_in_metadata_byte`
+        // will not load from this end address, resulting in us potentially not finding the
+        // correct address for the next set bit.
+        let end_addr = (data_addr + search_limit_bytes).align_up(region_bytes);
 
         let mut cursor = start_addr;
         while cursor < end_addr {
@@ -1212,7 +1216,11 @@ impl SideMetadataSpec {
 
         // Figure out the start and end data address.
         let start_addr = data_addr.align_down(1 << self.log_bytes_in_region);
-        let end_addr = data_addr + search_limit_bytes - 1usize;
+        // We need to align the end_address up because the metadata might be stored right at
+        // the end address otherwise. Our loop in `find_first_non_zero_bit_in_metadata_byte`
+        // will not load from this end address, resulting in us potentially not finding the
+        // correct address for the next set bit.
+        let end_addr = (data_addr + search_limit_bytes).align_up(1 << self.log_bytes_in_region);
 
         // Then figure out the start and end metadata address and bits.
         // The start bit may not be accurate, as we map any address in the region to the same bit.
@@ -2224,6 +2232,85 @@ mod tests {
                             let start_addr = data_addr + len;
                             // Use len+1, as len is non inclusive.
                             let res_addr = unsafe { spec.find_prev_non_zero_value::<$type>(start_addr, len + 1) };
+                            assert!(res_addr.is_none());
+                        }
+                    });
+                }
+
+                #[test]
+                fn [<$tname _find_next_non_zero_value_easy>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, _meta_addr| {
+                        let max_value: $type = max_value($log_bits) as _;
+                        // Store non zero value at data_addr
+                        spec.store_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
+
+                        // Find the value starting from data_addr, at max 8 bytes.
+                        // We should find data_addr
+                        let res_addr = unsafe { spec.find_next_non_zero_value::<$type>(data_addr, 8) };
+                        assert!(res_addr.is_some());
+                        assert_eq!(res_addr.unwrap(), data_addr);
+                    });
+                }
+
+                #[test]
+                fn [<$tname _find_next_non_zero_value_arbitrary_bytes>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, _meta_addr| {
+                        let max_value: $type = max_value($log_bits) as _;
+                        let test_region = (1 << TEST_LOG_BYTES_IN_REGION);
+
+                        // Take a data address in the middle since metadata before
+                        // the start may not be mapped
+                        let data_addr = data_addr + test_region*4;
+
+                        // Store non zero value at data_addr
+                        spec.store_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
+                        assert_eq!(spec.load_atomic::<$type>(data_addr, Ordering::SeqCst), max_value);
+
+                        // Start from data_addr, we offset arbitrary length, and search forwards to find data_addr
+                        for len in 1..(test_region*4) {
+                            let start_addr = data_addr - len;
+                            // Use len+1, as len is non inclusive.
+                            let res_addr = unsafe { spec.find_next_non_zero_value::<$type>(start_addr, len + 1) };
+                            assert!(res_addr.is_some());
+                            assert_eq!(res_addr.unwrap(), data_addr);
+                        }
+                    });
+                }
+
+                #[test]
+                fn [<$tname _find_next_non_zero_value_arbitrary_start>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, _meta_addr| {
+                        let max_value: $type = max_value($log_bits) as _;
+
+                        // data_addr has a non-aligned offset
+                        for offset in 0..7usize {
+                            // Apply offset and test with the new data addr
+                            let test_data_addr = data_addr + offset;
+                            spec.store_atomic::<$type>(test_data_addr, max_value, Ordering::SeqCst);
+
+                            // The return result should be aligned
+                            let res_addr = unsafe { spec.find_next_non_zero_value::<$type>(test_data_addr, 4096) };
+                            assert!(res_addr.is_some());
+                            assert_eq!(res_addr.unwrap(), data_addr);
+
+                            // Clear whatever is set
+                            spec.store_atomic::<$type>(test_data_addr, 0, Ordering::SeqCst);
+                        }
+                    });
+                }
+
+                #[test]
+                fn [<$tname _find_next_non_zero_value_no_find>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, _meta_addr| {
+                        // Store zero value at data_addr -- so we won't find anything
+                        spec.store_atomic::<$type>(data_addr, 0, Ordering::SeqCst);
+
+                        // Start from data_addr, we offset arbitrary length, and search back
+                        let test_region = (1 << TEST_LOG_BYTES_IN_REGION);
+                        for len in 1..(test_region*4) {
+                            let start_addr = data_addr - len;
+                            // Use len+1, as len is non inclusive.
+                            let res_addr = unsafe { spec.find_next_non_zero_value::<$type>(start_addr, len + 1) };
                             assert!(res_addr.is_none());
                         }
                     });
