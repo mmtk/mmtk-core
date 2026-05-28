@@ -120,6 +120,8 @@ impl<VM: VMBinding, DT: Trace<VM = VM>, PT: Trace<VM = VM>> DefaultRootsWorkFact
 /// Because pinning roots by definition cannot be updated, we don't need to represent the edges as a
 /// [`Slot`].
 ///
+/// [`Slot`]: crate::vm::slot::Slot
+///
 /// The `roots` member holds a list of `ObjectReference` to objects directly pointed by roots. These
 /// objects will be traced using `R2OT` (Root-to-Object Trace).
 ///
