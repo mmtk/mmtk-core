@@ -66,6 +66,11 @@ impl WorkerGoals {
         self.current
     }
 
+    /// Return true if there are pending requests that have not been promoted to the current goal.
+    pub fn has_pending_requests(&self) -> bool {
+        self.requests.iter().any(|(_, requested)| *requested)
+    }
+
     /// Called when the current goal is completed.  This will clear the current goal.
     pub fn on_current_goal_completed(&mut self) {
         probe!(mmtk, goal_complete);

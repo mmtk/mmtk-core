@@ -422,9 +422,41 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             }
 
             let ordinal = worker.ordinal;
-            self.worker_monitor
-                .park_and_wait(ordinal, |goals| self.on_last_parked(worker, goals))?;
+            self.worker_monitor.park_and_wait(
+                ordinal,
+                |goals| self.on_last_parked(worker, goals),
+                |goals| self.may_worker_unpark(worker, goals),
+            )?;
         }
+    }
+
+    fn concurrent_worker_count(&self, worker: &GCWorker<VM>) -> usize {
+        (*worker.mmtk.get_options().concurrent_threads).min(self.num_workers())
+    }
+
+    fn may_worker_unpark(&self, worker: &GCWorker<VM>, goals: &WorkerGoals) -> bool {
+        if goals.current().is_some() || goals.has_pending_requests() {
+            return true;
+        }
+
+        let concurrent_workers = self.concurrent_worker_count(worker);
+        let should_unpark = worker.ordinal < concurrent_workers;
+        if should_unpark {
+            debug!(
+                "Worker {} resumes for concurrent work (concurrent_threads={}, total_workers={}).",
+                worker.ordinal,
+                concurrent_workers,
+                self.num_workers()
+            );
+        } else {
+            debug!(
+                "Worker {} stays parked for concurrent work (concurrent_threads={}, total_workers={}).",
+                worker.ordinal,
+                concurrent_workers,
+                self.num_workers()
+            );
+        }
+        should_unpark
     }
 
     /// Called when the last worker parked.  `goal` allows this function to inspect and change the
@@ -616,6 +648,15 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         mmtk.state.reset_collection_trigger();
 
         let concurrent_work_scheduled = self.schedule_concurrent_packets();
+        if concurrent_work_scheduled {
+            let concurrent_workers =
+                (*mmtk.get_options().concurrent_threads).min(self.num_workers());
+            debug!(
+                "Concurrent work scheduled. Allowing worker ordinals [0, {}) out of {} total workers to resume.",
+                concurrent_workers,
+                self.num_workers()
+            );
+        }
         self.debug_assert_all_stw_buckets_closed();
 
         // Set to NotInGC after everything, and right before resuming mutators.
