@@ -5,6 +5,9 @@ use super::gc_work::{
 use crate::plan::global::CommonPlan;
 use crate::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 use crate::plan::markcompact::mutator::ALLOCATOR_MAPPING;
+use crate::plan::tracing::gc_work::weakref::{
+    VMForwardWeakRefs, VMPostForwarding, VMProcessWeakRefs,
+};
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
