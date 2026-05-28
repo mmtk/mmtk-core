@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::{
     plan::{
-        tracing::{gc_work::weakref::DefaultObjectTracerContext, SlotOfTrace, Trace},
+        tracing::{gc_work::DefaultObjectTracerContext, SlotOfTrace, Trace},
         VectorObjectQueue, VectorQueue,
     },
     scheduler::{GCWork, GCWorker, WorkBucketStage},

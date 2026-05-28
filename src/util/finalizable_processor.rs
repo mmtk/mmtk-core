@@ -1,5 +1,5 @@
 use crate::plan::is_nursery_gc;
-use crate::plan::tracing::gc_work::weakref::DefaultObjectTracerContext;
+use crate::plan::tracing::gc_work::DefaultObjectTracerContext;
 use crate::plan::tracing::Trace;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
 use crate::util::reference_processor::RescanReferences;
