@@ -254,6 +254,12 @@ impl<VM: VMBinding> GCWorker<VM> {
             std::hint::black_box(unsafe { *(typename.as_ptr()) });
 
             probe!(mmtk, work, typename.as_ptr(), typename.len());
+            debug_assert!(
+                self.scheduler().is_worker_active(self.ordinal),
+                "Worker {} is executing {} while inactive.",
+                self.ordinal,
+                typename
+            );
             work.do_work_with_stat(&mut self, mmtk);
         }
         debug!(

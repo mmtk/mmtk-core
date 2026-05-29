@@ -122,7 +122,7 @@ impl WorkerMonitor {
         self.active_workers.load(Ordering::SeqCst)
     }
 
-    fn is_worker_active(&self, ordinal: usize) -> bool {
+    pub(crate) fn is_worker_active(&self, ordinal: usize) -> bool {
         ordinal < self.active_workers()
     }
 
