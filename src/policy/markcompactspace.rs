@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use super::sft::SFT;
 use super::space::{CommonSpace, Space};
-use crate::plan::VectorObjectQueue;
+use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::scheduler::GCWorker;
@@ -13,7 +13,7 @@ use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::{extract_side_metadata, vo_bit};
 use crate::util::object_enum::{self, ObjectEnumerator};
 use crate::util::{Address, ObjectReference};
-use crate::{vm::*, ObjectQueue};
+use crate::vm::*;
 use atomic::Ordering;
 
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
@@ -92,7 +92,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
 
     fn sft_trace_object(
         &self,
-        _queue: &mut VectorObjectQueue,
+        _queue: &mut OptionObjectQueue,
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {

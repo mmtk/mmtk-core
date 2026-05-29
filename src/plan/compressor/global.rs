@@ -1,7 +1,5 @@
 use super::gc_work::CompressorWorkContext;
-use super::gc_work::{
-    AfterCompact, ForwardingProcessEdges, GenerateWork, MarkingProcessEdges, UpdateReferences,
-};
+use super::gc_work::{AfterCompact, ForwardingTrace, GenerateWork, MarkingTrace, UpdateReferences};
 use crate::plan::compressor::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
@@ -81,9 +79,8 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        // TODO use schedule_common once it can work with the Compressor
-        // The main issue there is that we need to ForwardingProcessEdges
-        // in FinalizableForwarding.
+        // TODO: Extract a method similar to `GCWorkScheduler::schedule_common_work`
+        // but for compressing plans.
 
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
@@ -120,7 +117,7 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
                 PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
             };
             scheduler.work_buckets[WorkBucketStage::SoftRefClosure]
-                .add(SoftRefProcessing::<MarkingProcessEdges<VM>>::new());
+                .add(SoftRefProcessing::<MarkingTrace<VM>>::new());
             scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
                 .add(WeakRefProcessing::<VM>::new());
             scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
@@ -128,7 +125,7 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
 
             use crate::util::reference_processor::RefForwarding;
             scheduler.work_buckets[WorkBucketStage::RefForwarding]
-                .add(RefForwarding::<ForwardingProcessEdges<VM>>::new());
+                .add(RefForwarding::<ForwardingTrace<VM>>::new());
 
             use crate::util::reference_processor::RefEnqueue;
             scheduler.work_buckets[WorkBucketStage::Release].add(RefEnqueue::<VM>::new());
@@ -141,20 +138,20 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
             // treat finalizable objects as roots and perform a closure (marking)
             // must be done before calculating forwarding pointers
             scheduler.work_buckets[WorkBucketStage::FinalRefClosure]
-                .add(Finalization::<MarkingProcessEdges<VM>>::new());
+                .add(Finalization::<MarkingTrace<VM>>::new());
             // update finalizable object references
             // must be done before compacting
             scheduler.work_buckets[WorkBucketStage::FinalizableForwarding]
-                .add(ForwardFinalization::<ForwardingProcessEdges<VM>>::new());
+                .add(ForwardFinalization::<ForwardingTrace<VM>>::new());
         }
 
         // VM-specific weak ref processing
         scheduler.work_buckets[WorkBucketStage::VMRefClosure]
-            .set_sentinel(Box::new(VMProcessWeakRefs::<MarkingProcessEdges<VM>>::new()));
+            .set_sentinel(Box::new(VMProcessWeakRefs::<MarkingTrace<VM>>::new()));
 
         // VM-specific weak ref forwarding
         scheduler.work_buckets[WorkBucketStage::VMRefForwarding]
-            .add(VMForwardWeakRefs::<ForwardingProcessEdges<VM>>::new());
+            .add(VMForwardWeakRefs::<ForwardingTrace<VM>>::new());
 
         // VM-specific work after forwarding, possible to implement ref enququing.
         scheduler.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());

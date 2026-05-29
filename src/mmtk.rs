@@ -359,6 +359,7 @@ impl<VM: VMBinding> MMTK<VM> {
     }
 
     #[cfg(feature = "sanity")]
+    #[allow(unused)]
     pub(crate) fn is_in_sanity(&self) -> bool {
         self.inside_sanity.load(Ordering::Relaxed)
     }

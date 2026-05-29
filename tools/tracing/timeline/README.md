@@ -47,33 +47,63 @@ Run the command and it will prompt you for root password because the script inte
 like:
 
 ```
-Attaching 48 probes...
+...
+Attached 26 probes
+====MMTK:CUT_HERE====
 ```
 
 Then open another terminal, and run OpenJDK with MMTk.
 
 ```shell
-/path/to/openjdk/build/linux-x86_64-normal-server-release/images/jdk/bin/java -XX:+UseThirdPartyHeap -Xm{s,x}100M -jar dacapo-23.11-chopin.jar lusearch
+/path/to/openjdk/build/linux-x86_64-normal-server-release/images/jdk/bin/java -XX:+UseThirdPartyHeap -Xm{s,x}100M -jar dacapo-23.11-MR2-chopin.jar lusearch
 ```
 
 You should see logs showing in the terminal that runs `./capture.py`, like this:
 
 ```
+gc_requested,i,115708,41346432406164
+GC,B,115715,41346432462341
+add_schedule_collection_packet,i,115715,41346432468032
+WORK,B,115715,41346432479346,139898594718525,44
+gen_full_heap,meta,115715,41346432489359,0
+WORK,E,115715,41346432495607,139898594718525
+WORK,B,115715,41346432497946,139898594597858,139
+WORK,E,115715,41346432980636,139898594597858
+WORK,B,115735,41346432982788,139898594600309,143
+WORK,B,115715,41346432987786,139898594600309,143
+WORK,B,115719,41346432987930,139898594590104,134
+roots,meta,115735,41346432990728,0,2
+WORK,E,115735,41346432993943,139898594600309
+roots,meta,115715,41346432994917,0,2
+WORK,B,115735,41346432994988,139898594600309,143
+WORK,E,115715,41346432997876,139898594600309
 ...
-WORK,E,23151,19072307551777,140188748267562
-WORK,B,23162,19072307551916,140188748272882,143
-WORK,E,23160,19072307551959,140188748279315
-WORK,B,23150,19072307552199,140188748259188,42
-WORK,B,23151,19072307552801,140188748259188,42
-WORK,E,23150,19072307553295,140188748259188
-WORK,B,23160,19072307553315,140188748259188,42
-WORK,E,23151,19072307553701,140188748259188
-WORK,E,23160,19072307554493,140188748259188
-WORK,E,23156,19072307554636,140188748272882
-WORK,B,23151,19072307554917,140188748272882,143
-WORK,B,23150,19072307555142,140188748327402,406
-WORK,E,23162,19072307555309,140188748272882
-Lost 2027780 events
+WORK,E,115718,41348748729880,139898594642010
+WORK,E,115737,41348748730014,139898594642010
+BUCKET_OPEN,i,115718,41348748734550,18
+plan_end_of_gc,B,115718,41348748735895
+plan_end_of_gc,E,115718,41348748737804
+GC,E,115718,41348748739984
+gc_requested,i,115770,41348751350234
+GC,B,115731,41348751375660
+add_schedule_collection_packet,i,115731,41348751379012
+gen_full_heap,meta,115731,41348751386384,0
+GC,E,115720,41348752182137
+gc_requested,i,115776,41348755704518
+GC,B,115725,41348755720047
+add_schedule_collection_packet,i,115725,41348755722343
+gen_full_heap,meta,115725,41348755726909,0
+GC,E,115734,41348756510361
+gc_requested,i,115776,41348761478421
+GC,B,115720,41348761493600
+add_schedule_collection_packet,i,115720,41348761497245
+gen_full_heap,meta,115720,41348761504991,0
+GC,E,115734,41348762194242
+gc_requested,i,115783,41348768675807
+GC,B,115722,41348768696679
+add_schedule_collection_packet,i,115722,41348768700538
+gen_full_heap,meta,115722,41348768709878,0
+GC,E,115737,41348769408588
 ```
 
 Then press CTRL+C in the terminal that runs `./capture.py`.  It should print additional logs and
@@ -81,12 +111,13 @@ then exit, like this:
 
 ```
 ...
-@type_name[140188748468414]: mmtk::util::finalizable_processor::Finalization<mmtk::plan::gen
-@type_name[140188748468841]: mmtk::util::finalizable_processor::Finalization<mmtk::scheduler
-@type_name[140188748470271]: mmtk::util::finalizable_processor::Finalization<mmtk::scheduler
-@type_name[140188748475639]: mmtk::plan::generational::gc_work::ProcessModBuf<mmtk::plan::ge
-@type_name[140188748476795]: mmtk::plan::generational::gc_work::ProcessRegionModBuf<mmtk::pl
-@type_name[140188748477674]: mmtk::plan::generational::gc_work::GenNurseryProcessEdges<mmtk_
+@type_name[139898594718525]: mmtk::scheduler::gc_work::ScheduleCollectio
+@type_name[139898594718727]: mmtk::scheduler::gc_work::VMProcessWeakRefs<mmtk::plan::tracing::PlanTrace<mmtk::plan::generational::immix::global::GenImmix<mmtk_openjdk::OpenJDK<true>>, 0>
+@type_name[139898594720646]: mmtk::scheduler::gc_work::VMProcessWeakRefs<mmtk::plan::generational::gc_work::GenNurseryTrace<mmtk_openjdk::OpenJDK<true>, mmtk::plan::generational::immix::global::GenImmix<mmtk_openjdk::OpenJDK<true>>, u8::MAX>
+@type_name[139898594723178]: mmtk::util::reference_processor::RescanReferences<mmtk_openjdk::OpenJDK<true>
+@type_name[139898594724717]: mmtk_openjdk::gc_work::FixRelocation
+@type_name[139898594731250]: mmtk::scheduler::gc_work::ProcessSlots<mmtk::plan::tracing::PlanTrace<mmtk::plan::generational::immix::global::GenImmix<mmtk_openjdk::OpenJDK<true>>, 0>
+@type_name[139898594731554]: mmtk::scheduler::gc_work::ProcessSlots<mmtk::plan::generational::gc_work::GenNurseryTrace<mmtk_openjdk::OpenJDK<true>, mmtk::plan::generational::immix::global::GenImmix<mmtk_openjdk::OpenJDK<true>>, u8::MAX>
 ```
 
 This means things are working properly.  Now re-run `./capture.py` again, but pipe the STDOUT into a
@@ -118,7 +149,7 @@ and specify the callbacks properly according to your benchmark suite. For exampl
     -Xm{s,x}100M \
     -Djava.library.path=/path/to/probes/out \
     -Dprobes=RustMMTk
-    -cp /path/to/probes/out/probes.jar:/path/to/dacapo-23.11-chopin.jar \
+    -cp /path/to/probes/out/probes.jar:/path/to/dacapo-23.11-MR2-chopin.jar \
     Harness -c probe.DacapoChopinCallback lusearch
 ```
 

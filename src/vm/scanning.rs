@@ -43,31 +43,29 @@ impl<F: FnMut(ObjectReference) -> ObjectReference> ObjectTracer for F {
     }
 }
 
-/// An `ObjectTracerContext` gives a GC worker temporary access to an `ObjectTracer`, allowing
-/// the GC worker to trace objects.  This trait is intended to abstract out the implementation
-/// details of tracing objects, enqueuing objects, and creating work packets that expand the
-/// transitive closure, allowing the VM binding to focus on VM-specific parts.
+/// An `ObjectTracerContext` gives a GC worker temporary access to an [`ObjectTracer`], allowing the
+/// GC worker to trace objects.  This trait is intended to abstract out the implementation details
+/// of tracing objects, enqueuing objects, and creating work packets that expand the transitive
+/// closure, allowing the VM binding to focus on VM-specific parts.
 ///
 /// This trait is used during root scanning and binding-side weak reference processing.
 pub trait ObjectTracerContext<VM: VMBinding>: Clone + Send + 'static {
-    /// The concrete `ObjectTracer` type.
+    /// The concrete [`ObjectTracer`] type.
     ///
-    /// FIXME: The current code works because of the unsafe method `ProcessEdgesWork::set_worker`.
-    /// The tracer should borrow the worker passed to `with_queuing_tracer` during its lifetime.
-    /// For this reason, `TracerType` should have a `<'w>` lifetime parameter.
-    /// Generic Associated Types (GAT) is already stablized in Rust 1.65.
-    /// We should update our toolchain version, too.
-    type TracerType: ObjectTracer;
+    /// The lifetime parameter `'w` is the lifetime of the `&'w mut GCWorker<VM>` passed to the
+    /// [`Self::with_tracer`] method.  It is borrowed by the [`ObjectTracer`] passed to the `func`
+    /// callback of [`Self::with_tracer`].
+    type TracerType<'w>: ObjectTracer;
 
-    /// Create a temporary `ObjectTracer` and provide access in the scope of `func`.
+    /// Create a temporary [`ObjectTracer`] and provide access in the scope of `func`.
     ///
-    /// When the `ObjectTracer::trace_object` is called, if the traced object is first visited
-    /// in this transitive closure, it will be enqueued.  After `func` returns, the implememtation
-    /// will create work packets to continue computing the transitive closure from the newly
-    /// enqueued objects.
+    /// When [`ObjectTracer::trace_object`] is called, if the traced object is first visited in this
+    /// transitive closure, it will be enqueued.  After `func` returns, the implememtation will
+    /// create work packets to continue computing the transitive closure from the newly enqueued
+    /// objects.
     ///
-    /// API functions that provide `QueuingTracerFactory` should document
-    /// 1.  on which fields the user is supposed to call `ObjectTracer::trace_object`, and
+    /// API functions that provide [`ObjectTracerContext`] should document
+    /// 1.  on which fields the user is supposed to call [`ObjectTracer::trace_object`], and
     /// 2.  which work bucket the generated work packet will be added to.  Sometimes the user needs
     ///     to know when the computing of transitive closure finishes.
     ///
@@ -76,9 +74,9 @@ pub trait ObjectTracerContext<VM: VMBinding>: Clone + Send + 'static {
     /// -   `func`: A caller-supplied closure in which the created `ObjectTracer` can be used.
     ///
     /// Returns: The return value of `func`.
-    fn with_tracer<R, F>(&self, worker: &mut GCWorker<VM>, func: F) -> R
+    fn with_tracer<'w, R, F>(&self, worker: &'w mut GCWorker<VM>, func: F) -> R
     where
-        F: FnOnce(&mut Self::TracerType) -> R;
+        F: FnOnce(&mut Self::TracerType<'w>) -> R;
 }
 
 /// Root-scanning methods use this trait to create work packets for processing roots.

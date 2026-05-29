@@ -9,7 +9,7 @@ use crate::util::metadata::mark_bit::MarkState;
 use crate::util::object_enum::{self, ObjectEnumerator};
 use crate::util::{metadata, ObjectReference};
 
-use crate::plan::{ObjectQueue, VectorObjectQueue};
+use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 
 use crate::policy::sft::GCWorkerMutRef;
 use crate::vm::{ObjectModel, VMBinding};
@@ -79,7 +79,7 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     }
     fn sft_trace_object(
         &self,
-        queue: &mut VectorObjectQueue,
+        queue: &mut OptionObjectQueue,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
