@@ -8,6 +8,7 @@ use crate::util::metadata::side_metadata::layout::*;
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::os::*;
 use crate::util::Address;
+use crate::MMAPPER;
 use num_traits::FromPrimitive;
 use ranges::BitByteRange;
 use std::fmt;
@@ -1022,11 +1023,20 @@ impl SideMetadataSpec {
         let start_addr = data_addr.align_down(region_bytes);
         let end_addr = data_addr.saturating_sub(search_limit_bytes) + 1usize;
 
+        let mmap_granularity = MMAPPER.granularity();
+        let mut mapped_grain = Address::MAX;
+
         let mut cursor = start_addr;
         while cursor >= end_addr {
-            // We encounter an unmapped address. Just return None.
-            if !cursor.is_mapped() {
-                return None;
+            // We can cache the "is the cursor mapped?" check because MMTk maps metadata at
+            // chunk-level
+            if cursor < mapped_grain {
+                if cursor.is_mapped() {
+                    mapped_grain = cursor.align_down(mmap_granularity);
+                } else {
+                    // We encounter an unmapped address. Just return None.
+                    return None;
+                }
             }
             // If we find non-zero value, just return it.
             if !unsafe { self.load::<T>(cursor).is_zero() } {
@@ -1179,11 +1189,20 @@ impl SideMetadataSpec {
         let start_addr = data_addr.align_down(region_bytes);
         let end_addr = data_addr + search_limit_bytes;
 
+        let mmap_granularity = MMAPPER.granularity();
+        let mut mapped_grain = Address::ZERO;
+
         let mut cursor = start_addr;
         while cursor < end_addr {
-            // We encounter an unmapped address. Just return None.
-            if !cursor.is_mapped() {
-                return None;
+            // We can cache the "is the cursor mapped?" check because MMTk maps metadata at
+            // chunk-level
+            if cursor > mapped_grain {
+                if cursor.is_mapped() {
+                    mapped_grain = cursor.align_up(mmap_granularity) - 0x1;
+                } else {
+                    // We encounter an unmapped address. Just return None.
+                    return None;
+                }
             }
             // If we find non-zero value, just return it.
             if !unsafe { self.load::<T>(cursor).is_zero() } {
