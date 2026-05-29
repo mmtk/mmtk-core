@@ -4,6 +4,7 @@
 //! -   letting the last parked worker take action, and
 //! -   letting workers and mutators notify workers when workers are given things to do.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Condvar, Mutex};
 
 use super::{
@@ -31,6 +32,8 @@ pub(crate) enum LastParkedResult {
 pub(crate) struct WorkerMonitor {
     /// The synchronized part.
     sync: Mutex<WorkerMonitorSync>,
+    /// The number of workers that are allowed to execute work after being notified.
+    active_workers: AtomicUsize,
     /// Workers wait on these when idle.  A parked worker is notified if workers have things to
     /// do.  That include:
     /// -   any work packets available, and
@@ -93,8 +96,11 @@ impl WorkerParker {
         self.parked[ordinal] = false;
     }
 
-    fn first_parked_worker(&self) -> Option<usize> {
-        self.parked.iter().position(|parked| *parked)
+    fn first_parked_active_worker(&self, active_workers: usize) -> Option<usize> {
+        self.parked
+            .iter()
+            .take(active_workers)
+            .position(|parked| *parked)
     }
 }
 
@@ -105,15 +111,35 @@ impl WorkerMonitor {
                 parker: WorkerParker::new(worker_count),
                 goals: Default::default(),
             }),
+            active_workers: AtomicUsize::new(worker_count),
             workers_have_anything_to_do: std::iter::repeat_with(Condvar::new)
                 .take(worker_count)
                 .collect(),
         }
     }
 
+    fn active_workers(&self) -> usize {
+        self.active_workers.load(Ordering::SeqCst)
+    }
+
+    fn is_worker_active(&self, ordinal: usize) -> bool {
+        ordinal < self.active_workers()
+    }
+
+    pub fn set_active_workers(&self, active_workers: usize) {
+        let worker_count = self.workers_have_anything_to_do.len();
+        let active_workers = active_workers.clamp(1, worker_count);
+        self.active_workers.store(active_workers, Ordering::SeqCst);
+        debug!(
+            "WorkerMonitor active worker count set to {} (worker_count={}).",
+            active_workers, worker_count
+        );
+    }
+
     /// Make a request.  Can be called by a mutator to request the workers to work towards the
     /// given `goal`.
     pub fn make_request(&self, goal: WorkerGoal) {
+        self.set_active_workers(self.workers_have_anything_to_do.len());
         let newly_requested = {
             let mut guard = self.sync.lock().unwrap();
             guard.goals.set_request(goal)
@@ -127,12 +153,14 @@ impl WorkerMonitor {
     /// or a mutator has requested the GC workers to schedule a GC.
     pub fn notify_work_available(&self, all: bool) {
         if all {
-            for condvar in &self.workers_have_anything_to_do {
+            let active_workers = self.active_workers();
+            for condvar in self.workers_have_anything_to_do.iter().take(active_workers) {
                 condvar.notify_one();
             }
         } else {
             let sync = self.sync.lock().unwrap();
-            if let Some(ordinal) = sync.parker.first_parked_worker() {
+            let active_workers = self.active_workers();
+            if let Some(ordinal) = sync.parker.first_parked_active_worker(active_workers) {
                 debug!("Notifying parked worker {} for available work.", ordinal);
                 self.workers_have_anything_to_do[ordinal].notify_one();
             }
@@ -146,21 +174,15 @@ impl WorkerMonitor {
     /// The return value of `on_last_parked` will determine whether this worker and other workers
     /// will wake up or block waiting.
     ///
-    /// `may_unpark` decides whether the current worker should resume after it is notified.
-    /// This lets the scheduler keep some workers parked while concurrent work is limited to a
-    /// subset of worker ordinals.
-    ///
     /// This function returns `Ok(())` if the current worker should continue working,
     /// or `Err(WorkerShouldExit)` if the current worker should exit now.
-    pub fn park_and_wait<F, G>(
+    pub fn park_and_wait<F>(
         &self,
         ordinal: usize,
         on_last_parked: F,
-        may_unpark: G,
     ) -> Result<(), WorkerShouldExit>
     where
         F: FnOnce(&mut WorkerGoals) -> LastParkedResult,
-        G: Fn(&WorkerGoals) -> bool,
     {
         let mut sync = self.sync.lock().unwrap();
 
@@ -194,7 +216,7 @@ impl WorkerMonitor {
             should_wait = true;
         }
 
-        while should_wait || !may_unpark(&sync.goals) {
+        while should_wait || !self.is_worker_active(ordinal) {
             should_wait = false;
             // Notes on CondVar usage:
             //
@@ -249,9 +271,6 @@ impl WorkerMonitor {
             //     and park again if not available.  The last parked worker will ensure the two
             //     conditions listed above are both false before blocking.  If either condition is
             //     true, the last parked worker will take action.
-            //
-            // 3.  A worker may also intentionally stay parked after being notified if the
-            //     scheduler wants to reserve the newly available work for another worker.
             sync = self.workers_have_anything_to_do[ordinal]
                 .wait(sync)
                 .unwrap();
@@ -310,16 +329,12 @@ mod tests {
                     while !should_unpark.load(Ordering::SeqCst) {
                         println!("Thread {} parking...", ordinal);
                         worker_monitor
-                            .park_and_wait(
-                                ordinal,
-                                |_goals| {
-                                    println!("Thread {} is the last thread parked.", ordinal);
-                                    on_last_parked_called.fetch_add(1, Ordering::SeqCst);
-                                    should_unpark.store(true, Ordering::SeqCst);
-                                    super::LastParkedResult::WakeAll
-                                },
-                                |_goals| true,
-                            )
+                            .park_and_wait(ordinal, |_goals| {
+                                println!("Thread {} is the last thread parked.", ordinal);
+                                on_last_parked_called.fetch_add(1, Ordering::SeqCst);
+                                should_unpark.store(true, Ordering::SeqCst);
+                                super::LastParkedResult::WakeAll
+                            })
                             .unwrap();
                         println!("Thread {} unparked.", ordinal);
                     }
@@ -354,17 +369,13 @@ mod tests {
                     while !should_unpark.load(Ordering::SeqCst) {
                         println!("Thread {} parking...", ordinal);
                         worker_monitor
-                            .park_and_wait(
-                                ordinal,
-                                |_goals| {
-                                    println!("Thread {} is the last thread parked.", ordinal);
-                                    on_last_parked_called.fetch_add(1, Ordering::SeqCst);
-                                    should_unpark.store(true, Ordering::SeqCst);
-                                    i_am_the_last_parked_worker = true;
-                                    super::LastParkedResult::WakeSelf
-                                },
-                                |_goals| true,
-                            )
+                            .park_and_wait(ordinal, |_goals| {
+                                println!("Thread {} is the last thread parked.", ordinal);
+                                on_last_parked_called.fetch_add(1, Ordering::SeqCst);
+                                should_unpark.store(true, Ordering::SeqCst);
+                                i_am_the_last_parked_worker = true;
+                                super::LastParkedResult::WakeSelf
+                            })
                             .unwrap();
                         println!("Thread {} unparked.", ordinal);
                     }
@@ -390,6 +401,7 @@ mod tests {
         let number_threads = 4;
         let concurrent_threads = 2;
         let worker_monitor = Arc::new(WorkerMonitor::new(number_threads));
+        worker_monitor.set_active_workers(concurrent_threads);
         let first_wave_unparked = AtomicUsize::new(0);
         let release_everyone = AtomicBool::new(false);
         let notifier_ran = AtomicBool::new(false);
@@ -402,14 +414,7 @@ mod tests {
                 let notifier_ran = &notifier_ran;
                 scope.spawn(move || {
                     worker_monitor
-                        .park_and_wait(
-                            ordinal,
-                            |_goals| super::LastParkedResult::WakeAll,
-                            |_goals| {
-                                release_everyone.load(Ordering::SeqCst)
-                                    || ordinal < concurrent_threads
-                            },
-                        )
+                        .park_and_wait(ordinal, |_goals| super::LastParkedResult::WakeAll)
                         .unwrap();
 
                     if !release_everyone.load(Ordering::SeqCst) {
@@ -422,6 +427,7 @@ mod tests {
                         }
                         if !notifier_ran.swap(true, Ordering::SeqCst) {
                             release_everyone.store(true, Ordering::SeqCst);
+                            worker_monitor.set_active_workers(number_threads);
                             worker_monitor.notify_work_available(true);
                         }
                     }
