@@ -246,6 +246,14 @@ pub trait Scanning<VM: VMBinding> {
     /// The `memory_manager::is_mmtk_object` function can be used in this function if
     /// -   the "vo_bit" feature is enabled.
     ///
+    /// Implementors must call `mutator.flush()` before this method returns,
+    /// after publishing roots to the factory. The flush drains per-mutator
+    /// barrier/remset buffers and is required for correctness in plans that
+    /// use them (e.g. SATB, generational remsets). MMTk core no longer flushes
+    /// on the binding's behalf; this gives bindings full control over the
+    /// per-mutator scan window, enabling per-mutator early release in plans
+    /// that want it.
+    ///
     /// Arguments:
     /// * `tls`: The GC thread that is performing this scanning.
     /// * `mutator`: The reference to the mutator whose roots will be scanned.
