@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["PlanTrace","SFTTrace","SlotIterator","UnsupportedTrace","VectorQueue"],"trait":["ObjectQueue","Trace"],"type":["OptionObjectQueue","SlotOfTrace","VectorObjectQueue"]};
+window.SIDEBAR_ITEMS = {"mod":["gc_work"],"struct":["PlanTrace","SFTTrace","SlotIterator","UnsupportedTrace","VectorQueue"],"trait":["ObjectQueue","Trace"],"type":["OptionObjectQueue","SlotOfTrace","VectorObjectQueue"]};

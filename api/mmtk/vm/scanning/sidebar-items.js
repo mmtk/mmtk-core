@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"trait":["ObjectTracer","ObjectTracerContext","RootsWorkFactory","Scanning","SlotVisitor"]};
+window.SIDEBAR_ITEMS = {"enum":["RootsKind"],"trait":["ObjectTracer","ObjectTracerContext","RootsWorkFactory","Scanning","SlotVisitor"]};
