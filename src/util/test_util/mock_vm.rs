@@ -1,10 +1,10 @@
 // Some mock methods may get really complex
 #![allow(clippy::type_complexity)]
 
+use crate::plan::tracing::gc_work::root::DefaultRootsWorkFactory;
+use crate::plan::tracing::gc_work::DefaultObjectTracerContext;
 use crate::plan::tracing::UnsupportedTrace;
 use crate::plan::ObjectQueue;
-use crate::scheduler::gc_work::DefaultObjectTracerContext;
-use crate::scheduler::gc_work::DefaultRootsWorkFactory;
 use crate::scheduler::*;
 use crate::util::alloc::AllocationError;
 use crate::util::copy::*;

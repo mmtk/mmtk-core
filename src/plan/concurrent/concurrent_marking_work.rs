@@ -3,14 +3,12 @@ use crate::plan::concurrent::Pause;
 use crate::plan::tracing::{PlanTrace, Trace};
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
-use crate::scheduler::gc_work::RootsKind;
+use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
 use crate::util::{scanning_helper, ObjectReference};
 use crate::vm::slot::Slot;
-use crate::{
-    scheduler::{GCWork, GCWorker, WorkBucketStage},
-    vm::*,
-    MMTK,
-};
+use crate::vm::{RootsKind, RootsWorkFactory, VMBinding};
+use crate::MMTK;
+
 use std::collections::VecDeque;
 use std::marker::PhantomData;
 

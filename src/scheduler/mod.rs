@@ -29,5 +29,6 @@ mod worker_goals;
 mod worker_monitor;
 pub(crate) use worker::current_worker_ordinal;
 pub use worker::GCWorker;
+pub(crate) use worker::GCWorkerShared;
 
 pub(crate) mod gc_work;

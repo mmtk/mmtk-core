@@ -1,5 +1,5 @@
 use super::worker::*;
-use crate::scheduler::gc_work::DefaultRootsWorkFactory;
+use crate::plan::tracing::gc_work::root::DefaultRootsWorkFactory;
 use crate::vm::{RootsWorkFactory, VMBinding};
 use crate::{mmtk::MMTK, plan::tracing::Trace};
 #[cfg(feature = "work_packet_stats")]

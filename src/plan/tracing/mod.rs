@@ -10,6 +10,8 @@ use crate::util::{ObjectReference, VMThread, VMWorkerThread};
 use crate::vm::{Scanning, VMBinding};
 use crate::{Plan, MMTK};
 
+pub(crate) mod gc_work;
+
 /// This trait provides methods used during a trace.  The most important method is
 /// [`Self::trace_object`] which provides the way to trace an object during the current trace.  Many
 /// work packets depend on this trait to trace objects.

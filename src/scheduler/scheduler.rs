@@ -9,6 +9,9 @@ use super::worker_monitor::{LastParkedResult, WorkerMonitor};
 use super::*;
 use crate::global_state::GcStatus;
 use crate::mmtk::MMTK;
+use crate::plan::tracing::gc_work::weakref::{
+    VMForwardWeakRefs, VMPostForwarding, VMProcessWeakRefs,
+};
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
 use crate::vm::Collection;

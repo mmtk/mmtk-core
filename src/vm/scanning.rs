@@ -136,6 +136,15 @@ pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
     fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>);
 }
 
+/// For USDT tracepoints for roots.
+/// Keep in sync with `tools/tracing/timeline/visualize.py`.
+#[repr(usize)]
+pub(crate) enum RootsKind {
+    NORMAL = 0,
+    PINNING = 1,
+    TPINNING = 2,
+}
+
 /// VM-specific methods for scanning roots/objects.
 pub trait Scanning<VM: VMBinding> {
     /// When set to `true`, all plans will guarantee that during each GC, each live object is
