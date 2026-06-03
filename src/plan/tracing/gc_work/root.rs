@@ -14,8 +14,8 @@ use crate::{
     MMTK,
 };
 
-/// An implementation of [`RootsWorkFactory`] for stop-the-world tracing GC, i.e. finding the
-/// transitive closure from roots, with all mutators stopped.
+/// An implementation of [`RootsWorkFactory`] for stop-the-world tracing GC.  It will create work
+/// packets to find the transitive closure from roots, assuming mutators are stopped during the GC.
 ///
 /// It creates the [`ProcessSlots`] work packet to handle non-pinning roots, and
 /// [`ProcessPinningRoots`] to handle pinning roots (transitive or not).  The work packets will be
@@ -116,9 +116,9 @@ impl<VM: VMBinding, DT: Trace<VM = VM>, PT: Trace<VM = VM>> DefaultRootsWorkFact
 /// This work packet processes pinning roots during stop-the-world tracing GC.
 ///
 /// Note that by definition, a "root" is an *edge* from outside the object graph to an object.  This
-/// work packet represents each edge as the `ObjectReference` of the object the edge points to.
-/// Because pinning roots by definition cannot be updated, we don't need to represent the edges as a
-/// [`Slot`].
+/// work packet represents each edge as the `ObjectReference` of the object the edge points to (i.e.
+/// the referent).  Because pinning roots by definition cannot be updated, we don't need to
+/// represent the edges as [`Slot`].
 ///
 /// [`Slot`]: crate::vm::slot::Slot
 ///

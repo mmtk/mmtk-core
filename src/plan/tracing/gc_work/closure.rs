@@ -5,8 +5,8 @@ use crate::{
         tracing::{gc_work::DefaultObjectTracerContext, SlotOfTrace, Trace},
         VectorObjectQueue, VectorQueue,
     },
-    scheduler::{GCWork, GCWorker, WorkBucketStage},
-    util::{heap::layout::heap_parameters::MAX_SPACES, ObjectReference, VMWorkerThread},
+    scheduler::{GCWork, GCWorker, GCWorkerShared, WorkBucketStage},
+    util::{ObjectReference, VMWorkerThread},
     vm::{slot::Slot, ObjectTracerContext, Scanning, VMBinding},
     MMTK,
 };
@@ -87,10 +87,12 @@ impl<T: Trace> GCWork<T::VM> for ProcessSlots<T> {
 /// A work packet for scanning objects and optionally do node-enqueuing tracing during a
 /// stop-the-world tracing GC and the final mark pause of a concurrent GC.
 ///
-/// It will scan each objects.  For objects that supports slot enqueuing, it will collect their
-/// slots and spawn [`ProcessSlots`] work packets to trace them.  For objects that don't
-/// support slot enqueuing, it will immediately trace their slots and spawn other
-/// [`ProcessNodes`] work packets to process their newly traced children.
+/// It will scan each object.  For objects that supports slot enqueuing, it will collect their slots
+/// and spawn [`ProcessSlots`] work packets to trace them.  For objects that don't support slot
+/// enqueuing, it will immediately trace their slots and spawn other [`ProcessNodes`] work packets
+/// to process their newly traced children.  It is the VM's responsibility to implement
+/// [`Scanning::scan_object_and_trace_edges`] to update the references to point to the new addresses
+/// in such a case.
 pub struct ProcessNodes<T: Trace> {
     objects: Vec<ObjectReference>,
     bucket: WorkBucketStage,
@@ -103,30 +105,6 @@ impl<T: Trace> ProcessNodes<T> {
             objects,
             bucket,
             phantom_data: PhantomData,
-        }
-    }
-
-    fn increase_live_bytes(
-        live_bytes_per_space: &mut [usize; MAX_SPACES],
-        object: ObjectReference,
-    ) {
-        use crate::mmtk::VM_MAP;
-        use crate::vm::object_model::ObjectModel;
-
-        // The live bytes of the object
-        let bytes = <T::VM as VMBinding>::VMObjectModel::get_current_size(object);
-        // Get the space index from descriptor
-        let space_descriptor = VM_MAP.get_descriptor_for_address(object.to_raw_address());
-        if space_descriptor != crate::util::heap::space_descriptor::SpaceDescriptor::UNINITIALIZED {
-            let space_index = space_descriptor.get_index();
-            debug_assert!(
-                space_index < MAX_SPACES,
-                "Space index {} is not in the range of [0, {})",
-                space_index,
-                MAX_SPACES
-            );
-            // Accumulate the live bytes for the index
-            live_bytes_per_space[space_index] += bytes;
         }
     }
 
@@ -149,11 +127,17 @@ impl<T: Trace> ProcessNodes<T> {
 
         // For any object we need to scan, we count its live bytes.
         // Check the option outside the loop for better performance.
+        //
+        // TODO: Currently all objects reached in a GC will be processed here,
+        // so it is a good place to do statistics for all reachable objects.
+        // In the future, when we refactor the ProcessNodes and ProcessSlots work packets
+        // so that each of them can compute the transitive closure alone (i.e. removing double enqueuing),
+        // we need to make sure both work packets will count the live bytes.
         if crate::util::rust_util::unlikely(*worker.mmtk.get_options().count_live_bytes_in_gc) {
             // Borrow before the loop.
             let mut live_bytes_stats = worker.shared.live_bytes_per_space.borrow_mut();
             for object in self.objects.iter().copied() {
-                Self::increase_live_bytes(&mut live_bytes_stats, object);
+                GCWorkerShared::<T::VM>::increase_live_bytes(&mut live_bytes_stats, object);
             }
         }
 

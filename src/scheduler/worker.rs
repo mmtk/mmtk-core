@@ -5,6 +5,7 @@ use crate::mmtk::MMTK;
 use crate::util::copy::GCWorkerCopyContext;
 use crate::util::heap::layout::heap_parameters::MAX_SPACES;
 use crate::util::opaque_pointer::*;
+use crate::util::ObjectReference;
 use crate::vm::{Collection, GCThreadContext, VMBinding};
 use atomic::Atomic;
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
@@ -56,6 +57,30 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
             live_bytes_per_space: AtomicRefCell::new([0; MAX_SPACES]),
             designated_work: ArrayQueue::new(16),
             stealer,
+        }
+    }
+
+    pub(crate) fn increase_live_bytes(
+        live_bytes_per_space: &mut [usize; MAX_SPACES],
+        object: ObjectReference,
+    ) {
+        use crate::mmtk::VM_MAP;
+        use crate::vm::object_model::ObjectModel;
+
+        // The live bytes of the object
+        let bytes = VM::VMObjectModel::get_current_size(object);
+        // Get the space index from descriptor
+        let space_descriptor = VM_MAP.get_descriptor_for_address(object.to_raw_address());
+        if space_descriptor != crate::util::heap::space_descriptor::SpaceDescriptor::UNINITIALIZED {
+            let space_index = space_descriptor.get_index();
+            debug_assert!(
+                space_index < MAX_SPACES,
+                "Space index {} is not in the range of [0, {})",
+                space_index,
+                MAX_SPACES
+            );
+            // Accumulate the live bytes for the index
+            live_bytes_per_space[space_index] += bytes;
         }
     }
 }
