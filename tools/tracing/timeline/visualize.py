@@ -264,12 +264,15 @@ class LogProcessor:
                     }
 
                 case "process_slots":
+                    initial_slots, visited_slots, empty_slots, scanned_objects, splits = [int(a) for a in args]
+                    non_empty_slots = visited_slots - empty_slots
                     wp["args"] |= {
-                        # Group args by "process_slots" and "process_nodes" because a ProcessSlots
-                        # work packet may do both if SCAN_OBJECTS_IMMEDIATELY is true.
-                        "process_slots": {
-                            "num_slots": int(args[0]),
-                        },
+                        "initial_slots": initial_slots,
+                        "visited_slots": visited_slots,
+                        "empty_slots": empty_slots,
+                        "non_empty_slots": non_empty_slots,
+                        "scanned_objects": scanned_objects,
+                        "splits": splits,
                     }
 
                 case "process_nodes":

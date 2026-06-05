@@ -23,10 +23,19 @@ pub struct ProcessSlots<T: Trace> {
 }
 
 impl<T: Trace> ProcessSlots<T> {
-    const FORKING_THRESHOLD: usize = EDGES_WORK_BUFFER_SIZE;
+    /// The nominative capacity of the deque.
+    ///
+    /// It will try to split the work packet if the deque has too many elements.
+    const CAPACITY: usize = EDGES_WORK_BUFFER_SIZE;
+
+    /// The number of slots to push before it proactively splits the work packet.
+    ///
+    /// The purpose of this is preventing a pathological case where one worker keeps popping and
+    /// pushing elements without reaching the capacity.
+    const PUSHES_BEFORE_SPLIT: usize = Self::CAPACITY;
 
     pub fn new(slots: Vec<SlotOfTrace<T>>, bucket: WorkBucketStage) -> Self {
-        let mut slot_queue = VecDeque::with_capacity(EDGES_WORK_BUFFER_SIZE);
+        let mut slot_queue = VecDeque::with_capacity(Self::CAPACITY);
         slot_queue.extend(slots);
         Self::from_deque(slot_queue, bucket)
     }
@@ -35,10 +44,16 @@ impl<T: Trace> ProcessSlots<T> {
         Self { slot_queue, bucket }
     }
 
-    fn fork_queue(&mut self, worker: &mut GCWorker<T::VM>) {
+    fn split(&mut self, worker: &mut GCWorker<T::VM>) {
         debug_assert!(!self.slot_queue.is_empty());
 
-        let split_queue = self.slot_queue.split_off(self.slot_queue.len() / 2);
+        let split_len = self.slot_queue.len() / 2;
+        if split_len == 0 {
+            // Avoid the pathological case where we currently have only one element in the deque.
+            return;
+        }
+
+        let split_queue = self.slot_queue.split_off(split_len);
         let work = Self::from_deque(split_queue, self.bucket);
         worker.add_work(self.bucket, work);
     }
@@ -46,49 +61,87 @@ impl<T: Trace> ProcessSlots<T> {
 
 impl<T: Trace> GCWork<T::VM> for ProcessSlots<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
-        probe!(mmtk, process_slots, self.slot_queue.len());
-
         let tls = worker.tls;
         let trace = T::from_mmtk(mmtk);
 
+        // The number of slots at the beginning of the work packet.
+        let num_initial_slots = self.slot_queue.len();
+        // The number of slots visited.
+        let mut num_visited_slots = 0;
+        // The number of empty slots visited
+        let mut num_empty_slots = 0;
+        // The number of objects scanned.
+        let mut num_scanned_objects = 0;
+        // The number of times we split the work packet.
+        let mut num_splits = 0;
+
+        // The number of slots pushed since we create or split the work packet.
+        let mut num_pushes = 0;
+
         while let Some(slot) = self.slot_queue.pop_back() {
+            num_visited_slots += 1;
+
             #[cfg(feature = "extreme_assertions")]
             if crate::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {
                 // log slot, panic if already logged
                 mmtk.slot_logger.log_slot(*slot);
             }
 
-            if let Some(target) = slot.load() {
-                let new_target = trace.trace_object(worker, target, &mut |enqueued_object| {
-                    // If not all objects support slot enqueuing, the VM binding should choose
-                    // `ProcessNodes` as the default tracing strategy.
-                    debug_assert!(
-                        <T::VM as VMBinding>::VMScanning::support_slot_enqueuing(
-                            tls,
-                            enqueued_object
-                        ),
-                        "Object {enqueued_object} does not support slot enqueuing."
-                    );
-                    trace!("Scan object (slot) {}", enqueued_object);
-                    <T::VM as VMBinding>::VMScanning::scan_object(
-                        tls,
-                        enqueued_object,
-                        &mut |slot| {
-                            self.slot_queue.push_back(slot);
-                        },
-                    );
-                    trace.post_scan_object(enqueued_object);
-                });
-                if T::may_move_objects() && new_target != target {
-                    slot.store(new_target);
-                }
+            // Skip empty slot.
+            let Some(target) = slot.load() else {
+                num_empty_slots += 1;
+                continue;
+            };
+
+            // trace.trace_object borrows the `worker`, preventing us from flushing the queue inside
+            // (which also requires the worker).  We store the reference to a local variable, first.
+            let mut enqueued_object = None;
+            let new_target = trace.trace_object(worker, target, &mut enqueued_object);
+
+            // Store back to the slot if the object is moved.
+            if T::may_move_objects() && new_target != target {
+                slot.store(new_target);
             }
 
-            // Fork if appropriately sized.
-            if self.slot_queue.len() >= Self::FORKING_THRESHOLD {
-                self.fork_queue(worker);
+            // Scan the object if it is enqueued.
+            if let Some(enqueued_object) = enqueued_object {
+                num_scanned_objects += 1;
+
+                // If there is any object that does not support slot enqueuing, the VM binding
+                // should choose `ProcessNodes` as the default tracing strategy.
+                debug_assert!(
+                    <T::VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, enqueued_object),
+                    "Object {enqueued_object} does not support slot enqueuing."
+                );
+
+                trace!("Scan object {} for slots...", enqueued_object);
+                <T::VM as VMBinding>::VMScanning::scan_object(tls, enqueued_object, &mut |slot| {
+                    self.slot_queue.push_back(slot);
+                    num_pushes += 1;
+
+                    // Split the work packet if needed.
+                    if num_pushes >= Self::PUSHES_BEFORE_SPLIT
+                        || self.slot_queue.len() >= Self::CAPACITY
+                    {
+                        self.split(worker);
+                        num_splits += 1;
+                        num_pushes = 0;
+                    }
+                });
+
+                trace.post_scan_object(enqueued_object);
             }
         }
+
+        probe!(
+            mmtk,
+            process_slots,
+            num_initial_slots,
+            num_visited_slots,
+            num_empty_slots,
+            num_scanned_objects,
+            num_splits
+        );
     }
 }
 
