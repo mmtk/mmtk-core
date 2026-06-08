@@ -174,6 +174,12 @@ class LogProcessor:
             case "gc_requested":
                 result["tid"] = 1
 
+            case "local_cache":
+                result["name"] = "local_cache {}".format(tid)
+                result["args"] |= {
+                    "num_work_packets": int(args[0]),
+                }
+
             case _:
                 if self.enrich_event_extra is not None:
                     # Call ``enrich_event_extra`` in the extension script if defined.
@@ -264,11 +270,12 @@ class LogProcessor:
                     }
 
                 case "process_slots":
-                    initial_slots, visited_slots, empty_slots, scanned_objects, splits = [int(a) for a in args]
+                    initial_slots, visited_slots, enqueued_slots, empty_slots, scanned_objects, splits = [int(a) for a in args]
                     non_empty_slots = visited_slots - empty_slots
                     wp["args"] |= {
                         "initial_slots": initial_slots,
                         "visited_slots": visited_slots,
+                        "enqueued_slots": enqueued_slots,
                         "empty_slots": empty_slots,
                         "non_empty_slots": non_empty_slots,
                         "scanned_objects": scanned_objects,

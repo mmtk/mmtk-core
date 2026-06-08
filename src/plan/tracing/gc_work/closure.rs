@@ -47,15 +47,23 @@ impl<T: Trace> ProcessSlots<T> {
     fn split(&mut self, worker: &mut GCWorker<T::VM>) {
         debug_assert!(!self.slot_queue.is_empty());
 
-        let split_len = self.slot_queue.len() / 2;
-        if split_len == 0 {
-            // Avoid the pathological case where we currently have only one element in the deque.
-            return;
-        }
+        let parked_workers_sloppy = worker.scheduler().worker_monitor.parked_workers_sloppy();
 
-        let split_queue = self.slot_queue.split_off(split_len);
-        let work = Self::from_deque(split_queue, self.bucket);
-        worker.add_work(self.bucket, work);
+        // Divide the current work packet into two parts by default, but add one more part for every
+        // idle worker.
+        let divider = 2 + parked_workers_sloppy;
+
+        // Each part has at least one element.
+        let split_len = (self.slot_queue.len() / divider).max(1);
+
+        let mut remaining_parts = divider - 1; // Leave one part for myself.
+        while remaining_parts > 0 && self.slot_queue.len() > split_len {
+            let split_queue = self.slot_queue.split_off(split_len);
+            let work = Self::from_deque(split_queue, self.bucket);
+            worker.add_work(self.bucket, work);
+
+            remaining_parts -= 1;
+        }
     }
 }
 
@@ -68,6 +76,8 @@ impl<T: Trace> GCWork<T::VM> for ProcessSlots<T> {
         let num_initial_slots = self.slot_queue.len();
         // The number of slots visited.
         let mut num_visited_slots = 0;
+        // The number of slots enqueued.
+        let mut num_enqueued_slots = 0;
         // The number of empty slots visited
         let mut num_empty_slots = 0;
         // The number of objects scanned.
@@ -117,6 +127,7 @@ impl<T: Trace> GCWork<T::VM> for ProcessSlots<T> {
                 trace!("Scan object {} for slots...", enqueued_object);
                 <T::VM as VMBinding>::VMScanning::scan_object(tls, enqueued_object, &mut |slot| {
                     self.slot_queue.push_back(slot);
+                    num_enqueued_slots += 1;
                     num_pushes += 1;
 
                     // Split the work packet if needed.
@@ -138,6 +149,7 @@ impl<T: Trace> GCWork<T::VM> for ProcessSlots<T> {
             process_slots,
             num_initial_slots,
             num_visited_slots,
+            num_enqueued_slots,
             num_empty_slots,
             num_scanned_objects,
             num_splits

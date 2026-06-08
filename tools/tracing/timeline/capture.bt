@@ -108,7 +108,7 @@ usdt:$MMTK:mmtk:process_root_nodes {
 
 usdt:$MMTK:mmtk:process_slots {
     if (@enable_print) {
-        printf("process_slots,meta,%d,%lu,%lu,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2, arg3, arg4);
+        printf("process_slots,meta,%d,%lu,%lu,%lu,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2, arg3, arg4, arg5);
     }
 }
 
@@ -182,3 +182,10 @@ usdt:$MMTK:mmtk:reference_retained {
         printf("reference_retained,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
     }
 }
+
+usdt:$MMTK:mmtk:local_cache {
+    if (@enable_print) {
+        printf("local_cache,C,%d,%lu,%lu\n", tid, nsecs, arg0);
+    }
+}
+

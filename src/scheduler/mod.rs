@@ -6,7 +6,7 @@
 /// We expose this constant to the VM binding developers.  During root scanning, the VM binding
 /// should call methods of [`crate::vm::RootsWorkFactory`] and pass lists of root slots or root nodes.  This
 /// constant shall be used as the max lengths of those lists.
-pub const EDGES_WORK_BUFFER_SIZE: usize = 4096;
+pub const EDGES_WORK_BUFFER_SIZE: usize = 512;
 
 pub(crate) mod affinity;
 
