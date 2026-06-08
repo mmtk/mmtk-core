@@ -376,7 +376,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<ConcurrentImmixGCWorkContext<VM>>::new());
         scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<ConcurrentImmixGCWorkContext<VM>>::new(self));
+            .add(Prepare::<ConcurrentImmixGCWorkContext<VM>>::new());
     }
 
     fn schedule_concurrent_marking_final_pause(&'static self, scheduler: &GCWorkScheduler<VM>) {
@@ -387,13 +387,13 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             .add(StopMutators::<ConcurrentImmixGCWorkContext<VM>>::new_no_scan_roots());
 
         scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<ConcurrentImmixGCWorkContext<VM>>::new(self));
+            .add(Release::<ConcurrentImmixGCWorkContext<VM>>::new());
 
         // Sanity
         #[cfg(feature = "sanity")]
         {
             use crate::util::sanity::sanity_checker::ScheduleSanityGC;
-            scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC::<Self>::new(self));
+            scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC::<Self>::new());
         }
 
         // Deal with weak ref and finalizers

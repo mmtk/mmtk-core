@@ -8,6 +8,7 @@ use crate::vm::slot::Slot;
 use crate::vm::{ObjectModel, VMBinding};
 use crate::MMTK;
 use std::collections::HashSet;
+use std::marker::PhantomData;
 
 #[allow(dead_code)]
 pub struct SanityChecker<SL: Slot> {
@@ -54,14 +55,24 @@ impl<SL: Slot> SanityChecker<SL> {
 }
 
 pub struct ScheduleSanityGC<P: Plan> {
-    plan: &'static P,
+    phantom_data: PhantomData<&'static P>,
 }
 
 impl<P: Plan> ScheduleSanityGC<P> {
-    pub fn new(plan: &'static P) -> Self {
-        ScheduleSanityGC { plan }
+    pub fn new() -> Self {
+        Self {
+            phantom_data: PhantomData,
+        }
     }
 }
+
+impl<P: Plan> Default for ScheduleSanityGC<P> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+unsafe impl<P: Plan> Send for ScheduleSanityGC<P> {}
 
 impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
@@ -76,29 +87,19 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
         mmtk.sanity_begin(); // Stop & scan mutators (mutator scanning can happen before STW)
 
         // Prepare global/collectors/mutators
-        worker.scheduler().work_buckets[WorkBucketStage::Prepare]
-            .add(SanityPrepare::<P>::new(self.plan));
+        worker.scheduler().work_buckets[WorkBucketStage::Prepare].add(SanityPrepare);
         // Do the transitive closure
         worker.scheduler().work_buckets[WorkBucketStage::Closure]
-            .add(SanityClosure::<P>::new(self.plan));
+            .add(SanityClosure::<P>::default());
         // Release global/collectors/mutators
-        worker.scheduler().work_buckets[WorkBucketStage::Release]
-            .add(SanityRelease::<P>::new(self.plan));
+        worker.scheduler().work_buckets[WorkBucketStage::Release].add(SanityRelease);
     }
 }
 
-pub struct SanityPrepare<P: Plan> {
-    pub plan: &'static P,
-}
+pub struct SanityPrepare;
 
-impl<P: Plan> SanityPrepare<P> {
-    pub fn new(plan: &'static P) -> Self {
-        Self { plan }
-    }
-}
-
-impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
-    fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+impl<VM: VMBinding> GCWork<VM> for SanityPrepare {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         info!("Sanity GC prepare");
         {
             let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
@@ -107,18 +108,10 @@ impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
     }
 }
 
-pub struct SanityRelease<P: Plan> {
-    pub plan: &'static P,
-}
+pub struct SanityRelease;
 
-impl<P: Plan> SanityRelease<P> {
-    pub fn new(plan: &'static P) -> Self {
-        Self { plan }
-    }
-}
-
-impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
-    fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+impl<VM: VMBinding> GCWork<VM> for SanityRelease {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         info!("Sanity GC release");
         mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
         mmtk.sanity_end();
@@ -126,19 +119,25 @@ impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
 }
 
 pub struct SanityClosure<P: Plan> {
-    pub plan: &'static P,
+    phantom_data: PhantomData<&'static P>,
 }
 
-impl<P: Plan> SanityClosure<P> {
-    pub fn new(plan: &'static P) -> Self {
-        Self { plan }
+impl<P: Plan> Default for SanityClosure<P> {
+    fn default() -> Self {
+        Self {
+            phantom_data: PhantomData,
+        }
     }
 }
+
+unsafe impl<P: Plan> Send for SanityClosure<P> {}
 
 impl<P: Plan> GCWork<P::VM> for SanityClosure<P> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         info!("Sanity GC closure");
         let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
+
+        let plan = mmtk.get_plan().downcast_ref::<P>().unwrap();
 
         let mut queue = Vec::new();
 
@@ -177,7 +176,7 @@ impl<P: Plan> GCWork<P::VM> for SanityClosure<P> {
 
             // Let plan check object
             assert!(
-                self.plan.sanity_check_object(object),
+                plan.sanity_check_object(object),
                 "plan.sanity_check_object(object) returned false. object: {object}",
             );
 
