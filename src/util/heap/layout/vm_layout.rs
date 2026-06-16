@@ -99,9 +99,9 @@ impl VMLayout {
     }
 
     /// This mask extracts a few bits from address, and use it as index to the space map table.
-    /// When masked with this constant, the index is 1 to 16. If we mask any arbitrary address with this mask, we will get 0 to 31 (32 entries).
+    /// When masked with this constant, the index spans all addressable contiguous-space slots.
     pub(crate) fn address_mask(&self) -> usize {
-        0x1f << self.log_space_extent
+        ((1 << LOG_MAX_SPACES) - 1) << self.log_space_extent
     }
 
     const fn validate(&self) {
@@ -111,6 +111,7 @@ impl VMLayout {
         assert!(self.log_address_space <= Self::LOG_ARCH_ADDRESS_SPACE);
         assert!(self.log_space_extent <= self.log_address_space);
         if self.force_use_contiguous_spaces {
+            assert!(self.log_space_extent == Self::LOG_CONTIGUOUS_SPACE_EXTENT_64);
             assert!(self.log_space_extent <= (self.log_address_space - LOG_MAX_SPACES));
             assert!(self.heap_start.is_aligned_to(self.max_space_extent()));
         }
@@ -140,6 +141,10 @@ impl VMLayout {
         layout32.validate();
         layout32
     }
+
+    pub const LOG_CONTIGUOUS_SPACE_EXTENT_64: usize = 41;
+    pub const CONTIGUOUS_SPACE_EXTENT_64: usize = 1 << Self::LOG_CONTIGUOUS_SPACE_EXTENT_64;
+
     /// Normal 64-bit configuration
     #[cfg(target_pointer_width = "64")]
     pub const fn new_64bit() -> Self {

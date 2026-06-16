@@ -25,6 +25,10 @@ impl HeapMeta {
         huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
     ) -> MmapResult<Address> {
+        debug!(
+            "Request to reserve quarantined memory for {} bytes, align {:?}, top={}",
+            extent, align, top
+        );
         let preferred = if top {
             let raw_start = self.heap_limit - extent;
             if let Some(align) = align {
@@ -40,7 +44,10 @@ impl HeapMeta {
                 raw_start
             }
         };
-
+        debug!(
+            "Preferred address for quarantine reservation is {}",
+            preferred
+        );
         let actual = mmapper.quarantine_address_range_preferred(
             preferred,
             crate::util::conversions::bytes_to_pages_up(extent),
@@ -58,10 +65,12 @@ impl HeapMeta {
             self.heap_limit,
         );
 
-        if top {
-            self.heap_limit = actual;
-        } else {
-            self.heap_cursor = actual + extent;
+        if actual == preferred {
+            if top {
+                self.heap_limit = actual;
+            } else {
+                self.heap_cursor = actual + extent;
+            }
         }
 
         assert!(
@@ -71,6 +80,17 @@ impl HeapMeta {
             actual + extent,
         );
 
+        debug!(
+            "Reserved quarantined memory [{}, {}) for {} bytes, align {:?}",
+            actual,
+            actual + extent,
+            extent,
+            align
+        );
+        debug!(
+            "Available heap range after reservation is [{}, {})",
+            self.heap_cursor, self.heap_limit
+        );
         Ok(actual)
     }
 

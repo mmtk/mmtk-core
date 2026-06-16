@@ -3,7 +3,7 @@ use super::map::VMMap;
 use crate::util::constants::*;
 use crate::util::conversions;
 use crate::util::freelist::FreeList;
-use crate::util::heap::layout::heap_parameters::*;
+use crate::util::heap::layout::heap_parameters::MAX_SPACES;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::os::*;
@@ -33,7 +33,8 @@ impl Map64 {
         let mut base_address = vec![Address::ZERO; MAX_SPACES];
 
         for i in 0..MAX_SPACES {
-            let base = unsafe { Address::from_usize(i << vm_layout().log_space_extent) };
+            let base =
+                unsafe { Address::from_usize(i << VMLayout::LOG_CONTIGUOUS_SPACE_EXTENT_64) };
             high_water[i] = base;
             base_address[i] = base;
         }
@@ -239,7 +240,7 @@ impl Map64 {
     }
 
     fn is_space_start(base: Address) -> bool {
-        (base & !vm_layout().space_mask_64()) == 0
+        base.is_aligned_to(1 << VMLayout::LOG_CONTIGUOUS_SPACE_EXTENT_64)
     }
 }
 

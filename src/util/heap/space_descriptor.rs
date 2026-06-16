@@ -121,7 +121,8 @@ impl SpaceDescriptor {
             // For 64-bit discontiguous space, use 32-bit extent
             self.get_extent_32()
         } else {
-            vm_layout().space_size_64()
+            use crate::util::heap::vm_layout::VMLayout;
+            VMLayout::CONTIGUOUS_SPACE_EXTENT_64
         }
     }
 

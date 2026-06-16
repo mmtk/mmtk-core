@@ -168,6 +168,7 @@ impl std::default::Default for SFTRefStorage {
 #[cfg(target_pointer_width = "64")] // This impl only works for 64 bits: 1. the mask is designed for our 64bit heap range, 2. on 64bits, all our spaces are contiguous.
 mod space_map {
     use super::*;
+    use crate::util::heap::layout::heap_parameters::MAX_SPACES;
     use crate::util::heap::layout::vm_layout::vm_layout;
 
     /// Space map is a small table, and it has one entry for each MMTk space.
@@ -243,15 +244,14 @@ mod space_map {
         /// Create a new space map.
         #[allow(clippy::assertions_on_constants)] // We assert to make sure the constants
         pub fn new() -> Self {
-            use crate::util::heap::layout::heap_parameters::MAX_SPACES;
             let table_size = Self::addr_to_index(Address::MAX) + 1;
-            debug_assert!(table_size >= MAX_SPACES);
+            debug_assert_eq!(table_size, MAX_SPACES);
             Self {
                 sft: std::iter::repeat_with(SFTRefStorage::default)
                     .take(table_size)
                     .collect(),
                 space_address_start: Self::index_to_space_range(1).0, // the start of the first space
-                space_address_end: Self::index_to_space_range(MAX_SPACES - 1).1, // the end of the last space
+                space_address_end: Self::index_to_space_range(MAX_SPACES - 1).1, // the end of the last addressable space
             }
         }
 
@@ -285,6 +285,8 @@ mod space_map {
         // We need to update the code and the constants for the address arithemtic.
         #[test]
         fn test_address_arithmetic() {
+            use crate::util::heap::layout::vm_layout::VMLayout;
+
             // Before 1st space
             assert_eq!(SFTSpaceMap::addr_to_index(Address::ZERO), 0);
             assert_eq!(SFTSpaceMap::addr_to_index(vm_layout().heap_start - 1), 0);
@@ -296,20 +298,24 @@ mod space_map {
                 assert_eq!(SFTSpaceMap::addr_to_index(end - 1), i);
             };
 
-            // Index 1 to 16 (MAX_SPACES)
-            for i in 1..=MAX_SPACES {
+            // Index 1 to the last addressable 2TB slot.
+            for i in 1..MAX_SPACES {
                 assert_for_index(i);
             }
 
-            // assert space end
-            let (_, last_space_end) = SFTSpaceMap::index_to_space_range(MAX_SPACES);
+            // assert addressable space end
+            let (_, last_space_end) = SFTSpaceMap::index_to_space_range(MAX_SPACES - 1);
             println!("Space end = {}", last_space_end);
-            println!("Heap  end = {}", vm_layout().heap_end);
-            assert_eq!(last_space_end, vm_layout().heap_end);
+            println!("Addr  end = {}", unsafe {
+                Address::from_usize(1usize << VMLayout::LOG_ARCH_ADDRESS_SPACE)
+            });
+            assert_eq!(last_space_end, unsafe {
+                Address::from_usize(1usize << VMLayout::LOG_ARCH_ADDRESS_SPACE)
+            });
 
-            // after last space
-            assert_eq!(SFTSpaceMap::addr_to_index(last_space_end), 17);
-            assert_eq!(SFTSpaceMap::addr_to_index(Address::MAX), 31);
+            // after the last addressable slot, the masked index wraps.
+            assert_eq!(SFTSpaceMap::addr_to_index(last_space_end), 0);
+            assert_eq!(SFTSpaceMap::addr_to_index(Address::MAX), MAX_SPACES - 1);
         }
     }
 }
