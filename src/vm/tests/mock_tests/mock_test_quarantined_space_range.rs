@@ -13,10 +13,8 @@ fn test_quarantined_space_range_semispace() {
         default_setup,
         || {
             let default_layout = VMLayout::default();
-            let extended_layout = VMLayout {
-                heap_end: unsafe {
-                    Address::from_usize(1usize << VMLayout::LOG_ARCH_ADDRESS_SPACE)
-                },
+            let dynamic_layout = VMLayout {
+                dynamic_heap_range: true,
                 ..default_layout
             };
 
@@ -37,12 +35,13 @@ fn test_quarantined_space_range_semispace() {
                 normal_space_range_start + normal_space_range_bytes
             );
             println!(
-                "Extended heap range is [{}, {})",
-                extended_layout.heap_start, extended_layout.heap_end
+                "Dynamic heap range is [{}, {})",
+                unsafe { Address::from_usize(default_layout.max_space_extent()) },
+                unsafe { Address::from_usize(1usize << VMLayout::LOG_ARCH_ADDRESS_SPACE) }
             );
 
             let mut builder = crate::mmtk::MMTKBuilder::new_no_env_vars();
-            builder.set_vm_layout(extended_layout);
+            builder.set_vm_layout(dynamic_layout);
             builder
                 .options
                 .gc_trigger

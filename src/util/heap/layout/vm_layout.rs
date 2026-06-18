@@ -36,6 +36,9 @@ pub struct VMLayout {
     /// For normal 64-bit config, this should be set to true. Each space should own a contiguous piece of virtual memory.
     /// For 32-bit or 64-bit compressed heap, we don't have enough virtual memory, so this should be set to false.
     pub force_use_contiguous_spaces: bool,
+    /// Ignore the specified heap start/end and use a dynamic addressable heap window based on
+    /// the space extent and the maximum mappable address.
+    pub dynamic_heap_range: bool,
 }
 
 impl VMLayout {
@@ -76,12 +79,6 @@ impl VMLayout {
     pub(crate) fn space_shift_64(&self) -> usize {
         self.log_space_extent
     }
-    /// Bitwise mask to isolate a space index in a virtual address.
-    /// We can't express this constant in a 32-bit environment, hence the
-    /// conditional definition.
-    pub(crate) fn space_mask_64(&self) -> usize {
-        ((1 << LOG_MAX_SPACES) - 1) << self.space_shift_64()
-    }
     /// Size of each space in the 64-bit memory layout
     /// We can't express this constant in a 32-bit environment, hence the
     /// conditional definition.
@@ -98,10 +95,9 @@ impl VMLayout {
         1 << self.log_pages_in_space64()
     }
 
-    /// This mask extracts a few bits from address, and use it as index to the space map table.
-    /// When masked with this constant, the index spans all addressable contiguous-space slots.
-    pub(crate) fn address_mask(&self) -> usize {
-        ((1 << LOG_MAX_SPACES) - 1) << self.log_space_extent
+    /// The number of addressable contiguous-space slots in the current heap range.
+    pub(crate) fn addressable_spaces(&self) -> usize {
+        self.available_bytes() >> self.log_space_extent
     }
 
     const fn validate(&self) {
@@ -111,9 +107,10 @@ impl VMLayout {
         assert!(self.log_address_space <= Self::LOG_ARCH_ADDRESS_SPACE);
         assert!(self.log_space_extent <= self.log_address_space);
         if self.force_use_contiguous_spaces {
-            assert!(self.log_space_extent == Self::LOG_CONTIGUOUS_SPACE_EXTENT_64);
-            assert!(self.log_space_extent <= (self.log_address_space - LOG_MAX_SPACES));
             assert!(self.heap_start.is_aligned_to(self.max_space_extent()));
+            if !self.dynamic_heap_range {
+                assert!(self.log_space_extent <= (self.log_address_space - LOG_MAX_SPACES));
+            }
         }
     }
 
@@ -137,6 +134,7 @@ impl VMLayout {
             heap_end: chunk_align_up(unsafe { Address::from_usize(0xd000_0000) }),
             log_space_extent: 31,
             force_use_contiguous_spaces: false,
+            dynamic_heap_range: false,
         };
         layout32.validate();
         layout32
@@ -156,6 +154,7 @@ impl VMLayout {
             heap_end: chunk_align_up(unsafe { Address::from_usize(0x0000_2200_0000_0000usize) }),
             log_space_extent: 41,
             force_use_contiguous_spaces: true,
+            dynamic_heap_range: false,
         };
         layout64.validate();
         layout64
@@ -164,6 +163,15 @@ impl VMLayout {
     /// Custom VM layout constants. VM bindings may use this function for compressed or 39-bit heap support.
     /// This function must be called before MMTk::new()
     pub(crate) fn set_custom_vm_layout(constants: VMLayout) {
+        let constants = if constants.dynamic_heap_range {
+            VMLayout {
+                heap_start: unsafe { Address::from_usize(1usize << constants.log_space_extent) },
+                heap_end: unsafe { Address::from_usize(1usize << constants.log_address_space) },
+                ..constants
+            }
+        } else {
+            constants
+        };
         if cfg!(debug_assertions) {
             assert!(
                 !VM_LAYOUT_FETCHED.load(Ordering::SeqCst),

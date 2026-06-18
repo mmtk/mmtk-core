@@ -29,17 +29,11 @@ unsafe impl Sync for Map64 {}
 
 impl Map64 {
     pub fn new() -> Self {
-        let mut high_water = vec![Address::ZERO; MAX_SPACES];
-        let mut base_address = vec![Address::ZERO; MAX_SPACES];
+        let high_water = vec![Address::ZERO; MAX_SPACES];
+        let base_address = vec![Address::ZERO; MAX_SPACES];
 
-        for i in 0..MAX_SPACES {
-            let base =
-                unsafe { Address::from_usize(i << VMLayout::LOG_CONTIGUOUS_SPACE_EXTENT_64) };
-            high_water[i] = base;
-            base_address[i] = base;
-        }
-
-        let descriptor_map = vec![SpaceDescriptor::UNINITIALIZED; MAX_SPACES];
+        let descriptor_map =
+            vec![SpaceDescriptor::UNINITIALIZED; Self::addressable_space_count()];
 
         Self {
             inner: UnsafeCell::new(Map64Inner {
@@ -60,8 +54,8 @@ impl VMMap for Map64 {
         // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
         // as each space will update different indices.
         let self_mut = unsafe { self.mut_self() };
-        let index = Self::space_index(start).unwrap();
-        self_mut.descriptor_map[index] = descriptor;
+        let slot = Self::space_slot_index(start).unwrap();
+        self_mut.descriptor_map[slot] = descriptor;
     }
 
     fn create_freelist(&self, start: Address) -> CreateFreeListResult {
@@ -81,7 +75,8 @@ impl VMMap for Map64 {
 
         // This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
         let self_mut = unsafe { self.mut_self() };
-        let index = Self::space_index(start).unwrap();
+        let slot = Self::space_slot_index(start).unwrap();
+        let index = self.inner().descriptor_map[slot].get_index();
 
         units = (units as f64 * NON_MAP_FRACTION) as _;
         let list_extent =
@@ -122,7 +117,6 @@ impl VMMap for Map64 {
         _head: Address,
         maybe_freelist: Option<&mut dyn FreeList>,
     ) -> Address {
-        debug_assert!(Self::space_index(descriptor.get_start()).unwrap() == descriptor.get_index());
         // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
         // as each space will update different indices.
         let self_mut = self.mut_self();
@@ -202,8 +196,8 @@ impl VMMap for Map64 {
     }
 
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
-        if let Some(index) = Self::space_index(address) {
-            self.inner().descriptor_map[index]
+        if let Some(slot) = Self::space_slot_index(address) {
+            self.inner().descriptor_map[slot]
         } else {
             SpaceDescriptor::UNINITIALIZED
         }
@@ -232,15 +226,23 @@ impl Map64 {
         unsafe { &*self.inner.get() }
     }
 
-    fn space_index(addr: Address) -> Option<usize> {
-        if addr > vm_layout().heap_end {
+    fn addressable_space_count() -> usize {
+        vm_layout().addressable_spaces()
+    }
+
+    fn space_slot_index(addr: Address) -> Option<usize> {
+        let layout = vm_layout();
+        if addr < layout.heap_start || addr >= layout.heap_end {
             return None;
         }
-        Some(addr >> vm_layout().space_shift_64())
+        Some((addr - layout.heap_start) >> layout.space_shift_64())
     }
 
     fn is_space_start(base: Address) -> bool {
-        base.is_aligned_to(1 << VMLayout::LOG_CONTIGUOUS_SPACE_EXTENT_64)
+        let layout = vm_layout();
+        base >= layout.heap_start
+            && base < layout.heap_end
+            && ((base - layout.heap_start) & (layout.max_space_extent() - 1)) == 0
     }
 }
 

@@ -29,7 +29,7 @@ impl HeapMeta {
             "Request to reserve quarantined memory for {} bytes, align {:?}, top={}",
             extent, align, top
         );
-        let preferred = if top {
+        let candidate = if top {
             let raw_start = self.heap_limit - extent;
             if let Some(align) = align {
                 raw_start.align_down(align)
@@ -46,15 +46,25 @@ impl HeapMeta {
         };
         debug!(
             "Preferred address for quarantine reservation is {}",
-            preferred
+            candidate
         );
-        let actual = mmapper.quarantine_address_range_preferred(
-            preferred,
-            crate::util::conversions::bytes_to_pages_up(extent),
-            align,
-            huge_page_option,
-            anno,
-        )?;
+        let actual = if vm_layout().dynamic_heap_range {
+            mmapper.quarantine_address_range_preferred(
+                candidate,
+                crate::util::conversions::bytes_to_pages_up(extent),
+                align,
+                huge_page_option,
+                anno,
+            )?
+        } else {
+            mmapper.quarantine_address_range(
+                candidate,
+                crate::util::conversions::bytes_to_pages_up(extent),
+                huge_page_option,
+                anno,
+            )?;
+            candidate
+        };
 
         assert!(
             actual >= self.heap_cursor && actual + extent <= self.heap_limit,
@@ -65,7 +75,7 @@ impl HeapMeta {
             self.heap_limit,
         );
 
-        if actual == preferred {
+        if actual == candidate {
             if top {
                 self.heap_limit = actual;
             } else {

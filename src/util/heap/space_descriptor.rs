@@ -1,11 +1,12 @@
 use bytemuck::Zeroable;
 
 use crate::util::heap::layout::vm_layout::{self, vm_layout};
+use crate::util::heap::layout::heap_parameters::MAX_SPACES;
 use crate::util::Address;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 const TYPE_BITS: usize = 2;
-#[allow(unused)]
 const TYPE_SHARED: usize = 0;
 const TYPE_CONTIGUOUS: usize = 1;
 const TYPE_CONTIGUOUS_HI: usize = 3;
@@ -30,6 +31,18 @@ const INDEX_SHIFT: usize = TYPE_BITS;
 
 static DISCONTIGUOUS_SPACE_INDEX: AtomicUsize = AtomicUsize::new(DISCONTIG_INDEX_INCREMENT);
 const DISCONTIG_INDEX_INCREMENT: usize = 1 << TYPE_BITS;
+static DYNAMIC_CONTIGUOUS_SPACE_INDEX: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Copy, Clone)]
+struct DynamicContiguousSpaceInfo {
+    start: Address,
+    extent: usize,
+}
+
+lazy_static! {
+    static ref DYNAMIC_CONTIGUOUS_SPACE_TABLE: Mutex<Vec<Option<DynamicContiguousSpaceInfo>>> =
+        Mutex::new(vec![None; MAX_SPACES]);
+}
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(transparent)]
@@ -43,10 +56,23 @@ impl SpaceDescriptor {
     pub fn create_descriptor_from_heap_range(start: Address, end: Address) -> SpaceDescriptor {
         let top = end == vm_layout().heap_end;
         if vm_layout().force_use_contiguous_spaces {
-            let space_index = if start > vm_layout().heap_end {
-                usize::MAX
+            let space_index = if vm_layout().dynamic_heap_range {
+                let next = DYNAMIC_CONTIGUOUS_SPACE_INDEX.fetch_add(1, Ordering::Relaxed);
+                assert!(
+                    next < MAX_SPACES,
+                    "Too many dynamic contiguous spaces: {} >= {}",
+                    next,
+                    MAX_SPACES
+                );
+                DYNAMIC_CONTIGUOUS_SPACE_TABLE.lock().unwrap()[next] = Some(
+                    DynamicContiguousSpaceInfo {
+                        start,
+                        extent: end - start,
+                    },
+                );
+                next
             } else {
-                start >> vm_layout().space_shift_64()
+                (start - vm_layout().heap_start) >> vm_layout().space_shift_64()
             };
             let flags = if top {
                 TYPE_CONTIGUOUS_HI
@@ -101,8 +127,12 @@ impl SpaceDescriptor {
         if !vm_layout().force_use_contiguous_spaces {
             // For 64-bit discontiguous space, use 32-bit start address
             self.get_start_32()
+        } else if vm_layout().dynamic_heap_range {
+            DYNAMIC_CONTIGUOUS_SPACE_TABLE.lock().unwrap()[self.get_index()]
+                .unwrap()
+                .start
         } else {
-            unsafe { Address::from_usize(self.get_index() << vm_layout().log_space_extent) }
+            vm_layout().heap_start + (self.get_index() << vm_layout().log_space_extent)
         }
     }
 
@@ -120,9 +150,12 @@ impl SpaceDescriptor {
         if !vm_layout().force_use_contiguous_spaces {
             // For 64-bit discontiguous space, use 32-bit extent
             self.get_extent_32()
+        } else if vm_layout().dynamic_heap_range {
+            DYNAMIC_CONTIGUOUS_SPACE_TABLE.lock().unwrap()[self.get_index()]
+                .unwrap()
+                .extent
         } else {
-            use crate::util::heap::vm_layout::VMLayout;
-            VMLayout::CONTIGUOUS_SPACE_EXTENT_64
+            vm_layout().space_size_64()
         }
     }
 
