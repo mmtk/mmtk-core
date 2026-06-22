@@ -264,6 +264,14 @@ impl<VM: VMBinding> MMTK<VM> {
         probe!(mmtk, collection_initialized);
     }
 
+    /// Shut down all GC worker threads.
+    pub fn shutdown(&'static self) {
+        if self.state.is_initialized() {
+            self.scheduler.shutdown_gc_threads();
+            self.state.initialized.store(false, Ordering::SeqCst);
+        }
+    }
+
     /// Prepare an MMTk instance for calling the `fork()` system call.
     ///
     /// The `fork()` system call is available on Linux and some UNIX variants, and may be emulated
