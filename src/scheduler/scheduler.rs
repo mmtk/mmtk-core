@@ -104,7 +104,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn shutdown_gc_threads(self: &Arc<Self>) {
         self.worker_group.prepare_surrender_buffer();
 
-        debug!("A mutator is requesting GC threads to shut down...");
+        info!("A mutator is requesting GC threads to shut down...");
         self.worker_monitor.make_request(WorkerGoal::Shutdown);
     }
 

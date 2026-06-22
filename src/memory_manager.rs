@@ -87,8 +87,7 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
 }
 
 /// Shut down an MMTk instance.
-/// This would asycnronously request GC workers to stop, but it will not be blocked until
-/// the GC workers actually quit. A binding needs to check if all GC workers have quit.
+/// This would asynchronously request GC workers to stop. Bindings need to check if all GC workers have quit in binding-specific ways.
 pub fn mmtk_shutdown<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
     mmtk.shutdown();
 }
