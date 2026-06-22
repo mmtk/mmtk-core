@@ -86,6 +86,13 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     Box::new(mmtk)
 }
 
+/// Shut down an MMTk instance.
+/// This would asycnronously request GC workers to stop, but it will not be blocked until
+/// the GC workers actually quit. A binding needs to check if all GC workers have quit.
+pub fn mmtk_shutdown<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
+    mmtk.shutdown();
+}
+
 /// Add an externally mmapped region to the VM space. A VM space can be set through MMTk options (`vm_space_start` and `vm_space_size`),
 /// and can also be set through this function call. A VM space can be discontiguous. This function can be called multiple times,
 /// and all the address ranges passed as arguments in the function will be considered as part of the VM space.
