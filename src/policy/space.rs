@@ -702,15 +702,12 @@ impl<VM: VMBinding> CommonSpace<VM> {
                     )
                 })
         };
-        debug!(
-            "Space {} reserved contiguous memory [{}, {}) for {} bytes, align {:?}",
+        assert!(
+            start == chunk_align_up(start),
+            "{} starting on non-aligned boundary: {}",
             rtn.name,
-            start,
-            start + reasonable_extent,
-            reasonable_extent,
-            align
+            start
         );
-        assert!(start.is_aligned_to(align.unwrap_or(BYTES_IN_CHUNK)));
 
         rtn.contiguous = true;
         rtn.start = start;
