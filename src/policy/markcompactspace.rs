@@ -120,6 +120,10 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
         self
     }
 
+    fn as_inspector(&self) -> &dyn crate::util::heap::inspection::SpaceInspector {
+        self
+    }
+
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
@@ -451,5 +455,25 @@ struct MarkCompactObjectSize<VM>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MarkCompactObjectSize<VM> {
     fn size(object: ObjectReference) -> usize {
         VM::VMObjectModel::get_current_size(object)
+    }
+}
+
+mod inspector {
+    use super::*;
+    use crate::util::heap::inspection::{RegionInspector, SpaceInspector};
+
+    impl<VM: VMBinding> SpaceInspector for MarkCompactSpace<VM> {
+        fn list_top_regions(&self) -> Vec<Box<dyn RegionInspector>> {
+            crate::util::heap::inspection::into_regions::<crate::util::heap::chunk_map::Chunk>(
+                &mut self.pr.iterate_allocated_regions(),
+            )
+        }
+
+        fn list_sub_regions(
+            &self,
+            _parent_region: &dyn RegionInspector,
+        ) -> Vec<Box<dyn RegionInspector>> {
+            vec![]
+        }
     }
 }

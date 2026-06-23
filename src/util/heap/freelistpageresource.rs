@@ -93,7 +93,6 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
             };
             new_chunk = true;
         }
-
         if page_offset == freelist::FAILURE {
             return Result::Err(PRAllocFail);
         } else {
