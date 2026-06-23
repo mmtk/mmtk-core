@@ -100,6 +100,14 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_monitor.make_request(WorkerGoal::StopForFork);
     }
 
+    /// Ask all GC workers to exit permanently.
+    pub fn shutdown_gc_threads(self: &Arc<Self>) {
+        self.worker_group.prepare_surrender_buffer();
+
+        info!("A mutator is requesting GC threads to shut down...");
+        self.worker_monitor.make_request(WorkerGoal::Shutdown);
+    }
+
     /// Surrender the `GCWorker` struct of a GC worker when it exits.
     pub fn surrender_gc_worker(&self, worker: Box<GCWorker<VM>>) {
         let all_surrendered = self.worker_group.surrender_gc_worker(worker);
@@ -478,7 +486,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     }
                 }
             }
-            WorkerGoal::StopForFork => {
+            WorkerGoal::StopForFork | WorkerGoal::Shutdown => {
                 panic!(
                     "Worker {} parked again when it is asked to exit.",
                     worker.ordinal
@@ -517,8 +525,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 self.add_schedule_collection_packet();
                 LastParkedResult::WakeSelf
             }
-            WorkerGoal::StopForFork => {
-                trace!("A mutator wanted to fork.");
+            WorkerGoal::StopForFork | WorkerGoal::Shutdown => {
+                trace!("A mutator requested {:?}", goal);
                 LastParkedResult::WakeAll
             }
         }

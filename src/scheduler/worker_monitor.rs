@@ -230,8 +230,11 @@ impl WorkerMonitor {
             sync.parker.worker_count,
         );
 
-        // If the current goal is `StopForFork`, the worker thread should exit.
-        if matches!(sync.goals.current(), Some(WorkerGoal::StopForFork)) {
+        // If the current goal is an exit goal, the worker thread should exit.
+        if matches!(
+            sync.goals.current(),
+            Some(WorkerGoal::Shutdown | WorkerGoal::StopForFork)
+        ) {
             return Err(WorkerShouldExit);
         }
 
