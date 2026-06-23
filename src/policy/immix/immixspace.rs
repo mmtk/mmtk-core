@@ -1,7 +1,7 @@
 use super::defrag::StatsForDefrag;
 use super::line::*;
 use super::{block::*, defrag::Defrag};
-use crate::plan::VectorObjectQueue;
+use crate::plan::tracing::OptionObjectQueue;
 use crate::policy::gc_work::{TraceKind, DEFAULT_TRACE, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
@@ -145,7 +145,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     }
     fn sft_trace_object(
         &self,
-        _queue: &mut VectorObjectQueue,
+        _queue: &mut OptionObjectQueue,
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
@@ -269,8 +269,8 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         } else if KIND == DEFAULT_TRACE {
             // FIXME: This is hacky. When we do a default trace, this should be a nonmoving space.
             // The only exception is the nursery GC for sticky immix, for which, we use default trace.
-            // This function is only used for PlanProcessEdges, and for sticky immix nursery GC, we use
-            // GenNurseryProcessEdges. So it still works. But this is quite hacky anyway.
+            // This function is only used for PlanTrace, and for sticky immix nursery GC, we use
+            // GenNurseryTrace. So it still works. But this is quite hacky anyway.
             // See https://github.com/mmtk/mmtk-core/issues/1314 for details.
             false
         } else {
@@ -996,8 +996,14 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
         // Hints for clearing side forwarding bits.
         let is_moving_gc = mmtk.get_plan().current_gc_may_move_object();
         let is_defrag_gc = self.space.defrag.in_defrag();
-        // number of allocated blocks.
-        let mut allocated_blocks = 0;
+
+        // number of swept (completely free) blocks.
+        let mut swept_blocks = 0;
+        // number of reused blocks.
+        let mut reused_blocks = 0;
+        // number of non-free blocks that cannot be reused (e.g. full, or non-empty when block-only).
+        let mut unreused_blocks = 0;
+
         // Iterate over all allocated blocks in this chunk.
         for block in self
             .chunk
@@ -1028,12 +1034,24 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
                 }
             }
 
-            if !block.sweep(self.space, &mut histogram, line_mark_state) {
-                // Block is live. Increment the allocated block count.
-                allocated_blocks += 1;
+            match block.sweep(self.space, &mut histogram, line_mark_state) {
+                BlockSweepResult::Swept => swept_blocks += 1,
+                BlockSweepResult::Reused => reused_blocks += 1,
+                BlockSweepResult::NoReuse => unreused_blocks += 1,
             }
         }
-        probe!(mmtk, sweep_chunk, allocated_blocks);
+
+        probe!(
+            mmtk,
+            sweep_chunk_immix,
+            swept_blocks,
+            reused_blocks,
+            unreused_blocks
+        );
+
+        // number of allocated blocks.
+        let allocated_blocks = reused_blocks + unreused_blocks;
+
         // Set this chunk as free if there is not live blocks.
         if allocated_blocks == 0 {
             self.space.chunk_map.set_allocated(self.chunk, false)

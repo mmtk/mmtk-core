@@ -65,6 +65,7 @@ pub(crate) mod rust_util;
 /// Sanity checker for GC.
 #[cfg(feature = "sanity")]
 pub(crate) mod sanity;
+pub(crate) mod scanning_helper;
 /// Logging slots to check duplicated edges in GC.
 #[cfg(feature = "extreme_assertions")]
 pub(crate) mod slot_logger;

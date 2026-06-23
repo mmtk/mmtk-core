@@ -30,6 +30,7 @@ pub use self::reference_glue::Finalizable;
 pub use self::reference_glue::ReferenceGlue;
 pub use self::scanning::ObjectTracer;
 pub use self::scanning::ObjectTracerContext;
+pub(crate) use self::scanning::RootsKind;
 pub use self::scanning::RootsWorkFactory;
 pub use self::scanning::Scanning;
 pub use self::scanning::SlotVisitor;

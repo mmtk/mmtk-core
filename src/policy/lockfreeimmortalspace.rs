@@ -3,13 +3,15 @@ use atomic::Atomic;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
+use crate::scheduler::GCWorker;
 use crate::util::address::Address;
-
 use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::conversions;
+use crate::util::copy::CopySemantics;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::heap::PageResource;
@@ -92,7 +94,7 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     }
     fn sft_trace_object(
         &self,
-        _queue: &mut VectorObjectQueue,
+        _queue: &mut OptionObjectQueue,
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
@@ -189,10 +191,6 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         unimplemented!()
     }
 }
-
-use crate::plan::{ObjectQueue, VectorObjectQueue};
-use crate::scheduler::GCWorker;
-use crate::util::copy::CopySemantics;
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LockFreeImmortalSpace<VM> {
     fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
