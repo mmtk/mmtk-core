@@ -25,7 +25,7 @@ impl HeapMeta {
         huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
     ) -> MmapResult<Address> {
-        let preferred = if top {
+        let start = if top {
             let raw_start = self.heap_limit - extent;
             if let Some(align) = align {
                 raw_start.align_down(align)
@@ -41,37 +41,28 @@ impl HeapMeta {
             }
         };
 
-        let actual = mmapper.quarantine_address_range_preferred(
-            preferred,
+        // TODO: The following call do an fixed mmap. We should try to allow the OS to choose the address if the fixed mmap fails.
+        mmapper.quarantine_address_range(
+            start,
             crate::util::conversions::bytes_to_pages_up(extent),
-            align,
             huge_page_option,
             anno,
         )?;
 
-        assert!(
-            actual >= self.heap_cursor && actual + extent <= self.heap_limit,
-            "Quarantined heap range [{}, {}) is outside available heap range [{}, {})",
-            actual,
-            actual + extent,
-            self.heap_cursor,
-            self.heap_limit,
-        );
-
         if top {
-            self.heap_limit = actual;
+            self.heap_limit = start;
         } else {
-            self.heap_cursor = actual + extent;
+            self.heap_cursor = start + extent;
         }
 
         assert!(
             self.heap_cursor <= self.heap_limit,
             "Out of virtual address space after quarantining [{}, {})",
-            actual,
-            actual + extent,
+            start,
+            start + extent,
         );
 
-        Ok(actual)
+        Ok(start)
     }
 
     pub fn get_discontig_start(&self) -> Address {
