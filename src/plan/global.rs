@@ -69,6 +69,13 @@ pub fn create_mutator<VM: VMBinding>(
     })
 }
 
+/// Create a plan and the spaces for the plan.
+///
+/// It is very important that in the constructor of each plan (including the constructor of each space),
+/// sft and side metadata is not available for access. If a plan or a space needs to initialize sft or side metadata
+/// in its constructor, it needs to postpone the initialization to [`Plan::initialize_sft`], [`Plan::initialize_side_metadata`],
+/// [`Space::initialize_sft`] or [`Space::initialize_side_metadata`].
+/// If a plan or a space tries to access sft or side metadata in its constructor, it may cause undefined behavior.
 pub fn create_plan<VM: VMBinding>(
     plan: PlanSelector,
     args: CreateGeneralPlanArgs<VM>,
@@ -358,6 +365,13 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
             sft_map.notify_space_creation(s.as_sft());
             s.initialize_sft(sft_map);
         });
+    }
+
+    /// Call `space.initialize_side_metadata` for all spaces in this plan.
+    /// This is called after the plan is created in the heap and won't be moved, and after side metadata is initialized.
+    /// If a plan needs to access side metadata during space construction, it can override this method for its own initialization.
+    fn initialize_side_metadata(&self) {
+        self.for_each_space(&mut |s| s.initialize_side_metadata());
     }
 }
 

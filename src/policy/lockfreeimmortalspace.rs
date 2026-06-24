@@ -131,6 +131,15 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         unsafe { sft_map.eager_initialize(self.as_sft(), self.start, self.total_bytes) };
     }
 
+    fn initialize_side_metadata(&self) {
+        self.metadata
+            .try_map_metadata_space(self.start, self.total_bytes, self.get_name())
+            .unwrap_or_else(|e| {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory: {e}")
+            });
+    }
+
     fn estimate_side_meta_pages(&self, data_pages: usize) -> usize {
         self.metadata.calculate_reserved_pages(data_pages)
     }
@@ -284,13 +293,6 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             .replace(true)
             .reserve(true);
         crate::util::os::OS::dzmmap(start, aligned_total_bytes, strategy, &anno).unwrap();
-        space
-            .metadata
-            .try_map_metadata_space(start, aligned_total_bytes, space.get_name())
-            .unwrap_or_else(|e| {
-                // TODO(Javad): handle meta space allocation failure
-                panic!("failed to mmap meta memory: {e}")
-            });
 
         space
     }
