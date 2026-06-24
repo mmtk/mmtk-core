@@ -266,7 +266,15 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             .prot(crate::util::os::MmapProtection::ReadWrite)
             .replace(false)
             .reserve(true);
-        crate::util::os::OS::dzmmap(start, aligned_total_bytes, strategy, &anno).unwrap();
+        crate::util::os::OS::dzmmap(
+            start,
+            aligned_total_bytes,
+            strategy,
+            &MmapAnnotation::Space {
+                name: space.get_name(),
+            },
+        )
+        .unwrap();
 
         space
     }
