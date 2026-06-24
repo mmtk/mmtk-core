@@ -1833,7 +1833,7 @@ via <code>mmtk_set_heap_size()</code>. We will create an <code>MMTK</code> insta
 <h3 id="runtime-side-changes"><a class="header" href="#runtime-side-changes">Runtime-side changes</a></h3>
 <p>Create a <code>mmtk.h</code> header file in the runtime folder of the binding (i.e. <code>mmtk-X/X</code>) which exposes the functions required to implement NoGC and <code>#include</code> it in the relevant runtime code. You can use the <a href="https://github.com/mmtk/mmtk-core/blob/master/docs/dummyvm/include/mmtk.h">example <code>mmtk.h</code> header file</a> as an example.</p>
 <p><strong>Note:</strong> It is convention to prefix all MMTk API functions exposed with <code>mmtk_</code> in order to avoid name clashes. It is <em>highly</em> recommended that you follow this convention.</p>
-<p>Having a clean heap API for MMTk to implement makes life easier. Some runtimes may already have a sufficiently clean abstraction such as OpenJDK after the merging of <a href="https://openjdk.org/jeps/304">JEP 304</a>. In (most) other cases, the runtime doesn't provide a clean enough heap API for MMTk to implement. In such cases, it is recommended to create a class (or equivalent) that abstracts allocation and other heap functions like what the <a href="https://chromium.googlesource.com/v8/v8/+/a9976e160f4755990ec065d4b077c9401340c8fb/src/heap/third-party/heap-api.h">V8</a> and ART bindings do. This allows making minimal changes to the actual runtime and having a concrete implementation of the exposed heap API in the binding, reducing MMTk-specific code in the runtime. Ideally these changes are upstreamed like in the case of V8.</p>
+<p>Having a clean heap API for MMTk to implement makes life easier. Some runtimes may already have a sufficiently clean abstraction such as OpenJDK after the merging of <a href="https://openjdk.org/jeps/304">JEP 304</a>. In (most) other cases, the runtime doesn't provide a clean enough heap API for MMTk to implement. In such cases, it is recommended to create a class (or equivalent) that abstracts allocation and other heap functions. This allows making minimal changes to the actual runtime and having a concrete implementation of the exposed heap API in the binding, reducing MMTk-specific code in the runtime. Ideally these changes are upstreamed.</p>
 <p>It is also recommended that any change you do in the runtime be guarded by build-time flags as it helps in maintaining a clean port.</p>
 <p>At this step, your <code>mmtk.h</code> file may look something like this:</p>
 <pre><code class="language-C">#ifndef MMTK_H
@@ -2069,37 +2069,35 @@ Then, to ensure you know which GC cycle you’re in, set breakpoints at the star
 </code></pre>
 <p>These breakpoints help you detect if replay takes you into a different GC than the one that crashed.</p>
 <h2 id="step-2-identify-the-slot-that-loaded-the-object"><a class="header" href="#step-2-identify-the-slot-that-loaded-the-object">Step 2: Identify the Slot that Loaded the Object</a></h2>
-<div id="admonition-note" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-title">
-<div class="admonition-title">
-<div id="admonition-note-title">
-<p>Note</p>
-</div>
-<a class="admonition-anchor-link" href="portingguide/debugging/traverse_object_graph.html#admonition-note"></a>
-</div>
-<div>
-<p>This example uses an old version of MMTk, but the principles are still applicable.
-<strong>The current work packet that loads from slots is <code>ProcessSlots</code>.</strong></p>
-</div>
-</div>
-<p>Object references are usually loaded from slots in <a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html#method.process_slot"><code>ProcessEdgesWork::process_slot</code></a>.
-Most MMTk plans use <a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html#method.process_slot"><code>PlanProcessEdges</code> which implements this method like this</a>:</p>
+<p>Object references are usually loaded from slots in
+<a href="https://github.com/mmtk/mmtk-core/blob/master/src/plan/tracing/gc_work/closure.rs"><code>ProcessSlots::process_slots</code></a>.
+The current code looks like this:</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>fn process_slot(&amp;mut self, slot: SlotOf&lt;Self&gt;) {
-    let Some(object) = slot.load() else {
-        return;
-    };
-    let new_object = self.trace_object(object); // Assume this is line 978 in your version
-    if P::may_move_objects::&lt;KIND&gt;() &amp;&amp; new_object != object {
-        slot.store(new_object);
+</span>fn process_slots(
+    &amp;mut self,
+    worker: &amp;mut GCWorker&lt;T::VM&gt;,
+    trace: T,
+) -&gt; VectorQueue&lt;ObjectReference&gt; {
+    let mut queue = VectorObjectQueue::new();
+
+    for slot in self.slots.iter() {
+        if let Some(object) = slot.load() {
+            let new_object = trace.trace_object(worker, object, &amp;mut queue);
+            if T::may_move_objects() &amp;&amp; new_object != object {
+                slot.store(new_object);
+            }
+        }
     }
+
+    queue
 }
 <span class="boring">}</span></code></pre></pre>
-<p>At line 978, the variable object is the reference of interest.
-To catch the corrupted object (<code>0x725a62eb60f0</code>), set a conditional breakpoint here.</p>
+<p>At the <code>slot.load()</code> / <code>trace.trace_object(...)</code> point, <code>object</code> is the reference of interest.
+To catch the corrupted object (<code>0x725a62eb60f0</code>), set a conditional breakpoint there.</p>
 <p>Conditions can be expressed in different ways, such as <code>if object.as_raw_address().as_usize() == 0x725a62eb60f0</code> (Rust),
 <code>if (uintptr_t)object == 0x725a62eb60f0</code> (C), and <code>if $rsi == 0x725a62eb60f0</code>.</p>
-<p>Using registers seem to work more reliably when
+<p>Using registers seems to work more reliably when
 the execution keeps switching between Rust and C. You can find which register holds the value <code>0x725a62eb60f0</code> (using <code>info registers</code>)
 and use that as the condition. If the value <code>0x725a62eb60f0</code> does not appear in any register, you can <code>step</code> forward through one or more statements,
 until you see the value appears. Set the breakpoint at that line.</p>
@@ -2110,63 +2108,63 @@ We can also set up a GDB command, as we will likely do this step repeatedly to t
 You need to change the example below to match your recorded trace:</p>
 <ol>
 <li>The file path.</li>
-<li>The line number of the breakpoint.</li>
+<li>The line number inside <code>ProcessSlots::process_slots</code>.</li>
 <li>The register that holds the value <code>object</code>.</li>
 </ol>
 <pre><code class="language-gdb">(rr) define find_slot
-&gt;tbreak /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/scheduler/gc_work.rs:978 if $rsi == $arg0
+&gt;tbreak /path/to/mmtk-core/src/plan/tracing/gc_work/closure.rs:41 if $rsi == $arg0
 &gt;reverse-cont
 &gt;end
 </code></pre>
 <p>Usage:</p>
 <pre><code class="language-gdb">(rr) find_slot 0x725a62eb60f0
-Temporary breakpoint 1 at 0x725a7d4dc2de: /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/scheduler/gc_work.rs:978. (14 locations)
+Temporary breakpoint 1 at 0x...: /path/to/mmtk-core/src/plan/tracing/gc_work/closure.rs:41. (N locations)
 </code></pre>
 <p>If the breakpoint hits (it may take a while), you’ll see something like:</p>
-<pre><code class="language-gdb">Thread 2 hit Temporary breakpoint 1, mmtk::scheduler::gc_work::{impl#39}::process_slot&lt;mmtk_julia::JuliaVM, mmtk::plan::immix::global::Immix&lt;mmtk_julia::JuliaVM&gt;, 1&gt; (self=0x725a64001850, slot=...) at /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/scheduler/gc_work.rs:978
-978             let new_object = self.trace_object(object);
+<pre><code class="language-gdb">Thread 2 hit Temporary breakpoint 1, mmtk::plan::tracing::gc_work::closure::ProcessSlots&lt;...&gt;::process_slots (...) at /path/to/mmtk-core/src/plan/tracing/gc_work/closure.rs:41
+41                  let new_object = trace.trace_object(worker, object, &amp;mut queue);
 </code></pre>
 <p>Then:</p>
 <pre><code class="language-gdb">(rr) p/x slot
 $2 = mmtk_julia::slots::JuliaVMSlot::Simple(mmtk::vm::slot::SimpleSlot {slot_addr: 0x725a62eb6168})
 </code></pre>
 <p>Here we learn that object <code>0x725a62eb60f0</code> was loaded from slot <code>0x725a62eb6168</code>.</p>
-<p>If instead you hit <code>stop_all_mutators</code>, it means the object wasn’t processed through <code>PlanProcessEdges</code> (our conditional breakpoint) in this GC. It could have been enqueued by another <code>ProcessEdgesWork</code>, by node enqueueing, or it may be a root. Similar techniques apply: set breakpoints in other relevant paths until you find where the object comes from.</p>
+<p>If instead you hit <code>stop_all_mutators</code>, it means the object was not processed through
+<code>ProcessSlots</code> (our conditional breakpoint) in this GC. Similar techniques apply: set breakpoints
+in other relevant paths until you find where the object comes from.</p>
 <h3 id="step-3-identify-the-object-that-owns-the-slot"><a class="header" href="#step-3-identify-the-object-that-owns-the-slot">Step 3: Identify the Object that Owns the Slot</a></h3>
 <p>Now that we know slot <code>0x725a62eb6168</code> contains the object <code>0x725a62eb60f0</code>, we need to determine which object this slot belongs to.
-Slots are enqueued when bindings scan an object, via <a href="https://docs.mmtk.io/api/mmtk/vm/trait.SlotVisitor.html#tymethod.visit_slot"><code>SlotVisitor::visit_slot</code></a>.
-We can set a conditional breakpoint at the implementation of <code>visit_slot</code> to capture where the slot is enqueue'd to MMTk.</p>
+Slots are reported when bindings scan an object via
+<a href="https://docs.mmtk.io/api/mmtk/vm/trait.Scanning.html#tymethod.scan_object"><code>Scanning::scan_object</code></a>,
+which calls <a href="https://docs.mmtk.io/api/mmtk/vm/trait.SlotVisitor.html#tymethod.visit_slot"><code>SlotVisitor::visit_slot</code></a>
+for each outgoing reference field.
+To find the owning object, set a conditional breakpoint in mmtk-core at the <code>SlotVisitor</code>
+implementation for closures.</p>
 <p>Define another helper command:</p>
 <pre><code class="language-gdb">(rr) define find_object
-&gt;tbreak /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/plan/tracing.rs:61 if $rcx == $arg0
+&gt;tbreak /path/to/mmtk-core/src/vm/scanning.rs:16 if $rsi == $arg0
 &gt;reverse-cont
 &gt;end
 </code></pre>
 <p>Usage:</p>
 <pre><code class="language-gdb">(rr) find_object 0x725a62eb6168
-Temporary breakpoint 2 at 0x725a7d57a363: /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/plan/tracing.rs:61. (3 locations)
+Temporary breakpoint 2 at 0x...: /path/to/mmtk-core/src/vm/scanning.rs:16. (N locations)
 </code></pre>
 <p>When the breakpoint hits:</p>
-<pre><code class="language-gdb">Thread 2 hit Temporary breakpoint 2, mmtk::plan::tracing::VectorQueue&lt;mmtk_julia::slots::JuliaVMSlot&gt;::push&lt;mmtk_julia::slots::JuliaVMSlot&gt; (self=0x725a695fafe0, v=...) at /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/plan/tracing.rs:61
-61              if self.buffer.is_empty() {
+<pre><code class="language-gdb">Thread 2 hit Temporary breakpoint 2, &lt;... as mmtk::vm::scanning::SlotVisitor&lt;...&gt;&gt;::visit_slot (...) at /path/to/mmtk-core/src/vm/scanning.rs:16
+16          self(slot)
 </code></pre>
 <p>From the stack, you can walk upward to find the object that is being scanned.</p>
 <pre><code class="language-gdb">(rr) up
-#1  0x0000725a7d578050 in mmtk::plan::tracing::{impl#4}::visit_slot&lt;mmtk::scheduler::gc_work::PlanProcessEdges&lt;mmtk_julia::JuliaVM, mmtk::plan::immix::global::Immix&lt;mmtk_julia::JuliaVM&gt;, 1&gt;&gt; (self=0x725a695fafe0, slot=...)
-    at /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/plan/tracing.rs:125
-125             self.buffer.push(slot);
+#1  ... in &lt;closure at ...&gt;
 (rr) up
-#2  0x0000725a7d536dbb in mmtk_julia::julia_scanning::process_slot&lt;mmtk::plan::tracing::ObjectsClosure&lt;mmtk::scheduler::gc_work::PlanProcessEdges&lt;mmtk_julia::JuliaVM, mmtk::plan::immix::global::Immix&lt;mmtk_julia::JuliaVM&gt;, 1&gt;&gt;&gt; (closure=0x725a695fafe0, slot=...)
-    at src/julia_scanning.rs:720
-720         closure.visit_slot(JuliaVMSlot::Simple(simple_slot));
+#2  ... in &lt;your binding&gt;::scan_object(...)
 (rr) up
-#3  mmtk_julia::julia_scanning::scan_julia_obj_n&lt;u8, mmtk::plan::tracing::ObjectsClosure&lt;mmtk::scheduler::gc_work::PlanProcessEdges&lt;mmtk_julia::JuliaVM, mmtk::plan::immix::global::Immix&lt;mmtk_julia::JuliaVM&gt;, 1&gt;&gt;&gt; (obj=..., begin=..., end=..., closure=0x725a695fafe0)
-    at src/julia_scanning.rs:111
-111             process_slot(closure, slot);
+#3  ... in mmtk::plan::tracing::gc_work::closure::ProcessNodes&lt;...&gt;::try_enqueue_slots(...)
 (rr) p/x obj
 $1 = mmtk::util::address::Address (0x725a62eb6130)
 </code></pre>
-<p>By repeating Step 2 (finding the slot that loaded an object) and Step 3 (finding the object that owns that slot), you can walk backward through the object graph. Continue this process until you reach a point of interest -- such as the root object, or an object that errornously enqueues a slot.</p>
+<p>By repeating Step 2 (finding the slot that loaded an object) and Step 3 (finding the object that owns that slot), you can walk backward through the object graph. Continue this process until you reach a point of interest -- such as the root object, or an object that erroneously enqueues a slot.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="performance-tuning-for-bindings"><a class="header" href="#performance-tuning-for-bindings">Performance Tuning for Bindings</a></h1>
 <p>In this section, we discuss how to achieve the best performance with MMTk in a binding implementation.
 MMTk is a high performance GC library. But there are some key points that need to be done correctly
