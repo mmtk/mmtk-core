@@ -27,33 +27,38 @@ These breakpoints help you detect if replay takes you into a different GC than t
 
 ## Step 2: Identify the Slot that Loaded the Object
 
-```admonish note
-This example uses an old version of MMTk, but the principles are still applicable.
-**The current work packet that loads from slots is `ProcessSlots`.**
-```
-
-Object references are usually loaded from slots in [`ProcessEdgesWork::process_slot`](https://docs.mmtk.io/api/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html#method.process_slot).
-Most MMTk plans use [`PlanProcessEdges` which implements this method like this](https://docs.mmtk.io/api/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html#method.process_slot):
+Object references are usually loaded from slots in
+[`ProcessSlots::process_slots`](https://github.com/mmtk/mmtk-core/blob/master/src/plan/tracing/gc_work/closure.rs).
+The current code looks like this:
 
 ```rust
-fn process_slot(&mut self, slot: SlotOf<Self>) {
-    let Some(object) = slot.load() else {
-        return;
-    };
-    let new_object = self.trace_object(object); // Assume this is line 978 in your version
-    if P::may_move_objects::<KIND>() && new_object != object {
-        slot.store(new_object);
+fn process_slots(
+    &mut self,
+    worker: &mut GCWorker<T::VM>,
+    trace: T,
+) -> VectorQueue<ObjectReference> {
+    let mut queue = VectorObjectQueue::new();
+
+    for slot in self.slots.iter() {
+        if let Some(object) = slot.load() {
+            let new_object = trace.trace_object(worker, object, &mut queue);
+            if T::may_move_objects() && new_object != object {
+                slot.store(new_object);
+            }
+        }
     }
+
+    queue
 }
 ```
 
-At line 978, the variable object is the reference of interest.
-To catch the corrupted object (`0x725a62eb60f0`), set a conditional breakpoint here.
+At the `slot.load()` / `trace.trace_object(...)` point, `object` is the reference of interest.
+To catch the corrupted object (`0x725a62eb60f0`), set a conditional breakpoint there.
 
 Conditions can be expressed in different ways, such as `if object.as_raw_address().as_usize() == 0x725a62eb60f0` (Rust),
 `if (uintptr_t)object == 0x725a62eb60f0` (C), and `if $rsi == 0x725a62eb60f0`.
 
-Using registers seem to work more reliably when
+Using registers seems to work more reliably when
 the execution keeps switching between Rust and C. You can find which register holds the value `0x725a62eb60f0` (using `info registers`)
 and use that as the condition. If the value `0x725a62eb60f0` does not appear in any register, you can `step` forward through one or more statements,
 until you see the value appears. Set the breakpoint at that line.
@@ -66,12 +71,12 @@ We can also set up a GDB command, as we will likely do this step repeatedly to t
 Define a helper GDB command.
 You need to change the example below to match your recorded trace:
 1. The file path.
-2. The line number of the breakpoint.
+2. The line number inside `ProcessSlots::process_slots`.
 3. The register that holds the value `object`.
 
 ```gdb
 (rr) define find_slot
->tbreak /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/scheduler/gc_work.rs:978 if $rsi == $arg0
+>tbreak /path/to/mmtk-core/src/plan/tracing/gc_work/closure.rs:41 if $rsi == $arg0
 >reverse-cont
 >end
 ```
@@ -79,13 +84,13 @@ You need to change the example below to match your recorded trace:
 Usage:
 ```gdb
 (rr) find_slot 0x725a62eb60f0
-Temporary breakpoint 1 at 0x725a7d4dc2de: /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/scheduler/gc_work.rs:978. (14 locations)
+Temporary breakpoint 1 at 0x...: /path/to/mmtk-core/src/plan/tracing/gc_work/closure.rs:41. (N locations)
 ```
 
 If the breakpoint hits (it may take a while), you’ll see something like:
 ```gdb
-Thread 2 hit Temporary breakpoint 1, mmtk::scheduler::gc_work::{impl#39}::process_slot<mmtk_julia::JuliaVM, mmtk::plan::immix::global::Immix<mmtk_julia::JuliaVM>, 1> (self=0x725a64001850, slot=...) at /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/scheduler/gc_work.rs:978
-978             let new_object = self.trace_object(object);
+Thread 2 hit Temporary breakpoint 1, mmtk::plan::tracing::gc_work::closure::ProcessSlots<...>::process_slots (...) at /path/to/mmtk-core/src/plan/tracing/gc_work/closure.rs:41
+41                  let new_object = trace.trace_object(worker, object, &mut queue);
 ```
 
 Then:
@@ -96,18 +101,24 @@ $2 = mmtk_julia::slots::JuliaVMSlot::Simple(mmtk::vm::slot::SimpleSlot {slot_add
 
 Here we learn that object `0x725a62eb60f0` was loaded from slot `0x725a62eb6168`.
 
-If instead you hit `stop_all_mutators`, it means the object wasn’t processed through `PlanProcessEdges` (our conditional breakpoint) in this GC. It could have been enqueued by another `ProcessEdgesWork`, by node enqueueing, or it may be a root. Similar techniques apply: set breakpoints in other relevant paths until you find where the object comes from.
+If instead you hit `stop_all_mutators`, it means the object was not processed through
+`ProcessSlots` (our conditional breakpoint) in this GC. Similar techniques apply: set breakpoints
+in other relevant paths until you find where the object comes from.
 
 ### Step 3: Identify the Object that Owns the Slot
 
 Now that we know slot `0x725a62eb6168` contains the object `0x725a62eb60f0`, we need to determine which object this slot belongs to.
-Slots are enqueued when bindings scan an object, via [`SlotVisitor::visit_slot`](https://docs.mmtk.io/api/mmtk/vm/trait.SlotVisitor.html#tymethod.visit_slot).
-We can set a conditional breakpoint at the implementation of `visit_slot` to capture where the slot is enqueue'd to MMTk.
+Slots are reported when bindings scan an object via
+[`Scanning::scan_object`](https://docs.mmtk.io/api/mmtk/vm/trait.Scanning.html#tymethod.scan_object),
+which calls [`SlotVisitor::visit_slot`](https://docs.mmtk.io/api/mmtk/vm/trait.SlotVisitor.html#tymethod.visit_slot)
+for each outgoing reference field.
+To find the owning object, set a conditional breakpoint in mmtk-core at the `SlotVisitor`
+implementation for closures.
 
 Define another helper command:
 ```gdb
 (rr) define find_object
->tbreak /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/plan/tracing.rs:61 if $rcx == $arg0
+>tbreak /path/to/mmtk-core/src/vm/scanning.rs:16 if $rsi == $arg0
 >reverse-cont
 >end
 ```
@@ -115,31 +126,25 @@ Define another helper command:
 Usage:
 ```gdb
 (rr) find_object 0x725a62eb6168
-Temporary breakpoint 2 at 0x725a7d57a363: /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/plan/tracing.rs:61. (3 locations)
+Temporary breakpoint 2 at 0x...: /path/to/mmtk-core/src/vm/scanning.rs:16. (N locations)
 ```
 
 When the breakpoint hits:
 ```gdb
-Thread 2 hit Temporary breakpoint 2, mmtk::plan::tracing::VectorQueue<mmtk_julia::slots::JuliaVMSlot>::push<mmtk_julia::slots::JuliaVMSlot> (self=0x725a695fafe0, v=...) at /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/plan/tracing.rs:61
-61              if self.buffer.is_empty() {
+Thread 2 hit Temporary breakpoint 2, <... as mmtk::vm::scanning::SlotVisitor<...>>::visit_slot (...) at /path/to/mmtk-core/src/vm/scanning.rs:16
+16          self(slot)
 ```
 
 From the stack, you can walk upward to find the object that is being scanned.
 ```gdb
 (rr) up
-#1  0x0000725a7d578050 in mmtk::plan::tracing::{impl#4}::visit_slot<mmtk::scheduler::gc_work::PlanProcessEdges<mmtk_julia::JuliaVM, mmtk::plan::immix::global::Immix<mmtk_julia::JuliaVM>, 1>> (self=0x725a695fafe0, slot=...)
-    at /home/yilin/.cargo/git/checkouts/mmtk-core-3306bdeb8eb4322b/ceea8cf/src/plan/tracing.rs:125
-125             self.buffer.push(slot);
+#1  ... in <closure at ...>
 (rr) up
-#2  0x0000725a7d536dbb in mmtk_julia::julia_scanning::process_slot<mmtk::plan::tracing::ObjectsClosure<mmtk::scheduler::gc_work::PlanProcessEdges<mmtk_julia::JuliaVM, mmtk::plan::immix::global::Immix<mmtk_julia::JuliaVM>, 1>>> (closure=0x725a695fafe0, slot=...)
-    at src/julia_scanning.rs:720
-720         closure.visit_slot(JuliaVMSlot::Simple(simple_slot));
+#2  ... in <your binding>::scan_object(...)
 (rr) up
-#3  mmtk_julia::julia_scanning::scan_julia_obj_n<u8, mmtk::plan::tracing::ObjectsClosure<mmtk::scheduler::gc_work::PlanProcessEdges<mmtk_julia::JuliaVM, mmtk::plan::immix::global::Immix<mmtk_julia::JuliaVM>, 1>>> (obj=..., begin=..., end=..., closure=0x725a695fafe0)
-    at src/julia_scanning.rs:111
-111             process_slot(closure, slot);
+#3  ... in mmtk::plan::tracing::gc_work::closure::ProcessNodes<...>::try_enqueue_slots(...)
 (rr) p/x obj
 $1 = mmtk::util::address::Address (0x725a62eb6130)
 ```
 
-By repeating Step 2 (finding the slot that loaded an object) and Step 3 (finding the object that owns that slot), you can walk backward through the object graph. Continue this process until you reach a point of interest -- such as the root object, or an object that errornously enqueues a slot.
+By repeating Step 2 (finding the slot that loaded an object) and Step 3 (finding the object that owns that slot), you can walk backward through the object graph. Continue this process until you reach a point of interest -- such as the root object, or an object that erroneously enqueues a slot.
