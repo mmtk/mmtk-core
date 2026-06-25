@@ -247,8 +247,7 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             _ => unreachable!(),
         };
         let anno = MmapAnnotation::Space { name: args.name };
-        let huge_page_option: HugePageSupport =
-            args.options.transparent_hugepages_as_huge_page_support();
+        let huge_page_option = args.options.transparent_hugepages_as_huge_page_support();
         let reasonable_extent = CommonSpace::estimate_reasonable_contiguous_extent(
             &args.options,
             &args.gc_trigger,
