@@ -241,41 +241,58 @@
 <a href=#241 id=241 data-nosnippet>241</a>        <span class="comment">// Create a VM request of fixed size
 <a href=#242 id=242 data-nosnippet>242</a>        </span><span class="kw">let </span>vmrequest = VMRequest::fixed_size(aligned_total_bytes);
 <a href=#243 id=243 data-nosnippet>243</a>        <span class="comment">// Reserve the space
-<a href=#244 id=244 data-nosnippet>244</a>        </span><span class="kw">let </span>VMRequest::Extent { extent, top } = vmrequest <span class="kw">else </span>{
-<a href=#245 id=245 data-nosnippet>245</a>            <span class="macro">unreachable!</span>()
-<a href=#246 id=246 data-nosnippet>246</a>        };
-<a href=#247 id=247 data-nosnippet>247</a>        <span class="kw">let </span>start = args.heap.reserve(extent, top);
-<a href=#248 id=248 data-nosnippet>248</a>
-<a href=#249 id=249 data-nosnippet>249</a>        <span class="kw">let </span>space = <span class="self">Self </span>{
-<a href=#250 id=250 data-nosnippet>250</a>            name: args.name,
-<a href=#251 id=251 data-nosnippet>251</a>            cursor: Atomic::new(start),
-<a href=#252 id=252 data-nosnippet>252</a>            limit: start + aligned_total_bytes,
-<a href=#253 id=253 data-nosnippet>253</a>            start,
-<a href=#254 id=254 data-nosnippet>254</a>            total_bytes: aligned_total_bytes,
-<a href=#255 id=255 data-nosnippet>255</a>            slow_path_zeroing,
-<a href=#256 id=256 data-nosnippet>256</a>            metadata: SideMetadataContext {
-<a href=#257 id=257 data-nosnippet>257</a>                global: args.global_side_metadata_specs,
-<a href=#258 id=258 data-nosnippet>258</a>                local: <span class="macro">vec!</span>[],
-<a href=#259 id=259 data-nosnippet>259</a>            },
-<a href=#260 id=260 data-nosnippet>260</a>            gc_trigger: args.gc_trigger,
-<a href=#261 id=261 data-nosnippet>261</a>        };
-<a href=#262 id=262 data-nosnippet>262</a>
-<a href=#263 id=263 data-nosnippet>263</a>        <span class="comment">// Eagerly memory map the entire heap (also zero all the memory)
-<a href=#264 id=264 data-nosnippet>264</a>        </span><span class="kw">let </span>strategy = MmapStrategy::default()
-<a href=#265 id=265 data-nosnippet>265</a>            .transparent_hugepages(<span class="kw-2">*</span>args.options.transparent_hugepages)
-<a href=#266 id=266 data-nosnippet>266</a>            .prot(<span class="kw">crate</span>::util::os::MmapProtection::ReadWrite)
-<a href=#267 id=267 data-nosnippet>267</a>            .replace(<span class="bool-val">false</span>)
-<a href=#268 id=268 data-nosnippet>268</a>            .reserve(<span class="bool-val">true</span>);
-<a href=#269 id=269 data-nosnippet>269</a>        <span class="kw">crate</span>::util::os::OS::dzmmap(
-<a href=#270 id=270 data-nosnippet>270</a>            start,
-<a href=#271 id=271 data-nosnippet>271</a>            aligned_total_bytes,
-<a href=#272 id=272 data-nosnippet>272</a>            strategy,
-<a href=#273 id=273 data-nosnippet>273</a>            <span class="kw-2">&amp;</span>MmapAnnotation::Space {
-<a href=#274 id=274 data-nosnippet>274</a>                name: space.get_name(),
-<a href=#275 id=275 data-nosnippet>275</a>            },
-<a href=#276 id=276 data-nosnippet>276</a>        )
-<a href=#277 id=277 data-nosnippet>277</a>        .unwrap();
-<a href=#278 id=278 data-nosnippet>278</a>
-<a href=#279 id=279 data-nosnippet>279</a>        space
-<a href=#280 id=280 data-nosnippet>280</a>    }
-<a href=#281 id=281 data-nosnippet>281</a>}</code></pre></div></section></main></body></html>
+<a href=#244 id=244 data-nosnippet>244</a>        </span><span class="kw">let </span>(extent, align, top) = <span class="kw">match </span>vmrequest {
+<a href=#245 id=245 data-nosnippet>245</a>            VMRequest::Extent { extent, top } =&gt; (extent, <span class="prelude-val">None</span>, top),
+<a href=#246 id=246 data-nosnippet>246</a>            VMRequest::AlignedExtent { extent, align, top } =&gt; (extent, <span class="prelude-val">Some</span>(align), top),
+<a href=#247 id=247 data-nosnippet>247</a>            <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(),
+<a href=#248 id=248 data-nosnippet>248</a>        };
+<a href=#249 id=249 data-nosnippet>249</a>        <span class="kw">let </span>anno = MmapAnnotation::Space { name: args.name };
+<a href=#250 id=250 data-nosnippet>250</a>        <span class="kw">let </span>huge_page_option = args.options.transparent_hugepages_as_huge_page_support();
+<a href=#251 id=251 data-nosnippet>251</a>        <span class="kw">let </span>reasonable_extent = CommonSpace::estimate_reasonable_contiguous_extent(
+<a href=#252 id=252 data-nosnippet>252</a>            <span class="kw-2">&amp;</span>args.options,
+<a href=#253 id=253 data-nosnippet>253</a>            <span class="kw-2">&amp;</span>args.gc_trigger,
+<a href=#254 id=254 data-nosnippet>254</a>            args.vm_map,
+<a href=#255 id=255 data-nosnippet>255</a>            extent,
+<a href=#256 id=256 data-nosnippet>256</a>        );
+<a href=#257 id=257 data-nosnippet>257</a>        <span class="kw">let </span>start = args
+<a href=#258 id=258 data-nosnippet>258</a>            .heap
+<a href=#259 id=259 data-nosnippet>259</a>            .reserve_quarantined(
+<a href=#260 id=260 data-nosnippet>260</a>                reasonable_extent,
+<a href=#261 id=261 data-nosnippet>261</a>                align,
+<a href=#262 id=262 data-nosnippet>262</a>                top,
+<a href=#263 id=263 data-nosnippet>263</a>                args.mmapper,
+<a href=#264 id=264 data-nosnippet>264</a>                huge_page_option,
+<a href=#265 id=265 data-nosnippet>265</a>                <span class="kw-2">&amp;</span>anno,
+<a href=#266 id=266 data-nosnippet>266</a>            )
+<a href=#267 id=267 data-nosnippet>267</a>            .unwrap_or_else(|mmap_error| {
+<a href=#268 id=268 data-nosnippet>268</a>                <span class="macro">panic!</span>(
+<a href=#269 id=269 data-nosnippet>269</a>                    <span class="string">"Failed to quarantine contiguous space {} for {} bytes: {}"</span>,
+<a href=#270 id=270 data-nosnippet>270</a>                    args.name, reasonable_extent, mmap_error
+<a href=#271 id=271 data-nosnippet>271</a>                )
+<a href=#272 id=272 data-nosnippet>272</a>            });
+<a href=#273 id=273 data-nosnippet>273</a>
+<a href=#274 id=274 data-nosnippet>274</a>        <span class="kw">let </span>space = <span class="self">Self </span>{
+<a href=#275 id=275 data-nosnippet>275</a>            name: args.name,
+<a href=#276 id=276 data-nosnippet>276</a>            cursor: Atomic::new(start),
+<a href=#277 id=277 data-nosnippet>277</a>            limit: start + aligned_total_bytes,
+<a href=#278 id=278 data-nosnippet>278</a>            start,
+<a href=#279 id=279 data-nosnippet>279</a>            total_bytes: aligned_total_bytes,
+<a href=#280 id=280 data-nosnippet>280</a>            slow_path_zeroing,
+<a href=#281 id=281 data-nosnippet>281</a>            metadata: SideMetadataContext {
+<a href=#282 id=282 data-nosnippet>282</a>                global: args.global_side_metadata_specs,
+<a href=#283 id=283 data-nosnippet>283</a>                local: <span class="macro">vec!</span>[],
+<a href=#284 id=284 data-nosnippet>284</a>            },
+<a href=#285 id=285 data-nosnippet>285</a>            gc_trigger: args.gc_trigger,
+<a href=#286 id=286 data-nosnippet>286</a>        };
+<a href=#287 id=287 data-nosnippet>287</a>
+<a href=#288 id=288 data-nosnippet>288</a>        <span class="comment">// Eagerly memory map the entire heap (also zero all the memory)
+<a href=#289 id=289 data-nosnippet>289</a>        </span><span class="kw">let </span>strategy = MmapStrategy::default()
+<a href=#290 id=290 data-nosnippet>290</a>            .transparent_hugepages(<span class="kw-2">*</span>args.options.transparent_hugepages)
+<a href=#291 id=291 data-nosnippet>291</a>            .prot(<span class="kw">crate</span>::util::os::MmapProtection::ReadWrite)
+<a href=#292 id=292 data-nosnippet>292</a>            .replace(<span class="bool-val">true</span>)
+<a href=#293 id=293 data-nosnippet>293</a>            .reserve(<span class="bool-val">true</span>);
+<a href=#294 id=294 data-nosnippet>294</a>        <span class="kw">crate</span>::util::os::OS::dzmmap(start, aligned_total_bytes, strategy, <span class="kw-2">&amp;</span>anno).unwrap();
+<a href=#295 id=295 data-nosnippet>295</a>
+<a href=#296 id=296 data-nosnippet>296</a>        space
+<a href=#297 id=297 data-nosnippet>297</a>    }
+<a href=#298 id=298 data-nosnippet>298</a>}</code></pre></div></section></main></body></html>

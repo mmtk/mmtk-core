@@ -127,32 +127,47 @@
 <a href=#127 id=127 data-nosnippet>127</a>    align: usize,
 <a href=#128 id=128 data-nosnippet>128</a>    strategy: MmapStrategy,
 <a href=#129 id=129 data-nosnippet>129</a>    annotation: <span class="kw-2">&amp;</span>MmapAnnotation&lt;<span class="lifetime">'_</span>&gt;,
-<a href=#130 id=130 data-nosnippet>130</a>) -&gt; <span class="prelude-ty">Result</span>&lt;Address&gt; {
-<a href=#131 id=131 data-nosnippet>131</a>    <span class="kw">let </span>addr = unix_common::mmap_anywhere(size, align, strategy)<span class="question-mark">?</span>;
+<a href=#130 id=130 data-nosnippet>130</a>) -&gt; MmapResult&lt;Address&gt; {
+<a href=#131 id=131 data-nosnippet>131</a>    <span class="kw">let </span>addr = unix_common::mmap_anywhere(size, align, strategy, annotation)<span class="question-mark">?</span>;
 <a href=#132 id=132 data-nosnippet>132</a>    <span class="kw">if </span>!<span class="macro">cfg!</span>(feature = <span class="string">"no_mmap_annotation"</span>) {
 <a href=#133 id=133 data-nosnippet>133</a>        set_vma_name(addr, size, annotation);
 <a href=#134 id=134 data-nosnippet>134</a>    }
 <a href=#135 id=135 data-nosnippet>135</a>    <span class="prelude-val">Ok</span>(addr)
 <a href=#136 id=136 data-nosnippet>136</a>}
 <a href=#137 id=137 data-nosnippet>137</a>
-<a href=#138 id=138 data-nosnippet>138</a><span class="kw">pub fn </span>panic_if_unmapped(start: Address, size: usize) {
-<a href=#139 id=139 data-nosnippet>139</a>    <span class="kw">let </span>strategy = MmapStrategy {
-<a href=#140 id=140 data-nosnippet>140</a>        huge_page: HugePageSupport::No,
-<a href=#141 id=141 data-nosnippet>141</a>        prot: MmapProtection::ReadWrite,
-<a href=#142 id=142 data-nosnippet>142</a>        replace: <span class="bool-val">false</span>,
-<a href=#143 id=143 data-nosnippet>143</a>        reserve: <span class="bool-val">true</span>,
-<a href=#144 id=144 data-nosnippet>144</a>    };
-<a href=#145 id=145 data-nosnippet>145</a>    <span class="kw">let </span>annotation = MmapAnnotation::Misc {
-<a href=#146 id=146 data-nosnippet>146</a>        name: <span class="string">"panic_if_unmapped"</span>,
-<a href=#147 id=147 data-nosnippet>147</a>    };
-<a href=#148 id=148 data-nosnippet>148</a>    <span class="kw">match </span>unix_common::mmap(start, size, strategy, <span class="kw-2">&amp;</span>annotation) {
-<a href=#149 id=149 data-nosnippet>149</a>        <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="macro">panic!</span>(<span class="string">"{} of size {} is not mapped"</span>, start, size),
-<a href=#150 id=150 data-nosnippet>150</a>        <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#151 id=151 data-nosnippet>151</a>            <span class="macro">assert!</span>(
-<a href=#152 id=152 data-nosnippet>152</a>                e.error.kind() == std::io::ErrorKind::AlreadyExists,
-<a href=#153 id=153 data-nosnippet>153</a>                <span class="string">"Failed to check mapped: {:?}"</span>,
-<a href=#154 id=154 data-nosnippet>154</a>                e
-<a href=#155 id=155 data-nosnippet>155</a>            );
-<a href=#156 id=156 data-nosnippet>156</a>        }
-<a href=#157 id=157 data-nosnippet>157</a>    }
-<a href=#158 id=158 data-nosnippet>158</a>}</code></pre></div></section></main></body></html>
+<a href=#138 id=138 data-nosnippet>138</a><span class="kw">pub fn </span>dzmmap_preferred(
+<a href=#139 id=139 data-nosnippet>139</a>    start: Address,
+<a href=#140 id=140 data-nosnippet>140</a>    size: usize,
+<a href=#141 id=141 data-nosnippet>141</a>    align: usize,
+<a href=#142 id=142 data-nosnippet>142</a>    strategy: MmapStrategy,
+<a href=#143 id=143 data-nosnippet>143</a>    annotation: <span class="kw-2">&amp;</span>MmapAnnotation&lt;<span class="lifetime">'_</span>&gt;,
+<a href=#144 id=144 data-nosnippet>144</a>) -&gt; MmapResult&lt;Address&gt; {
+<a href=#145 id=145 data-nosnippet>145</a>    <span class="kw">let </span>addr = unix_common::mmap_preferred(start, size, align, strategy, annotation)<span class="question-mark">?</span>;
+<a href=#146 id=146 data-nosnippet>146</a>    <span class="kw">if </span>!<span class="macro">cfg!</span>(feature = <span class="string">"no_mmap_annotation"</span>) {
+<a href=#147 id=147 data-nosnippet>147</a>        set_vma_name(addr, size, annotation);
+<a href=#148 id=148 data-nosnippet>148</a>    }
+<a href=#149 id=149 data-nosnippet>149</a>    set_hugepage(addr, size, strategy.huge_page).expect(<span class="string">"Failed to set huge page option"</span>);
+<a href=#150 id=150 data-nosnippet>150</a>    <span class="prelude-val">Ok</span>(addr)
+<a href=#151 id=151 data-nosnippet>151</a>}
+<a href=#152 id=152 data-nosnippet>152</a>
+<a href=#153 id=153 data-nosnippet>153</a><span class="kw">pub fn </span>panic_if_unmapped(start: Address, size: usize) {
+<a href=#154 id=154 data-nosnippet>154</a>    <span class="kw">let </span>strategy = MmapStrategy {
+<a href=#155 id=155 data-nosnippet>155</a>        huge_page: HugePageSupport::No,
+<a href=#156 id=156 data-nosnippet>156</a>        prot: MmapProtection::ReadWrite,
+<a href=#157 id=157 data-nosnippet>157</a>        replace: <span class="bool-val">false</span>,
+<a href=#158 id=158 data-nosnippet>158</a>        reserve: <span class="bool-val">true</span>,
+<a href=#159 id=159 data-nosnippet>159</a>    };
+<a href=#160 id=160 data-nosnippet>160</a>    <span class="kw">let </span>annotation = MmapAnnotation::Misc {
+<a href=#161 id=161 data-nosnippet>161</a>        name: <span class="string">"panic_if_unmapped"</span>,
+<a href=#162 id=162 data-nosnippet>162</a>    };
+<a href=#163 id=163 data-nosnippet>163</a>    <span class="kw">match </span>unix_common::mmap(start, size, strategy, <span class="kw-2">&amp;</span>annotation) {
+<a href=#164 id=164 data-nosnippet>164</a>        <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="macro">panic!</span>(<span class="string">"{} of size {} is not mapped"</span>, start, size),
+<a href=#165 id=165 data-nosnippet>165</a>        <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#166 id=166 data-nosnippet>166</a>            <span class="macro">assert!</span>(
+<a href=#167 id=167 data-nosnippet>167</a>                e.error.kind() == std::io::ErrorKind::AlreadyExists,
+<a href=#168 id=168 data-nosnippet>168</a>                <span class="string">"Failed to check mapped: {:?}"</span>,
+<a href=#169 id=169 data-nosnippet>169</a>                e
+<a href=#170 id=170 data-nosnippet>170</a>            );
+<a href=#171 id=171 data-nosnippet>171</a>        }
+<a href=#172 id=172 data-nosnippet>172</a>    }
+<a href=#173 id=173 data-nosnippet>173</a>}</code></pre></div></section></main></body></html>

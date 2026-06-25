@@ -80,7 +80,7 @@
 <a href=#80 id=80 data-nosnippet>80</a>    );
 <a href=#81 id=81 data-nosnippet>81</a>    <span class="kw">let </span>base = <span class="kw">if </span>specified_base.is_zero() {
 <a href=#82 id=82 data-nosnippet>82</a>        MMAPPER
-<a href=#83 id=83 data-nosnippet>83</a>            .quarantine_address_range_anywhere(pages, huge_page_support, <span class="kw-2">&amp;</span>anno)
+<a href=#83 id=83 data-nosnippet>83</a>            .quarantine_address_range_anywhere(pages, <span class="prelude-val">None</span>, huge_page_support, <span class="kw-2">&amp;</span>anno)
 <a href=#84 id=84 data-nosnippet>84</a>            .unwrap_or_else(|e| <span class="macro">panic!</span>(<span class="string">"failed to quarantine side metadata address range: {e}"</span>))
 <a href=#85 id=85 data-nosnippet>85</a>    } <span class="kw">else </span>{
 <a href=#86 id=86 data-nosnippet>86</a>        MMAPPER
