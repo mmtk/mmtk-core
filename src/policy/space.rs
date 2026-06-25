@@ -609,7 +609,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             needs_log_bit: args.plan_args.constraints.needs_log_bit,
             unlog_allocated_object: args.plan_args.unlog_allocated_object,
             unlog_traced_object: args.plan_args.unlog_traced_object,
-            gc_trigger: args.plan_args.gc_trigger,
+            gc_trigger: args.plan_args.gc_trigger.clone(),
             metadata: SideMetadataContext {
                 global: args.plan_args.global_side_metadata_specs,
                 local: args.local_side_metadata_specs,
@@ -630,15 +630,16 @@ impl<VM: VMBinding> CommonSpace<VM> {
             return rtn;
         }
 
-        let (extent, top) = match vmrequest {
-            VMRequest::Fraction { frac, top: _top } => (get_frac_available(frac), _top),
+        let (extent, align, top) = match vmrequest {
+            VMRequest::Fraction { frac, top: _top } => (get_frac_available(frac), None, _top),
             VMRequest::Extent {
                 extent: _extent,
                 top: _top,
-            } => (_extent, _top),
+            } => (_extent, None, _top),
+            VMRequest::AlignedExtent { align, extent, top } => (extent, Some(align), top),
             VMRequest::Fixed {
                 extent: _extent, ..
-            } => (_extent, false),
+            } => (_extent, None, false),
             _ => unreachable!(),
         };
 
@@ -649,12 +650,62 @@ impl<VM: VMBinding> CommonSpace<VM> {
             extent
         );
 
+        // The given extent might be too large for the heap. We get an estimate of the required virtual memory for the heap size,
+        // then use the min of the given extent and the estimate as the actual extent for the space.
+        let reasonable_extent = conversions::raw_align_up(
+            Self::estimate_reasonable_contiguous_extent(
+                &args.plan_args.options,
+                &args.plan_args.gc_trigger,
+                args.plan_args.vm_map,
+                extent,
+            ),
+            BYTES_IN_CHUNK,
+        );
+        debug!(
+            "resonable_extent for space {} is {} bytes",
+            rtn.name, reasonable_extent
+        );
+
+        let anno = MmapAnnotation::Space { name: rtn.name };
+        let huge_page_option = args
+            .plan_args
+            .options
+            .transparent_hugepages_as_huge_page_support();
+
         let start = if let VMRequest::Fixed { start: _start, .. } = vmrequest {
+            if let Err(mmap_error) = args.plan_args.mmapper.quarantine_address_range(
+                _start,
+                bytes_to_pages_up(reasonable_extent),
+                huge_page_option,
+                &anno,
+            ) {
+                panic!(
+                    "Failed to quarantine fixed contiguous space {} [{}, {}) for {} bytes: {}",
+                    rtn.name,
+                    _start,
+                    _start + extent,
+                    extent,
+                    mmap_error
+                );
+            }
             _start
         } else {
-            // FIXME
-            //if (HeapLayout.vmMap.isFinalized()) VM.assertions.fail("heap is narrowed after regionMap is finalized: " + name);
-            args.plan_args.heap.reserve(extent, top)
+            args.plan_args
+                .heap
+                .reserve_quarantined(
+                    reasonable_extent,
+                    align,
+                    top,
+                    args.plan_args.mmapper,
+                    huge_page_option,
+                    &anno,
+                )
+                .unwrap_or_else(|mmap_error| {
+                    panic!(
+                        "Failed to quarantine contiguous space {} for {} bytes: {}",
+                        rtn.name, extent, mmap_error
+                    )
+                })
         };
         assert!(
             start == chunk_align_up(start),
@@ -665,10 +716,9 @@ impl<VM: VMBinding> CommonSpace<VM> {
 
         rtn.contiguous = true;
         rtn.start = start;
-        rtn.extent = extent;
-        // FIXME
-        rtn.descriptor = SpaceDescriptor::create_descriptor_from_heap_range(start, start + extent);
-        // VM.memory.setHeapRange(index, start, start.plus(extent));
+        rtn.extent = reasonable_extent;
+        rtn.descriptor =
+            SpaceDescriptor::create_descriptor_from_heap_range(start, start + reasonable_extent);
 
         // We only initialize our vm map if the range of the space is in our available heap range. For normally spaces,
         // they are definitely in our heap range. But for VM space, a runtime could give us an arbitrary range. We only
@@ -690,11 +740,36 @@ impl<VM: VMBinding> CommonSpace<VM> {
             "Created space {} [{}, {}) for {} bytes",
             rtn.name,
             start,
-            start + extent,
-            extent
+            start + reasonable_extent,
+            reasonable_extent
         );
 
         rtn
+    }
+
+    /// This function return an estimate value of required virtual memory for the heap size.
+    /// Considering virtual memory fragmentation, we may need more virtual memory than the actual heap size.
+    /// When a space needs to quarantine a virtual memory range, it can use this function to get an estimate
+    /// of the required virtual memory, and use that to decide how much virtual memory to quarantine.
+    pub fn estimate_reasonable_contiguous_extent(
+        options: &Options,
+        gc_trigger: &GCTrigger<VM>,
+        vm_map: &dyn VMMap,
+        extent: usize,
+    ) -> usize {
+        // PageProtect will consume virtual memory very quickly, and it is not a performant plan anyway. Just return extent.
+        if *options.plan == crate::util::options::PlanSelector::PageProtect {
+            return extent;
+        }
+
+        // To accomodate virtual memory fragmentation, we use a fixed ratio to estimate the required virtual memory.
+        // The following value (2) is a pure estimate, we may chanage it to whatever is reasonable based on the actual
+        // fragmentation observed in different platforms.
+        const VIRTUAL_MEMORY_RATIO_TO_MAX_HEAP_SIZE: usize = 2;
+        let estimate = conversions::pages_to_bytes(gc_trigger.policy.get_max_heap_size_in_pages())
+            * VIRTUAL_MEMORY_RATIO_TO_MAX_HEAP_SIZE;
+
+        estimate.max(vm_map.min_contiguous_extent())
     }
 
     pub fn initialize_sft(

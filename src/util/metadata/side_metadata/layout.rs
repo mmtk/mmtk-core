@@ -80,7 +80,7 @@ pub(super) fn initialize_side_metadata_base(
     );
     let base = if specified_base.is_zero() {
         MMAPPER
-            .quarantine_address_range_anywhere(pages, huge_page_support, &anno)
+            .quarantine_address_range_anywhere(pages, None, huge_page_support, &anno)
             .unwrap_or_else(|e| panic!("failed to quarantine side metadata address range: {e}"))
     } else {
         MMAPPER

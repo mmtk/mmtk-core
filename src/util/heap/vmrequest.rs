@@ -5,9 +5,23 @@ use crate::util::Address;
 #[derive(Clone, Copy, Debug)]
 pub enum VMRequest {
     Discontiguous,
-    Fixed { start: Address, extent: usize },
-    Extent { extent: usize, top: bool },
-    Fraction { frac: f32, top: bool },
+    Fixed {
+        start: Address,
+        extent: usize,
+    },
+    Extent {
+        extent: usize,
+        top: bool,
+    },
+    AlignedExtent {
+        align: usize,
+        extent: usize,
+        top: bool,
+    },
+    Fraction {
+        frac: f32,
+        top: bool,
+    },
 }
 
 impl VMRequest {
@@ -16,7 +30,9 @@ impl VMRequest {
     }
 
     pub fn common64bit(top: bool) -> Self {
-        VMRequest::Extent {
+        VMRequest::AlignedExtent {
+            // A common64bit space need to be aligned. See Map64::is_space_start.
+            align: vm_layout().max_space_extent(),
             extent: vm_layout().max_space_extent(),
             top,
         }
@@ -61,6 +77,13 @@ impl VMRequest {
             return Self::common64bit(top);
         }
         VMRequest::Extent { extent, top }
+    }
+
+    pub fn aligned_extent(align: usize, extent: usize, top: bool) -> Self {
+        if cfg!(target_pointer_width = "64") && vm_layout().force_use_contiguous_spaces {
+            return Self::common64bit(top);
+        }
+        VMRequest::AlignedExtent { align, extent, top }
     }
 
     pub fn fixed(start: Address, extent: usize) -> Self {

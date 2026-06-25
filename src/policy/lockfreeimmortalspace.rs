@@ -241,10 +241,35 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         // Create a VM request of fixed size
         let vmrequest = VMRequest::fixed_size(aligned_total_bytes);
         // Reserve the space
-        let VMRequest::Extent { extent, top } = vmrequest else {
-            unreachable!()
+        let (extent, align, top) = match vmrequest {
+            VMRequest::Extent { extent, top } => (extent, None, top),
+            VMRequest::AlignedExtent { extent, align, top } => (extent, Some(align), top),
+            _ => unreachable!(),
         };
-        let start = args.heap.reserve(extent, top);
+        let anno = MmapAnnotation::Space { name: args.name };
+        let huge_page_option = args.options.transparent_hugepages_as_huge_page_support();
+        let reasonable_extent = CommonSpace::estimate_reasonable_contiguous_extent(
+            &args.options,
+            &args.gc_trigger,
+            args.vm_map,
+            extent,
+        );
+        let start = args
+            .heap
+            .reserve_quarantined(
+                reasonable_extent,
+                align,
+                top,
+                args.mmapper,
+                huge_page_option,
+                &anno,
+            )
+            .unwrap_or_else(|mmap_error| {
+                panic!(
+                    "Failed to quarantine contiguous space {} for {} bytes: {}",
+                    args.name, reasonable_extent, mmap_error
+                )
+            });
 
         let space = Self {
             name: args.name,
@@ -264,17 +289,9 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         let strategy = MmapStrategy::default()
             .transparent_hugepages(*args.options.transparent_hugepages)
             .prot(crate::util::os::MmapProtection::ReadWrite)
-            .replace(false)
+            .replace(true)
             .reserve(true);
-        crate::util::os::OS::dzmmap(
-            start,
-            aligned_total_bytes,
-            strategy,
-            &MmapAnnotation::Space {
-                name: space.get_name(),
-            },
-        )
-        .unwrap();
+        crate::util::os::OS::dzmmap(start, aligned_total_bytes, strategy, &anno).unwrap();
 
         space
     }
