@@ -21,23 +21,15 @@ const FORWARDING_POINTER_MASK: usize = 0xffff_fffc;
 /// Attempt to become the worker thread who will forward the object.
 /// The successful worker will set the object forwarding bits to BEING_FORWARDED, preventing other workers from forwarding the same object.
 pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
-    loop {
-        let old_value = get_forwarding_status::<VM>(object);
-        if old_value != FORWARDING_NOT_TRIGGERED_YET
-            || VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC
-                .compare_exchange_metadata::<VM, u8>(
-                    object,
-                    old_value,
-                    BEING_FORWARDED,
-                    None,
-                    Ordering::SeqCst,
-                    Ordering::Relaxed,
-                )
-                .is_ok()
-        {
-            return old_value;
-        }
-    }
+    // We simply "or" the current value with `BEING_FORWARDED` and return the old value.
+    // If the old value was 00 (`FORWARDING_NOT_TRIGGERED_YET`),
+    // it will be changed to 10 (`BEING_FORWARDED`);
+    // otherwise (the old value would be 10 or 11) it will be a no-op.
+    VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.fetch_or_metadata::<VM, u8>(
+        object,
+        BEING_FORWARDED,
+        Ordering::SeqCst,
+    )
 }
 
 /// Spin-wait for the object's forwarding to become complete and then read the forwarding pointer to the new object.
@@ -149,12 +141,11 @@ pub fn state_is_being_forwarded(forwarding_bits: u8) -> bool {
 /// Zero the forwarding bits of an object.
 /// This function is used on new objects.
 pub fn clear_forwarding_bits<VM: VMBinding>(object: ObjectReference) {
-    VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.store_atomic::<VM, u8>(
+    VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.fetch_and_metadata::<VM, u8>(
         object,
         0,
-        None,
         Ordering::SeqCst,
-    )
+    );
 }
 
 /// Read the forwarding pointer of an object.
