@@ -164,14 +164,11 @@ impl<VM: VMBinding> MMTK<VM> {
 
         let stats = Arc::new(Stats::new(&options));
 
-        // Initialize side metadata runtime state and reserve its address range before creating
-        // spaces. Plan/space initialization may map side metadata during setup.
-        crate::util::metadata::side_metadata::initialize_side_metadata::<VM>(&options);
-
         // We need this during creating spaces, but we do not use this once the MMTk instance is created.
         // So we do not save it in MMTK. This may change in the future.
         let mut heap = HeapMeta::new();
 
+        // Create plan and spaces. Note that side metadata is not initialized yet. Plan creation should avoid using it.
         let mut plan = crate::plan::create_plan(
             *options.plan,
             CreateGeneralPlanArgs {
@@ -185,6 +182,9 @@ impl<VM: VMBinding> MMTK<VM> {
                 heap: &mut heap,
             },
         );
+
+        // Initialize side metadata runtime state and reserve its address range after creating spaces.
+        crate::util::metadata::side_metadata::initialize_side_metadata::<VM>(&options);
 
         // We haven't finished creating MMTk. No one is using the GC trigger. We cast the arc into a mutable reference.
         {
@@ -214,6 +214,7 @@ impl<VM: VMBinding> MMTK<VM> {
         );
 
         // The order here is important:
+        plan.initialize_side_metadata();
         // Initialize side metadat sanity first
         plan.verify_side_metadata_sanity();
         // Then intiialize SFT because it may use side metadata
@@ -262,6 +263,14 @@ impl<VM: VMBinding> MMTK<VM> {
         self.scheduler.spawn_gc_threads(self, tls);
         self.state.initialized.store(true, Ordering::SeqCst);
         probe!(mmtk, collection_initialized);
+    }
+
+    /// Shut down all GC worker threads.
+    pub fn shutdown(&'static self) {
+        if self.state.is_initialized() {
+            self.scheduler.shutdown_gc_threads();
+            self.state.initialized.store(false, Ordering::SeqCst);
+        }
     }
 
     /// Prepare an MMTk instance for calling the `fork()` system call.
@@ -359,6 +368,7 @@ impl<VM: VMBinding> MMTK<VM> {
     }
 
     #[cfg(feature = "sanity")]
+    #[allow(unused)]
     pub(crate) fn is_in_sanity(&self) -> bool {
         self.inside_sanity.load(Ordering::Relaxed)
     }

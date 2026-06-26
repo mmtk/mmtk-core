@@ -67,6 +67,7 @@ mod mock_test_mmtk_julia_pr_143;
 mod mock_test_nogc_lock_free;
 #[cfg(target_pointer_width = "64")]
 mod mock_test_quarantined_space_range;
+mod mock_test_shutdown;
 mod mock_test_slots;
 #[cfg(target_pointer_width = "64")]
 mod mock_test_vm_layout_compressed_pointer;

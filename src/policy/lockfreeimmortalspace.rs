@@ -3,13 +3,15 @@ use atomic::Atomic;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
+use crate::scheduler::GCWorker;
 use crate::util::address::Address;
-
 use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::conversions;
+use crate::util::copy::CopySemantics;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::heap::PageResource;
@@ -92,7 +94,7 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     }
     fn sft_trace_object(
         &self,
-        _queue: &mut VectorObjectQueue,
+        _queue: &mut OptionObjectQueue,
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
@@ -127,6 +129,15 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 
     fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
         unsafe { sft_map.eager_initialize(self.as_sft(), self.start, self.total_bytes) };
+    }
+
+    fn initialize_side_metadata(&self) {
+        self.metadata
+            .try_map_metadata_space(self.start, self.total_bytes, self.get_name())
+            .unwrap_or_else(|e| {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory: {e}")
+            });
     }
 
     fn estimate_side_meta_pages(&self, data_pages: usize) -> usize {
@@ -190,10 +201,6 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 }
 
-use crate::plan::{ObjectQueue, VectorObjectQueue};
-use crate::scheduler::GCWorker;
-use crate::util::copy::CopySemantics;
-
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LockFreeImmortalSpace<VM> {
     fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
@@ -240,8 +247,7 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             _ => unreachable!(),
         };
         let anno = MmapAnnotation::Space { name: args.name };
-        let huge_page_option: HugePageSupport =
-            args.options.transparent_hugepages_as_huge_page_support();
+        let huge_page_option = args.options.transparent_hugepages_as_huge_page_support();
         let reasonable_extent = CommonSpace::estimate_reasonable_contiguous_extent(
             &args.options,
             &args.gc_trigger,
@@ -286,13 +292,6 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             .replace(true)
             .reserve(true);
         crate::util::os::OS::dzmmap(start, aligned_total_bytes, strategy, &anno).unwrap();
-        space
-            .metadata
-            .try_map_metadata_space(start, aligned_total_bytes, space.get_name())
-            .unwrap_or_else(|e| {
-                // TODO(Javad): handle meta space allocation failure
-                panic!("failed to mmap meta memory: {e}")
-            });
 
         space
     }

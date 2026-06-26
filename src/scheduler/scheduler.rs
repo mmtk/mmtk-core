@@ -9,6 +9,9 @@ use super::worker_monitor::{LastParkedResult, WorkerMonitor};
 use super::*;
 use crate::global_state::GcStatus;
 use crate::mmtk::MMTK;
+use crate::plan::tracing::gc_work::weakref::{
+    VMForwardWeakRefs, VMPostForwarding, VMProcessWeakRefs,
+};
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
 use crate::vm::Collection;
@@ -97,6 +100,14 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_monitor.make_request(WorkerGoal::StopForFork);
     }
 
+    /// Ask all GC workers to exit permanently.
+    pub fn shutdown_gc_threads(self: &Arc<Self>) {
+        self.worker_group.prepare_surrender_buffer();
+
+        info!("A mutator is requesting GC threads to shut down...");
+        self.worker_monitor.make_request(WorkerGoal::Shutdown);
+    }
+
     /// Surrender the `GCWorker` struct of a GC worker when it exits.
     pub fn surrender_gc_worker(&self, worker: Box<GCWorker<VM>>) {
         let all_surrendered = self.worker_group.surrender_gc_worker(worker);
@@ -168,7 +179,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
             };
             self.work_buckets[WorkBucketStage::SoftRefClosure]
-                .add(SoftRefProcessing::<C::DefaultProcessEdges>::new());
+                .add(SoftRefProcessing::<C::DefaultTrace>::new());
             self.work_buckets[WorkBucketStage::WeakRefClosure].add(WeakRefProcessing::<VM>::new());
             self.work_buckets[WorkBucketStage::PhantomRefClosure]
                 .add(PhantomRefProcessing::<VM>::new());
@@ -176,7 +187,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             use crate::util::reference_processor::RefForwarding;
             if plan.constraints().needs_forward_after_liveness {
                 self.work_buckets[WorkBucketStage::RefForwarding]
-                    .add(RefForwarding::<C::DefaultProcessEdges>::new());
+                    .add(RefForwarding::<C::DefaultTrace>::new());
             }
 
             use crate::util::reference_processor::RefEnqueue;
@@ -188,11 +199,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
             // finalization
             self.work_buckets[WorkBucketStage::FinalRefClosure]
-                .add(Finalization::<C::DefaultProcessEdges>::new());
+                .add(Finalization::<C::DefaultTrace>::new());
             // forward refs
             if plan.constraints().needs_forward_after_liveness {
                 self.work_buckets[WorkBucketStage::FinalizableForwarding]
-                    .add(ForwardFinalization::<C::DefaultProcessEdges>::new());
+                    .add(ForwardFinalization::<C::DefaultTrace>::new());
             }
         }
 
@@ -218,12 +229,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // because there are no other packets in the bucket.  We set it as sentinel for
         // consistency.
         self.work_buckets[WorkBucketStage::VMRefClosure]
-            .set_sentinel(Box::new(VMProcessWeakRefs::<C::DefaultProcessEdges>::new()));
+            .set_sentinel(Box::new(VMProcessWeakRefs::<C::DefaultTrace>::new()));
 
         if plan.constraints().needs_forward_after_liveness {
             // VM-specific weak ref forwarding
             self.work_buckets[WorkBucketStage::VMRefForwarding]
-                .add(VMForwardWeakRefs::<C::DefaultProcessEdges>::new());
+                .add(VMForwardWeakRefs::<C::DefaultTrace>::new());
         }
 
         self.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
@@ -475,7 +486,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     }
                 }
             }
-            WorkerGoal::StopForFork => {
+            WorkerGoal::StopForFork | WorkerGoal::Shutdown => {
                 panic!(
                     "Worker {} parked again when it is asked to exit.",
                     worker.ordinal
@@ -514,8 +525,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 self.add_schedule_collection_packet();
                 LastParkedResult::WakeSelf
             }
-            WorkerGoal::StopForFork => {
-                trace!("A mutator wanted to fork.");
+            WorkerGoal::StopForFork | WorkerGoal::Shutdown => {
+                trace!("A mutator requested {:?}", goal);
                 LastParkedResult::WakeAll
             }
         }

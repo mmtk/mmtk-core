@@ -1,5 +1,6 @@
 use crate::mmtk::SFT_MAP;
-use crate::plan::{ObjectQueue, VectorObjectQueue};
+use crate::plan::tracing::OptionObjectQueue;
+use crate::plan::ObjectQueue;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
@@ -84,7 +85,7 @@ impl<VM: VMBinding> SFT for VMSpace<VM> {
     }
     fn sft_trace_object(
         &self,
-        queue: &mut VectorObjectQueue,
+        queue: &mut OptionObjectQueue,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
@@ -125,11 +126,19 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
                 sft_map.get_checked(start).name(),
                 crate::policy::sft::EMPTY_SFT_NAME
             );
-            // Set SFT
-            assert!(sft_map.has_sft_entry(start), "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.", start);
-            unsafe {
-                sft_map.eager_initialize(self.as_sft(), start, size);
-            }
+            self.set_sft(start, size);
+        }
+    }
+
+    fn initialize_side_metadata(&self) {
+        let vm_regions = self.pr.get_external_pages();
+        for external_pages in vm_regions.iter() {
+            // Chunk align things.
+            let chunk_start = external_pages.start.align_down(BYTES_IN_CHUNK);
+            let chunk_size = external_pages.end.align_up(BYTES_IN_CHUNK) - chunk_start;
+            let raw_start = external_pages.start;
+            let raw_size = external_pages.end - external_pages.start;
+            self.set_side_metadata(chunk_start, chunk_size, raw_start, raw_size);
         }
     }
 
@@ -208,17 +217,17 @@ impl<VM: VMBinding> VMSpace<VM> {
 
         if !vm_space_start.is_zero() {
             // Do not set sft here, as the space may be moved. We do so for those regions in `initialize_sft`.
-            space.set_vm_region_inner(vm_space_start, vm_space_size, false);
+            space.set_vm_region_inner(vm_space_start, vm_space_size, true);
         }
 
         space
     }
 
     pub fn set_vm_region(&mut self, start: Address, size: usize) {
-        self.set_vm_region_inner(start, size, true);
+        self.set_vm_region_inner(start, size, false);
     }
 
-    fn set_vm_region_inner(&self, start: Address, size: usize, set_sft: bool) {
+    fn set_vm_region_inner(&self, start: Address, size: usize, init: bool) {
         assert!(size > 0);
         assert!(!start.is_zero());
 
@@ -243,32 +252,47 @@ impl<VM: VMBinding> VMSpace<VM> {
 
         // Mark as mapped in mmapper
         self.common.mmapper.mark_as_mapped(chunk_start, chunk_size);
-        // Map side metadata
-        self.common
-            .metadata
-            .try_map_metadata_space(chunk_start, chunk_size, self.get_name())
-            .unwrap();
+        // Map side metadata -- we can't access side metadata during initialization. We do it in initialize_side_metadata instead.
+        if !init {
+            self.set_side_metadata(chunk_start, chunk_size, start, size);
+        }
         // Insert to vm map: it would be good if we can make VM map aware of the region. However, the region may be outside what we can map in our VM map implementation.
         // self.common.vm_map.insert(chunk_start, chunk_size, self.common.descriptor);
         // Set SFT if we should
-        if set_sft {
-            assert!(SFT_MAP.has_sft_entry(chunk_start), "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.", chunk_start);
-            unsafe {
-                SFT_MAP.update(self.as_sft(), chunk_start, chunk_size);
-            }
+        if !init {
+            self.set_sft(chunk_start, chunk_size);
         }
 
         self.pr.add_new_external_pages(ExternalPages {
             start: start.align_down(BYTES_IN_PAGE),
             end: end.align_up(BYTES_IN_PAGE),
         });
+    }
 
+    fn set_sft(&self, chunk_start: Address, chunk_size: usize) {
+        assert!(SFT_MAP.has_sft_entry(chunk_start), "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.", chunk_start);
+        unsafe {
+            SFT_MAP.update(self.as_sft(), chunk_start, chunk_size);
+        }
+    }
+
+    fn set_side_metadata(
+        &self,
+        chunk_start: Address,
+        chunk_size: usize,
+        _raw_start: Address,
+        _raw_size: usize,
+    ) {
+        self.common
+            .metadata
+            .try_map_metadata_space(chunk_start, chunk_size, self.get_name())
+            .unwrap();
         #[cfg(feature = "set_unlog_bits_vm_space")]
         if self.common.needs_log_bit {
             // Bulk set unlog bits for all addresses in the VM space. This ensures that any
             // modification to the bootimage is logged
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                side.bset_metadata(start, size);
+                side.bset_metadata(_raw_start, _raw_size);
             }
         }
     }

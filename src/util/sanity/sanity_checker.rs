@@ -1,12 +1,13 @@
 use crate::plan::Plan;
-use crate::scheduler::gc_work::*;
+use crate::scheduler::GCWork;
+use crate::scheduler::GCWorker;
+use crate::scheduler::WorkBucketStage;
+use crate::util::scanning_helper;
 use crate::util::ObjectReference;
 use crate::vm::slot::Slot;
-use crate::vm::*;
+use crate::vm::{ObjectModel, VMBinding};
 use crate::MMTK;
-use crate::{scheduler::*, ObjectQueue};
 use std::collections::HashSet;
-use std::ops::{Deref, DerefMut};
 
 #[allow(dead_code)]
 pub struct SanityChecker<SL: Slot> {
@@ -53,19 +54,18 @@ impl<SL: Slot> SanityChecker<SL> {
 }
 
 pub struct ScheduleSanityGC<P: Plan> {
-    _plan: &'static P,
+    plan: &'static P,
 }
 
 impl<P: Plan> ScheduleSanityGC<P> {
     pub fn new(plan: &'static P) -> Self {
-        ScheduleSanityGC { _plan: plan }
+        ScheduleSanityGC { plan }
     }
 }
 
 impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         let scheduler = worker.scheduler();
-        let plan = mmtk.get_plan();
 
         scheduler.reset_state();
 
@@ -75,46 +75,15 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
 
         mmtk.sanity_begin(); // Stop & scan mutators (mutator scanning can happen before STW)
 
-        // We use the cached roots for sanity gc, based on the assumption that
-        // the stack scanning triggered by the selected plan is correct and precise.
-        // FIXME(Wenyu,Tianle): When working on eager stack scanning on OpenJDK,
-        // the stack scanning may be broken. Uncomment the following lines to
-        // collect the roots again.
-        // Also, remember to call `DerivedPointerTable::update_pointers(); DerivedPointerTable::clear();`
-        // in openjdk binding before the second round of roots scanning.
-        // for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-        //     scheduler.work_buckets[WorkBucketStage::Prepare]
-        //         .add(ScanMutatorRoots::<SanityGCProcessEdges<P::VM>>(mutator));
-        // }
-        {
-            let sanity_checker = mmtk.sanity_checker.lock().unwrap();
-            for roots in &sanity_checker.root_slots {
-                scheduler.work_buckets[WorkBucketStage::Closure].add(
-                    SanityGCProcessEdges::<P::VM>::new(
-                        roots.clone(),
-                        true,
-                        mmtk,
-                        WorkBucketStage::Closure,
-                    ),
-                );
-            }
-            for roots in &sanity_checker.root_nodes {
-                scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessRootNodes::<
-                    P::VM,
-                    SanityGCProcessEdges<P::VM>,
-                    SanityGCProcessEdges<P::VM>,
-                >::new(
-                    roots.clone(),
-                    WorkBucketStage::Closure,
-                ));
-            }
-        }
         // Prepare global/collectors/mutators
         worker.scheduler().work_buckets[WorkBucketStage::Prepare]
-            .add(SanityPrepare::<P>::new(plan.downcast_ref::<P>().unwrap()));
+            .add(SanityPrepare::<P>::new(self.plan));
+        // Do the transitive closure
+        worker.scheduler().work_buckets[WorkBucketStage::Closure]
+            .add(SanityClosure::<P>::new(self.plan));
         // Release global/collectors/mutators
         worker.scheduler().work_buckets[WorkBucketStage::Release]
-            .add(SanityRelease::<P>::new(plan.downcast_ref::<P>().unwrap()));
+            .add(SanityRelease::<P>::new(self.plan));
     }
 }
 
@@ -156,82 +125,74 @@ impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
     }
 }
 
-// #[derive(Default)]
-pub struct SanityGCProcessEdges<VM: VMBinding> {
-    base: ProcessEdgesBase<VM>,
+pub struct SanityClosure<P: Plan> {
+    pub plan: &'static P,
 }
 
-impl<VM: VMBinding> Deref for SanityGCProcessEdges<VM> {
-    type Target = ProcessEdgesBase<VM>;
-    fn deref(&self) -> &Self::Target {
-        &self.base
+impl<P: Plan> SanityClosure<P> {
+    pub fn new(plan: &'static P) -> Self {
+        Self { plan }
     }
 }
 
-impl<VM: VMBinding> DerefMut for SanityGCProcessEdges<VM> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
-    }
-}
+impl<P: Plan> GCWork<P::VM> for SanityClosure<P> {
+    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+        info!("Sanity GC closure");
+        let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
 
-impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
-    type VM = VM;
-    type ScanObjectsWorkType = ScanObjects<Self>;
+        let mut queue = Vec::new();
 
-    const OVERWRITE_REFERENCE: bool = false;
-    fn new(
-        slots: Vec<SlotOf<Self>>,
-        roots: bool,
-        mmtk: &'static MMTK<VM>,
-        bucket: WorkBucketStage,
-    ) -> Self {
-        Self {
-            base: ProcessEdgesBase::new(slots, roots, mmtk, bucket),
-            // ..Default::default()
+        // We use the cached roots for sanity gc, based on the assumption that
+        // the stack scanning triggered by the selected plan is correct and precise.
+        // FIXME(Wenyu,Tianle): When working on eager stack scanning on OpenJDK,
+        // the stack scanning may be broken. Uncomment the following lines to
+        // collect the roots again.
+        // Also, remember to call `DerivedPointerTable::update_pointers(); DerivedPointerTable::clear();`
+        // in openjdk binding before the second round of roots scanning.
+        // for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
+        //     scheduler.work_buckets[WorkBucketStage::Prepare]
+        //         .add(ScanMutatorRoots::<SanityGCProcessEdges<P::VM>>(mutator));
+        // }
+        for roots in &sanity_checker.root_slots {
+            queue.extend(roots.iter().flat_map(|slot| slot.load()));
         }
-    }
+        for roots in &sanity_checker.root_nodes {
+            queue.extend(roots);
+        }
 
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        let mut sanity_checker = self.mmtk().sanity_checker.lock().unwrap();
-        if !sanity_checker.refs.contains(&object) {
+        let tls = worker.tls;
+
+        while let Some(object) = queue.pop() {
+            if !sanity_checker.refs.insert(object) {
+                continue;
+            }
+
+            trace!("Doing sanity check on object {object}");
+
             // FIXME steveb consider VM-specific integrity check on reference.
-            assert!(object.is_sane(), "Invalid reference {:?}", object);
+            assert!(
+                object.is_sane(),
+                "`object.is_sane()` returned false.  object: {object}",
+            );
 
             // Let plan check object
             assert!(
-                self.mmtk().get_plan().sanity_check_object(object),
-                "Invalid reference {:?}",
-                object
+                self.plan.sanity_check_object(object),
+                "plan.sanity_check_object(object) returned false. object: {object}",
             );
 
             // Let VM check object
             assert!(
-                VM::VMObjectModel::is_object_sane(object),
-                "Invalid reference {:?}",
-                object
+                <P::VM as VMBinding>::VMObjectModel::is_object_sane(object),
+                "VMObjectModel::is_object_sane(object) returned false. object: {object}",
             );
 
-            // Object is not "marked"
-            sanity_checker.refs.insert(object); // "Mark" it
-            trace!("Sanity mark object {}", object);
-            self.nodes.enqueue(object);
+            // Enqueue children.  If a child is already visited, it will be skipped at the beginning
+            // of the loop.
+            scanning_helper::visit_children_non_moving::<P::VM>(tls, object, &mut |child| {
+                queue.push(child);
+                child
+            });
         }
-
-        // If the valid object (VO) bit metadata is enabled, all live objects should have the VO
-        // bit set when sanity GC starts.
-        #[cfg(feature = "vo_bit")]
-        if !crate::util::metadata::vo_bit::is_vo_bit_set(object) {
-            panic!("VO bit is not set: {}", object);
-        }
-
-        object
-    }
-
-    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Option<Self::ScanObjectsWorkType> {
-        Some(ScanObjects::<Self>::new(
-            nodes,
-            false,
-            WorkBucketStage::Closure,
-        ))
     }
 }

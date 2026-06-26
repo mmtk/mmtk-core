@@ -1,8 +1,5 @@
 use crate::util::{os::*, Address};
 
-#[allow(unused)] // Used in doc comment.
-use crate::util::constants::LOG_BYTES_IN_PAGE;
-
 pub mod csm;
 
 /// An `Mmapper` manages the mmap state of memory used by the heap and side metadata of MMTk.
@@ -31,7 +28,7 @@ pub mod csm;
 ///     MMTk.
 pub trait Mmapper: Sync {
     /// The logarithm of granularity of this `Mmapper`, in bytes.  Must be at least
-    /// [`LOG_BYTES_IN_PAGE`].
+    /// [`crate::util::constants::LOG_BYTES_IN_PAGE`].
     ///
     /// See trait-level doc for [`Mmapper`] for details.
     fn log_granularity(&self) -> u8;

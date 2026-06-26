@@ -46,7 +46,6 @@ impl HeapMeta {
         };
         debug!(
             "Preferred address for quarantine reservation is {}",
-            candidate
         );
         let actual = if vm_layout().dynamic_heap_range {
             mmapper.quarantine_address_range_preferred(
@@ -65,6 +64,18 @@ impl HeapMeta {
             )?;
             candidate
         };
+
+            start,
+            crate::util::conversions::bytes_to_pages_up(extent),
+            huge_page_option,
+            anno,
+        )?;
+
+        if top {
+            self.heap_limit = start;
+        } else {
+            self.heap_cursor = start + extent;
+        }
 
         assert!(
             actual >= self.heap_cursor && actual + extent <= self.heap_limit,

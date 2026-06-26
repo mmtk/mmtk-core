@@ -54,6 +54,11 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// Currently after we create a boxed plan, spaces in the plan have a non-moving address.
     fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap);
 
+    /// Initialize side metadata for the space. This is called after spaces and the plan are contructued
+    /// and the side metadata has been initialized. If a space needs to access side metadata during its
+    /// construction, it can override this method to initialize side metadata here.  By default, this method does nothing.
+    fn initialize_side_metadata(&self) {}
+
     fn acquire(&self, tls: VMThread, pages: usize, alloc_options: AllocationOptions) -> Address {
         trace!(
             "Space.acquire, tls={:?}, alloc_options={:?}",
@@ -375,7 +380,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn release_multiple_pages(&mut self, start: Address);
 
     /// What copy semantic we should use for this space if we copy objects from this space.
-    /// This is only needed for plans that use SFTProcessEdges
+    /// This is only needed for plans that use [`crate::plan::tracing::SFTTrace`].
     fn set_copy_for_sft_trace(&mut self, _semantics: Option<CopySemantics>) {
         panic!("A copying space should override this method")
     }
