@@ -4,6 +4,7 @@
 //! -   letting the last parked worker take action, and
 //! -   letting workers and mutators notify workers when workers are given things to do.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Condvar, Mutex};
 
 use super::{
@@ -31,10 +32,13 @@ pub(crate) enum LastParkedResult {
 pub(crate) struct WorkerMonitor {
     /// The synchronized part.
     sync: Mutex<WorkerMonitorSync>,
-    /// Workers wait on this when idle.  Notified if workers have things to do.  That include:
+    /// The number of workers that are allowed to execute work after being notified.
+    active_workers: AtomicUsize,
+    /// Workers wait on these when idle.  A parked worker is notified if workers have things to
+    /// do.  That include:
     /// -   any work packets available, and
     /// -   any field in `sync.goals.requests` set to true.
-    workers_have_anything_to_do: Condvar,
+    workers_have_anything_to_do: Vec<Condvar>,
 }
 
 /// The synchronized part of `WorkerMonitor`.
@@ -51,6 +55,8 @@ struct WorkerParker {
     worker_count: usize,
     /// Number of parked workers.
     parked_workers: usize,
+    /// Whether each worker is currently parked.
+    parked: Vec<bool>,
 }
 
 impl WorkerParker {
@@ -58,6 +64,7 @@ impl WorkerParker {
         Self {
             worker_count,
             parked_workers: 0,
+            parked: vec![false; worker_count],
         }
     }
 
@@ -65,22 +72,35 @@ impl WorkerParker {
     /// Called before a worker is parked.
     ///
     /// Return true if all the workers are parked.
-    fn inc_parked_workers(&mut self) -> bool {
+    fn inc_parked_workers(&mut self, ordinal: usize) -> bool {
+        debug_assert!(ordinal < self.worker_count);
+        debug_assert!(!self.parked[ordinal]);
         let old = self.parked_workers;
         debug_assert!(old < self.worker_count);
         let new = old + 1;
         self.parked_workers = new;
+        self.parked[ordinal] = true;
         new == self.worker_count
     }
 
     /// Decrease the packed-workers counter.
     /// Called after a worker is resumed from the parked state.
-    fn dec_parked_workers(&mut self) {
+    fn dec_parked_workers(&mut self, ordinal: usize) {
+        debug_assert!(ordinal < self.worker_count);
+        debug_assert!(self.parked[ordinal]);
         let old = self.parked_workers;
         debug_assert!(old <= self.worker_count);
         debug_assert!(old > 0);
         let new = old - 1;
         self.parked_workers = new;
+        self.parked[ordinal] = false;
+    }
+
+    fn first_parked_active_worker(&self, active_workers: usize) -> Option<usize> {
+        self.parked
+            .iter()
+            .take(active_workers)
+            .position(|parked| *parked)
     }
 }
 
@@ -91,15 +111,39 @@ impl WorkerMonitor {
                 parker: WorkerParker::new(worker_count),
                 goals: Default::default(),
             }),
-            workers_have_anything_to_do: Default::default(),
+            active_workers: AtomicUsize::new(worker_count),
+            workers_have_anything_to_do: std::iter::repeat_with(Condvar::new)
+                .take(worker_count)
+                .collect(),
         }
+    }
+
+    fn active_workers(&self) -> usize {
+        self.active_workers.load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn is_worker_active(&self, ordinal: usize) -> bool {
+        ordinal < self.active_workers()
+    }
+
+    pub fn set_active_workers(&self, active_workers: usize) {
+        let worker_count = self.workers_have_anything_to_do.len();
+        let active_workers = active_workers.clamp(1, worker_count);
+        self.active_workers.store(active_workers, Ordering::SeqCst);
+        debug!(
+            "WorkerMonitor active worker count set to {} (worker_count={}).",
+            active_workers, worker_count
+        );
     }
 
     /// Make a request.  Can be called by a mutator to request the workers to work towards the
     /// given `goal`.
     pub fn make_request(&self, goal: WorkerGoal) {
-        let mut guard = self.sync.lock().unwrap();
-        let newly_requested = guard.goals.set_request(goal);
+        self.set_active_workers(self.workers_have_anything_to_do.len());
+        let newly_requested = {
+            let mut guard = self.sync.lock().unwrap();
+            guard.goals.set_request(goal)
+        };
         if newly_requested {
             self.notify_work_available(false);
         }
@@ -109,9 +153,17 @@ impl WorkerMonitor {
     /// or a mutator has requested the GC workers to schedule a GC.
     pub fn notify_work_available(&self, all: bool) {
         if all {
-            self.workers_have_anything_to_do.notify_all();
+            let active_workers = self.active_workers();
+            for condvar in self.workers_have_anything_to_do.iter().take(active_workers) {
+                condvar.notify_one();
+            }
         } else {
-            self.workers_have_anything_to_do.notify_one();
+            let sync = self.sync.lock().unwrap();
+            let active_workers = self.active_workers();
+            if let Some(ordinal) = sync.parker.first_parked_active_worker(active_workers) {
+                debug!("Notifying parked worker {} for available work.", ordinal);
+                self.workers_have_anything_to_do[ordinal].notify_one();
+            }
         }
     }
 
@@ -135,7 +187,7 @@ impl WorkerMonitor {
         let mut sync = self.sync.lock().unwrap();
 
         // Park this worker
-        let all_parked = sync.parker.inc_parked_workers();
+        let all_parked = sync.parker.inc_parked_workers(ordinal);
         trace!(
             "Worker {} parked.  parked/total: {}/{}.  All parked: {}",
             ordinal,
@@ -164,7 +216,8 @@ impl WorkerMonitor {
             should_wait = true;
         }
 
-        if should_wait {
+        while should_wait || !self.is_worker_active(ordinal) {
+            should_wait = false;
             // Notes on CondVar usage:
             //
             // Conditional variables are usually tested in a loop while holding a mutex
@@ -218,11 +271,13 @@ impl WorkerMonitor {
             //     and park again if not available.  The last parked worker will ensure the two
             //     conditions listed above are both false before blocking.  If either condition is
             //     true, the last parked worker will take action.
-            sync = self.workers_have_anything_to_do.wait(sync).unwrap();
+            sync = self.workers_have_anything_to_do[ordinal]
+                .wait(sync)
+                .unwrap();
         }
 
         // Unpark this worker.
-        sync.parker.dec_parked_workers();
+        sync.parker.dec_parked_workers(ordinal);
         trace!(
             "Worker {} unparked.  parked/total: {}/{}.",
             ordinal,
@@ -342,5 +397,50 @@ mod tests {
 
         // `on_last_parked` should only be called once.
         assert_eq!(on_last_parked_called.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_only_selected_workers_unpark() {
+        let number_threads = 4;
+        let concurrent_threads = 2;
+        let worker_monitor = Arc::new(WorkerMonitor::new(number_threads));
+        worker_monitor.set_active_workers(concurrent_threads);
+        let first_wave_unparked = AtomicUsize::new(0);
+        let release_everyone = AtomicBool::new(false);
+        let notifier_ran = AtomicBool::new(false);
+
+        std::thread::scope(|scope| {
+            for ordinal in 0..number_threads {
+                let worker_monitor = worker_monitor.clone();
+                let first_wave_unparked = &first_wave_unparked;
+                let release_everyone = &release_everyone;
+                let notifier_ran = &notifier_ran;
+                scope.spawn(move || {
+                    worker_monitor
+                        .park_and_wait(ordinal, |_goals| super::LastParkedResult::WakeAll)
+                        .unwrap();
+
+                    if !release_everyone.load(Ordering::SeqCst) {
+                        first_wave_unparked.fetch_add(1, Ordering::SeqCst);
+                    }
+
+                    if ordinal < concurrent_threads {
+                        while first_wave_unparked.load(Ordering::SeqCst) < concurrent_threads {
+                            std::thread::yield_now();
+                        }
+                        if !notifier_ran.swap(true, Ordering::SeqCst) {
+                            release_everyone.store(true, Ordering::SeqCst);
+                            worker_monitor.set_active_workers(number_threads);
+                            worker_monitor.notify_work_available(true);
+                        }
+                    }
+                });
+            }
+        });
+
+        assert_eq!(
+            first_wave_unparked.load(Ordering::SeqCst),
+            concurrent_threads
+        );
     }
 }

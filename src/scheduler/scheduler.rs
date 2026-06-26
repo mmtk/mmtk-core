@@ -84,6 +84,14 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_group.as_ref().worker_count()
     }
 
+    pub fn set_active_workers(&self, active_workers: usize) {
+        self.worker_monitor.set_active_workers(active_workers);
+    }
+
+    pub(crate) fn is_worker_active(&self, ordinal: usize) -> bool {
+        self.worker_monitor.is_worker_active(ordinal)
+    }
+
     /// Create GC threads for the first time.  It will also create the `GCWorker` instances.
     ///
     /// Currently GC threads only include worker threads, and we currently have only one worker

@@ -242,6 +242,14 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         let pause = self.current_pause().unwrap();
         if pause == Pause::InitialMark {
             self.set_concurrent_marking_state(true);
+            self.common
+                .base
+                .scheduler
+                .set_active_workers(*self.base().options.concurrent_threads);
+            debug!(
+                "Concurrent marking started. Active worker count set from concurrent_threads={}.",
+                *self.base().options.concurrent_threads
+            );
         }
         self.previous_pause.store(Some(pause), Ordering::SeqCst);
         self.current_pause.store(None, Ordering::SeqCst);
@@ -280,7 +288,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         &self.common
     }
 
-    fn notify_mutators_paused(&self, _scheduler: &GCWorkScheduler<VM>) {
+    fn notify_mutators_paused(&self, scheduler: &GCWorkScheduler<VM>) {
         use crate::vm::ActivePlan;
         let pause = self.current_pause().unwrap();
         match pause {
@@ -295,6 +303,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
                 );
             }
             Pause::FinalMark => {
+                scheduler.set_active_workers(scheduler.num_workers());
                 debug_assert!(self.concurrent_marking_in_progress());
                 // Flush barrier buffers
                 for mutator in <VM as VMBinding>::VMActivePlan::mutators() {

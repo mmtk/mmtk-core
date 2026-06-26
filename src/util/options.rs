@@ -878,6 +878,9 @@ options! {
     plan:                   PlanSelector            [always_valid] = PlanSelector::GenImmix,
     /// Number of GC worker threads.
     threads:                usize                   [|v: &usize| *v > 0] = num_cpus::get(),
+    /// Maximum number of GC worker threads that may run concurrent GC work.
+    /// If this exceeds the total number of GC worker threads, all workers may participate.
+    concurrent_threads:     usize                   [|v: &usize| *v > 0] = num_cpus::get(),
     /// Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans:  bool                    [always_valid] = false,
     /// Enable a return barrier (not supported)
@@ -1101,6 +1104,17 @@ mod tests {
                 *options.work_perf_events,
                 PerfEventOptions { events: vec![] }
             );
+        })
+    }
+
+    #[test]
+    fn test_concurrent_threads_validation() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let concurrent_threads = *options.concurrent_threads;
+            let success = options.concurrent_threads.set(0);
+            assert!(!success);
+            assert_eq!(*options.concurrent_threads, concurrent_threads);
         })
     }
 
@@ -1331,6 +1345,16 @@ mod tests {
             let success = options.set_from_string("no_finalizer", "true");
             assert!(success);
             assert!(*options.no_finalizer);
+        })
+    }
+
+    #[test]
+    fn test_process_concurrent_threads_valid() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let success = options.set_from_string("concurrent_threads", "2");
+            assert!(success);
+            assert_eq!(*options.concurrent_threads, 2);
         })
     }
 
