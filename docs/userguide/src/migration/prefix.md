@@ -32,6 +32,22 @@ Notes for the mmtk-core developers:
 
 ## 0.33.0
 
+### Linux thread IDs use `libc::pid_t`
+
+```admonish tldr
+On Linux, `mmtk::util::os::OS::ThreadIDType` is now `libc::pid_t` instead of
+`libc::pthread_t`.
+```
+
+API changes:
+
+-   module `util::os`
+    +   `OS::ThreadIDType`: On Linux, this is now `libc::pid_t` instead of `libc::pthread_t`.
+        *   On common Linux targets, this changes the concrete public type from `u64` to `i32`.
+        *   Bindings that name this associated type or store thread IDs returned by
+            `OSProcess::get_thread_id` should use `OS::ThreadIDType` or `libc::pid_t` rather than
+            assuming an unsigned 64-bit integer.
+
 ### The `<'w>` lifetime in `ObjectTracerContext`
 
 ```admonish tldr
