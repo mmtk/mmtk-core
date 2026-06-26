@@ -56,7 +56,7 @@ impl OSMemory for Linux {
 
 impl OSProcess for Linux {
     type ProcessIDType = unix_common::ProcessIDType;
-    type ThreadIDType = unix_common::ThreadIDType;
+    type ThreadIDType = libc::pid_t;
 
     fn get_process_memory_maps() -> Result<String> {
         linux_common::get_process_memory_maps()
@@ -67,7 +67,12 @@ impl OSProcess for Linux {
     }
 
     fn get_thread_id() -> Result<Self::ThreadIDType> {
-        unix_common::get_thread_id()
+        let tid = unsafe { libc::syscall(libc::SYS_gettid) };
+        if tid == -1 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(tid as libc::pid_t)
+        }
     }
 
     fn get_total_num_cpus() -> CoreNum {
