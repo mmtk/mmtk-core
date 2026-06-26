@@ -35,15 +35,16 @@ impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
 /// We assume this work packet is the only running work packet that accesses plan, and there should
 /// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
 /// be a race condition.
+#[derive(Default)]
 pub struct Prepare<C: GCWorkContext> {
-    pub plan: *const C::PlanType,
+    phantom_data: PhantomData<C>,
 }
 
-unsafe impl<C: GCWorkContext> Send for Prepare<C> {}
-
 impl<C: GCWorkContext> Prepare<C> {
-    pub fn new(plan: *const C::PlanType) -> Self {
-        Self { plan }
+    pub fn new() -> Self {
+        Self {
+            phantom_data: PhantomData,
+        }
     }
 }
 
@@ -51,7 +52,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for Prepare<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Prepare Global");
         // We assume this is the only running work packet that accesses plan at the point of execution
-        let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
+        let plan_mut = unsafe { mmtk.get_plan_mut() };
         plan_mut.prepare(worker.tls);
 
         if plan_mut.constraints().needs_prepare_mutator {
@@ -112,17 +113,18 @@ impl<VM: VMBinding> GCWork<VM> for PrepareCollector {
 /// We assume this work packet is the only running work packet that accesses plan, and there should
 /// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
 /// be a race condition.
+#[derive(Default)]
 pub struct Release<C: GCWorkContext> {
-    pub plan: *const C::PlanType,
+    phantom_data: PhantomData<C>,
 }
 
 impl<C: GCWorkContext> Release<C> {
-    pub fn new(plan: *const C::PlanType) -> Self {
-        Self { plan }
+    pub fn new() -> Self {
+        Self {
+            phantom_data: PhantomData,
+        }
     }
 }
-
-unsafe impl<C: GCWorkContext> Send for Release<C> {}
 
 impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
@@ -131,7 +133,7 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
         mmtk.gc_trigger.policy.on_gc_release(mmtk);
         // We assume this is the only running work packet that accesses plan at the point of execution
 
-        let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
+        let plan_mut = unsafe { mmtk.get_plan_mut() };
         plan_mut.release(worker.tls);
 
         let release_mutator_packets = <C::VM as VMBinding>::VMActivePlan::mutators()

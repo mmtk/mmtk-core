@@ -772,18 +772,15 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
     pub(crate) fn schedule_unlog_bits_op(&mut self, unlog_bits_op: UnlogBitsOperation) {
         if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
-            // # Safety: CommonPlan reference is always valid within this collection cycle.
-            let common_plan = unsafe { &*(self as *const CommonPlan<VM>) };
-
             match unlog_bits_op {
                 UnlogBitsOperation::NoOp => {}
                 UnlogBitsOperation::BulkSet => {
                     self.base.scheduler.work_buckets[WorkBucketStage::Prepare]
-                        .add(SetCommonPlanUnlogBits { common_plan });
+                        .add(SetCommonPlanUnlogBits::default());
                 }
                 UnlogBitsOperation::BulkClear => {
                     self.base.scheduler.work_buckets[WorkBucketStage::Release]
-                        .add(ClearCommonPlanUnlogBits { common_plan });
+                        .add(ClearCommonPlanUnlogBits::default());
                 }
             }
         }
