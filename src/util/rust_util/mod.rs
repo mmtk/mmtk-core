@@ -112,7 +112,10 @@ pub fn debug_process_thread_id() -> String {
     format!(
         "PID: {}, TID: {}",
         OS::get_process_id().map_or("(Failed to get PID)".to_string(), |pid| format!("{}", pid)),
-        OS::get_thread_id().map_or("(Failed to get TID)".to_string(), |tid| format!("{}", tid)),
+        OS::get_thread_id().map_or("(Failed to get TID)".to_string(), |tid| format!(
+            "{:?}",
+            tid
+        )),
     )
 }
 

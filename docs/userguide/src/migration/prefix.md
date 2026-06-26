@@ -32,21 +32,20 @@ Notes for the mmtk-core developers:
 
 ## 0.33.0
 
-### Linux thread IDs use `libc::pid_t`
+### Thread IDs require `Debug` instead of `Display`
 
 ```admonish tldr
-On Linux, `mmtk::util::os::OS::ThreadIDType` is now `libc::pid_t` instead of
-`libc::pthread_t`.
+`mmtk::util::os::OS::ThreadIDType` now needs to implement `Debug` instead of `Display`.
 ```
 
 API changes:
 
 -   module `util::os`
-    +   `OS::ThreadIDType`: On Linux, this is now `libc::pid_t` instead of `libc::pthread_t`.
-        *   On common Linux targets, this changes the concrete public type from `u64` to `i32`.
-        *   Bindings that name this associated type or store thread IDs returned by
-            `OSProcess::get_thread_id` should use `OS::ThreadIDType` or `libc::pid_t` rather than
-            assuming an unsigned 64-bit integer.
+    +   `OS::ThreadIDType`: This associated type now requires `Debug` instead of `Display`.
+        *   This allows platforms where the native thread ID type does not implement `Display`,
+            such as `libc::pthread_t` on musl.
+        *   Bindings that provide an OS implementation should derive or implement `Debug` for
+            their thread ID type.
 
 ### The `<'w>` lifetime in `ObjectTracerContext`
 
