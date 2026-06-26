@@ -190,7 +190,11 @@ pub struct StopMutators<C: GCWorkContext> {
     /// If this is true, we skip creating root-scanning work packets.
     /// By default, this is false.
     skip_roots: bool,
-    /// Flush mutators once they are stopped. By default this is false. [`ScanMutatorRoots`] will flush mutators.
+    /// Flush mutators once they are stopped. By default this is false.
+    /// Use it via [`StopMutators::new_no_scan_roots`] to flush mutators when
+    /// no root scan is run. When a root scan is run, the binding's
+    /// [`crate::vm::Scanning::scan_roots_in_mutator_thread`] is responsible
+    /// for flushing the mutator (see contract on that method).
     flush_mutator: bool,
     phantom: PhantomData<C>,
 }
@@ -252,7 +256,6 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
             unsafe { &mut *(self.0 as *mut _) },
             factory,
         );
-        self.0.flush();
 
         if mmtk.state.inform_stack_scanned(mutators) {
             <C::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
