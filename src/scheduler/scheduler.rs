@@ -586,10 +586,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let elapsed = start_time.elapsed();
 
         info!(
-            "End of GC ({}/{} pages, took {} ms)",
+            "End of GC ({}/{} pages, took {:.2} ms)",
             mmtk.get_plan().get_reserved_pages(),
             mmtk.get_plan().get_total_pages(),
-            elapsed.as_millis()
+            elapsed.as_secs_f64() * 1000.0
         );
 
         // USDT tracepoint for the end of GC.
