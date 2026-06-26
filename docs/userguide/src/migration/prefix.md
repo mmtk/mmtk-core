@@ -32,6 +32,21 @@ Notes for the mmtk-core developers:
 
 ## 0.33.0
 
+### Thread IDs require `Debug` instead of `Display`
+
+```admonish tldr
+`mmtk::util::os::OS::ThreadIDType` now needs to implement `Debug` instead of `Display`.
+```
+
+API changes:
+
+-   module `util::os`
+    +   `OS::ThreadIDType`: This associated type now requires `Debug` instead of `Display`.
+        *   This allows platforms where the native thread ID type does not implement `Display`,
+            such as `libc::pthread_t` on musl.
+        *   Bindings that provide an OS implementation should derive or implement `Debug` for
+            their thread ID type.
+
 ### The `<'w>` lifetime in `ObjectTracerContext`
 
 ```admonish tldr
