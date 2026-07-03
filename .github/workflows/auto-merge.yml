@@ -104,21 +104,6 @@ jobs:
       update_lockfile: cargo build --features nogc
     secrets: inherit
 
-  check-merge-julia-pr:
-    uses: ./.github/workflows/auto-merge-inner.yml
-    needs: [get-merged-pr, binding-refs]
-    with:
-      repo: ${{ needs.binding-refs.outputs.julia_binding_repo }}
-      base_repo: ${{ needs.binding-refs.outputs.julia_binding_repo_default }}
-      ref: ${{ needs.binding-refs.outputs.julia_binding_ref }}
-      base_ref: ${{ needs.binding-refs.outputs.julia_binding_ref_default }}
-      core_commit: ${{ needs.get-merged-pr.outputs.commit }}
-      # `cargo generate-lockfile` will update other dependencies. We avoid using it for the bindings.
-      # mmtk-julia uses bindgen during building and requires the Julia repo. This is a similar situation
-      # as mmtk-jikesrvm. To make thigns simpler, we just use `cargo generate-lockfile`.
-      update_lockfile: cargo generate-lockfile
-    secrets: inherit
-
   check-merge-ruby-pr:
     uses: ./.github/workflows/auto-merge-inner.yml
     needs: [get-merged-pr, binding-refs]
