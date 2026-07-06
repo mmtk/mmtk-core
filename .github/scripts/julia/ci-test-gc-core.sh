@@ -19,7 +19,8 @@ declare -a test_names=(
 for i in "${test_names[@]}"
 do
     # echo "Token: '$i'"
-    test=`sed 's/\"\(.*\)\"/\1/' <<< $i`
+    test="$i"
+
     if [[ ! -z "$test" ]]; then
         echo $test
 

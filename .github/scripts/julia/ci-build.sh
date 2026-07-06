@@ -24,9 +24,6 @@ if [ "$build_type" == "release" ]; then
     build_args=$build_args" --release"
 fi
 
-plan_feature=${plan,,}
-moving_feature=${is_moving,,}
-
 if [ "$is_moving" == "moving" ]; then
     MOVING=1
 else
