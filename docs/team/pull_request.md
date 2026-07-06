@@ -15,6 +15,8 @@ If an MMTk core PR should be tested with other bindings PRs, one can specify the
 should be tested with by adding a comment like below (see https://github.com/mmtk/mmtk-core/blob/master/.github/workflows/pr-binding-refs.yml).
 If there are multiple comments that match, the first one is effective. If the info is missing for
 a binding, the default repo (`mmtk/mmtk-X`) and branch (`master` for most bindings) will be used instead.
+Julia is different: the MMTk binding lives in the Julia repository, so use `JULIA_REPO` and `JULIA_REF`
+to select the Julia checkout for testing.
 
 Note that OpenJDK 11 and OpenJDK 21 are considered two bindings.  Their default repos are both
 `mmtk/mmtk-openjdk`, but their default branches are `jdk-11` and `jdk-21`, respectively.  We can
@@ -30,8 +32,8 @@ JIKESRVM_BINDING_REPO=xx/xx
 JIKESRVM_BINDING_REF=xxxxxx
 V8_BINDING_REPO=xx/xx
 V8_BINDING_REF=xxxxxx
-JULIA_BINDING_REPO=xx/xx
-JULIA_BINDING_REF=xxxxxx
+JULIA_REPO=xx/xx
+JULIA_REF=xxxxxx
 RUBY_BINDING_REPO=xx/xx
 RUBY_BINDING_REF=xxxxxx
 ```
@@ -62,6 +64,8 @@ when an mmtk-core PR is merged and the `binding-refs` comment is present.
 6. When a new commit is pushed to `master`, `auto-merge.yml` will be triggered.
 7. The binding PRs should be updated and auto merge will be eanbled for the PR. Keep an eye until the PRs are all merged. Resolve any
    issue that prevents the PR from being auto merged (e.g. flaky tests).
+
+Note: Julia is not auto-merged by this workflow. The Julia binding lives in the Julia repository, and mmtk-core CI does not have write access to that repository. For the Julia binding, follow the manual merging process.
 
 #### Manual merging process
 
