@@ -399,6 +399,48 @@ impl<VM: VMBinding> MMTK<VM> {
         *self.state.gc_status.lock().unwrap() == GcStatus::GcProper
     }
 
+    /// Disable collection. MMTk will not trigger a GC while collection is disabled, though a GC
+    /// that has already been requested (or is already under way, including the concurrent phase
+    /// of a concurrent GC) is not aborted by this call. Use
+    /// [`MMTK::wait_for_no_collection_in_progress`] to wait for such a GC to fully finish.
+    ///
+    /// This call is nestable. Each call must be paired with a matching call to
+    /// [`MMTK::enable_collection`].
+    pub fn disable_collection(&self) {
+        self.gc_trigger.disable_collection();
+    }
+
+    /// Re-enable collection. Calling it without a prior matching call to
+    /// [`MMTK::disable_collection`] is a logic error.
+    pub fn enable_collection(&self) {
+        self.gc_trigger.enable_collection();
+    }
+
+    /// Return whether collection is currently enabled.
+    pub fn is_collection_enabled(&self) -> bool {
+        self.gc_trigger.is_collection_enabled()
+    }
+
+    /// Block the calling thread until there is no collection currently pending or in progress,
+    /// including the concurrent marking phase of a concurrent GC (during which mutators run
+    /// normally rather than being stopped). This does not itself prevent a new collection from
+    /// starting immediately afterwards; call [`MMTK::disable_collection`] first if that must
+    /// also be prevented.
+    ///
+    /// This is intended for infrequent, safety-sensitive call sites (e.g. adopting a foreign
+    /// thread, or recovering from a fatal signal) rather than as a general-purpose GC barrier,
+    /// so it is implemented as a simple bounded poll loop rather than a condition variable.
+    pub fn wait_for_no_collection_in_progress(&self) {
+        let concurrent_work_in_progress = || {
+            self.get_plan()
+                .concurrent()
+                .is_some_and(|c| c.concurrent_work_in_progress())
+        };
+        while self.gc_trigger.has_pending_or_active_stw() || concurrent_work_in_progress() {
+            std::thread::sleep(std::time::Duration::from_micros(50));
+        }
+    }
+
     /// Return true if the current GC is an emergency GC.
     ///
     /// An emergency GC happens when a normal GC cannot reclaim enough memory to satisfy allocation

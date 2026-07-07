@@ -577,6 +577,26 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
     mmtk.initialize_collection(tls);
 }
 
+/// Wrapper for [`crate::mmtk::MMTK::disable_collection`].
+pub fn disable_collection<VM: VMBinding>(mmtk: &MMTK<VM>) {
+    mmtk.disable_collection();
+}
+
+/// Wrapper for [`crate::mmtk::MMTK::enable_collection`].
+pub fn enable_collection<VM: VMBinding>(mmtk: &MMTK<VM>) {
+    mmtk.enable_collection();
+}
+
+/// Wrapper for [`crate::mmtk::MMTK::is_collection_enabled`].
+pub fn is_collection_enabled<VM: VMBinding>(mmtk: &MMTK<VM>) -> bool {
+    mmtk.is_collection_enabled()
+}
+
+/// Wrapper for [`crate::mmtk::MMTK::wait_for_no_collection_in_progress`].
+pub fn wait_for_no_collection_in_progress<VM: VMBinding>(mmtk: &MMTK<VM>) {
+    mmtk.wait_for_no_collection_in_progress();
+}
+
 /// Process MMTk run-time options. Returns true if the option is processed successfully.
 ///
 /// Arguments:

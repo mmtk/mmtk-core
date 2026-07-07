@@ -1,18 +1,17 @@
 use atomic::Ordering;
 
-use crate::global_state::GlobalState;
+use crate::global_state::{GcStatus, GlobalState};
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions;
 use crate::util::options::{GCTriggerSelector, Options, DEFAULT_MAX_NURSERY, DEFAULT_MIN_NURSERY};
-use crate::vm::Collection;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::mem::MaybeUninit;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// GCTrigger is responsible for triggering GCs based on the given policy.
 /// All the decisions about heap limit and GC triggering should be resolved here.
@@ -27,6 +26,12 @@ pub struct GCTrigger<VM: VMBinding> {
     /// Set by mutators to trigger GC.  It is atomic so that mutators can check if GC has already
     /// been requested efficiently in `poll` without acquiring any mutex.
     request_flag: AtomicBool,
+    /// Nesting depth for collection-disable scopes requested via [`GCTrigger::disable_collection`].
+    /// A depth of 0 means collection is enabled.
+    collection_disable_depth: AtomicUsize,
+    /// Serializes [`GCTrigger::disable_collection`]/[`GCTrigger::enable_collection`] with the
+    /// decision to request a GC, so that a GC is never requested while collection is disabled.
+    collection_control_lock: Mutex<()>,
     scheduler: Arc<GCWorkScheduler<VM>>,
     options: Arc<Options>,
     state: Arc<GlobalState>,
@@ -63,6 +68,8 @@ impl<VM: VMBinding> GCTrigger<VM> {
             },
             options,
             request_flag: AtomicBool::new(false),
+            collection_disable_depth: AtomicUsize::new(0),
+            collection_control_lock: Mutex::new(()),
             scheduler,
             state,
         }
@@ -99,6 +106,59 @@ impl<VM: VMBinding> GCTrigger<VM> {
         self.request_flag.store(false, Ordering::Relaxed);
     }
 
+    /// Atomically check that collection is enabled, and if so, request a GC. This makes the
+    /// enabled-check and the request atomic with respect to [`GCTrigger::disable_collection`]
+    /// and [`GCTrigger::enable_collection`], so a GC is never requested after collection has
+    /// been disabled. Returns whether a GC was actually requested.
+    fn request_if_collection_enabled(&self) -> bool {
+        let _guard = self.collection_control_lock.lock().unwrap();
+        if self.collection_disable_depth.load(Ordering::Acquire) > 0 {
+            return false;
+        }
+        self.request();
+        true
+    }
+
+    /// Disable collection. MMTk will not trigger a GC while collection is disabled, though a GC
+    /// that has already been requested (or is already under way, including the concurrent phase
+    /// of a concurrent GC) is not aborted by this call. Use
+    /// [`crate::MMTK::wait_for_no_collection_in_progress`] to wait for such a GC to fully finish.
+    ///
+    /// This call is nestable. Each call must be paired with a matching call to
+    /// [`GCTrigger::enable_collection`].
+    pub fn disable_collection(&self) {
+        let _guard = self.collection_control_lock.lock().unwrap();
+        self.collection_disable_depth
+            .fetch_add(1, Ordering::Release);
+    }
+
+    /// Re-enable collection. Calling it without a prior matching call to
+    /// [`GCTrigger::disable_collection`] is a logic error.
+    pub fn enable_collection(&self) {
+        let _guard = self.collection_control_lock.lock().unwrap();
+        let depth = self.collection_disable_depth.load(Ordering::Acquire);
+        assert!(
+            depth > 0,
+            "enable_collection() called without a matching disable_collection()"
+        );
+        self.collection_disable_depth
+            .store(depth - 1, Ordering::Release);
+    }
+
+    /// Return whether collection is currently enabled.
+    pub fn is_collection_enabled(&self) -> bool {
+        self.collection_disable_depth.load(Ordering::Acquire) == 0
+    }
+
+    /// Return whether a GC has been requested but not yet started (i.e. mutators have not all
+    /// stopped), or a stop-the-world pause is currently active. This does not account for the
+    /// concurrent marking phase of a concurrent GC, which mutators run through normally; see
+    /// [`crate::plan::concurrent::global::ConcurrentPlan::concurrent_work_in_progress`] for that.
+    pub(crate) fn has_pending_or_active_stw(&self) -> bool {
+        self.request_flag.load(Ordering::Acquire)
+            || *self.state.gc_status.lock().unwrap() != GcStatus::NotInGC
+    }
+
     /// This method is called periodically by the allocation subsystem
     /// (by default, each time a page is consumed), and provides the
     /// collector with an opportunity to collect.
@@ -107,7 +167,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// * `space_full`: Space request failed, must recover pages within 'space'.
     /// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.
     pub fn poll(&self, space_full: bool, space: Option<&dyn Space<VM>>) -> bool {
-        if !VM::VMCollection::is_collection_enabled() {
+        if !self.is_collection_enabled() {
             return false;
         }
 
@@ -127,8 +187,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 plan.get_reserved_pages(),
                 plan.get_total_pages(),
             );
-            self.request();
-            return true;
+            return self.request_if_collection_enabled();
         }
         false
     }
@@ -145,7 +204,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
             return false;
         }
 
-        if force || !*self.options.ignore_system_gc && VM::VMCollection::is_collection_enabled() {
+        if force || !*self.options.ignore_system_gc && self.is_collection_enabled() {
             info!("User triggering collection");
             // TODO: this may not work reliably. If a GC has been triggered, this will not force it to be a full heap GC.
             if exhaustive {
@@ -157,8 +216,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
             self.state
                 .user_triggered_collection
                 .store(true, Ordering::Relaxed);
-            self.request();
-            return true;
+            return self.request_if_collection_enabled();
         }
 
         false
