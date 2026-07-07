@@ -1,7 +1,5 @@
-use std::mem::MaybeUninit;
+use std::mem::{MaybeUninit, offset_of};
 use std::sync::Arc;
-
-use memoffset::offset_of;
 
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::marksweepspace::malloc_ms::MallocSpace;

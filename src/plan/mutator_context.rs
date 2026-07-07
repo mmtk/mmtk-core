@@ -356,8 +356,7 @@ impl<VM: VMBinding> Mutator<VM> {
     /// Return the base offset from a mutator pointer to the allocator specified by the selector.
     pub fn get_allocator_base_offset(selector: AllocatorSelector) -> usize {
         use crate::util::alloc::*;
-        use memoffset::offset_of;
-        use std::mem::size_of;
+        use std::mem::{size_of, offset_of};
         offset_of!(Mutator<VM>, allocators)
             + match selector {
                 AllocatorSelector::BumpPointer(index) => {
