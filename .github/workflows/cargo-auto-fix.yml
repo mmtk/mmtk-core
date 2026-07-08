@@ -54,6 +54,9 @@ jobs:
 
       - name: Remove label
         if: always()
-        run: gh pr edit ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --remove-label "PR-cargo-auto-fix"
+        # Use the REST endpoint directly instead of `gh pr edit --remove-label`:
+        # that command's GraphQL query also resolves team/reviewer metadata,
+        # which requires a `read:org` scope we don't otherwise need.
+        run: gh api --method DELETE "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels/PR-cargo-auto-fix"
         env:
           GITHUB_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
