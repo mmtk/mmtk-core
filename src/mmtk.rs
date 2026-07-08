@@ -2,8 +2,8 @@
 use crate::global_state::{GcStatus, GlobalState};
 use crate::plan::CreateGeneralPlanArgs;
 use crate::plan::Plan;
-use crate::policy::sft_map::{create_sft_map, SFTMap};
 use crate::scheduler::GCWorkScheduler;
+use crate::policy::sft_map::{create_sft_map, SFTMap};
 
 #[cfg(feature = "vo_bit")]
 use crate::util::address::ObjectReference;
