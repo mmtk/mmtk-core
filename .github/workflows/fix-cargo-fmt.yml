@@ -1,0 +1,44 @@
+name: Fix Cargo Format
+
+# When the "fix-cargo-fmt" label is applied to a pull request, run `cargo fmt`,
+# push a formatting commit as mmtkgc-bot, and remove the label.
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  fix-cargo-fmt:
+    if: github.event.label.name == 'fix-cargo-fmt'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          # Use a token with push access so we can push the formatting commit back to the PR branch.
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+
+      - name: Install Rust toolchain
+        run: rustup component add rustfmt
+
+      - name: Run cargo fmt
+        run: cargo fmt
+
+      - name: Commit and push formatting changes
+        run: |
+          git config user.name "mmtkgc-bot"
+          git config user.email "mmtkgc.bot@gmail.com"
+          git add .
+          if git diff --cached --quiet; then
+            echo "No formatting changes to commit."
+          else
+            git commit -m "Fix cargo fmt"
+            git push
+          fi
+
+      - name: Remove the fix-cargo-fmt label
+        if: always()
+        run: gh pr edit ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --remove-label "fix-cargo-fmt"
+        env:
+          GITHUB_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
