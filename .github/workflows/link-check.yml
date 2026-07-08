@@ -34,7 +34,6 @@ jobs:
             --no-progress
             --cache
             --max-cache-age 1d
-            --exclude 'https://users.cecs.anu.edu.au/~steveb/pubs/papers/**'
             --exclude 'https://dl.acm.org/**'
             './docs/**/*.md'
       - name: Save lychee cache
