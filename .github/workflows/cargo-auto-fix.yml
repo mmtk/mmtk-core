@@ -13,7 +13,7 @@ name: Cargo Auto Fix
 # code: do not add steps that run tests or otherwise execute the resulting
 # binaries.
 on:
-  pull_request:
+  pull_request_target:
     types: [labeled]
 
 permissions:
