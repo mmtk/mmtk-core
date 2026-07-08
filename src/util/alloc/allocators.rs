@@ -1,4 +1,4 @@
-use std::mem::{MaybeUninit, offset_of};
+use std::mem::{offset_of, MaybeUninit};
 use std::sync::Arc;
 
 use crate::policy::largeobjectspace::LargeObjectSpace;
