@@ -39,8 +39,7 @@ jobs:
       - name: On link check failure
         if: failure()
         run: |
-          echo "Summary:"
-          cat lychee/out.md
+          echo "Link check failed.  Please read the summary in the last step."
           if grep -q 403 lychee/out.md; then
             echo "Some links received reply code 403 Forbidden:"
             grep 403 lychee/out.md
