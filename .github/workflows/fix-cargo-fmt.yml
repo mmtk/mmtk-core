@@ -2,9 +2,21 @@ name: Fix Cargo Format
 
 # When the "fix-cargo-fmt" label is applied to a pull request, run `cargo fmt`,
 # push a formatting commit as mmtkgc-bot, and remove the label.
+#
+# This uses pull_request_target (rather than pull_request) so that secrets are
+# available even when the PR comes from a fork - applying a label requires
+# triage/write access, so only trusted actors can trigger this. Because the
+# job still checks out and operates on unreviewed PR code, keep this job
+# limited to `cargo fmt` (parses and reformats source only). Do not add steps
+# that build, test, or otherwise execute PR-controlled code (build scripts,
+# proc macros, etc.) to this job.
 on:
-  pull_request:
+  pull_request_target:
     types: [labeled]
+
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
   fix-cargo-fmt:
@@ -15,7 +27,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
+          # Pin to the exact commit rather than the mutable branch name.
+          ref: ${{ github.event.pull_request.head.sha }}
           # Use a token with push access so we can push the formatting commit back to the PR branch.
           token: ${{ secrets.CI_ACCESS_TOKEN }}
 
@@ -34,7 +47,7 @@ jobs:
             echo "No formatting changes to commit."
           else
             git commit -m "Fix cargo fmt"
-            git push
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
           fi
 
       - name: Remove the fix-cargo-fmt label
