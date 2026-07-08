@@ -72,6 +72,7 @@ mod mock_test_vm_layout_compressed_pointer;
 mod mock_test_vm_layout_default;
 mod mock_test_vm_layout_heap_start;
 mod mock_test_vm_layout_log_address_space;
+mod mock_test_wait_for_no_collection_in_progress;
 
 mod mock_test_doc_avoid_resolving_allocator;
 mod mock_test_doc_mutator_storage;

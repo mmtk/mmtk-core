@@ -429,7 +429,8 @@ impl<VM: VMBinding> MMTK<VM> {
     ///
     /// This is intended for infrequent, safety-sensitive call sites (e.g. adopting a foreign
     /// thread, or recovering from a fatal signal) rather than as a general-purpose GC barrier,
-    /// so it is implemented as a simple bounded poll loop rather than a condition variable.
+    /// so it is implemented as a simple poll loop (yielding the calling thread between checks)
+    /// rather than a condition variable.
     pub fn wait_for_no_collection_in_progress(&self) {
         let concurrent_work_in_progress = || {
             self.get_plan()
@@ -437,7 +438,7 @@ impl<VM: VMBinding> MMTK<VM> {
                 .is_some_and(|c| c.concurrent_work_in_progress())
         };
         while self.gc_trigger.has_pending_or_active_stw() || concurrent_work_in_progress() {
-            std::thread::sleep(std::time::Duration::from_micros(50));
+            std::thread::yield_now();
         }
     }
 
