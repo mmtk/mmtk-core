@@ -1,11 +1,9 @@
 //! Read/Write barrier implementations.
 
+use crate::util::{Address, ObjectReference};
 use crate::vm::slot::{MemorySlice, Slot};
-use crate::vm::ObjectModel;
-use crate::{
-    util::{metadata::MetadataSpec, *},
-    vm::VMBinding,
-};
+use crate::vm::VMBinding;
+use crate::vm::{ObjectModel, VMGlobalFieldUnlogBitSpec, VMGlobalObjectUnlogBitSpec};
 use atomic::Ordering;
 use downcast_rs::Downcast;
 
@@ -21,6 +19,8 @@ pub enum BarrierSelector {
     NoBarrier,
     /// Object remembering post-write barrier is used.
     ObjectBarrier,
+    /// Field remembering pre-write barrier with weak reference loading barrier.
+    FieldBarrier,
     /// Object remembering pre-write barrier with weak reference loading barrier.
     // TODO: We might be able to generalize this to object remembering pre-write barrier.
     SATBBarrier,
@@ -45,6 +45,23 @@ impl BarrierSelector {
 ///
 /// As a performance optimization, the binding may also choose to port the fast-path to the VM side,
 /// and call the slow-path (`object_reference_write_slow`) only if necessary.
+///
+/// # Known limitations
+///
+/// Currently, each `Barrier` implements one or more barrier *mechanisms*.
+///
+/// -   `ObjectBarrier`: object-remembering post-write barrier
+/// -   `FieldBarrier`: field-remembering pre-write barrier + weak reference loading barrier
+/// -   `SATBBarrier`: object-remembering pre-write barrier + weak reference loading barrier
+///
+/// According to https://github.com/mmtk/mmtk-core/issues/1406, each plan has a barrier *policy*,
+/// and each policy can be implemented with one or more barrier mechanisms.  Fpr example, the SATB
+/// barrier can be implemented with either object-remembering barrier or field-remembering barrier,
+/// and the loading of weak reference field also needs to be handled.  The current separation of
+/// `FieldBarrier` and `SATBBarrier` is inappropriate.
+///
+/// We should decouple the policies and mechanisms so that one policy, such as SATB, can be
+/// implemented with a combination of mechanisms.
 pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
     /// Flush thread-local states like buffers or remembered sets.
     fn flush(&mut self) {}
@@ -117,7 +134,7 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
 
     /// A pre-barrier indicating that some fields of the object will probably be modified soon.
     /// Specifically, the caller should ensure that:
-    ///     * The barrier must called before any field modification.
+    ///     * The barrier must be called before any field modification.
     ///     * Some fields (unknown at the time of calling this barrier) might be modified soon, without a write barrier.
     ///     * There are no safepoints between the barrier call and the field writes.
     ///
@@ -151,8 +168,11 @@ impl<VM: VMBinding> Barrier<VM> for NoBarrier {}
 pub trait BarrierSemantics: 'static + Send {
     type VM: VMBinding;
 
-    const UNLOG_BIT_SPEC: MetadataSpec =
-        *<Self::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.as_spec();
+    const OBJECT_UNLOG_BIT: VMGlobalObjectUnlogBitSpec =
+        <Self::VM as VMBinding>::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC;
+
+    const FIELD_UNLOG_BIT: VMGlobalFieldUnlogBitSpec =
+        <Self::VM as VMBinding>::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC;
 
     /// Flush thread-local buffers or remembered sets.
     /// Normally this is called by the slow-path implementation whenever the thread-local buffers are full.
@@ -194,7 +214,7 @@ impl<S: BarrierSemantics> ObjectBarrier<S> {
 
     /// Returns true if the object is not logged.
     fn object_is_unlogged(&self, object: ObjectReference) -> bool {
-        S::UNLOG_BIT_SPEC.load_atomic::<S::VM, u8>(object, None, Ordering::SeqCst) != 0
+        S::OBJECT_UNLOG_BIT.is_unlogged::<S::VM>(object, Ordering::SeqCst)
     }
 
     /// Attempt to atomically log an object.
@@ -205,26 +225,7 @@ impl<S: BarrierSemantics> ObjectBarrier<S> {
             crate::util::metadata::vo_bit::is_vo_bit_set(object),
             "object bit is unset"
         );
-        loop {
-            let old_value =
-                S::UNLOG_BIT_SPEC.load_atomic::<S::VM, u8>(object, None, Ordering::SeqCst);
-            if old_value == 0 {
-                return false;
-            }
-            if S::UNLOG_BIT_SPEC
-                .compare_exchange_metadata::<S::VM, u8>(
-                    object,
-                    1,
-                    0,
-                    None,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                return true;
-            }
-        }
+        S::OBJECT_UNLOG_BIT.log_object_atomic::<S::VM>(object)
     }
 }
 
@@ -271,6 +272,90 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
     }
 }
 
+/// Generic field pre-write barrier with a type argument defining it's slow-path behaviour.
+pub struct FieldBarrier<S: BarrierSemantics> {
+    weak_ref_barrier_enabled: bool,
+    semantics: S,
+}
+
+impl<S: BarrierSemantics> FieldBarrier<S> {
+    pub fn new(semantics: S) -> Self {
+        Self {
+            weak_ref_barrier_enabled: false,
+            semantics,
+        }
+    }
+
+    pub(crate) fn set_weak_ref_barrier_enabled(&mut self, value: bool) {
+        self.weak_ref_barrier_enabled = value;
+    }
+
+    fn field_is_unlogged(&self, field_addr: Address) -> bool {
+        S::FIELD_UNLOG_BIT.is_unlogged::<S::VM>(field_addr, Ordering::SeqCst)
+    }
+}
+
+impl<S: BarrierSemantics> Barrier<S::VM> for FieldBarrier<S> {
+    fn flush(&mut self) {
+        self.semantics.flush();
+    }
+
+    fn load_weak_reference(&mut self, o: ObjectReference) {
+        self.semantics.load_weak_reference(o)
+    }
+
+    fn object_probable_write(&mut self, obj: ObjectReference) {
+        self.semantics.object_probable_write_slow(obj);
+    }
+
+    fn object_reference_write_pre(
+        &mut self,
+        src: ObjectReference,
+        slot: <S::VM as VMBinding>::VMSlot,
+        target: Option<ObjectReference>,
+    ) {
+        if self.field_is_unlogged(slot.to_address()) {
+            self.semantics
+                .object_reference_write_slow(src, slot, target);
+        }
+    }
+
+    fn object_reference_write_post(
+        &mut self,
+        _src: ObjectReference,
+        _slot: <S::VM as VMBinding>::VMSlot,
+        _target: Option<ObjectReference>,
+    ) {
+        unimplemented!()
+    }
+
+    fn object_reference_write_slow(
+        &mut self,
+        src: ObjectReference,
+        slot: <S::VM as VMBinding>::VMSlot,
+        target: Option<ObjectReference>,
+    ) {
+        self.semantics
+            .object_reference_write_slow(src, slot, target);
+    }
+
+    fn memory_region_copy_pre(
+        &mut self,
+        src: <S::VM as VMBinding>::VMMemorySlice,
+        dst: <S::VM as VMBinding>::VMMemorySlice,
+    ) {
+        self.semantics.memory_region_copy_slow(src, dst);
+    }
+
+    fn memory_region_copy_post(
+        &mut self,
+        _src: <S::VM as VMBinding>::VMMemorySlice,
+        _dst: <S::VM as VMBinding>::VMMemorySlice,
+    ) {
+        unimplemented!()
+    }
+}
+
 /// A SATB (Snapshot-At-The-Beginning) barrier implementation.
 /// This barrier is basically a pre-write object barrier with a weak reference loading barrier.
 pub struct SATBBarrier<S: BarrierSemantics> {
@@ -292,7 +377,7 @@ impl<S: BarrierSemantics> SATBBarrier<S> {
     }
 
     fn object_is_unlogged(&self, object: ObjectReference) -> bool {
-        S::UNLOG_BIT_SPEC.load_atomic::<S::VM, u8>(object, None, Ordering::SeqCst) != 0
+        S::OBJECT_UNLOG_BIT.is_unlogged::<S::VM>(object, Ordering::SeqCst)
     }
 }
 

@@ -102,12 +102,8 @@ impl<T: Trace> GCWork<T::VM> for ProcessModBuf<T> {
                     *obj,
                     OS::get_process_memory_maps().unwrap(),
                 );
-                <T::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<T::VM, u8>(
-                    *obj,
-                    1,
-                    None,
-                    Ordering::SeqCst,
-                );
+                <T::VM as VMBinding>::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
+                    .store_atomic::<T::VM, u8>(*obj, 1, None, Ordering::SeqCst);
             }
             // Scan objects in the modbuf and forward pointers
             let modbuf = std::mem::take(&mut self.modbuf);

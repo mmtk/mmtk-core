@@ -18,7 +18,7 @@ pub const OBJECT_HEADER_OFFSET: usize = 0;
 impl ObjectModel<DummyVM> for VMObjectModel {
     // Global metadata
 
-    const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::side_first();
+    const GLOBAL_OBJECT_UNLOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::side_first();
 
     // Local metadata
 

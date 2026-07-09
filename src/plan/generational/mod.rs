@@ -58,7 +58,9 @@ pub const GEN_CONSTRAINTS: PlanConstraints = PlanConstraints {
 /// So if a plan calls this, it should not call SideMetadataContext::new_global_specs() again.
 pub fn new_generational_global_metadata_specs<VM: VMBinding>() -> Vec<SideMetadataSpec> {
     let specs = if ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
-        crate::util::metadata::extract_side_metadata(&[*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC])
+        crate::util::metadata::extract_side_metadata(&[
+            *VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC,
+        ])
     } else {
         vec![]
     };

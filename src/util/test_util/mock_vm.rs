@@ -469,7 +469,7 @@ impl crate::vm::Collection<MockVM> for MockVM {
 }
 
 impl crate::vm::ObjectModel<MockVM> for MockVM {
-    const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::in_header(0);
+    const GLOBAL_OBJECT_UNLOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::in_header(0);
     const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec =
         VMLocalForwardingPointerSpec::in_header(0);
     const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec =

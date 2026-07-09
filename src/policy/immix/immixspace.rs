@@ -201,9 +201,11 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
         // Remove the following warning if we have a legitimate use case.
         warn!("ImmixSpace::clear_side_log_bits is single-treaded.  Consider clearing side metadata in per-chunk work packets.");
 
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        let object_unlog_bit = VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.extract_side_spec();
+        let field_unlog_bit = VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.extract_side_spec();
         for chunk in self.chunk_map.all_chunks() {
-            log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
+            object_unlog_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
+            field_unlog_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
         }
     }
 
@@ -211,9 +213,11 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
         // Remove the following warning if we have a legitimate use case.
         warn!("ImmixSpace::set_side_log_bits is single-treaded.  Consider setting side metadata in per-chunk work packets.");
 
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        let object_unlog_bit = VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.extract_side_spec();
+        let field_unlog_bit = VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.extract_side_spec();
         for chunk in self.chunk_map.all_chunks() {
-            log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
+            object_unlog_bit.bset_metadata(chunk.start(), Chunk::BYTES);
+            field_unlog_bit.bset_metadata(chunk.start(), Chunk::BYTES);
         }
     }
 }
@@ -728,7 +732,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                         // if `unlog_traced_object` is true.
                         debug_assert!(
                             !self.common.unlog_traced_object
-                                || VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                                || VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
                                     .is_unlogged::<VM>(new_object, Ordering::Relaxed)
                         );
                         #[cfg(feature = "vo_bit")]
@@ -758,14 +762,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                             + crate::util::constants::LOG_MIN_OBJECT_SIZE))
             );
             const_assert_eq!(
-                crate::vm::object_model::specs::VMGlobalLogBitSpec::LOG_NUM_BITS,
+                crate::vm::object_model::specs::VMGlobalObjectUnlogBitSpec::LOG_NUM_BITS,
                 0
             ); // We should put this to the addition, but type casting is not allowed in constant assertions.
 
             // Every immix line is 256 bytes, which is mapped to 4 bytes in the side metadata.
             // If we have one object in the line that is mature, we can assume all the objects in the line are mature objects.
             // So we can just mark the byte.
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+            VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
                 .mark_byte_as_unlogged::<VM>(object, Ordering::Relaxed);
         }
     }
@@ -898,7 +902,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.mark_lines(object);
         }
         if self.common.unlog_traced_object {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+            VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
                 .mark_byte_as_unlogged::<VM>(object, Ordering::Relaxed);
         }
     }

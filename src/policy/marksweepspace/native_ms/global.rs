@@ -255,14 +255,14 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
     }
 
     fn clear_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        let log_bit = VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.extract_side_spec();
         for chunk in self.chunk_map.all_chunks() {
             log_bit.bzero_metadata(chunk.start(), Chunk::BYTES);
         }
     }
 
     fn set_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        let log_bit = VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.extract_side_spec();
         for chunk in self.chunk_map.all_chunks() {
             log_bit.bset_metadata(chunk.start(), Chunk::BYTES);
         }
