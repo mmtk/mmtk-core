@@ -437,7 +437,7 @@ impl<VM: VMBinding> MMTK<VM> {
                 .concurrent()
                 .is_some_and(|c| c.concurrent_work_in_progress())
         };
-        while self.gc_trigger.has_pending_or_active_stw() || concurrent_work_in_progress() {
+        while self.gc_trigger.has_pending_or_active_pause() || concurrent_work_in_progress() {
             std::thread::yield_now();
         }
     }

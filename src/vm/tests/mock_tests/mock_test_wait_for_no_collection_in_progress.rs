@@ -1,3 +1,5 @@
+// GITHUB-CI: MMTK_PLAN=Immix,ConcurrentImmix
+
 use super::mock_test_prelude::*;
 use crate::util::{OpaquePointer, VMMutatorThread, VMThread};
 use std::sync::{Condvar, Mutex};
@@ -55,7 +57,7 @@ pub fn wait_for_no_collection_in_progress_blocks_until_gc_finishes() {
 
             // Thread A: trigger a GC. `handle_user_collection_request` blocks the calling
             // thread in (our mocked) `block_for_gc` until the GC finishes.
-            let gc_thread = std::thread::spawn(move || {
+            let thread_to_trigger_gc = std::thread::spawn(move || {
                 let tls = VMMutatorThread(VMThread(OpaquePointer::UNINITIALIZED));
                 memory_manager::handle_user_collection_request(mmtk, tls);
             });
@@ -71,7 +73,7 @@ pub fn wait_for_no_collection_in_progress_blocks_until_gc_finishes() {
 
             // Thread B: disable collection and wait for no collection to be in progress. This
             // must block, because the GC triggered by thread A is still running.
-            let waiter = std::thread::spawn(move || {
+            let thread_to_disable_gc = std::thread::spawn(move || {
                 mmtk.disable_collection();
                 mmtk.wait_for_no_collection_in_progress();
             });
@@ -79,7 +81,7 @@ pub fn wait_for_no_collection_in_progress_blocks_until_gc_finishes() {
             // Give thread B a chance to run, then confirm it is still blocked.
             std::thread::sleep(Duration::from_millis(200));
             assert!(
-                !waiter.is_finished(),
+                !thread_to_disable_gc.is_finished(),
                 "wait_for_no_collection_in_progress() returned while a GC was still in progress"
             );
 
@@ -91,7 +93,7 @@ pub fn wait_for_no_collection_in_progress_blocks_until_gc_finishes() {
                 cvar.notify_all();
             }
             wait_until(
-                || gc_thread.is_finished(),
+                || thread_to_trigger_gc.is_finished(),
                 "the GC-triggering thread did not finish in time",
             );
             // This test does not spawn real GC worker threads, so nothing else clears the GC
@@ -101,13 +103,13 @@ pub fn wait_for_no_collection_in_progress_blocks_until_gc_finishes() {
 
             // Now that the GC has finished, thread B should unblock.
             wait_until(
-                || waiter.is_finished(),
+                || thread_to_disable_gc.is_finished(),
                 "wait_for_no_collection_in_progress() did not return after the GC finished",
             );
 
             mmtk.enable_collection();
-            gc_thread.join().unwrap();
-            waiter.join().unwrap();
+            thread_to_trigger_gc.join().unwrap();
+            thread_to_disable_gc.join().unwrap();
         },
         no_cleanup,
     )

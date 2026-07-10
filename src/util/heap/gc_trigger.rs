@@ -86,9 +86,19 @@ impl<VM: VMBinding> GCTrigger<VM> {
 
     /// Request a GC.  Called by mutators when polling (during allocation) and when handling user
     /// GC requests (e.g. `System.gc();` in Java).
-    fn request(&self) {
+    /// Atomically check that collection is enabled, and if so, request a GC. This makes the
+    /// enabled-check and the request atomic with respect to [`GCTrigger::disable_collection`]
+    /// and [`GCTrigger::enable_collection`], so a GC is never requested after collection has
+    /// been disabled.
+    /// Returns whether a GC was actually requested.
+    fn request(&self) -> bool {
+        let _guard = self.collection_control_lock.lock().unwrap();
+        if self.collection_disable_depth.load(Ordering::Acquire) > 0 {
+            return false;
+        }
+
         if self.request_flag.load(Ordering::Relaxed) {
-            return;
+            return true;
         }
 
         if !self.request_flag.swap(true, Ordering::Relaxed) {
@@ -98,25 +108,14 @@ impl<VM: VMBinding> GCTrigger<VM> {
             probe!(mmtk, gc_requested);
             self.scheduler.request_schedule_collection();
         }
+
+        true
     }
 
     /// Clear the "GC requested" flag so that mutators can trigger the next GC.
     /// Called by a GC worker when all mutators have come to a stop.
     pub fn clear_request(&self) {
         self.request_flag.store(false, Ordering::Relaxed);
-    }
-
-    /// Atomically check that collection is enabled, and if so, request a GC. This makes the
-    /// enabled-check and the request atomic with respect to [`GCTrigger::disable_collection`]
-    /// and [`GCTrigger::enable_collection`], so a GC is never requested after collection has
-    /// been disabled. Returns whether a GC was actually requested.
-    fn request_if_collection_enabled(&self) -> bool {
-        let _guard = self.collection_control_lock.lock().unwrap();
-        if self.collection_disable_depth.load(Ordering::Acquire) > 0 {
-            return false;
-        }
-        self.request();
-        true
     }
 
     /// Disable collection. MMTk will not trigger a GC while collection is disabled, though a GC
@@ -153,8 +152,8 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// Return whether a GC has been requested but not yet started (i.e. mutators have not all
     /// stopped), or a stop-the-world pause is currently active. This does not account for the
     /// concurrent marking phase of a concurrent GC, which mutators run through normally; see
-    /// [`crate::plan::concurrent::global::ConcurrentPlan::concurrent_work_in_progress`] for that.
-    pub(crate) fn has_pending_or_active_stw(&self) -> bool {
+    /// `ConcurrentPlan::concurrent_work_in_progress`.
+    pub(crate) fn has_pending_or_active_pause(&self) -> bool {
         self.request_flag.load(Ordering::Acquire)
             || *self.state.gc_status.lock().unwrap() != GcStatus::NotInGC
     }
@@ -187,7 +186,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 plan.get_reserved_pages(),
                 plan.get_total_pages(),
             );
-            return self.request_if_collection_enabled();
+            return self.request();
         }
         false
     }
@@ -216,7 +215,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
             self.state
                 .user_triggered_collection
                 .store(true, Ordering::Relaxed);
-            return self.request_if_collection_enabled();
+            return self.request();
         }
 
         false
