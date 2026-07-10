@@ -593,27 +593,25 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             return None;
         }
         loop {
-            if let Some(block) = self.reusable_blocks.pop() {
-                // Skip blocks that should be evacuated.
-                if copy && block.is_defrag_source() {
-                    continue;
-                }
+            let block = self.reusable_blocks.pop()?;
 
-                // Get available lines. Do this before block.init which will reset block state.
-                let lines_delta = match block.get_state() {
-                    BlockState::Reusable { unavailable_lines } => {
-                        Block::LINES - unavailable_lines as usize
-                    }
-                    BlockState::Unmarked => Block::LINES,
-                    _ => unreachable!("{:?} {:?}", block, block.get_state()),
-                };
-                self.lines_consumed.fetch_add(lines_delta, Ordering::SeqCst);
-
-                block.init(copy);
-                return Some(block);
-            } else {
-                return None;
+            // Skip blocks that should be evacuated.
+            if copy && block.is_defrag_source() {
+                continue;
             }
+
+            // Get available lines. Do this before block.init which will reset block state.
+            let lines_delta = match block.get_state() {
+                BlockState::Reusable { unavailable_lines } => {
+                    Block::LINES - unavailable_lines as usize
+                }
+                BlockState::Unmarked => Block::LINES,
+                _ => unreachable!("{:?} {:?}", block, block.get_state()),
+            };
+            self.lines_consumed.fetch_add(lines_delta, Ordering::SeqCst);
+
+            block.init(copy);
+            return Some(block);
         }
     }
 
