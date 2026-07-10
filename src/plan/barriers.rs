@@ -272,6 +272,61 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
     }
 }
 
+/// Field-grained generational remembered set barrier.  It has a post-barrier that
+pub struct FieldGenRemSetBarrier<S: BarrierSemantics> {
+    semantics: S,
+}
+
+impl<S: BarrierSemantics> FieldGenRemSetBarrier<S> {
+    pub fn new(semantics: S) -> Self {
+        Self { semantics }
+    }
+
+    fn field_is_unlogged(&self, field_addr: Address) -> bool {
+        S::FIELD_UNLOG_BIT.is_unlogged::<S::VM>(field_addr, Ordering::SeqCst)
+    }
+}
+
+impl<S: BarrierSemantics> Barrier<S::VM> for FieldGenRemSetBarrier<S> {
+    fn flush(&mut self) {
+        self.semantics.flush();
+    }
+
+    fn object_probable_write(&mut self, obj: ObjectReference) {
+        self.semantics.object_probable_write_slow(obj);
+    }
+
+    fn object_reference_write_post(
+        &mut self,
+        src: ObjectReference,
+        slot: <S::VM as VMBinding>::VMSlot,
+        target: Option<ObjectReference>,
+    ) {
+        if self.field_is_unlogged(slot.to_address()) {
+            self.semantics
+                .object_reference_write_slow(src, slot, target);
+        }
+    }
+
+    fn object_reference_write_slow(
+        &mut self,
+        src: ObjectReference,
+        slot: <S::VM as VMBinding>::VMSlot,
+        target: Option<ObjectReference>,
+    ) {
+        self.semantics
+            .object_reference_write_slow(src, slot, target);
+    }
+
+    fn memory_region_copy_post(
+        &mut self,
+        src: <S::VM as VMBinding>::VMMemorySlice,
+        dst: <S::VM as VMBinding>::VMMemorySlice,
+    ) {
+        self.semantics.memory_region_copy_slow(src, dst);
+    }
+}
+
 /// Generic field pre-write barrier with a type argument defining it's slow-path behaviour.
 pub struct FieldBarrier<S: BarrierSemantics> {
     weak_ref_barrier_enabled: bool,
