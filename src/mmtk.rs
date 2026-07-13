@@ -442,6 +442,14 @@ impl<VM: VMBinding> MMTK<VM> {
         }
     }
 
+    /// Check if MMTK has any pending or active pauses.
+    /// MMTk may initiate a pause before MMTk requires a stop-the-world through
+    /// the [`crate::vm::Collection::stop_all_mutators()`] call. This function allows the VM to check
+    /// if MMTk has any pending pauses before `stop_all_mutators` is called.
+    pub fn has_pending_or_active_pause(&self) -> bool {
+        self.gc_trigger.has_pending_or_active_pause()
+    }
+
     /// Return true if the current GC is an emergency GC.
     ///
     /// An emergency GC happens when a normal GC cannot reclaim enough memory to satisfy allocation
