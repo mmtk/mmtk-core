@@ -1,30 +1,13 @@
 . $(dirname "$0")/ci-common.sh
 
-export RUSTFLAGS="-D warnings -A unknown-lints"
+# We may consider adding 'cargo fix' and 'cargo clippy --fix' here.
+# However, fixing warnings and style issues may need human intervention
+# for the best results. Unless we are confident that 'cargo fix' and 'cargo clippy --fix'
+# produces good results, we should not add them to this CI pipeline.
 
-# --- Fix main crate ---
+# Currently we only run 'cargo fmt'.
 
-# base
-cargo fix --allow-dirty --allow-staged
-cargo clippy --fix --allow-dirty --allow-staged
-
-# all features
-for_all_features "cargo fix --allow-dirty --allow-staged"
-for_all_features "cargo clippy --fix --allow-dirty --allow-staged"
-
-# --- Fix auxiliary crate ---
-
-fix_auxiliary_crate() {
-    crate_path=$1
-
-    cargo fix --manifest-path=$crate_path/Cargo.toml --allow-dirty --allow-staged
-    cargo clippy --fix --manifest-path=$crate_path/Cargo.toml --allow-dirty --allow-staged
-}
-
-fix_auxiliary_crate macros
-fix_auxiliary_crate docs/dummyvm
-
-# --- Format everything last, so the fixes above end up properly formatted ---
+# --- Format everything ---
 
 cargo fmt
 cargo fmt --manifest-path=macros/Cargo.toml
