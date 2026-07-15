@@ -569,12 +569,21 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 if fail_with_oom {
                     // Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
                     trace!("Throw HeapOutOfMemory!");
-                    self.out_of_memory(tls);
-                    reset_allocation_state(self);
+                    // `allocation_success` was swapped to `true` above unconditionally, before
+                    // calling the VM binding's callback. `Collection::out_of_memory` is not
+                    // guaranteed to return (a binding may unwind out of it instead), so we undo
+                    // that swap *before* calling it, rather than after: otherwise, a callback
+                    // that doesn't return would leave `allocation_success` stuck at `true`.
                     self.get_context()
                         .state
                         .allocation_success
                         .store(false, Ordering::SeqCst);
+                    self.out_of_memory(tls);
+                    // `thrown_oom` is only ever set (by `out_of_memory`, above) *after* the
+                    // callback returns, so resetting it here is only ever undoing a side effect
+                    // that happened in this same call -- there's nothing to undo if the callback
+                    // didn't return, so it's safe for this reset to stay after the call.
+                    reset_allocation_state(self);
                     return result;
                 }
             }
