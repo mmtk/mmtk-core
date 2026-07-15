@@ -317,6 +317,12 @@ be missing information (especially about import statements). If something is
 missing or inaccurate, refer to the relevant completed garbage collector if
 possible. Please also raise an issue, or create a pull request addressing
 the problem.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="introduction-1"><a class="header" href="#introduction-1">Introduction</a></h1>
+<p>In this section, we introduce MMTk and this tutorial. We will cover what
+MMTk is, what this tutorial covers, and a glossary of terms that will be
+used throughout the tutorial. If you are already familiar with MMTk and
+garbage collection terminology, you may skim through this section and move
+on to the <a href="tutorial/intro/../preliminaries/prefix.html">preliminaries</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="what-is-mmtk"><a class="header" href="#what-is-mmtk">What <em>is</em> MMTk?</a></h1>
 <p>The Memory Management Toolkit (MMTk) is a framework for designing and
 implementing memory managers. It has a runtime-neutral core (mmtk-core)
@@ -387,6 +393,11 @@ what this tutorial covers.</p>
 collection policy (such as Immix, for example), would need to first create
 a policy which specifies that algorithm, before creating a plan which defines
 how the GC algorithm fits together and utilizes that policy.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="preliminaries"><a class="header" href="#preliminaries">Preliminaries</a></h1>
+<p>In this section, we set up the environment for the tutorial. We will set up
+MMTk and OpenJDK (the binding used throughout the tutorial), and test the
+build to make sure everything works before moving on to building a new
+collector.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="set-up-mmtk-and-openjdk"><a class="header" href="#set-up-mmtk-and-openjdk">Set up MMTk and OpenJDK</a></h1>
 <p>This tutorial can be completed with any binding. However, for the sake of
 simplicity, only the setup for the OpenJDK binding will be described in detail
@@ -561,6 +572,12 @@ same as they did while using NoGC.
 </code></pre>
 </li>
 </ol>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="mygc"><a class="header" href="#mygc">MyGC</a></h1>
+<p>In this section, we will build a new garbage collector from scratch, called
+<code>MyGC</code>. We will start by creating MyGC as a copy of the simple NoGC plan,
+which only allocates memory and never collects. We will then extend it step
+by step into a semispace collector, and finally into a generational copying
+collector.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="create-mygc"><a class="header" href="#create-mygc">Create MyGC</a></h1>
 <p>NoGC is a GC plan that only allocates memory, and does not have a collector.
 We're going to use it as a base for building a new garbage collector.</p>
