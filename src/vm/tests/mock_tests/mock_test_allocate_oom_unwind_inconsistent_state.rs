@@ -22,8 +22,7 @@ pub fn allocate_oom_unwind_leaves_inconsistent_state() {
                 block_for_gc: MockMethod::new_default(),
                 // A callback that never returns.
                 out_of_memory: MockMethod::new_fixed(Box::new(|(_tls, _err)| {
-                    assert!(
-                        false,
+                    panic!(
                         "Collection::out_of_memory was invoked for a real OOM; a real binding \
                          (e.g. mmtk-julia's jl_throw_out_of_memory_error()) may never return \
                          from this call"
