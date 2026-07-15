@@ -1,0 +1,62 @@
+name: Cargo Auto Fix
+
+# When the "PR-cargo-auto-fix" label is applied to a pull request, run
+# .github/scripts/ci-cargo-fix.sh (cargo fix, cargo clippy --fix, and cargo
+# fmt across all tested feature combinations), push the resulting commit as
+# mmtkgc-bot, and remove the label.
+#
+# This uses pull_request_target (rather than pull_request) so that secrets are
+# available even when the PR comes from a fork - applying a label requires
+# triage/write access, so only trusted actors can trigger this. Because the
+# job still checks out and builds unreviewed PR code (cargo fix/clippy run the
+# compiler, unlike plain cargo fmt), treat this job as executing untrusted
+# code: do not add steps that run tests or otherwise execute the resulting
+# binaries.
+on:
+  pull_request_target:
+    types: [labeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  cargo-auto-fix:
+    if: github.event.label.name == 'PR-cargo-auto-fix'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          # Pin to the exact commit rather than the mutable branch name.
+          ref: ${{ github.event.pull_request.head.sha }}
+          # Use a token with push access so we can push the fix commit back to the PR branch.
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+
+      - name: Install Rust toolchain
+        run: rustup component add rustfmt clippy
+
+      - name: Run cargo fix, clippy --fix, and fmt
+        run: ./.github/scripts/ci-cargo-fix.sh
+
+      - name: Commit and push fixes
+        run: |
+          git config user.name "mmtkgc-bot"
+          git config user.email "mmtkgc.bot@gmail.com"
+          git add .
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Auto-fix cargo fmt/clippy issues"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
+
+      - name: Remove label
+        if: always()
+        # Use the REST endpoint directly instead of `gh pr edit --remove-label`:
+        # that command's GraphQL query also resolves team/reviewer metadata,
+        # which requires a `read:org` scope we don't otherwise need.
+        run: gh api --method DELETE "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels/PR-cargo-auto-fix"
+        env:
+          GITHUB_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
