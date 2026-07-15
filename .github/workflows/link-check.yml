@@ -35,7 +35,6 @@ jobs:
             --cache
             --max-cache-age 1d
             --exclude 'https://dl.acm.org/**'
-            --failIfEmpty false
             './docs/**/*.md'
       - name: On link check failure
         if: failure()
