@@ -16,7 +16,7 @@ Before starting a full detailed review, the reviewer should first evaluate wheth
 
 * A pull request may partially address an issue, or be an incremental improvement rather than a full fix.
 
-* A pull request does not need to be a complete or final solution, as long as it moves in the right direction and does not introduce regressions.
+* A pull request does not need to be a complete solution, as long as it moves in the right direction and does not introduce regressions.
 
 * A pull request should stay focused on a single, well-scoped change. If it grows to include unrelated changes along the way,
 reviewers should ask the contributor to split it into separate PRs.
@@ -30,6 +30,7 @@ contributor. The reasons may include, but are not limited to:
 * The PR does not align with the project principles.
 * The PR does not provide value.
 * The PR brings in more downsides than value.
+* The PR has major flaws in its high-level design.
 
 There might be further discussion, and the reviewer may change their mind.
 
@@ -56,9 +57,16 @@ that the PR is WIP and the author may already have intentions to change it.
 
 ## Details on Full Review
 
-Ideally, a reviewer should be objective during the code review.
+### Correctness
+
+We largely rely on automated tests for correctness. Code review should check if new code is covered by automated tests.
+
+Code review does not have to focus on correctness. However, if the reviewer spots any correctness bug, they should
+point it out, and ask the contributor to fix it (ideally with an automated regression test).
 
 ### Design
+
+Ideally, a reviewer should be objective during the code review.
 
 Design is highly subjective, and there might be multiple designs that work equally well for the same purpose.
 
@@ -66,13 +74,6 @@ The reviewer should not let personal preference bias the review.
 
 When reviewing a design, the reviewer should justify their feedback with objective metrics where possible
 (e.g. performance, complexity, maintainability).
-
-### Correctness
-
-We largely rely on automated tests for correctness. Code review should check if new code is covered by automated tests.
-
-Code review does not have to focus on correctness. However, if the reviewer spots any correctness bug, they should
-point it out, and ask the contributor to fix it (ideally with an automated regression test).
 
 ### Coding Style
 
