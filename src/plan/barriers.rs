@@ -302,7 +302,9 @@ impl<S: BarrierSemantics> Barrier<S::VM> for FieldGenRemSetBarrier<S> {
         slot: <S::VM as VMBinding>::VMSlot,
         target: Option<ObjectReference>,
     ) {
+        debug!("Calling post barrier. slot: {}", slot.to_address());
         if self.field_is_unlogged(slot.to_address()) {
+            debug!("Slot {} is unlogged!", slot.to_address());
             self.semantics
                 .object_reference_write_slow(src, slot, target);
         }

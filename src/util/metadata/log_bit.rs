@@ -85,6 +85,20 @@ impl VMGlobalFieldUnlogBitSpec {
             .load_atomic::<u8>(field_addr, order)
             == UNLOGGED_VALUE
     }
+
+    /// Clear the unlog bit to log object (0 means logged)
+    pub fn clear_all_fields<VM: VMBinding>(&self, object: ObjectReference) {
+        let start = object.to_object_start::<VM>();
+        let size = VM::VMObjectModel::get_current_size(object);
+        self.extract_side_spec().bzero_metadata(start, size);
+    }
+
+    /// Clear the unlog bit to log object (0 means logged)
+    pub fn mark_all_fields_as_unlogged<VM: VMBinding>(&self, object: ObjectReference) {
+        let start = object.to_object_start::<VM>();
+        let size = VM::VMObjectModel::get_current_size(object);
+        self.extract_side_spec().bset_metadata(start, size);
+    }
 }
 
 /// This specifies what to do to the global side unlog bits in various functions or work packets.

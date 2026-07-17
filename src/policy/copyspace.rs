@@ -313,6 +313,20 @@ impl<VM: VMBinding> CopySpace<VM> {
         }
         trace!("Unprotect {:x} {:x}", start, start + extent);
     }
+
+    pub(crate) fn clear_side_field_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.extract_side_spec();
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            log_bit.bzero_metadata(start, size);
+        }
+    }
+
+    pub(crate) fn set_side_field_log_bits(&self) {
+        let log_bit = VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.extract_side_spec();
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            log_bit.bset_metadata(start, size);
+        }
+    }
 }
 
 use crate::util::alloc::Allocator;

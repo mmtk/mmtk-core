@@ -109,6 +109,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     fn release(&mut self, tls: VMWorkerThread) {
         let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.release(tls);
+        if VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.is_on_side() {
+            self.fromspace().set_side_field_log_bits();
+            self.tospace().set_side_field_log_bits();
+        }
         if full_heap {
             if VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.is_on_side() {
                 self.fromspace().clear_side_log_bits();

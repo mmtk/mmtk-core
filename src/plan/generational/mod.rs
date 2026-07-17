@@ -60,6 +60,7 @@ pub fn new_generational_global_metadata_specs<VM: VMBinding>() -> Vec<SideMetada
     let specs = if ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
         crate::util::metadata::extract_side_metadata(&[
             *VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC,
+            *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC,
         ])
     } else {
         vec![]

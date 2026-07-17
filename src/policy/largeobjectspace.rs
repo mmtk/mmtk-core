@@ -361,6 +361,8 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 if self.common.unlog_traced_object {
                     VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
                         .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+                    VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+                        .mark_all_fields_as_unlogged::<VM>(object);
                 }
                 queue.enqueue(object);
             } else {
@@ -381,6 +383,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             if self.clear_log_bit_on_sweep {
                 VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
                     .clear::<VM>(object, Ordering::SeqCst);
+                VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.clear_all_fields::<VM>(object);
             }
             self.pr
                 .release_pages(get_super_page(object.to_object_start::<VM>()));
