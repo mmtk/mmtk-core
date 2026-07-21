@@ -10,8 +10,8 @@ use crate::util::options::{GCTriggerSelector, Options, DEFAULT_MAX_NURSERY, DEFA
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::mem::MaybeUninit;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 
 /// GCTrigger is responsible for triggering GCs based on the given policy.
 /// All the decisions about heap limit and GC triggering should be resolved here.
@@ -23,15 +23,6 @@ pub struct GCTrigger<VM: VMBinding> {
     plan: MaybeUninit<&'static dyn Plan<VM = VM>>,
     /// The triggering policy.
     pub policy: Box<dyn GCTriggerPolicy<VM>>,
-    /// Set by mutators to trigger GC.  It is atomic so that mutators can check if GC has already
-    /// been requested efficiently in `poll` without acquiring any mutex.
-    // request_flag: AtomicBool,
-    /// Nesting depth for collection-disable scopes requested via [`GCTrigger::disable_collection`].
-    /// A depth of 0 means collection is enabled.
-    // collection_disable_depth: AtomicUsize,
-    /// Serializes [`GCTrigger::disable_collection`]/[`GCTrigger::enable_collection`] with the
-    /// decision to request a GC, so that a GC is never requested while collection is disabled.
-    // collection_control_lock: Mutex<()>,
     scheduler: Arc<GCWorkScheduler<VM>>,
     options: Arc<Options>,
     state: Arc<GlobalState>,
@@ -67,9 +58,6 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 }
             },
             options,
-            // request_flag: AtomicBool::new(false),
-            // collection_disable_depth: AtomicUsize::new(0),
-            // collection_control_lock: Mutex::new(()),
             scheduler,
             state,
         }
@@ -99,6 +87,12 @@ impl<VM: VMBinding> GCTrigger<VM> {
         // status.
         match self.state.gc_status.try_request_pause() {
             PauseRequestOutcome::Disabled => false,
+            // A GC is genuinely required (the heap policy has been exceeded), but MMTk has no GC
+            // worker threads to service it. Silently returning `false` here would let allocation
+            // grow the heap without bound instead of respecting the configured limit.
+            PauseRequestOutcome::Uninitialized => panic!(
+                "GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."
+            ),
             PauseRequestOutcome::AlreadyRequested => true,
             PauseRequestOutcome::Requested => {
                 probe!(mmtk, gc_requested);
@@ -108,16 +102,11 @@ impl<VM: VMBinding> GCTrigger<VM> {
         }
     }
 
-    /// Clear the "GC requested" flag so that mutators can trigger the next GC.
-    /// Called by a GC worker when all mutators have come to a stop.
-    // pub fn clear_request(&self) {
-    //     self.request_flag.store(false, Ordering::Relaxed);
-    // }
-
-    /// Disable collection. MMTk will not trigger a GC while collection is disabled, though a GC
-    /// that has already been requested (or is already under way, including the concurrent phase
-    /// of a concurrent GC) is not aborted by this call. Use
-    /// [`crate::MMTK::wait_for_no_collection_in_progress`] to wait for such a GC to fully finish.
+    /// Disable collection.
+    /// Return true if the collection is disabled successfully. MMTk guarantees no GC will be triggered.
+    /// If this function returns false, it means MMTk is unable to disable GC right now. Possibly a GC is in progress,
+    /// or a GC has been requested. Users should invoke runtime safepoints or other mechanisms to prepare for
+    /// a GC pause, and then call this function again.
     ///
     /// This call is nestable. Each call must be paired with a matching call to
     /// [`GCTrigger::enable_collection`].

@@ -29,11 +29,10 @@ fn wait_until(mut condition: impl FnMut() -> bool, msg: &str) {
 }
 
 /// Regression test for issue mmtk/mmtk-julia#278: if a GC is already in progress on one thread,
-/// another thread that calls `disable_collection()` followed by
-/// `wait_for_no_collection_in_progress()` must block until that GC actually finishes, rather
-/// than racing past it.
+/// `disable_collection()` on another thread must fail (return `false`) rather than racing past
+/// it, and must only succeed once that GC has actually finished.
 #[test]
-pub fn wait_for_no_collection_in_progress_blocks_until_gc_finishes() {
+pub fn disable_collection_fails_while_gc_in_progress() {
     with_mockvm(
         || -> MockVM {
             MockVM {
@@ -71,18 +70,26 @@ pub fn wait_for_no_collection_in_progress_blocks_until_gc_finishes() {
                 }
             }
 
-            // Thread B: disable collection and wait for no collection to be in progress. This
-            // must block, because the GC triggered by thread A is still running.
+            // `disable_collection()` must fail while a GC is in progress, rather than racing
+            // past it.
+            assert!(
+                !mmtk.disable_collection(),
+                "disable_collection() succeeded while a GC was still in progress"
+            );
+
+            // Thread B: as `disable_collection()`'s documentation instructs, retry (yielding
+            // between attempts) until it succeeds.
             let thread_to_disable_gc = std::thread::spawn(move || {
-                mmtk.disable_collection();
-                mmtk.wait_for_no_collection_in_progress();
+                while !mmtk.disable_collection() {
+                    std::thread::yield_now();
+                }
             });
 
-            // Give thread B a chance to run, then confirm it is still blocked.
+            // Give thread B a chance to run, then confirm it is still retrying.
             std::thread::sleep(Duration::from_millis(200));
             assert!(
                 !thread_to_disable_gc.is_finished(),
-                "wait_for_no_collection_in_progress() returned while a GC was still in progress"
+                "disable_collection() succeeded while a GC was still in progress"
             );
 
             // Let thread A's GC finish.
@@ -96,15 +103,18 @@ pub fn wait_for_no_collection_in_progress_blocks_until_gc_finishes() {
                 || thread_to_trigger_gc.is_finished(),
                 "the GC-triggering thread did not finish in time",
             );
-            // This test does not spawn real GC worker threads, so nothing else clears the GC
-            // request that thread A made. Normally the scheduler does this once all mutators
-            // have stopped and the collection completes; simulate that here.
-            mmtk.gc_trigger.clear_request();
+            // This test does not spawn real GC worker threads, so nothing else transitions the
+            // GC status away from `PauseRequested` (which is what thread A's request set it to).
+            // Normally the scheduler does this via `notify_mutators_paused()` (-> `InPause`) once
+            // all mutators have stopped, then `on_gc_finished()` (-> `NotInGC`) once the
+            // collection completes; simulate that sequence here.
+            mmtk.state.gc_status.set_in_pause();
+            mmtk.state.gc_status.set_not_in_gc();
 
-            // Now that the GC has finished, thread B should unblock.
+            // Now that the GC has finished, thread B's retry should succeed and it should finish.
             wait_until(
                 || thread_to_disable_gc.is_finished(),
-                "wait_for_no_collection_in_progress() did not return after the GC finished",
+                "disable_collection() did not succeed after the GC finished",
             );
 
             mmtk.enable_collection();

@@ -1,6 +1,5 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
-use crate::global_state::GcStatus;
 use crate::vm::*;
 use crate::*;
 use std::marker::PhantomData;

@@ -254,6 +254,9 @@ impl GcStatus {
 pub(crate) enum PauseRequestOutcome {
     /// Collection is currently disabled; no pause was (or could be) requested.
     Disabled,
+    /// MMTk has not been initialized yet (`initialize_collection()` has not been called), so
+    /// there are no GC worker threads to run a collection; no pause was (or could be) requested.
+    Uninitialized,
     /// A pause was already requested (by this call or a racing one); the caller does not need
     /// to do anything further.
     AlreadyRequested,
@@ -404,14 +407,17 @@ impl GcStatusWord {
         });
     }
 
-    /// `NotInGC`/`InConcurrentGC` -> `PauseRequested`, unless collection is disabled or a pause has
-    /// already been requested. See [`PauseRequestOutcome`].
+    /// `NotInGC`/`InConcurrentGC` -> `PauseRequested`, unless collection is disabled, MMTk is not
+    /// yet initialized, or a pause has already been requested. See [`PauseRequestOutcome`].
     pub(crate) fn try_request_pause(&self) -> PauseRequestOutcome {
         let mut cur = self.0.load(Ordering::SeqCst);
         loop {
             let status = Self::decode(cur);
             if status.is_disabled() {
                 return PauseRequestOutcome::Disabled;
+            }
+            if status == GcStatus::Uninitialized {
+                return PauseRequestOutcome::Uninitialized;
             }
             if status.is_pause_requested() {
                 return PauseRequestOutcome::AlreadyRequested;
@@ -575,10 +581,16 @@ mod gc_status_tests {
         assert_eq!(word.load(), GcStatus::Disabled(1));
     }
 
+    /// Allocation can call `poll()` (and thus `try_request_pause`) before
+    /// `initialize_collection()` has been called, e.g. if the heap fills up before the VM
+    /// binding initializes MMTk's GC worker threads. This must not panic here: the caller (e.g.
+    /// `Space::not_acquiring`) is responsible for producing a clear "GC is not allowed here"
+    /// error once it knows allocation has genuinely failed.
     #[test]
-    #[should_panic(expected = "invalid status")]
-    fn try_request_pause_panics_when_uninitialized() {
-        GcStatusWord::new(GcStatus::Uninitialized).try_request_pause();
+    fn try_request_pause_when_uninitialized() {
+        let word = GcStatusWord::new(GcStatus::Uninitialized);
+        assert_eq!(word.try_request_pause(), PauseRequestOutcome::Uninitialized);
+        assert_eq!(word.load(), GcStatus::Uninitialized);
     }
 
     #[test]

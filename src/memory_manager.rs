@@ -578,10 +578,6 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
 }
 
 /// Wrapper for [`crate::mmtk::MMTK::disable_collection`].
-/// Return true if the collection is disabled successfully. MMTk guarantees no GC will be triggered.
-/// If this function returns false, it means MMTk is unable to disable GC right now. Possibly a GC is in progress,
-/// or a GC has been requested. Users should invoke runtime safepoints or other mechanisms to prepare for
-/// a GC pause, and then call this function again.
 pub fn disable_collection<VM: VMBinding>(mmtk: &MMTK<VM>) -> bool {
     mmtk.disable_collection()
 }
@@ -594,11 +590,6 @@ pub fn enable_collection<VM: VMBinding>(mmtk: &MMTK<VM>) {
 /// Wrapper for [`crate::mmtk::MMTK::is_collection_enabled`].
 pub fn is_collection_enabled<VM: VMBinding>(mmtk: &MMTK<VM>) -> bool {
     mmtk.is_collection_enabled()
-}
-
-/// Wrapper for [`crate::mmtk::MMTK::wait_for_no_collection_in_progress`].
-pub fn wait_for_no_collection_in_progress<VM: VMBinding>(mmtk: &MMTK<VM>) {
-    mmtk.wait_for_no_collection_in_progress();
 }
 
 /// Process MMTk run-time options. Returns true if the option is processed successfully.

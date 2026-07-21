@@ -375,14 +375,16 @@ impl<VM: VMBinding> MMTK<VM> {
         self.inside_sanity.load(Ordering::Relaxed)
     }
 
+    /// Get the current GC status for MMTk.
     pub fn get_gc_status(&self) -> GcStatus {
         self.state.gc_status.load()
     }
 
-    /// Disable collection. MMTk will not trigger a GC while collection is disabled, though a GC
-    /// that has already been requested (or is already under way, including the concurrent phase
-    /// of a concurrent GC) is not aborted by this call. Use
-    /// [`MMTK::wait_for_no_collection_in_progress`] to wait for such a GC to fully finish.
+    /// Disable collection.
+    /// Return true if the collection is disabled successfully. MMTk guarantees no GC will be triggered.
+    /// If this function returns false, it means MMTk is unable to disable GC right now. Possibly a GC is in progress,
+    /// or a GC has been requested. Users should invoke runtime safepoints or other mechanisms to prepare for
+    /// a GC pause, and then call this function again.
     ///
     /// This call is nestable. Each call must be paired with a matching call to
     /// [`MMTK::enable_collection`].
@@ -399,35 +401,6 @@ impl<VM: VMBinding> MMTK<VM> {
     /// Return whether collection is currently enabled.
     pub fn is_collection_enabled(&self) -> bool {
         self.gc_trigger.is_collection_enabled()
-    }
-
-    /// Block the calling thread until there is no collection currently pending or in progress,
-    /// including the concurrent marking phase of a concurrent GC (during which mutators run
-    /// normally rather than being stopped). This does not itself prevent a new collection from
-    /// starting immediately afterwards; call [`MMTK::disable_collection`] first if that must
-    /// also be prevented.
-    ///
-    /// This is intended for infrequent, safety-sensitive call sites (e.g. adopting a foreign
-    /// thread, or recovering from a fatal signal) rather than as a general-purpose GC barrier,
-    /// so it is implemented as a simple poll loop (yielding the calling thread between checks)
-    /// rather than a condition variable.
-    pub fn wait_for_no_collection_in_progress(&self) {
-        let concurrent_work_in_progress = || {
-            self.get_plan()
-                .concurrent()
-                .is_some_and(|c| c.concurrent_work_in_progress())
-        };
-        while self.gc_trigger.has_pending_or_active_pause() || concurrent_work_in_progress() {
-            std::thread::yield_now();
-        }
-    }
-
-    /// Check if MMTK has any pending or active pauses.
-    /// MMTk may initiate a pause before MMTk requires a stop-the-world through
-    /// the [`crate::vm::Collection::stop_all_mutators()`] call. This function allows the VM to check
-    /// if MMTk has any pending pauses before `stop_all_mutators` is called.
-    pub fn has_pending_or_active_pause(&self) -> bool {
-        self.gc_trigger.has_pending_or_active_pause()
     }
 
     /// Return true if the current GC is an emergency GC.
