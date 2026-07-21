@@ -50,7 +50,6 @@ jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], opt
 lazy_static = "1.1"
 libc = "0.2"
 log = { version = "0.4", features = ["max_level_trace"] }
-memoffset = "0.9"
 mimalloc-sys = { version = "0.1.6", optional = true }
 num_cpus = "1.8"
 num-traits = "0.2"

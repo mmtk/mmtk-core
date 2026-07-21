@@ -124,7 +124,7 @@ in object fields, the VM binding can deal with the encoding and the decoding in 
 [`Slot`][slot-trait] implementation, and always present plain `ObjectReference`s to MMTk. See [this
 test] for some `Slot` implementation examples.
 
-[FBC09]: https://users.cecs.anu.edu.au/~steveb/pubs/papers/vmmagic-vee-2009.pdf
+[FBC09]: https://www.steveblackburn.org/pubs/papers/vmmagic-vee-2009.pdf
 [jikesrvm-objref]: https://github.com/mmtk/mmtk-jikesrvm/issues/178
 [slot-trait]: https://docs.mmtk.io/api/mmtk/vm/slot/trait.Slot.html
 [slot-test]: https://github.com/mmtk/mmtk-core/blob/master/src/vm/tests/mock_tests/mock_test_slots.rs

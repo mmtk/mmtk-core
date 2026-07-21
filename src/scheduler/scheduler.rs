@@ -61,7 +61,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                         move |scheduler: &GCWorkScheduler<VM>| {
                             debug!(
                                 "Check if {:?} can be opened? These needs to be drained: {:?}",
-                                stage, &cur_stages
+                                stage, cur_stages
                             );
                             scheduler.are_buckets_drained(&cur_stages)
                         },
