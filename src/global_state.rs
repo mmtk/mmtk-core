@@ -305,31 +305,23 @@ impl GcStatusWord {
         Self::decode(self.0.load(Ordering::SeqCst))
     }
 
-    /// Retry `f` (a pure function of the current status) as a compare-and-swap loop until it
-    /// succeeds, and return the status it transitioned *from* (not the new status), mirroring
-    /// [`std::sync::atomic::AtomicUsize::fetch_update`]. Returning the old status (rather than
-    /// the new one) lets a caller tell whether it "won" the race when multiple threads
-    /// concurrently drive the same transition: only the thread whose CAS actually moved the
-    /// status away from a given old value can be sure it is the one responsible for that
-    /// transition, so it is the one that should perform any side effect that must happen exactly
-    /// once (e.g. notifying the scheduler). If `transition` returned the new status instead,
-    /// every racing thread would observe the same new status and none could tell which of them
-    /// caused it. `f` may be invoked more than once under contention.
+    /// Retry `f` (a pure function of the current status) via [`AtomicUsize::fetch_update`] until
+    /// it succeeds, and return the status it transitioned *from* (not the new status). Returning
+    /// the old status (rather than the new one) lets a caller tell whether it "won" the race when
+    /// multiple threads concurrently drive the same transition: only the thread whose CAS
+    /// actually moved the status away from a given old value can be sure it is the one
+    /// responsible for that transition, so it is the one that should perform any side effect that
+    /// must happen exactly once (e.g. notifying the scheduler). If `transition` returned the new
+    /// status instead, every racing thread would observe the same new status and none could tell
+    /// which of them caused it. `f` may be invoked more than once under contention.
     fn transition<F: FnMut(GcStatus) -> GcStatus>(&self, mut f: F) -> GcStatus {
-        let mut cur = self.0.load(Ordering::SeqCst);
-        loop {
-            let old = Self::decode(cur);
-            let next = f(old);
-            match self.0.compare_exchange_weak(
-                cur,
-                Self::encode(next),
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
-                Ok(_) => return old,
-                Err(actual) => cur = actual,
-            }
-        }
+        let old_bits = self
+            .0
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
+                Some(Self::encode(f(Self::decode(bits))))
+            })
+            .unwrap(); // `f` always returns a status to move to, so this never returns `Err`.
+        Self::decode(old_bits)
     }
 
     pub(crate) fn is_initialized(&self) -> bool {
@@ -398,29 +390,32 @@ impl GcStatusWord {
     /// `NotInGC`/`InConcurrentGC` -> `PauseRequested`, unless MMTk is not yet initialized, or a
     /// pause has already been requested. See [`PauseRequestOutcome`].
     pub(crate) fn try_request_pause(&self) -> PauseRequestOutcome {
-        let mut cur = self.0.load(Ordering::SeqCst);
-        loop {
-            let status = Self::decode(cur);
-            if status == GcStatus::Uninitialized {
-                return PauseRequestOutcome::Uninitialized;
-            }
-            if status == GcStatus::PauseRequested {
-                return PauseRequestOutcome::AlreadyRequested;
-            }
-            assert!(
-                matches!(status, GcStatus::NotInGC | GcStatus::InConcurrentGC),
-                "Trying to request a GC pause in invalid status: {:?}",
-                status
-            );
-            match self.0.compare_exchange_weak(
-                cur,
-                Self::encode(GcStatus::PauseRequested),
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
-                Ok(_) => return PauseRequestOutcome::Requested,
-                Err(actual) => cur = actual,
-            }
+        // `fetch_update`'s closure returning `None` aborts the update and makes `fetch_update`
+        // return `Err` with the status that caused the abort, so `Uninitialized`/`PauseRequested`
+        // (which must not transition here) are reported that way instead of via a CAS.
+        match self
+            .0
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
+                let status = Self::decode(bits);
+                if matches!(status, GcStatus::Uninitialized | GcStatus::PauseRequested) {
+                    return None;
+                }
+                assert!(
+                    matches!(status, GcStatus::NotInGC | GcStatus::InConcurrentGC),
+                    "Trying to request a GC pause in invalid status: {:?}",
+                    status
+                );
+                Some(Self::encode(GcStatus::PauseRequested))
+            }) {
+            Ok(_) => PauseRequestOutcome::Requested,
+            Err(bits) => match Self::decode(bits) {
+                GcStatus::Uninitialized => PauseRequestOutcome::Uninitialized,
+                GcStatus::PauseRequested => PauseRequestOutcome::AlreadyRequested,
+                status => unreachable!(
+                    "fetch_update aborted the transition for an unexpected status: {:?}",
+                    status
+                ),
+            },
         }
     }
 }
