@@ -4,6 +4,7 @@ use crate::global_state::GcStatus;
 use crate::vm::*;
 use crate::*;
 use std::marker::PhantomData;
+use std::sync::atomic::Ordering;
 
 pub struct ScheduleCollection;
 
@@ -22,6 +23,9 @@ impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
         }
         // Set to GcPrepare
         // mmtk.set_gc_status(GcStatus::GcPrepare);
+        mmtk.state.stacks_prepared.store(false, Ordering::SeqCst);
+        // FIXME: We are still in transition
+        mmtk.stats.start_gc();
 
         // Let the plan to schedule collection work
         mmtk.get_plan().schedule_collection(worker.scheduler());

@@ -1,6 +1,6 @@
 use atomic::Ordering;
 
-use crate::global_state::{GcStatus, GlobalState};
+use crate::global_state::{GlobalState, PauseRequestOutcome};
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
@@ -92,33 +92,20 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// been disabled.
     /// Returns whether a GC was actually requested.
     fn request(&self) -> bool {
-        // let _guard = self.collection_control_lock.lock().unwrap();
-        let mut status = self.state.gc_status.lock().unwrap();
-        if status.is_disabled() {
-            return false;
+        // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
+        // with GC workers, which is expensive for functions like `poll`. `try_request_pause`
+        // only reports `Requested` to the thread that actually wins the race to transition the
+        // status, so only that thread calls it, instead of every thread that observes the old
+        // status.
+        match self.state.gc_status.try_request_pause() {
+            PauseRequestOutcome::Disabled => false,
+            PauseRequestOutcome::AlreadyRequested => true,
+            PauseRequestOutcome::Requested => {
+                probe!(mmtk, gc_requested);
+                self.scheduler.request_schedule_collection();
+                true
+            }
         }
-
-        if status.is_pause_requested() {
-            return true;
-        }
-
-        // if !self.request_flag.swap(true, Ordering::Relaxed) {
-        //     // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
-        //     // with GC workers, which is expensive for functions like `poll`.  We use the atomic
-        //     // flag `request_flag` to elide the need to acquire the mutex in subsequent calls.
-        //     probe!(mmtk, gc_requested);
-        //     self.scheduler.request_schedule_collection();
-        // }
-        if !status.is_pause_requested() {
-            // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
-            // with GC workers, which is expensive for functions like `poll`.  We use the atomic
-            // flag `request_flag` to elide the need to acquire the mutex in subsequent calls.
-            probe!(mmtk, gc_requested);
-            self.scheduler.request_schedule_collection();
-            status.set_requested();
-        }
-
-        true
     }
 
     /// Clear the "GC requested" flag so that mutators can trigger the next GC.
@@ -135,31 +122,18 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// This call is nestable. Each call must be paired with a matching call to
     /// [`GCTrigger::enable_collection`].
     pub fn disable_collection(&self) -> bool {
-        // let _guard = self.collection_control_lock.lock().unwrap();
-        // self.collection_disable_depth
-        //     .fetch_add(1, Ordering::Release);
-        let mut status = self.state.gc_status.lock().unwrap();
-        status.set_disabled()
+        self.state.gc_status.set_disabled()
     }
 
     /// Re-enable collection. Calling it without a prior matching call to
     /// [`GCTrigger::disable_collection`] is a logic error.
     pub fn enable_collection(&self) {
-        // let _guard = self.collection_control_lock.lock().unwrap();
-        // let depth = self.collection_disable_depth.load(Ordering::Acquire);
-        // assert!(
-        //     depth > 0,
-        //     "enable_collection() called without a matching disable_collection()"
-        // );
-        // self.collection_disable_depth
-        //     .store(depth - 1, Ordering::Release);
-        self.state.gc_status.lock().unwrap().set_enabled();
+        self.state.gc_status.set_enabled();
     }
 
     /// Return whether collection is currently enabled.
     pub fn is_collection_enabled(&self) -> bool {
-        // self.collection_disable_depth.load(Ordering::Acquire) == 0
-        !self.state.gc_status.lock().unwrap().is_disabled()
+        !self.state.gc_status.is_disabled()
     }
 
     /// Return whether a GC has been requested but not yet started (i.e. mutators have not all
@@ -167,9 +141,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// concurrent marking phase of a concurrent GC, which mutators run through normally; see
     /// `ConcurrentPlan::concurrent_work_in_progress`.
     pub(crate) fn has_pending_or_active_pause(&self) -> bool {
-        // self.request_flag.load(Ordering::Acquire)
-        //     || *self.state.gc_status.lock().unwrap() != GcStatus::NotInGC
-        let status = self.state.gc_status.lock().unwrap();
+        let status = self.state.gc_status.load();
         status.is_pause_requested() || status.is_in_pause()
     }
 

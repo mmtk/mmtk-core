@@ -262,7 +262,7 @@ impl<VM: VMBinding> MMTK<VM> {
         );
         self.scheduler.spawn_gc_threads(self, tls);
         // self.state.initialized.store(true, Ordering::SeqCst);
-        self.state.gc_status.lock().unwrap().set_initialized();
+        self.state.gc_status.set_initialized();
         probe!(mmtk, collection_initialized);
     }
 
@@ -271,7 +271,7 @@ impl<VM: VMBinding> MMTK<VM> {
         if self.state.is_initialized() {
             self.scheduler.shutdown_gc_threads();
             // self.state.initialized.store(false, Ordering::SeqCst);
-            self.state.gc_status.lock().unwrap().set_uninitialized();
+            self.state.gc_status.set_uninitialized();
         }
     }
 
@@ -375,24 +375,8 @@ impl<VM: VMBinding> MMTK<VM> {
         self.inside_sanity.load(Ordering::Relaxed)
     }
 
-    pub(crate) fn set_gc_status(&self, s: GcStatus) {
-        let mut gc_status = self.state.gc_status.lock().unwrap();
-        if *gc_status == GcStatus::NotInGC {
-            self.state.stacks_prepared.store(false, Ordering::SeqCst);
-            // FIXME stats
-            self.stats.start_gc();
-        }
-        *gc_status = s;
-        if *gc_status == GcStatus::NotInGC {
-            // FIXME stats
-            if self.stats.get_gathering_stats() {
-                self.stats.end_gc();
-            }
-        }
-    }
-
     pub fn get_gc_status(&self) -> GcStatus {
-        *self.state.gc_status.lock().unwrap()
+        self.state.gc_status.load()
     }
 
     /// Disable collection. MMTk will not trigger a GC while collection is disabled, though a GC

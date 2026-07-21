@@ -1,7 +1,6 @@
 use atomic_refcell::AtomicRefCell;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Mutex;
 use std::time::Instant;
 
 /// This stores some global states for an MMTK instance.
@@ -17,7 +16,7 @@ pub struct GlobalState {
     /// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
     // pub(crate) initialized: AtomicBool,
     /// The current GC status.
-    pub(crate) gc_status: Mutex<GcStatus>,
+    pub(crate) gc_status: GcStatusWord,
     /// When did the last GC start? Only accessed by the last parked worker.
     pub(crate) gc_start_time: AtomicRefCell<Option<Instant>>,
     /// Is the current GC an emergency collection? Emergency means we may run out of memory soon, and we should
@@ -56,7 +55,7 @@ pub struct GlobalState {
 impl GlobalState {
     /// Is MMTk initialized?
     pub fn is_initialized(&self) -> bool {
-        self.gc_status.lock().unwrap().is_initialized()
+        self.gc_status.is_initialized()
     }
 
     /// Set the collection kind for the current GC. This is called before
@@ -201,7 +200,7 @@ impl Default for GlobalState {
     fn default() -> Self {
         Self {
             // initialized: AtomicBool::new(false),
-            gc_status: Mutex::new(GcStatus::Uninitialized),
+            gc_status: GcStatusWord::new(GcStatus::Uninitialized),
             gc_start_time: AtomicRefCell::new(None),
             stacks_prepared: AtomicBool::new(false),
             emergency_collection: AtomicBool::new(false),
@@ -224,77 +223,15 @@ impl Default for GlobalState {
 
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum GcStatus {
-    // NotInGC,
-    // GcPrepare,
-    // GcProper,
     Uninitialized,
     NotInGC,
-    ConcurrentGC,
+    InConcurrentGC,
     InPause,
-    // GcPrepare,
-    // GcProper,
-    Disabled(usize),
     PauseRequested,
+    Disabled(usize),
 }
 
 impl GcStatus {
-    pub(crate) fn set_initialized(&mut self) {
-        assert!(
-            *self == GcStatus::Uninitialized,
-            "Trying to set initialized GC status when it is not uninitialized"
-        );
-        *self = GcStatus::NotInGC;
-    }
-
-    pub(crate) fn set_uninitialized(&mut self) {
-        assert!(
-            *self != GcStatus::Uninitialized,
-            "Trying to set uninitialized GC status when it is already uninitialized"
-        );
-        *self = GcStatus::Uninitialized;
-    }
-
-    pub(crate) fn set_requested(&mut self) {
-        assert!(*self == Self::NotInGC || *self == Self::ConcurrentGC, "Trying to set requested GC status in invalid status: {:?}", self);
-        *self = GcStatus::PauseRequested;
-    }
-
-    pub(crate) fn set_in_pause(&mut self) {
-        assert!(
-            *self == Self::PauseRequested,
-            "Trying to set in-pause GC status in invalid status: {:?}",
-            self
-        );
-        *self = GcStatus::InPause;;
-    }
-
-    pub(crate) fn set_disabled(&mut self) -> bool {
-        match self {
-            GcStatus::Disabled(depth) => {
-                *depth += 1;
-                true
-            },
-            Self::NotInGC => {
-                *self = GcStatus::Disabled(1);
-                true
-            },
-            _ => false,
-        }
-    }
-
-    pub(crate) fn set_enabled(&mut self) -> bool {
-        match self {
-            GcStatus::Disabled(depth) => {
-                *depth -= 1;
-                if *depth == 0 {
-                    *self = GcStatus::NotInGC;
-                }
-                true
-            },
-            _ => panic!("Trying to enable GC when it is not disabled"),
-        }
-    }
-
     pub fn is_initialized(&self) -> bool {
         *self != GcStatus::Uninitialized
     }
@@ -309,6 +246,434 @@ impl GcStatus {
 
     pub fn is_disabled(&self) -> bool {
         matches!(self, GcStatus::Disabled(_))
+    }
+}
+
+/// The outcome of [`GcStatusWord::try_request_pause`].
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum PauseRequestOutcome {
+    /// Collection is currently disabled; no pause was (or could be) requested.
+    Disabled,
+    /// A pause was already requested (by this call or a racing one); the caller does not need
+    /// to do anything further.
+    AlreadyRequested,
+    /// This call transitioned the status to `PauseRequested`; the caller is responsible for
+    /// requesting the pause (e.g. notifying the scheduler) exactly once.
+    Requested,
+}
+
+/// A lock-free, atomic encoding of [`GcStatus`]. This packs the variant tag into the low bits
+/// of a `usize` and, for `GcStatus::Disabled`, the nesting depth into the remaining high bits,
+/// so the whole status fits in a single machine word and can be updated with compare-and-swap
+/// instead of behind a `Mutex<GcStatus>`.
+///
+/// `GcStatus` is a state machine: only a handful of transitions between its variants are legal.
+/// Every legal transition is exposed here as its own method, each performing its own
+/// compare-and-swap retry loop and asserting that the transition is legal for the status it
+/// finds. Do not add a generic "set the status to X" method: doing so would make it possible to
+/// bypass the state machine's invariants.
+pub(crate) struct GcStatusWord(AtomicUsize);
+
+impl GcStatusWord {
+    /// Number of bits used to encode the variant tag. 3 bits is enough to distinguish the 6
+    /// variants, leaving the rest of the word for `Disabled`'s nesting depth.
+    const TAG_BITS: u32 = 3;
+    const TAG_MASK: usize = (1 << Self::TAG_BITS) - 1;
+
+    fn encode(status: GcStatus) -> usize {
+        match status {
+            GcStatus::Uninitialized => 0,
+            GcStatus::NotInGC => 1,
+            GcStatus::InConcurrentGC => 2,
+            GcStatus::InPause => 3,
+            GcStatus::PauseRequested => 4,
+            GcStatus::Disabled(depth) => {
+                debug_assert!(
+                    depth < (1 << (usize::BITS - Self::TAG_BITS)),
+                    "GC-disable nesting depth overflows the bits reserved for it"
+                );
+                5 | (depth << Self::TAG_BITS)
+            }
+        }
+    }
+
+    fn decode(bits: usize) -> GcStatus {
+        match bits & Self::TAG_MASK {
+            0 => GcStatus::Uninitialized,
+            1 => GcStatus::NotInGC,
+            2 => GcStatus::InConcurrentGC,
+            3 => GcStatus::InPause,
+            4 => GcStatus::PauseRequested,
+            5 => GcStatus::Disabled(bits >> Self::TAG_BITS),
+            _ => unreachable!("invalid encoded GcStatus tag"),
+        }
+    }
+
+    pub(crate) fn new(status: GcStatus) -> Self {
+        GcStatusWord(AtomicUsize::new(Self::encode(status)))
+    }
+
+    /// Read the current status.
+    pub(crate) fn load(&self) -> GcStatus {
+        Self::decode(self.0.load(Ordering::SeqCst))
+    }
+
+    /// Retry `f` (a pure function of the current status) as a compare-and-swap loop until it
+    /// succeeds, and return the status it settled on. `f` may be invoked more than once under
+    /// contention.
+    fn transition<F: FnMut(GcStatus) -> GcStatus>(&self, mut f: F) -> GcStatus {
+        let mut cur = self.0.load(Ordering::SeqCst);
+        loop {
+            let next = f(Self::decode(cur));
+            match self.0.compare_exchange_weak(
+                cur,
+                Self::encode(next),
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => return next,
+                Err(actual) => cur = actual,
+            }
+        }
+    }
+
+    pub(crate) fn is_initialized(&self) -> bool {
+        self.load().is_initialized()
+    }
+
+    pub(crate) fn is_disabled(&self) -> bool {
+        self.load().is_disabled()
+    }
+
+    /// `Uninitialized` -> `NotInGC`.
+    pub(crate) fn set_initialized(&self) {
+        self.transition(|status| {
+            assert!(
+                status == GcStatus::Uninitialized,
+                "Trying to set initialized GC status when it is not uninitialized"
+            );
+            GcStatus::NotInGC
+        });
+    }
+
+    /// Any status other than `Uninitialized` -> `Uninitialized`.
+    pub(crate) fn set_uninitialized(&self) {
+        self.transition(|status| {
+            assert!(
+                status != GcStatus::Uninitialized,
+                "Trying to set uninitialized GC status when it is already uninitialized"
+            );
+            GcStatus::Uninitialized
+        });
+    }
+
+    /// `PauseRequested` -> `InPause`.
+    pub(crate) fn set_in_pause(&self) {
+        self.transition(|status| {
+            assert!(
+                status == GcStatus::PauseRequested,
+                "Trying to set in-pause GC status in invalid status: {:?}",
+                status
+            );
+            GcStatus::InPause
+        });
+    }
+
+    /// `InPause` -> `InConcurrentGC`, e.g. once a GC pause has finished but concurrent work (such
+    /// as concurrent marking) was scheduled to continue after mutators resume.
+    pub(crate) fn set_in_concurrent_gc(&self) {
+        self.transition(|status| {
+            assert!(
+                status == GcStatus::InPause,
+                "Trying to set in-concurrent-gc GC status in invalid status: {:?}",
+                status
+            );
+            GcStatus::InConcurrentGC
+        });
+    }
+
+    /// `InPause` -> `NotInGC`, e.g. once a GC pause has finished and no concurrent work remains.
+    pub(crate) fn set_not_in_gc(&self) {
+        self.transition(|status| {
+            assert!(
+                status == GcStatus::InPause,
+                "Trying to set not-in-gc GC status in invalid status: {:?}",
+                status
+            );
+            GcStatus::NotInGC
+        });
+    }
+
+    /// `NotInGC`/`InConcurrentGC` -> `PauseRequested`, unless collection is disabled or a pause has
+    /// already been requested. See [`PauseRequestOutcome`].
+    pub(crate) fn try_request_pause(&self) -> PauseRequestOutcome {
+        let mut cur = self.0.load(Ordering::SeqCst);
+        loop {
+            let status = Self::decode(cur);
+            if status.is_disabled() {
+                return PauseRequestOutcome::Disabled;
+            }
+            if status.is_pause_requested() {
+                return PauseRequestOutcome::AlreadyRequested;
+            }
+            assert!(
+                matches!(status, GcStatus::NotInGC | GcStatus::InConcurrentGC),
+                "Trying to request a GC pause in invalid status: {:?}",
+                status
+            );
+            match self.0.compare_exchange_weak(
+                cur,
+                Self::encode(GcStatus::PauseRequested),
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => return PauseRequestOutcome::Requested,
+                Err(actual) => cur = actual,
+            }
+        }
+    }
+
+    /// `NotInGC`/`Disabled(depth)` -> `Disabled(depth + 1)`. Returns `false` without changing the
+    /// status if collection cannot be disabled from the current status (e.g. a GC is in progress
+    /// or has been requested).
+    pub(crate) fn set_disabled(&self) -> bool {
+        let mut cur = self.0.load(Ordering::SeqCst);
+        loop {
+            let status = Self::decode(cur);
+            let next = match status {
+                GcStatus::Disabled(depth) => GcStatus::Disabled(depth + 1),
+                GcStatus::NotInGC => GcStatus::Disabled(1),
+                _ => return false,
+            };
+            match self.0.compare_exchange_weak(
+                cur,
+                Self::encode(next),
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => return true,
+                Err(actual) => cur = actual,
+            }
+        }
+    }
+
+    /// `Disabled(depth)` -> `Disabled(depth - 1)`, or `Disabled(1)` -> `NotInGC`. Panics if
+    /// collection is not currently disabled.
+    pub(crate) fn set_enabled(&self) {
+        self.transition(|status| match status {
+            GcStatus::Disabled(1) => GcStatus::NotInGC,
+            GcStatus::Disabled(depth) => GcStatus::Disabled(depth - 1),
+            _ => panic!("Trying to enable GC when it is not disabled"),
+        });
+    }
+}
+
+#[cfg(test)]
+mod gc_status_tests {
+    use super::{GcStatus, GcStatusWord, PauseRequestOutcome};
+
+    #[test]
+    fn encode_decode_roundtrip() {
+        let statuses = [
+            GcStatus::Uninitialized,
+            GcStatus::NotInGC,
+            GcStatus::InConcurrentGC,
+            GcStatus::InPause,
+            GcStatus::PauseRequested,
+            GcStatus::Disabled(1),
+            GcStatus::Disabled(42),
+        ];
+        for status in statuses {
+            assert_eq!(GcStatusWord::decode(GcStatusWord::encode(status)), status);
+        }
+    }
+
+    #[test]
+    fn new_and_load_roundtrip() {
+        let statuses = [
+            GcStatus::Uninitialized,
+            GcStatus::NotInGC,
+            GcStatus::InConcurrentGC,
+            GcStatus::InPause,
+            GcStatus::PauseRequested,
+            GcStatus::Disabled(1),
+            GcStatus::Disabled(42),
+        ];
+        for status in statuses {
+            assert_eq!(GcStatusWord::new(status).load(), status);
+        }
+    }
+
+    #[test]
+    fn set_initialized_from_uninitialized() {
+        let word = GcStatusWord::new(GcStatus::Uninitialized);
+        assert!(!word.is_initialized());
+        word.set_initialized();
+        assert_eq!(word.load(), GcStatus::NotInGC);
+        assert!(word.is_initialized());
+    }
+
+    #[test]
+    #[should_panic(expected = "not uninitialized")]
+    fn set_initialized_panics_if_already_initialized() {
+        GcStatusWord::new(GcStatus::NotInGC).set_initialized();
+    }
+
+    #[test]
+    fn set_uninitialized_from_not_in_gc() {
+        let word = GcStatusWord::new(GcStatus::NotInGC);
+        word.set_uninitialized();
+        assert_eq!(word.load(), GcStatus::Uninitialized);
+    }
+
+    #[test]
+    #[should_panic(expected = "already uninitialized")]
+    fn set_uninitialized_panics_if_already_uninitialized() {
+        GcStatusWord::new(GcStatus::Uninitialized).set_uninitialized();
+    }
+
+    #[test]
+    fn try_request_pause_from_not_in_gc() {
+        let word = GcStatusWord::new(GcStatus::NotInGC);
+        assert_eq!(word.try_request_pause(), PauseRequestOutcome::Requested);
+        assert_eq!(word.load(), GcStatus::PauseRequested);
+    }
+
+    #[test]
+    fn try_request_pause_from_in_concurrent_gc() {
+        let word = GcStatusWord::new(GcStatus::InConcurrentGC);
+        assert_eq!(word.try_request_pause(), PauseRequestOutcome::Requested);
+        assert_eq!(word.load(), GcStatus::PauseRequested);
+    }
+
+    #[test]
+    fn try_request_pause_when_already_requested() {
+        let word = GcStatusWord::new(GcStatus::PauseRequested);
+        assert_eq!(
+            word.try_request_pause(),
+            PauseRequestOutcome::AlreadyRequested
+        );
+        // Idempotent: the status is unchanged, not "double requested".
+        assert_eq!(word.load(), GcStatus::PauseRequested);
+    }
+
+    /// A GC pause should never be requested while one is already underway: by the time the
+    /// status reaches `InPause`, all mutators must already be stopped, so no mutator should be
+    /// calling `try_request_pause` at all. Observing `InPause` here indicates a state-machine
+    /// violation elsewhere, so it must panic rather than being silently treated as a no-op.
+    #[test]
+    #[should_panic(expected = "invalid status")]
+    fn try_request_pause_panics_when_already_in_pause() {
+        GcStatusWord::new(GcStatus::InPause).try_request_pause();
+    }
+
+    #[test]
+    fn try_request_pause_when_disabled() {
+        let word = GcStatusWord::new(GcStatus::Disabled(1));
+        assert_eq!(word.try_request_pause(), PauseRequestOutcome::Disabled);
+        // Unchanged: disabling is not overridden by a pause request.
+        assert_eq!(word.load(), GcStatus::Disabled(1));
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid status")]
+    fn try_request_pause_panics_when_uninitialized() {
+        GcStatusWord::new(GcStatus::Uninitialized).try_request_pause();
+    }
+
+    #[test]
+    fn set_in_pause_from_pause_requested() {
+        let word = GcStatusWord::new(GcStatus::PauseRequested);
+        word.set_in_pause();
+        assert_eq!(word.load(), GcStatus::InPause);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid status")]
+    fn set_in_pause_panics_if_not_requested() {
+        GcStatusWord::new(GcStatus::NotInGC).set_in_pause();
+    }
+
+    #[test]
+    fn set_disabled_from_not_in_gc() {
+        let word = GcStatusWord::new(GcStatus::NotInGC);
+        assert!(word.set_disabled());
+        assert_eq!(word.load(), GcStatus::Disabled(1));
+    }
+
+    #[test]
+    fn set_disabled_nests() {
+        let word = GcStatusWord::new(GcStatus::Disabled(1));
+        assert!(word.set_disabled());
+        assert_eq!(word.load(), GcStatus::Disabled(2));
+        assert!(word.set_disabled());
+        assert_eq!(word.load(), GcStatus::Disabled(3));
+    }
+
+    #[test]
+    fn set_disabled_fails_without_changing_status() {
+        for status in [
+            GcStatus::Uninitialized,
+            GcStatus::InConcurrentGC,
+            GcStatus::PauseRequested,
+            GcStatus::InPause,
+        ] {
+            let word = GcStatusWord::new(status);
+            assert!(!word.set_disabled());
+            assert_eq!(word.load(), status);
+        }
+    }
+
+    #[test]
+    fn set_enabled_decrements_nesting() {
+        let word = GcStatusWord::new(GcStatus::Disabled(3));
+        word.set_enabled();
+        assert_eq!(word.load(), GcStatus::Disabled(2));
+    }
+
+    #[test]
+    fn set_enabled_to_not_in_gc_at_zero_depth() {
+        let word = GcStatusWord::new(GcStatus::Disabled(1));
+        word.set_enabled();
+        assert_eq!(word.load(), GcStatus::NotInGC);
+    }
+
+    #[test]
+    #[should_panic(expected = "not disabled")]
+    fn set_enabled_panics_if_not_disabled() {
+        GcStatusWord::new(GcStatus::NotInGC).set_enabled();
+    }
+
+    #[test]
+    fn set_in_concurrent_gc_from_in_pause() {
+        let word = GcStatusWord::new(GcStatus::InPause);
+        word.set_in_concurrent_gc();
+        assert_eq!(word.load(), GcStatus::InConcurrentGC);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid status")]
+    fn set_in_concurrent_gc_panics_if_not_in_pause() {
+        GcStatusWord::new(GcStatus::NotInGC).set_in_concurrent_gc();
+    }
+
+    #[test]
+    fn set_not_in_gc_from_in_pause() {
+        let word = GcStatusWord::new(GcStatus::InPause);
+        word.set_not_in_gc();
+        assert_eq!(word.load(), GcStatus::NotInGC);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid status")]
+    fn set_not_in_gc_panics_if_not_in_pause() {
+        GcStatusWord::new(GcStatus::InConcurrentGC).set_not_in_gc();
+    }
+
+    #[test]
+    fn is_disabled_reflects_status() {
+        assert!(GcStatusWord::new(GcStatus::Disabled(1)).is_disabled());
+        assert!(!GcStatusWord::new(GcStatus::NotInGC).is_disabled());
     }
 }
 
