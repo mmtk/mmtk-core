@@ -25,13 +25,13 @@ pub struct GCTrigger<VM: VMBinding> {
     pub policy: Box<dyn GCTriggerPolicy<VM>>,
     /// Set by mutators to trigger GC.  It is atomic so that mutators can check if GC has already
     /// been requested efficiently in `poll` without acquiring any mutex.
-    request_flag: AtomicBool,
+    // request_flag: AtomicBool,
     /// Nesting depth for collection-disable scopes requested via [`GCTrigger::disable_collection`].
     /// A depth of 0 means collection is enabled.
-    collection_disable_depth: AtomicUsize,
+    // collection_disable_depth: AtomicUsize,
     /// Serializes [`GCTrigger::disable_collection`]/[`GCTrigger::enable_collection`] with the
     /// decision to request a GC, so that a GC is never requested while collection is disabled.
-    collection_control_lock: Mutex<()>,
+    // collection_control_lock: Mutex<()>,
     scheduler: Arc<GCWorkScheduler<VM>>,
     options: Arc<Options>,
     state: Arc<GlobalState>,
@@ -67,9 +67,9 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 }
             },
             options,
-            request_flag: AtomicBool::new(false),
-            collection_disable_depth: AtomicUsize::new(0),
-            collection_control_lock: Mutex::new(()),
+            // request_flag: AtomicBool::new(false),
+            // collection_disable_depth: AtomicUsize::new(0),
+            // collection_control_lock: Mutex::new(()),
             scheduler,
             state,
         }
@@ -92,21 +92,30 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// been disabled.
     /// Returns whether a GC was actually requested.
     fn request(&self) -> bool {
-        let _guard = self.collection_control_lock.lock().unwrap();
-        if self.collection_disable_depth.load(Ordering::Acquire) > 0 {
+        // let _guard = self.collection_control_lock.lock().unwrap();
+        let mut status = self.state.gc_status.lock().unwrap();
+        if status.is_disabled() {
             return false;
         }
 
-        if self.request_flag.load(Ordering::Relaxed) {
+        if status.is_pause_requested() {
             return true;
         }
 
-        if !self.request_flag.swap(true, Ordering::Relaxed) {
+        // if !self.request_flag.swap(true, Ordering::Relaxed) {
+        //     // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
+        //     // with GC workers, which is expensive for functions like `poll`.  We use the atomic
+        //     // flag `request_flag` to elide the need to acquire the mutex in subsequent calls.
+        //     probe!(mmtk, gc_requested);
+        //     self.scheduler.request_schedule_collection();
+        // }
+        if !status.is_pause_requested() {
             // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
             // with GC workers, which is expensive for functions like `poll`.  We use the atomic
             // flag `request_flag` to elide the need to acquire the mutex in subsequent calls.
             probe!(mmtk, gc_requested);
             self.scheduler.request_schedule_collection();
+            status.set_requested();
         }
 
         true
@@ -114,9 +123,9 @@ impl<VM: VMBinding> GCTrigger<VM> {
 
     /// Clear the "GC requested" flag so that mutators can trigger the next GC.
     /// Called by a GC worker when all mutators have come to a stop.
-    pub fn clear_request(&self) {
-        self.request_flag.store(false, Ordering::Relaxed);
-    }
+    // pub fn clear_request(&self) {
+    //     self.request_flag.store(false, Ordering::Relaxed);
+    // }
 
     /// Disable collection. MMTk will not trigger a GC while collection is disabled, though a GC
     /// that has already been requested (or is already under way, including the concurrent phase
@@ -125,28 +134,32 @@ impl<VM: VMBinding> GCTrigger<VM> {
     ///
     /// This call is nestable. Each call must be paired with a matching call to
     /// [`GCTrigger::enable_collection`].
-    pub fn disable_collection(&self) {
-        let _guard = self.collection_control_lock.lock().unwrap();
-        self.collection_disable_depth
-            .fetch_add(1, Ordering::Release);
+    pub fn disable_collection(&self) -> bool {
+        // let _guard = self.collection_control_lock.lock().unwrap();
+        // self.collection_disable_depth
+        //     .fetch_add(1, Ordering::Release);
+        let mut status = self.state.gc_status.lock().unwrap();
+        status.set_disabled()
     }
 
     /// Re-enable collection. Calling it without a prior matching call to
     /// [`GCTrigger::disable_collection`] is a logic error.
     pub fn enable_collection(&self) {
-        let _guard = self.collection_control_lock.lock().unwrap();
-        let depth = self.collection_disable_depth.load(Ordering::Acquire);
-        assert!(
-            depth > 0,
-            "enable_collection() called without a matching disable_collection()"
-        );
-        self.collection_disable_depth
-            .store(depth - 1, Ordering::Release);
+        // let _guard = self.collection_control_lock.lock().unwrap();
+        // let depth = self.collection_disable_depth.load(Ordering::Acquire);
+        // assert!(
+        //     depth > 0,
+        //     "enable_collection() called without a matching disable_collection()"
+        // );
+        // self.collection_disable_depth
+        //     .store(depth - 1, Ordering::Release);
+        self.state.gc_status.lock().unwrap().set_enabled();
     }
 
     /// Return whether collection is currently enabled.
     pub fn is_collection_enabled(&self) -> bool {
-        self.collection_disable_depth.load(Ordering::Acquire) == 0
+        // self.collection_disable_depth.load(Ordering::Acquire) == 0
+        !self.state.gc_status.lock().unwrap().is_disabled()
     }
 
     /// Return whether a GC has been requested but not yet started (i.e. mutators have not all
@@ -154,8 +167,10 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// concurrent marking phase of a concurrent GC, which mutators run through normally; see
     /// `ConcurrentPlan::concurrent_work_in_progress`.
     pub(crate) fn has_pending_or_active_pause(&self) -> bool {
-        self.request_flag.load(Ordering::Acquire)
-            || *self.state.gc_status.lock().unwrap() != GcStatus::NotInGC
+        // self.request_flag.load(Ordering::Acquire)
+        //     || *self.state.gc_status.lock().unwrap() != GcStatus::NotInGC
+        let status = self.state.gc_status.lock().unwrap();
+        status.is_pause_requested() || status.is_in_pause()
     }
 
     /// This method is called periodically by the allocation subsystem

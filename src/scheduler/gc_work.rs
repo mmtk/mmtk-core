@@ -21,7 +21,7 @@ impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
             mmtk.get_plan().notify_emergency_collection();
         }
         // Set to GcPrepare
-        mmtk.set_gc_status(GcStatus::GcPrepare);
+        // mmtk.set_gc_status(GcStatus::GcPrepare);
 
         // Let the plan to schedule collection work
         mmtk.get_plan().schedule_collection(worker.scheduler());
@@ -258,7 +258,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
             <C::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
                 false, worker.tls,
             );
-            mmtk.set_gc_status(GcStatus::GcProper);
+            // mmtk.set_gc_status(GcStatus::GcProper);
         }
     }
 }

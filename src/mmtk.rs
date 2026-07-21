@@ -261,7 +261,8 @@ impl<VM: VMBinding> MMTK<VM> {
             "MMTk collection has been initialized (was initialize_collection() already called before?)"
         );
         self.scheduler.spawn_gc_threads(self, tls);
-        self.state.initialized.store(true, Ordering::SeqCst);
+        // self.state.initialized.store(true, Ordering::SeqCst);
+        self.state.gc_status.lock().unwrap().set_initialized();
         probe!(mmtk, collection_initialized);
     }
 
@@ -269,7 +270,8 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn shutdown(&'static self) {
         if self.state.is_initialized() {
             self.scheduler.shutdown_gc_threads();
-            self.state.initialized.store(false, Ordering::SeqCst);
+            // self.state.initialized.store(false, Ordering::SeqCst);
+            self.state.gc_status.lock().unwrap().set_uninitialized();
         }
     }
 
@@ -389,14 +391,8 @@ impl<VM: VMBinding> MMTK<VM> {
         }
     }
 
-    /// Return true if a collection is in progress.
-    pub fn gc_in_progress(&self) -> bool {
-        *self.state.gc_status.lock().unwrap() != GcStatus::NotInGC
-    }
-
-    /// Return true if a collection is in progress and past the preparatory stage.
-    pub fn gc_in_progress_proper(&self) -> bool {
-        *self.state.gc_status.lock().unwrap() == GcStatus::GcProper
+    pub fn get_gc_status(&self) -> GcStatus {
+        *self.state.gc_status.lock().unwrap()
     }
 
     /// Disable collection. MMTk will not trigger a GC while collection is disabled, though a GC
@@ -406,8 +402,8 @@ impl<VM: VMBinding> MMTK<VM> {
     ///
     /// This call is nestable. Each call must be paired with a matching call to
     /// [`MMTK::enable_collection`].
-    pub fn disable_collection(&self) {
-        self.gc_trigger.disable_collection();
+    pub fn disable_collection(&self) -> bool {
+        self.gc_trigger.disable_collection()
     }
 
     /// Re-enable collection. Calling it without a prior matching call to

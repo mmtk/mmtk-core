@@ -15,7 +15,7 @@ use std::time::Instant;
 // We may consider further break down the fields into smaller structs.
 pub struct GlobalState {
     /// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
-    pub(crate) initialized: AtomicBool,
+    // pub(crate) initialized: AtomicBool,
     /// The current GC status.
     pub(crate) gc_status: Mutex<GcStatus>,
     /// When did the last GC start? Only accessed by the last parked worker.
@@ -56,7 +56,7 @@ pub struct GlobalState {
 impl GlobalState {
     /// Is MMTk initialized?
     pub fn is_initialized(&self) -> bool {
-        self.initialized.load(Ordering::SeqCst)
+        self.gc_status.lock().unwrap().is_initialized()
     }
 
     /// Set the collection kind for the current GC. This is called before
@@ -200,8 +200,8 @@ impl GlobalState {
 impl Default for GlobalState {
     fn default() -> Self {
         Self {
-            initialized: AtomicBool::new(false),
-            gc_status: Mutex::new(GcStatus::NotInGC),
+            // initialized: AtomicBool::new(false),
+            gc_status: Mutex::new(GcStatus::Uninitialized),
             gc_start_time: AtomicRefCell::new(None),
             stacks_prepared: AtomicBool::new(false),
             emergency_collection: AtomicBool::new(false),
@@ -222,11 +222,94 @@ impl Default for GlobalState {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Copy, Clone, Debug)]
 pub enum GcStatus {
+    // NotInGC,
+    // GcPrepare,
+    // GcProper,
+    Uninitialized,
     NotInGC,
-    GcPrepare,
-    GcProper,
+    ConcurrentGC,
+    InPause,
+    // GcPrepare,
+    // GcProper,
+    Disabled(usize),
+    PauseRequested,
+}
+
+impl GcStatus {
+    pub(crate) fn set_initialized(&mut self) {
+        assert!(
+            *self == GcStatus::Uninitialized,
+            "Trying to set initialized GC status when it is not uninitialized"
+        );
+        *self = GcStatus::NotInGC;
+    }
+
+    pub(crate) fn set_uninitialized(&mut self) {
+        assert!(
+            *self != GcStatus::Uninitialized,
+            "Trying to set uninitialized GC status when it is already uninitialized"
+        );
+        *self = GcStatus::Uninitialized;
+    }
+
+    pub(crate) fn set_requested(&mut self) {
+        assert!(*self == Self::NotInGC || *self == Self::ConcurrentGC, "Trying to set requested GC status in invalid status: {:?}", self);
+        *self = GcStatus::PauseRequested;
+    }
+
+    pub(crate) fn set_in_pause(&mut self) {
+        assert!(
+            *self == Self::PauseRequested,
+            "Trying to set in-pause GC status in invalid status: {:?}",
+            self
+        );
+        *self = GcStatus::InPause;;
+    }
+
+    pub(crate) fn set_disabled(&mut self) -> bool {
+        match self {
+            GcStatus::Disabled(depth) => {
+                *depth += 1;
+                true
+            },
+            Self::NotInGC => {
+                *self = GcStatus::Disabled(1);
+                true
+            },
+            _ => false,
+        }
+    }
+
+    pub(crate) fn set_enabled(&mut self) -> bool {
+        match self {
+            GcStatus::Disabled(depth) => {
+                *depth -= 1;
+                if *depth == 0 {
+                    *self = GcStatus::NotInGC;
+                }
+                true
+            },
+            _ => panic!("Trying to enable GC when it is not disabled"),
+        }
+    }
+
+    pub fn is_initialized(&self) -> bool {
+        *self != GcStatus::Uninitialized
+    }
+
+    pub fn is_pause_requested(&self) -> bool {
+        *self == GcStatus::PauseRequested
+    }
+
+    pub fn is_in_pause(&self) -> bool {
+        *self == GcStatus::InPause
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        matches!(self, GcStatus::Disabled(_))
+    }
 }
 
 /// Statistics for the live bytes in the last GC. The statistics is per space.
