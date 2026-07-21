@@ -5,7 +5,6 @@ use crate::plan::tracing::{SlotOfTrace, Trace};
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
-use crate::util::metadata::log_bit::UNLOGGED_VALUE;
 use crate::util::os::*;
 use crate::util::ObjectReference;
 use crate::vm::slot::{MemorySlice, Slot};

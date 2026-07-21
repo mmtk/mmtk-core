@@ -86,15 +86,23 @@ impl VMGlobalFieldUnlogBitSpec {
             == UNLOGGED_VALUE
     }
 
-    /// Clear the unlog bit to log object (0 means logged)
+    /// Clear the unlog bit of all fields
     pub fn clear_all_fields<VM: VMBinding>(&self, object: ObjectReference) {
         let start = object.to_object_start::<VM>();
         let size = VM::VMObjectModel::get_current_size(object);
         self.extract_side_spec().bzero_metadata(start, size);
     }
 
-    /// Clear the unlog bit to log object (0 means logged)
+    /// Set the unlog bit of all fields
     pub fn mark_all_fields_as_unlogged<VM: VMBinding>(&self, object: ObjectReference) {
+        let start = object.to_object_start::<VM>();
+        let size = VM::VMObjectModel::get_current_size(object);
+        self.extract_side_spec().bset_metadata(start, size);
+    }
+
+    /// Similar to [`Self::mark_all_fields_as_unlogged`], but write all overlapping bytes.
+    /// This avoids expensive bit operations at the cost of precision.
+    pub fn mark_all_bytes_as_unlogged<VM: VMBinding>(&self, object: ObjectReference) {
         let start = object.to_object_start::<VM>();
         let size = VM::VMObjectModel::get_current_size(object);
         self.extract_side_spec().bset_metadata(start, size);
