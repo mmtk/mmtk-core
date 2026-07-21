@@ -218,12 +218,27 @@ impl Default for GlobalState {
     }
 }
 
+/// The status of MMTk's GC subsystem. This doubles as the "is MMTk initialized" flag (via
+/// [`GcStatus::Uninitialized`]) and as the state that tracks whether a GC is running and, if so,
+/// what phase it is in. See [`GcStatusWord`] for how this is stored atomically and which
+/// transitions between variants are legal.
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum GcStatus {
+    /// MMTk has not been initialized yet, i.e. `initialize_collection()` has not been called, so
+    /// there are no GC worker threads available to run a collection. This is the same condition
+    /// reported by [`PauseRequestOutcome::Uninitialized`]: [`GcStatusWord::try_request_pause`]
+    /// returns that variant exactly when the status is `GcStatus::Uninitialized`.
     Uninitialized,
+    /// MMTk is initialized, and no GC is running, pending, or requested.
     NotInGC,
+    /// A concurrent GC's background work (e.g. concurrent marking) is running while mutators
+    /// continue to run normally. See `ConcurrentPlan::concurrent_work_in_progress`.
     InConcurrentGC,
+    /// A stop-the-world pause is active: mutators are stopped and GC workers are doing pause
+    /// work (e.g. tracing).
     InPause,
+    /// A GC pause has been requested (by [`GcStatusWord::try_request_pause`]) but mutators have
+    /// not all stopped yet.
     PauseRequested,
 }
 
@@ -291,19 +306,27 @@ impl GcStatusWord {
     }
 
     /// Retry `f` (a pure function of the current status) as a compare-and-swap loop until it
-    /// succeeds, and return the status it settled on. `f` may be invoked more than once under
-    /// contention.
+    /// succeeds, and return the status it transitioned *from* (not the new status), mirroring
+    /// [`std::sync::atomic::AtomicUsize::fetch_update`]. Returning the old status (rather than
+    /// the new one) lets a caller tell whether it "won" the race when multiple threads
+    /// concurrently drive the same transition: only the thread whose CAS actually moved the
+    /// status away from a given old value can be sure it is the one responsible for that
+    /// transition, so it is the one that should perform any side effect that must happen exactly
+    /// once (e.g. notifying the scheduler). If `transition` returned the new status instead,
+    /// every racing thread would observe the same new status and none could tell which of them
+    /// caused it. `f` may be invoked more than once under contention.
     fn transition<F: FnMut(GcStatus) -> GcStatus>(&self, mut f: F) -> GcStatus {
         let mut cur = self.0.load(Ordering::SeqCst);
         loop {
-            let next = f(Self::decode(cur));
+            let old = Self::decode(cur);
+            let next = f(old);
             match self.0.compare_exchange_weak(
                 cur,
                 Self::encode(next),
                 Ordering::SeqCst,
                 Ordering::SeqCst,
             ) {
-                Ok(_) => return next,
+                Ok(_) => return old,
                 Err(actual) => cur = actual,
             }
         }
