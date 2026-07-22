@@ -225,9 +225,8 @@ impl Default for GlobalState {
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum GcStatus {
     /// MMTk has not been initialized yet, i.e. `initialize_collection()` has not been called, so
-    /// there are no GC worker threads available to run a collection. This is the same condition
-    /// reported by [`PauseRequestOutcome::Uninitialized`]: [`GcStatusWord::try_request_pause`]
-    /// returns that variant exactly when the status is `GcStatus::Uninitialized`.
+    /// there are no GC worker threads available to run a collection. [`GcStatusWord::try_request_pause`]
+    /// returns `Err(GcStatus::Uninitialized)` exactly when the status is `GcStatus::Uninitialized`.
     Uninitialized,
     /// MMTk is initialized, and no GC is running, pending, or requested.
     NotInGC,
@@ -245,22 +244,6 @@ pub enum GcStatus {
     /// each call to `disable_collection()` increments the depth, and each call to `enable_collection()`
     /// decrements it. When the depth is about to reach zero, the status is transitioned to `NoInGC`.
     Disabled(usize),
-}
-
-/// The outcome of [`GcStatusWord::try_request_pause`].
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) enum PauseRequestOutcome {
-    /// Collection is currently disabled; no pause was (or could be) requested.
-    Disabled,
-    /// MMTk has not been initialized yet (`initialize_collection()` has not been called), so
-    /// there are no GC worker threads to run a collection; no pause was (or could be) requested.
-    Uninitialized,
-    /// A pause was already requested (by this call or a racing one); the caller does not need
-    /// to do anything further.
-    AlreadyRequested,
-    /// This call transitioned the status to `PauseRequested`; the caller is responsible for
-    /// requesting the pause (e.g. notifying the scheduler) exactly once.
-    Requested,
 }
 
 /// A lock-free, atomic encoding of [`GcStatus`]. This packs the variant tag into the low bits
@@ -440,8 +423,10 @@ impl GcStatusWord {
     }
 
     /// `NotInGC`/`InConcurrentGC` -> `PauseRequested`, unless collection is disabled, MMTk is not
-    /// yet initialized, or a pause has already been requested. See [`PauseRequestOutcome`].
-    pub(crate) fn try_request_pause(&self) -> PauseRequestOutcome {
+    /// yet initialized, or a pause has already been requested, in which case `Err` is returned
+    /// with the status that prevented the transition (`Disabled(_)`, `Uninitialized`, or
+    /// `PauseRequested` respectively).
+    pub(crate) fn try_request_pause(&self) -> Result<(), GcStatus> {
         // `fetch_update`'s closure returning `None` aborts the update and makes `fetch_update`
         // return `Err` with the status that caused the abort, so `Disabled`/`Uninitialized`/
         // `PauseRequested` (which must not transition here) are reported that way instead of via
@@ -463,15 +448,14 @@ impl GcStatusWord {
                 );
                 Some(Self::encode(GcStatus::PauseRequested))
             }) {
-            Ok(_) => PauseRequestOutcome::Requested,
-            Err(bits) => match Self::decode(bits) {
-                GcStatus::Disabled(_) => PauseRequestOutcome::Disabled,
-                GcStatus::Uninitialized => PauseRequestOutcome::Uninitialized,
-                GcStatus::PauseRequested => PauseRequestOutcome::AlreadyRequested,
-                status => unreachable!(
-                    "fetch_update aborted the transition for an unexpected status: {:?}",
-                    status
-                ),
+            Ok(_) => Ok(()),
+            Err(bits) => {
+                let error_state = Self::decode(bits);
+                assert!(matches!(
+                    error_state,
+                    GcStatus::Disabled(_) | GcStatus::Uninitialized | GcStatus::PauseRequested
+                ), "fetch_update aborted the transition for an unexpected status: {:?}", error_state);
+                Err(error_state)
             },
         }
     }
@@ -479,7 +463,7 @@ impl GcStatusWord {
 
 #[cfg(test)]
 mod gc_status_tests {
-    use super::{GcStatus, GcStatusWord, PauseRequestOutcome};
+    use super::{GcStatus, GcStatusWord};
 
     #[test]
     fn encode_decode_roundtrip() {
@@ -544,14 +528,14 @@ mod gc_status_tests {
     #[test]
     fn try_request_pause_from_not_in_gc() {
         let word = GcStatusWord::new(GcStatus::NotInGC);
-        assert_eq!(word.try_request_pause(), PauseRequestOutcome::Requested);
+        assert!(word.try_request_pause().is_ok());
         assert_eq!(word.load(), GcStatus::PauseRequested);
     }
 
     #[test]
     fn try_request_pause_from_in_concurrent_gc() {
         let word = GcStatusWord::new(GcStatus::InConcurrentGC);
-        assert_eq!(word.try_request_pause(), PauseRequestOutcome::Requested);
+        assert!(word.try_request_pause().is_ok());
         assert_eq!(word.load(), GcStatus::PauseRequested);
     }
 
@@ -560,7 +544,7 @@ mod gc_status_tests {
         let word = GcStatusWord::new(GcStatus::PauseRequested);
         assert_eq!(
             word.try_request_pause(),
-            PauseRequestOutcome::AlreadyRequested
+            Err(GcStatus::PauseRequested)
         );
         // Idempotent: the status is unchanged, not "double requested".
         assert_eq!(word.load(), GcStatus::PauseRequested);
@@ -573,13 +557,13 @@ mod gc_status_tests {
     #[test]
     #[should_panic(expected = "invalid status")]
     fn try_request_pause_panics_when_already_in_pause() {
-        GcStatusWord::new(GcStatus::InPause).try_request_pause();
+        let _ = GcStatusWord::new(GcStatus::InPause).try_request_pause();
     }
 
     #[test]
     fn try_request_pause_when_disabled() {
         let word = GcStatusWord::new(GcStatus::Disabled(1));
-        assert_eq!(word.try_request_pause(), PauseRequestOutcome::Disabled);
+        assert_eq!(word.try_request_pause(), Err(GcStatus::Disabled(1)));
         // Unchanged: disabling is not overridden by a pause request.
         assert_eq!(word.load(), GcStatus::Disabled(1));
     }
@@ -592,7 +576,7 @@ mod gc_status_tests {
     #[test]
     fn try_request_pause_when_uninitialized() {
         let word = GcStatusWord::new(GcStatus::Uninitialized);
-        assert_eq!(word.try_request_pause(), PauseRequestOutcome::Uninitialized);
+        assert_eq!(word.try_request_pause(), Err(GcStatus::Uninitialized));
         assert_eq!(word.load(), GcStatus::Uninitialized);
     }
 

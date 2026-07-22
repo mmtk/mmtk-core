@@ -1,6 +1,6 @@
 use atomic::Ordering;
 
-use crate::global_state::{GlobalState, PauseRequestOutcome};
+use crate::global_state::{GlobalState, GcStatus};
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
@@ -82,23 +82,23 @@ impl<VM: VMBinding> GCTrigger<VM> {
     fn request(&self) -> bool {
         // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
         // with GC workers, which is expensive for functions like `poll`. `try_request_pause`
-        // only reports `Requested` to the thread that actually wins the race to transition the
-        // status, so only that thread calls it, instead of every thread that observes the old
-        // status.
+        // only returns `Ok` to the thread that actually wins the race to transition the status,
+        // so only that thread calls it, instead of every thread that observes the old status.
         match self.state.gc_status.try_request_pause() {
-            PauseRequestOutcome::Disabled => false,
-            // A GC is genuinely required (the heap policy has been exceeded), but MMTk has no GC
-            // worker threads to service it. Silently returning `false` here would let allocation
-            // grow the heap without bound instead of respecting the configured limit.
-            PauseRequestOutcome::Uninitialized => panic!(
-                "GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."
-            ),
-            PauseRequestOutcome::AlreadyRequested => true,
-            PauseRequestOutcome::Requested => {
+            Ok(_) => {
                 probe!(mmtk, gc_requested);
                 self.scheduler.request_schedule_collection();
                 true
-            }
+            },
+            Err(GcStatus::Disabled(_)) => false,
+            // A GC is genuinely required (the heap policy has been exceeded), but MMTk has no GC
+            // worker threads to service it. Silently returning `false` here would let allocation
+            // grow the heap without bound instead of respecting the configured limit.
+            Err(GcStatus::Uninitialized) => panic!(
+                "GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."
+            ),
+            Err(GcStatus::PauseRequested) => true,
+            _ => unreachable!(),
         }
     }
 
