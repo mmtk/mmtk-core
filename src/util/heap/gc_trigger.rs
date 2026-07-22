@@ -125,15 +125,6 @@ impl<VM: VMBinding> GCTrigger<VM> {
         !self.state.gc_status.is_disabled()
     }
 
-    /// Return whether a GC has been requested but not yet started (i.e. mutators have not all
-    /// stopped), or a stop-the-world pause is currently active. This does not account for the
-    /// concurrent marking phase of a concurrent GC, which mutators run through normally; see
-    /// `ConcurrentPlan::concurrent_work_in_progress`.
-    pub(crate) fn has_pending_or_active_pause(&self) -> bool {
-        let status = self.state.gc_status.load();
-        status.is_pause_requested() || status.is_in_pause()
-    }
-
     /// This method is called periodically by the allocation subsystem
     /// (by default, each time a page is consumed), and provides the
     /// collector with an opportunity to collect.

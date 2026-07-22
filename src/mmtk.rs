@@ -261,7 +261,6 @@ impl<VM: VMBinding> MMTK<VM> {
             "MMTk collection has been initialized (was initialize_collection() already called before?)"
         );
         self.scheduler.spawn_gc_threads(self, tls);
-        // self.state.initialized.store(true, Ordering::SeqCst);
         self.state.gc_status.set_initialized();
         probe!(mmtk, collection_initialized);
     }
@@ -270,7 +269,6 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn shutdown(&'static self) {
         if self.state.is_initialized() {
             self.scheduler.shutdown_gc_threads();
-            // self.state.initialized.store(false, Ordering::SeqCst);
             self.state.gc_status.set_uninitialized();
         }
     }

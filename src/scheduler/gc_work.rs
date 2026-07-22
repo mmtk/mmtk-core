@@ -20,10 +20,10 @@ impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
         if is_emergency {
             mmtk.get_plan().notify_emergency_collection();
         }
-        // Set to GcPrepare
-        // mmtk.set_gc_status(GcStatus::GcPrepare);
         mmtk.state.stacks_prepared.store(false, Ordering::SeqCst);
-        // FIXME: We are still in transition
+        // FIXME: This seems to be a weird place to start counting GC statistics.
+        // This is not when we set the status to PauseRequested or InPause. Instead, this is just a random place during transition
+        // See https://github.com/mmtk/mmtk-core/issues/1330
         mmtk.stats.start_gc();
 
         // Let the plan to schedule collection work
@@ -261,7 +261,6 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
             <C::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
                 false, worker.tls,
             );
-            // mmtk.set_gc_status(GcStatus::GcProper);
         }
     }
 }
