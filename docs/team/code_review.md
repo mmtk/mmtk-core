@@ -1,7 +1,8 @@
 # Code Review
 
 Code review is very important for the project. Any change/PR needs to be reviewed and approved before
-merging into the mainline.
+merging into the mainline. At the same time, we still want a decent turnaround time for PRs to be reviewed and merged, so
+contributors do not lose momentum waiting on the process.
 
 ## Nominate a Reviewer
 
@@ -102,6 +103,16 @@ Reviewers may ask for clarification, request changes, provide soft suggestions, 
 
 Comments should be resolved between reviewers and contributors.
 
+### Timely Reviews
+
+Turnaround time matters as much as thoroughness. Once requested, reviewers should treat reviewing as a
+priority, and start working on it at the next available opportunity.
+
+Where possible, reviewers should leave all the feedback
+they have in one pass, rather than trickling comments across multiple rounds. This reduces the number of
+round trips needed and shortens the overall review cycle. Contributors should likewise try to address
+review comments promptly, so the PR keeps moving.
+
 ### Disagreements
 
 If a reviewer and a contributor cannot reach an agreement on a comment, either side should bring in a third team
@@ -110,6 +121,9 @@ member, or raise it in a team meeting, rather than leaving the PR blocked indefi
 ## Approval and Merging
 
 A PR needs at least one approval from a team member other than the author before it can be merged.
+
+Once a PR is approved and CI passes, it should be merged promptly (unless explicitly stated otherwise).
+Anyone with access may merge it, as long as GitHub's settings allow it to be merged.
 
 ### Substantial Changes after Approval
 
