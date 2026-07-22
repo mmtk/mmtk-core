@@ -33,7 +33,10 @@ contributor. The reasons may include, but are not limited to:
 * The PR brings in more downsides than value.
 * The PR has major flaws in its high-level design.
 
-There might be further discussion, and the reviewer may change their mind.
+There might be further discussion, and the reviewer may change their mind. If contributors intend to upstream
+a significant change, we recommend they engage with the MMTk maintainers first, on [MMTk Zulip](https://mmtk.zulipchat.com)
+or via [GitHub issues](https://github.com/mmtk/mmtk-core/issues), before investing significant effort, to
+avoid a PR being rejected later.
 
 If a reviewer finds the PR valuable, they should start a full review, and work collaboratively with the contributor
 to eventually get the PR merged.
