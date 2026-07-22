@@ -443,12 +443,16 @@ impl GcStatusWord {
             Ok(_) => Ok(()),
             Err(bits) => {
                 let error_state = Self::decode(bits);
-                assert!(matches!(
-                    error_state,
-                    GcStatus::Disabled(_) | GcStatus::Uninitialized | GcStatus::PauseRequested
-                ), "fetch_update aborted the transition for an unexpected status: {:?}", error_state);
+                assert!(
+                    matches!(
+                        error_state,
+                        GcStatus::Disabled(_) | GcStatus::Uninitialized | GcStatus::PauseRequested
+                    ),
+                    "fetch_update aborted the transition for an unexpected status: {:?}",
+                    error_state
+                );
                 Err(error_state)
-            },
+            }
         }
     }
 }
@@ -534,10 +538,7 @@ mod gc_status_tests {
     #[test]
     fn try_request_pause_when_already_requested() {
         let word = GcStatusWord::new(GcStatus::PauseRequested);
-        assert_eq!(
-            word.try_request_pause(),
-            Err(GcStatus::PauseRequested)
-        );
+        assert_eq!(word.try_request_pause(), Err(GcStatus::PauseRequested));
         // Idempotent: the status is unchanged, not "double requested".
         assert_eq!(word.load(), GcStatus::PauseRequested);
     }

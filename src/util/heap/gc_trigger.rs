@@ -1,6 +1,6 @@
 use atomic::Ordering;
 
-use crate::global_state::{GlobalState, GcStatus};
+use crate::global_state::{GcStatus, GlobalState};
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
