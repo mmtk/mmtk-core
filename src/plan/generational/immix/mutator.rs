@@ -1,5 +1,7 @@
 pub(super) use super::super::ALLOCATOR_MAPPING;
+use crate::plan::barriers::FieldGenRemSetBarrier;
 use crate::plan::barriers::ObjectBarrier;
+use crate::plan::generational::barrier::GenFieldBarrierSemantics;
 use crate::plan::generational::barrier::GenObjectBarrierSemantics;
 use crate::plan::generational::create_gen_space_mapping;
 use crate::plan::generational::immix::GenImmix;
@@ -45,8 +47,8 @@ pub fn create_genimmix_mutator<VM: VMBinding>(
 
     let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
     builder
-        .barrier(Box::new(ObjectBarrier::new(
-            GenObjectBarrierSemantics::new(mmtk, genimmix),
+        .barrier(Box::new(FieldGenRemSetBarrier::new(
+            GenFieldBarrierSemantics::new(mmtk, genimmix),
         )))
         .build()
 }
