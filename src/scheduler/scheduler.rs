@@ -7,7 +7,6 @@ use super::worker::{GCWorker, ThreadId, WorkerGroup};
 use super::worker_goals::{WorkerGoal, WorkerGoals};
 use super::worker_monitor::{LastParkedResult, WorkerMonitor};
 use super::*;
-use crate::global_state::GcStatus;
 use crate::mmtk::MMTK;
 use crate::plan::tracing::gc_work::weakref::{
     VMForwardWeakRefs, VMPostForwarding, VMProcessWeakRefs,
@@ -630,7 +629,14 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.debug_assert_all_stw_buckets_closed();
 
         // Set to NotInGC after everything, and right before resuming mutators.
-        mmtk.set_gc_status(GcStatus::NotInGC);
+        if concurrent_work_scheduled {
+            mmtk.state.gc_status.set_in_concurrent_gc();
+        } else {
+            mmtk.state.gc_status.set_not_in_gc();
+        }
+        if mmtk.stats.get_gathering_stats() {
+            mmtk.stats.end_gc();
+        }
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
 
         concurrent_work_scheduled
@@ -653,7 +659,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
-        mmtk.gc_trigger.clear_request();
+        mmtk.state.gc_status.set_in_pause();
         let first_stw_bucket = &self.work_buckets[WorkBucketStage::FIRST_STW_STAGE];
         debug_assert!(!first_stw_bucket.is_open());
         // Note: This is the only place where a bucket is opened without having all workers parked.

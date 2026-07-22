@@ -1,7 +1,6 @@
 use atomic_refcell::AtomicRefCell;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Mutex;
 use std::time::Instant;
 
 /// This stores some global states for an MMTK instance.
@@ -14,10 +13,8 @@ use std::time::Instant;
 // a reference to the struct, and are no longer dependent on the plan.
 // We may consider further break down the fields into smaller structs.
 pub struct GlobalState {
-    /// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
-    pub(crate) initialized: AtomicBool,
     /// The current GC status.
-    pub(crate) gc_status: Mutex<GcStatus>,
+    pub(crate) gc_status: GcStatusWord,
     /// When did the last GC start? Only accessed by the last parked worker.
     pub(crate) gc_start_time: AtomicRefCell<Option<Instant>>,
     /// Is the current GC an emergency collection? Emergency means we may run out of memory soon, and we should
@@ -56,7 +53,7 @@ pub struct GlobalState {
 impl GlobalState {
     /// Is MMTk initialized?
     pub fn is_initialized(&self) -> bool {
-        self.initialized.load(Ordering::SeqCst)
+        self.gc_status.is_initialized()
     }
 
     /// Set the collection kind for the current GC. This is called before
@@ -200,8 +197,7 @@ impl GlobalState {
 impl Default for GlobalState {
     fn default() -> Self {
         Self {
-            initialized: AtomicBool::new(false),
-            gc_status: Mutex::new(GcStatus::NotInGC),
+            gc_status: GcStatusWord::new(GcStatus::Uninitialized),
             gc_start_time: AtomicRefCell::new(None),
             stacks_prepared: AtomicBool::new(false),
             emergency_collection: AtomicBool::new(false),
@@ -222,11 +218,353 @@ impl Default for GlobalState {
     }
 }
 
-#[derive(PartialEq)]
+/// The status of MMTk's GC subsystem. This doubles as the "is MMTk initialized" flag (via
+/// [`GcStatus::Uninitialized`]) and as the state that tracks whether a GC is running and, if so,
+/// what phase it is in. See [`GcStatusWord`] for how this is stored atomically and which
+/// transitions between variants are legal.
+#[derive(PartialEq, Copy, Clone, Debug)]
 pub enum GcStatus {
+    /// MMTk has not been initialized yet, i.e. `initialize_collection()` has not been called, so
+    /// there are no GC worker threads available to run a collection. This is the same condition
+    /// reported by [`PauseRequestOutcome::Uninitialized`]: [`GcStatusWord::try_request_pause`]
+    /// returns that variant exactly when the status is `GcStatus::Uninitialized`.
+    Uninitialized,
+    /// MMTk is initialized, and no GC is running, pending, or requested.
     NotInGC,
-    GcPrepare,
-    GcProper,
+    /// A concurrent GC's background work (e.g. concurrent marking) is running while mutators
+    /// continue to run normally. See `ConcurrentPlan::concurrent_work_in_progress`.
+    InConcurrentGC,
+    /// A stop-the-world pause is active: mutators are stopped and GC workers are doing pause
+    /// work (e.g. tracing).
+    InPause,
+    /// A GC pause has been requested (by [`GcStatusWord::try_request_pause`]) but mutators have
+    /// not all stopped yet.
+    PauseRequested,
+}
+
+/// The outcome of [`GcStatusWord::try_request_pause`].
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum PauseRequestOutcome {
+    /// MMTk has not been initialized yet (`initialize_collection()` has not been called), so
+    /// there are no GC worker threads to run a collection; no pause was (or could be) requested.
+    Uninitialized,
+    /// A pause was already requested (by this call or a racing one); the caller does not need
+    /// to do anything further.
+    AlreadyRequested,
+    /// This call transitioned the status to `PauseRequested`; the caller is responsible for
+    /// requesting the pause (e.g. notifying the scheduler) exactly once.
+    Requested,
+}
+
+/// A lock-free, atomic encoding of [`GcStatus`]. This packs the variant tag into a `usize` so
+/// the whole status fits in a single machine word and can be updated with compare-and-swap
+/// instead of behind a `Mutex<GcStatus>`. The tag is kept to [`Self::TAG_BITS`] bits (rather than
+/// using the whole word) to leave room for a payload-carrying variant (e.g. a nesting depth) to
+/// be added later without needing to re-encode the rest.
+///
+/// `GcStatus` is a state machine: only a handful of transitions between its variants are legal.
+/// Every legal transition is exposed here as its own method, each performing its own
+/// compare-and-swap retry loop and asserting that the transition is legal for the status it
+/// finds. Do not add a generic "set the status to X" method: doing so would make it possible to
+/// bypass the state machine's invariants.
+pub(crate) struct GcStatusWord(AtomicUsize);
+
+impl GcStatusWord {
+    /// Number of bits used to encode the variant tag. 3 bits is enough to distinguish the 5
+    /// variants, leaving the rest of the word free for a future payload-carrying variant.
+    const TAG_BITS: u32 = 3;
+    const TAG_MASK: usize = (1 << Self::TAG_BITS) - 1;
+
+    fn encode(status: GcStatus) -> usize {
+        match status {
+            GcStatus::Uninitialized => 0,
+            GcStatus::NotInGC => 1,
+            GcStatus::InConcurrentGC => 2,
+            GcStatus::InPause => 3,
+            GcStatus::PauseRequested => 4,
+        }
+    }
+
+    fn decode(bits: usize) -> GcStatus {
+        match bits & Self::TAG_MASK {
+            0 => GcStatus::Uninitialized,
+            1 => GcStatus::NotInGC,
+            2 => GcStatus::InConcurrentGC,
+            3 => GcStatus::InPause,
+            4 => GcStatus::PauseRequested,
+            _ => unreachable!("invalid encoded GcStatus tag"),
+        }
+    }
+
+    pub(crate) fn new(status: GcStatus) -> Self {
+        GcStatusWord(AtomicUsize::new(Self::encode(status)))
+    }
+
+    /// Read the current status.
+    pub(crate) fn load(&self) -> GcStatus {
+        Self::decode(self.0.load(Ordering::SeqCst))
+    }
+
+    /// Retry `f` (a pure function of the current status) via [`AtomicUsize::fetch_update`] until
+    /// it succeeds, and return the status it transitioned *from* (not the new status). Returning
+    /// the old status (rather than the new one) lets a caller tell whether it "won" the race when
+    /// multiple threads concurrently drive the same transition: only the thread whose CAS
+    /// actually moved the status away from a given old value can be sure it is the one
+    /// responsible for that transition, so it is the one that should perform any side effect that
+    /// must happen exactly once (e.g. notifying the scheduler). If `transition` returned the new
+    /// status instead, every racing thread would observe the same new status and none could tell
+    /// which of them caused it. `f` may be invoked more than once under contention.
+    fn transition<F: FnMut(GcStatus) -> GcStatus>(&self, mut f: F) -> GcStatus {
+        let old_bits = self
+            .0
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
+                Some(Self::encode(f(Self::decode(bits))))
+            })
+            .unwrap(); // `f` always returns a status to move to, so this never returns `Err`.
+        Self::decode(old_bits)
+    }
+
+    pub(crate) fn is_initialized(&self) -> bool {
+        self.load() != GcStatus::Uninitialized
+    }
+
+    /// `Uninitialized` -> `NotInGC`.
+    pub(crate) fn set_initialized(&self) {
+        self.transition(|status| {
+            assert!(
+                status == GcStatus::Uninitialized,
+                "Trying to set initialized GC status when it is not uninitialized"
+            );
+            GcStatus::NotInGC
+        });
+    }
+
+    /// Any status other than `Uninitialized` -> `Uninitialized`.
+    pub(crate) fn set_uninitialized(&self) {
+        self.transition(|status| {
+            assert!(
+                status != GcStatus::Uninitialized,
+                "Trying to set uninitialized GC status when it is already uninitialized"
+            );
+            GcStatus::Uninitialized
+        });
+    }
+
+    /// `PauseRequested` -> `InPause`.
+    pub(crate) fn set_in_pause(&self) {
+        self.transition(|status| {
+            assert!(
+                status == GcStatus::PauseRequested,
+                "Trying to set in-pause GC status in invalid status: {:?}",
+                status
+            );
+            GcStatus::InPause
+        });
+    }
+
+    /// `InPause` -> `InConcurrentGC`, e.g. once a GC pause has finished but concurrent work (such
+    /// as concurrent marking) was scheduled to continue after mutators resume.
+    pub(crate) fn set_in_concurrent_gc(&self) {
+        self.transition(|status| {
+            assert!(
+                status == GcStatus::InPause,
+                "Trying to set in-concurrent-gc GC status in invalid status: {:?}",
+                status
+            );
+            GcStatus::InConcurrentGC
+        });
+    }
+
+    /// `InPause` -> `NotInGC`, e.g. once a GC pause has finished and no concurrent work remains.
+    pub(crate) fn set_not_in_gc(&self) {
+        self.transition(|status| {
+            assert!(
+                status == GcStatus::InPause,
+                "Trying to set not-in-gc GC status in invalid status: {:?}",
+                status
+            );
+            GcStatus::NotInGC
+        });
+    }
+
+    /// `NotInGC`/`InConcurrentGC` -> `PauseRequested`, unless MMTk is not yet initialized, or a
+    /// pause has already been requested. See [`PauseRequestOutcome`].
+    pub(crate) fn try_request_pause(&self) -> PauseRequestOutcome {
+        // `fetch_update`'s closure returning `None` aborts the update and makes `fetch_update`
+        // return `Err` with the status that caused the abort, so `Uninitialized`/`PauseRequested`
+        // (which must not transition here) are reported that way instead of via a CAS.
+        match self
+            .0
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
+                let status = Self::decode(bits);
+                if matches!(status, GcStatus::Uninitialized | GcStatus::PauseRequested) {
+                    return None;
+                }
+                assert!(
+                    matches!(status, GcStatus::NotInGC | GcStatus::InConcurrentGC),
+                    "Trying to request a GC pause in invalid status: {:?}",
+                    status
+                );
+                Some(Self::encode(GcStatus::PauseRequested))
+            }) {
+            Ok(_) => PauseRequestOutcome::Requested,
+            Err(bits) => match Self::decode(bits) {
+                GcStatus::Uninitialized => PauseRequestOutcome::Uninitialized,
+                GcStatus::PauseRequested => PauseRequestOutcome::AlreadyRequested,
+                status => unreachable!(
+                    "fetch_update aborted the transition for an unexpected status: {:?}",
+                    status
+                ),
+            },
+        }
+    }
+}
+
+#[cfg(test)]
+mod gc_status_tests {
+    use super::{GcStatus, GcStatusWord, PauseRequestOutcome};
+
+    #[test]
+    fn encode_decode_roundtrip() {
+        let statuses = [
+            GcStatus::Uninitialized,
+            GcStatus::NotInGC,
+            GcStatus::InConcurrentGC,
+            GcStatus::InPause,
+            GcStatus::PauseRequested,
+        ];
+        for status in statuses {
+            assert_eq!(GcStatusWord::decode(GcStatusWord::encode(status)), status);
+        }
+    }
+
+    #[test]
+    fn new_and_load_roundtrip() {
+        let statuses = [
+            GcStatus::Uninitialized,
+            GcStatus::NotInGC,
+            GcStatus::InConcurrentGC,
+            GcStatus::InPause,
+            GcStatus::PauseRequested,
+        ];
+        for status in statuses {
+            assert_eq!(GcStatusWord::new(status).load(), status);
+        }
+    }
+
+    #[test]
+    fn set_initialized_from_uninitialized() {
+        let word = GcStatusWord::new(GcStatus::Uninitialized);
+        assert!(!word.is_initialized());
+        word.set_initialized();
+        assert_eq!(word.load(), GcStatus::NotInGC);
+        assert!(word.is_initialized());
+    }
+
+    #[test]
+    #[should_panic(expected = "not uninitialized")]
+    fn set_initialized_panics_if_already_initialized() {
+        GcStatusWord::new(GcStatus::NotInGC).set_initialized();
+    }
+
+    #[test]
+    fn set_uninitialized_from_not_in_gc() {
+        let word = GcStatusWord::new(GcStatus::NotInGC);
+        word.set_uninitialized();
+        assert_eq!(word.load(), GcStatus::Uninitialized);
+    }
+
+    #[test]
+    #[should_panic(expected = "already uninitialized")]
+    fn set_uninitialized_panics_if_already_uninitialized() {
+        GcStatusWord::new(GcStatus::Uninitialized).set_uninitialized();
+    }
+
+    #[test]
+    fn try_request_pause_from_not_in_gc() {
+        let word = GcStatusWord::new(GcStatus::NotInGC);
+        assert_eq!(word.try_request_pause(), PauseRequestOutcome::Requested);
+        assert_eq!(word.load(), GcStatus::PauseRequested);
+    }
+
+    #[test]
+    fn try_request_pause_from_in_concurrent_gc() {
+        let word = GcStatusWord::new(GcStatus::InConcurrentGC);
+        assert_eq!(word.try_request_pause(), PauseRequestOutcome::Requested);
+        assert_eq!(word.load(), GcStatus::PauseRequested);
+    }
+
+    #[test]
+    fn try_request_pause_when_already_requested() {
+        let word = GcStatusWord::new(GcStatus::PauseRequested);
+        assert_eq!(
+            word.try_request_pause(),
+            PauseRequestOutcome::AlreadyRequested
+        );
+        // Idempotent: the status is unchanged, not "double requested".
+        assert_eq!(word.load(), GcStatus::PauseRequested);
+    }
+
+    /// A GC pause should never be requested while one is already underway: by the time the
+    /// status reaches `InPause`, all mutators must already be stopped, so no mutator should be
+    /// calling `try_request_pause` at all. Observing `InPause` here indicates a state-machine
+    /// violation elsewhere, so it must panic rather than being silently treated as a no-op.
+    #[test]
+    #[should_panic(expected = "invalid status")]
+    fn try_request_pause_panics_when_already_in_pause() {
+        GcStatusWord::new(GcStatus::InPause).try_request_pause();
+    }
+
+    /// Allocation can call `poll()` (and thus `try_request_pause`) before
+    /// `initialize_collection()` has been called, e.g. if the heap fills up before the VM
+    /// binding initializes MMTk's GC worker threads. This must not panic here: the caller (e.g.
+    /// `Space::not_acquiring`) is responsible for producing a clear "GC is not allowed here"
+    /// error once it knows allocation has genuinely failed.
+    #[test]
+    fn try_request_pause_when_uninitialized() {
+        let word = GcStatusWord::new(GcStatus::Uninitialized);
+        assert_eq!(word.try_request_pause(), PauseRequestOutcome::Uninitialized);
+        assert_eq!(word.load(), GcStatus::Uninitialized);
+    }
+
+    #[test]
+    fn set_in_pause_from_pause_requested() {
+        let word = GcStatusWord::new(GcStatus::PauseRequested);
+        word.set_in_pause();
+        assert_eq!(word.load(), GcStatus::InPause);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid status")]
+    fn set_in_pause_panics_if_not_requested() {
+        GcStatusWord::new(GcStatus::NotInGC).set_in_pause();
+    }
+
+    #[test]
+    fn set_in_concurrent_gc_from_in_pause() {
+        let word = GcStatusWord::new(GcStatus::InPause);
+        word.set_in_concurrent_gc();
+        assert_eq!(word.load(), GcStatus::InConcurrentGC);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid status")]
+    fn set_in_concurrent_gc_panics_if_not_in_pause() {
+        GcStatusWord::new(GcStatus::NotInGC).set_in_concurrent_gc();
+    }
+
+    #[test]
+    fn set_not_in_gc_from_in_pause() {
+        let word = GcStatusWord::new(GcStatus::InPause);
+        word.set_not_in_gc();
+        assert_eq!(word.load(), GcStatus::NotInGC);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid status")]
+    fn set_not_in_gc_panics_if_not_in_pause() {
+        GcStatusWord::new(GcStatus::InConcurrentGC).set_not_in_gc();
+    }
 }
 
 /// Statistics for the live bytes in the last GC. The statistics is per space.
