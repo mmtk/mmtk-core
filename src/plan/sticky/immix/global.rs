@@ -208,6 +208,13 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
                 error!("Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
                 return false;
             }
+            // The field at the raw address of object should be logged, too.
+            if !VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+                .is_unlogged::<VM>(object.to_raw_address(), Ordering::SeqCst)
+            {
+                error!("Object {} field {} is not unlogged (all objects that have been traced should be unlogged/mature)", object, object.to_raw_address());
+                return false;
+            }
 
             // Every reachable object should be marked
             if self.immix.immix_space.in_space(object) && !self.immix.immix_space.is_marked(object)
