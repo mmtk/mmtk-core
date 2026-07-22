@@ -32,6 +32,22 @@ Notes for the mmtk-core developers:
 
 ## 0.33.0
 
+### `Slot` is required to implement `Sync`
+
+```admonish tldr
+`vm::slot::Slot` now needs to implement `Sync`.
+```
+
+API changes:
+-   module `vm::slot`
+    +   `Slot`: Now required to implement `Sync`
+        *   The provided `SimpleSlot` in mmtk-core already implements `Sync`.  If the VM binding
+            uses it, no change is needed.
+        *   If the VM binding's `Slot` implementation does not include raw pointers (`*const T` and
+            `*mut T`), chance is high that it automatically implements `Sync`.  If this is the case,
+            no change is needed.
+        *   Otherwise, the VM binding should declare `unsafe impl Sync for ...` for the slot type.
+
 ### Thread IDs require `Debug` instead of `Display`
 
 ```admonish tldr
