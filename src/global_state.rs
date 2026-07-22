@@ -392,24 +392,16 @@ impl GcStatusWord {
     /// status if collection cannot be disabled from the current status (e.g. a GC is in progress
     /// or has been requested).
     pub(crate) fn set_disabled(&self) -> bool {
-        let mut cur = self.0.load(Ordering::SeqCst);
-        loop {
-            let status = Self::decode(cur);
-            let next = match status {
-                GcStatus::Disabled(depth) => GcStatus::Disabled(depth + 1),
-                GcStatus::NotInGC => GcStatus::Disabled(1),
-                _ => return false,
-            };
-            match self.0.compare_exchange_weak(
-                cur,
-                Self::encode(next),
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
-                Ok(_) => return true,
-                Err(actual) => cur = actual,
-            }
-        }
+        self.0
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
+                let next = match Self::decode(bits) {
+                    GcStatus::Disabled(depth) => GcStatus::Disabled(depth + 1),
+                    GcStatus::NotInGC => GcStatus::Disabled(1),
+                    _ => return None,
+                };
+                Some(Self::encode(next))
+            })
+            .is_ok()
     }
 
     /// `Disabled(depth)` -> `Disabled(depth - 1)`, or `Disabled(1)` -> `NotInGC`. Panics if
