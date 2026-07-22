@@ -1,9 +1,9 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/scheduler/gc_work.rs`."><title>gc_work.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.92.0 (ded5c06cf 2025-12-08)" data-channel="1.92.0" data-search-js="search-d69d8955.js" data-stringdex-js="stringdex-c3e638e9.js" data-settings-js="settings-c38705f0.js" ><script src="../../../static.files/storage-e2aeef58.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-ce535bd0.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">mmtk/scheduler/</div>gc_work.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <a href=#2 id=2 data-nosnippet>2</a><span class="kw">use super</span>::<span class="kw-2">*</span>;
-<a href=#3 id=3 data-nosnippet>3</a><span class="kw">use </span><span class="kw">crate</span>::global_state::GcStatus;
-<a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
-<a href=#5 id=5 data-nosnippet>5</a><span class="kw">use crate</span>::<span class="kw-2">*</span>;
-<a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span>std::marker::PhantomData;
+<a href=#3 id=3 data-nosnippet>3</a><span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
+<a href=#4 id=4 data-nosnippet>4</a><span class="kw">use crate</span>::<span class="kw-2">*</span>;
+<a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span>std::marker::PhantomData;
+<a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span>std::sync::atomic::Ordering;
 <a href=#7 id=7 data-nosnippet>7</a>
 <a href=#8 id=8 data-nosnippet>8</a><span class="kw">pub struct </span>ScheduleCollection;
 <a href=#9 id=9 data-nosnippet>9</a>
@@ -20,262 +20,264 @@
 <a href=#20 id=20 data-nosnippet>20</a>        <span class="kw">if </span>is_emergency {
 <a href=#21 id=21 data-nosnippet>21</a>            mmtk.get_plan().notify_emergency_collection();
 <a href=#22 id=22 data-nosnippet>22</a>        }
-<a href=#23 id=23 data-nosnippet>23</a>        <span class="comment">// Set to GcPrepare
-<a href=#24 id=24 data-nosnippet>24</a>        </span>mmtk.set_gc_status(GcStatus::GcPrepare);
-<a href=#25 id=25 data-nosnippet>25</a>
-<a href=#26 id=26 data-nosnippet>26</a>        <span class="comment">// Let the plan to schedule collection work
-<a href=#27 id=27 data-nosnippet>27</a>        </span>mmtk.get_plan().schedule_collection(worker.scheduler());
-<a href=#28 id=28 data-nosnippet>28</a>    }
-<a href=#29 id=29 data-nosnippet>29</a>}
-<a href=#30 id=30 data-nosnippet>30</a>
-<a href=#31 id=31 data-nosnippet>31</a><span class="doccomment">/// The global GC Preparation Work
-<a href=#32 id=32 data-nosnippet>32</a>/// This work packet invokes prepare() for the plan (which will invoke prepare() for each space), and
-<a href=#33 id=33 data-nosnippet>33</a>/// pushes work packets for preparing mutators and collectors.
-<a href=#34 id=34 data-nosnippet>34</a>/// We should only have one such work packet per GC, before any actual GC work starts.
-<a href=#35 id=35 data-nosnippet>35</a>/// We assume this work packet is the only running work packet that accesses plan, and there should
-<a href=#36 id=36 data-nosnippet>36</a>/// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
-<a href=#37 id=37 data-nosnippet>37</a>/// be a race condition.
-<a href=#38 id=38 data-nosnippet>38</a></span><span class="kw">pub struct </span>Prepare&lt;C: GCWorkContext&gt; {
-<a href=#39 id=39 data-nosnippet>39</a>    <span class="kw">pub </span>plan: <span class="kw-2">*const </span>C::PlanType,
-<a href=#40 id=40 data-nosnippet>40</a>}
-<a href=#41 id=41 data-nosnippet>41</a>
-<a href=#42 id=42 data-nosnippet>42</a><span class="kw">unsafe impl</span>&lt;C: GCWorkContext&gt; Send <span class="kw">for </span>Prepare&lt;C&gt; {}
-<a href=#43 id=43 data-nosnippet>43</a>
-<a href=#44 id=44 data-nosnippet>44</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; Prepare&lt;C&gt; {
-<a href=#45 id=45 data-nosnippet>45</a>    <span class="kw">pub fn </span>new(plan: <span class="kw-2">*const </span>C::PlanType) -&gt; <span class="self">Self </span>{
-<a href=#46 id=46 data-nosnippet>46</a>        <span class="self">Self </span>{ plan }
-<a href=#47 id=47 data-nosnippet>47</a>    }
-<a href=#48 id=48 data-nosnippet>48</a>}
-<a href=#49 id=49 data-nosnippet>49</a>
-<a href=#50 id=50 data-nosnippet>50</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>Prepare&lt;C&gt; {
-<a href=#51 id=51 data-nosnippet>51</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
-<a href=#52 id=52 data-nosnippet>52</a>        <span class="macro">trace!</span>(<span class="string">"Prepare Global"</span>);
-<a href=#53 id=53 data-nosnippet>53</a>        <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution
-<a href=#54 id=54 data-nosnippet>54</a>        </span><span class="kw">let </span>plan_mut: <span class="kw-2">&amp;mut </span>C::PlanType = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.plan <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
-<a href=#55 id=55 data-nosnippet>55</a>        plan_mut.prepare(worker.tls);
-<a href=#56 id=56 data-nosnippet>56</a>
-<a href=#57 id=57 data-nosnippet>57</a>        <span class="kw">if </span>plan_mut.constraints().needs_prepare_mutator {
-<a href=#58 id=58 data-nosnippet>58</a>            <span class="kw">let </span>prepare_mutator_packets = &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::mutators()
-<a href=#59 id=59 data-nosnippet>59</a>                .map(|mutator| Box::new(PrepareMutator::&lt;C::VM&gt;::new(mutator)) <span class="kw">as _</span>)
-<a href=#60 id=60 data-nosnippet>60</a>                .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
-<a href=#61 id=61 data-nosnippet>61</a>            <span class="comment">// Just in case the VM binding is inconsistent about the number of mutators and the actual mutator list.
-<a href=#62 id=62 data-nosnippet>62</a>            </span><span class="macro">debug_assert_eq!</span>(
-<a href=#63 id=63 data-nosnippet>63</a>                prepare_mutator_packets.len(),
-<a href=#64 id=64 data-nosnippet>64</a>                &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::number_of_mutators()
-<a href=#65 id=65 data-nosnippet>65</a>            );
-<a href=#66 id=66 data-nosnippet>66</a>            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].bulk_add(prepare_mutator_packets);
-<a href=#67 id=67 data-nosnippet>67</a>        }
-<a href=#68 id=68 data-nosnippet>68</a>
-<a href=#69 id=69 data-nosnippet>69</a>        <span class="kw">for </span>w <span class="kw">in </span><span class="kw-2">&amp;</span>mmtk.scheduler.worker_group.workers_shared {
-<a href=#70 id=70 data-nosnippet>70</a>            <span class="kw">let </span>result = w.designated_work.push(Box::new(PrepareCollector));
-<a href=#71 id=71 data-nosnippet>71</a>            <span class="macro">debug_assert!</span>(result.is_ok());
-<a href=#72 id=72 data-nosnippet>72</a>        }
-<a href=#73 id=73 data-nosnippet>73</a>    }
-<a href=#74 id=74 data-nosnippet>74</a>}
-<a href=#75 id=75 data-nosnippet>75</a>
-<a href=#76 id=76 data-nosnippet>76</a><span class="doccomment">/// The mutator GC Preparation Work
-<a href=#77 id=77 data-nosnippet>77</a></span><span class="kw">pub struct </span>PrepareMutator&lt;VM: VMBinding&gt; {
-<a href=#78 id=78 data-nosnippet>78</a>    <span class="comment">// The mutator reference has static lifetime.
-<a href=#79 id=79 data-nosnippet>79</a>    // It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.
-<a href=#80 id=80 data-nosnippet>80</a>    </span><span class="kw">pub </span>mutator: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
-<a href=#81 id=81 data-nosnippet>81</a>}
-<a href=#82 id=82 data-nosnippet>82</a>
-<a href=#83 id=83 data-nosnippet>83</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; PrepareMutator&lt;VM&gt; {
-<a href=#84 id=84 data-nosnippet>84</a>    <span class="kw">pub fn </span>new(mutator: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;) -&gt; <span class="self">Self </span>{
-<a href=#85 id=85 data-nosnippet>85</a>        <span class="self">Self </span>{ mutator }
-<a href=#86 id=86 data-nosnippet>86</a>    }
-<a href=#87 id=87 data-nosnippet>87</a>}
-<a href=#88 id=88 data-nosnippet>88</a>
-<a href=#89 id=89 data-nosnippet>89</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>PrepareMutator&lt;VM&gt; {
-<a href=#90 id=90 data-nosnippet>90</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-<a href=#91 id=91 data-nosnippet>91</a>        <span class="macro">trace!</span>(<span class="string">"Prepare Mutator"</span>);
-<a href=#92 id=92 data-nosnippet>92</a>        <span class="self">self</span>.mutator.prepare(worker.tls);
-<a href=#93 id=93 data-nosnippet>93</a>    }
-<a href=#94 id=94 data-nosnippet>94</a>}
-<a href=#95 id=95 data-nosnippet>95</a>
-<a href=#96 id=96 data-nosnippet>96</a><span class="doccomment">/// The collector GC Preparation Work
-<a href=#97 id=97 data-nosnippet>97</a></span><span class="attr">#[derive(Default)]
-<a href=#98 id=98 data-nosnippet>98</a></span><span class="kw">pub struct </span>PrepareCollector;
-<a href=#99 id=99 data-nosnippet>99</a>
-<a href=#100 id=100 data-nosnippet>100</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>PrepareCollector {
-<a href=#101 id=101 data-nosnippet>101</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-<a href=#102 id=102 data-nosnippet>102</a>        <span class="macro">trace!</span>(<span class="string">"Prepare Collector"</span>);
-<a href=#103 id=103 data-nosnippet>103</a>        worker.get_copy_context_mut().prepare();
-<a href=#104 id=104 data-nosnippet>104</a>        mmtk.get_plan().prepare_worker(worker);
-<a href=#105 id=105 data-nosnippet>105</a>    }
-<a href=#106 id=106 data-nosnippet>106</a>}
-<a href=#107 id=107 data-nosnippet>107</a>
-<a href=#108 id=108 data-nosnippet>108</a><span class="doccomment">/// The global GC release Work
-<a href=#109 id=109 data-nosnippet>109</a>/// This work packet invokes release() for the plan (which will invoke release() for each space), and
-<a href=#110 id=110 data-nosnippet>110</a>/// pushes work packets for releasing mutators and collectors.
-<a href=#111 id=111 data-nosnippet>111</a>/// We should only have one such work packet per GC, after all actual GC work ends.
-<a href=#112 id=112 data-nosnippet>112</a>/// We assume this work packet is the only running work packet that accesses plan, and there should
-<a href=#113 id=113 data-nosnippet>113</a>/// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
-<a href=#114 id=114 data-nosnippet>114</a>/// be a race condition.
-<a href=#115 id=115 data-nosnippet>115</a></span><span class="kw">pub struct </span>Release&lt;C: GCWorkContext&gt; {
-<a href=#116 id=116 data-nosnippet>116</a>    <span class="kw">pub </span>plan: <span class="kw-2">*const </span>C::PlanType,
-<a href=#117 id=117 data-nosnippet>117</a>}
-<a href=#118 id=118 data-nosnippet>118</a>
-<a href=#119 id=119 data-nosnippet>119</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; Release&lt;C&gt; {
-<a href=#120 id=120 data-nosnippet>120</a>    <span class="kw">pub fn </span>new(plan: <span class="kw-2">*const </span>C::PlanType) -&gt; <span class="self">Self </span>{
-<a href=#121 id=121 data-nosnippet>121</a>        <span class="self">Self </span>{ plan }
-<a href=#122 id=122 data-nosnippet>122</a>    }
-<a href=#123 id=123 data-nosnippet>123</a>}
-<a href=#124 id=124 data-nosnippet>124</a>
-<a href=#125 id=125 data-nosnippet>125</a><span class="kw">unsafe impl</span>&lt;C: GCWorkContext&gt; Send <span class="kw">for </span>Release&lt;C&gt; {}
-<a href=#126 id=126 data-nosnippet>126</a>
-<a href=#127 id=127 data-nosnippet>127</a><span class="kw">impl</span>&lt;C: GCWorkContext + <span class="lifetime">'static</span>&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>Release&lt;C&gt; {
-<a href=#128 id=128 data-nosnippet>128</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
-<a href=#129 id=129 data-nosnippet>129</a>        <span class="macro">trace!</span>(<span class="string">"Release Global"</span>);
-<a href=#130 id=130 data-nosnippet>130</a>
-<a href=#131 id=131 data-nosnippet>131</a>        mmtk.gc_trigger.policy.on_gc_release(mmtk);
-<a href=#132 id=132 data-nosnippet>132</a>        <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution
+<a href=#23 id=23 data-nosnippet>23</a>        mmtk.state.stacks_prepared.store(<span class="bool-val">false</span>, Ordering::SeqCst);
+<a href=#24 id=24 data-nosnippet>24</a>        <span class="comment">// FIXME: This seems to be a weird place to start counting GC statistics.
+<a href=#25 id=25 data-nosnippet>25</a>        // This is not when we set the status to PauseRequested or InPause. Instead, this is just a random place during transition
+<a href=#26 id=26 data-nosnippet>26</a>        // See https://github.com/mmtk/mmtk-core/issues/1330
+<a href=#27 id=27 data-nosnippet>27</a>        </span>mmtk.stats.start_gc();
+<a href=#28 id=28 data-nosnippet>28</a>
+<a href=#29 id=29 data-nosnippet>29</a>        <span class="comment">// Let the plan to schedule collection work
+<a href=#30 id=30 data-nosnippet>30</a>        </span>mmtk.get_plan().schedule_collection(worker.scheduler());
+<a href=#31 id=31 data-nosnippet>31</a>    }
+<a href=#32 id=32 data-nosnippet>32</a>}
+<a href=#33 id=33 data-nosnippet>33</a>
+<a href=#34 id=34 data-nosnippet>34</a><span class="doccomment">/// The global GC Preparation Work
+<a href=#35 id=35 data-nosnippet>35</a>/// This work packet invokes prepare() for the plan (which will invoke prepare() for each space), and
+<a href=#36 id=36 data-nosnippet>36</a>/// pushes work packets for preparing mutators and collectors.
+<a href=#37 id=37 data-nosnippet>37</a>/// We should only have one such work packet per GC, before any actual GC work starts.
+<a href=#38 id=38 data-nosnippet>38</a>/// We assume this work packet is the only running work packet that accesses plan, and there should
+<a href=#39 id=39 data-nosnippet>39</a>/// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
+<a href=#40 id=40 data-nosnippet>40</a>/// be a race condition.
+<a href=#41 id=41 data-nosnippet>41</a></span><span class="kw">pub struct </span>Prepare&lt;C: GCWorkContext&gt; {
+<a href=#42 id=42 data-nosnippet>42</a>    <span class="kw">pub </span>plan: <span class="kw-2">*const </span>C::PlanType,
+<a href=#43 id=43 data-nosnippet>43</a>}
+<a href=#44 id=44 data-nosnippet>44</a>
+<a href=#45 id=45 data-nosnippet>45</a><span class="kw">unsafe impl</span>&lt;C: GCWorkContext&gt; Send <span class="kw">for </span>Prepare&lt;C&gt; {}
+<a href=#46 id=46 data-nosnippet>46</a>
+<a href=#47 id=47 data-nosnippet>47</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; Prepare&lt;C&gt; {
+<a href=#48 id=48 data-nosnippet>48</a>    <span class="kw">pub fn </span>new(plan: <span class="kw-2">*const </span>C::PlanType) -&gt; <span class="self">Self </span>{
+<a href=#49 id=49 data-nosnippet>49</a>        <span class="self">Self </span>{ plan }
+<a href=#50 id=50 data-nosnippet>50</a>    }
+<a href=#51 id=51 data-nosnippet>51</a>}
+<a href=#52 id=52 data-nosnippet>52</a>
+<a href=#53 id=53 data-nosnippet>53</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>Prepare&lt;C&gt; {
+<a href=#54 id=54 data-nosnippet>54</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
+<a href=#55 id=55 data-nosnippet>55</a>        <span class="macro">trace!</span>(<span class="string">"Prepare Global"</span>);
+<a href=#56 id=56 data-nosnippet>56</a>        <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution
+<a href=#57 id=57 data-nosnippet>57</a>        </span><span class="kw">let </span>plan_mut: <span class="kw-2">&amp;mut </span>C::PlanType = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.plan <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
+<a href=#58 id=58 data-nosnippet>58</a>        plan_mut.prepare(worker.tls);
+<a href=#59 id=59 data-nosnippet>59</a>
+<a href=#60 id=60 data-nosnippet>60</a>        <span class="kw">if </span>plan_mut.constraints().needs_prepare_mutator {
+<a href=#61 id=61 data-nosnippet>61</a>            <span class="kw">let </span>prepare_mutator_packets = &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::mutators()
+<a href=#62 id=62 data-nosnippet>62</a>                .map(|mutator| Box::new(PrepareMutator::&lt;C::VM&gt;::new(mutator)) <span class="kw">as _</span>)
+<a href=#63 id=63 data-nosnippet>63</a>                .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+<a href=#64 id=64 data-nosnippet>64</a>            <span class="comment">// Just in case the VM binding is inconsistent about the number of mutators and the actual mutator list.
+<a href=#65 id=65 data-nosnippet>65</a>            </span><span class="macro">debug_assert_eq!</span>(
+<a href=#66 id=66 data-nosnippet>66</a>                prepare_mutator_packets.len(),
+<a href=#67 id=67 data-nosnippet>67</a>                &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::number_of_mutators()
+<a href=#68 id=68 data-nosnippet>68</a>            );
+<a href=#69 id=69 data-nosnippet>69</a>            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].bulk_add(prepare_mutator_packets);
+<a href=#70 id=70 data-nosnippet>70</a>        }
+<a href=#71 id=71 data-nosnippet>71</a>
+<a href=#72 id=72 data-nosnippet>72</a>        <span class="kw">for </span>w <span class="kw">in </span><span class="kw-2">&amp;</span>mmtk.scheduler.worker_group.workers_shared {
+<a href=#73 id=73 data-nosnippet>73</a>            <span class="kw">let </span>result = w.designated_work.push(Box::new(PrepareCollector));
+<a href=#74 id=74 data-nosnippet>74</a>            <span class="macro">debug_assert!</span>(result.is_ok());
+<a href=#75 id=75 data-nosnippet>75</a>        }
+<a href=#76 id=76 data-nosnippet>76</a>    }
+<a href=#77 id=77 data-nosnippet>77</a>}
+<a href=#78 id=78 data-nosnippet>78</a>
+<a href=#79 id=79 data-nosnippet>79</a><span class="doccomment">/// The mutator GC Preparation Work
+<a href=#80 id=80 data-nosnippet>80</a></span><span class="kw">pub struct </span>PrepareMutator&lt;VM: VMBinding&gt; {
+<a href=#81 id=81 data-nosnippet>81</a>    <span class="comment">// The mutator reference has static lifetime.
+<a href=#82 id=82 data-nosnippet>82</a>    // It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.
+<a href=#83 id=83 data-nosnippet>83</a>    </span><span class="kw">pub </span>mutator: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
+<a href=#84 id=84 data-nosnippet>84</a>}
+<a href=#85 id=85 data-nosnippet>85</a>
+<a href=#86 id=86 data-nosnippet>86</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; PrepareMutator&lt;VM&gt; {
+<a href=#87 id=87 data-nosnippet>87</a>    <span class="kw">pub fn </span>new(mutator: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+<a href=#88 id=88 data-nosnippet>88</a>        <span class="self">Self </span>{ mutator }
+<a href=#89 id=89 data-nosnippet>89</a>    }
+<a href=#90 id=90 data-nosnippet>90</a>}
+<a href=#91 id=91 data-nosnippet>91</a>
+<a href=#92 id=92 data-nosnippet>92</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>PrepareMutator&lt;VM&gt; {
+<a href=#93 id=93 data-nosnippet>93</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+<a href=#94 id=94 data-nosnippet>94</a>        <span class="macro">trace!</span>(<span class="string">"Prepare Mutator"</span>);
+<a href=#95 id=95 data-nosnippet>95</a>        <span class="self">self</span>.mutator.prepare(worker.tls);
+<a href=#96 id=96 data-nosnippet>96</a>    }
+<a href=#97 id=97 data-nosnippet>97</a>}
+<a href=#98 id=98 data-nosnippet>98</a>
+<a href=#99 id=99 data-nosnippet>99</a><span class="doccomment">/// The collector GC Preparation Work
+<a href=#100 id=100 data-nosnippet>100</a></span><span class="attr">#[derive(Default)]
+<a href=#101 id=101 data-nosnippet>101</a></span><span class="kw">pub struct </span>PrepareCollector;
+<a href=#102 id=102 data-nosnippet>102</a>
+<a href=#103 id=103 data-nosnippet>103</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>PrepareCollector {
+<a href=#104 id=104 data-nosnippet>104</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+<a href=#105 id=105 data-nosnippet>105</a>        <span class="macro">trace!</span>(<span class="string">"Prepare Collector"</span>);
+<a href=#106 id=106 data-nosnippet>106</a>        worker.get_copy_context_mut().prepare();
+<a href=#107 id=107 data-nosnippet>107</a>        mmtk.get_plan().prepare_worker(worker);
+<a href=#108 id=108 data-nosnippet>108</a>    }
+<a href=#109 id=109 data-nosnippet>109</a>}
+<a href=#110 id=110 data-nosnippet>110</a>
+<a href=#111 id=111 data-nosnippet>111</a><span class="doccomment">/// The global GC release Work
+<a href=#112 id=112 data-nosnippet>112</a>/// This work packet invokes release() for the plan (which will invoke release() for each space), and
+<a href=#113 id=113 data-nosnippet>113</a>/// pushes work packets for releasing mutators and collectors.
+<a href=#114 id=114 data-nosnippet>114</a>/// We should only have one such work packet per GC, after all actual GC work ends.
+<a href=#115 id=115 data-nosnippet>115</a>/// We assume this work packet is the only running work packet that accesses plan, and there should
+<a href=#116 id=116 data-nosnippet>116</a>/// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
+<a href=#117 id=117 data-nosnippet>117</a>/// be a race condition.
+<a href=#118 id=118 data-nosnippet>118</a></span><span class="kw">pub struct </span>Release&lt;C: GCWorkContext&gt; {
+<a href=#119 id=119 data-nosnippet>119</a>    <span class="kw">pub </span>plan: <span class="kw-2">*const </span>C::PlanType,
+<a href=#120 id=120 data-nosnippet>120</a>}
+<a href=#121 id=121 data-nosnippet>121</a>
+<a href=#122 id=122 data-nosnippet>122</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; Release&lt;C&gt; {
+<a href=#123 id=123 data-nosnippet>123</a>    <span class="kw">pub fn </span>new(plan: <span class="kw-2">*const </span>C::PlanType) -&gt; <span class="self">Self </span>{
+<a href=#124 id=124 data-nosnippet>124</a>        <span class="self">Self </span>{ plan }
+<a href=#125 id=125 data-nosnippet>125</a>    }
+<a href=#126 id=126 data-nosnippet>126</a>}
+<a href=#127 id=127 data-nosnippet>127</a>
+<a href=#128 id=128 data-nosnippet>128</a><span class="kw">unsafe impl</span>&lt;C: GCWorkContext&gt; Send <span class="kw">for </span>Release&lt;C&gt; {}
+<a href=#129 id=129 data-nosnippet>129</a>
+<a href=#130 id=130 data-nosnippet>130</a><span class="kw">impl</span>&lt;C: GCWorkContext + <span class="lifetime">'static</span>&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>Release&lt;C&gt; {
+<a href=#131 id=131 data-nosnippet>131</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
+<a href=#132 id=132 data-nosnippet>132</a>        <span class="macro">trace!</span>(<span class="string">"Release Global"</span>);
 <a href=#133 id=133 data-nosnippet>133</a>
-<a href=#134 id=134 data-nosnippet>134</a>        </span><span class="kw">let </span>plan_mut: <span class="kw-2">&amp;mut </span>C::PlanType = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.plan <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
-<a href=#135 id=135 data-nosnippet>135</a>        plan_mut.release(worker.tls);
+<a href=#134 id=134 data-nosnippet>134</a>        mmtk.gc_trigger.policy.on_gc_release(mmtk);
+<a href=#135 id=135 data-nosnippet>135</a>        <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution
 <a href=#136 id=136 data-nosnippet>136</a>
-<a href=#137 id=137 data-nosnippet>137</a>        <span class="kw">let </span>release_mutator_packets = &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::mutators()
-<a href=#138 id=138 data-nosnippet>138</a>            .map(|mutator| Box::new(ReleaseMutator::&lt;C::VM&gt;::new(mutator)) <span class="kw">as _</span>)
-<a href=#139 id=139 data-nosnippet>139</a>            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
-<a href=#140 id=140 data-nosnippet>140</a>        <span class="comment">// Just in case the VM binding is inconsistent about the number of mutators and the actual mutator list.
-<a href=#141 id=141 data-nosnippet>141</a>        </span><span class="macro">debug_assert_eq!</span>(
-<a href=#142 id=142 data-nosnippet>142</a>            release_mutator_packets.len(),
-<a href=#143 id=143 data-nosnippet>143</a>            &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::number_of_mutators()
-<a href=#144 id=144 data-nosnippet>144</a>        );
-<a href=#145 id=145 data-nosnippet>145</a>        mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(release_mutator_packets);
-<a href=#146 id=146 data-nosnippet>146</a>
-<a href=#147 id=147 data-nosnippet>147</a>        <span class="kw">for </span>w <span class="kw">in </span><span class="kw-2">&amp;</span>mmtk.scheduler.worker_group.workers_shared {
-<a href=#148 id=148 data-nosnippet>148</a>            <span class="kw">let </span>result = w.designated_work.push(Box::new(ReleaseCollector));
-<a href=#149 id=149 data-nosnippet>149</a>            <span class="macro">debug_assert!</span>(result.is_ok());
-<a href=#150 id=150 data-nosnippet>150</a>        }
-<a href=#151 id=151 data-nosnippet>151</a>    }
-<a href=#152 id=152 data-nosnippet>152</a>}
-<a href=#153 id=153 data-nosnippet>153</a>
-<a href=#154 id=154 data-nosnippet>154</a><span class="doccomment">/// The mutator release Work
-<a href=#155 id=155 data-nosnippet>155</a></span><span class="kw">pub struct </span>ReleaseMutator&lt;VM: VMBinding&gt; {
-<a href=#156 id=156 data-nosnippet>156</a>    <span class="comment">// The mutator reference has static lifetime.
-<a href=#157 id=157 data-nosnippet>157</a>    // It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.
-<a href=#158 id=158 data-nosnippet>158</a>    </span><span class="kw">pub </span>mutator: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
-<a href=#159 id=159 data-nosnippet>159</a>}
-<a href=#160 id=160 data-nosnippet>160</a>
-<a href=#161 id=161 data-nosnippet>161</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; ReleaseMutator&lt;VM&gt; {
-<a href=#162 id=162 data-nosnippet>162</a>    <span class="kw">pub fn </span>new(mutator: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;) -&gt; <span class="self">Self </span>{
-<a href=#163 id=163 data-nosnippet>163</a>        <span class="self">Self </span>{ mutator }
-<a href=#164 id=164 data-nosnippet>164</a>    }
-<a href=#165 id=165 data-nosnippet>165</a>}
-<a href=#166 id=166 data-nosnippet>166</a>
-<a href=#167 id=167 data-nosnippet>167</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>ReleaseMutator&lt;VM&gt; {
-<a href=#168 id=168 data-nosnippet>168</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-<a href=#169 id=169 data-nosnippet>169</a>        <span class="macro">trace!</span>(<span class="string">"Release Mutator"</span>);
-<a href=#170 id=170 data-nosnippet>170</a>        <span class="self">self</span>.mutator.release(worker.tls);
-<a href=#171 id=171 data-nosnippet>171</a>    }
-<a href=#172 id=172 data-nosnippet>172</a>}
-<a href=#173 id=173 data-nosnippet>173</a>
-<a href=#174 id=174 data-nosnippet>174</a><span class="doccomment">/// The collector release Work
-<a href=#175 id=175 data-nosnippet>175</a></span><span class="attr">#[derive(Default)]
-<a href=#176 id=176 data-nosnippet>176</a></span><span class="kw">pub struct </span>ReleaseCollector;
-<a href=#177 id=177 data-nosnippet>177</a>
-<a href=#178 id=178 data-nosnippet>178</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>ReleaseCollector {
-<a href=#179 id=179 data-nosnippet>179</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-<a href=#180 id=180 data-nosnippet>180</a>        <span class="macro">trace!</span>(<span class="string">"Release Collector"</span>);
-<a href=#181 id=181 data-nosnippet>181</a>        worker.get_copy_context_mut().release();
-<a href=#182 id=182 data-nosnippet>182</a>    }
-<a href=#183 id=183 data-nosnippet>183</a>}
-<a href=#184 id=184 data-nosnippet>184</a>
-<a href=#185 id=185 data-nosnippet>185</a><span class="doccomment">/// Stop all mutators
-<a href=#186 id=186 data-nosnippet>186</a>///
-<a href=#187 id=187 data-nosnippet>187</a>/// TODO: Smaller work granularity
-<a href=#188 id=188 data-nosnippet>188</a></span><span class="attr">#[derive(Default)]
-<a href=#189 id=189 data-nosnippet>189</a></span><span class="kw">pub struct </span>StopMutators&lt;C: GCWorkContext&gt; {
-<a href=#190 id=190 data-nosnippet>190</a>    <span class="doccomment">/// If this is true, we skip creating root-scanning work packets.
-<a href=#191 id=191 data-nosnippet>191</a>    /// By default, this is false.
-<a href=#192 id=192 data-nosnippet>192</a>    </span>skip_roots: bool,
-<a href=#193 id=193 data-nosnippet>193</a>    <span class="doccomment">/// Flush mutators once they are stopped. By default this is false. [`ScanMutatorRoots`] will flush mutators.
-<a href=#194 id=194 data-nosnippet>194</a>    </span>flush_mutator: bool,
-<a href=#195 id=195 data-nosnippet>195</a>    phantom: PhantomData&lt;C&gt;,
-<a href=#196 id=196 data-nosnippet>196</a>}
-<a href=#197 id=197 data-nosnippet>197</a>
-<a href=#198 id=198 data-nosnippet>198</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; StopMutators&lt;C&gt; {
-<a href=#199 id=199 data-nosnippet>199</a>    <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
-<a href=#200 id=200 data-nosnippet>200</a>        <span class="self">Self </span>{
-<a href=#201 id=201 data-nosnippet>201</a>            skip_roots: <span class="bool-val">false</span>,
-<a href=#202 id=202 data-nosnippet>202</a>            flush_mutator: <span class="bool-val">false</span>,
-<a href=#203 id=203 data-nosnippet>203</a>            phantom: PhantomData,
-<a href=#204 id=204 data-nosnippet>204</a>        }
-<a href=#205 id=205 data-nosnippet>205</a>    }
-<a href=#206 id=206 data-nosnippet>206</a>
-<a href=#207 id=207 data-nosnippet>207</a>    <span class="doccomment">/// Create a `StopMutators` work packet that does not create any root-scanning work packets, and will simply flush mutators.
-<a href=#208 id=208 data-nosnippet>208</a>    </span><span class="kw">pub fn </span>new_no_scan_roots() -&gt; <span class="self">Self </span>{
-<a href=#209 id=209 data-nosnippet>209</a>        <span class="self">Self </span>{
-<a href=#210 id=210 data-nosnippet>210</a>            skip_roots: <span class="bool-val">true</span>,
-<a href=#211 id=211 data-nosnippet>211</a>            flush_mutator: <span class="bool-val">true</span>,
-<a href=#212 id=212 data-nosnippet>212</a>            phantom: PhantomData,
-<a href=#213 id=213 data-nosnippet>213</a>        }
-<a href=#214 id=214 data-nosnippet>214</a>    }
-<a href=#215 id=215 data-nosnippet>215</a>}
-<a href=#216 id=216 data-nosnippet>216</a>
-<a href=#217 id=217 data-nosnippet>217</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>StopMutators&lt;C&gt; {
-<a href=#218 id=218 data-nosnippet>218</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
-<a href=#219 id=219 data-nosnippet>219</a>        <span class="macro">trace!</span>(<span class="string">"stop_all_mutators start"</span>);
-<a href=#220 id=220 data-nosnippet>220</a>        mmtk.state.prepare_for_stack_scanning();
-<a href=#221 id=221 data-nosnippet>221</a>        &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMCollection::stop_all_mutators(worker.tls, |mutator| {
-<a href=#222 id=222 data-nosnippet>222</a>            <span class="comment">// TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
-<a href=#223 id=223 data-nosnippet>223</a>            // Should we push to Unconstrained instead?
-<a href=#224 id=224 data-nosnippet>224</a>
-<a href=#225 id=225 data-nosnippet>225</a>            </span><span class="kw">if </span><span class="self">self</span>.flush_mutator {
-<a href=#226 id=226 data-nosnippet>226</a>                mutator.flush();
-<a href=#227 id=227 data-nosnippet>227</a>            }
-<a href=#228 id=228 data-nosnippet>228</a>            <span class="kw">if </span>!<span class="self">self</span>.skip_roots {
-<a href=#229 id=229 data-nosnippet>229</a>                mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-<a href=#230 id=230 data-nosnippet>230</a>                    .add(ScanMutatorRoots::&lt;C&gt;(mutator));
-<a href=#231 id=231 data-nosnippet>231</a>            }
-<a href=#232 id=232 data-nosnippet>232</a>        });
-<a href=#233 id=233 data-nosnippet>233</a>        <span class="macro">trace!</span>(<span class="string">"stop_all_mutators end"</span>);
-<a href=#234 id=234 data-nosnippet>234</a>        mmtk.get_plan().notify_mutators_paused(<span class="kw-2">&amp;</span>mmtk.scheduler);
-<a href=#235 id=235 data-nosnippet>235</a>        mmtk.scheduler.notify_mutators_paused(mmtk);
-<a href=#236 id=236 data-nosnippet>236</a>        <span class="kw">if </span>!<span class="self">self</span>.skip_roots {
-<a href=#237 id=237 data-nosnippet>237</a>            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-<a href=#238 id=238 data-nosnippet>238</a>                .add(ScanVMSpecificRoots::&lt;C&gt;::new());
-<a href=#239 id=239 data-nosnippet>239</a>        }
-<a href=#240 id=240 data-nosnippet>240</a>    }
-<a href=#241 id=241 data-nosnippet>241</a>}
-<a href=#242 id=242 data-nosnippet>242</a>
-<a href=#243 id=243 data-nosnippet>243</a><span class="kw">pub struct </span>ScanMutatorRoots&lt;C: GCWorkContext&gt;(<span class="kw">pub </span><span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;C::VM&gt;);
-<a href=#244 id=244 data-nosnippet>244</a>
-<a href=#245 id=245 data-nosnippet>245</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>ScanMutatorRoots&lt;C&gt; {
-<a href=#246 id=246 data-nosnippet>246</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
-<a href=#247 id=247 data-nosnippet>247</a>        <span class="macro">trace!</span>(<span class="string">"ScanMutatorRoots for mutator {:?}"</span>, <span class="self">self</span>.<span class="number">0</span>.get_tls());
-<a href=#248 id=248 data-nosnippet>248</a>        <span class="kw">let </span>mutators = &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::number_of_mutators();
-<a href=#249 id=249 data-nosnippet>249</a>        <span class="kw">let </span>factory = C::make_roots_work_factory(mmtk);
-<a href=#250 id=250 data-nosnippet>250</a>        &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_roots_in_mutator_thread(
-<a href=#251 id=251 data-nosnippet>251</a>            worker.tls,
-<a href=#252 id=252 data-nosnippet>252</a>            <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>) },
-<a href=#253 id=253 data-nosnippet>253</a>            factory,
-<a href=#254 id=254 data-nosnippet>254</a>        );
-<a href=#255 id=255 data-nosnippet>255</a>        <span class="self">self</span>.<span class="number">0</span>.flush();
-<a href=#256 id=256 data-nosnippet>256</a>
-<a href=#257 id=257 data-nosnippet>257</a>        <span class="kw">if </span>mmtk.state.inform_stack_scanned(mutators) {
-<a href=#258 id=258 data-nosnippet>258</a>            &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::notify_initial_thread_scan_complete(
-<a href=#259 id=259 data-nosnippet>259</a>                <span class="bool-val">false</span>, worker.tls,
-<a href=#260 id=260 data-nosnippet>260</a>            );
-<a href=#261 id=261 data-nosnippet>261</a>            mmtk.set_gc_status(GcStatus::GcProper);
-<a href=#262 id=262 data-nosnippet>262</a>        }
-<a href=#263 id=263 data-nosnippet>263</a>    }
-<a href=#264 id=264 data-nosnippet>264</a>}
-<a href=#265 id=265 data-nosnippet>265</a>
-<a href=#266 id=266 data-nosnippet>266</a><span class="attr">#[derive(Default)]
-<a href=#267 id=267 data-nosnippet>267</a></span><span class="kw">pub struct </span>ScanVMSpecificRoots&lt;C: GCWorkContext&gt;(PhantomData&lt;C&gt;);
-<a href=#268 id=268 data-nosnippet>268</a>
-<a href=#269 id=269 data-nosnippet>269</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; ScanVMSpecificRoots&lt;C&gt; {
-<a href=#270 id=270 data-nosnippet>270</a>    <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
-<a href=#271 id=271 data-nosnippet>271</a>        <span class="self">Self</span>(PhantomData)
-<a href=#272 id=272 data-nosnippet>272</a>    }
-<a href=#273 id=273 data-nosnippet>273</a>}
-<a href=#274 id=274 data-nosnippet>274</a>
-<a href=#275 id=275 data-nosnippet>275</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>ScanVMSpecificRoots&lt;C&gt; {
-<a href=#276 id=276 data-nosnippet>276</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
-<a href=#277 id=277 data-nosnippet>277</a>        <span class="macro">trace!</span>(<span class="string">"ScanStaticRoots"</span>);
-<a href=#278 id=278 data-nosnippet>278</a>        <span class="kw">let </span>factory = C::make_roots_work_factory(mmtk);
-<a href=#279 id=279 data-nosnippet>279</a>        &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_vm_specific_roots(worker.tls, factory);
-<a href=#280 id=280 data-nosnippet>280</a>    }
-<a href=#281 id=281 data-nosnippet>281</a>}</code></pre></div></section></main></body></html>
+<a href=#137 id=137 data-nosnippet>137</a>        </span><span class="kw">let </span>plan_mut: <span class="kw-2">&amp;mut </span>C::PlanType = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.plan <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
+<a href=#138 id=138 data-nosnippet>138</a>        plan_mut.release(worker.tls);
+<a href=#139 id=139 data-nosnippet>139</a>
+<a href=#140 id=140 data-nosnippet>140</a>        <span class="kw">let </span>release_mutator_packets = &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::mutators()
+<a href=#141 id=141 data-nosnippet>141</a>            .map(|mutator| Box::new(ReleaseMutator::&lt;C::VM&gt;::new(mutator)) <span class="kw">as _</span>)
+<a href=#142 id=142 data-nosnippet>142</a>            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+<a href=#143 id=143 data-nosnippet>143</a>        <span class="comment">// Just in case the VM binding is inconsistent about the number of mutators and the actual mutator list.
+<a href=#144 id=144 data-nosnippet>144</a>        </span><span class="macro">debug_assert_eq!</span>(
+<a href=#145 id=145 data-nosnippet>145</a>            release_mutator_packets.len(),
+<a href=#146 id=146 data-nosnippet>146</a>            &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::number_of_mutators()
+<a href=#147 id=147 data-nosnippet>147</a>        );
+<a href=#148 id=148 data-nosnippet>148</a>        mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(release_mutator_packets);
+<a href=#149 id=149 data-nosnippet>149</a>
+<a href=#150 id=150 data-nosnippet>150</a>        <span class="kw">for </span>w <span class="kw">in </span><span class="kw-2">&amp;</span>mmtk.scheduler.worker_group.workers_shared {
+<a href=#151 id=151 data-nosnippet>151</a>            <span class="kw">let </span>result = w.designated_work.push(Box::new(ReleaseCollector));
+<a href=#152 id=152 data-nosnippet>152</a>            <span class="macro">debug_assert!</span>(result.is_ok());
+<a href=#153 id=153 data-nosnippet>153</a>        }
+<a href=#154 id=154 data-nosnippet>154</a>    }
+<a href=#155 id=155 data-nosnippet>155</a>}
+<a href=#156 id=156 data-nosnippet>156</a>
+<a href=#157 id=157 data-nosnippet>157</a><span class="doccomment">/// The mutator release Work
+<a href=#158 id=158 data-nosnippet>158</a></span><span class="kw">pub struct </span>ReleaseMutator&lt;VM: VMBinding&gt; {
+<a href=#159 id=159 data-nosnippet>159</a>    <span class="comment">// The mutator reference has static lifetime.
+<a href=#160 id=160 data-nosnippet>160</a>    // It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.
+<a href=#161 id=161 data-nosnippet>161</a>    </span><span class="kw">pub </span>mutator: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
+<a href=#162 id=162 data-nosnippet>162</a>}
+<a href=#163 id=163 data-nosnippet>163</a>
+<a href=#164 id=164 data-nosnippet>164</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; ReleaseMutator&lt;VM&gt; {
+<a href=#165 id=165 data-nosnippet>165</a>    <span class="kw">pub fn </span>new(mutator: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+<a href=#166 id=166 data-nosnippet>166</a>        <span class="self">Self </span>{ mutator }
+<a href=#167 id=167 data-nosnippet>167</a>    }
+<a href=#168 id=168 data-nosnippet>168</a>}
+<a href=#169 id=169 data-nosnippet>169</a>
+<a href=#170 id=170 data-nosnippet>170</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>ReleaseMutator&lt;VM&gt; {
+<a href=#171 id=171 data-nosnippet>171</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+<a href=#172 id=172 data-nosnippet>172</a>        <span class="macro">trace!</span>(<span class="string">"Release Mutator"</span>);
+<a href=#173 id=173 data-nosnippet>173</a>        <span class="self">self</span>.mutator.release(worker.tls);
+<a href=#174 id=174 data-nosnippet>174</a>    }
+<a href=#175 id=175 data-nosnippet>175</a>}
+<a href=#176 id=176 data-nosnippet>176</a>
+<a href=#177 id=177 data-nosnippet>177</a><span class="doccomment">/// The collector release Work
+<a href=#178 id=178 data-nosnippet>178</a></span><span class="attr">#[derive(Default)]
+<a href=#179 id=179 data-nosnippet>179</a></span><span class="kw">pub struct </span>ReleaseCollector;
+<a href=#180 id=180 data-nosnippet>180</a>
+<a href=#181 id=181 data-nosnippet>181</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>ReleaseCollector {
+<a href=#182 id=182 data-nosnippet>182</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+<a href=#183 id=183 data-nosnippet>183</a>        <span class="macro">trace!</span>(<span class="string">"Release Collector"</span>);
+<a href=#184 id=184 data-nosnippet>184</a>        worker.get_copy_context_mut().release();
+<a href=#185 id=185 data-nosnippet>185</a>    }
+<a href=#186 id=186 data-nosnippet>186</a>}
+<a href=#187 id=187 data-nosnippet>187</a>
+<a href=#188 id=188 data-nosnippet>188</a><span class="doccomment">/// Stop all mutators
+<a href=#189 id=189 data-nosnippet>189</a>///
+<a href=#190 id=190 data-nosnippet>190</a>/// TODO: Smaller work granularity
+<a href=#191 id=191 data-nosnippet>191</a></span><span class="attr">#[derive(Default)]
+<a href=#192 id=192 data-nosnippet>192</a></span><span class="kw">pub struct </span>StopMutators&lt;C: GCWorkContext&gt; {
+<a href=#193 id=193 data-nosnippet>193</a>    <span class="doccomment">/// If this is true, we skip creating root-scanning work packets.
+<a href=#194 id=194 data-nosnippet>194</a>    /// By default, this is false.
+<a href=#195 id=195 data-nosnippet>195</a>    </span>skip_roots: bool,
+<a href=#196 id=196 data-nosnippet>196</a>    <span class="doccomment">/// Flush mutators once they are stopped. By default this is false. [`ScanMutatorRoots`] will flush mutators.
+<a href=#197 id=197 data-nosnippet>197</a>    </span>flush_mutator: bool,
+<a href=#198 id=198 data-nosnippet>198</a>    phantom: PhantomData&lt;C&gt;,
+<a href=#199 id=199 data-nosnippet>199</a>}
+<a href=#200 id=200 data-nosnippet>200</a>
+<a href=#201 id=201 data-nosnippet>201</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; StopMutators&lt;C&gt; {
+<a href=#202 id=202 data-nosnippet>202</a>    <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+<a href=#203 id=203 data-nosnippet>203</a>        <span class="self">Self </span>{
+<a href=#204 id=204 data-nosnippet>204</a>            skip_roots: <span class="bool-val">false</span>,
+<a href=#205 id=205 data-nosnippet>205</a>            flush_mutator: <span class="bool-val">false</span>,
+<a href=#206 id=206 data-nosnippet>206</a>            phantom: PhantomData,
+<a href=#207 id=207 data-nosnippet>207</a>        }
+<a href=#208 id=208 data-nosnippet>208</a>    }
+<a href=#209 id=209 data-nosnippet>209</a>
+<a href=#210 id=210 data-nosnippet>210</a>    <span class="doccomment">/// Create a `StopMutators` work packet that does not create any root-scanning work packets, and will simply flush mutators.
+<a href=#211 id=211 data-nosnippet>211</a>    </span><span class="kw">pub fn </span>new_no_scan_roots() -&gt; <span class="self">Self </span>{
+<a href=#212 id=212 data-nosnippet>212</a>        <span class="self">Self </span>{
+<a href=#213 id=213 data-nosnippet>213</a>            skip_roots: <span class="bool-val">true</span>,
+<a href=#214 id=214 data-nosnippet>214</a>            flush_mutator: <span class="bool-val">true</span>,
+<a href=#215 id=215 data-nosnippet>215</a>            phantom: PhantomData,
+<a href=#216 id=216 data-nosnippet>216</a>        }
+<a href=#217 id=217 data-nosnippet>217</a>    }
+<a href=#218 id=218 data-nosnippet>218</a>}
+<a href=#219 id=219 data-nosnippet>219</a>
+<a href=#220 id=220 data-nosnippet>220</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>StopMutators&lt;C&gt; {
+<a href=#221 id=221 data-nosnippet>221</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
+<a href=#222 id=222 data-nosnippet>222</a>        <span class="macro">trace!</span>(<span class="string">"stop_all_mutators start"</span>);
+<a href=#223 id=223 data-nosnippet>223</a>        mmtk.state.prepare_for_stack_scanning();
+<a href=#224 id=224 data-nosnippet>224</a>        &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMCollection::stop_all_mutators(worker.tls, |mutator| {
+<a href=#225 id=225 data-nosnippet>225</a>            <span class="comment">// TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
+<a href=#226 id=226 data-nosnippet>226</a>            // Should we push to Unconstrained instead?
+<a href=#227 id=227 data-nosnippet>227</a>
+<a href=#228 id=228 data-nosnippet>228</a>            </span><span class="kw">if </span><span class="self">self</span>.flush_mutator {
+<a href=#229 id=229 data-nosnippet>229</a>                mutator.flush();
+<a href=#230 id=230 data-nosnippet>230</a>            }
+<a href=#231 id=231 data-nosnippet>231</a>            <span class="kw">if </span>!<span class="self">self</span>.skip_roots {
+<a href=#232 id=232 data-nosnippet>232</a>                mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+<a href=#233 id=233 data-nosnippet>233</a>                    .add(ScanMutatorRoots::&lt;C&gt;(mutator));
+<a href=#234 id=234 data-nosnippet>234</a>            }
+<a href=#235 id=235 data-nosnippet>235</a>        });
+<a href=#236 id=236 data-nosnippet>236</a>        <span class="macro">trace!</span>(<span class="string">"stop_all_mutators end"</span>);
+<a href=#237 id=237 data-nosnippet>237</a>        mmtk.get_plan().notify_mutators_paused(<span class="kw-2">&amp;</span>mmtk.scheduler);
+<a href=#238 id=238 data-nosnippet>238</a>        mmtk.scheduler.notify_mutators_paused(mmtk);
+<a href=#239 id=239 data-nosnippet>239</a>        <span class="kw">if </span>!<span class="self">self</span>.skip_roots {
+<a href=#240 id=240 data-nosnippet>240</a>            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+<a href=#241 id=241 data-nosnippet>241</a>                .add(ScanVMSpecificRoots::&lt;C&gt;::new());
+<a href=#242 id=242 data-nosnippet>242</a>        }
+<a href=#243 id=243 data-nosnippet>243</a>    }
+<a href=#244 id=244 data-nosnippet>244</a>}
+<a href=#245 id=245 data-nosnippet>245</a>
+<a href=#246 id=246 data-nosnippet>246</a><span class="kw">pub struct </span>ScanMutatorRoots&lt;C: GCWorkContext&gt;(<span class="kw">pub </span><span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;C::VM&gt;);
+<a href=#247 id=247 data-nosnippet>247</a>
+<a href=#248 id=248 data-nosnippet>248</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>ScanMutatorRoots&lt;C&gt; {
+<a href=#249 id=249 data-nosnippet>249</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
+<a href=#250 id=250 data-nosnippet>250</a>        <span class="macro">trace!</span>(<span class="string">"ScanMutatorRoots for mutator {:?}"</span>, <span class="self">self</span>.<span class="number">0</span>.get_tls());
+<a href=#251 id=251 data-nosnippet>251</a>        <span class="kw">let </span>mutators = &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::number_of_mutators();
+<a href=#252 id=252 data-nosnippet>252</a>        <span class="kw">let </span>factory = C::make_roots_work_factory(mmtk);
+<a href=#253 id=253 data-nosnippet>253</a>        &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_roots_in_mutator_thread(
+<a href=#254 id=254 data-nosnippet>254</a>            worker.tls,
+<a href=#255 id=255 data-nosnippet>255</a>            <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>) },
+<a href=#256 id=256 data-nosnippet>256</a>            factory,
+<a href=#257 id=257 data-nosnippet>257</a>        );
+<a href=#258 id=258 data-nosnippet>258</a>        <span class="self">self</span>.<span class="number">0</span>.flush();
+<a href=#259 id=259 data-nosnippet>259</a>
+<a href=#260 id=260 data-nosnippet>260</a>        <span class="kw">if </span>mmtk.state.inform_stack_scanned(mutators) {
+<a href=#261 id=261 data-nosnippet>261</a>            &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::notify_initial_thread_scan_complete(
+<a href=#262 id=262 data-nosnippet>262</a>                <span class="bool-val">false</span>, worker.tls,
+<a href=#263 id=263 data-nosnippet>263</a>            );
+<a href=#264 id=264 data-nosnippet>264</a>        }
+<a href=#265 id=265 data-nosnippet>265</a>    }
+<a href=#266 id=266 data-nosnippet>266</a>}
+<a href=#267 id=267 data-nosnippet>267</a>
+<a href=#268 id=268 data-nosnippet>268</a><span class="attr">#[derive(Default)]
+<a href=#269 id=269 data-nosnippet>269</a></span><span class="kw">pub struct </span>ScanVMSpecificRoots&lt;C: GCWorkContext&gt;(PhantomData&lt;C&gt;);
+<a href=#270 id=270 data-nosnippet>270</a>
+<a href=#271 id=271 data-nosnippet>271</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; ScanVMSpecificRoots&lt;C&gt; {
+<a href=#272 id=272 data-nosnippet>272</a>    <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+<a href=#273 id=273 data-nosnippet>273</a>        <span class="self">Self</span>(PhantomData)
+<a href=#274 id=274 data-nosnippet>274</a>    }
+<a href=#275 id=275 data-nosnippet>275</a>}
+<a href=#276 id=276 data-nosnippet>276</a>
+<a href=#277 id=277 data-nosnippet>277</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>ScanVMSpecificRoots&lt;C&gt; {
+<a href=#278 id=278 data-nosnippet>278</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
+<a href=#279 id=279 data-nosnippet>279</a>        <span class="macro">trace!</span>(<span class="string">"ScanStaticRoots"</span>);
+<a href=#280 id=280 data-nosnippet>280</a>        <span class="kw">let </span>factory = C::make_roots_work_factory(mmtk);
+<a href=#281 id=281 data-nosnippet>281</a>        &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_vm_specific_roots(worker.tls, factory);
+<a href=#282 id=282 data-nosnippet>282</a>    }
+<a href=#283 id=283 data-nosnippet>283</a>}</code></pre></div></section></main></body></html>
