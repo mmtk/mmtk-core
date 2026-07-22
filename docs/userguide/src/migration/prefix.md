@@ -32,6 +32,36 @@ Notes for the mmtk-core developers:
 
 ## 0.33.0
 
+### Collection enabling/disabling is now managed by MMTk instead of the VM binding
+
+```admonish tldr
+`Collection::is_collection_enabled()` is removed.  MMTk now tracks whether collection is enabled
+itself, via the new, nestable `disable_collection()`/`enable_collection()` API on `MMTK` (and
+`memory_manager`).
+```
+
+API changes:
+
+-   trait `vm::Collection`
+    +   `is_collection_enabled()`: Removed.
+        *   Previously, the VM binding implemented this method to tell MMTk whether GC is
+            currently allowed. MMTk now manages this state itself, so the binding no longer needs
+            to (and no longer can) answer this question.
+        *   If the binding previously disabled collection at certain times (e.g. before some
+            initialization completed), it should instead call the new `memory_manager::disable_collection()`
+            at the point where it used to start returning `false`, and `memory_manager::enable_collection()`
+            at the point where it used to start returning `true` again.
+-   module `memory_manager`
+    +   `disable_collection()`: returns true if GC is disabled after the call. If the function returns
+        false, the VM binding should check safepoints, and expect a pause.
+    *   `enable_collection()`: return true if the GC is enabled after the call. Otherwise, the function
+        returns false.
+    +   `is_collection_enabled()`: New. Returns whether collection is currently enabled.
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/pull/1457>
+
 ### `Slot` is required to implement `Sync`
 
 ```admonish tldr
