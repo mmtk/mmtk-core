@@ -37,7 +37,7 @@ pub fn allocate_with_re_enable_collection() {
             // Fill up the heap
             let _ =
                 memory_manager::alloc(&mut fixture.mutator, MB, 8, 0, AllocationSemantics::Default);
-            memory_manager::enable_collection(fixture.mmtk());
+            assert!(memory_manager::enable_collection(fixture.mmtk()));
 
             // Attempt another allocation. This will trigger GC since GC is enabled again.
             let addr =

@@ -116,8 +116,10 @@ impl<VM: VMBinding> GCTrigger<VM> {
 
     /// Re-enable collection. Calling it without a prior matching call to
     /// [`GCTrigger::disable_collection`] is a logic error.
-    pub fn enable_collection(&self) {
-        self.state.gc_status.set_enabled();
+    /// Returns `true` if this call actually re-enabled collection (i.e. it was the outermost
+    /// matching call), `false` if it only decremented the nesting depth.
+    pub fn enable_collection(&self) -> bool {
+        self.state.gc_status.set_enabled()
     }
 
     /// Return whether collection is currently enabled.

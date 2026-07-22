@@ -583,8 +583,8 @@ pub fn disable_collection<VM: VMBinding>(mmtk: &MMTK<VM>) -> bool {
 }
 
 /// Wrapper for [`crate::mmtk::MMTK::enable_collection`].
-pub fn enable_collection<VM: VMBinding>(mmtk: &MMTK<VM>) {
-    mmtk.enable_collection();
+pub fn enable_collection<VM: VMBinding>(mmtk: &MMTK<VM>) -> bool {
+    mmtk.enable_collection()
 }
 
 /// Wrapper for [`crate::mmtk::MMTK::is_collection_enabled`].

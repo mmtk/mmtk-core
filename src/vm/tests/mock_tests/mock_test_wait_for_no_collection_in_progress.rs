@@ -117,7 +117,7 @@ pub fn disable_collection_fails_while_gc_in_progress() {
                 "disable_collection() did not succeed after the GC finished",
             );
 
-            mmtk.enable_collection();
+            assert!(mmtk.enable_collection());
             thread_to_trigger_gc.join().unwrap();
             thread_to_disable_gc.join().unwrap();
         },

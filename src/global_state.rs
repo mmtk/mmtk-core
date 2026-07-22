@@ -405,13 +405,16 @@ impl GcStatusWord {
     }
 
     /// `Disabled(depth)` -> `Disabled(depth - 1)`, or `Disabled(1)` -> `NotInGC`. Panics if
-    /// collection is not currently disabled.
-    pub(crate) fn set_enabled(&self) {
-        self.transition(|status| match status {
+    /// collection is not currently disabled. Returns `true` if this call actually re-enabled
+    /// collection (i.e. it was the outermost `Disabled(1)` -> `NotInGC` transition), `false` if
+    /// it only decremented the nesting depth.
+    pub(crate) fn set_enabled(&self) -> bool {
+        let old = self.transition(|status| match status {
             GcStatus::Disabled(1) => GcStatus::NotInGC,
             GcStatus::Disabled(depth) => GcStatus::Disabled(depth - 1),
             _ => panic!("Trying to enable GC when it is not disabled"),
         });
+        old == GcStatus::Disabled(1)
     }
 
     /// `NotInGC`/`InConcurrentGC` -> `PauseRequested`, unless collection is disabled, MMTk is not
@@ -619,14 +622,32 @@ mod gc_status_tests {
     #[test]
     fn set_enabled_decrements_nesting() {
         let word = GcStatusWord::new(GcStatus::Disabled(3));
-        word.set_enabled();
+        assert!(!word.set_enabled());
         assert_eq!(word.load(), GcStatus::Disabled(2));
     }
 
     #[test]
     fn set_enabled_to_not_in_gc_at_zero_depth() {
         let word = GcStatusWord::new(GcStatus::Disabled(1));
-        word.set_enabled();
+        assert!(word.set_enabled());
+        assert_eq!(word.load(), GcStatus::NotInGC);
+    }
+
+    #[test]
+    fn set_disabled_and_set_enabled_nest_round_trip() {
+        let word = GcStatusWord::new(GcStatus::NotInGC);
+        assert!(word.set_disabled());
+        assert!(word.set_disabled());
+        assert!(word.set_disabled());
+        assert_eq!(word.load(), GcStatus::Disabled(3));
+
+        // Only the call that brings the nesting depth back to 0 (i.e. all the way back to
+        // `NotInGC`) should return `true`.
+        assert!(!word.set_enabled());
+        assert_eq!(word.load(), GcStatus::Disabled(2));
+        assert!(!word.set_enabled());
+        assert_eq!(word.load(), GcStatus::Disabled(1));
+        assert!(word.set_enabled());
         assert_eq!(word.load(), GcStatus::NotInGC);
     }
 

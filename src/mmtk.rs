@@ -392,8 +392,10 @@ impl<VM: VMBinding> MMTK<VM> {
 
     /// Re-enable collection. Calling it without a prior matching call to
     /// [`MMTK::disable_collection`] is a logic error.
-    pub fn enable_collection(&self) {
-        self.gc_trigger.enable_collection();
+    /// Returns `true` if this call actually re-enabled collection (i.e. it was the outermost
+    /// matching call), `false` if it only decremented the nesting depth.
+    pub fn enable_collection(&self) -> bool {
+        self.gc_trigger.enable_collection()
     }
 
     /// Return whether collection is currently enabled.
