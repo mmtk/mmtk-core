@@ -225,8 +225,7 @@ impl Default for GlobalState {
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum GcStatus {
     /// MMTk has not been initialized yet, i.e. `initialize_collection()` has not been called, so
-    /// there are no GC worker threads available to run a collection. [`GcStatusWord::try_request_pause`]
-    /// returns `Err(GcStatus::Uninitialized)` exactly when the status is `GcStatus::Uninitialized`.
+    /// there are no GC worker threads available to run a collection.
     Uninitialized,
     /// MMTk is initialized, and no GC is running, pending, or requested.
     NotInGC,
@@ -248,7 +247,7 @@ pub enum GcStatus {
 
 /// A lock-free, atomic encoding of [`GcStatus`]. This packs the variant tag into the low bits
 /// of a `usize` and, for `GcStatus::Disabled`, the nesting depth into the remaining high bits,
-/// so the whole status fits in a single machine word and can be updated with compare-and-swap
+/// so the whole status fits in a single machine word and can be updated with atomic operations
 /// instead of behind a `Mutex<GcStatus>`.
 ///
 /// `GcStatus` is a state machine: only a handful of transitions between its variants are legal.
@@ -433,8 +432,7 @@ impl GcStatusWord {
         // return `Err` with the status that caused the abort, so `Disabled`/`Uninitialized`/
         // `PauseRequested` (which must not transition here) are reported that way instead of via
         // a CAS.
-        match self
-            .0
+        self.0
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
                 let status = Self::decode(bits);
                 if matches!(
@@ -449,21 +447,9 @@ impl GcStatusWord {
                     status
                 );
                 Some(Self::encode(GcStatus::PauseRequested))
-            }) {
-            Ok(_) => Ok(()),
-            Err(bits) => {
-                let error_state = Self::decode(bits);
-                assert!(
-                    matches!(
-                        error_state,
-                        GcStatus::Disabled(_) | GcStatus::Uninitialized | GcStatus::PauseRequested
-                    ),
-                    "fetch_update aborted the transition for an unexpected status: {:?}",
-                    error_state
-                );
-                Err(error_state)
-            }
-        }
+            })
+            .map(|_| ())
+            .map_err(Self::decode)
     }
 }
 
