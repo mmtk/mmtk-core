@@ -68,6 +68,7 @@ mod compressed_oop {
     }
 
     unsafe impl Send for CompressedOopSlot {}
+    unsafe impl Sync for CompressedOopSlot {}
 
     impl CompressedOopSlot {
         pub fn from_address(address: Address) -> Self {
@@ -148,6 +149,7 @@ mod offset_slot {
     }
 
     unsafe impl Send for OffsetSlot {}
+    unsafe impl Sync for OffsetSlot {}
 
     impl OffsetSlot {
         pub fn new_no_offset(address: Address) -> Self {
@@ -183,6 +185,11 @@ mod offset_slot {
         fn store(&self, object: ObjectReference) {
             let begin = object.to_raw_address();
             let middle = begin + self.offset;
+
+            // Note on thread-safety: Because the `OffsetSlot` value itself is immutable,
+            // if multiple GC workers call `store` with the same `object` value,
+            // they always compute to the same `middle` value,
+            // and it is stored via a single atomic store.
             unsafe { (*self.slot_addr).store(middle, atomic::Ordering::Relaxed) }
         }
     }
@@ -242,6 +249,7 @@ mod tagged_slot {
     }
 
     unsafe impl Send for TaggedSlot {}
+    unsafe impl Sync for TaggedSlot {}
 
     impl TaggedSlot {
         // The DummyVM has OBJECT_REF_OFFSET = 4.
@@ -262,6 +270,10 @@ mod tagged_slot {
             ObjectReference::from_raw_address(unsafe { Address::from_usize(untagged) })
         }
 
+        // Note on thread-safety: `TaggedSlot::store` doesn't modify the tag bits.
+        // If multiple GC workers call `store` with the same `object` value,
+        // they will apply the same tag bits, resulting in the same `new_tagged` value.
+        // It is then stored via a single atomic store.
         fn store(&self, object: ObjectReference) {
             let old_tagged = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
             let new_untagged = object.to_raw_address().as_usize();
@@ -359,6 +371,7 @@ mod mixed {
     }
 
     unsafe impl Send for DummyVMSlot {}
+    unsafe impl Sync for DummyVMSlot {}
 
     impl Slot for DummyVMSlot {
         fn load(&self) -> Option<ObjectReference> {
@@ -372,6 +385,15 @@ mod mixed {
         }
 
         fn store(&self, object: ObjectReference) {
+            // Note on thread-safety:
+            // A `DummyVMSlot` value is an `enum` with multiple variants,
+            // and an `enum` cannot be updated atomically.
+            // But `DummyVMSlot::store` updates the underlying object slot,
+            // not the `DummyVMSlot` value itself.
+            // In fact, all `Slot` implementations are immutable.
+            // Regardless what variant the enum variant is,
+            // the underlying store is always atomic,
+            // and multiple GC workers always store the same value to the underlying object slot.
             match self {
                 DummyVMSlot::Simple(e) => e.store(object),
                 #[cfg(target_pointer_width = "64")]

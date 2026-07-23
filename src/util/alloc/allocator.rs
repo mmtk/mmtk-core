@@ -254,6 +254,7 @@ pub struct AllocatorContext<VM: VMBinding> {
     alloc_options: AllocationOptionsHolder,
     pub state: Arc<GlobalState>,
     /// Have we thrown an OOM already?
+    /// This value is only set and reset if [`Collection::out_of_memory`] returns.
     pub thrown_oom: AtomicBool,
     pub options: Arc<Options>,
     pub gc_trigger: Arc<GCTrigger<VM>>,
@@ -287,7 +288,7 @@ impl<VM: VMBinding> AllocatorContext<VM> {
     }
 }
 
-fn reset_allocation_state<VM: VMBinding, A: Allocator<VM> + ?Sized>(allocator: &A) {
+fn reset_oom_state<VM: VMBinding, A: Allocator<VM> + ?Sized>(allocator: &A) {
     let context = allocator.get_context();
     // Relaxed store is fine since this is a thread-local boolean.
     context.thrown_oom.store(false, Ordering::Relaxed);
@@ -536,7 +537,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 // the code beyond this point tests OOM conditions and, if not OOM, try to allocate
                 // again.  Since we didn't block for GC, the allocation will fail again if we try
                 // again. So we return null immediately.
-                reset_allocation_state(self);
+                reset_oom_state(self);
                 return Address::ZERO;
             }
 
@@ -545,7 +546,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             if self.get_context().thrown_oom.load(Ordering::Relaxed) {
                 // Need to reset the thrown_oom state since we're giving up on this allocation,
                 // that is to say, the thrown_oom state is *per* allocation request
-                reset_allocation_state(self);
+                reset_oom_state(self);
                 return Address::ZERO;
             }
 
@@ -569,12 +570,18 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 if fail_with_oom {
                     // Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
                     trace!("Throw HeapOutOfMemory!");
-                    self.out_of_memory(tls);
-                    reset_allocation_state(self);
+                    // Undo the swap above *before* the callback: `Collection::out_of_memory`
+                    // may not return (a binding may unwind out of it instead).
                     self.get_context()
                         .state
                         .allocation_success
                         .store(false, Ordering::SeqCst);
+                    // Tell the binding about the OOM. The binding may or may not return from this call.
+                    // TODO: This is subject to change in the future. See https://github.com/mmtk/mmtk-core/issues/1475.
+                    self.out_of_memory(tls);
+                    // `thrown_oom` is only set after `out_of_memory` returns, so this reset can
+                    // safely stay after the call.
+                    reset_oom_state(self);
                     return result;
                 }
             }
