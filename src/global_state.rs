@@ -404,15 +404,16 @@ impl GcStatusWord {
             .is_ok()
     }
 
-    /// `Disabled(depth)` -> `Disabled(depth - 1)`, or `Disabled(1)` -> `NotInGC`. Panics if
-    /// collection is not currently disabled. Returns `true` if this call actually re-enabled
-    /// collection (i.e. it was the outermost `Disabled(1)` -> `NotInGC` transition), `false` if
-    /// it only decremented the nesting depth.
+    /// `Disabled(depth)` -> `Disabled(depth - 1)`, or `Disabled(1)` -> `NotInGC`. If collection is
+    /// not currently disabled, this is a no-op (the status is left unchanged). Returns `true` if
+    /// this call actually re-enabled collection (i.e. it was the outermost `Disabled(1)` ->
+    /// `NotInGC` transition), `false` if it only decremented the nesting depth, or if collection
+    /// was already enabled.
     pub(crate) fn set_enabled(&self) -> bool {
         let old = self.transition(|status| match status {
             GcStatus::Disabled(1) => GcStatus::NotInGC,
             GcStatus::Disabled(depth) => GcStatus::Disabled(depth - 1),
-            _ => panic!("Trying to enable GC when it is not disabled"),
+            other => other,
         });
         old == GcStatus::Disabled(1)
     }
@@ -652,9 +653,18 @@ mod gc_status_tests {
     }
 
     #[test]
-    #[should_panic(expected = "not disabled")]
-    fn set_enabled_panics_if_not_disabled() {
-        GcStatusWord::new(GcStatus::NotInGC).set_enabled();
+    fn set_enabled_is_noop_if_not_disabled() {
+        for status in [
+            GcStatus::Uninitialized,
+            GcStatus::NotInGC,
+            GcStatus::InConcurrentGC,
+            GcStatus::InPause,
+            GcStatus::PauseRequested,
+        ] {
+            let word = GcStatusWord::new(status);
+            assert!(!word.set_enabled());
+            assert_eq!(word.load(), status);
+        }
     }
 
     #[test]
