@@ -45,7 +45,7 @@ pub trait SFT {
     /// Note that this may be a no-op (i.e. always return `false`) for some
     /// policies (such as immortal or non-moving) and may panic for policies
     /// where pinning is unsupported (such as fully copying spaces like
-    /// [`CopySpace`]).
+    /// `CopySpace`).
     #[cfg(feature = "object_pinning")]
     fn pin_object(&self, object: ObjectReference) -> bool;
 
@@ -54,7 +54,7 @@ pub trait SFT {
     /// Note that this may be a no-op (i.e. always return `false`) for some
     /// policies (such as immortal or non-moving) and may panic for policies
     /// where pinning is unsupported (such as fully copying spaces like
-    /// [`CopySpace`]).
+    /// `CopySpace`).
     #[cfg(feature = "object_pinning")]
     fn unpin_object(&self, object: ObjectReference) -> bool;
 
@@ -63,7 +63,7 @@ pub trait SFT {
     /// Note that this may be a no-op (i.e. always return `true`) for some
     /// policies (such as immortal or non-moving) and may always return `false`
     /// for policies where pinnning is unsupported (such as fully copying spaces
-    /// like [`CopySpace`]).
+    /// like `CopySpace`).
     #[cfg(feature = "object_pinning")]
     fn is_object_pinned(&self, object: ObjectReference) -> bool;
 
