@@ -40,17 +40,27 @@ pub trait SFT {
         self.is_live(object)
     }
 
-    // Functions for pinning/unpining and checking if an object is pinned
-    // For non moving policies, all the objects are considered as forever pinned,
-    // thus attempting to pin or unpin them will not succeed and will always return false.
-    // For policies where moving is compusory, pin/unpin is impossible and will panic (is_object_pinned will return false).
-    // For policies that support pinning (eg. Immix), pin/unpin will return a boolean indicating that the
-    // pinning/unpinning action has been performed by the function, and is_object_pinned will return whether the object
-    // is currently pinned.
+    /// Pin a given object. Return if this call pinned the given object.
+    ///
+    /// Note that this may be a no-op (i.e. always return `false`) for some
+    /// policies (such as immortal or non-moving) and may panic for other
+    /// policies (such as fully copying spaces like [`CopySpace`]).
     #[cfg(feature = "object_pinning")]
     fn pin_object(&self, object: ObjectReference) -> bool;
+
+    /// Unpin a given object. Return if this call unpinned the given object.
+    ///
+    /// Note that this may be a no-op (i.e. always return `false`) for some
+    /// policies (such as immortal or non-moving) and may panic for other
+    /// policies (such as fully copying spaces like [`CopySpace`]).
     #[cfg(feature = "object_pinning")]
     fn unpin_object(&self, object: ObjectReference) -> bool;
+
+    /// Return if the given object is pinned.
+    ///
+    /// Note that this may be a no-op (i.e. always return `true`) for some
+    /// policies (such as immortal or non-moving) and will always return `false`
+    /// for other policies (such as fully copying spaces like [`CopySpace`]).
     #[cfg(feature = "object_pinning")]
     fn is_object_pinned(&self, object: ObjectReference) -> bool;
 
