@@ -1,6 +1,7 @@
 // GITHUB-CI: MMTK_PLAN=Immix,ConcurrentImmix
 
 use super::mock_test_prelude::*;
+use crate::global_state::GcStatus;
 use crate::util::{OpaquePointer, VMMutatorThread, VMThread};
 use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
@@ -72,15 +73,16 @@ pub fn disable_collection_fails_while_gc_in_progress() {
 
             // `disable_collection()` must fail while a GC is in progress, rather than racing
             // past it.
-            assert!(
-                !mmtk.disable_collection(),
+            assert_eq!(
+                mmtk.disable_collection(),
+                Err(GcStatus::PauseRequested),
                 "disable_collection() succeeded while a GC was still in progress"
             );
 
             // Thread B: as `disable_collection()`'s documentation instructs, retry (yielding
             // between attempts) until it succeeds.
             let thread_to_disable_gc = std::thread::spawn(move || {
-                while !mmtk.disable_collection() {
+                while mmtk.disable_collection().is_err() {
                     std::thread::yield_now();
                 }
             });

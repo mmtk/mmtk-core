@@ -13,7 +13,7 @@ pub fn allocate_with_disable_collection() {
             // 1MB heap
             const MB: usize = 1024 * 1024;
             let mut fixture = MutatorFixture::create_with_heapsize(MB);
-            memory_manager::disable_collection(fixture.mmtk());
+            assert_eq!(memory_manager::disable_collection(fixture.mmtk()), Ok(true));
 
             // Allocate half MB. It should be fine.
             let addr = memory_manager::alloc(

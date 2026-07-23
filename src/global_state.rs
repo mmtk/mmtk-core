@@ -388,10 +388,15 @@ impl GcStatusWord {
         });
     }
 
-    /// `NotInGC`/`Disabled(depth)` -> `Disabled(depth + 1)`. Returns `false` without changing the
-    /// status if collection cannot be disabled from the current status (e.g. a GC is in progress
-    /// or has been requested).
-    pub(crate) fn set_disabled(&self) -> bool {
+    /// `NotInGC`/`Disabled(depth)` -> `Disabled(depth + 1)`. Leaves the status unchanged if
+    /// collection cannot be disabled from the current status (e.g. a GC is in progress or has
+    /// been requested), and returns `Err` with the status that blocked the transition.
+    ///
+    /// On success, returns `Ok(true)` if this call actually switched collection from enabled to
+    /// disabled (i.e. it was the outermost `NotInGC` -> `Disabled(1)` transition), `Ok(false)` if
+    /// it only increased the nesting depth of an already-disabled status. Mirrors the meaning of
+    /// [`GcStatusWord::set_enabled`]'s return value.
+    pub(crate) fn set_disabled(&self) -> Result<bool, GcStatus> {
         self.0
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
                 let next = match Self::decode(bits) {
@@ -401,7 +406,8 @@ impl GcStatusWord {
                 };
                 Some(Self::encode(next))
             })
-            .is_ok()
+            .map(|old_bits| Self::decode(old_bits) == GcStatus::NotInGC)
+            .map_err(Self::decode)
     }
 
     /// `Disabled(depth)` -> `Disabled(depth - 1)`, or `Disabled(1)` -> `NotInGC`. If collection is
@@ -593,16 +599,17 @@ mod gc_status_tests {
     #[test]
     fn set_disabled_from_not_in_gc() {
         let word = GcStatusWord::new(GcStatus::NotInGC);
-        assert!(word.set_disabled());
+        assert_eq!(word.set_disabled(), Ok(true));
         assert_eq!(word.load(), GcStatus::Disabled(1));
     }
 
     #[test]
     fn set_disabled_nests() {
         let word = GcStatusWord::new(GcStatus::Disabled(1));
-        assert!(word.set_disabled());
+        assert_eq!(word.set_disabled(), Ok(false));
         assert_eq!(word.load(), GcStatus::Disabled(2));
-        assert!(word.set_disabled());
+
+        assert_eq!(word.set_disabled(), Ok(false));
         assert_eq!(word.load(), GcStatus::Disabled(3));
     }
 
@@ -615,7 +622,7 @@ mod gc_status_tests {
             GcStatus::InPause,
         ] {
             let word = GcStatusWord::new(status);
-            assert!(!word.set_disabled());
+            assert_eq!(word.set_disabled(), Err(status));
             assert_eq!(word.load(), status);
         }
     }
@@ -637,9 +644,9 @@ mod gc_status_tests {
     #[test]
     fn set_disabled_and_set_enabled_nest_round_trip() {
         let word = GcStatusWord::new(GcStatus::NotInGC);
-        assert!(word.set_disabled());
-        assert!(word.set_disabled());
-        assert!(word.set_disabled());
+        assert!(word.set_disabled().is_ok());
+        assert!(word.set_disabled().is_ok());
+        assert!(word.set_disabled().is_ok());
         assert_eq!(word.load(), GcStatus::Disabled(3));
 
         // Only the call that brings the nesting depth back to 0 (i.e. all the way back to

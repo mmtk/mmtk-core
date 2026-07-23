@@ -12,7 +12,7 @@ pub fn bench(c: &mut Criterion) {
     #[cfg(feature = "vo_bit")]
     let mut fixture = MutatorFixture::create_with_heapsize(1 << 30);
     #[cfg(feature = "vo_bit")]
-    memory_manager::disable_collection(fixture.mmtk());
+    memory_manager::disable_collection(fixture.mmtk()).unwrap();
 
     // Normal objects
     // 16KB object -- we want to make sure the object can fit into any normal space (e.g. immix space or mark sweep space)

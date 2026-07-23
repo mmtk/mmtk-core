@@ -52,8 +52,12 @@ API changes:
             at the point where it used to start returning `false`, and `memory_manager::enable_collection()`
             at the point where it used to start returning `true` again.
 -   module `memory_manager`
-    +   `disable_collection()`: returns true if GC is disabled after the call. If the function returns
-        false, the VM binding should check safepoints, and expect a pause.
+    +   `disable_collection()`: now returns `Result<bool, GcStatus>`. `Ok(true)`
+        means this call actually switched collection from enabled to disabled; `Ok(false)` means
+        it only increased the nesting depth of an already-disabled status. `Err(status)` means
+        collection could not be disabled right now, with `status` naming why (e.g. a GC is in
+        progress or has been requested); the VM binding should check safepoints, expect a pause,
+        or wait for the concurrent GC to finish, then call this function again.
     *   `enable_collection()`: return true if the GC is enabled after the call. Otherwise, the function
         returns false.
     +   `is_collection_enabled()`: New. Returns whether collection is currently enabled.

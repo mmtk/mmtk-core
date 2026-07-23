@@ -33,7 +33,7 @@ pub fn allocate_with_re_enable_collection() {
             assert!(!addr.is_zero());
 
             // In the next allocation GC is disabled. So we can keep allocate without triggering a GC.
-            memory_manager::disable_collection(fixture.mmtk());
+            assert_eq!(memory_manager::disable_collection(fixture.mmtk()), Ok(true));
             // Fill up the heap
             let _ =
                 memory_manager::alloc(&mut fixture.mutator, MB, 8, 0, AllocationSemantics::Default);

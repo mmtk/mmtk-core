@@ -11,6 +11,7 @@
 //! it can turn the `Box` pointer to a native pointer (`*mut Mutator`), and forge a mut reference from the native
 //! pointer. Either way, the VM binding code needs to guarantee the safety.
 
+use crate::global_state::GcStatus;
 use crate::mmtk::MMTKBuilder;
 use crate::mmtk::MMTK;
 use crate::plan::AllocationSemantics;
@@ -578,7 +579,7 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
 }
 
 /// Wrapper for [`crate::mmtk::MMTK::disable_collection`].
-pub fn disable_collection<VM: VMBinding>(mmtk: &MMTK<VM>) -> bool {
+pub fn disable_collection<VM: VMBinding>(mmtk: &MMTK<VM>) -> Result<bool, GcStatus> {
     mmtk.disable_collection()
 }
 
