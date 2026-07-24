@@ -1,8 +1,12 @@
 name: Merge Check
 on:
   pull_request:
-    branches:
-      - master
+    # TEMPORARILY DISABLED while testing the OpenJDK Chopin workflow changes -
+    # only perf-regression-ci-openjdk.yml should run. Revert this before merging.
+    # branches:
+    #   - master
+    branches-ignore:
+      - '**'
   merge_group:
     branches:
       - master

@@ -2,8 +2,12 @@ name: Check broken links in docs
 
 on:
   pull_request:
-    branches:
-      - master
+    # TEMPORARILY DISABLED while testing the OpenJDK Chopin workflow changes -
+    # only perf-regression-ci-openjdk.yml should run. Revert this before merging.
+    # branches:
+    #   - master
+    branches-ignore:
+      - '**'
 
 jobs:
   check-broken-links-in-docs:

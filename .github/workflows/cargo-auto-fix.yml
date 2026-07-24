@@ -15,6 +15,13 @@ name: Cargo Auto Fix
 on:
   pull_request_target:
     types: [labeled]
+    # TEMPORARILY DISABLED while testing the OpenJDK Chopin workflow changes -
+    # only perf-regression-ci-openjdk.yml should run. Revert this before
+    # merging. (This only fires when the PR-cargo-auto-fix label is applied,
+    # so it wasn't going to run from just opening a PR anyway - disabled for
+    # good measure, without touching any of the permissions/security setup above.)
+    branches-ignore:
+      - '**'
 
 permissions:
   contents: read
