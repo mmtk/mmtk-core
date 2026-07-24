@@ -220,8 +220,8 @@ impl Default for GlobalState {
 
 /// The status of MMTk's GC subsystem. This doubles as the "is MMTk initialized" flag (via
 /// [`GcStatus::Uninitialized`]) and as the state that tracks whether a GC is running and, if so,
-/// what phase it is in. See [`GcStatusWord`] for how this is stored atomically and which
-/// transitions between variants are legal.
+/// what phase it is in. See `GcStatusWord` (the internal atomic encoding of this type) for how
+/// this is stored atomically and which transitions between variants are legal.
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum GcStatus {
     /// MMTk has not been initialized yet, i.e. `initialize_collection()` has not been called, so
@@ -235,7 +235,7 @@ pub enum GcStatus {
     /// A stop-the-world pause is active: mutators are stopped and GC workers are doing pause
     /// work (e.g. tracing).
     InPause,
-    /// A GC pause has been requested (by [`GcStatusWord::try_request_pause`]) but mutators have
+    /// A GC pause has been requested (by `GcStatusWord::try_request_pause`) but mutators have
     /// not all stopped yet.
     PauseRequested,
     /// Collection is currently disabled (e.g. by a mutator calling `disable_collection()`).
