@@ -1,0 +1,62 @@
+name: Performance Regression CI (OpenJDK, weekly batch 2)
+
+# Batch 2 of the plans we don't track on every commit (see weekly-1 for the
+# rest of this split, and perf-regression-ci-openjdk.yml for the ones we do
+# track on every commit): GenImmix, MarkSweep, and the canary run. Runs
+# against whichever OpenJDK+MMTk build was most recently cached by
+# perf-regression-ci-openjdk.yml's openjdk-build job (see
+# openjdk-run-plan-reusable.yml for the cache lookup and for the canary
+# download/setup, which that reusable workflow handles when canary: true).
+on:
+  # TEMPORARILY DISABLED while testing the OpenJDK Chopin workflow changes -
+  # only perf-regression-ci-openjdk.yml should run. Revert this before merging.
+  # Times are in UTC; GitHub Actions cron cannot follow daylight saving, so
+  # this is pinned to AEST (UTC+10, Canberra standard time): Sunday 00:00
+  # AEST = Saturday 14:00 UTC. During AEDT (UTC+11, roughly Oct-Apr) this
+  # will actually fire at 1am AU time instead of 0am.
+  # schedule:
+  #   - cron: '0 14 * * 6'
+  # Manual trigger, e.g. for testing without waiting for the schedule.
+  workflow_dispatch:
+  # See openjdk-perf-config.yml for the "testing in a branch" convention -
+  # its env: block is what you toggle, not one here. You'll still need to
+  # enable this trigger to actually run this specific workflow on your branch.
+  # pull_request:
+  #   branches:
+  #     - master
+
+jobs:
+  # Single source of truth for RESULT_REPO_BRANCH/DEPLOY/CI_PERF_KIT_VERSION,
+  # shared with the per-commit and other weekly-batch workflows. See
+  # openjdk-perf-config.yml.
+  config:
+    uses: ./.github/workflows/openjdk-perf-config.yml
+
+  openjdk-run-plan:
+    needs: [config]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - plan_name: genimmix
+            config: running-openjdk-genimmix-complete.yml
+            heap_modifier: "6"
+            canary: false
+          - plan_name: marksweep
+            config: running-openjdk-marksweep-complete.yml
+            heap_modifier: "6"
+            canary: false
+          - plan_name: canary
+            config: running-openjdk-canary-complete.yml
+            heap_modifier: "6"
+            canary: true
+    uses: ./.github/workflows/openjdk-run-plan-reusable.yml
+    with:
+      plan_name: ${{ matrix.plan_name }}
+      config: ${{ matrix.config }}
+      heap_modifier: ${{ matrix.heap_modifier }}
+      canary: ${{ matrix.canary }}
+      result_repo_branch: ${{ needs.config.outputs.result_repo_branch }}
+      deploy: ${{ needs.config.outputs.deploy == 'true' }}
+      ci_perf_kit_version: ${{ needs.config.outputs.ci_perf_kit_version }}
+    secrets: inherit

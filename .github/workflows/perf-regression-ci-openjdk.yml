@@ -1,0 +1,196 @@
+name: Performance Regression CI (OpenJDK, per-commit)
+
+# Triggerred when a new commit is pushed to master
+on:
+  push:
+    branches:
+      - master
+  # See openjdk-perf-config.yml for the "testing in a branch" convention -
+  # its env: block is what you toggle, not one here.
+  # TESTING: enabled to validate the Chopin workflow changes. Revert this before merging.
+  pull_request:
+    branches:
+      - master
+
+env:
+  # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
+  CI_PERF_KIT_BUILD: ci-perf-kit/upload
+  CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
+
+jobs:
+  # Single source of truth for RESULT_REPO_BRANCH/DEPLOY/CI_PERF_KIT_VERSION,
+  # shared with the weekly batch workflows. See openjdk-perf-config.yml.
+  config:
+    uses: ./.github/workflows/openjdk-perf-config.yml
+
+  # Build OpenJDK+MMTk once per push, and cache it for openjdk-run-plan below
+  # (and for the weekly batch workflows, which reuse whatever was cached here most recently).
+  openjdk-build:
+    needs: [config]
+    runs-on: [self-hosted, Linux, freq-scaling-off]
+    timeout-minutes: 1440
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v4
+        with:
+          path: mmtk-core
+      - name: Checkout OpenJDK Binding
+        uses: actions/checkout@v4
+        with:
+          repository: mmtk/mmtk-openjdk
+          # TODO: We currently use OpenJDK 11 for performance comparison.
+          # We should switch to OpenJDK 21 when we are ready, and start a new epoch.
+          ref: jdk-11
+          path: mmtk-openjdk
+      - name: Checkout OpenJDK
+        working-directory: mmtk-openjdk
+        run: |
+          ./.github/scripts/ci-checkout.sh
+      # checkout perf-kit
+      - name: Checkout Perf Kit
+        uses: actions/checkout@v4
+        with:
+          repository: mmtk/ci-perf-kit
+          ref: ${{ needs.config.outputs.ci_perf_kit_version }}
+          path: ci-perf-kit
+          submodules: true
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
+      # setup
+      - name: Replace mmtk-core dependency and clean previous build
+        run: |
+          # Note that ci-replace-mmtk-dep.sh will apply `realpath()` to the `--mmtk-core-path` option.
+          # so we specify the relative path from the PWD to the mmtk-core repo.
+          ./mmtk-core/.github/scripts/ci-replace-mmtk-dep.sh mmtk-openjdk/mmtk/Cargo.toml \
+            --mmtk-core-path mmtk-core
+          rm -rf mmtk-openjdk/repos/openjdk/scratch
+          rm -rf mmtk-openjdk/repos/openjdk/build
+      # build
+      - name: Build OpenJDK+MMTk
+        run: |
+          export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64/
+          ./ci-perf-kit/scripts/openjdk-build.sh ./mmtk-openjdk
+      # cache the build for openjdk-run-plan below, and for the weekly batch workflows
+      - name: Cache OpenJDK+MMTk build
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ci-perf-kit/build
+            ci-perf-kit/probes/out
+            ci-perf-kit/openjdk-probe
+          # Kept in sync with the cache key in openjdk-run-plan-reusable.yml.
+          key: openjdk-mmtk-build-${{ github.sha }}
+      - name: Upload build as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openjdk-regression-build
+          path: ${{ env.CI_PERF_KIT_BUILD }}
+          if-no-files-found: error
+
+  # Plans we track on every commit: one job per plan, each calling the reusable workflow.
+  openjdk-run-plan:
+    needs: [config, openjdk-build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - plan_name: stickyimmix
+            config: running-openjdk-stickyimmix-complete.yml
+            heap_modifier: "6"
+          # TESTING: only running one plan for now to validate the Chopin
+          # workflow changes. Re-add immix before merging.
+          # - plan_name: immix
+          #   config: running-openjdk-immix-complete.yml
+          #   heap_modifier: "6"
+    uses: ./.github/workflows/openjdk-run-plan-reusable.yml
+    with:
+      plan_name: ${{ matrix.plan_name }}
+      config: ${{ matrix.config }}
+      heap_modifier: ${{ matrix.heap_modifier }}
+      result_repo_branch: ${{ needs.config.outputs.result_repo_branch }}
+      deploy: ${{ needs.config.outputs.deploy == 'true' }}
+      ci_perf_kit_version: ${{ needs.config.outputs.ci_perf_kit_version }}
+    secrets: inherit
+
+  openjdk-mutator-perf:
+    # TEMPORARILY DISABLED while testing the OpenJDK Chopin workflow changes -
+    # not part of what's being tested. Revert this before merging.
+    if: false
+    needs: [config]
+    runs-on: [self-hosted, Linux, freq-scaling-off]
+    timeout-minutes: 1440
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v4
+        with:
+          path: mmtk-core
+      - name: Checkout OpenJDK Binding
+        uses: actions/checkout@v4
+        with:
+          repository: mmtk/mmtk-openjdk
+          # TODO: We currently use OpenJDK 11 for performance comparison.
+          # We should switch to OpenJDK 21 when we are ready, and start a new epoch.
+          ref: jdk-11
+          path: mmtk-openjdk
+      - name: Checkout OpenJDK
+        working-directory: mmtk-openjdk
+        run: |
+          ./.github/scripts/ci-checkout.sh
+      # checkout perf-kit
+      - name: Checkout Perf Kit
+        uses: actions/checkout@v4
+        with:
+          repository: mmtk/ci-perf-kit
+          ref: ${{ needs.config.outputs.ci_perf_kit_version }}
+          path: ci-perf-kit
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          submodules: true
+      # setup
+      - name: Overwrite MMTk core in openjdk binding
+        run: cp -r mmtk-core mmtk-openjdk/repos/
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
+      # cleanup previosu build
+      - name: Cleanup previous build
+        run: |
+          rm -rf mmtk-openjdk/repos/openjdk/scratch
+          rm -rf mmtk-openjdk/repos/openjdk/build
+      - id: branch
+        # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
+        run: echo "branch_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_OUTPUT
+      - name: Setup
+        run: |
+          ./ci-perf-kit/scripts/history-run-setup.sh
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
+      # run
+      - name: Performance Run
+        run: |
+          export RESULT_REPO=mmtk/ci-perf-result
+          export RESULT_REPO_BRANCH=${{ needs.config.outputs.result_repo_branch }}
+          export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
+          export FROM_DATE=2020-08-03
+          export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64/
+          ./ci-perf-kit/scripts/mutator-history-run.sh ./mmtk-openjdk ./reports/${{ steps.branch.outputs.branch_name }}
+      # deploy
+      - name: Deploy to Github Page
+        if: ${{ needs.config.outputs.deploy == 'true' }}
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
+          external_repository: mmtk/ci-perf-result
+          publish_dir: ./reports
+          publish_branch: gh-pages
+          keep_files: true
+      - name: Upload build as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutator-regression-build
+          path: ${{ env.CI_PERF_KIT_BUILD }}
+          if-no-files-found: error
+      - name: Upload logs as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutator-regression-logs
+          path: ${{ env.CI_PERF_KIT_LOG }}
+          if-no-files-found: error

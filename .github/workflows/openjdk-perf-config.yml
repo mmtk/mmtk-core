@@ -1,0 +1,52 @@
+name: OpenJDK Perf Config (reusable)
+
+# Single source of truth for config shared across all the OpenJDK performance
+# workflows (the per-commit workflow and both weekly batches). Everything
+# that needs one of these values does `needs: [config]` (with `config:` being
+# `uses: ./.github/workflows/openjdk-perf-config.yml`) and reads
+# `needs.config.outputs.<name>` - this works both in regular steps and in a
+# job's `with:` block when calling a reusable workflow (unlike `env`, which
+# only works in the former).
+#
+# READ BEFORE ENABLING THE TRIGGER BELOW
+# The env: block below is what the various OpenJDK workflows' "testing in a
+# branch" convention now toggles (RESULT_REPO_BRANCH -> 'test' (MUST),
+# DEPLOY -> false (optional)), instead of duplicating RESULT_REPO_BRANCH/
+# DEPLOY in each of them. You'll still need to enable the commented-out
+# pull_request trigger on whichever workflow you're actually testing.
+
+on:
+  workflow_call:
+    outputs:
+      result_repo_branch:
+        value: ${{ jobs.config.outputs.result_repo_branch }}
+      deploy:
+        value: ${{ jobs.config.outputs.deploy }}
+      ci_perf_kit_version:
+        value: ${{ jobs.config.outputs.ci_perf_kit_version }}
+
+jobs:
+  config:
+    # Trivial - no need to occupy the dedicated perf runner for this.
+    runs-on: ubuntu-latest
+    env:
+      # The branch to save run data and plot graph from. Use 'self-hosted' for master, use 'test' or anything else for testing in a branch.
+      # TESTING: using a dedicated test branch. Revert to 'self-hosted' before merging.
+      RESULT_REPO_BRANCH: 'chopin-test'
+      # Whether we deploy the generated page. Set to true for master.
+      # TESTING: not deploying to the real GitHub Page. Revert to true before merging.
+      DEPLOY: false
+      # TODO: openjdk-build.sh/openjdk-run-plan.sh/openjdk-report.sh only exist on this
+      # branch so far. Pin this back to a released ci-perf-kit version tag (like the
+      # JikesRVM workflow does) once ci-perf-kit cuts a release that includes them.
+      CI_PERF_KIT_VERSION: move-to-dacapo-chopin
+    outputs:
+      result_repo_branch: ${{ steps.vars.outputs.result_repo_branch }}
+      deploy: ${{ steps.vars.outputs.deploy }}
+      ci_perf_kit_version: ${{ steps.vars.outputs.ci_perf_kit_version }}
+    steps:
+      - id: vars
+        run: |
+          echo "result_repo_branch=$RESULT_REPO_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "deploy=$DEPLOY" >> "$GITHUB_OUTPUT"
+          echo "ci_perf_kit_version=$CI_PERF_KIT_VERSION" >> "$GITHUB_OUTPUT"
