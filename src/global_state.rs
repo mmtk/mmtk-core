@@ -301,11 +301,13 @@ impl GcStatusWord {
         Self::decode(self.0.load(Ordering::SeqCst))
     }
 
-    /// Retry `f` (a pure function of the current status) via [`AtomicUsize::fetch_update`] until
-    /// it succeeds, and return the status it transitioned *from* (not the new status). Returning
-    /// the old status (rather than the new one) lets a caller tell whether it "won" the race when
-    /// multiple threads concurrently drive the same transition: only the thread whose CAS
-    /// actually moved the status away from a given old value can be sure it is the one
+    /// Attempt to atomically transition the GC status using function `f`.  Return the status
+    /// atomically transitioned *from* (not the new status).  It will retry `f` if the status is
+    /// modified concurrently.
+    ///
+    /// Note: Returning the old status (rather than the new one) lets a caller tell whether it "won"
+    /// the race when multiple threads concurrently drive the same transition: only the thread whose
+    /// CAS actually moved the status away from a given old value can be sure it is the one
     /// responsible for that transition, so it is the one that should perform any side effect that
     /// must happen exactly once (e.g. notifying the scheduler). If `transition` returned the new
     /// status instead, every racing thread would observe the same new status and none could tell
@@ -318,6 +320,23 @@ impl GcStatusWord {
             })
             .unwrap(); // `f` always returns a status to move to, so this never returns `Err`.
         Self::decode(old_bits)
+    }
+
+    /// Attempt to atomically transition the GC status using function `f`.  Return `Ok(old_status)`
+    /// if `f` returns `Some(new_status)`, in which case it has atomically transitioned the state
+    /// from `old_state` to `new_state`.  Return `Err(old_status)` if `f` returns `None`, in which
+    /// case `old_status` is the status passed to the last invocation of `f`.  It will retry `f` if
+    /// `f` returns `Some` but the underlying status is modified concurrently.
+    fn try_transition<F: FnMut(GcStatus) -> Option<GcStatus>>(
+        &self,
+        mut f: F,
+    ) -> Result<GcStatus, GcStatus> {
+        self.0
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
+                f(Self::decode(bits)).map(Self::encode)
+            })
+            .map(Self::decode)
+            .map_err(Self::decode)
     }
 
     pub(crate) fn is_initialized(&self) -> bool {
@@ -396,17 +415,12 @@ impl GcStatusWord {
     /// it only increased the nesting depth of an already-disabled status. Mirrors the meaning of
     /// [`GcStatusWord::set_enabled`]'s return value.
     pub(crate) fn set_disabled(&self) -> Result<bool, GcStatus> {
-        self.0
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
-                let next = match Self::decode(bits) {
-                    GcStatus::Disabled(depth) => GcStatus::Disabled(depth + 1),
-                    GcStatus::NotInGC => GcStatus::Disabled(1),
-                    _ => return None,
-                };
-                Some(Self::encode(next))
-            })
-            .map(|old_bits| Self::decode(old_bits) == GcStatus::NotInGC)
-            .map_err(Self::decode)
+        self.try_transition(|status| match status {
+            GcStatus::Disabled(depth) => Some(GcStatus::Disabled(depth + 1)),
+            GcStatus::NotInGC => Some(GcStatus::Disabled(1)),
+            _ => None,
+        })
+        .map(|old_status| old_status == GcStatus::NotInGC)
     }
 
     /// `Disabled(depth)` -> `Disabled(depth - 1)`, or `Disabled(1)` -> `NotInGC`. If collection is
@@ -428,28 +442,12 @@ impl GcStatusWord {
     /// with the status that prevented the transition (`Disabled(_)`, `Uninitialized`, or
     /// `PauseRequested` respectively).
     pub(crate) fn try_request_pause(&self) -> Result<(), GcStatus> {
-        // `fetch_update`'s closure returning `None` aborts the update and makes `fetch_update`
-        // return `Err` with the status that caused the abort, so `Disabled`/`Uninitialized`/
-        // `PauseRequested` (which must not transition here) are reported that way instead of via
-        // a CAS.
-        self.0
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
-                let status = Self::decode(bits);
-                if matches!(
-                    status,
-                    GcStatus::Disabled(_) | GcStatus::Uninitialized | GcStatus::PauseRequested
-                ) {
-                    return None;
-                }
-                assert!(
-                    matches!(status, GcStatus::NotInGC | GcStatus::InConcurrentGC),
-                    "Trying to request a GC pause in invalid status: {:?}",
-                    status
-                );
-                Some(Self::encode(GcStatus::PauseRequested))
-            })
-            .map(|_| ())
-            .map_err(Self::decode)
+        self.try_transition(|status| match status {
+            GcStatus::Disabled(_) | GcStatus::Uninitialized | GcStatus::PauseRequested => None,
+            GcStatus::NotInGC | GcStatus::InConcurrentGC => Some(GcStatus::PauseRequested),
+            _ => panic!("Trying to request a GC pause in invalid status: {status:?}"),
+        })
+        .map(|_| ())
     }
 }
 
