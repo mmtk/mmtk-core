@@ -10,6 +10,11 @@ name: OpenJDK Run Plan (reusable)
 # this is master's current tip, which will usually already be cached too),
 # falling back to the most recently saved build under the same prefix if
 # that exact commit hasn't been built yet (or its build failed).
+#
+# TESTING: the above is currently disabled - the cache key below is
+# temporarily fixed (not keyed by github.sha) to match openjdk-build.sh's
+# skip-if-cached fixed key in perf-regression-ci-openjdk.yml, so every push
+# to the test PR reuses the one build. Revert both before merging.
 on:
   workflow_call:
     inputs:
@@ -83,9 +88,9 @@ jobs:
             ci-perf-kit/build
             ci-perf-kit/probes/out
             ci-perf-kit/openjdk-probe
-          key: ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}${{ github.sha }}
-          restore-keys: |
-            ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}
+          # TESTING: fixed key instead of ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}${{ github.sha }}
+          # + a restore-keys prefix fallback. Revert to that before merging.
+          key: ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}chopin-test-fixed
           fail-on-cache-miss: true
       - name: Download canary build
         if: ${{ inputs.canary }}
