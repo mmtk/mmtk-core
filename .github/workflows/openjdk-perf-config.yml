@@ -1,12 +1,19 @@
 name: OpenJDK Perf Config (reusable)
 
-# Single source of truth for config shared across all the OpenJDK performance
-# workflows (the per-commit workflow and both weekly batches). Everything
-# that needs one of these values does `needs: [config]` (with `config:` being
+# Single source of truth for config and other run-scoped values shared across
+# all the OpenJDK performance workflows (the per-commit workflow and both
+# weekly batches). Everything that needs one of these values does
+# `needs: [config]` (with `config:` being
 # `uses: ./.github/workflows/openjdk-perf-config.yml`) and reads
 # `needs.config.outputs.<name>` - this works both in regular steps and in a
 # job's `with:` block when calling a reusable workflow (unlike `env`, which
 # only works in the former).
+#
+# This also resolves the current mmtk-openjdk (jdk-11 branch) revision once
+# per workflow run, rather than each openjdk-run-plan-reusable.yml call (one
+# per plan) redundantly re-checking-out the same repo just to read the same
+# commit - it's only used to label the result-repo commit message, nothing
+# is built from it here.
 #
 # READ BEFORE ENABLING THE TRIGGER BELOW
 # The env: block below is what the various OpenJDK workflows' "testing in a
@@ -24,6 +31,8 @@ on:
         value: ${{ jobs.config.outputs.deploy }}
       ci_perf_kit_version:
         value: ${{ jobs.config.outputs.ci_perf_kit_version }}
+      openjdk_rev:
+        value: ${{ jobs.config.outputs.openjdk_rev }}
 
 jobs:
   config:
@@ -44,9 +53,22 @@ jobs:
       result_repo_branch: ${{ steps.vars.outputs.result_repo_branch }}
       deploy: ${{ steps.vars.outputs.deploy }}
       ci_perf_kit_version: ${{ steps.vars.outputs.ci_perf_kit_version }}
+      openjdk_rev: ${{ steps.openjdk-rev.outputs.rev }}
     steps:
       - id: vars
         run: |
           echo "result_repo_branch=$RESULT_REPO_BRANCH" >> "$GITHUB_OUTPUT"
           echo "deploy=$DEPLOY" >> "$GITHUB_OUTPUT"
           echo "ci_perf_kit_version=$CI_PERF_KIT_VERSION" >> "$GITHUB_OUTPUT"
+      # Only used to label the result-repo commit message; the binding isn't
+      # built here, so this is a plain (cheap) checkout, no ci-checkout.sh.
+      - name: Checkout OpenJDK Binding
+        uses: actions/checkout@v4
+        with:
+          repository: mmtk/mmtk-openjdk
+          # TODO: We currently use OpenJDK 11 for performance comparison.
+          # We should switch to OpenJDK 21 when we are ready, and start a new epoch.
+          ref: jdk-11
+          path: mmtk-openjdk
+      - id: openjdk-rev
+        run: echo "rev=$(git -C mmtk-openjdk rev-parse HEAD)" >> "$GITHUB_OUTPUT"

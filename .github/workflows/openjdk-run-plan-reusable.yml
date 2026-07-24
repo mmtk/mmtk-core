@@ -46,6 +46,10 @@ on:
       ci_perf_kit_version:
         required: true
         type: string
+      openjdk_rev:
+        description: mmtk-openjdk (jdk-11) revision, used only to label the result-repo commit message. Computed once by openjdk-perf-config.yml.
+        required: true
+        type: string
     secrets:
       CI_ACCESS_TOKEN:
         required: true
@@ -64,16 +68,6 @@ jobs:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     timeout-minutes: 1440
     steps:
-      # Only used to label the result-repo commit message; the binding itself
-      # isn't built here, so this is a plain (cheap) checkout, no ci-checkout.sh.
-      - name: Checkout OpenJDK Binding
-        uses: actions/checkout@v4
-        with:
-          repository: mmtk/mmtk-openjdk
-          ref: jdk-11
-          path: mmtk-openjdk
-      - id: openjdk-rev
-        run: echo "rev=$(git -C mmtk-openjdk rev-parse HEAD)" >> $GITHUB_OUTPUT
       - name: Checkout Perf Kit
         uses: actions/checkout@v4
         with:
@@ -118,7 +112,7 @@ jobs:
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           # TESTING: only do 1 invocation instead of the usual $history_invocations. Revert this before merging.
           export OPENJDK_HISTORY_RUN_TEST_FAST=1
-          ./ci-perf-kit/scripts/openjdk-run-plan.sh ${{ inputs.plan_name }} ${{ inputs.config }} ${{ inputs.heap_modifier }} ${{ steps.openjdk-rev.outputs.rev }}
+          ./ci-perf-kit/scripts/openjdk-run-plan.sh ${{ inputs.plan_name }} ${{ inputs.config }} ${{ inputs.heap_modifier }} ${{ inputs.openjdk_rev }}
       # render
       - name: Regenerate report
         run: |

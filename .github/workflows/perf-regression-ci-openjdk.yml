@@ -135,6 +135,7 @@ jobs:
       result_repo_branch: ${{ needs.config.outputs.result_repo_branch }}
       deploy: ${{ needs.config.outputs.deploy == 'true' }}
       ci_perf_kit_version: ${{ needs.config.outputs.ci_perf_kit_version }}
+      openjdk_rev: ${{ needs.config.outputs.openjdk_rev }}
     secrets: inherit
 
   openjdk-mutator-perf:
