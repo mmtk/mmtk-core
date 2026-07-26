@@ -8,6 +8,10 @@ BEGIN {
         //always collect data
         @stats_enabled = 1;
     }
+
+    // Some recent versions of bpftrace print warning messages in the beginning of stdout.
+    // We print a marker so that visualize.py knows where to start parsing.
+    printf("====MMTK:CUT_HERE====\n")
 }
 
 END {
@@ -85,7 +89,7 @@ usdt:$MMTK:mmtk:gen_full_heap {
 }
 
 usdt:$MMTK:mmtk:immix_defrag {
-    printf("immix_defrag,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+    printf("immix_defrag,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
 }
 
 usdt:$MMTK:mmtk:roots {
@@ -104,13 +108,13 @@ usdt:$MMTK:mmtk:process_root_nodes {
 
 usdt:$MMTK:mmtk:process_slots {
     if (@enable_print) {
-        printf("process_slots,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+        printf("process_slots,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
     }
 }
 
-usdt:$MMTK:mmtk:scan_objects {
+usdt:$MMTK:mmtk:process_nodes {
     if (@enable_print) {
-        printf("scan_objects,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+        printf("process_nodes,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
     }
 }
 
@@ -126,15 +130,23 @@ usdt:$MMTK:mmtk:plan_end_of_gc_end {
     }
 }
 
-usdt:$MMTK:mmtk:sweep_chunk {
+//////// BEGIN:SWEEP_CHUNK_MS
+usdt:$MMTK:mmtk:sweep_chunk_ms {
     if (@enable_print) {
-        printf("sweep_chunk,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+        printf("sweep_chunk_ms,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+    }
+}
+//////// END:SWEEP_CHUNK_MS
+
+usdt:$MMTK:mmtk:sweep_chunk_immix {
+    if (@enable_print) {
+        printf("sweep_chunk_immix,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
     }
 }
 
 usdt:$MMTK:mmtk:concurrent_trace_objects {
     if (@enable_print) {
-        printf("concurrent_trace_objects,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
+        printf("concurrent_trace_objects,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
     }
 }
 

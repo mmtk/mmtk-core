@@ -4,12 +4,11 @@ use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 use crate::util::conversions::rshift_align_up;
 use crate::util::heap::layout::vm_layout::VMLayout;
-use crate::util::memory::{MmapAnnotation, MmapStrategy};
 #[cfg(target_pointer_width = "32")]
 use crate::util::metadata::side_metadata::address_to_chunked_meta_address;
+use crate::util::os::*;
 use crate::util::Address;
 use crate::MMAPPER;
-use std::io::Result;
 
 /// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)
 pub(super) fn address_to_contiguous_meta_address(
@@ -22,9 +21,9 @@ pub(super) fn address_to_contiguous_meta_address(
     let shift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
     if shift >= 0 {
-        metadata_spec.get_absolute_offset() + ((data_addr >> log_bytes_in_region) >> shift)
+        metadata_spec.get_starting_address() + ((data_addr >> log_bytes_in_region) >> shift)
     } else {
-        metadata_spec.get_absolute_offset() + ((data_addr >> log_bytes_in_region) << (-shift))
+        metadata_spec.get_starting_address() + ((data_addr >> log_bytes_in_region) << (-shift))
     }
 }
 
@@ -45,7 +44,7 @@ pub(super) fn contiguous_meta_address_to_address(
         (metadata_addr, bit)
     );
     let shift = (LOG_BITS_IN_BYTE as i32) - metadata_spec.log_num_of_bits as i32;
-    let relative_meta_addr = metadata_addr - metadata_spec.get_absolute_offset();
+    let relative_meta_addr = metadata_addr - metadata_spec.get_starting_address();
 
     let data_addr_intermediate = if shift >= 0 {
         relative_meta_addr << shift
@@ -93,10 +92,9 @@ pub(super) fn align_metadata_address(
 /// Unmaps the specified metadata range, or panics.
 #[cfg(test)]
 pub(crate) fn ensure_munmap_metadata(start: Address, size: usize) {
-    use crate::util::memory;
     trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
 
-    assert!(memory::munmap(start, size).is_ok())
+    assert!(OS::munmap(start, size).is_ok())
 }
 
 /// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)
@@ -128,7 +126,7 @@ pub(super) fn try_mmap_contiguous_metadata_space(
     spec: &SideMetadataSpec,
     no_reserve: bool,
     anno: &MmapAnnotation,
-) -> Result<usize> {
+) -> MmapResult<usize> {
     debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
     debug_assert!(size % BYTES_IN_PAGE == 0);
 
@@ -143,14 +141,15 @@ pub(super) fn try_mmap_contiguous_metadata_space(
             MMAPPER.ensure_mapped(
                 mmap_start,
                 mmap_size >> LOG_BYTES_IN_PAGE,
-                MmapStrategy::SIDE_METADATA,
+                HugePageSupport::No,
+                MmapProtection::ReadWrite,
                 anno,
             )
         } else {
             MMAPPER.quarantine_address_range(
                 mmap_start,
                 mmap_size >> LOG_BYTES_IN_PAGE,
-                MmapStrategy::SIDE_METADATA,
+                HugePageSupport::No,
                 anno,
             )
         }
@@ -346,6 +345,103 @@ where
     }
 }
 
+pub fn find_first_non_zero_bit_in_metadata_bytes(
+    meta_start: Address,
+    meta_end: Address,
+) -> FindMetaBitResult {
+    use crate::util::constants::BYTES_IN_ADDRESS;
+
+    let mmap_granularity = MMAPPER.granularity();
+
+    let mut cursor = meta_start;
+    // We need to check if metadata address is mapped or not.  But we make use of the granularity of
+    // the `Mmapper` to reduce the number of checks.  This records the start of a grain that is
+    // tested to be mapped.
+    let mut mapped_grain = Address::ZERO;
+    while cursor < meta_end {
+        // If we can check the whole word, set step to word size. Otherwise, the step is 1 (byte) and we check byte.
+        let step =
+            if cursor.is_aligned_to(BYTES_IN_ADDRESS) && cursor + BYTES_IN_ADDRESS <= meta_end {
+                BYTES_IN_ADDRESS
+            } else {
+                1
+            };
+        // The value we check has to be in the range.
+        debug_assert!(
+            cursor >= meta_start && cursor < meta_end,
+            "Check metadata value at meta address {}, which is not in the range of [{}, {})",
+            cursor,
+            meta_start,
+            meta_end
+        );
+
+        // If we are looking at an address that is not in a mapped chunk, we need to check if the chunk if mapped.
+        if cursor > mapped_grain {
+            if cursor.is_mapped() {
+                // This is mapped. No need to check for this chunk.
+                mapped_grain = cursor.align_up(mmap_granularity) - 0x1;
+            } else {
+                return FindMetaBitResult::UnmappedMetadata;
+            }
+        }
+
+        if step == BYTES_IN_ADDRESS {
+            // Load and check a usize word
+            let value = unsafe { cursor.load::<usize>() };
+            if value != 0 {
+                let bit = find_first_non_zero_bit::<usize>(value, 0, usize::BITS as u8).unwrap();
+                let byte_offset = bit >> LOG_BITS_IN_BYTE;
+                let bit_offset = bit - ((byte_offset) << LOG_BITS_IN_BYTE);
+                return FindMetaBitResult::Found {
+                    addr: cursor + byte_offset as usize,
+                    bit: bit_offset,
+                };
+            }
+        } else {
+            // Load and check a byte
+            let value = unsafe { cursor.load::<u8>() };
+            if let Some(bit) = find_first_non_zero_bit::<u8>(value, 0, 8) {
+                return FindMetaBitResult::Found { addr: cursor, bit };
+            }
+        }
+        // Move to the address so we can load from it
+        cursor += step;
+    }
+    FindMetaBitResult::NotFound
+}
+
+pub fn find_first_non_zero_bit_in_metadata_bits(
+    addr: Address,
+    start_bit: u8,
+    end_bit: u8,
+) -> FindMetaBitResult {
+    if !addr.is_mapped() {
+        return FindMetaBitResult::UnmappedMetadata;
+    }
+    let byte = unsafe { addr.load::<u8>() };
+    if let Some(bit) = find_first_non_zero_bit::<u8>(byte, start_bit, end_bit) {
+        return FindMetaBitResult::Found { addr, bit };
+    }
+    FindMetaBitResult::NotFound
+}
+
+fn find_first_non_zero_bit<T>(value: T, start: u8, end: u8) -> Option<u8>
+where
+    T: PrimInt + CheckedShl,
+{
+    let mask = match T::one().checked_shl((end - start) as u32) {
+        Some(shl) => (shl - T::one()) << (start as u32),
+        None => T::max_value() << (start as u32),
+    };
+    let masked = value & mask;
+    if masked.is_zero() {
+        None
+    } else {
+        let trailing_zeroes = masked.trailing_zeros();
+        Some(trailing_zeroes as u8)
+    }
+}
+
 pub fn scan_non_zero_bits_in_metadata_bytes(
     meta_start: Address,
     meta_end: Address,
@@ -404,7 +500,22 @@ mod tests {
     use super::*;
     use crate::util::metadata::side_metadata::*;
 
+    fn should_skip_spec_on_this_target(spec: &SideMetadataSpec) -> bool {
+        use layout::LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO;
+        log_data_meta_ratio(spec) < LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO
+    }
+
     fn test_round_trip_conversion(spec: &SideMetadataSpec, test_data: &[Address]) {
+        if should_skip_spec_on_this_target(spec) {
+            eprintln!(
+                "Skipping {} on this target: spec ratio is outside global side metadata worst-case bound",
+                spec.name
+            );
+            return;
+        }
+
+        core_test_initialize_side_metadata();
+
         for ref_addr in test_data {
             let addr = *ref_addr;
 
@@ -448,7 +559,7 @@ mod tests {
         let spec = SideMetadataSpec {
             name: "ContiguousMetadataTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 3,
         };
@@ -461,7 +572,7 @@ mod tests {
         let spec = SideMetadataSpec {
             name: "ContiguousMetadataTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: 0,
             log_num_of_bits: 1,
             log_bytes_in_region: 3,
         };
@@ -474,7 +585,7 @@ mod tests {
         let spec = SideMetadataSpec {
             name: "ContiguousMetadataTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: 0,
             log_num_of_bits: 4,
             log_bytes_in_region: 3,
         };
@@ -487,7 +598,7 @@ mod tests {
         let spec = SideMetadataSpec {
             name: "ContiguousMetadataTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: 0,
             log_num_of_bits: 5,
             log_bytes_in_region: 3,
         };
@@ -511,7 +622,7 @@ mod tests {
         let spec = SideMetadataSpec {
             name: "ContiguousMetadataTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 12, // 4K
         };
@@ -540,7 +651,7 @@ mod tests {
         let create_spec = |log_num_of_bits: usize| SideMetadataSpec {
             name: "AlignMetadataBitTestSpec",
             is_global: true,
-            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            offset: 0,
             log_num_of_bits,
             log_bytes_in_region: 3,
         };

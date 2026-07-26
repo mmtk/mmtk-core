@@ -53,36 +53,6 @@ pub(crate) use card_scanning::*;
 // FIXME: we are not really using this constant to decide lazy sweep or not.
 pub(crate) const LAZY_SWEEP: bool = true;
 
-// Java-specific sizes currently used by MMTk
-// TODO: MMTk should really become independent of these Java types: https://github.com/mmtk/mmtk-core/issues/922
-mod java_specific_constants {
-    use super::LOG_BITS_IN_BYTE;
-
-    pub const LOG_BYTES_IN_CHAR: u8 = 1;
-    pub const BYTES_IN_CHAR: usize = 1 << LOG_BYTES_IN_CHAR;
-    pub const LOG_BITS_IN_CHAR: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_CHAR;
-    pub const BITS_IN_CHAR: usize = 1 << LOG_BITS_IN_CHAR;
-
-    pub const LOG_BYTES_IN_SHORT: u8 = 1;
-    pub const BYTES_IN_SHORT: usize = 1 << LOG_BYTES_IN_SHORT;
-    pub const LOG_BITS_IN_SHORT: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_SHORT;
-    pub const BITS_IN_SHORT: usize = 1 << LOG_BITS_IN_SHORT;
-
-    pub const LOG_BYTES_IN_INT: u8 = 2;
-    pub const BYTES_IN_INT: usize = 1 << LOG_BYTES_IN_INT;
-    pub const LOG_BITS_IN_INT: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_INT;
-    pub const BITS_IN_INT: usize = 1 << LOG_BITS_IN_INT;
-
-    pub const LOG_BYTES_IN_LONG: u8 = 3;
-    pub const BYTES_IN_LONG: usize = 1 << LOG_BYTES_IN_LONG;
-    pub const LOG_BITS_IN_LONG: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_LONG;
-    pub const BITS_IN_LONG: usize = 1 << LOG_BITS_IN_LONG;
-
-    pub const MAX_INT: usize = i32::MAX as usize; // 0x7fff_ffff
-    pub const MIN_INT: usize = i32::MIN as u32 as usize; // 0x8000_0000
-}
-pub(crate) use java_specific_constants::*;
-
 #[cfg(target_pointer_width = "32")]
 /// log2 of the number of bytes in an address
 pub const LOG_BYTES_IN_ADDRESS: u8 = 2;

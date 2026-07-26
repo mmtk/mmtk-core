@@ -1,11 +1,4 @@
-use crate::util::{
-    memory::{MmapAnnotation, MmapStrategy},
-    Address,
-};
-use std::io::Result;
-
-#[allow(unused)] // Used in doc comment.
-use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::{os::*, Address};
 
 pub mod csm;
 
@@ -35,7 +28,7 @@ pub mod csm;
 ///     MMTk.
 pub trait Mmapper: Sync {
     /// The logarithm of granularity of this `Mmapper`, in bytes.  Must be at least
-    /// [`LOG_BYTES_IN_PAGE`].
+    /// [`crate::util::constants::LOG_BYTES_IN_PAGE`].
     ///
     /// See trait-level doc for [`Mmapper`] for details.
     fn log_granularity(&self) -> u8;
@@ -70,16 +63,41 @@ pub trait Mmapper: Sync {
     /// Arguments:
     /// * `start`: Address of the first page to be quarantined
     /// * `pages`: Number of pages to quarantine from the start
-    /// * `strategy`: The mmap strategy.  The `prot` field is ignored because we always use
-    ///   `PROT_NONE`.
+    /// * `huge_page_support`: The huge page support option to use when quarantining the address range.
     /// * `anno`: Human-readable annotation to apply to newly mapped memory ranges.
     fn quarantine_address_range(
         &self,
         start: Address,
         pages: usize,
-        strategy: MmapStrategy,
+        huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
-    ) -> Result<()>;
+    ) -> MmapResult<()>;
+
+    /// Quarantine/reserve address range at any available address and return the base address.
+    /// The returned address is aligned to the mmapper's granularity.
+    ///
+    /// Arguments:
+    /// * `pages`: Number of pages to quarantine
+    /// * `huge_page_support`: The huge page support option to use when quarantining the address range.
+    /// * `anno`: Human-readable annotation to apply to newly mapped memory ranges.
+    fn quarantine_address_range_anywhere(
+        &self,
+        pages: usize,
+        align: Option<usize>,
+        huge_page_option: HugePageSupport,
+        anno: &MmapAnnotation,
+    ) -> MmapResult<Address>;
+
+    /// Quarantine/reserve an address range, using `start` as a preferred address. The OS may return
+    /// another address, and the returned address is the actual quarantined range start.
+    fn quarantine_address_range_preferred(
+        &self,
+        start: Address,
+        pages: usize,
+        align: Option<usize>,
+        huge_page_option: HugePageSupport,
+        anno: &MmapAnnotation,
+    ) -> MmapResult<Address>;
 
     /// Ensure that a range of pages is mmapped (or equivalent).  If the
     /// pages are not yet mapped, demand-zero map them. Note that mapping
@@ -97,9 +115,10 @@ pub trait Mmapper: Sync {
         &self,
         start: Address,
         pages: usize,
-        strategy: MmapStrategy,
+        huge_page_option: HugePageSupport,
+        prot: MmapProtection,
         anno: &MmapAnnotation,
-    ) -> Result<()>;
+    ) -> MmapResult<()>;
 
     /// Is the page pointed to by this address mapped? Returns true if
     /// the page at the given address is mapped.

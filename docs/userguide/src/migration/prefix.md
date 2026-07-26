@@ -30,6 +30,103 @@ Notes for the mmtk-core developers:
 
 <!-- Insert new versions here -->
 
+## 0.33.0
+
+### `Slot` is required to implement `Sync`
+
+```admonish tldr
+`vm::slot::Slot` now needs to implement `Sync`.
+```
+
+API changes:
+-   module `vm::slot`
+    +   `Slot`: Now required to implement `Sync`
+        *   The provided `SimpleSlot` in mmtk-core already implements `Sync`.  If the VM binding
+            uses it, no change is needed.
+        *   If the VM binding's `Slot` implementation does not include raw pointers (`*const T` and
+            `*mut T`), chance is high that it automatically implements `Sync`.  If this is the case,
+            no change is needed.
+        *   Otherwise, the VM binding should declare `unsafe impl Sync for ...` for the slot type.
+
+### Thread IDs require `Debug` instead of `Display`
+
+```admonish tldr
+`mmtk::util::os::OS::ThreadIDType` now needs to implement `Debug` instead of `Display`.
+```
+
+API changes:
+
+-   module `util::os`
+    +   `OS::ThreadIDType`: This associated type now requires `Debug` instead of `Display`.
+        *   This allows platforms where the native thread ID type does not implement `Display`,
+            such as `libc::pthread_t` on musl.
+        *   Bindings that provide an OS implementation should derive or implement `Debug` for
+            their thread ID type.
+
+### The `<'w>` lifetime in `ObjectTracerContext`
+
+```admonish tldr
+Your existing source code probably still works.
+```
+
+API changes:
+
+-   module `vm::scanning`
+    +   `ObjectTracerContext::TracerType`: Now has a `<'w>` lifetime parameter
+    +   `ObjectTracerContext::with_tracer`: Now has a `<'w>` lifetime parameter
+        *   `'w` is the lifetime of the `worker` argument, and is passed to the
+            `Self::TracerType<'w>` argument of the `func` callback.  It basically means the
+            `ObjectTracer` provided to the `func` callback borrows the `worker` during the callback.
+            This has always been true, but we now made it explicit through the lifetime parameter.
+
+### Type argument changes in `Finalizable::keep_alive` module
+
+```admonish tldr
+`Finalizable::keep_alive` now has the `<OT: ObjectTracer>` type parameter.
+```
+
+API changes:
+
+-   module `vm::reference_glue`
+    +   `Finalizable::keep_alive`: Now has the `<OT: ObjectTracer>` type parameter instead of
+        `<E: ProcessEdgesWork>`.  The `trace` parameter is now `&mut OT`.  It still has the
+        `trace_object` method like the old `ProcessEdgesWork` trait, and is supposed to be used the
+        same way.
+
+### The Cargo feature "is_mmtk_object" is removed
+
+```admonish tldr
+The "is_mmtk_object" cargo feature is removed.  Anything previously enabled by the "is_mmtk_object"
+feature are now enabled by the "vo_bit" feature.
+```
+
+API changes: None.  If a VM binding uses the "is_mmtk_object" feature, it should now use the
+"vo_bit" feature if not already using, and existing code should still compile.
+
+### Side metadata base addresses are no longer constants
+
+```admonish tldr
+Side metadata addresses are now chosen at runtime.  The old address constants are removed and
+replaced with accessor functions that must only be called after MMTk is initialized.
+```
+
+API changes:
+
+-   module `util::metadata::side_metadata`
+    +   `GLOBAL_SIDE_METADATA_BASE_ADDRESS`: Removed.
+        *   Use `global_side_metadata_base_address()` instead.
+    +   `GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS`: Removed.
+        *   Use `global_side_metadata_vm_base_address()` instead.
+    +   `VO_BIT_SIDE_METADATA_ADDR`: Removed.
+        *   Use `vo_bit_side_metadata_addr()` instead.
+-   module `util::metadata::vo_bit`
+    +   `VO_BIT_SIDE_METADATA_ADDR`: Removed.
+        *   Use `vo_bit_side_metadata_addr()` instead.
+
+These addresses are no longer constants because MMTk now chooses the side metadata base address at
+boot time. Bindings should fetch them from the accessor functions after MMTk initialization has
+completed. Bindings can assume the addresses will not change once they are initialized.
+
 ## 0.32.0
 
 ### Allocation options changed

@@ -26,9 +26,12 @@ pub trait ActivePlan<VM: VMBinding> {
     fn mutator(tls: VMMutatorThread) -> &'static mut Mutator<VM>;
 
     /// Return an iterator that includes all the mutators at the point of invocation.
+    /// MMTk may call this method multiple times during a pause, and expect the set of mutators to be the same across all calls in a pause.
+    /// It is an undefined behavior if the set of mutators returned by this method changes during a pause.
     fn mutators<'a>() -> Box<dyn Iterator<Item = &'a mut Mutator<VM>> + 'a>;
 
     /// Return the total count of mutators.
+    /// MMTk may call this method multiple times during a pause, and expect the count to be the same across all calls in a pause. See also [`ActivePlan::mutators`].
     fn number_of_mutators() -> usize;
 
     /// The fallback for object tracing. MMTk generally expects to find an object in one of MMTk's spaces (if it is allocated by MMTK),

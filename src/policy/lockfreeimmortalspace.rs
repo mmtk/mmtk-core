@@ -3,23 +3,24 @@ use atomic::Atomic;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
+use crate::scheduler::GCWorker;
 use crate::util::address::Address;
-
 use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::conversions;
+use crate::util::copy::CopySemantics;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
-use crate::util::memory::MmapAnnotation;
-use crate::util::memory::MmapStrategy;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
+use crate::util::os::*;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 
@@ -76,11 +77,11 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(_object);
     }
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
         crate::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
     }
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn find_object_from_internal_pointer(
         &self,
         ptr: Address,
@@ -93,7 +94,7 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     }
     fn sft_trace_object(
         &self,
-        _queue: &mut VectorObjectQueue,
+        _queue: &mut OptionObjectQueue,
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
@@ -128,6 +129,15 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 
     fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
         unsafe { sft_map.eager_initialize(self.as_sft(), self.start, self.total_bytes) };
+    }
+
+    fn initialize_side_metadata(&self) {
+        self.metadata
+            .try_map_metadata_space(self.start, self.total_bytes, self.get_name())
+            .unwrap_or_else(|e| {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory: {e}")
+            });
     }
 
     fn estimate_side_meta_pages(&self, data_pages: usize) -> usize {
@@ -191,10 +201,6 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 }
 
-use crate::plan::{ObjectQueue, VectorObjectQueue};
-use crate::scheduler::GCWorker;
-use crate::util::copy::CopySemantics;
-
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LockFreeImmortalSpace<VM> {
     fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
@@ -235,10 +241,35 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         // Create a VM request of fixed size
         let vmrequest = VMRequest::fixed_size(aligned_total_bytes);
         // Reserve the space
-        let VMRequest::Extent { extent, top } = vmrequest else {
-            unreachable!()
+        let (extent, align, top) = match vmrequest {
+            VMRequest::Extent { extent, top } => (extent, None, top),
+            VMRequest::AlignedExtent { extent, align, top } => (extent, Some(align), top),
+            _ => unreachable!(),
         };
-        let start = args.heap.reserve(extent, top);
+        let anno = MmapAnnotation::Space { name: args.name };
+        let huge_page_option = args.options.transparent_hugepages_as_huge_page_support();
+        let reasonable_extent = CommonSpace::estimate_reasonable_contiguous_extent(
+            &args.options,
+            &args.gc_trigger,
+            args.vm_map,
+            extent,
+        );
+        let start = args
+            .heap
+            .reserve_quarantined(
+                reasonable_extent,
+                align,
+                top,
+                args.mmapper,
+                huge_page_option,
+                &anno,
+            )
+            .unwrap_or_else(|mmap_error| {
+                panic!(
+                    "Failed to quarantine contiguous space {} for {} bytes: {}",
+                    args.name, reasonable_extent, mmap_error
+                )
+            });
 
         let space = Self {
             name: args.name,
@@ -255,26 +286,12 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         };
 
         // Eagerly memory map the entire heap (also zero all the memory)
-        let strategy = MmapStrategy::new(
-            *args.options.transparent_hugepages,
-            crate::util::memory::MmapProtection::ReadWrite,
-        );
-        crate::util::memory::dzmmap_noreplace(
-            start,
-            aligned_total_bytes,
-            strategy,
-            &MmapAnnotation::Space {
-                name: space.get_name(),
-            },
-        )
-        .unwrap();
-        space
-            .metadata
-            .try_map_metadata_space(start, aligned_total_bytes, space.get_name())
-            .unwrap_or_else(|e| {
-                // TODO(Javad): handle meta space allocation failure
-                panic!("failed to mmap meta memory: {e}")
-            });
+        let strategy = MmapStrategy::default()
+            .transparent_hugepages(*args.options.transparent_hugepages)
+            .prot(crate::util::os::MmapProtection::ReadWrite)
+            .replace(true)
+            .reserve(true);
+        crate::util::os::OS::dzmmap(start, aligned_total_bytes, strategy, &anno).unwrap();
 
         space
     }

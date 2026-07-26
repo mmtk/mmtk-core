@@ -1,10 +1,10 @@
 //! This module provides an implementation of side table metadata.
 // For convenience, this module is public and the bindings may create and use side metadata for their purpose.
 
-mod constants;
 pub(crate) mod helpers;
 #[cfg(target_pointer_width = "32")]
 mod helpers_32;
+mod layout;
 
 mod global;
 pub(crate) mod ranges;
@@ -12,8 +12,50 @@ mod sanity;
 mod side_metadata_tests;
 pub(crate) mod spec_defs;
 
-pub use constants::*;
 pub use global::*;
+pub use layout::*;
+
+use crate::util::options::Options;
+use crate::vm::ObjectModel;
+use crate::vm::VMBinding;
+
+/// Initialize side metadata runtime state and reserve the side metadata address range.
+pub fn initialize_side_metadata<VM: VMBinding>(options: &Options) {
+    let vm_side_metadata_specs = super::extract_side_metadata(&[
+        *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+        *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+        *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+        *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        #[cfg(feature = "object_pinning")]
+        *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
+        *VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+    ]);
+    debug!(
+        "initialize_side_metadata(): collected {} VM side metadata specs",
+        vm_side_metadata_specs.len()
+    );
+    for spec in &vm_side_metadata_specs {
+        debug!("  VM side metadata spec: {:?}", spec);
+    }
+    set_vm_side_metadata_specs(&vm_side_metadata_specs);
+    initialize_side_metadata_base(
+        *options.side_metadata_base_address,
+        options.transparent_hugepages_as_huge_page_support(),
+    );
+}
+
+#[cfg(test)]
+pub(crate) fn core_test_initialize_side_metadata() {
+    use crate::util::os::HugePageSupport;
+    use crate::util::Address;
+
+    if is_side_metadata_initialized() {
+        return;
+    }
+
+    set_vm_side_metadata_specs(&[]);
+    initialize_side_metadata_base(Address::ZERO, HugePageSupport::No);
+}
 
 // Re-export helper functions. Allow unused imports in case there is no function that can be re-exported.
 #[allow(unused_imports)]

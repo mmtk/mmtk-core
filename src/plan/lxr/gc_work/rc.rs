@@ -4,11 +4,10 @@ use super::super::LXR;
 use super::super::{LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURSERY_EVACUATION};
 use super::tracing::LXRConcurrentTraceObjects;
 use super::tracing::LXRStopTheWorldProcessEdges;
+use super::ProcessEdgesBase;
 use crate::plan::VectorQueue;
 use crate::policy::immix::block::BlockState;
 use crate::scheduler::gc_work::RootKind;
-use crate::scheduler::gc_work::ScanObjects;
-use crate::scheduler::gc_work::SlotOf;
 use crate::util::copy::CopySemantics;
 use crate::util::copy::GCWorkerCopyContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
@@ -18,7 +17,7 @@ use crate::{
     plan::concurrent::global::ConcurrentPlan,
     plan::concurrent::Pause,
     policy::{immix::block::Block, space::Space},
-    scheduler::{gc_work::ProcessEdgesBase, GCWork, GCWorker, ProcessEdgesWork, WorkBucketStage},
+    scheduler::{GCWork, GCWorker, WorkBucketStage},
     util::{metadata::side_metadata, object_forwarding, ObjectReference},
     vm::*,
     MMTK,
@@ -696,14 +695,9 @@ pub struct CollectRoots<VM: VMBinding> {
     base: ProcessEdgesBase<VM>,
 }
 
-impl<VM: VMBinding> ProcessEdgesWork for CollectRoots<VM> {
-    type VM = VM;
-    type ScanObjectsWorkType = ScanObjects<Self>;
-    const OVERWRITE_REFERENCE: bool = false;
-    const SCAN_OBJECTS_IMMEDIATELY: bool = true;
-
-    fn new(
-        slots: Vec<SlotOf<Self>>,
+impl<VM: VMBinding> CollectRoots<VM> {
+    pub fn new(
+        slots: Vec<VM::VMSlot>,
         roots: bool,
         mmtk: &'static MMTK<VM>,
         bucket: WorkBucketStage,
@@ -712,30 +706,18 @@ impl<VM: VMBinding> ProcessEdgesWork for CollectRoots<VM> {
         let base = ProcessEdgesBase::new(slots, roots, mmtk, bucket);
         Self { base }
     }
+}
 
-    fn trace_object(&mut self, _object: ObjectReference) -> ObjectReference {
-        unreachable!()
-    }
-
-    fn process_slots(&mut self) {
+impl<VM: VMBinding> GCWork<VM> for CollectRoots<VM> {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        self.set_worker(worker);
         if !self.slots.is_empty() {
-            #[cfg(feature = "sanity")]
-            if self.roots
-                && !self.mmtk().get_plan().is_in_sanity()
-                && self.root_kind != Some(RootKind::Weak)
-            {
-                self.cache_roots_for_sanity_gc(self.slots.clone());
-            }
             let lxr = self.mmtk().get_plan().downcast_ref::<LXR<VM>>().unwrap();
             let roots = std::mem::take(&mut self.slots);
             let mut w = ProcessIncs::<_, EDGE_KIND_ROOT>::new(roots, lxr);
             w.root_kind = self.root_kind;
             GCWork::do_work(&mut w, self.worker(), self.mmtk());
         }
-    }
-
-    fn create_scan_work(&self, _nodes: Vec<ObjectReference>) -> Self::ScanObjectsWorkType {
-        unimplemented!()
     }
 }
 

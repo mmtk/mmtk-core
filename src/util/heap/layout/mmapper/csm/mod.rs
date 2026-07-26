@@ -2,10 +2,10 @@ use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::conversions::raw_is_aligned;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::layout::Mmapper;
-use crate::util::memory::*;
+use crate::util::os::*;
 use crate::util::Address;
 use bytemuck::NoUninit;
-use std::{io::Result, sync::Mutex};
+use std::sync::Mutex;
 
 mod byte_map_storage;
 #[cfg(target_pointer_width = "64")]
@@ -94,9 +94,9 @@ trait MapStateStorage {
     /// -   `Ok(Some(new_state))`: Set the state of all chunks within `group_range` to `new_state`.
     ///
     /// Return `Ok(())` if finished visiting all chunks normally.
-    fn bulk_transition_state<F>(&self, range: ChunkRange, update_fn: F) -> Result<()>
+    fn bulk_transition_state<F>(&self, range: ChunkRange, update_fn: F) -> MmapResult<()>
     where
-        F: FnMut(ChunkRange, MapState) -> Result<Option<MapState>>;
+        F: FnMut(ChunkRange, MapState) -> MmapResult<Option<MapState>>;
 }
 
 /// A [`Mmapper`] implementation based on a logical array of chunk states.
@@ -117,6 +117,46 @@ impl ChunkStateMmapper {
         Self {
             transition_lock: Default::default(),
             storage: ChosenMapStateStorage::new(),
+        }
+    }
+
+    /// Update the underlying storage to quarantined for the given range.
+    fn record_quarantined_range(
+        &self,
+        start: Address,
+        bytes: usize,
+        anno: &MmapAnnotation,
+    ) -> MmapResult<()> {
+        let range = ChunkRange::new_aligned(start, bytes);
+        let mappable_limit = self.mappable_limit();
+        if !range.is_within_limit(mappable_limit) {
+            let _ = OS::munmap(start, bytes);
+            return Err(MmapError::new(
+                start,
+                bytes,
+                anno,
+                std::io::Error::other("quarantined range is outside the mappable address space"),
+            ));
+        }
+
+        self.storage
+            .bulk_transition_state(range, |group_range, state| match state {
+                MapState::Unmapped => Ok(Some(MapState::Quarantined)),
+                MapState::Quarantined => {
+                    panic!("Attempted to quarantine already quarantined range {group_range}")
+                }
+                MapState::Mapped => {
+                    panic!("Quarantine returned already mapped range {group_range}")
+                }
+            })
+    }
+
+    fn mappable_limit(&self) -> Address {
+        let log_mappable = self.storage.log_mappable_bytes() as u32;
+        if log_mappable < usize::BITS {
+            unsafe { Address::from_usize(1usize << log_mappable) }
+        } else {
+            Address::MAX
         }
     }
 
@@ -146,9 +186,9 @@ impl Mmapper for ChunkStateMmapper {
         &self,
         start: Address,
         pages: usize,
-        strategy: MmapStrategy,
+        huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
-    ) -> Result<()> {
+    ) -> MmapResult<()> {
         let _guard = self.transition_lock.lock().unwrap();
 
         let bytes = pages << LOG_BYTES_IN_PAGE;
@@ -162,12 +202,12 @@ impl Mmapper for ChunkStateMmapper {
                 match state {
                     MapState::Unmapped => {
                         trace!("Trying to quarantine {group_range}");
-                        mmap_noreserve(group_start, group_bytes, strategy, anno)?;
+                        let mmap_strategy = MmapStrategy::QUARANTINE.huge_page(huge_page_option);
+                        OS::dzmmap(group_start, group_bytes, mmap_strategy, anno)?;
                         Ok(Some(MapState::Quarantined))
                     }
                     MapState::Quarantined => {
-                        trace!("Already quarantine {group_range}");
-                        Ok(None)
+                        panic!("Attempted to quarantine already quarantined range {group_range}")
                     }
                     MapState::Mapped => {
                         trace!("Already mapped {group_range}");
@@ -177,17 +217,62 @@ impl Mmapper for ChunkStateMmapper {
             })
     }
 
+    fn quarantine_address_range_anywhere(
+        &self,
+        pages: usize,
+        align: Option<usize>,
+        huge_page_option: HugePageSupport,
+        anno: &MmapAnnotation,
+    ) -> MmapResult<Address> {
+        let _guard = self.transition_lock.lock().unwrap();
+
+        let bytes = pages << LOG_BYTES_IN_PAGE;
+        let align = align.unwrap_or(BYTES_IN_CHUNK);
+        let mmap_strategy = MmapStrategy::QUARANTINE.huge_page(huge_page_option);
+        let start = OS::dzmmap_anywhere(bytes, align, mmap_strategy, anno)?;
+        self.record_quarantined_range(start, bytes, anno)?;
+        Ok(start)
+    }
+
+    fn quarantine_address_range_preferred(
+        &self,
+        start: Address,
+        pages: usize,
+        align: Option<usize>,
+        huge_page_option: HugePageSupport,
+        anno: &MmapAnnotation,
+    ) -> MmapResult<Address> {
+        let _guard = self.transition_lock.lock().unwrap();
+
+        let bytes = pages << LOG_BYTES_IN_PAGE;
+        let align = align.unwrap_or(BYTES_IN_CHUNK);
+        assert!(
+            start.is_aligned_to(align),
+            "Preferred start {start} is not aligned to {align}"
+        );
+        let mmap_strategy = MmapStrategy::QUARANTINE.huge_page(huge_page_option);
+        let actual_start = OS::dzmmap_preferred(start, bytes, align, mmap_strategy, anno)?;
+        self.record_quarantined_range(actual_start, bytes, anno)?;
+        Ok(actual_start)
+    }
+
     fn ensure_mapped(
         &self,
         start: Address,
         pages: usize,
-        strategy: MmapStrategy,
+        huge_page_option: HugePageSupport,
+        prot: MmapProtection,
         anno: &MmapAnnotation,
-    ) -> Result<()> {
+    ) -> MmapResult<()> {
         let _guard = self.transition_lock.lock().unwrap();
 
         let bytes = pages << LOG_BYTES_IN_PAGE;
         let range = ChunkRange::new_unaligned(start, bytes);
+
+        let mmap_strategy = MmapStrategy::default()
+            .huge_page(huge_page_option)
+            .prot(prot)
+            .reserve(true);
 
         self.storage
             .bulk_transition_state(range, |group_range, state| {
@@ -196,11 +281,11 @@ impl Mmapper for ChunkStateMmapper {
 
                 match state {
                     MapState::Unmapped => {
-                        dzmmap_noreplace(group_start, group_bytes, strategy, anno)?;
+                        OS::dzmmap(group_start, group_bytes, mmap_strategy.replace(false), anno)?;
                         Ok(Some(MapState::Mapped))
                     }
                     MapState::Quarantined => {
-                        unsafe { dzmmap(group_start, group_bytes, strategy, anno) }?;
+                        OS::dzmmap(group_start, group_bytes, mmap_strategy.replace(true), anno)?;
                         Ok(Some(MapState::Mapped))
                     }
                     MapState::Mapped => Ok(None),
@@ -231,7 +316,6 @@ mod tests {
     use super::*;
     use crate::mmap_anno_test;
     use crate::util::constants::LOG_BYTES_IN_PAGE;
-    use crate::util::memory;
     use crate::util::test_util::CHUNK_STATE_MMAPPER_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
     use crate::util::{conversions, Address};
@@ -256,7 +340,13 @@ mod tests {
                 || {
                     let mmapper = ChunkStateMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, mmap_anno_test!())
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            pages,
+                            HugePageSupport::No,
+                            MmapProtection::ReadWrite,
+                            mmap_anno_test!(),
+                        )
                         .unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
@@ -271,7 +361,7 @@ mod tests {
                     }
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
+                    OS::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
                 },
             )
         })
@@ -284,7 +374,13 @@ mod tests {
                 || {
                     let mmapper = ChunkStateMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, mmap_anno_test!())
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            pages,
+                            HugePageSupport::No,
+                            MmapProtection::ReadWrite,
+                            mmap_anno_test!(),
+                        )
                         .unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
@@ -299,7 +395,7 @@ mod tests {
                     }
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
+                    OS::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
                 },
             )
         })
@@ -313,7 +409,13 @@ mod tests {
                 || {
                     let mmapper = ChunkStateMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST, mmap_anno_test!())
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            pages,
+                            HugePageSupport::No,
+                            MmapProtection::ReadWrite,
+                            mmap_anno_test!(),
+                        )
                         .unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
@@ -328,7 +430,7 @@ mod tests {
                     }
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
+                    OS::munmap(FIXED_ADDRESS, MAX_BYTES).unwrap();
                 },
             )
         })

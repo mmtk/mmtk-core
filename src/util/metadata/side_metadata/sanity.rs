@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Result};
 use std::sync::{Mutex, RwLock};
 
-use super::constants::{
+use super::layout::{
     LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO, LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };
 use super::{SideMetadataContext, SideMetadataSpec};
@@ -141,10 +141,11 @@ fn verify_no_overlap_contiguous(
     spec_1: &SideMetadataSpec,
     spec_2: &SideMetadataSpec,
 ) -> Result<()> {
-    let end_1 = spec_1.get_absolute_offset() + super::metadata_address_range_size(spec_1);
-    let end_2 = spec_2.get_absolute_offset() + super::metadata_address_range_size(spec_2);
+    let base = crate::util::metadata::side_metadata::layout::global_side_metadata_base_address();
+    let end_1 = base + super::metadata_address_range_size(spec_1);
+    let end_2 = base + super::metadata_address_range_size(spec_2);
 
-    if !(spec_1.get_absolute_offset() >= end_2 || spec_2.get_absolute_offset() >= end_1) {
+    if !(spec_1.get_starting_address() >= end_2 || spec_2.get_starting_address() >= end_1) {
         return Err(Error::new(
             ErrorKind::InvalidInput,
             format!(
@@ -166,12 +167,12 @@ fn verify_no_overlap_contiguous(
 ///
 #[cfg(target_pointer_width = "32")]
 fn verify_no_overlap_chunked(spec_1: &SideMetadataSpec, spec_2: &SideMetadataSpec) -> Result<()> {
-    let end_1 = spec_1.get_rel_offset()
+    let end_1 = spec_1.get_offset_for_chunked()
         + super::metadata_bytes_per_chunk(spec_1.log_bytes_in_region, spec_1.log_num_of_bits);
-    let end_2 = spec_2.get_rel_offset()
+    let end_2 = spec_2.get_offset_for_chunked()
         + super::metadata_bytes_per_chunk(spec_2.log_bytes_in_region, spec_2.log_num_of_bits);
 
-    if !(spec_1.get_rel_offset() >= end_2 || spec_2.get_rel_offset() >= end_1) {
+    if !(spec_1.get_offset_for_chunked() >= end_2 || spec_2.get_offset_for_chunked() >= end_1) {
         return Err(Error::new(
             ErrorKind::InvalidInput,
             format!(
@@ -390,7 +391,7 @@ fn verify_metadata_address_bound(spec: &SideMetadataSpec, data_addr: Address) {
 
     let metadata_addr =
         crate::util::metadata::side_metadata::address_to_meta_address(spec, data_addr);
-    let metadata_addr_bound = if spec.is_absolute_offset() {
+    let metadata_addr_bound = if spec.uses_contiguous_side_metadata() {
         spec.upper_bound_address_for_contiguous()
     } else {
         #[cfg(target_pointer_width = "32")]
@@ -681,14 +682,14 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: true,
-            offset: SideMetadataOffset::addr(Address::ZERO),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
             is_global: true,
-            offset: SideMetadataOffset::layout_after(&spec_1),
+            offset: side_metadata_offset_after(&spec_1),
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -702,7 +703,7 @@ mod tests {
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
             is_global: true,
-            offset: SideMetadataOffset::layout_after(&spec_1),
+            offset: side_metadata_offset_after(&spec_1),
             log_num_of_bits: 3,
             log_bytes_in_region: 1,
         };
@@ -712,7 +713,7 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: true,
-            offset: SideMetadataOffset::addr(Address::ZERO),
+            offset: 0,
             log_num_of_bits: 1,
             #[cfg(target_pointer_width = "64")]
             log_bytes_in_region: 0,
@@ -722,7 +723,7 @@ mod tests {
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
             is_global: true,
-            offset: SideMetadataOffset::layout_after(&spec_1),
+            offset: side_metadata_offset_after(&spec_1),
             log_num_of_bits: 3,
             #[cfg(target_pointer_width = "64")]
             log_bytes_in_region: 2,
@@ -739,14 +740,14 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: true,
-            offset: SideMetadataOffset::addr(Address::ZERO),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
             is_global: true,
-            offset: SideMetadataOffset::layout_after(&spec_1),
+            offset: side_metadata_offset_after(&spec_1),
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -757,17 +758,19 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: true,
-            offset: SideMetadataOffset::addr(unsafe { Address::from_usize(1) }),
+            offset: 1,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
 
-        assert!(verify_no_overlap_contiguous(&spec_1, &spec_2).is_err());
+        // spec_2 starts after spec_1 end because spec_1 base is shifted by 1.
+        // With relative offsets and runtime base, they no longer overlap.
+        assert!(verify_no_overlap_contiguous(&spec_1, &spec_2).is_ok());
 
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: true,
-            offset: SideMetadataOffset::addr(Address::ZERO),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -775,9 +778,7 @@ mod tests {
             name: "spec_2",
             is_global: true,
             // We specifically make up an invalid offset
-            offset: SideMetadataOffset::addr(
-                spec_1.get_absolute_offset() + metadata_address_range_size(&spec_1) - 1,
-            ),
+            offset: (Address::ZERO + metadata_address_range_size(&spec_1) - 1).as_usize(),
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -791,14 +792,14 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: false,
-            offset: SideMetadataOffset::rel(0),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
             is_global: false,
-            offset: SideMetadataOffset::layout_after(&spec_1),
+            offset: side_metadata_offset_after(&spec_1),
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -809,7 +810,7 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: false,
-            offset: SideMetadataOffset::rel(1),
+            offset: 1,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -819,7 +820,7 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: false,
-            offset: SideMetadataOffset::rel(0),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -827,11 +828,9 @@ mod tests {
             name: "spec_2",
             is_global: false,
             // We make up an invalid offset
-            offset: SideMetadataOffset::rel(
-                spec_1.get_rel_offset()
-                    + metadata_bytes_per_chunk(spec_1.log_bytes_in_region, spec_1.log_num_of_bits)
-                    - 1,
-            ),
+            offset: spec_1.get_offset_for_chunked()
+                + metadata_bytes_per_chunk(spec_1.log_bytes_in_region, spec_1.log_num_of_bits)
+                - 1,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -845,7 +844,7 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: false,
-            offset: SideMetadataOffset::rel(0),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };
@@ -860,7 +859,7 @@ mod tests {
         let spec_1 = SideMetadataSpec {
             name: "spec_1",
             is_global: false,
-            offset: SideMetadataOffset::rel(0),
+            offset: 0,
             log_num_of_bits: 0,
             log_bytes_in_region: 0,
         };

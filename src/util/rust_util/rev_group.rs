@@ -111,14 +111,11 @@ where
         } else {
             // Either we haven't start iterating, yet, or we already exhausted the iter.
             // Get the next item from the underlying iter.
-            if let Some(item) = self.iter.next() {
-                // The next group has at least one item.
-                // This is the key of the group.
-                let key = (self.get_key)(&item);
-                (item, key)
-            } else {
-                return None;
-            }
+            let item = self.iter.next()?;
+            // The next group has at least one item.
+            // This is the key of the group.
+            let key = (self.get_key)(&item);
+            (item, key)
         };
 
         // If reached here, the group must have at least one item.

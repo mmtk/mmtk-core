@@ -1,4 +1,4 @@
-use crate::plan::VectorObjectQueue;
+use crate::plan::tracing::OptionObjectQueue;
 use crate::scheduler::GCWorker;
 use crate::util::*;
 use crate::vm::VMBinding;
@@ -75,10 +75,10 @@ pub trait SFT: Sync + 'static {
     /// This default implementation works for all spaces that use MMTk's mapper to allocate memory.
     /// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.
     /// Such spaces needs to override this method.
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference>;
 
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn find_object_from_internal_pointer(
         &self,
         ptr: Address,
@@ -94,16 +94,18 @@ pub trait SFT: Sync + 'static {
     ///     `Mutator::post_alloc` will call this method after allocation.
     fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize);
 
-    /// Trace objects through SFT. This along with [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges)
+    /// Trace objects through SFT. This along with [`crate::plan::tracing::SFTTrace`]
     /// provides an easy way for most plans to trace objects without the need to implement any plan-specific
     /// code. However, tracing objects for some policies are more complicated, and they do not provide an
     /// implementation of this method. For example, mark compact space requires trace twice in each GC.
     /// Immix has defrag trace and fast trace.
     fn sft_trace_object(
         &self,
-        // We use concrete type for `queue` because SFT doesn't support generic parameters,
-        // and SFTProcessEdges uses `VectorObjectQueue`.
-        queue: &mut VectorObjectQueue,
+        // We use `OptionObjectQueue`, the simplest `ObjectQueue` implementation, for `queue`
+        // because SFT doesn't support generic parameters.  The generic `SFTTrace::trace_object`
+        // method wraps `SFT::sft_trace_object` and forwards the enqueued object to the actual
+        // queue.
+        queue: &mut OptionObjectQueue,
         object: ObjectReference,
         worker: GCWorkerMutRef,
     ) -> ObjectReference;
@@ -169,11 +171,11 @@ impl SFT for EmptySpaceSFT {
     fn is_in_space(&self, _object: ObjectReference) -> bool {
         false
     }
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn is_mmtk_object(&self, _addr: Address) -> Option<ObjectReference> {
         None
     }
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn find_object_from_internal_pointer(
         &self,
         _ptr: Address,
@@ -191,13 +193,13 @@ impl SFT for EmptySpaceSFT {
 
     fn sft_trace_object(
         &self,
-        _queue: &mut VectorObjectQueue,
+        _queue: &mut OptionObjectQueue,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
         // We do not have the `VM` type parameter here, so we cannot forward the call to the VM.
         panic!(
-            "Call trace_object() on {}, which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().",
+            "Call trace_object() on {}, which maps to an empty space. SFTTrace does not support the fallback to vm_trace_object().",
             object,
         )
     }

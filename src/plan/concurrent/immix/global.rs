@@ -1,4 +1,3 @@
-use crate::plan::concurrent::concurrent_marking_work::ProcessRootSlots;
 use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::immix::gc_work::ConcurrentImmixGCWorkContext;
 use crate::plan::concurrent::immix::gc_work::ConcurrentImmixSTWGCWorkContext;
@@ -8,6 +7,7 @@ use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::immix::mutator::ALLOCATOR_MAPPING;
+use crate::plan::tracing::gc_work::weakref::VMProcessWeakRefs;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -18,8 +18,6 @@ use crate::policy::immix::TRACE_KIND_FAST;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::Release;
 use crate::scheduler::gc_work::StopMutators;
-use crate::scheduler::gc_work::UnsupportedProcessEdges;
-use crate::scheduler::gc_work::VMProcessWeakRefs;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
@@ -75,8 +73,8 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             return true;
         }
 
+        // Check stw for final mark
         let concurrent_marking_in_progress = self.concurrent_marking_in_progress();
-
         if concurrent_marking_in_progress
             && self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].is_drained()
         {
@@ -84,6 +82,13 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             // we trigger the FinalMark pause at the next poll() site (here).
             // FIXME: Immediately trigger FinalMark when the Concurrent bucket is drained.
             return true;
+        }
+
+        // Check stw for initial mark
+
+        // If concurrent marking is disbled, no need to check further.
+        if self.concurrent_marking_is_disabled() {
+            return false;
         }
 
         let threshold = self.get_total_pages() >> 1;
@@ -99,6 +104,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             debug_assert_ne!(self.previous_pause(), Some(Pause::InitialMark));
             return true;
         }
+
         false
     }
 
@@ -124,12 +130,25 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        // If concurrent marking is disabled, force a full GC.
+        // Though we have checked in collection_required to not trigger a concurrent GC, it is still possible
+        // that a GC is triggered without going through collection_required, e.g. a user triggered GC, or a GC trigger
+        // implemented at the binding side without calling collection_required.
+        // In those cases, we also want to force a full GC.
+        if self.concurrent_marking_is_disabled() {
+            self.should_do_full_gc.store(true, Ordering::SeqCst);
+        }
+
         let pause = if self.concurrent_marking_in_progress() {
             // FIXME: Currently it is unsafe to bypass `FinalMark` and go directly from `InitialMark` to `Full`.
             // It is related to defragmentation.  See https://github.com/mmtk/mmtk-core/issues/1357 for more details.
             // We currently force `FinalMark` to happen if the last pause is `InitialMark`.
             Pause::FinalMark
-        } else if self.should_do_full_gc.load(Ordering::SeqCst) {
+        } else if self.should_do_full_gc.load(Ordering::SeqCst)
+            // For user-triggered GCs, we don't want a simple initial pause which reclaims nothing.
+            // We do a full STW collection for user triggered collection instead.
+            || self.base().global_state.is_user_triggered_collection()
+        {
             Pause::Full
         } else {
             Pause::InitialMark
@@ -298,6 +317,10 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
 
 impl<VM: VMBinding> ConcurrentImmix<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        if *args.options.concurrent_immix_disable_concurrent_marking {
+            warn!("Option 'concurrent_immix_disable_concurrent_marking' is set to true. Concurrent marking is disabled for ConcurrentImmix. This will make ConcurrentImmix behave exactly like full heap Immix.");
+        }
+
         let spec = crate::util::metadata::extract_side_metadata(&[
             *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
         ]);
@@ -323,7 +346,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         scheduler.work_buckets[WorkBucketStage::FinalizableForwarding].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::Compact].set_enabled(false);
 
-        let immix = ConcurrentImmix {
+        ConcurrentImmix {
             immix_space: ImmixSpace::new(
                 plan_args.get_normal_space_args("immix", true, false, VMRequest::discontiguous()),
                 immix_args,
@@ -334,11 +357,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             previous_pause: Atomic::new(None),
             should_do_full_gc: AtomicBool::new(false),
             concurrent_marking_active: AtomicBool::new(false),
-        };
-
-        immix.verify_side_metadata_sanity();
-
-        immix
+        }
     }
 
     fn set_ref_closure_buckets_enabled(&self, do_closure: bool) {
@@ -358,37 +377,40 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
         self.set_ref_closure_buckets_enabled(false);
 
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-            ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self, TRACE_KIND_FAST>>,
-        >::new());
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<
-            ConcurrentImmixGCWorkContext<UnsupportedProcessEdges<VM>>,
-        >::new(self));
+        scheduler.work_buckets[WorkBucketStage::Unconstrained]
+            .add(StopMutators::<ConcurrentImmixGCWorkContext<VM>>::new());
+        scheduler.work_buckets[WorkBucketStage::Prepare]
+            .add(Prepare::<ConcurrentImmixGCWorkContext<VM>>::new(self));
     }
 
     fn schedule_concurrent_marking_final_pause(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.set_ref_closure_buckets_enabled(true);
 
         // Skip root scanning in the final mark
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-            ConcurrentImmixGCWorkContext<ProcessRootSlots<VM, Self, TRACE_KIND_FAST>>,
-        >::new_no_scan_roots());
+        scheduler.work_buckets[WorkBucketStage::Unconstrained]
+            .add(StopMutators::<ConcurrentImmixGCWorkContext<VM>>::new_no_scan_roots());
 
-        scheduler.work_buckets[WorkBucketStage::Release].add(Release::<
-            ConcurrentImmixGCWorkContext<UnsupportedProcessEdges<VM>>,
-        >::new(self));
+        scheduler.work_buckets[WorkBucketStage::Release]
+            .add(Release::<ConcurrentImmixGCWorkContext<VM>>::new(self));
+
+        // Sanity
+        #[cfg(feature = "sanity")]
+        {
+            use crate::util::sanity::sanity_checker::ScheduleSanityGC;
+            scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC::<Self>::new(self));
+        }
 
         // Deal with weak ref and finalizers
         // TODO: Check against schedule_common_work and see if we are still missing any work packet
-        type RefProcessingEdges<VM> =
-            crate::scheduler::gc_work::PlanProcessEdges<VM, ConcurrentImmix<VM>, TRACE_KIND_FAST>;
+        type RefTracePolicy<VM> =
+            crate::plan::tracing::PlanTrace<ConcurrentImmix<VM>, TRACE_KIND_FAST>;
         // Reference processing
         if !*self.base().options.no_reference_types {
             use crate::util::reference_processor::{
                 PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
             };
             scheduler.work_buckets[WorkBucketStage::SoftRefClosure]
-                .add(SoftRefProcessing::<RefProcessingEdges<VM>>::new());
+                .add(SoftRefProcessing::<RefTracePolicy<VM>>::new());
             scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
                 .add(WeakRefProcessing::<VM>::new());
             scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
@@ -403,14 +425,14 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             use crate::util::finalizable_processor::Finalization;
             // finalization
             scheduler.work_buckets[WorkBucketStage::FinalRefClosure]
-                .add(Finalization::<RefProcessingEdges<VM>>::new());
+                .add(Finalization::<RefTracePolicy<VM>>::new());
         }
 
         // VM-specific weak ref processing
         // Note that ConcurrentImmix does not have a separate forwarding stage,
         // so we don't schedule the `VMForwardWeakRefs` work packet.
         scheduler.work_buckets[WorkBucketStage::VMRefClosure]
-            .set_sentinel(Box::new(VMProcessWeakRefs::<RefProcessingEdges<VM>>::new()));
+            .set_sentinel(Box::new(VMProcessWeakRefs::<RefTracePolicy<VM>>::new()));
     }
 
     pub fn concurrent_marking_in_progress(&self) -> bool {
@@ -439,6 +461,13 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
     fn previous_pause(&self) -> Option<Pause> {
         self.previous_pause.load(Ordering::SeqCst)
+    }
+
+    fn concurrent_marking_is_disabled(&self) -> bool {
+        *self
+            .base()
+            .options
+            .concurrent_immix_disable_concurrent_marking
     }
 }
 

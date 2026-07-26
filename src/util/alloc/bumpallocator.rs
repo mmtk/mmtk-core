@@ -194,11 +194,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         offset: usize,
         stress_test: bool,
     ) -> Address {
-        if self.space.handle_obvious_oom_request(
-            self.tls,
-            size,
-            self.get_context().get_alloc_options(),
-        ) {
+        if self.handle_obvious_oom_request(self.tls, size) {
             return Address::ZERO;
         }
 

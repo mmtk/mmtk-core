@@ -14,7 +14,7 @@ use crate::util::heap::{PageResource, VMRequest};
 use crate::util::options::Options;
 use crate::vm::{ActivePlan, Collection};
 
-use crate::util::constants::{LOG_BYTES_IN_MBYTE, LOG_BYTES_IN_PAGE};
+use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
 use crate::util::opaque_pointer::*;
 
@@ -30,7 +30,7 @@ use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
-use crate::util::memory::{self, HugePageSupport, MmapProtection, MmapStrategy};
+use crate::util::os::*;
 use crate::vm::VMBinding;
 
 use std::marker::PhantomData;
@@ -54,47 +54,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// Currently after we create a boxed plan, spaces in the plan have a non-moving address.
     fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap);
 
-    /// A check for the obvious out-of-memory case: if the requested size is larger than
-    /// the heap size, it is definitely an OOM. We would like to identify that, and
-    /// allows the binding to deal with OOM. Without this check, we will attempt
-    /// to allocate from the page resource. If the requested size is unrealistically large
-    /// (such as `usize::MAX`), it breaks the assumptions of our implementation of
-    /// page resource, vm map, etc. This check prevents that, and allows us to
-    /// handle the OOM case.
-    /// Each allocator that may request an arbitrary size should call this method before
-    /// acquring memory from the space. For example, bump pointer allocator and large object
-    /// allocator need to call this method. On the other hand, allocators that only allocate
-    /// memory in fixed size blocks do not need to call this method.
-    /// An allocator should call this method before doing any computation on the size to
-    /// avoid arithmatic overflow. If we have to do computation in the allocation fastpath and
-    /// overflow happens there, there is nothing we can do about it.
-    /// Return a boolean to indicate if we will be out of memory, determined by the check.
-    fn will_oom_on_acquire(&self, size: usize) -> bool {
-        let max_pages = self.get_gc_trigger().policy.get_max_heap_size_in_pages();
-        let requested_pages = size >> LOG_BYTES_IN_PAGE;
-        requested_pages > max_pages
-    }
-
-    /// Check if the requested `size` is an obvious out-of-memory case using
-    /// [`Self::will_oom_on_acquire`] and, if it is, call `Collection::out_of_memory`.  Return the
-    /// result of `will_oom_on_acquire`.
-    fn handle_obvious_oom_request(
-        &self,
-        tls: VMThread,
-        size: usize,
-        alloc_options: AllocationOptions,
-    ) -> bool {
-        if self.will_oom_on_acquire(size) {
-            if alloc_options.allow_oom_call {
-                VM::VMCollection::out_of_memory(
-                    tls,
-                    crate::util::alloc::AllocationError::HeapOutOfMemory,
-                );
-            }
-            return true;
-        }
-        false
-    }
+    /// Initialize side metadata for the space. This is called after spaces and the plan are contructued
+    /// and the side metadata has been initialized. If a space needs to access side metadata during its
+    /// construction, it can override this method to initialize side metadata here.  By default, this method does nothing.
+    fn initialize_side_metadata(&self) {}
 
     fn acquire(&self, tls: VMThread, pages: usize, alloc_options: AllocationOptions) -> Address {
         trace!(
@@ -104,7 +67,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         );
 
         debug_assert!(
-            !self.will_oom_on_acquire(pages << LOG_BYTES_IN_PAGE),
+            !self.get_gc_trigger().will_oom_on_alloc(pages << crate::util::constants::LOG_BYTES_IN_PAGE),
             "The requested pages is larger than the max heap size. Is will_go_oom_on_acquire used before acquring memory?"
         );
 
@@ -181,6 +144,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             res.new_chunk
         );
         let bytes = conversions::pages_to_bytes(res.pages);
+        #[cfg(debug_assertions)]
+        self.common()
+            .metadata
+            .assert_metadata_ranges_in_reserved_range(res.start, bytes, self.get_name());
 
         let mmap = || {
             // Mmap the pages and the side metadata, and handle error. In case of any error,
@@ -191,8 +158,11 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 .ensure_mapped(
                     res.start,
                     res.pages,
-                    self.common().mmap_strategy(),
-                    &memory::MmapAnnotation::Space {
+                    self.common()
+                        .options
+                        .transparent_hugepages_as_huge_page_support(),
+                    self.common().mmap_protection(),
+                    &MmapAnnotation::Space {
                         name: self.get_name(),
                     },
                 )
@@ -202,7 +172,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     self.get_name(),
                 ))
             {
-                memory::handle_mmap_error::<VM>(mmap_error, tls, res.start, bytes);
+                OS::handle_mmap_error::<VM>(mmap_error, tls);
             }
         };
         let grow_space = || {
@@ -227,7 +197,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
         // TODO: Concurrent zeroing
         if self.common().zeroed {
-            memory::zero(res.start, bytes);
+            crate::util::memory::zero(res.start, bytes);
         }
 
         // Some assertions
@@ -410,7 +380,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn release_multiple_pages(&mut self, start: Address);
 
     /// What copy semantic we should use for this space if we copy objects from this space.
-    /// This is only needed for plans that use SFTProcessEdges
+    /// This is only needed for plans that use [`crate::plan::tracing::SFTTrace`].
     fn set_copy_for_sft_trace(&mut self, _semantics: Option<CopySemantics>) {
         panic!("A copying space should override this method")
     }
@@ -641,7 +611,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             needs_field_log_bit: args.plan_args.constraints.needs_field_log_bit,
             unlog_allocated_object: args.plan_args.unlog_allocated_object,
             unlog_traced_object: args.plan_args.unlog_traced_object,
-            gc_trigger: args.plan_args.gc_trigger,
+            gc_trigger: args.plan_args.gc_trigger.clone(),
             metadata: SideMetadataContext {
                 global: args.plan_args.global_side_metadata_specs,
                 local: args.local_side_metadata_specs,
@@ -662,15 +632,16 @@ impl<VM: VMBinding> CommonSpace<VM> {
             return rtn;
         }
 
-        let (extent, top) = match vmrequest {
-            VMRequest::Fraction { frac, top: _top } => (get_frac_available(frac), _top),
+        let (extent, align, top) = match vmrequest {
+            VMRequest::Fraction { frac, top: _top } => (get_frac_available(frac), None, _top),
             VMRequest::Extent {
                 extent: _extent,
                 top: _top,
-            } => (_extent, _top),
+            } => (_extent, None, _top),
+            VMRequest::AlignedExtent { align, extent, top } => (extent, Some(align), top),
             VMRequest::Fixed {
                 extent: _extent, ..
-            } => (_extent, false),
+            } => (_extent, None, false),
             _ => unreachable!(),
         };
 
@@ -681,12 +652,62 @@ impl<VM: VMBinding> CommonSpace<VM> {
             extent
         );
 
+        // The given extent might be too large for the heap. We get an estimate of the required virtual memory for the heap size,
+        // then use the min of the given extent and the estimate as the actual extent for the space.
+        let reasonable_extent = conversions::raw_align_up(
+            Self::estimate_reasonable_contiguous_extent(
+                &args.plan_args.options,
+                &args.plan_args.gc_trigger,
+                args.plan_args.vm_map,
+                extent,
+            ),
+            BYTES_IN_CHUNK,
+        );
+        debug!(
+            "resonable_extent for space {} is {} bytes",
+            rtn.name, reasonable_extent
+        );
+
+        let anno = MmapAnnotation::Space { name: rtn.name };
+        let huge_page_option = args
+            .plan_args
+            .options
+            .transparent_hugepages_as_huge_page_support();
+
         let start = if let VMRequest::Fixed { start: _start, .. } = vmrequest {
+            if let Err(mmap_error) = args.plan_args.mmapper.quarantine_address_range(
+                _start,
+                bytes_to_pages_up(reasonable_extent),
+                huge_page_option,
+                &anno,
+            ) {
+                panic!(
+                    "Failed to quarantine fixed contiguous space {} [{}, {}) for {} bytes: {}",
+                    rtn.name,
+                    _start,
+                    _start + extent,
+                    extent,
+                    mmap_error
+                );
+            }
             _start
         } else {
-            // FIXME
-            //if (HeapLayout.vmMap.isFinalized()) VM.assertions.fail("heap is narrowed after regionMap is finalized: " + name);
-            args.plan_args.heap.reserve(extent, top)
+            args.plan_args
+                .heap
+                .reserve_quarantined(
+                    reasonable_extent,
+                    align,
+                    top,
+                    args.plan_args.mmapper,
+                    huge_page_option,
+                    &anno,
+                )
+                .unwrap_or_else(|mmap_error| {
+                    panic!(
+                        "Failed to quarantine contiguous space {} for {} bytes: {}",
+                        rtn.name, extent, mmap_error
+                    )
+                })
         };
         assert!(
             start == chunk_align_up(start),
@@ -697,10 +718,9 @@ impl<VM: VMBinding> CommonSpace<VM> {
 
         rtn.contiguous = true;
         rtn.start = start;
-        rtn.extent = extent;
-        // FIXME
-        rtn.descriptor = SpaceDescriptor::create_descriptor_from_heap_range(start, start + extent);
-        // VM.memory.setHeapRange(index, start, start.plus(extent));
+        rtn.extent = reasonable_extent;
+        rtn.descriptor =
+            SpaceDescriptor::create_descriptor_from_heap_range(start, start + reasonable_extent);
 
         // We only initialize our vm map if the range of the space is in our available heap range. For normally spaces,
         // they are definitely in our heap range. But for VM space, a runtime could give us an arbitrary range. We only
@@ -718,23 +738,40 @@ impl<VM: VMBinding> CommonSpace<VM> {
             }
         }
 
-        // For contiguous space, we know its address range so we reserve metadata memory for its range.
-        rtn.metadata
-            .try_map_metadata_address_range(rtn.start, rtn.extent, rtn.name)
-            .unwrap_or_else(|e| {
-                // TODO(Javad): handle meta space allocation failure
-                panic!("failed to mmap meta memory: {e}");
-            });
-
         debug!(
             "Created space {} [{}, {}) for {} bytes",
             rtn.name,
             start,
-            start + extent,
-            extent
+            start + reasonable_extent,
+            reasonable_extent
         );
 
         rtn
+    }
+
+    /// This function return an estimate value of required virtual memory for the heap size.
+    /// Considering virtual memory fragmentation, we may need more virtual memory than the actual heap size.
+    /// When a space needs to quarantine a virtual memory range, it can use this function to get an estimate
+    /// of the required virtual memory, and use that to decide how much virtual memory to quarantine.
+    pub fn estimate_reasonable_contiguous_extent(
+        options: &Options,
+        gc_trigger: &GCTrigger<VM>,
+        vm_map: &dyn VMMap,
+        extent: usize,
+    ) -> usize {
+        // PageProtect will consume virtual memory very quickly, and it is not a performant plan anyway. Just return extent.
+        if *options.plan == crate::util::options::PlanSelector::PageProtect {
+            return extent;
+        }
+
+        // To accomodate virtual memory fragmentation, we use a fixed ratio to estimate the required virtual memory.
+        // The following value (2) is a pure estimate, we may chanage it to whatever is reasonable based on the actual
+        // fragmentation observed in different platforms.
+        const VIRTUAL_MEMORY_RATIO_TO_MAX_HEAP_SIZE: usize = 2;
+        let estimate = conversions::pages_to_bytes(gc_trigger.policy.get_max_heap_size_in_pages())
+            * VIRTUAL_MEMORY_RATIO_TO_MAX_HEAP_SIZE;
+
+        estimate.max(vm_map.min_contiguous_extent())
     }
 
     pub fn initialize_sft(
@@ -757,18 +794,11 @@ impl<VM: VMBinding> CommonSpace<VM> {
         self.vm_map
     }
 
-    pub fn mmap_strategy(&self) -> MmapStrategy {
-        MmapStrategy {
-            huge_page: if *self.options.transparent_hugepages {
-                HugePageSupport::TransparentHugePages
-            } else {
-                HugePageSupport::No
-            },
-            prot: if self.permission_exec || cfg!(feature = "exec_permission_on_all_spaces") {
-                MmapProtection::ReadWriteExec
-            } else {
-                MmapProtection::ReadWrite
-            },
+    pub fn mmap_protection(&self) -> MmapProtection {
+        if self.permission_exec || cfg!(feature = "exec_permission_on_all_spaces") {
+            MmapProtection::ReadWriteExec
+        } else {
+            MmapProtection::ReadWrite
         }
     }
 

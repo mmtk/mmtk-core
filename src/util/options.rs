@@ -1,5 +1,5 @@
-use crate::scheduler::affinity::{get_total_num_cpus, CoreId};
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
+use crate::util::os::*;
 use crate::util::Address;
 use std::default::Default;
 use std::fmt::Debug;
@@ -343,6 +343,15 @@ impl Options {
         *self.stress_factor != DEFAULT_STRESS_FACTOR
             || *self.analysis_factor != DEFAULT_STRESS_FACTOR
     }
+
+    /// Turning transparent huge pages into HugePageSupport.
+    pub fn transparent_hugepages_as_huge_page_support(&self) -> HugePageSupport {
+        if *self.transparent_hugepages {
+            HugePageSupport::TransparentHugePages
+        } else {
+            HugePageSupport::No
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -457,7 +466,7 @@ impl AffinityKind {
     /// maximum number of cores allocated to the program. Assumes core ids on the system are
     /// 0-indexed.
     pub fn validate(&self) -> bool {
-        let num_cpu = get_total_num_cpus();
+        let num_cpu = OS::get_total_num_cpus();
 
         if let AffinityKind::RoundRobin(cpuset) = self {
             for cpu in cpuset {
@@ -912,6 +921,10 @@ options! {
     vm_space_start:         Address                 [always_valid] = Address::ZERO,
     /// The size of vmspace.
     vm_space_size:          usize                   [|v: &usize| *v > 0] = 0xdc0_0000,
+    /// The base address to reserve side metadata at startup.
+    /// If this is zero, MMTk will reserve side metadata at any available address.
+    /// If non-zero, MMTk will quarantine side metadata at this fixed address.
+    side_metadata_base_address: Address             [always_valid] = Address::ZERO,
     /// Perf events to measure
     /// Semicolons are used to separate events
     /// Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
@@ -954,7 +967,7 @@ options! {
     verbose:                       usize            [|v: &usize| *v <= 10]  = 0,
     /// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
     /// Default to a fixed heap size of 0.5x physical memory.
-    gc_trigger:             GCTriggerSelector       [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize),
+    gc_trigger:             GCTriggerSelector       [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((OS::get_system_total_memory().unwrap_or(4 * 1024 * 1024 * 1024) as f64 * 0.5f64) as usize),
     /// Enable transparent hugepage support for MMTk spaces via madvise (only Linux is supported)
     /// This only affects the memory for MMTk spaces.
     transparent_hugepages:  bool                    [|v: &bool| !v || cfg!(target_os = "linux")] = false,
@@ -968,7 +981,9 @@ options! {
     /// Percentage of heap size reserved for defragmentation.
     /// According to [this paper](https://doi.org/10.1145/1375581.1375586), Immix works well with
     /// headroom between 1% to 3% of the heap size.
-    immix_defrag_headroom_percent: usize            [|v: &usize| *v <= 50] = 5
+    immix_defrag_headroom_percent: usize            [|v: &usize| *v <= 50] = 5,
+    /// Disable concurrent marking in ConcurrentImmix. Setting this to true will make ConcurrentImmix behave exactly like full heap Immix. This option is only intended for debugging.
+    concurrent_immix_disable_concurrent_marking: bool              [always_valid] = false
 }
 
 #[cfg(test)]
@@ -1214,7 +1229,7 @@ mod tests {
                 || {
                     let mut vec = vec![0_u16];
                     let mut cpu_list = String::new();
-                    let num_cpus = get_total_num_cpus();
+                    let num_cpus = OS::get_total_num_cpus();
 
                     cpu_list.push('0');
                     for cpu in 1..num_cpus {

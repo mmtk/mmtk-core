@@ -143,7 +143,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
-        let res = SemiSpace {
+        SemiSpace {
             hi: AtomicBool::new(false),
             copyspace0: CopySpace::new(
                 plan_args.get_normal_space_args(
@@ -164,11 +164,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
                 true,
             ),
             common: CommonPlan::new(plan_args),
-        };
-
-        res.verify_side_metadata_sanity();
-
-        res
+        }
     }
 
     pub fn tospace(&self) -> &CopySpace<VM> {

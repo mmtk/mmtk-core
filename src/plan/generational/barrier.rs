@@ -1,17 +1,16 @@
 //! Generational read/write barrier implementations.
 
 use crate::plan::barriers::BarrierSemantics;
+use crate::plan::generational::gc_work::GenNurseryTrace;
 use crate::plan::PlanTraceObject;
 use crate::plan::VectorQueue;
 use crate::policy::gc_work::DEFAULT_TRACE;
 use crate::scheduler::WorkBucketStage;
-use crate::util::constants::BYTES_IN_INT;
 use crate::util::*;
 use crate::vm::slot::MemorySlice;
 use crate::vm::VMBinding;
 use crate::MMTK;
 
-use super::gc_work::GenNurseryProcessEdges;
 use super::gc_work::ProcessModBuf;
 use super::gc_work::ProcessRegionModBuf;
 use super::global::GenerationalPlanExt;
@@ -45,8 +44,9 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>>
     fn flush_modbuf(&mut self) {
         let buf = self.modbuf.take();
         if !buf.is_empty() {
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
-                .add(ProcessModBuf::<GenNurseryProcessEdges<VM, P, DEFAULT_TRACE>>::new(buf));
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessModBuf::<
+                GenNurseryTrace<VM, P, DEFAULT_TRACE>,
+            >::new(buf));
         }
     }
 
@@ -54,9 +54,8 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>>
         let buf = self.region_modbuf.take();
         if !buf.is_empty() {
             debug_assert!(!buf.is_empty());
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessRegionModBuf::<
-                GenNurseryProcessEdges<VM, P, DEFAULT_TRACE>,
-            >::new(buf));
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
+                .add(ProcessRegionModBuf::<GenNurseryTrace<VM, P, DEFAULT_TRACE>>::new(buf));
         }
     }
 }
@@ -91,11 +90,6 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> BarrierSem
         // Only enqueue array slices in mature spaces
         if !dst_in_nursery {
             // enqueue
-            debug_assert_eq!(
-                dst.bytes() & (BYTES_IN_INT - 1),
-                0,
-                "bytes should be a multiple of 32-bit words"
-            );
             self.region_modbuf.push(dst);
             self.region_modbuf
                 .is_full()

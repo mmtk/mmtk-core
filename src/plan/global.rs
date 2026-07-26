@@ -70,11 +70,18 @@ pub fn create_mutator<VM: VMBinding>(
     })
 }
 
+/// Create a plan and the spaces for the plan.
+///
+/// It is very important that in the constructor of each plan (including the constructor of each space),
+/// sft and side metadata is not available for access. If a plan or a space needs to initialize sft or side metadata
+/// in its constructor, it needs to postpone the initialization to [`Plan::initialize_sft`], [`Plan::initialize_side_metadata`],
+/// [`Space::initialize_sft`] or [`Space::initialize_side_metadata`].
+/// If a plan or a space tries to access sft or side metadata in its constructor, it may cause undefined behavior.
 pub fn create_plan<VM: VMBinding>(
     plan: PlanSelector,
     args: CreateGeneralPlanArgs<VM>,
 ) -> Box<dyn Plan<VM = VM>> {
-    let plan = match plan {
+    match plan {
         PlanSelector::NoGC => {
             Box::new(crate::plan::nogc::NoGC::new(args)) as Box<dyn Plan<VM = VM>>
         }
@@ -108,18 +115,7 @@ pub fn create_plan<VM: VMBinding>(
         PlanSelector::Compressor => {
             Box::new(crate::plan::compressor::Compressor::new(args)) as Box<dyn Plan<VM = VM>>
         }
-    };
-
-    // We have created Plan in the heap, and we won't explicitly move it.
-    // Each space now has a fixed address for its lifetime. It is safe now to initialize SFT.
-    let sft_map: &mut dyn crate::policy::sft_map::SFTMap =
-        unsafe { crate::mmtk::SFT_MAP.get_mut() }.as_mut();
-    plan.for_each_space(&mut |s| {
-        sft_map.notify_space_creation(s.as_sft());
-        s.initialize_sft(sft_map);
-    });
-
-    plan
+    }
 }
 
 /// Create thread local GC worker.
@@ -366,6 +362,25 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         self.for_each_space(&mut |space| {
             space.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         })
+    }
+
+    /// Call `space.initialize_sft` for all spaces in this plan, and notify the SFT map about the creation of each space.
+    /// This method should only be called after 1. side metadata is initialized (as some SFT maps may use side metadata), 2. the plan is created in the heap and won't be moved,
+    /// and 3. the side metadata sanity is initialized (otherwise we may try access side metadata and trigger sanity check before side metadata sanity is initialized)
+    fn initialize_sft(&self) {
+        let sft_map: &mut dyn crate::policy::sft_map::SFTMap =
+            unsafe { crate::mmtk::SFT_MAP.get_mut() }.as_mut();
+        self.for_each_space(&mut |s| {
+            sft_map.notify_space_creation(s.as_sft());
+            s.initialize_sft(sft_map);
+        });
+    }
+
+    /// Call `space.initialize_side_metadata` for all spaces in this plan.
+    /// This is called after the plan is created in the heap and won't be moved, and after side metadata is initialized.
+    /// If a plan needs to access side metadata during space construction, it can override this method for its own initialization.
+    fn initialize_side_metadata(&self) {
+        self.for_each_space(&mut |s| s.initialize_side_metadata());
     }
 }
 
@@ -901,21 +916,18 @@ pub trait HasSpaces {
     fn for_each_space_mut(&mut self, func: &mut dyn FnMut(&mut dyn Space<Self::VM>));
 }
 
-/// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.
+/// A plan that uses [`PlanTrace`] needs to provide an implementation for this trait.
 /// Generally a plan does not need to manually implement this trait. Instead, we provide
 /// a procedural macro that helps generate an implementation. Please check `macros/trace_object`.
 ///
 /// A plan could also manually implement this trait. For the sake of performance, the implementation
 /// of this trait should mark methods as `[inline(always)]`.
+///
+/// [`PlanTrace`]: crate::plan::tracing::PlanTrace
 pub trait PlanTraceObject<VM: VMBinding> {
-    /// Trace objects in the plan. Generally one needs to figure out
-    /// which space an object resides in, and invokes the corresponding policy
-    /// trace object method.
+    /// Trace objects in the plan.
     ///
-    /// Arguments:
-    /// * `trace`: the current transitive closure
-    /// * `object`: the object to trace.
-    /// * `worker`: the GC worker that is tracing this object.
+    /// See [`crate::plan::tracing::Trace::trace_object`].
     fn trace_object<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
         queue: &mut Q,
@@ -923,15 +935,14 @@ pub trait PlanTraceObject<VM: VMBinding> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference;
 
-    /// Post-scan objects in the plan. Each object is scanned by `VM::VMScanning::scan_object()`, and this function
-    /// will be called after the `VM::VMScanning::scan_object()` as a hook to invoke possible policy post scan method.
-    /// If a plan does not have any policy that needs post scan, this method can be implemented as empty.
-    /// If a plan has a policy that has some policy specific behaviors for scanning (e.g. mark lines in Immix),
-    /// this method should also invoke those policy specific methods for objects in that space.
+    /// Post-scan objects in the plan.
+    ///
+    /// See [`crate::plan::tracing::Trace::post_scan_object`].
     fn post_scan_object(&self, object: ObjectReference);
 
-    /// Whether objects in this plan may move. If any of the spaces used by the plan may move objects, this should
-    /// return true.
+    /// Whether objects in this plan may move.
+    ///
+    /// See [`crate::plan::tracing::Trace::post_scan_object`].
     fn may_move_objects<const KIND: TraceKind>() -> bool;
 }
 

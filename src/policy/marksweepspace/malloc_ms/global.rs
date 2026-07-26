@@ -1,6 +1,5 @@
 use super::metadata::*;
-use crate::plan::ObjectQueue;
-use crate::plan::VectorObjectQueue;
+use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::CommonSpace;
@@ -105,7 +104,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     }
 
     /// For malloc space, we just use the side metadata.
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
         debug_assert!(!addr.is_zero());
         // `addr` cannot be mapped by us. It should be mapped by the malloc library.
@@ -113,7 +112,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         self.has_object_alloced_by_malloc(addr)
     }
 
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn find_object_from_internal_pointer(
         &self,
         ptr: Address,
@@ -132,7 +131,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     fn sft_trace_object(
         &self,
-        queue: &mut VectorObjectQueue,
+        queue: &mut OptionObjectQueue,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
@@ -272,7 +271,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MallocSpac
 
 // Actually no max object size.
 #[allow(dead_code)]
-pub const MAX_OBJECT_SIZE: usize = crate::util::constants::MAX_INT;
+pub const MAX_OBJECT_SIZE: usize = usize::MAX;
 
 impl<VM: VMBinding> MallocSpace<VM> {
     pub fn extend_global_side_metadata_specs(specs: &mut Vec<SideMetadataSpec>) {
@@ -435,11 +434,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// for the chunk map is mapped, and if it is allocated in the chunk map.
     fn is_meta_space_mapped_for_address(&self, address: Address) -> bool {
         let is_chunk_map_mapped = |chunk_start: Address| {
-            const CHUNK_MAP_MAX_META_ADDRESS: Address =
+            let chunk_map_max_meta_address =
                 ChunkMap::ALLOC_TABLE.upper_bound_address_for_contiguous();
             let meta_address =
                 side_metadata::address_to_meta_address(&ChunkMap::ALLOC_TABLE, chunk_start);
-            if meta_address < CHUNK_MAP_MAX_META_ADDRESS {
+            if meta_address < chunk_map_max_meta_address {
                 meta_address.is_mapped()
             } else {
                 false
@@ -545,7 +544,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     ///
     /// This function doesn't check if `addr` is aligned.
     /// If not, it will try to load the VO bit for the address rounded down to the metadata's granularity.
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     pub fn has_object_alloced_by_malloc(&self, addr: Address) -> Option<ObjectReference> {
         if !self.is_meta_space_mapped_for_address(addr) {
             return None;

@@ -1,9 +1,9 @@
 use super::super::LXR;
+use super::ProcessEdgesBase;
 use crate::plan::concurrent::Pause;
 use crate::plan::VectorQueue;
 use crate::policy::immix::block::Block;
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::{ScanObjects, SlotOf};
 use crate::scheduler::RootKind;
 use crate::util::copy::CopySemantics;
 use crate::util::rc::RefCountHelper;
@@ -11,7 +11,7 @@ use crate::util::ObjectReference;
 use crate::vm::slot::Slot;
 use crate::{
     plan::ObjectQueue,
-    scheduler::{gc_work::ProcessEdgesBase, GCWork, GCWorker, ProcessEdgesWork, WorkBucketStage},
+    scheduler::{GCWork, GCWorker, WorkBucketStage},
     vm::*,
     MMTK,
 };
@@ -230,29 +230,23 @@ pub struct LXRStopTheWorldProcessEdges<VM: VMBinding, const FULL_GC: bool> {
     pause: Pause,
     base: ProcessEdgesBase<VM>,
     forwarded_roots: Vec<ObjectReference>,
-    next_slots: VectorQueue<SlotOf<Self>>,
+    next_slots: VectorQueue<VM::VMSlot>,
     next_slot_count: u32,
     remset_recorded_slots: bool,
     should_record_forwarded_roots: bool,
 }
 
 impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC> {
-    pub fn new_remset(slots: Vec<SlotOf<Self>>, mmtk: &'static MMTK<VM>) -> Self {
+    const OVERWRITE_REFERENCE: bool = super::super::MATURE_EVACUATION;
+
+    pub fn new_remset(slots: Vec<VM::VMSlot>, mmtk: &'static MMTK<VM>) -> Self {
         let mut me = Self::new(slots, false, mmtk, WorkBucketStage::Closure);
         me.remset_recorded_slots = true;
         me
     }
-}
 
-impl<VM: VMBinding, const FULL_GC: bool> ProcessEdgesWork
-    for LXRStopTheWorldProcessEdges<VM, FULL_GC>
-{
-    type VM = VM;
-    type ScanObjectsWorkType = ScanObjects<Self>;
-    const OVERWRITE_REFERENCE: bool = super::super::MATURE_EVACUATION;
-
-    fn new(
-        slots: Vec<SlotOf<Self>>,
+    pub fn new(
+        slots: Vec<VM::VMSlot>,
         roots: bool,
         mmtk: &'static MMTK<VM>,
         bucket: WorkBucketStage,
@@ -281,11 +275,6 @@ impl<VM: VMBinding, const FULL_GC: bool> ProcessEdgesWork
         }
         assert!(self.nodes.is_empty());
         self.next_slot_count = 0;
-    }
-
-    /// Trace  and evacuate objects.
-    fn trace_object(&mut self, _object: ObjectReference) -> ObjectReference {
-        unreachable!()
     }
 
     fn process_slots(&mut self) {
@@ -323,13 +312,15 @@ impl<VM: VMBinding, const FULL_GC: bool> ProcessEdgesWork
             self.lxr.curr_roots.read().unwrap().push(roots);
         }
     }
+}
 
-    fn process_slot(&mut self, _slot: SlotOf<Self>) {
-        unreachable!()
-    }
-
-    fn create_scan_work(&self, _nodes: Vec<ObjectReference>) -> ScanObjects<Self> {
-        unreachable!()
+impl<VM: VMBinding, const FULL_GC: bool> GCWork<VM> for LXRStopTheWorldProcessEdges<VM, FULL_GC> {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        self.set_worker(worker);
+        self.process_slots();
+        if !self.nodes.is_empty() {
+            self.flush();
+        }
     }
 }
 
@@ -419,7 +410,7 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
     }
 
     #[inline]
-    fn __process_slot<const WEAK_ROOT: bool, const REMSET: bool>(&mut self, slot: SlotOf<Self>) {
+    fn __process_slot<const WEAK_ROOT: bool, const REMSET: bool>(&mut self, slot: VM::VMSlot) {
         let Some(object) = slot.load() else {
             return;
         };

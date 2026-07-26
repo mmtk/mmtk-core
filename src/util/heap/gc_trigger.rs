@@ -1,6 +1,6 @@
 use atomic::Ordering;
 
-use crate::global_state::GlobalState;
+use crate::global_state::{GlobalState, PauseRequestOutcome};
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
@@ -11,7 +11,7 @@ use crate::vm::Collection;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::mem::MaybeUninit;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
 /// GCTrigger is responsible for triggering GCs based on the given policy.
@@ -24,9 +24,6 @@ pub struct GCTrigger<VM: VMBinding> {
     plan: MaybeUninit<&'static dyn Plan<VM = VM>>,
     /// The triggering policy.
     pub policy: Box<dyn GCTriggerPolicy<VM>>,
-    /// Set by mutators to trigger GC.  It is atomic so that mutators can check if GC has already
-    /// been requested efficiently in `poll` without acquiring any mutex.
-    request_flag: AtomicBool,
     scheduler: Arc<GCWorkScheduler<VM>>,
     options: Arc<Options>,
     state: Arc<GlobalState>,
@@ -62,7 +59,6 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 }
             },
             options,
-            request_flag: AtomicBool::new(false),
             scheduler,
             state,
         }
@@ -79,24 +75,27 @@ impl<VM: VMBinding> GCTrigger<VM> {
 
     /// Request a GC.  Called by mutators when polling (during allocation) and when handling user
     /// GC requests (e.g. `System.gc();` in Java).
-    fn request(&self) {
-        if self.request_flag.load(Ordering::Relaxed) {
-            return;
+    /// Returns whether a GC was actually requested.
+    fn request(&self) -> bool {
+        // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
+        // with GC workers, which is expensive for functions like `poll`. `try_request_pause`
+        // only reports `Requested` to the thread that actually wins the race to transition the
+        // status, so only that thread calls it, instead of every thread that observes the old
+        // status.
+        match self.state.gc_status.try_request_pause() {
+            // A GC is genuinely required (the heap policy has been exceeded), but MMTk has no GC
+            // worker threads to service it. Silently returning `false` here would let allocation
+            // grow the heap without bound instead of respecting the configured limit.
+            PauseRequestOutcome::Uninitialized => panic!(
+                "GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."
+            ),
+            PauseRequestOutcome::AlreadyRequested => true,
+            PauseRequestOutcome::Requested => {
+                probe!(mmtk, gc_requested);
+                self.scheduler.request_schedule_collection();
+                true
+            }
         }
-
-        if !self.request_flag.swap(true, Ordering::Relaxed) {
-            // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
-            // with GC workers, which is expensive for functions like `poll`.  We use the atomic
-            // flag `request_flag` to elide the need to acquire the mutex in subsequent calls.
-            probe!(mmtk, gc_requested);
-            self.scheduler.request_schedule_collection();
-        }
-    }
-
-    /// Clear the "GC requested" flag so that mutators can trigger the next GC.
-    /// Called by a GC worker when all mutators have come to a stop.
-    pub fn clear_request(&self) {
-        self.request_flag.store(false, Ordering::Relaxed);
     }
 
     /// This method is called periodically by the allocation subsystem
@@ -127,8 +126,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 plan.get_reserved_pages(),
                 plan.get_total_pages(),
             );
-            self.request();
-            return true;
+            return self.request();
         }
         false
     }
@@ -157,8 +155,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
             self.state
                 .user_triggered_collection
                 .store(true, Ordering::Relaxed);
-            self.request();
-            return true;
+            return self.request();
         }
 
         false
@@ -252,6 +249,27 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// Return lower bound of the nursery size (in number of pages)
     pub fn get_min_nursery_pages(&self) -> usize {
         crate::util::conversions::bytes_to_pages_up(self.get_min_nursery_bytes())
+    }
+
+    /// A check for the obvious out-of-memory case: if the requested size is larger than
+    /// the heap size, it is definitely an OOM. We would like to identify that, and
+    /// allows the binding to deal with OOM. Without this check, we will attempt
+    /// to allocate from the page resource. If the requested size is unrealistically large
+    /// (such as `usize::MAX`), it breaks the assumptions of our implementation of
+    /// page resource, vm map, etc. This check prevents that, and allows us to
+    /// handle the OOM case.
+    /// Each allocator that may request an arbitrary size should call this method before
+    /// acquring memory from the space. For example, bump pointer allocator and large object
+    /// allocator need to call this method. On the other hand, allocators that only allocate
+    /// memory in fixed size blocks do not need to call this method.
+    /// An allocator should call this method before doing any computation on the size to
+    /// avoid arithmatic overflow. If we have to do computation in the allocation fastpath and
+    /// overflow happens there, there is nothing we can do about it.
+    /// Return a boolean to indicate if we will be out of memory, determined by the check.
+    pub fn will_oom_on_alloc(&self, size: usize) -> bool {
+        let max_pages = self.policy.get_max_heap_size_in_pages();
+        let requested_pages = size >> crate::util::constants::LOG_BYTES_IN_PAGE;
+        requested_pages > max_pages
     }
 }
 
