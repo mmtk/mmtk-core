@@ -6,12 +6,7 @@ use crate::plan::AllocationSemantics;
 #[test]
 pub fn allocate_nonmoving() {
     with_mockvm(
-        || -> MockVM {
-            MockVM {
-                is_collection_enabled: MockMethod::new_fixed(Box::new(|_| false)),
-                ..MockVM::default()
-            }
-        },
+        MockVM::default,
         || {
             // 1MB heap
             const MB: usize = 1024 * 1024;

@@ -107,15 +107,27 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     }
     #[cfg(feature = "object_pinning")]
     fn pin_object(&self, object: ObjectReference) -> bool {
-        VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.pin_object::<VM>(object)
+        if self.space_args.never_move_objects {
+            false
+        } else {
+            VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.pin_object::<VM>(object)
+        }
     }
     #[cfg(feature = "object_pinning")]
     fn unpin_object(&self, object: ObjectReference) -> bool {
-        VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.unpin_object::<VM>(object)
+        if self.space_args.never_move_objects {
+            false
+        } else {
+            VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.unpin_object::<VM>(object)
+        }
     }
     #[cfg(feature = "object_pinning")]
     fn is_object_pinned(&self, object: ObjectReference) -> bool {
-        VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.is_object_pinned::<VM>(object)
+        if self.space_args.never_move_objects {
+            true
+        } else {
+            VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.is_object_pinned::<VM>(object)
+        }
     }
     fn is_movable(&self) -> bool {
         !self.space_args.never_move_objects
@@ -604,27 +616,25 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             return None;
         }
         loop {
-            if let Some(block) = self.reusable_blocks.pop() {
-                // Skip blocks that should be evacuated.
-                if copy && block.is_defrag_source() {
-                    continue;
-                }
+            let block = self.reusable_blocks.pop()?;
 
-                // Get available lines. Do this before block.init which will reset block state.
-                let lines_delta = match block.get_state() {
-                    BlockState::Reusable { unavailable_lines } => {
-                        Block::LINES - unavailable_lines as usize
-                    }
-                    BlockState::Unmarked => Block::LINES,
-                    _ => unreachable!("{:?} {:?}", block, block.get_state()),
-                };
-                self.lines_consumed.fetch_add(lines_delta, Ordering::SeqCst);
-
-                block.init(copy);
-                return Some(block);
-            } else {
-                return None;
+            // Skip blocks that should be evacuated.
+            if copy && block.is_defrag_source() {
+                continue;
             }
+
+            // Get available lines. Do this before block.init which will reset block state.
+            let lines_delta = match block.get_state() {
+                BlockState::Reusable { unavailable_lines } => {
+                    Block::LINES - unavailable_lines as usize
+                }
+                BlockState::Unmarked => Block::LINES,
+                _ => unreachable!("{:?} {:?}", block, block.get_state()),
+            };
+            self.lines_consumed.fetch_add(lines_delta, Ordering::SeqCst);
+
+            block.init(copy);
+            return Some(block);
         }
     }
 

@@ -32,6 +32,56 @@ Notes for the mmtk-core developers:
 
 ## 0.33.0
 
+### Collection enabling/disabling is now managed by MMTk instead of the VM binding
+
+```admonish tldr
+`Collection::is_collection_enabled()` is removed.  MMTk now tracks whether collection is enabled
+itself, via the new, nestable `disable_collection()`/`enable_collection()` API on `MMTK` (and
+`memory_manager`).
+```
+
+API changes:
+
+-   trait `vm::Collection`
+    +   `is_collection_enabled()`: Removed.
+        *   Previously, the VM binding implemented this method to tell MMTk whether GC is
+            currently allowed. MMTk now manages this state itself, so the binding no longer needs
+            to (and no longer can) answer this question.
+        *   If the binding previously disabled collection at certain times (e.g. before some
+            initialization completed), it should instead call the new `memory_manager::disable_collection()`
+            at the point where it used to start returning `false`, and `memory_manager::enable_collection()`
+            at the point where it used to start returning `true` again.
+-   module `memory_manager`
+    +   `disable_collection()`: now returns `Result<bool, GcStatus>`. `Ok(true)`
+        means this call actually switched collection from enabled to disabled; `Ok(false)` means
+        it only increased the nesting depth of an already-disabled status. `Err(status)` means
+        collection could not be disabled right now, with `status` naming why (e.g. a GC is in
+        progress or has been requested); the VM binding should check safepoints, expect a pause,
+        or wait for the concurrent GC to finish, then call this function again.
+    *   `enable_collection()`: return true if the GC is enabled after the call. Otherwise, the function
+        returns false.
+    +   `is_collection_enabled()`: New. Returns whether collection is currently enabled.
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/pull/1457>
+
+### `Slot` is required to implement `Sync`
+
+```admonish tldr
+`vm::slot::Slot` now needs to implement `Sync`.
+```
+
+API changes:
+-   module `vm::slot`
+    +   `Slot`: Now required to implement `Sync`
+        *   The provided `SimpleSlot` in mmtk-core already implements `Sync`.  If the VM binding
+            uses it, no change is needed.
+        *   If the VM binding's `Slot` implementation does not include raw pointers (`*const T` and
+            `*mut T`), chance is high that it automatically implements `Sync`.  If this is the case,
+            no change is needed.
+        *   Otherwise, the VM binding should declare `unsafe impl Sync for ...` for the slot type.
+
 ### Thread IDs require `Debug` instead of `Display`
 
 ```admonish tldr

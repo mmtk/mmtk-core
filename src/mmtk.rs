@@ -261,7 +261,7 @@ impl<VM: VMBinding> MMTK<VM> {
             "MMTk collection has been initialized (was initialize_collection() already called before?)"
         );
         self.scheduler.spawn_gc_threads(self, tls);
-        self.state.initialized.store(true, Ordering::SeqCst);
+        self.state.gc_status.set_initialized();
         probe!(mmtk, collection_initialized);
     }
 
@@ -269,7 +269,7 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn shutdown(&'static self) {
         if self.state.is_initialized() {
             self.scheduler.shutdown_gc_threads();
-            self.state.initialized.store(false, Ordering::SeqCst);
+            self.state.gc_status.set_uninitialized();
         }
     }
 
@@ -373,30 +373,36 @@ impl<VM: VMBinding> MMTK<VM> {
         self.inside_sanity.load(Ordering::Relaxed)
     }
 
-    pub(crate) fn set_gc_status(&self, s: GcStatus) {
-        let mut gc_status = self.state.gc_status.lock().unwrap();
-        if *gc_status == GcStatus::NotInGC {
-            self.state.stacks_prepared.store(false, Ordering::SeqCst);
-            // FIXME stats
-            self.stats.start_gc();
-        }
-        *gc_status = s;
-        if *gc_status == GcStatus::NotInGC {
-            // FIXME stats
-            if self.stats.get_gathering_stats() {
-                self.stats.end_gc();
-            }
-        }
+    /// Get the current GC status for MMTk.
+    pub fn get_gc_status(&self) -> GcStatus {
+        self.state.gc_status.load()
     }
 
-    /// Return true if a collection is in progress.
-    pub fn gc_in_progress(&self) -> bool {
-        *self.state.gc_status.lock().unwrap() != GcStatus::NotInGC
+    /// Disable collection. On success, returns `Ok(true)` if this call actually switched
+    /// collection from enabled to disabled, `Ok(false)` if it only increased the nesting depth of
+    /// an already-disabled status. If MMTk is unable to disable GC right now (possibly a GC is in
+    /// progress, or a GC has been requested), returns `Err` with the status that prevented it;
+    /// users should invoke runtime safepoints or other mechanisms to prepare for a GC pause, and
+    /// then call this function again.
+    ///
+    /// This call is nestable. Each call must be paired with a matching call to
+    /// [`MMTK::enable_collection`].
+    pub fn disable_collection(&self) -> Result<bool, GcStatus> {
+        self.gc_trigger.disable_collection()
     }
 
-    /// Return true if a collection is in progress and past the preparatory stage.
-    pub fn gc_in_progress_proper(&self) -> bool {
-        *self.state.gc_status.lock().unwrap() == GcStatus::GcProper
+    /// Enable collection. If collection is not currently disabled (e.g. there was no prior
+    /// matching call to [`MMTK::disable_collection`]), this is a no-op.
+    /// Returns `true` if this call actually re-enabled collection (i.e. it was the outermost
+    /// matching call), `false` if it only decremented the nesting depth, or if collection was
+    /// already enabled.
+    pub fn enable_collection(&self) -> bool {
+        self.gc_trigger.enable_collection()
+    }
+
+    /// Return whether collection is currently enabled.
+    pub fn is_collection_enabled(&self) -> bool {
+        self.gc_trigger.is_collection_enabled()
     }
 
     /// Return true if the current GC is an emergency GC.

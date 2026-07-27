@@ -34,9 +34,18 @@ jobs:
             --no-progress
             --cache
             --max-cache-age 1d
-            --exclude 'https://users.cecs.anu.edu.au/~steveb/pubs/papers/**'
             --exclude 'https://dl.acm.org/**'
             './docs/**/*.md'
+      - name: On link check failure
+        if: failure()
+        run: |
+          echo "Link check failed.  Please read the summary in the last step."
+          if grep -q 403 lychee/out.md; then
+            echo "Some links received reply code 403 Forbidden:"
+            grep 403 lychee/out.md
+            echo "If the server disallows robot access,"
+            echo "please exclude affected web sites in .github/workflows/link-check.yml"
+          fi
       - name: Save lychee cache
         uses: actions/cache/save@v4
         if: always()
