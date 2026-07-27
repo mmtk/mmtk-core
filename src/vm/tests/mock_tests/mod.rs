@@ -40,6 +40,7 @@ mod mock_test_barrier_slow_path_assertion;
 #[cfg(feature = "vo_bit")]
 mod mock_test_conservatism;
 mod mock_test_debug_get_object_info;
+mod mock_test_enable_collection_without_disable;
 #[cfg(target_os = "linux")]
 mod mock_test_handle_mmap_conflict;
 mod mock_test_handle_mmap_oom;
@@ -73,6 +74,7 @@ mod mock_test_vm_layout_compressed_pointer;
 mod mock_test_vm_layout_default;
 mod mock_test_vm_layout_heap_start;
 mod mock_test_vm_layout_log_address_space;
+mod mock_test_wait_for_no_collection_in_progress;
 
 mod mock_test_doc_avoid_resolving_allocator;
 mod mock_test_doc_mutator_storage;
