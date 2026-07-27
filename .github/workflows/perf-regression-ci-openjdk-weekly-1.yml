@@ -31,8 +31,17 @@ jobs:
   config:
     uses: ./.github/workflows/openjdk-perf-config.yml
 
-  openjdk-run-plan:
+  # Build OpenJDK+MMTk if it isn't already cached (e.g. the per-commit
+  # workflow's cache expired, or hasn't run yet) - cheap no-op otherwise,
+  # since this reuses the same cache-hit-skip build job as that workflow.
+  openjdk-build:
     needs: [config]
+    uses: ./.github/workflows/openjdk-build-reusable.yml
+    with:
+      ci_perf_kit_version: ${{ needs.config.outputs.ci_perf_kit_version }}
+
+  openjdk-run-plan:
+    needs: [config, openjdk-build]
     strategy:
       fail-fast: false
       matrix:

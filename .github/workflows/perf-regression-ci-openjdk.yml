@@ -24,93 +24,13 @@ jobs:
     uses: ./.github/workflows/openjdk-perf-config.yml
 
   # Build OpenJDK+MMTk once per push, and cache it for openjdk-run-plan below
-  # (and for the weekly batch workflows, which reuse whatever was cached here most recently).
+  # (and for the weekly batch workflows, which also call this and so will
+  # build fresh themselves if that cache is ever missing - e.g. expired).
   openjdk-build:
     needs: [config]
-    runs-on: [self-hosted, Linux, freq-scaling-off]
-    timeout-minutes: 1440
-    steps:
-      # checkout perf-kit
-      - name: Checkout Perf Kit
-        uses: actions/checkout@v4
-        with:
-          repository: mmtk/ci-perf-kit
-          ref: ${{ needs.config.outputs.ci_perf_kit_version }}
-          path: ci-perf-kit
-          submodules: true
-      # TESTING: build OpenJDK+MMTk only once and reuse it for every commit
-      # pushed to this PR, instead of rebuilding on every push. Uses a fixed
-      # cache key (not keyed by github.sha like production) so it's a cache
-      # hit regardless of which commit triggered this run - every step below
-      # is skipped once that's the case. Revert this whole
-      # restore/skip-if-hit mechanism, and the fixed key (here and in
-      # openjdk-run-plan-reusable.yml), before merging.
-      - name: Check for existing OpenJDK+MMTk build cache
-        id: restore-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ci-perf-kit/build
-            ci-perf-kit/probes/out
-            ci-perf-kit/openjdk-probe
-          # Kept in sync with the cache key in openjdk-run-plan-reusable.yml.
-          key: openjdk-mmtk-build-chopin-test-fixed
-      - name: Checkout MMTk Core
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
-        with:
-          path: mmtk-core
-      - name: Checkout OpenJDK Binding
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: mmtk/mmtk-openjdk
-          # TODO: We currently use OpenJDK 11 for performance comparison.
-          # We should switch to OpenJDK 21 when we are ready, and start a new epoch.
-          ref: jdk-11
-          path: mmtk-openjdk
-      - name: Checkout OpenJDK
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        working-directory: mmtk-openjdk
-        run: |
-          ./.github/scripts/ci-checkout.sh
-      - name: Setup Rust Toolchain
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
-      # setup
-      - name: Replace mmtk-core dependency and clean previous build
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: |
-          # Note that ci-replace-mmtk-dep.sh will apply `realpath()` to the `--mmtk-core-path` option.
-          # so we specify the relative path from the PWD to the mmtk-core repo.
-          ./mmtk-core/.github/scripts/ci-replace-mmtk-dep.sh mmtk-openjdk/mmtk/Cargo.toml \
-            --mmtk-core-path mmtk-core
-          rm -rf mmtk-openjdk/repos/openjdk/scratch
-          rm -rf mmtk-openjdk/repos/openjdk/build
-      # build
-      - name: Build OpenJDK+MMTk
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: |
-          export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64/
-          ./ci-perf-kit/scripts/openjdk-build.sh ./mmtk-openjdk ./mmtk-core
-      # cache the build for openjdk-run-plan below, and for the weekly batch workflows
-      - name: Cache OpenJDK+MMTk build
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ci-perf-kit/build
-            ci-perf-kit/probes/out
-            ci-perf-kit/openjdk-probe
-          # Kept in sync with the cache key in openjdk-run-plan-reusable.yml.
-          key: openjdk-mmtk-build-chopin-test-fixed
-      - name: Upload build as artifacts
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: openjdk-regression-build
-          path: ${{ env.CI_PERF_KIT_BUILD }}
-          if-no-files-found: error
+    uses: ./.github/workflows/openjdk-build-reusable.yml
+    with:
+      ci_perf_kit_version: ${{ needs.config.outputs.ci_perf_kit_version }}
 
   # Plans we track on every commit: one job per plan, each calling the reusable workflow.
   openjdk-run-plan:
