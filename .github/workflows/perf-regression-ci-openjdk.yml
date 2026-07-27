@@ -92,7 +92,7 @@ jobs:
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: |
           export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64/
-          ./ci-perf-kit/scripts/openjdk-build.sh ./mmtk-openjdk
+          ./ci-perf-kit/scripts/openjdk-build.sh ./mmtk-openjdk ./mmtk-core
       # cache the build for openjdk-run-plan below, and for the weekly batch workflows
       - name: Cache OpenJDK+MMTk build
         if: steps.restore-cache.outputs.cache-hit != 'true'
@@ -121,7 +121,7 @@ jobs:
         include:
           - plan_name: stickyimmix
             config: running-openjdk-stickyimmix-complete.yml
-            heap_modifier: "6"
+            heap_modifier: "3"
           # TESTING: only running one plan for now to validate the Chopin
           # workflow changes. Re-add immix before merging.
           # - plan_name: immix

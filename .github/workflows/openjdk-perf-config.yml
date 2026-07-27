@@ -44,7 +44,7 @@ jobs:
       RESULT_REPO_BRANCH: 'chopin-test'
       # Whether we deploy the generated page. Set to true for master.
       # TESTING: not deploying to the real GitHub Page. Revert to true before merging.
-      DEPLOY: false
+      DEPLOY: true
       # TODO: openjdk-build.sh/openjdk-run-plan.sh/openjdk-report.sh only exist on this
       # branch so far. Pin this back to a released ci-perf-kit version tag (like the
       # JikesRVM workflow does) once ci-perf-kit cuts a release that includes them.
