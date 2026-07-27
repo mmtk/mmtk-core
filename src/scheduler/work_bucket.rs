@@ -340,8 +340,17 @@ pub enum WorkBucketStage {
     /// work in the unconstrained bucket will always be consumed during STW. Users can disable this bucket
     /// and cache some concurrent work during STW, and only enable this bucket and allow concurrent execution once a STW is done.
     Concurrent,
+    /// Concurrent work that may be resumed across a stop-the-world pause (LXR-specific), such as
+    /// concurrent marking packets discovered while processing reference-count increments during
+    /// `InitialMark`.  Unlike other stages, this bucket is allowed to remain non-empty when a STW
+    /// pause ends.
     ConcurrentResumable,
+    /// The first stop-the-world stage (see [`WorkBucketStage::FIRST_STW_STAGE`]).  Used to join
+    /// outstanding concurrent work, e.g. flushing SATB mod-buffer packets recorded by the LXR
+    /// barrier, before the rest of the STW stages proceed.
     FinishConcurrentWork,
+    /// Process reference-count increments recorded by the LXR barrier.  LXR also uses this stage
+    /// to scan roots (see `root_scanning_stage`).
     RCProcessIncs,
     /// Preparation work.  Plans, spaces, GC workers, mutators, etc. should be prepared for GC at
     /// this stage.
@@ -395,6 +404,9 @@ pub enum WorkBucketStage {
     /// Work packets that should be done just before GC shall go here.  This includes releasing
     /// resources and setting states in plans, spaces, GC workers, mutators, etc.
     Release,
+    /// Process reference-count decrements recorded by the LXR barrier, and sweep objects whose
+    /// reference count has dropped to zero, during a stop-the-world pause.  This is used when
+    /// lazy (concurrent) decrements are disabled for the current GC.
     STWRCDecsAndSweep,
     /// Resume mutators and end GC.
     Final,
@@ -453,5 +465,8 @@ impl WorkBucketStage {
         )
     }
 
+    /// Alias for [`WorkBucketStage::Closure`], used by LXR when scheduling mature-space
+    /// evacuation remset packets so that they are processed as part of the transitive closure
+    /// stage.
     pub const RCEvacuateMature: Self = Self::Closure;
 }

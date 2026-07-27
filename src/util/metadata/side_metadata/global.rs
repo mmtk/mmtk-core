@@ -537,6 +537,9 @@ impl SideMetadataSpec {
         )
     }
 
+    /// Non-atomically load a raw byte from the side metadata byte that is mapped to the data address.
+    /// Unlike [`SideMetadataSpec::load`], this always reads a whole byte regardless of the number of
+    /// bits used by this spec, and does not mask/shift out unrelated bits sharing that byte.
     pub fn load_byte(&self, data_addr: Address) -> u8 {
         let meta_addr = address_to_meta_address(self, data_addr);
         unsafe { meta_addr.load::<u8>() }

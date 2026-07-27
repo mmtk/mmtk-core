@@ -54,13 +54,20 @@ static HEAP_AFTER_GC: AtomicUsize = AtomicUsize::new(0);
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
+/// The LXR plan: a low-latency garbage collector that uses reference counting
+/// to reclaim most garbage immediately, and periodically runs a concurrent
+/// tracing cycle (backed by an Immix mature space) to collect reference cycles.
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct LXR<VM: VMBinding> {
     #[post_scan]
     #[space]
     #[copy_semantics(CopySemantics::DefaultCopy)]
+    /// The Immix-based space holding both nursery and mature (RC-managed) objects,
+    /// and used as the evacuation destination for both nursery and mature copying.
     pub immix_space: ImmixSpace<VM>,
     #[parent]
+    /// The common plan state (base plan, large object space, etc.) shared with
+    /// other plans.
     pub common: CommonPlan<VM>,
     /// Always true for non-rc immix.
     /// For RC immix, this is used for enable backup tracing.
@@ -73,8 +80,13 @@ pub struct LXR<VM: VMBinding> {
     zeroing_packets_scheduled: AtomicBool,
     decide_cycle_collection: (Mutex<bool>, Condvar),
     in_concurrent_marking: AtomicBool,
+    /// Roots collected during the previous GC pause, still awaiting reference-count
+    /// decrement processing at the start of the next pause.
     pub prev_roots: RwLock<SegQueue<Vec<ObjectReference>>>,
+    /// Roots collected during the current GC pause. Swapped into `prev_roots` at
+    /// the end of the pause (in `release`) so they can be processed next time.
     pub curr_roots: RwLock<SegQueue<Vec<ObjectReference>>>,
+    /// Helper for accessing the per-object reference-count metadata.
     pub rc: RefCountHelper<VM>,
     block_allocation: BlockAllocation<VM>,
     pub(super) evac_set: MatureEvacuationSet,
@@ -83,6 +95,8 @@ pub struct LXR<VM: VMBinding> {
     pub(super) possibly_dead_mature_blocks: SegQueue<(Block, bool)>,
 }
 
+/// The static plan constraints for LXR: it moves objects, uses a field-level
+/// write barrier with log bits, and enables reference counting.
 pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints {
     moves_objects: true,
     // Max immix object size is half of a block.
@@ -333,6 +347,9 @@ impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
 }
 
 impl<VM: VMBinding> LXR<VM> {
+    /// Creates a new LXR plan: registers the RC and unlogged-bit side metadata,
+    /// constructs the Immix mature/nursery space and common plan, and runs
+    /// GC-specific initialization.
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Box<Self> {
         let num_workers = args.scheduler.num_workers();
         // Note: `Block::DEFRAG_STATE_TABLE` doesn't need to be listed here; it's already
@@ -390,6 +407,8 @@ impl<VM: VMBinding> LXR<VM> {
         lxr
     }
 
+    /// Returns whether concurrent marking (used for cycle collection) is enabled
+    /// in this build, i.e. the `lxr_no_cm` feature is not set.
     pub fn cm_enabled(&self) -> bool {
         !cfg!(feature = "lxr_no_cm")
     }
@@ -702,26 +721,38 @@ impl<VM: VMBinding> LXR<VM> {
         }
     }
 
+    /// Returns whether the current GC pause performs cycle collection (tracing),
+    /// as opposed to being a pure reference-counting pause.
     pub fn perform_cycle_collection(&self) -> bool {
         self.perform_cycle_collection.load(Ordering::SeqCst)
     }
 
+    /// Returns the kind of GC pause currently in progress, or `None` if no pause
+    /// is currently executing.
     pub fn current_pause(&self) -> Option<Pause> {
         self.current_pause.load(Ordering::SeqCst)
     }
 
+    /// Returns the kind of the most recently completed GC pause.
     pub fn previous_pause(&self) -> Option<Pause> {
         self.previous_pause.load(Ordering::SeqCst)
     }
 
+    /// Returns whether the given object is in a block that was selected for
+    /// defragmentation (evacuation) in the current collection.
     pub fn in_defrag(&self, o: ObjectReference) -> bool {
         Block::in_defrag_block(o)
     }
 
+    /// Returns whether the given address is in the Immix space and in a block
+    /// that was selected for defragmentation (evacuation).
     pub fn address_in_defrag(&self, a: Address) -> bool {
         self.immix_space.address_in_space(a) && Block::address_in_defrag_block(a)
     }
 
+    /// Attempts to mark the object as live, in whichever space (Immix or large
+    /// object space) it belongs to. Returns `true` if this call performed the
+    /// marking (i.e. the object was previously unmarked).
     pub fn mark(&self, o: ObjectReference) -> bool {
         if self.immix_space.in_space(o) {
             self.immix_space.attempt_mark(o)
@@ -730,6 +761,8 @@ impl<VM: VMBinding> LXR<VM> {
         }
     }
 
+    /// Like [`Self::mark`], but takes an explicit `los` flag indicating whether
+    /// the object is in the large object space, avoiding a space lookup.
     pub fn mark2(&self, o: ObjectReference, los: bool) -> bool {
         if !los {
             self.immix_space.attempt_mark(o)
@@ -738,6 +771,8 @@ impl<VM: VMBinding> LXR<VM> {
         }
     }
 
+    /// Returns whether the object has already been marked as live in whichever
+    /// space (Immix or large object space) it belongs to.
     pub fn is_marked(&self, o: ObjectReference) -> bool {
         if self.immix_space.in_space(o) {
             self.immix_space.is_marked(o)
@@ -746,6 +781,7 @@ impl<VM: VMBinding> LXR<VM> {
         }
     }
 
+    /// Returns a reference to the large object space, shared with the common plan.
     pub const fn los(&self) -> &LargeObjectSpace<VM> {
         &self.common.los
     }
@@ -793,6 +829,7 @@ impl<VM: VMBinding> LXR<VM> {
         self.in_concurrent_marking.store(active, Ordering::SeqCst);
     }
 
+    /// Returns the global MMTk options.
     pub fn options(&self) -> &Options {
         &self.common.base.options
     }

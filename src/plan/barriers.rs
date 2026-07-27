@@ -21,6 +21,7 @@ pub enum BarrierSelector {
     NoBarrier,
     /// Object remembering post-write barrier is used.
     ObjectBarrier,
+    /// Field remembering post-write barrier is used, using a per-field (rather than per-object) unlogged bit.
     FieldBarrier,
     /// Object remembering pre-write barrier with weak reference loading barrier.
     // TODO: We might be able to generalize this to object remembering pre-write barrier.
@@ -150,8 +151,11 @@ impl<VM: VMBinding> Barrier<VM> for NoBarrier {}
 /// A barrier is a combination of fast-path behaviour + slow-path semantics.
 /// The fast-path code will decide whether to call the slow-path calls.
 pub trait BarrierSemantics: 'static + Send {
+    /// The VM binding type that this barrier semantics is specialized for.
     type VM: VMBinding;
 
+    /// The metadata spec used to store the unlogged bit that this barrier's fast-path checks and
+    /// slow-path clears/sets.
     const UNLOG_BIT_SPEC: MetadataSpec =
         *<Self::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.as_spec();
 
@@ -278,6 +282,7 @@ pub struct FieldBarrier<S: BarrierSemantics> {
 }
 
 impl<S: BarrierSemantics> FieldBarrier<S> {
+    /// Create a new FieldBarrier with the given semantics.
     pub fn new(semantics: S) -> Self {
         Self { semantics }
     }
@@ -342,7 +347,11 @@ impl<S: BarrierSemantics> Barrier<S::VM> for FieldBarrier<S> {
     }
 }
 
+/// The value stored in the log bit/byte indicating that the object or field is unlogged, i.e. it
+/// has not yet been recorded in the remembered set and the write barrier should still take its slow path.
 pub const UNLOGGED_VALUE: u8 = 0b1;
+/// The value stored in the log bit/byte indicating that the object or field is logged, i.e. it
+/// has already been recorded in the remembered set and the write barrier can skip its slow path.
 pub const LOGGED_VALUE: u8 = 0b0;
 
 /// A SATB (Snapshot-At-The-Beginning) barrier implementation.

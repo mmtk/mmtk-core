@@ -122,6 +122,12 @@ pub trait Collection<VM: VMBinding> {
     /// * `tls`: The thread pointer for the current GC thread.
     fn schedule_finalization(_tls: VMWorkerThread) {}
 
+    /// A hook for the VM to update the state of its weak reference processor at the end of the
+    /// release phase of a GC. This is currently called by the LXR plan after a full or final-mark
+    /// pause, before the reachability of weak references has changed further.
+    ///
+    /// Arguments:
+    /// * `_lxr`: Whether the current GC is being driven by the LXR plan.
     fn update_weak_processor(_lxr: bool) {}
 
     /// A hook for the VM to do work after forwarding objects.

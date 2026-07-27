@@ -27,6 +27,8 @@ lazy_static! {
     static ref _WORKERS: Mutex<Vec<OpaquePointer>> = Mutex::new(Vec::new());
 }
 
+/// Release the copy context of every currently registered GC worker.
+/// This is used to reset per-worker copying-GC state, e.g. before workers are respawned.
 pub fn reset_workers<VM: VMBinding>() {
     let workers = _WORKERS.lock().unwrap();
     for w in workers.iter() {
@@ -65,6 +67,8 @@ pub struct GCWorkerShared<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWorkerShared<VM> {
+    /// Create a new `GCWorkerShared` instance, optionally with a `stealer` handle that other
+    /// workers can use to steal work packets from this worker's local queue.
     pub fn new(stealer: Option<Stealer<Box<dyn GCWork<VM>>>>) -> Self {
         Self {
             stat: Default::default(),
@@ -125,10 +129,12 @@ const STAT_BORROWED_MSG: &str = "GCWorkerShared.stat is already borrowed.  This 
     the mutator calls harness_begin or harness_end while the GC is running.";
 
 impl<VM: VMBinding> GCWorkerShared<VM> {
+    /// Immutably borrow this worker's local statistics.
     pub fn borrow_stat(&self) -> AtomicRef<'_, WorkerLocalStat<VM>> {
         self.stat.try_borrow().expect(STAT_BORROWED_MSG)
     }
 
+    /// Mutably borrow this worker's local statistics.
     pub fn borrow_stat_mut(&self) -> AtomicRefMut<'_, WorkerLocalStat<VM>> {
         self.stat.try_borrow_mut().expect(STAT_BORROWED_MSG)
     }
@@ -173,6 +179,8 @@ impl<VM: VMBinding> GCWorker<VM> {
 
     const LOCALLY_CACHED_WORK_PACKETS: usize = 16;
 
+    /// Add a boxed work packet to the work queue, in the given bucket.
+    /// Like [`GCWorker::add_work`], but the work packet is already boxed.
     pub fn add_boxed_work(&mut self, bucket: WorkBucketStage, work: Box<dyn GCWork<VM>>) {
         if !self.scheduler().work_buckets[bucket].is_open()
             || self.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS

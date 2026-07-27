@@ -468,6 +468,8 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     fn flush(&mut self) {
         self.flush_remembered_sets();
     }
+    /// Assert that this mutator's barrier has been flushed (i.e. it has no pending remembered-set
+    /// entries buffered). Used for sanity checking.
     fn assert_is_flushed(&mut self) {
         // self.barrier().assert_is_flushed();
     }

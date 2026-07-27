@@ -27,6 +27,13 @@ use crate::vm::slot::MemorySlice;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 
+/// Notify MMTk that a GC has started, so that MMTk can update its internal statistics (e.g. GC counts
+/// and timers) to reflect this. A binding does not normally need to call this directly, as MMTk calls it
+/// itself when it triggers a GC; it is only needed if the binding drives GC start/stop outside of MMTk's
+/// own scheduling.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
 pub fn report_gc_start<VM: VMBinding>(mmtk: &MMTK<VM>) {
     mmtk.stats.start_gc();
 }

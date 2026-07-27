@@ -350,6 +350,8 @@ impl Address {
         }
     }
 
+    /// Check whether the field at this address is logged, i.e. whether the field-level write
+    /// barrier has already recorded a write to it and can skip its slow path.
     pub fn is_field_logged<VM: VMBinding>(self) -> bool {
         debug_assert!(!self.is_zero());
         unsafe {
@@ -361,6 +363,8 @@ impl Address {
         }
     }
 
+    /// Mark the field(s) covered by this address as unlogged (using a relaxed, non-atomic store),
+    /// so that a subsequent write to them will be caught by the field-level write barrier's slow path again.
     pub fn unlog_field_relaxed<VM: VMBinding>(self) {
         debug_assert!(!self.is_zero());
         let heap_bytes_per_unlog_byte = if VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
@@ -377,6 +381,8 @@ impl Address {
         }
     }
 
+    /// Converts the address to an [`ObjectReference`]. The address must be non-zero and must be
+    /// the raw address of a valid object as defined by the VM's object model.
     pub fn to_object_reference<VM: VMBinding>(self) -> ObjectReference {
         debug_assert!(!self.is_zero());
         unsafe { ObjectReference::from_raw_address_unchecked(self) }
@@ -740,10 +746,13 @@ impl ObjectReference {
         unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_sane()
     }
 
+    /// Get the current size (in bytes) of the object, as determined by the VM's object model.
     pub fn get_size<VM: VMBinding>(self) -> usize {
         VM::VMObjectModel::get_current_size(self)
     }
 
+    /// Iterate over the slots (fields) of the object, calling `f` for each slot the VM's scanning
+    /// implementation reports for this object.
     pub fn iterate_fields<VM: VMBinding, F: FnMut(VM::VMSlot)>(self, f: F) {
         SlotIterator::<VM>::iterate(self, f)
     }

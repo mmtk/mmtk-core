@@ -22,6 +22,8 @@ pub struct PlanConstraints {
     pub max_non_los_copy_bytes: usize,
     /// Does this plan use the log bit? See vm::ObjectModel::GLOBAL_LOG_BIT_SPEC.
     pub needs_log_bit: bool,
+    /// Does this plan use the field-level (rather than object-level) unlogged bit for its write barrier?
+    /// See vm::ObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.
     pub needs_field_log_bit: bool,
     /// Some plans may allow benign race for testing mark bit, and this will lead to trace the same
     /// edge multiple times. If a plan allows tracing duplicated edges, we will not run duplicate
@@ -43,6 +45,7 @@ pub struct PlanConstraints {
     /// Some policies do object forwarding after the first liveness transitive closure, such as mark compact.
     /// For plans that use those policies, they should set this as true.
     pub needs_forward_after_liveness: bool,
+    /// True if this plan is reference-counting based (e.g. LXR), rather than tracing-only.
     pub rc_enabled: bool,
     /// Some (in fact, most) plans do nothing when preparing mutators before tracing (i.e. in
     /// `MutatorConfig::prepare_func`).  Those plans can set this to `false` so that the

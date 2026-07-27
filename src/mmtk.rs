@@ -112,12 +112,14 @@ impl Default for MMTKBuilder {
 /// An MMTk instance. MMTk allows multiple instances to run independently, and each instance gives users a separate heap.
 /// *Note that multi-instances is not fully supported yet*
 pub struct MMTK<VM: VMBinding> {
+    /// The command line options for this MMTk instance, shared with the VM binding.
     pub options: Arc<Options>,
     pub(crate) state: Arc<GlobalState>,
     pub(crate) plan: UnsafeCell<Box<dyn Plan<VM = VM>>>,
     pub(crate) reference_processors: ReferenceProcessors,
     pub(crate) finalizable_processor:
         Mutex<FinalizableProcessor<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType>>,
+    /// The GC work scheduler that schedules and executes GC work packets on GC worker threads.
     pub scheduler: Arc<GCWorkScheduler<VM>>,
     #[cfg(feature = "sanity")]
     pub(crate) sanity_checker: Mutex<SanityChecker<VM::VMSlot>>,

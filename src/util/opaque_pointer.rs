@@ -27,10 +27,12 @@ impl OpaquePointer {
         OpaquePointer(addr.to_mut_ptr::<c_void>())
     }
 
+    /// Cast a raw mutable pointer to an [`OpaquePointer`].
     pub fn from_mut_ptr<T>(ptr: *mut T) -> Self {
         OpaquePointer(ptr as *mut c_void)
     }
 
+    /// Cast the opaque pointer to a raw mutable pointer.
     pub fn as_mut_ptr<T>(self) -> *mut T {
         self.0 as *mut T
     }

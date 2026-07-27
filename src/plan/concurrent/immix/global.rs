@@ -40,10 +40,12 @@ use mmtk_macros::{HasSpaces, PlanTraceObject};
 /// The concurrent GC consists of two STW pauses (initial mark and final mark) with concurrent marking in between.
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct ConcurrentImmix<VM: VMBinding> {
+    /// The Immix space in which all objects for this plan are allocated.
     #[post_scan]
     #[space]
     #[copy_semantics(CopySemantics::DefaultCopy)]
     pub immix_space: ImmixSpace<VM>,
+    /// The common plan state (e.g. the immortal, large object and VM spaces) shared by plans.
     #[parent]
     pub common: CommonPlan<VM>,
     last_gc_was_defrag: AtomicBool,
@@ -316,6 +318,8 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
 }
 
 impl<VM: VMBinding> ConcurrentImmix<VM> {
+    /// Create a new `ConcurrentImmix` plan, setting up the Immix space and disabling the
+    /// scheduler work buckets that are not used by this plan (e.g. forwarding and compaction).
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
         if *args.options.concurrent_immix_disable_concurrent_marking {
             warn!("Option 'concurrent_immix_disable_concurrent_marking' is set to true. Concurrent marking is disabled for ConcurrentImmix. This will make ConcurrentImmix behave exactly like full heap Immix.");
@@ -435,6 +439,8 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             .set_sentinel(Box::new(VMProcessWeakRefs::<RefTracePolicy<VM>>::new()));
     }
 
+    /// Return whether concurrent marking is currently active (i.e. an `InitialMark` pause has
+    /// happened and the corresponding `FinalMark` has not yet completed).
     pub fn concurrent_marking_in_progress(&self) -> bool {
         self.concurrent_marking_active.load(Ordering::Acquire)
     }

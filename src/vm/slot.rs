@@ -155,6 +155,10 @@ pub trait Slot: Copy + Send + Sync + Debug + PartialEq + Eq + Hash {
         // no-op by default
     }
 
+    /// Return the raw memory address of this slot. This is used, for example, by LXR's field
+    /// barrier and remembered-set code to access per-field side metadata (such as the field unlog
+    /// bit) that is indexed by the slot's address. The default implementation is unimplemented;
+    /// slot types that are used with such features must override this method.
     fn to_address(&self) -> Address {
         unimplemented!()
     }

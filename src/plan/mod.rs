@@ -45,8 +45,11 @@ mod generational;
 mod sticky;
 
 mod compressor;
+/// Concurrent GC plans, which perform (parts of) tracing concurrently with mutators.
 pub mod concurrent;
+/// The Immix plan, a mostly-copying mark-region GC.
 pub mod immix;
+/// The LXR plan, a low-latency reference-counted GC.
 pub mod lxr;
 mod markcompact;
 mod marksweep;

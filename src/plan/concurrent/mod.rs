@@ -1,5 +1,7 @@
+/// The SATB (snapshot-at-the-beginning) barrier semantics shared by concurrent plans.
 pub mod barrier;
 pub(super) mod concurrent_marking_work;
+/// The `ConcurrentPlan` trait, shared by plans that support a concurrent marking phase.
 pub mod global;
 
 pub use self::global::ConcurrentPlan;

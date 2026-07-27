@@ -880,6 +880,7 @@ options! {
     plan:                   PlanSelector            [always_valid] = PlanSelector::GenImmix,
     /// Number of GC worker threads.
     threads:               usize                    [|v: &usize| *v > 0]    = num_cpus::get(),
+    /// Number of concurrent GC worker threads, used by concurrent plans that trace alongside mutators.
     conc_threads:          usize                    [|v: &usize| *v > 0]    = num_cpus::get(),
     /// Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans:  bool                    [always_valid] = false,
@@ -964,6 +965,7 @@ options! {
     /// there is no core with (perceived) ID 12.
     // XXX: This option is currently only supported on Linux.
     thread_affinity:        AffinityKind            [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
+    /// Verbosity level for GC statistics and logging output, from 0 (quiet) to 10 (most verbose).
     verbose:                       usize            [|v: &usize| *v <= 10]  = 0,
     /// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
     /// Default to a fixed heap size of 0.5x physical memory.

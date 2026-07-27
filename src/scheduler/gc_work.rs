@@ -10,20 +10,31 @@ use std::sync::atomic::Ordering;
 #[repr(u8)]
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum RootKind {
+    /// Ordinary strong roots, e.g. mutator stacks and globals.  These are reference-counted and
+    /// marked like any other strong reference.
     Strong,
+    /// Roots held by recently JIT-compiled ("young") code-cache entries.  These are recorded into
+    /// the remembered set (instead of being reference-counted) so the code cache can be
+    /// re-scanned on a later GC.
     YoungCodeCacheRoots,
+    /// Roots that hold weak references.  These must not keep their referents alive and are not
+    /// reference-counted.
     Weak,
 }
 
 impl RootKind {
+    /// Whether roots of this kind should be recorded into the remembered set rather than being
+    /// processed like normal roots.
     pub fn should_record_remset(&self) -> bool {
         matches!(self, RootKind::YoungCodeCacheRoots)
     }
 
+    /// Whether roots of this kind should skip marking and reference-count decrements.
     pub fn should_skip_mark_and_decs(&self) -> bool {
         matches!(self, RootKind::YoungCodeCacheRoots) || matches!(self, RootKind::Weak)
     }
 
+    /// Whether roots of this kind should skip reference-count decrements.
     pub fn should_skip_decs(&self) -> bool {
         matches!(self, RootKind::YoungCodeCacheRoots) || matches!(self, RootKind::Weak)
     }

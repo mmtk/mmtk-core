@@ -330,9 +330,19 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         true
     }
 
+    /// Called once all mutators have been stopped, right before root scanning starts, at the
+    /// beginning of a GC pause. Plans that need to do per-pause setup (e.g. resetting mark
+    /// tables, flushing mutator state) can override this. By default, this does nothing.
     fn gc_pause_start(&self, _scheduler: &GCWorkScheduler<Self::VM>) {}
+    /// Called at the end of a GC pause, after the pause has otherwise finished. Plans that need
+    /// to do per-pause teardown (e.g. recording pause-end statistics) can override this. By
+    /// default, this does nothing.
     fn gc_pause_end(&self) {}
 
+    /// Return the work bucket stage in which mutator (and VM) roots should be scanned for this
+    /// plan. By default, roots are scanned in the `Prepare` stage, but concurrent/incremental
+    /// plans may schedule root scanning into a different stage (e.g. alongside reference
+    /// counting increments).
     fn root_scanning_stage(&self) -> WorkBucketStage {
         WorkBucketStage::Prepare
     }
