@@ -542,6 +542,14 @@ impl SideMetadataSpec {
         unsafe { meta_addr.load::<u8>() }
     }
 
+    /// Non-atomically store a raw byte to the side metadata byte that is mapped to the data address.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because:
+    ///
+    /// 1. Concurrent access to this operation is undefined behaviour.
+    /// 2. Interleaving non-atomic and atomic operations is undefined behaviour.
     pub unsafe fn store_byte_relaxed(&self, data_addr: Address, byte: u8) {
         let meta_addr = address_to_meta_address(self, data_addr);
         meta_addr.store::<u8>(byte);
@@ -944,6 +952,14 @@ impl SideMetadataSpec {
         fetch_order: Ordering,
         mut f: F,
     ) -> std::result::Result<T, T> {
+        // `f` may have side effects (e.g. it may capture and mutate local state), so under
+        // `extreme_assertions` we must not call it a second time just to recompute the new
+        // value for the sanity check. Instead, stash the new value computed during the actual
+        // update here, and have the verify closure read it back.
+        #[cfg(feature = "extreme_assertions")]
+        let last_new_val: std::cell::Cell<Option<T>> = std::cell::Cell::new(None);
+        #[cfg(feature = "extreme_assertions")]
+        let last_new_val_ref = &last_new_val;
         self.side_metadata_access::<true, T, _, _, _>(
             data_addr,
             None,
@@ -960,7 +976,10 @@ impl SideMetadataSpec {
                             fetch_order,
                             |raw_byte: u8| {
                                 let old_val = (raw_byte & mask) >> lshift;
-                                f(FromPrimitive::from_u8(old_val).unwrap()).map(|new_val| {
+                                let new_val = f(FromPrimitive::from_u8(old_val).unwrap());
+                                #[cfg(feature = "extreme_assertions")]
+                                last_new_val_ref.set(new_val);
+                                new_val.map(|new_val| {
                                     (raw_byte & !mask)
                                         | ((new_val.to_u8().unwrap() << lshift) & mask)
                                 })
@@ -970,13 +989,25 @@ impl SideMetadataSpec {
                     .map(|x| FromPrimitive::from_u8((x & mask) >> lshift).unwrap())
                     .map_err(|x| FromPrimitive::from_u8((x & mask) >> lshift).unwrap())
                 } else {
-                    unsafe { T::fetch_update(meta_addr, set_order, fetch_order, f) }
+                    unsafe {
+                        T::fetch_update(meta_addr, set_order, fetch_order, |old_val| {
+                            let new_val = f(old_val);
+                            #[cfg(feature = "extreme_assertions")]
+                            last_new_val_ref.set(new_val);
+                            new_val
+                        })
+                    }
                 }
             },
             |_result| {
                 #[cfg(feature = "extreme_assertions")]
                 if let Ok(old_val) = _result {
-                    sanity::verify_update::<T>(self, data_addr, old_val, f(old_val).unwrap())
+                    sanity::verify_update::<T>(
+                        self,
+                        data_addr,
+                        old_val,
+                        last_new_val_ref.get().unwrap(),
+                    )
                 }
             },
         )
@@ -1472,6 +1503,12 @@ impl SideMetadataContext {
         // As we use either the mark sweep or (non moving) immix as the non moving space,
         // and both policies use the chunk map, we just add the chunk map table globally.
         ret.push(crate::util::heap::chunk_map::ChunkMap::ALLOC_TABLE);
+
+        // `Block::init()` unconditionally records per-block defrag state (e.g. whether a block
+        // is a defrag source) for every Immix-family plan, not just plans with reference
+        // counting enabled. So this table must always be mapped, regardless of which plan
+        // requests it.
+        ret.push(crate::policy::immix::block::Block::DEFRAG_STATE_TABLE);
 
         ret.extend_from_slice(specs);
         ret

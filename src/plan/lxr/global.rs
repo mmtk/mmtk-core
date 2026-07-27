@@ -182,7 +182,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        &*ALLOCATOR_MAPPING
+        &ALLOCATOR_MAPPING
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {
@@ -246,7 +246,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
                 as usize;
             predicted_survival << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER
         };
-        return survival + self.immix_space.defrag_headroom_pages();
+        survival + self.immix_space.defrag_headroom_pages()
     }
 
     fn get_used_pages(&self) -> usize {
@@ -335,6 +335,9 @@ impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
 impl<VM: VMBinding> LXR<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Box<Self> {
         let num_workers = args.scheduler.num_workers();
+        // Note: `Block::DEFRAG_STATE_TABLE` doesn't need to be listed here; it's already
+        // registered unconditionally by `SideMetadataContext::new_global_specs` since every
+        // Immix-family plan (not just LXR) requires it.
         let immix_specs = metadata::extract_side_metadata(&[
             MetadataSpec::OnSide(RC_TABLE),
             MetadataSpec::OnSide(
@@ -342,7 +345,6 @@ impl<VM: VMBinding> LXR<VM> {
                     .as_spec()
                     .extract_side_spec(),
             ),
-            MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
         ]);
         let global_side_metadata_specs = SideMetadataContext::new_global_specs(&immix_specs);
         let mut plan_args = CreateSpecificPlanArgs {
@@ -448,10 +450,10 @@ impl<VM: VMBinding> LXR<VM> {
         let mut bins = (0..num_bins)
             .map(|_| Vec::with_capacity(bin_cap))
             .collect::<Vec<Vec<(Block, bool)>>>();
-        'out: for i in 0..num_bins {
+        'out: for bin in bins.iter_mut() {
             for _ in 0..bin_cap {
                 if let Some(block) = self.possibly_dead_mature_blocks.pop() {
-                    bins[i].push(block);
+                    bin.push(block);
                 } else {
                     break 'out;
                 }
@@ -516,13 +518,12 @@ impl<VM: VMBinding> LXR<VM> {
         let total_pages = self.get_total_pages();
         let mature_space_pages = {
             let released_los_pages = self.los().num_pages_released_lazy.load(Ordering::SeqCst);
-            let pages_after_gc = HEAP_AFTER_GC
+            HEAP_AFTER_GC
                 .load(Ordering::SeqCst)
                 .saturating_sub(
                     self.num_clean_blocks_released_lazy.load(Ordering::SeqCst) << Block::LOG_PAGES,
                 )
-                .saturating_sub(released_los_pages);
-            pages_after_gc
+                .saturating_sub(released_los_pages)
         };
         // Decide next GC kind
         let hint_cycle_gc = self.next_gc_is_cycle_gc(mature_space_pages, pause);
@@ -589,13 +590,13 @@ impl<VM: VMBinding> LXR<VM> {
 
         // Should trigger CM?
         if hint_cycle_gc && !cm_in_progress {
-            return if self.cm_enabled() {
+            if self.cm_enabled() {
                 Pause::InitialMark
             } else {
                 Pause::Full
-            };
+            }
         } else {
-            return Pause::RefCount;
+            Pause::RefCount
         }
     }
 
@@ -680,7 +681,7 @@ impl<VM: VMBinding> LXR<VM> {
     }
 
     fn process_prev_roots(&self, scheduler: &GCWorkScheduler<VM>) {
-        let prev_roots = self.prev_roots.write().unwrap();
+        let prev_roots = self.prev_roots.read().unwrap();
         let mut work_packets: Vec<Box<dyn GCWork<VM>>> = Vec::with_capacity(prev_roots.len());
         while let Some(decs) = prev_roots.pop() {
             work_packets.push(Box::new(ProcessDecs::new(
@@ -714,7 +715,7 @@ impl<VM: VMBinding> LXR<VM> {
     }
 
     pub fn in_defrag(&self, o: ObjectReference) -> bool {
-        Block::in_defrag_block::<VM>(o)
+        Block::in_defrag_block(o)
     }
 
     pub fn address_in_defrag(&self, a: Address) -> bool {

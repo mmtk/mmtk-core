@@ -845,6 +845,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
+    #[allow(dead_code)]
     fn prepare_nonmoving_space(&mut self, _full_heap: bool) {
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {
@@ -857,6 +858,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
+    #[allow(dead_code)]
     fn release_nonmoving_space(&mut self, _full_heap: bool) {
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {

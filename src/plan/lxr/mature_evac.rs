@@ -70,6 +70,7 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
         rs
     }
 
+    #[allow(clippy::mut_from_ref)]
     fn gc_buffer(&self, id: usize) -> &mut Vec<RemSetEntry<VM>> {
         unsafe { &mut *self.gc_buffers[id].get() }
     }
@@ -78,14 +79,14 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
         let mut mature_evac_remsets = self.global_packets.lock().unwrap();
         self.size.store(0, Ordering::SeqCst);
         for id in 0..self.gc_buffers.len() {
-            if self.gc_buffer(id).len() > 0 {
+            if !self.gc_buffer(id).is_empty() {
                 let remset = std::mem::take(self.gc_buffer(id));
                 mature_evac_remsets.push(Box::new(EvacuateMatureObjects::new(remset)));
             }
         }
         for id in 0..self.local_packets.len() {
             let buf = unsafe { &mut *self.local_packets[id].get() };
-            if buf.len() > 0 {
+            if !buf.is_empty() {
                 let packets = std::mem::take(buf);
                 for p in packets {
                     mature_evac_remsets.push(p);
@@ -101,7 +102,7 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
 
     #[cold]
     fn flush(&self, id: usize) {
-        if self.gc_buffer(id).len() > 0 {
+        if !self.gc_buffer(id).is_empty() {
             let remset = std::mem::take(self.gc_buffer(id));
             self.size.fetch_add(remset.len(), Ordering::SeqCst);
             let w = EvacuateMatureObjects::new(remset);
@@ -143,8 +144,8 @@ impl MatureEvacuationSet {
                 // This block has been eagerly released (probably be reused again). Skip it.
                 continue;
             }
-            block.clear_rc_table::<VM>();
-            block.clear_striddle_table::<VM>();
+            block.clear_rc_table();
+            block.clear_striddle_table();
             block.rc_sweep_mature::<VM>(space, true);
             assert!(!block.is_defrag_source());
         }
@@ -191,6 +192,7 @@ impl MatureEvacuationSet {
         }
     }
 
+    #[allow(clippy::assertions_on_constants)]
     pub fn select_mature_evacuation_candidates<VM: VMBinding>(&self, lxr: &LXR<VM>) {
         debug_assert!(crate::plan::lxr::MATURE_EVACUATION);
         if lxr.current_pause().unwrap() == Pause::Full {

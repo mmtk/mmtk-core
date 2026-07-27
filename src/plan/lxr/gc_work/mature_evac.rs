@@ -82,6 +82,7 @@ pub struct EvacuateMatureObjects<VM: VMBinding> {
 impl<VM: VMBinding> EvacuateMatureObjects<VM> {
     pub const CAPACITY: usize = 1024;
 
+    #[allow(clippy::assertions_on_constants)]
     pub fn new(remset: Vec<RemSetEntry<VM>>) -> Self {
         debug_assert!(super::super::MATURE_EVACUATION);
         Self {
@@ -139,7 +140,7 @@ impl<VM: VMBinding> EvacuateMatureObjects<VM> {
         if !o.is_in_any_space() || !lxr.immix_space.in_space(o) {
             return false;
         }
-        if !lxr.rc.is_dead(o) && Block::in_defrag_block::<VM>(o) {
+        if !lxr.rc.is_dead(o) && Block::in_defrag_block(o) {
             return true;
         }
         false

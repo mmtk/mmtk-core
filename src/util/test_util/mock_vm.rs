@@ -470,11 +470,15 @@ impl crate::vm::Collection<MockVM> for MockVM {
 
 impl crate::vm::ObjectModel<MockVM> for MockVM {
     const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::in_header(0);
+    const GLOBAL_FIELD_UNLOG_BIT_SPEC: VMGlobalFieldUnlogBitSpec =
+        VMGlobalFieldUnlogBitSpec::side_first();
     const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec =
         VMLocalForwardingPointerSpec::in_header(0);
     const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec =
         VMLocalForwardingBitsSpec::in_header(0);
-    const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec = VMLocalMarkBitSpec::in_header(0);
+    // LXR clears mark bits in bulk over side metadata, so this must be a side spec (unlike most
+    // of the other local specs here, which can stay in the header).
+    const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec = VMLocalMarkBitSpec::side_first();
     const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec =
         VMLocalLOSMarkNurserySpec::in_header(0);
 
@@ -555,10 +559,10 @@ impl crate::vm::Scanning<MockVM> for MockVM {
     fn support_slot_enqueuing(tls: VMWorkerThread, object: ObjectReference) -> bool {
         mock!(support_slot_enqueuing(tls, object))
     }
-    fn scan_object<SV: SlotVisitor<<MockVM as VMBinding>::VMSlot>>(
+    fn scan_object(
         tls: VMWorkerThread,
         object: ObjectReference,
-        slot_visitor: &mut SV,
+        slot_visitor: &mut impl SlotVisitor<<MockVM as VMBinding>::VMSlot>,
     ) {
         mock!(scan_object(
             tls,

@@ -55,7 +55,7 @@ pub fn create_lxr_mutator<VM: VMBinding>(
 ) -> Mutator<VM> {
     let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
     let config = MutatorConfig {
-        allocator_mapping: &*ALLOCATOR_MAPPING,
+        allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, mmtk.get_plan());
             vec.push((AllocatorSelector::Immix(0), &lxr.immix_space));

@@ -208,7 +208,7 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
                 all_logged = false;
                 break;
             }
-            cursor = cursor + 16usize;
+            cursor += 16usize;
         }
         if all_logged {
             return;

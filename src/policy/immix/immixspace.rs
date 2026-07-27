@@ -168,7 +168,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
                 let forwarded = object_forwarding::read_forwarding_pointer::<VM>(object);
                 return self.is_marked(forwarded) && self.rc.count(forwarded) > 0;
             }
-            return self.is_marked(object) && self.rc.count(object) > 0;
+            self.is_marked(object) && self.rc.count(object) > 0
         } else {
             self.is_live(object)
         }
@@ -197,11 +197,11 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(_object);
     }
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
         crate::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
     }
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn find_object_from_internal_pointer(
         &self,
         ptr: Address,
@@ -222,10 +222,14 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
 
     fn debug_print_object_info(&self, object: ObjectReference) {
         println!("marked  = {}", self.is_marked(object));
-        println!(
-            "line marked = {}",
-            Line::from_unaligned_address(object.to_raw_address()).is_marked(self.mark_state)
-        );
+        // The line mark table isn't mapped when RC is enabled (LXR tracks liveness via
+        // block state and reference counts instead), so skip it in that case.
+        if !self.rc_enabled {
+            println!(
+                "line marked = {}",
+                Line::from_unaligned_address(object.to_raw_address()).is_marked(self.mark_state)
+            );
+        }
         println!(
             "block state = {:?}",
             Block::from_unaligned_address(object.to_raw_address()).get_state()
@@ -544,9 +548,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
             self.flush_page_resource();
         }
-        if pause == Pause::FinalMark {
-            self.is_end_of_satb_or_full_gc = true;
-        } else if pause == Pause::Full {
+        if pause == Pause::FinalMark || pause == Pause::Full {
             self.is_end_of_satb_or_full_gc = true;
         }
     }
@@ -988,9 +990,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let copy_context = worker.get_copy_context_mut();
         let forwarding_status = object_forwarding::attempt_to_forward::<VM>(object);
         if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
-            let new =
-                object_forwarding::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
-            new
+            object_forwarding::spin_and_get_forwarded_object::<VM>(object, forwarding_status)
         } else {
             // Evacuate the mature object
             let new = object_forwarding::try_forward_object::<VM>(
@@ -1204,7 +1204,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             .is_some_and(|h| h.cm_in_progress_or_final_mark())
         {
             Line::initialize_mark_table_as_marked::<VM>(start..end);
-            Line::inc_reuse_counts::<VM>(start..end);
+            Line::inc_reuse_counts(start..end);
         }
         Some((start, end))
     }

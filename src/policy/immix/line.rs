@@ -134,15 +134,15 @@ impl Line {
     /// doesn't need to explicitly mark bump-allocated objects in the fast path.
     pub fn initialize_mark_table_as_marked<VM: VMBinding>(lines: Range<Line>) {
         let meta = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec();
-        let start: *mut u8 = address_to_meta_address(&meta, lines.start.start()).to_mut_ptr();
-        let limit: *mut u8 = address_to_meta_address(&meta, lines.end.start()).to_mut_ptr();
+        let start: *mut u8 = address_to_meta_address(meta, lines.start.start()).to_mut_ptr();
+        let limit: *mut u8 = address_to_meta_address(meta, lines.end.start()).to_mut_ptr();
         unsafe {
             let bytes = limit.offset_from(start) as usize;
             std::ptr::write_bytes(start, 0xffu8, bytes);
         }
     }
 
-    pub fn inc_reuse_counts<VM: VMBinding>(lines: Range<Line>) {
+    pub fn inc_reuse_counts(lines: Range<Line>) {
         let mut l = lines.start;
         while l < lines.end {
             let addr = l.start();

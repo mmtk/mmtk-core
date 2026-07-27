@@ -55,6 +55,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         GCWorker::<VM>::current()
     }
 
+    #[allow(clippy::mut_from_ref)]
     fn copy_context(&self) -> &mut GCWorkerCopyContext<VM> {
         unsafe { &mut *self.copy_context }
     }
@@ -181,7 +182,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 cursor += step;
             }
         };
-        let obj_in_defrag = !los && Block::in_defrag_block::<VM>(o);
+        let obj_in_defrag = !los && Block::in_defrag_block(o);
         o.iterate_fields::<VM, _>(|slot| {
             let Some(target) = slot.load() else {
                 return;

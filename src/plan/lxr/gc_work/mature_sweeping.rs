@@ -49,7 +49,7 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
         let limit = block.end();
         while cursor < limit {
             let o = unsafe { cursor.to_object_reference::<VM>() };
-            cursor = cursor + rc::MIN_OBJECT_SIZE;
+            cursor += rc::MIN_OBJECT_SIZE;
             let c = self.rc.count(o);
             if c != 0 && !immix_space.is_marked(o) {
                 if Line::is_aligned(o.to_raw_address()) {
@@ -64,10 +64,8 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
                 }
                 self.process_dead_object(o);
                 has_dead_object = true;
-            } else {
-                if c != 0 {
-                    has_live = true;
-                }
+            } else if c != 0 {
+                has_live = true;
             }
         }
         if has_dead_object || !has_live {
@@ -119,6 +117,6 @@ impl RCSweepMatureAfterSATBLOS {
 impl<VM: VMBinding> GCWork<VM> for RCSweepMatureAfterSATBLOS {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let los = mmtk.get_plan().common().get_los();
-        los.sweep_rc_mature_objects_after_satb(&|o| !(!los.is_marked(o) && los.rc.count(o) != 0));
+        los.sweep_rc_mature_objects_after_satb(&|o| los.is_marked(o) || los.rc.count(o) == 0);
     }
 }

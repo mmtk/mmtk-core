@@ -213,10 +213,10 @@ impl Block {
     ) -> Result<BlockState, BlockState> {
         Self::MARK_TABLE
             .fetch_update_atomic::<u8, _>(self.start(), Ordering::SeqCst, Ordering::SeqCst, |s| {
-                f(s.into()).map(|x| u8::from(x))
+                f(s.into()).map(u8::from)
             })
-            .map(|x| (x as u8).into())
-            .map_err(|x| (x as u8).into())
+            .map(|x| x.into())
+            .map_err(|x| x.into())
     }
 
     pub fn attempt_dealloc(&self, ignore_reusing_blocks: bool) -> bool {
@@ -242,7 +242,7 @@ impl Block {
         byte == Self::DEFRAG_SOURCE_STATE
     }
 
-    pub fn in_defrag_block<VM: VMBinding>(o: ObjectReference) -> bool {
+    pub fn in_defrag_block(o: ObjectReference) -> bool {
         Block::containing(o).is_defrag_source()
     }
 
@@ -323,11 +323,11 @@ impl Block {
         RegionIterator::<Line>::new(self.start_line(), self.end_line())
     }
 
-    pub fn clear_rc_table<VM: VMBinding>(&self) {
+    pub fn clear_rc_table(&self) {
         crate::util::rc::RC_TABLE.bzero_metadata(self.start(), Block::BYTES);
     }
 
-    pub fn clear_striddle_table<VM: VMBinding>(&self) {
+    pub fn clear_striddle_table(&self) {
         crate::util::rc::RC_STRADDLE_LINES.bzero_metadata(self.start(), Block::BYTES);
     }
 
@@ -340,8 +340,8 @@ impl Block {
 
     pub(crate) fn initialize_mark_table_as_marked<VM: VMBinding>(&self) {
         let meta = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec();
-        let start: *mut u8 = address_to_meta_address(&meta, self.start()).to_mut_ptr();
-        let limit: *mut u8 = address_to_meta_address(&meta, self.end()).to_mut_ptr();
+        let start: *mut u8 = address_to_meta_address(meta, self.start()).to_mut_ptr();
+        let limit: *mut u8 = address_to_meta_address(meta, self.end()).to_mut_ptr();
         unsafe {
             let bytes = limit.offset_from(start) as usize;
             std::ptr::write_bytes(start, 0xffu8, bytes);
@@ -401,6 +401,7 @@ impl Block {
         }
     }
 
+    #[allow(clippy::assertions_on_constants)]
     pub fn rc_dead(&self) -> bool {
         type UInt = u128;
         const LOG_BITS_IN_UINT: usize =
