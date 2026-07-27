@@ -179,28 +179,9 @@
 <a href=#179 id=179 data-nosnippet>179</a>        </span><span class="number">0
 <a href=#180 id=180 data-nosnippet>180</a>    </span>}
 <a href=#181 id=181 data-nosnippet>181</a>
-<a href=#182 id=182 data-nosnippet>182</a>    <span class="doccomment">/// Callback function to ask the VM whether GC is enabled or disabled, allowing or disallowing MMTk
-<a href=#183 id=183 data-nosnippet>183</a>    /// to trigger garbage collection. When collection is disabled, you can still allocate through MMTk,
-<a href=#184 id=184 data-nosnippet>184</a>    /// but MMTk will not trigger a GC even if the heap is full. In such a case, the allocation will
-<a href=#185 id=185 data-nosnippet>185</a>    /// exceed MMTk's heap size (the soft heap limit). However, there is no guarantee that the physical
-<a href=#186 id=186 data-nosnippet>186</a>    /// allocation will succeed, and if it succeeds, there is no guarantee that further allocation will
-<a href=#187 id=187 data-nosnippet>187</a>    /// keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration
-<a href=#188 id=188 data-nosnippet>188</a>    /// to make sure that the physical memory allows the amount of allocation. We highly recommend
-<a href=#189 id=189 data-nosnippet>189</a>    /// to have GC always enabled (i.e. that this method always returns true). However, we support
-<a href=#190 id=190 data-nosnippet>190</a>    /// this to accomodate some VMs that require this behavior. Note that
-<a href=#191 id=191 data-nosnippet>191</a>    /// `handle_user_collection_request()` calls this function, too.  If this function returns
-<a href=#192 id=192 data-nosnippet>192</a>    /// false, `handle_user_collection_request()` will not trigger GC, either. Note also that any synchronization
-<a href=#193 id=193 data-nosnippet>193</a>    /// involving enabling and disabling collections by mutator threads should be implemented by the VM.
-<a href=#194 id=194 data-nosnippet>194</a>    </span><span class="kw">fn </span>is_collection_enabled() -&gt; bool {
-<a href=#195 id=195 data-nosnippet>195</a>        <span class="comment">// By default, MMTk assumes that collections are always enabled, and the binding should define
-<a href=#196 id=196 data-nosnippet>196</a>        // this method if the VM supports disabling GC, or if the VM cannot safely trigger GC until some
-<a href=#197 id=197 data-nosnippet>197</a>        // initialization is done, such as initializing class metadata for scanning objects.
-<a href=#198 id=198 data-nosnippet>198</a>        </span><span class="bool-val">true
-<a href=#199 id=199 data-nosnippet>199</a>    </span>}
-<a href=#200 id=200 data-nosnippet>200</a>
-<a href=#201 id=201 data-nosnippet>201</a>    <span class="doccomment">/// Ask the binding to create a [`GCTriggerPolicy`] if the option `gc_trigger` is set to
-<a href=#202 id=202 data-nosnippet>202</a>    /// `crate::util::options::GCTriggerSelector::Delegated`.
-<a href=#203 id=203 data-nosnippet>203</a>    </span><span class="kw">fn </span>create_gc_trigger() -&gt; Box&lt;<span class="kw">dyn </span>GCTriggerPolicy&lt;VM&gt;&gt; {
-<a href=#204 id=204 data-nosnippet>204</a>        <span class="macro">unimplemented!</span>()
-<a href=#205 id=205 data-nosnippet>205</a>    }
-<a href=#206 id=206 data-nosnippet>206</a>}</code></pre></div></section></main></body></html>
+<a href=#182 id=182 data-nosnippet>182</a>    <span class="doccomment">/// Ask the binding to create a [`GCTriggerPolicy`] if the option `gc_trigger` is set to
+<a href=#183 id=183 data-nosnippet>183</a>    /// `crate::util::options::GCTriggerSelector::Delegated`.
+<a href=#184 id=184 data-nosnippet>184</a>    </span><span class="kw">fn </span>create_gc_trigger() -&gt; Box&lt;<span class="kw">dyn </span>GCTriggerPolicy&lt;VM&gt;&gt; {
+<a href=#185 id=185 data-nosnippet>185</a>        <span class="macro">unimplemented!</span>()
+<a href=#186 id=186 data-nosnippet>186</a>    }
+<a href=#187 id=187 data-nosnippet>187</a>}</code></pre></div></section></main></body></html>

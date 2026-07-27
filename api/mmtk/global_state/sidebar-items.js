@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["GcStatus","PauseRequestOutcome"],"struct":["GcStatusWord","GlobalState","LiveBytesStats"]};
+window.SIDEBAR_ITEMS = {"enum":["GcStatus"],"struct":["GcStatusWord","GlobalState","LiveBytesStats"]};
