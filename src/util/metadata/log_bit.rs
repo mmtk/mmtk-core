@@ -49,7 +49,7 @@ impl VMGlobalObjectUnlogBitSpec {
     /// Atomically log an object.  Return true if it was unlogged.
     pub fn log_object_atomic<VM: VMBinding>(&self, object: ObjectReference) -> bool {
         self.fetch_update_metadata::<VM, u8, _>(object, Ordering::SeqCst, Ordering::SeqCst, |old| {
-            (old == UNLOGGED_VALUE).then(|| LOGGED_VALUE)
+            (old == UNLOGGED_VALUE).then_some(LOGGED_VALUE)
         })
         .is_ok()
     }
