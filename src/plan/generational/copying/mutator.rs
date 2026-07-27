@@ -1,7 +1,7 @@
 pub(super) use super::super::ALLOCATOR_MAPPING;
 use super::GenCopy;
-use crate::plan::barriers::FieldGenRemSetBarrier;
-use crate::plan::barriers::ObjectBarrier;
+use crate::plan::barriers::FieldGenBarrier;
+use crate::plan::barriers::ObjectGenBarrier;
 use crate::plan::generational::barrier::GenFieldBarrierSemantics;
 use crate::plan::generational::barrier::GenObjectBarrierSemantics;
 use crate::plan::generational::create_gen_space_mapping;
@@ -47,7 +47,7 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
 
     let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
     builder
-        .barrier(Box::new(FieldGenRemSetBarrier::new(
+        .barrier(Box::new(FieldGenBarrier::new(
             GenFieldBarrierSemantics::new(mmtk, gencopy),
         )))
         .build()

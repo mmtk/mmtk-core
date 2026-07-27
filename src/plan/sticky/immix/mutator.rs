@@ -1,4 +1,4 @@
-use crate::plan::barriers::{FieldGenRemSetBarrier, ObjectBarrier};
+use crate::plan::barriers::{FieldGenBarrier, ObjectGenBarrier};
 use crate::plan::generational::barrier::GenObjectBarrierSemantics;
 use crate::plan::immix;
 use crate::plan::mutator_context::{
@@ -37,7 +37,7 @@ pub fn create_stickyimmix_mutator<VM: VMBinding>(
 
     let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
     builder
-        .barrier(Box::new(FieldGenRemSetBarrier::new(
+        .barrier(Box::new(FieldGenBarrier::new(
             GenObjectBarrierSemantics::new(mmtk, stickyimmix),
         )))
         .build()

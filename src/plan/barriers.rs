@@ -202,11 +202,11 @@ pub trait BarrierSemantics: 'static + Send {
 }
 
 /// Generic object barrier with a type argument defining it's slow-path behaviour.
-pub struct ObjectBarrier<S: BarrierSemantics> {
+pub struct ObjectGenBarrier<S: BarrierSemantics> {
     semantics: S,
 }
 
-impl<S: BarrierSemantics> ObjectBarrier<S> {
+impl<S: BarrierSemantics> ObjectGenBarrier<S> {
     /// Create a new ObjectBarrier with the given semantics.
     pub fn new(semantics: S) -> Self {
         Self { semantics }
@@ -229,7 +229,7 @@ impl<S: BarrierSemantics> ObjectBarrier<S> {
     }
 }
 
-impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
+impl<S: BarrierSemantics> Barrier<S::VM> for ObjectGenBarrier<S> {
     fn flush(&mut self) {
         self.semantics.flush();
     }
@@ -273,11 +273,11 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
 }
 
 /// Field-grained generational remembered set barrier.  It has a post-barrier that
-pub struct FieldGenRemSetBarrier<S: BarrierSemantics> {
+pub struct FieldGenBarrier<S: BarrierSemantics> {
     semantics: S,
 }
 
-impl<S: BarrierSemantics> FieldGenRemSetBarrier<S> {
+impl<S: BarrierSemantics> FieldGenBarrier<S> {
     pub fn new(semantics: S) -> Self {
         Self { semantics }
     }
@@ -287,7 +287,7 @@ impl<S: BarrierSemantics> FieldGenRemSetBarrier<S> {
     }
 }
 
-impl<S: BarrierSemantics> Barrier<S::VM> for FieldGenRemSetBarrier<S> {
+impl<S: BarrierSemantics> Barrier<S::VM> for FieldGenBarrier<S> {
     fn flush(&mut self) {
         self.semantics.flush();
     }
