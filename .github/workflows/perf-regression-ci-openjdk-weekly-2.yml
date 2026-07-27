@@ -40,15 +40,15 @@ jobs:
         include:
           - plan_name: genimmix
             config: running-openjdk-genimmix-complete.yml
-            heap_modifier: "6"
+            heap_modifier: ${{ needs.config.outputs.normal_heap_factor }}
             canary: false
           - plan_name: marksweep
             config: running-openjdk-marksweep-complete.yml
-            heap_modifier: "6"
+            heap_modifier: ${{ needs.config.outputs.large_heap_factor }}
             canary: false
           - plan_name: canary
             config: running-openjdk-canary-complete.yml
-            heap_modifier: "6"
+            heap_modifier: ${{ needs.config.outputs.normal_heap_factor }}
             canary: true
     uses: ./.github/workflows/openjdk-run-plan-reusable.yml
     with:

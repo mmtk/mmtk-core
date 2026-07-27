@@ -41,10 +41,10 @@ jobs:
             heap_modifier: "0"
           - plan_name: semispace
             config: running-openjdk-semispace-complete.yml
-            heap_modifier: "6"
+            heap_modifier: ${{ needs.config.outputs.normal_heap_factor }}
           - plan_name: gencopy
             config: running-openjdk-gencopy-complete.yml
-            heap_modifier: "6"
+            heap_modifier: ${{ needs.config.outputs.normal_heap_factor }}
     uses: ./.github/workflows/openjdk-run-plan-reusable.yml
     with:
       plan_name: ${{ matrix.plan_name }}

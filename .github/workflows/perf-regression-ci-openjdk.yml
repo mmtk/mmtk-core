@@ -121,7 +121,7 @@ jobs:
         include:
           - plan_name: stickyimmix
             config: running-openjdk-stickyimmix-complete.yml
-            heap_modifier: "3"
+            heap_modifier: ${{ needs.config.outputs.normal_heap_factor }}
           # TESTING: only running one plan for now to validate the Chopin
           # workflow changes. Re-add immix before merging.
           # - plan_name: immix

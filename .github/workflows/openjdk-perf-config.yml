@@ -33,6 +33,10 @@ on:
         value: ${{ jobs.config.outputs.ci_perf_kit_version }}
       openjdk_rev:
         value: ${{ jobs.config.outputs.openjdk_rev }}
+      normal_heap_factor:
+        value: ${{ jobs.config.outputs.normal_heap_factor }}
+      large_heap_factor:
+        value: ${{ jobs.config.outputs.large_heap_factor }}
 
 jobs:
   config:
@@ -49,17 +53,28 @@ jobs:
       # branch so far. Pin this back to a released ci-perf-kit version tag (like the
       # JikesRVM workflow does) once ci-perf-kit cuts a release that includes them.
       CI_PERF_KIT_VERSION: move-to-dacapo-chopin
+      # heap_modifier passed to run_benchmarks: a multiple of each benchmark's
+      # min heap size. NoGC doesn't use either of these (it sets heap_modifier
+      # to 0, meaning "use the max heap instead"); MarkSweep needs the large
+      # factor since it doesn't compact and so needs more headroom at the same
+      # min-heap multiple; every other plan uses the normal factor.
+      NORMAL_HEAP_FACTOR: '2.5'
+      LARGE_HEAP_FACTOR: '5'
     outputs:
       result_repo_branch: ${{ steps.vars.outputs.result_repo_branch }}
       deploy: ${{ steps.vars.outputs.deploy }}
       ci_perf_kit_version: ${{ steps.vars.outputs.ci_perf_kit_version }}
       openjdk_rev: ${{ steps.openjdk-rev.outputs.rev }}
+      normal_heap_factor: ${{ steps.vars.outputs.normal_heap_factor }}
+      large_heap_factor: ${{ steps.vars.outputs.large_heap_factor }}
     steps:
       - id: vars
         run: |
           echo "result_repo_branch=$RESULT_REPO_BRANCH" >> "$GITHUB_OUTPUT"
           echo "deploy=$DEPLOY" >> "$GITHUB_OUTPUT"
           echo "ci_perf_kit_version=$CI_PERF_KIT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "normal_heap_factor=$NORMAL_HEAP_FACTOR" >> "$GITHUB_OUTPUT"
+          echo "large_heap_factor=$LARGE_HEAP_FACTOR" >> "$GITHUB_OUTPUT"
       # Only used to label the result-repo commit message; the binding isn't
       # built here, so this is a plain (cheap) checkout, no ci-checkout.sh.
       - name: Checkout OpenJDK Binding
