@@ -122,11 +122,11 @@ jobs:
           - plan_name: stickyimmix
             config: running-openjdk-stickyimmix-complete.yml
             heap_modifier: ${{ needs.config.outputs.normal_heap_factor }}
-          # TESTING: only running one plan for now to validate the Chopin
-          # workflow changes. Re-add immix before merging.
-          # - plan_name: immix
-          #   config: running-openjdk-immix-complete.yml
-          #   heap_modifier: "6"
+          # PLACEHOLDER: LXR isn't merged into mmtk-core yet. Uncomment once
+          # it lands and its running-ng config exists in ci-perf-kit.
+          # - plan_name: lxr
+          #   config: running-openjdk-lxr-complete.yml
+          #   heap_modifier: ${{ needs.config.outputs.normal_heap_factor }}
     uses: ./.github/workflows/openjdk-run-plan-reusable.yml
     with:
       plan_name: ${{ matrix.plan_name }}

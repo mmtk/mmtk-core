@@ -19,11 +19,12 @@ on:
   # Manual trigger, e.g. for testing without waiting for the schedule.
   workflow_dispatch:
   # See openjdk-perf-config.yml for the "testing in a branch" convention -
-  # its env: block is what you toggle, not one here. You'll still need to
-  # enable this trigger to actually run this specific workflow on your branch.
-  # pull_request:
-  #   branches:
-  #     - master
+  # its env: block is what you toggle, not one here.
+  # TESTING: enabled to validate the Chopin workflow changes alongside
+  # perf-regression-ci-openjdk.yml. Revert this before merging.
+  pull_request:
+    branches:
+      - master
 
 jobs:
   # Single source of truth for RESULT_REPO_BRANCH/DEPLOY/CI_PERF_KIT_VERSION,
