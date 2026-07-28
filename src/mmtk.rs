@@ -388,6 +388,33 @@ impl<VM: VMBinding> MMTK<VM> {
         self.state.gc_status.load()
     }
 
+    /// Disable collection. On success, returns `Ok(true)` if this call actually switched
+    /// collection from enabled to disabled, `Ok(false)` if it only increased the nesting depth of
+    /// an already-disabled status. If MMTk is unable to disable GC right now (possibly a GC is in
+    /// progress, or a GC has been requested), returns `Err` with the status that prevented it;
+    /// users should invoke runtime safepoints or other mechanisms to prepare for a GC pause, and
+    /// then call this function again.
+    ///
+    /// This call is nestable. Each call must be paired with a matching call to
+    /// [`MMTK::enable_collection`].
+    pub fn disable_collection(&self) -> Result<bool, GcStatus> {
+        self.gc_trigger.disable_collection()
+    }
+
+    /// Enable collection. If collection is not currently disabled (e.g. there was no prior
+    /// matching call to [`MMTK::disable_collection`]), this is a no-op.
+    /// Returns `true` if this call actually re-enabled collection (i.e. it was the outermost
+    /// matching call), `false` if it only decremented the nesting depth, or if collection was
+    /// already enabled.
+    pub fn enable_collection(&self) -> bool {
+        self.gc_trigger.enable_collection()
+    }
+
+    /// Return whether collection is currently enabled.
+    pub fn is_collection_enabled(&self) -> bool {
+        self.gc_trigger.is_collection_enabled()
+    }
+
     /// Return true if the current GC is an emergency GC.
     ///
     /// An emergency GC happens when a normal GC cannot reclaim enough memory to satisfy allocation

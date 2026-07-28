@@ -11,6 +11,7 @@
 //! it can turn the `Box` pointer to a native pointer (`*mut Mutator`), and forge a mut reference from the native
 //! pointer. Either way, the VM binding code needs to guarantee the safety.
 
+use crate::global_state::GcStatus;
 use crate::mmtk::MMTKBuilder;
 use crate::mmtk::MMTK;
 use crate::plan::AllocationSemantics;
@@ -586,6 +587,21 @@ pub fn start_worker<VM: VMBinding>(
 /// Wrapper for [`crate::mmtk::MMTK::initialize_collection`].
 pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
     mmtk.initialize_collection(tls);
+}
+
+/// Wrapper for [`crate::mmtk::MMTK::disable_collection`].
+pub fn disable_collection<VM: VMBinding>(mmtk: &MMTK<VM>) -> Result<bool, GcStatus> {
+    mmtk.disable_collection()
+}
+
+/// Wrapper for [`crate::mmtk::MMTK::enable_collection`].
+pub fn enable_collection<VM: VMBinding>(mmtk: &MMTK<VM>) -> bool {
+    mmtk.enable_collection()
+}
+
+/// Wrapper for [`crate::mmtk::MMTK::is_collection_enabled`].
+pub fn is_collection_enabled<VM: VMBinding>(mmtk: &MMTK<VM>) -> bool {
+    mmtk.is_collection_enabled()
 }
 
 /// Process MMTk run-time options. Returns true if the option is processed successfully.

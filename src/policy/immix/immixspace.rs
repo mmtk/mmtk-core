@@ -175,15 +175,27 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     }
     #[cfg(feature = "object_pinning")]
     fn pin_object(&self, object: ObjectReference) -> bool {
-        VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.pin_object::<VM>(object)
+        if self.space_args.never_move_objects {
+            false
+        } else {
+            VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.pin_object::<VM>(object)
+        }
     }
     #[cfg(feature = "object_pinning")]
     fn unpin_object(&self, object: ObjectReference) -> bool {
-        VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.unpin_object::<VM>(object)
+        if self.space_args.never_move_objects {
+            false
+        } else {
+            VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.unpin_object::<VM>(object)
+        }
     }
     #[cfg(feature = "object_pinning")]
     fn is_object_pinned(&self, object: ObjectReference) -> bool {
-        VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.is_object_pinned::<VM>(object)
+        if self.space_args.never_move_objects {
+            true
+        } else {
+            VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.is_object_pinned::<VM>(object)
+        }
     }
     fn is_movable(&self) -> bool {
         !self.space_args.never_move_objects
