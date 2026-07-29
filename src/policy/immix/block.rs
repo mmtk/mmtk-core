@@ -425,17 +425,16 @@ impl Block {
     }
 
     /// Sweep this block.
-    /// Return true if the block is swept.
     pub fn sweep<VM: VMBinding>(
         &self,
         space: &ImmixSpace<VM>,
         mark_histogram: &mut Histogram,
         line_mark_state: Option<u8>,
-    ) -> bool {
+    ) -> BlockSweepResult {
         self.set_as_defrag_source(false);
         if super::BLOCK_ONLY {
             match self.get_state() {
-                BlockState::Unallocated => false,
+                BlockState::Unallocated => unreachable!("Must not sweep unallocated block."),
                 BlockState::Unmarked => {
                     #[cfg(feature = "vo_bit")]
                     vo_bit::helper::on_region_swept::<VM, _>(self, false);
@@ -451,14 +450,14 @@ impl Block {
 
                     // Release the block if it is allocated but not marked by the current GC.
                     space.release_block(*self, false);
-                    true
+                    BlockSweepResult::Swept
                 }
                 BlockState::Marked => {
                     #[cfg(feature = "vo_bit")]
                     vo_bit::helper::on_region_swept::<VM, _>(self, true);
 
                     // The block is live.
-                    false
+                    BlockSweepResult::NoReuse
                 }
                 _ => unreachable!(),
             }
@@ -501,14 +500,16 @@ impl Block {
 
                 // Release the block if non of its lines are marked.
                 space.release_block(*self, false);
-                true
+                BlockSweepResult::Swept
             } else {
                 // There are some marked lines. Keep the block live.
-                if marked_lines != Block::LINES {
+                let is_reusable = marked_lines != Block::LINES;
+                if is_reusable {
                     // There are holes. Mark the block as reusable.
                     self.set_state(BlockState::Reusable {
                         unavailable_lines: usize::min(marked_lines, u8::MAX as usize) as _,
                     });
+                    space.reusable_blocks.push(*self)
                 } else {
                     // Clear mark state.
                     self.set_state(BlockState::Unmarked);
@@ -521,7 +522,11 @@ impl Block {
                 #[cfg(feature = "vo_bit")]
                 vo_bit::helper::on_region_swept::<VM, _>(self, true);
 
-                false
+                if is_reusable {
+                    BlockSweepResult::Reused
+                } else {
+                    BlockSweepResult::NoReuse
+                }
             }
         }
     }
@@ -692,4 +697,15 @@ impl ReusableBlockPool {
     pub fn flush_all(&self) {
         self.queue.flush_all();
     }
+}
+
+/// The result of sweeping a block.  Mainly used for statistics.
+pub enum BlockSweepResult {
+    /// The block is completely free.
+    Swept,
+    /// The block is partially free, and is reused.
+    Reused,
+    /// The block cannot be reused.  When [`super::BLOCK_ONLY`] is true, it is returned whenever a
+    /// block is not completely free.  Otherwise it is returned when a block is full.
+    NoReuse,
 }
