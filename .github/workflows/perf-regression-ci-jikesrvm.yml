@@ -3,28 +3,38 @@ name: Performance Regression CI (JikesRVM)
 # Triggerred when a new commit is pushed to master
 on:
   push:
-    # TEMPORARILY DISABLED while testing the OpenJDK Chopin workflow changes -
-    # only perf-regression-ci-openjdk.yml should run. Revert this before merging.
+    # TEMPORARILY DISABLED while testing the OpenJDK/JikesRVM Chopin workflow
+    # changes in a PR - only the pull_request trigger below should run.
+    # Revert this before merging.
     # branches:
     #   - master
     branches-ignore:
       - '**'
-  # READ BEFORE ENABLING THE TRIGGER BELOW
-  # This trigger is only used when testing the scripts in a branch, and should be commented out in other cases.
-  # If this trigger is used, please change the following env: RESULT_REPO_BRANCH -> 'test' (MUST), DEPLOY -> 'false' (optional)
-  # pull_request:
-  #   branches:
-  #     - master
+  # See the RESULT_REPO_BRANCH comment below - this uses its own 'test'
+  # branch, separate from the OpenJDK workflows' 'chopin-test'.
+  # TESTING: enabled to validate the JikesRVM Chopin workflow changes.
+  # Revert this before merging.
+  pull_request:
+    branches:
+      - master
 
 env:
   # The branch to save run data and plot graph from. Use 'self-hosted' for master, use 'test' or anything else for testing in a branch.
-  RESULT_REPO_BRANCH: 'self-hosted'
+  # TESTING: using a dedicated test branch (separate from the OpenJDK
+  # workflows' 'chopin-test', since a JikesRVM run and an OpenJDK run for the
+  # same commit would otherwise collide in the same result-repo branch).
+  # Revert to 'self-hosted' before merging.
+  RESULT_REPO_BRANCH: 'test'
   # Whether we deploy the generated page. Set to true for master.
   DEPLOY: true
   # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
   CI_PERF_KIT_BUILD: ci-perf-kit/upload
   CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
-  CI_PERF_KIT_VERSION: 0.8.8
+  # TODO: jikesrvm-history-run.sh's commit-info recording and DaCapo 2006
+  # callback support only exist on this branch so far. Pin this back to a
+  # released ci-perf-kit version tag once ci-perf-kit cuts a release that
+  # includes them.
+  CI_PERF_KIT_VERSION: move-to-dacapo-chopin
 
 jobs:
   # JikesRVM
@@ -74,7 +84,7 @@ jobs:
           export RESULT_REPO_BRANCH=${{ env.RESULT_REPO_BRANCH }}
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
-          JAVA_HOME=/opt/jdk1.6.0_45/ PATH=/opt/apache-ant-1.9.16/bin/:/opt/jdk1.6.0_45/bin/:$PATH ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports/${{ steps.branch.outputs.branch_name }}
+          JAVA_HOME=/opt/jdk1.6.0_45/ PATH=/opt/apache-ant-1.9.16/bin/:/opt/jdk1.6.0_45/bin/:$PATH ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./mmtk-core ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
       - name: Deploy to Github Page
         if: ${{ env.DEPLOY == 'true' }}
