@@ -169,11 +169,11 @@ impl VMMap for Map32 {
         debug_assert!(any_chunk == conversions::chunk_align_down(any_chunk));
         if !any_chunk.is_zero() {
             let chunk = any_chunk.chunk_index();
-            while self_mut.next_link[chunk] != 0 {
+            while self_mut.next_link[chunk] != -1 {
                 let x = self_mut.next_link[chunk];
                 self.free_contiguous_chunks_no_lock(x);
             }
-            while self_mut.prev_link[chunk] != 0 {
+            while self_mut.prev_link[chunk] != -1 {
                 let x = self_mut.prev_link[chunk];
                 self.free_contiguous_chunks_no_lock(x);
             }
