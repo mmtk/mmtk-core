@@ -753,44 +753,41 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             return None;
         }
         loop {
-            if let Some(block) = self.reusable_blocks.pop() {
-                // Skip blocks that should be evacuated.
-                if copy && block.is_defrag_source() {
+            let block = self.reusable_blocks.pop()?;
+            // Skip blocks that should be evacuated.
+            if copy && block.is_defrag_source() {
+                continue;
+            }
+            if self.rc_enabled {
+                if crate::plan::lxr::MATURE_EVACUATION && block.is_defrag_source() {
                     continue;
                 }
-                if self.rc_enabled {
-                    if crate::plan::lxr::MATURE_EVACUATION && block.is_defrag_source() {
-                        continue;
-                    }
-                    // Blocks in the `reusable_blocks` queue can be released after some RC collections.
-                    // These blocks can either have `Unallocated` state, or be reallocated again.
-                    // Skip these cases and only return the truly reusable blocks.
-                    if !block.get_state().is_reusable() {
-                        continue;
-                    }
-                    if !block.attempt_mutator_reuse() {
-                        continue;
-                    }
-                    if let Some(hooks) = self.hooks() {
-                        hooks.on_reusable_block_acquired(block, copy);
-                    }
-                } else {
-                    // Get available lines. Do this before block.init which will reset block state.
-                    let lines_delta = match block.get_state() {
-                        BlockState::Reusable { unavailable_lines } => {
-                            Block::LINES - unavailable_lines as usize
-                        }
-                        BlockState::Unmarked => Block::LINES,
-                        _ => unreachable!("{:?} {:?}", block, block.get_state()),
-                    };
-                    self.lines_consumed.fetch_add(lines_delta, Ordering::SeqCst);
+                // Blocks in the `reusable_blocks` queue can be released after some RC collections.
+                // These blocks can either have `Unallocated` state, or be reallocated again.
+                // Skip these cases and only return the truly reusable blocks.
+                if !block.get_state().is_reusable() {
+                    continue;
                 }
-
-                block.init(copy, true, self);
-                return Some(block);
+                if !block.attempt_mutator_reuse() {
+                    continue;
+                }
+                if let Some(hooks) = self.hooks() {
+                    hooks.on_reusable_block_acquired(block, copy);
+                }
             } else {
-                return None;
+                // Get available lines. Do this before block.init which will reset block state.
+                let lines_delta = match block.get_state() {
+                    BlockState::Reusable { unavailable_lines } => {
+                        Block::LINES - unavailable_lines as usize
+                    }
+                    BlockState::Unmarked => Block::LINES,
+                    _ => unreachable!("{:?} {:?}", block, block.get_state()),
+                };
+                self.lines_consumed.fetch_add(lines_delta, Ordering::SeqCst);
             }
+
+            block.init(copy, true, self);
+            return Some(block);
         }
     }
 
