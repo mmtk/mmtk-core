@@ -957,12 +957,13 @@ pub enum AllocationSemantics {
     /// This semantic may get removed and MMTk will transparently allocate into large object space for large objects.
     Los = 2,
     /// Code objects have execution permission.
-    /// Note that this is a place holder for now. Currently all the memory MMTk allocates has execution permission.
+    /// Note that we do not currently support this semantic.
     Code = 3,
     /// Read-only objects cannot be mutated once it is initialized.
-    /// Note that this is a place holder for now. It does not provide read only semantic.
+    /// Note that we do not currently support this semantic.
     ReadOnly = 4,
     /// Los + Code.
+    /// Note that we do not currently support this semantic.
     LargeCode = 5,
     /// Non moving objects will not be moved by GC.
     NonMoving = 6,
