@@ -301,6 +301,18 @@ impl GcStatusWord {
         Self::decode(self.0.load(Ordering::SeqCst))
     }
 
+    /// Inner implementation of [`Self::transition`], handling encoding, decoding, and atomic RMW
+    /// operation.
+    fn transition_inner<F: FnMut(GcStatus) -> GcStatus>(&self, mut f: F) -> GcStatus {
+        let old_bits = self
+            .0
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
+                Some(Self::encode(f(Self::decode(bits))))
+            })
+            .unwrap(); // `f` always returns a status to move to, so this never returns `Err`.
+        Self::decode(old_bits)
+    }
+
     /// Attempt to atomically transition the GC status using function `f`.  Return the status
     /// atomically transitioned *from* (not the new status).  It will retry `f` if the status is
     /// modified concurrently.
@@ -313,13 +325,29 @@ impl GcStatusWord {
     /// status instead, every racing thread would observe the same new status and none could tell
     /// which of them caused it. `f` may be invoked more than once under contention.
     fn transition<F: FnMut(GcStatus) -> GcStatus>(&self, mut f: F) -> GcStatus {
-        let old_bits = self
-            .0
+        let mut maybe_new_state = None;
+        let old_state = self.transition_inner(|old_state| {
+            let new_state = f(old_state);
+            maybe_new_state = Some(new_state);
+            new_state
+        });
+        let new_state = maybe_new_state.unwrap();
+        log::trace!("GC status transitioned from {old_state:?} to {new_state:?}");
+        old_state
+    }
+
+    /// Inner implementation of [`Self::try_transition`], handling encoding, decoding, and atomic RMW
+    /// operation.
+    fn try_transition_inner<F: FnMut(GcStatus) -> Option<GcStatus>>(
+        &self,
+        mut f: F,
+    ) -> Result<GcStatus, GcStatus> {
+        self.0
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
-                Some(Self::encode(f(Self::decode(bits))))
+                f(Self::decode(bits)).map(Self::encode)
             })
-            .unwrap(); // `f` always returns a status to move to, so this never returns `Err`.
-        Self::decode(old_bits)
+            .map(Self::decode)
+            .map_err(Self::decode)
     }
 
     /// Attempt to atomically transition the GC status using function `f`.  Return `Ok(old_status)`
@@ -331,12 +359,23 @@ impl GcStatusWord {
         &self,
         mut f: F,
     ) -> Result<GcStatus, GcStatus> {
-        self.0
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
-                f(Self::decode(bits)).map(Self::encode)
-            })
-            .map(Self::decode)
-            .map_err(Self::decode)
+        let mut maybe_new_state = None;
+        let result = self.try_transition_inner(|old_state| {
+            maybe_new_state = f(old_state);
+            maybe_new_state
+        });
+
+        match result {
+            Ok(old_state) => {
+                let new_state = maybe_new_state.unwrap();
+                log::trace!("GC status transitioned from {old_state:?} to {new_state:?}")
+            }
+            Err(old_state) => {
+                log::trace!("GC status transition attempted, but remains {old_state:?}")
+            }
+        }
+
+        result
     }
 
     pub(crate) fn is_initialized(&self) -> bool {
