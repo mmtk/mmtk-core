@@ -32,6 +32,31 @@ Notes for the mmtk-core developers:
 
 ## 0.33.0
 
+### `GCTriggerPolicy::on_gc_start`/`on_gc_end` renamed, and `on_pause_start` now fires after mutators stop
+
+```admonish tldr
+`GCTriggerPolicy::on_gc_start` and `on_gc_end` are renamed to `on_pause_start` and `on_pause_end`.
+In addition, `on_pause_start` is now called after all mutators have stopped, instead of at the very
+start of GC scheduling before mutators are asked to stop.
+```
+
+API changes:
+
+-   trait `util::heap::GCTriggerPolicy`
+    +   `on_gc_start`: Renamed to `on_pause_start`.
+        *   Previously called when GC was scheduled, before mutators were told to stop.
+        *   Now called after all mutators have stopped (i.e. once the world is actually stopped for
+            the pause). Implementations that only use this hook to record a timestamp or the
+            reserved-page count for computing GC time/space overhead should still work correctly,
+            but the recorded time will now reflect the start of the actual pause rather than the
+            start of GC scheduling (which also includes time spent waiting for mutators to reach a
+            safepoint).
+    +   `on_gc_end`: Renamed to `on_pause_end`.
+        *   No change to timing, only the name.
+
+This only affects VM bindings that provide a custom `GCTriggerPolicy` (via
+`Collection::create_gc_trigger`).
+
 ### Collection enabling/disabling is now managed by MMTk instead of the VM binding
 
 ```admonish tldr
