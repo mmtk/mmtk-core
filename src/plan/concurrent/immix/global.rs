@@ -381,6 +381,10 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
         self.set_ref_closure_buckets_enabled(false);
 
+        // We enable the concurrent bucket.  It will allow us to add (deferred) concurrent work
+        // packets during this pause.
+        scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(true);
+
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<ConcurrentImmixGCWorkContext<VM>>::new());
         scheduler.work_buckets[WorkBucketStage::Prepare]
