@@ -569,7 +569,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let mmtk = worker.mmtk;
 
         // Tell GC trigger that GC ended - this happens before we resume mutators.
-        mmtk.gc_trigger.policy.on_gc_end(mmtk);
+        mmtk.gc_trigger.policy.on_pause_end(mmtk);
 
         // All other workers are parked, so it is safe to access the Plan instance mutably.
         probe!(mmtk, plan_end_of_gc_begin);
