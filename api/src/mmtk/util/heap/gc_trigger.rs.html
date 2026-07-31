@@ -333,15 +333,15 @@
 <a href=#333 id=333 data-nosnippet>333</a>    /// Failing to do so may result in unnecessay GCs, or result in an infinite loop if the new heap size
 <a href=#334 id=334 data-nosnippet>334</a>    /// can never accomodate the pending allocation.
 <a href=#335 id=335 data-nosnippet>335</a>    </span><span class="kw">fn </span>on_pending_allocation(<span class="kw-2">&amp;</span><span class="self">self</span>, _pages: usize) {}
-<a href=#336 id=336 data-nosnippet>336</a>    <span class="doccomment">/// Inform the triggering policy that a GC starts.
-<a href=#337 id=337 data-nosnippet>337</a>    </span><span class="kw">fn </span>on_gc_start(<span class="kw-2">&amp;</span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {}
-<a href=#338 id=338 data-nosnippet>338</a>    <span class="doccomment">/// Inform the triggering policy that a GC is about to start the release work. This is called
-<a href=#339 id=339 data-nosnippet>339</a>    /// in the global Release work packet. This means we assume a plan
-<a href=#340 id=340 data-nosnippet>340</a>    /// do not schedule any work that reclaims memory before the global `Release` work. The current plans
-<a href=#341 id=341 data-nosnippet>341</a>    /// satisfy this assumption: they schedule other release work in `plan.release()`.
-<a href=#342 id=342 data-nosnippet>342</a>    </span><span class="kw">fn </span>on_gc_release(<span class="kw-2">&amp;</span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {}
-<a href=#343 id=343 data-nosnippet>343</a>    <span class="doccomment">/// Inform the triggering policy that a GC ends.
-<a href=#344 id=344 data-nosnippet>344</a>    </span><span class="kw">fn </span>on_gc_end(<span class="kw-2">&amp;</span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {}
+<a href=#336 id=336 data-nosnippet>336</a>    <span class="doccomment">/// Inform the triggering policy that a pause starts.
+<a href=#337 id=337 data-nosnippet>337</a>    </span><span class="kw">fn </span>on_pause_start(<span class="kw-2">&amp;</span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {}
+<a href=#338 id=338 data-nosnippet>338</a>    <span class="doccomment">/// Inform the triggering policy that a pause ends.
+<a href=#339 id=339 data-nosnippet>339</a>    </span><span class="kw">fn </span>on_pause_end(<span class="kw-2">&amp;</span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {}
+<a href=#340 id=340 data-nosnippet>340</a>    <span class="doccomment">/// Inform the triggering policy that a GC is about to start the release work. This is called
+<a href=#341 id=341 data-nosnippet>341</a>    /// in the global Release work packet. This means we assume a plan
+<a href=#342 id=342 data-nosnippet>342</a>    /// do not schedule any work that reclaims memory before the global `Release` work. The current plans
+<a href=#343 id=343 data-nosnippet>343</a>    /// satisfy this assumption: they schedule other release work in `plan.release()`.
+<a href=#344 id=344 data-nosnippet>344</a>    </span><span class="kw">fn </span>on_gc_release(<span class="kw-2">&amp;</span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {}
 <a href=#345 id=345 data-nosnippet>345</a>    <span class="doccomment">/// Is a GC required now? The GC trigger may implement its own heuristics to decide when
 <a href=#346 id=346 data-nosnippet>346</a>    /// a GC should be performed. However, we recommend the implementation to do its own checks
 <a href=#347 id=347 data-nosnippet>347</a>    /// first, and always call `plan.collection_required(space_full, space)` at the end as a fallback to see if the plan needs
@@ -483,7 +483,7 @@
 <a href=#483 id=483 data-nosnippet>483</a>    // * allocation = objects in mature space = promoted + pretentured = live pages in mature space before release - live pages at the end of last mature GC
 <a href=#484 id=484 data-nosnippet>484</a>    // * collection = live pages in mature space at the end of GC -  live pages in mature space before release
 <a href=#485 id=485 data-nosnippet>485</a>
-<a href=#486 id=486 data-nosnippet>486</a>    </span><span class="kw">fn </span>generational_mem_stats_on_gc_start&lt;VM: VMBinding&gt;(
+<a href=#486 id=486 data-nosnippet>486</a>    </span><span class="kw">fn </span>generational_mem_stats_on_pause_start&lt;VM: VMBinding&gt;(
 <a href=#487 id=487 data-nosnippet>487</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
 <a href=#488 id=488 data-nosnippet>488</a>        _plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>GenerationalPlan&lt;VM = VM&gt;,
 <a href=#489 id=489 data-nosnippet>489</a>    ) {
@@ -514,7 +514,7 @@
 <a href=#514 id=514 data-nosnippet>514</a>        }
 <a href=#515 id=515 data-nosnippet>515</a>    }
 <a href=#516 id=516 data-nosnippet>516</a>    <span class="doccomment">/// Return true if we should compute a new heap limit. Only do so at the end of a mature GC
-<a href=#517 id=517 data-nosnippet>517</a>    </span><span class="kw">fn </span>generational_mem_stats_on_gc_end&lt;VM: VMBinding&gt;(
+<a href=#517 id=517 data-nosnippet>517</a>    </span><span class="kw">fn </span>generational_mem_stats_on_pause_end&lt;VM: VMBinding&gt;(
 <a href=#518 id=518 data-nosnippet>518</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
 <a href=#519 id=519 data-nosnippet>519</a>        plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>GenerationalPlan&lt;VM = VM&gt;,
 <a href=#520 id=520 data-nosnippet>520</a>    ) -&gt; bool {
@@ -538,243 +538,246 @@
 <a href=#538 id=538 data-nosnippet>538</a>    // * allocation = live pages at the start of GC - live pages at the end of last GC
 <a href=#539 id=539 data-nosnippet>539</a>    // * collection = live pages at the end of GC - live pages before release
 <a href=#540 id=540 data-nosnippet>540</a>
-<a href=#541 id=541 data-nosnippet>541</a>    </span><span class="kw">fn </span>non_generational_mem_stats_on_gc_start&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-<a href=#542 id=542 data-nosnippet>542</a>        <span class="self">self</span>.allocation_pages = mmtk
-<a href=#543 id=543 data-nosnippet>543</a>            .get_plan()
-<a href=#544 id=544 data-nosnippet>544</a>            .get_reserved_pages()
-<a href=#545 id=545 data-nosnippet>545</a>            .saturating_sub(<span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
-<a href=#546 id=546 data-nosnippet>546</a>        <span class="macro">trace!</span>(
-<a href=#547 id=547 data-nosnippet>547</a>            <span class="string">"allocated pages = used {} - live in last gc {} = {}"</span>,
-<a href=#548 id=548 data-nosnippet>548</a>            mmtk.get_plan().get_reserved_pages(),
-<a href=#549 id=549 data-nosnippet>549</a>            <span class="self">self</span>.gc_end_live_pages,
-<a href=#550 id=550 data-nosnippet>550</a>            <span class="self">self</span>.allocation_pages
-<a href=#551 id=551 data-nosnippet>551</a>        );
-<a href=#552 id=552 data-nosnippet>552</a>    }
-<a href=#553 id=553 data-nosnippet>553</a>    <span class="kw">fn </span>non_generational_mem_stats_on_gc_release&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-<a href=#554 id=554 data-nosnippet>554</a>        <span class="self">self</span>.gc_release_live_pages = mmtk.get_plan().get_reserved_pages();
-<a href=#555 id=555 data-nosnippet>555</a>        <span class="macro">trace!</span>(<span class="string">"live before release = {}"</span>, <span class="self">self</span>.gc_release_live_pages);
-<a href=#556 id=556 data-nosnippet>556</a>    }
-<a href=#557 id=557 data-nosnippet>557</a>    <span class="kw">fn </span>non_generational_mem_stats_on_gc_end&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-<a href=#558 id=558 data-nosnippet>558</a>        <span class="self">self</span>.gc_end_live_pages = mmtk.get_plan().get_reserved_pages();
-<a href=#559 id=559 data-nosnippet>559</a>        <span class="macro">trace!</span>(<span class="string">"live pages = {}"</span>, <span class="self">self</span>.gc_end_live_pages);
-<a href=#560 id=560 data-nosnippet>560</a>        <span class="comment">// Use live pages as an estimate for pages traversed during GC
-<a href=#561 id=561 data-nosnippet>561</a>        </span><span class="self">self</span>.collection_pages = <span class="self">self</span>.gc_end_live_pages <span class="kw">as </span>f64;
-<a href=#562 id=562 data-nosnippet>562</a>        <span class="macro">trace!</span>(
-<a href=#563 id=563 data-nosnippet>563</a>            <span class="string">"collected pages = live at gc end {} - live at gc release {} = {}"</span>,
-<a href=#564 id=564 data-nosnippet>564</a>            <span class="self">self</span>.gc_release_live_pages,
-<a href=#565 id=565 data-nosnippet>565</a>            <span class="self">self</span>.gc_end_live_pages,
-<a href=#566 id=566 data-nosnippet>566</a>            <span class="self">self</span>.collection_pages
-<a href=#567 id=567 data-nosnippet>567</a>        );
-<a href=#568 id=568 data-nosnippet>568</a>    }
-<a href=#569 id=569 data-nosnippet>569</a>}
-<a href=#570 id=570 data-nosnippet>570</a>
-<a href=#571 id=571 data-nosnippet>571</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCTriggerPolicy&lt;VM&gt; <span class="kw">for </span>MemBalancerTrigger {
-<a href=#572 id=572 data-nosnippet>572</a>    <span class="kw">fn </span>is_gc_required(
-<a href=#573 id=573 data-nosnippet>573</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
-<a href=#574 id=574 data-nosnippet>574</a>        space_full: bool,
-<a href=#575 id=575 data-nosnippet>575</a>        space: <span class="prelude-ty">Option</span>&lt;SpaceStats&lt;VM&gt;&gt;,
-<a href=#576 id=576 data-nosnippet>576</a>        plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
-<a href=#577 id=577 data-nosnippet>577</a>    ) -&gt; bool {
-<a href=#578 id=578 data-nosnippet>578</a>        <span class="comment">// Let the plan decide
-<a href=#579 id=579 data-nosnippet>579</a>        </span>plan.collection_required(space_full, space)
-<a href=#580 id=580 data-nosnippet>580</a>    }
-<a href=#581 id=581 data-nosnippet>581</a>
-<a href=#582 id=582 data-nosnippet>582</a>    <span class="kw">fn </span>on_pending_allocation(<span class="kw-2">&amp;</span><span class="self">self</span>, pages: usize) {
-<a href=#583 id=583 data-nosnippet>583</a>        <span class="self">self</span>.pending_pages.fetch_add(pages, Ordering::SeqCst);
-<a href=#584 id=584 data-nosnippet>584</a>    }
-<a href=#585 id=585 data-nosnippet>585</a>
-<a href=#586 id=586 data-nosnippet>586</a>    <span class="kw">fn </span>on_gc_start(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-<a href=#587 id=587 data-nosnippet>587</a>        <span class="macro">trace!</span>(<span class="string">"=== on_gc_start ==="</span>);
-<a href=#588 id=588 data-nosnippet>588</a>        <span class="self">self</span>.access_stats(|stats| {
-<a href=#589 id=589 data-nosnippet>589</a>            stats.gc_start_time = Instant::now();
-<a href=#590 id=590 data-nosnippet>590</a>            stats.allocation_time += (stats.gc_start_time - stats.gc_end_time).as_secs_f64();
-<a href=#591 id=591 data-nosnippet>591</a>            <span class="macro">trace!</span>(
-<a href=#592 id=592 data-nosnippet>592</a>                <span class="string">"gc_start = {:?}, allocation_time = {}"</span>,
-<a href=#593 id=593 data-nosnippet>593</a>                stats.gc_start_time,
-<a href=#594 id=594 data-nosnippet>594</a>                stats.allocation_time
-<a href=#595 id=595 data-nosnippet>595</a>            );
-<a href=#596 id=596 data-nosnippet>596</a>
-<a href=#597 id=597 data-nosnippet>597</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.get_plan().generational() {
-<a href=#598 id=598 data-nosnippet>598</a>                stats.generational_mem_stats_on_gc_start(plan);
-<a href=#599 id=599 data-nosnippet>599</a>            } <span class="kw">else </span>{
-<a href=#600 id=600 data-nosnippet>600</a>                stats.non_generational_mem_stats_on_gc_start(mmtk);
-<a href=#601 id=601 data-nosnippet>601</a>            }
-<a href=#602 id=602 data-nosnippet>602</a>        });
-<a href=#603 id=603 data-nosnippet>603</a>    }
-<a href=#604 id=604 data-nosnippet>604</a>
-<a href=#605 id=605 data-nosnippet>605</a>    <span class="kw">fn </span>on_gc_release(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-<a href=#606 id=606 data-nosnippet>606</a>        <span class="macro">trace!</span>(<span class="string">"=== on_gc_release ==="</span>);
-<a href=#607 id=607 data-nosnippet>607</a>        <span class="self">self</span>.access_stats(|stats| {
-<a href=#608 id=608 data-nosnippet>608</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.get_plan().generational() {
-<a href=#609 id=609 data-nosnippet>609</a>                stats.generational_mem_stats_on_gc_release(plan);
-<a href=#610 id=610 data-nosnippet>610</a>            } <span class="kw">else </span>{
-<a href=#611 id=611 data-nosnippet>611</a>                stats.non_generational_mem_stats_on_gc_release(mmtk);
-<a href=#612 id=612 data-nosnippet>612</a>            }
-<a href=#613 id=613 data-nosnippet>613</a>        });
-<a href=#614 id=614 data-nosnippet>614</a>    }
-<a href=#615 id=615 data-nosnippet>615</a>
-<a href=#616 id=616 data-nosnippet>616</a>    <span class="kw">fn </span>on_gc_end(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-<a href=#617 id=617 data-nosnippet>617</a>        <span class="macro">trace!</span>(<span class="string">"=== on_gc_end ==="</span>);
-<a href=#618 id=618 data-nosnippet>618</a>        <span class="self">self</span>.access_stats(|stats| {
-<a href=#619 id=619 data-nosnippet>619</a>            stats.gc_end_time = Instant::now();
-<a href=#620 id=620 data-nosnippet>620</a>            stats.collection_time += (stats.gc_end_time - stats.gc_start_time).as_secs_f64();
-<a href=#621 id=621 data-nosnippet>621</a>            <span class="macro">trace!</span>(
-<a href=#622 id=622 data-nosnippet>622</a>                <span class="string">"gc_end = {:?}, collection_time = {}"</span>,
-<a href=#623 id=623 data-nosnippet>623</a>                stats.gc_end_time,
-<a href=#624 id=624 data-nosnippet>624</a>                stats.collection_time
-<a href=#625 id=625 data-nosnippet>625</a>            );
-<a href=#626 id=626 data-nosnippet>626</a>
-<a href=#627 id=627 data-nosnippet>627</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.get_plan().generational() {
-<a href=#628 id=628 data-nosnippet>628</a>                <span class="kw">if </span>stats.generational_mem_stats_on_gc_end(plan) {
-<a href=#629 id=629 data-nosnippet>629</a>                    <span class="self">self</span>.compute_new_heap_limit(
-<a href=#630 id=630 data-nosnippet>630</a>                        mmtk.get_plan().get_reserved_pages(),
-<a href=#631 id=631 data-nosnippet>631</a>                        <span class="comment">// We reserve an extra of min nursery. This ensures that we will not trigger
-<a href=#632 id=632 data-nosnippet>632</a>                        // a full heap GC in the next GC (if available pages is smaller than min nursery, we will force a full heap GC)
-<a href=#633 id=633 data-nosnippet>633</a>                        </span>mmtk.get_plan().get_collection_reserved_pages()
-<a href=#634 id=634 data-nosnippet>634</a>                            + mmtk.gc_trigger.get_min_nursery_pages(),
-<a href=#635 id=635 data-nosnippet>635</a>                        stats,
-<a href=#636 id=636 data-nosnippet>636</a>                    );
-<a href=#637 id=637 data-nosnippet>637</a>                }
-<a href=#638 id=638 data-nosnippet>638</a>            } <span class="kw">else </span>{
-<a href=#639 id=639 data-nosnippet>639</a>                stats.non_generational_mem_stats_on_gc_end(mmtk);
-<a href=#640 id=640 data-nosnippet>640</a>                <span class="self">self</span>.compute_new_heap_limit(
-<a href=#641 id=641 data-nosnippet>641</a>                    mmtk.get_plan().get_reserved_pages(),
-<a href=#642 id=642 data-nosnippet>642</a>                    mmtk.get_plan().get_collection_reserved_pages(),
-<a href=#643 id=643 data-nosnippet>643</a>                    stats,
-<a href=#644 id=644 data-nosnippet>644</a>                );
-<a href=#645 id=645 data-nosnippet>645</a>            }
-<a href=#646 id=646 data-nosnippet>646</a>        });
-<a href=#647 id=647 data-nosnippet>647</a>        <span class="comment">// Clear pending allocation pages at the end of GC, no matter we used it or not.
-<a href=#648 id=648 data-nosnippet>648</a>        </span><span class="self">self</span>.pending_pages.store(<span class="number">0</span>, Ordering::SeqCst);
-<a href=#649 id=649 data-nosnippet>649</a>    }
-<a href=#650 id=650 data-nosnippet>650</a>
-<a href=#651 id=651 data-nosnippet>651</a>    <span class="kw">fn </span>is_heap_full(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) -&gt; bool {
-<a href=#652 id=652 data-nosnippet>652</a>        <span class="comment">// If reserved pages is larger than the current heap size, the heap is full.
-<a href=#653 id=653 data-nosnippet>653</a>        </span>plan.get_reserved_pages() &gt; <span class="self">self</span>.current_heap_pages.load(Ordering::Relaxed)
-<a href=#654 id=654 data-nosnippet>654</a>    }
-<a href=#655 id=655 data-nosnippet>655</a>
-<a href=#656 id=656 data-nosnippet>656</a>    <span class="kw">fn </span>get_current_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-<a href=#657 id=657 data-nosnippet>657</a>        <span class="self">self</span>.current_heap_pages.load(Ordering::Relaxed)
-<a href=#658 id=658 data-nosnippet>658</a>    }
-<a href=#659 id=659 data-nosnippet>659</a>
-<a href=#660 id=660 data-nosnippet>660</a>    <span class="kw">fn </span>get_max_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-<a href=#661 id=661 data-nosnippet>661</a>        <span class="self">self</span>.max_heap_pages
-<a href=#662 id=662 data-nosnippet>662</a>    }
-<a href=#663 id=663 data-nosnippet>663</a>
-<a href=#664 id=664 data-nosnippet>664</a>    <span class="kw">fn </span>can_heap_size_grow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-<a href=#665 id=665 data-nosnippet>665</a>        <span class="self">self</span>.current_heap_pages.load(Ordering::Relaxed) &lt; <span class="self">self</span>.max_heap_pages
-<a href=#666 id=666 data-nosnippet>666</a>    }
-<a href=#667 id=667 data-nosnippet>667</a>}
-<a href=#668 id=668 data-nosnippet>668</a><span class="kw">impl </span>MemBalancerTrigger {
-<a href=#669 id=669 data-nosnippet>669</a>    <span class="kw">fn </span>new(min_heap_pages: usize, max_heap_pages: usize) -&gt; <span class="self">Self </span>{
-<a href=#670 id=670 data-nosnippet>670</a>        <span class="self">Self </span>{
-<a href=#671 id=671 data-nosnippet>671</a>            min_heap_pages,
-<a href=#672 id=672 data-nosnippet>672</a>            max_heap_pages,
-<a href=#673 id=673 data-nosnippet>673</a>            pending_pages: AtomicUsize::new(<span class="number">0</span>),
-<a href=#674 id=674 data-nosnippet>674</a>            <span class="comment">// start with min heap
-<a href=#675 id=675 data-nosnippet>675</a>            </span>current_heap_pages: AtomicUsize::new(min_heap_pages),
-<a href=#676 id=676 data-nosnippet>676</a>            stats: AtomicRefCell::new(Default::default()),
-<a href=#677 id=677 data-nosnippet>677</a>        }
-<a href=#678 id=678 data-nosnippet>678</a>    }
-<a href=#679 id=679 data-nosnippet>679</a>
-<a href=#680 id=680 data-nosnippet>680</a>    <span class="kw">fn </span>access_stats&lt;F&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>f: F)
-<a href=#681 id=681 data-nosnippet>681</a>    <span class="kw">where
-<a href=#682 id=682 data-nosnippet>682</a>        </span>F: FnMut(<span class="kw-2">&amp;mut </span>MemBalancerStats),
-<a href=#683 id=683 data-nosnippet>683</a>    {
-<a href=#684 id=684 data-nosnippet>684</a>        <span class="kw">let </span><span class="kw-2">mut </span>stats = <span class="self">self</span>.stats.borrow_mut();
-<a href=#685 id=685 data-nosnippet>685</a>        f(<span class="kw-2">&amp;mut </span>stats);
-<a href=#686 id=686 data-nosnippet>686</a>    }
-<a href=#687 id=687 data-nosnippet>687</a>
-<a href=#688 id=688 data-nosnippet>688</a>    <span class="kw">fn </span>compute_new_heap_limit(
-<a href=#689 id=689 data-nosnippet>689</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
-<a href=#690 id=690 data-nosnippet>690</a>        live: usize,
-<a href=#691 id=691 data-nosnippet>691</a>        extra_reserve: usize,
-<a href=#692 id=692 data-nosnippet>692</a>        stats: <span class="kw-2">&amp;mut </span>MemBalancerStats,
-<a href=#693 id=693 data-nosnippet>693</a>    ) {
-<a href=#694 id=694 data-nosnippet>694</a>        <span class="macro">trace!</span>(<span class="string">"compute new heap limit: {:?}"</span>, stats);
-<a href=#695 id=695 data-nosnippet>695</a>
-<a href=#696 id=696 data-nosnippet>696</a>        <span class="comment">// Constants from the original paper
-<a href=#697 id=697 data-nosnippet>697</a>        </span><span class="kw">const </span>ALLOCATION_SMOOTH_FACTOR: f64 = <span class="number">0.95</span>;
-<a href=#698 id=698 data-nosnippet>698</a>        <span class="kw">const </span>COLLECTION_SMOOTH_FACTOR: f64 = <span class="number">0.5</span>;
-<a href=#699 id=699 data-nosnippet>699</a>        <span class="kw">const </span>TUNING_FACTOR: f64 = <span class="number">0.2</span>;
-<a href=#700 id=700 data-nosnippet>700</a>
-<a href=#701 id=701 data-nosnippet>701</a>        <span class="comment">// Smooth memory/time for allocation/collection
-<a href=#702 id=702 data-nosnippet>702</a>        </span><span class="kw">let </span>smooth = |prev: <span class="prelude-ty">Option</span>&lt;f64&gt;, cur, factor| {
-<a href=#703 id=703 data-nosnippet>703</a>            prev.map(|p| p * factor + cur * (<span class="number">1.0f64 </span>- factor))
-<a href=#704 id=704 data-nosnippet>704</a>                .unwrap_or(cur)
-<a href=#705 id=705 data-nosnippet>705</a>        };
-<a href=#706 id=706 data-nosnippet>706</a>        <span class="kw">let </span>alloc_mem = smooth(
-<a href=#707 id=707 data-nosnippet>707</a>            stats.allocation_pages_prev,
-<a href=#708 id=708 data-nosnippet>708</a>            stats.allocation_pages,
-<a href=#709 id=709 data-nosnippet>709</a>            ALLOCATION_SMOOTH_FACTOR,
-<a href=#710 id=710 data-nosnippet>710</a>        );
-<a href=#711 id=711 data-nosnippet>711</a>        <span class="kw">let </span>alloc_time = smooth(
-<a href=#712 id=712 data-nosnippet>712</a>            stats.allocation_time_prev,
-<a href=#713 id=713 data-nosnippet>713</a>            stats.allocation_time,
-<a href=#714 id=714 data-nosnippet>714</a>            ALLOCATION_SMOOTH_FACTOR,
-<a href=#715 id=715 data-nosnippet>715</a>        );
-<a href=#716 id=716 data-nosnippet>716</a>        <span class="kw">let </span>gc_mem = smooth(
-<a href=#717 id=717 data-nosnippet>717</a>            stats.collection_pages_prev,
-<a href=#718 id=718 data-nosnippet>718</a>            stats.collection_pages,
-<a href=#719 id=719 data-nosnippet>719</a>            COLLECTION_SMOOTH_FACTOR,
-<a href=#720 id=720 data-nosnippet>720</a>        );
-<a href=#721 id=721 data-nosnippet>721</a>        <span class="kw">let </span>gc_time = smooth(
-<a href=#722 id=722 data-nosnippet>722</a>            stats.collection_time_prev,
-<a href=#723 id=723 data-nosnippet>723</a>            stats.collection_time,
-<a href=#724 id=724 data-nosnippet>724</a>            COLLECTION_SMOOTH_FACTOR,
-<a href=#725 id=725 data-nosnippet>725</a>        );
-<a href=#726 id=726 data-nosnippet>726</a>        <span class="macro">trace!</span>(
-<a href=#727 id=727 data-nosnippet>727</a>            <span class="string">"after smoothing, alloc mem = {}, alloc_time = {}"</span>,
-<a href=#728 id=728 data-nosnippet>728</a>            alloc_mem,
-<a href=#729 id=729 data-nosnippet>729</a>            alloc_time
-<a href=#730 id=730 data-nosnippet>730</a>        );
-<a href=#731 id=731 data-nosnippet>731</a>        <span class="macro">trace!</span>(
-<a href=#732 id=732 data-nosnippet>732</a>            <span class="string">"after smoothing, gc mem    = {}, gc_time    = {}"</span>,
-<a href=#733 id=733 data-nosnippet>733</a>            gc_mem,
-<a href=#734 id=734 data-nosnippet>734</a>            gc_time
-<a href=#735 id=735 data-nosnippet>735</a>        );
-<a href=#736 id=736 data-nosnippet>736</a>
-<a href=#737 id=737 data-nosnippet>737</a>        <span class="comment">// We got the smoothed stats. Now save the current stats as previous stats
-<a href=#738 id=738 data-nosnippet>738</a>        </span>stats.allocation_pages_prev = <span class="prelude-val">Some</span>(stats.allocation_pages);
-<a href=#739 id=739 data-nosnippet>739</a>        stats.allocation_pages = <span class="number">0f64</span>;
-<a href=#740 id=740 data-nosnippet>740</a>        stats.allocation_time_prev = <span class="prelude-val">Some</span>(stats.allocation_time);
-<a href=#741 id=741 data-nosnippet>741</a>        stats.allocation_time = <span class="number">0f64</span>;
-<a href=#742 id=742 data-nosnippet>742</a>        stats.collection_pages_prev = <span class="prelude-val">Some</span>(stats.collection_pages);
-<a href=#743 id=743 data-nosnippet>743</a>        stats.collection_pages = <span class="number">0f64</span>;
-<a href=#744 id=744 data-nosnippet>744</a>        stats.collection_time_prev = <span class="prelude-val">Some</span>(stats.collection_time);
-<a href=#745 id=745 data-nosnippet>745</a>        stats.collection_time = <span class="number">0f64</span>;
-<a href=#746 id=746 data-nosnippet>746</a>
-<a href=#747 id=747 data-nosnippet>747</a>        <span class="comment">// Calculate the square root
-<a href=#748 id=748 data-nosnippet>748</a>        </span><span class="kw">let </span>e: f64 = <span class="kw">if </span>alloc_mem != <span class="number">0f64 </span>&amp;&amp; gc_mem != <span class="number">0f64 </span>&amp;&amp; alloc_time != <span class="number">0f64 </span>&amp;&amp; gc_time != <span class="number">0f64
-<a href=#749 id=749 data-nosnippet>749</a>        </span>{
-<a href=#750 id=750 data-nosnippet>750</a>            <span class="kw">let </span><span class="kw-2">mut </span>e = live <span class="kw">as </span>f64;
-<a href=#751 id=751 data-nosnippet>751</a>            e <span class="kw-2">*</span>= alloc_mem / alloc_time;
-<a href=#752 id=752 data-nosnippet>752</a>            e /= TUNING_FACTOR;
-<a href=#753 id=753 data-nosnippet>753</a>            e /= gc_mem / gc_time;
-<a href=#754 id=754 data-nosnippet>754</a>            e.sqrt()
-<a href=#755 id=755 data-nosnippet>755</a>        } <span class="kw">else </span>{
-<a href=#756 id=756 data-nosnippet>756</a>            <span class="comment">// If any collected stat is abnormal, we use the fallback heuristics.
-<a href=#757 id=757 data-nosnippet>757</a>            </span>(live <span class="kw">as </span>f64 * <span class="number">4096f64</span>).sqrt()
-<a href=#758 id=758 data-nosnippet>758</a>        };
-<a href=#759 id=759 data-nosnippet>759</a>
-<a href=#760 id=760 data-nosnippet>760</a>        <span class="comment">// Get pending allocations
-<a href=#761 id=761 data-nosnippet>761</a>        </span><span class="kw">let </span>pending_pages = <span class="self">self</span>.pending_pages.load(Ordering::SeqCst);
+<a href=#541 id=541 data-nosnippet>541</a>    </span><span class="kw">fn </span>non_generational_mem_stats_on_pause_start&lt;VM: VMBinding&gt;(
+<a href=#542 id=542 data-nosnippet>542</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+<a href=#543 id=543 data-nosnippet>543</a>        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
+<a href=#544 id=544 data-nosnippet>544</a>    ) {
+<a href=#545 id=545 data-nosnippet>545</a>        <span class="self">self</span>.allocation_pages = mmtk
+<a href=#546 id=546 data-nosnippet>546</a>            .get_plan()
+<a href=#547 id=547 data-nosnippet>547</a>            .get_reserved_pages()
+<a href=#548 id=548 data-nosnippet>548</a>            .saturating_sub(<span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
+<a href=#549 id=549 data-nosnippet>549</a>        <span class="macro">trace!</span>(
+<a href=#550 id=550 data-nosnippet>550</a>            <span class="string">"allocated pages = used {} - live in last gc {} = {}"</span>,
+<a href=#551 id=551 data-nosnippet>551</a>            mmtk.get_plan().get_reserved_pages(),
+<a href=#552 id=552 data-nosnippet>552</a>            <span class="self">self</span>.gc_end_live_pages,
+<a href=#553 id=553 data-nosnippet>553</a>            <span class="self">self</span>.allocation_pages
+<a href=#554 id=554 data-nosnippet>554</a>        );
+<a href=#555 id=555 data-nosnippet>555</a>    }
+<a href=#556 id=556 data-nosnippet>556</a>    <span class="kw">fn </span>non_generational_mem_stats_on_gc_release&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+<a href=#557 id=557 data-nosnippet>557</a>        <span class="self">self</span>.gc_release_live_pages = mmtk.get_plan().get_reserved_pages();
+<a href=#558 id=558 data-nosnippet>558</a>        <span class="macro">trace!</span>(<span class="string">"live before release = {}"</span>, <span class="self">self</span>.gc_release_live_pages);
+<a href=#559 id=559 data-nosnippet>559</a>    }
+<a href=#560 id=560 data-nosnippet>560</a>    <span class="kw">fn </span>non_generational_mem_stats_on_pause_end&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+<a href=#561 id=561 data-nosnippet>561</a>        <span class="self">self</span>.gc_end_live_pages = mmtk.get_plan().get_reserved_pages();
+<a href=#562 id=562 data-nosnippet>562</a>        <span class="macro">trace!</span>(<span class="string">"live pages = {}"</span>, <span class="self">self</span>.gc_end_live_pages);
+<a href=#563 id=563 data-nosnippet>563</a>        <span class="comment">// Use live pages as an estimate for pages traversed during GC
+<a href=#564 id=564 data-nosnippet>564</a>        </span><span class="self">self</span>.collection_pages = <span class="self">self</span>.gc_end_live_pages <span class="kw">as </span>f64;
+<a href=#565 id=565 data-nosnippet>565</a>        <span class="macro">trace!</span>(
+<a href=#566 id=566 data-nosnippet>566</a>            <span class="string">"collected pages = live at gc end {} - live at gc release {} = {}"</span>,
+<a href=#567 id=567 data-nosnippet>567</a>            <span class="self">self</span>.gc_release_live_pages,
+<a href=#568 id=568 data-nosnippet>568</a>            <span class="self">self</span>.gc_end_live_pages,
+<a href=#569 id=569 data-nosnippet>569</a>            <span class="self">self</span>.collection_pages
+<a href=#570 id=570 data-nosnippet>570</a>        );
+<a href=#571 id=571 data-nosnippet>571</a>    }
+<a href=#572 id=572 data-nosnippet>572</a>}
+<a href=#573 id=573 data-nosnippet>573</a>
+<a href=#574 id=574 data-nosnippet>574</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCTriggerPolicy&lt;VM&gt; <span class="kw">for </span>MemBalancerTrigger {
+<a href=#575 id=575 data-nosnippet>575</a>    <span class="kw">fn </span>is_gc_required(
+<a href=#576 id=576 data-nosnippet>576</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#577 id=577 data-nosnippet>577</a>        space_full: bool,
+<a href=#578 id=578 data-nosnippet>578</a>        space: <span class="prelude-ty">Option</span>&lt;SpaceStats&lt;VM&gt;&gt;,
+<a href=#579 id=579 data-nosnippet>579</a>        plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+<a href=#580 id=580 data-nosnippet>580</a>    ) -&gt; bool {
+<a href=#581 id=581 data-nosnippet>581</a>        <span class="comment">// Let the plan decide
+<a href=#582 id=582 data-nosnippet>582</a>        </span>plan.collection_required(space_full, space)
+<a href=#583 id=583 data-nosnippet>583</a>    }
+<a href=#584 id=584 data-nosnippet>584</a>
+<a href=#585 id=585 data-nosnippet>585</a>    <span class="kw">fn </span>on_pending_allocation(<span class="kw-2">&amp;</span><span class="self">self</span>, pages: usize) {
+<a href=#586 id=586 data-nosnippet>586</a>        <span class="self">self</span>.pending_pages.fetch_add(pages, Ordering::SeqCst);
+<a href=#587 id=587 data-nosnippet>587</a>    }
+<a href=#588 id=588 data-nosnippet>588</a>
+<a href=#589 id=589 data-nosnippet>589</a>    <span class="kw">fn </span>on_pause_start(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+<a href=#590 id=590 data-nosnippet>590</a>        <span class="macro">trace!</span>(<span class="string">"=== on_pause_start ==="</span>);
+<a href=#591 id=591 data-nosnippet>591</a>        <span class="self">self</span>.access_stats(|stats| {
+<a href=#592 id=592 data-nosnippet>592</a>            stats.gc_start_time = Instant::now();
+<a href=#593 id=593 data-nosnippet>593</a>            stats.allocation_time += (stats.gc_start_time - stats.gc_end_time).as_secs_f64();
+<a href=#594 id=594 data-nosnippet>594</a>            <span class="macro">trace!</span>(
+<a href=#595 id=595 data-nosnippet>595</a>                <span class="string">"gc_start = {:?}, allocation_time = {}"</span>,
+<a href=#596 id=596 data-nosnippet>596</a>                stats.gc_start_time,
+<a href=#597 id=597 data-nosnippet>597</a>                stats.allocation_time
+<a href=#598 id=598 data-nosnippet>598</a>            );
+<a href=#599 id=599 data-nosnippet>599</a>
+<a href=#600 id=600 data-nosnippet>600</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.get_plan().generational() {
+<a href=#601 id=601 data-nosnippet>601</a>                stats.generational_mem_stats_on_pause_start(plan);
+<a href=#602 id=602 data-nosnippet>602</a>            } <span class="kw">else </span>{
+<a href=#603 id=603 data-nosnippet>603</a>                stats.non_generational_mem_stats_on_pause_start(mmtk);
+<a href=#604 id=604 data-nosnippet>604</a>            }
+<a href=#605 id=605 data-nosnippet>605</a>        });
+<a href=#606 id=606 data-nosnippet>606</a>    }
+<a href=#607 id=607 data-nosnippet>607</a>
+<a href=#608 id=608 data-nosnippet>608</a>    <span class="kw">fn </span>on_gc_release(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+<a href=#609 id=609 data-nosnippet>609</a>        <span class="macro">trace!</span>(<span class="string">"=== on_gc_release ==="</span>);
+<a href=#610 id=610 data-nosnippet>610</a>        <span class="self">self</span>.access_stats(|stats| {
+<a href=#611 id=611 data-nosnippet>611</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.get_plan().generational() {
+<a href=#612 id=612 data-nosnippet>612</a>                stats.generational_mem_stats_on_gc_release(plan);
+<a href=#613 id=613 data-nosnippet>613</a>            } <span class="kw">else </span>{
+<a href=#614 id=614 data-nosnippet>614</a>                stats.non_generational_mem_stats_on_gc_release(mmtk);
+<a href=#615 id=615 data-nosnippet>615</a>            }
+<a href=#616 id=616 data-nosnippet>616</a>        });
+<a href=#617 id=617 data-nosnippet>617</a>    }
+<a href=#618 id=618 data-nosnippet>618</a>
+<a href=#619 id=619 data-nosnippet>619</a>    <span class="kw">fn </span>on_pause_end(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+<a href=#620 id=620 data-nosnippet>620</a>        <span class="macro">trace!</span>(<span class="string">"=== on_pause_end ==="</span>);
+<a href=#621 id=621 data-nosnippet>621</a>        <span class="self">self</span>.access_stats(|stats| {
+<a href=#622 id=622 data-nosnippet>622</a>            stats.gc_end_time = Instant::now();
+<a href=#623 id=623 data-nosnippet>623</a>            stats.collection_time += (stats.gc_end_time - stats.gc_start_time).as_secs_f64();
+<a href=#624 id=624 data-nosnippet>624</a>            <span class="macro">trace!</span>(
+<a href=#625 id=625 data-nosnippet>625</a>                <span class="string">"gc_end = {:?}, collection_time = {}"</span>,
+<a href=#626 id=626 data-nosnippet>626</a>                stats.gc_end_time,
+<a href=#627 id=627 data-nosnippet>627</a>                stats.collection_time
+<a href=#628 id=628 data-nosnippet>628</a>            );
+<a href=#629 id=629 data-nosnippet>629</a>
+<a href=#630 id=630 data-nosnippet>630</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.get_plan().generational() {
+<a href=#631 id=631 data-nosnippet>631</a>                <span class="kw">if </span>stats.generational_mem_stats_on_pause_end(plan) {
+<a href=#632 id=632 data-nosnippet>632</a>                    <span class="self">self</span>.compute_new_heap_limit(
+<a href=#633 id=633 data-nosnippet>633</a>                        mmtk.get_plan().get_reserved_pages(),
+<a href=#634 id=634 data-nosnippet>634</a>                        <span class="comment">// We reserve an extra of min nursery. This ensures that we will not trigger
+<a href=#635 id=635 data-nosnippet>635</a>                        // a full heap GC in the next GC (if available pages is smaller than min nursery, we will force a full heap GC)
+<a href=#636 id=636 data-nosnippet>636</a>                        </span>mmtk.get_plan().get_collection_reserved_pages()
+<a href=#637 id=637 data-nosnippet>637</a>                            + mmtk.gc_trigger.get_min_nursery_pages(),
+<a href=#638 id=638 data-nosnippet>638</a>                        stats,
+<a href=#639 id=639 data-nosnippet>639</a>                    );
+<a href=#640 id=640 data-nosnippet>640</a>                }
+<a href=#641 id=641 data-nosnippet>641</a>            } <span class="kw">else </span>{
+<a href=#642 id=642 data-nosnippet>642</a>                stats.non_generational_mem_stats_on_pause_end(mmtk);
+<a href=#643 id=643 data-nosnippet>643</a>                <span class="self">self</span>.compute_new_heap_limit(
+<a href=#644 id=644 data-nosnippet>644</a>                    mmtk.get_plan().get_reserved_pages(),
+<a href=#645 id=645 data-nosnippet>645</a>                    mmtk.get_plan().get_collection_reserved_pages(),
+<a href=#646 id=646 data-nosnippet>646</a>                    stats,
+<a href=#647 id=647 data-nosnippet>647</a>                );
+<a href=#648 id=648 data-nosnippet>648</a>            }
+<a href=#649 id=649 data-nosnippet>649</a>        });
+<a href=#650 id=650 data-nosnippet>650</a>        <span class="comment">// Clear pending allocation pages at the end of GC, no matter we used it or not.
+<a href=#651 id=651 data-nosnippet>651</a>        </span><span class="self">self</span>.pending_pages.store(<span class="number">0</span>, Ordering::SeqCst);
+<a href=#652 id=652 data-nosnippet>652</a>    }
+<a href=#653 id=653 data-nosnippet>653</a>
+<a href=#654 id=654 data-nosnippet>654</a>    <span class="kw">fn </span>is_heap_full(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) -&gt; bool {
+<a href=#655 id=655 data-nosnippet>655</a>        <span class="comment">// If reserved pages is larger than the current heap size, the heap is full.
+<a href=#656 id=656 data-nosnippet>656</a>        </span>plan.get_reserved_pages() &gt; <span class="self">self</span>.current_heap_pages.load(Ordering::Relaxed)
+<a href=#657 id=657 data-nosnippet>657</a>    }
+<a href=#658 id=658 data-nosnippet>658</a>
+<a href=#659 id=659 data-nosnippet>659</a>    <span class="kw">fn </span>get_current_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+<a href=#660 id=660 data-nosnippet>660</a>        <span class="self">self</span>.current_heap_pages.load(Ordering::Relaxed)
+<a href=#661 id=661 data-nosnippet>661</a>    }
+<a href=#662 id=662 data-nosnippet>662</a>
+<a href=#663 id=663 data-nosnippet>663</a>    <span class="kw">fn </span>get_max_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+<a href=#664 id=664 data-nosnippet>664</a>        <span class="self">self</span>.max_heap_pages
+<a href=#665 id=665 data-nosnippet>665</a>    }
+<a href=#666 id=666 data-nosnippet>666</a>
+<a href=#667 id=667 data-nosnippet>667</a>    <span class="kw">fn </span>can_heap_size_grow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#668 id=668 data-nosnippet>668</a>        <span class="self">self</span>.current_heap_pages.load(Ordering::Relaxed) &lt; <span class="self">self</span>.max_heap_pages
+<a href=#669 id=669 data-nosnippet>669</a>    }
+<a href=#670 id=670 data-nosnippet>670</a>}
+<a href=#671 id=671 data-nosnippet>671</a><span class="kw">impl </span>MemBalancerTrigger {
+<a href=#672 id=672 data-nosnippet>672</a>    <span class="kw">fn </span>new(min_heap_pages: usize, max_heap_pages: usize) -&gt; <span class="self">Self </span>{
+<a href=#673 id=673 data-nosnippet>673</a>        <span class="self">Self </span>{
+<a href=#674 id=674 data-nosnippet>674</a>            min_heap_pages,
+<a href=#675 id=675 data-nosnippet>675</a>            max_heap_pages,
+<a href=#676 id=676 data-nosnippet>676</a>            pending_pages: AtomicUsize::new(<span class="number">0</span>),
+<a href=#677 id=677 data-nosnippet>677</a>            <span class="comment">// start with min heap
+<a href=#678 id=678 data-nosnippet>678</a>            </span>current_heap_pages: AtomicUsize::new(min_heap_pages),
+<a href=#679 id=679 data-nosnippet>679</a>            stats: AtomicRefCell::new(Default::default()),
+<a href=#680 id=680 data-nosnippet>680</a>        }
+<a href=#681 id=681 data-nosnippet>681</a>    }
+<a href=#682 id=682 data-nosnippet>682</a>
+<a href=#683 id=683 data-nosnippet>683</a>    <span class="kw">fn </span>access_stats&lt;F&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>f: F)
+<a href=#684 id=684 data-nosnippet>684</a>    <span class="kw">where
+<a href=#685 id=685 data-nosnippet>685</a>        </span>F: FnMut(<span class="kw-2">&amp;mut </span>MemBalancerStats),
+<a href=#686 id=686 data-nosnippet>686</a>    {
+<a href=#687 id=687 data-nosnippet>687</a>        <span class="kw">let </span><span class="kw-2">mut </span>stats = <span class="self">self</span>.stats.borrow_mut();
+<a href=#688 id=688 data-nosnippet>688</a>        f(<span class="kw-2">&amp;mut </span>stats);
+<a href=#689 id=689 data-nosnippet>689</a>    }
+<a href=#690 id=690 data-nosnippet>690</a>
+<a href=#691 id=691 data-nosnippet>691</a>    <span class="kw">fn </span>compute_new_heap_limit(
+<a href=#692 id=692 data-nosnippet>692</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#693 id=693 data-nosnippet>693</a>        live: usize,
+<a href=#694 id=694 data-nosnippet>694</a>        extra_reserve: usize,
+<a href=#695 id=695 data-nosnippet>695</a>        stats: <span class="kw-2">&amp;mut </span>MemBalancerStats,
+<a href=#696 id=696 data-nosnippet>696</a>    ) {
+<a href=#697 id=697 data-nosnippet>697</a>        <span class="macro">trace!</span>(<span class="string">"compute new heap limit: {:?}"</span>, stats);
+<a href=#698 id=698 data-nosnippet>698</a>
+<a href=#699 id=699 data-nosnippet>699</a>        <span class="comment">// Constants from the original paper
+<a href=#700 id=700 data-nosnippet>700</a>        </span><span class="kw">const </span>ALLOCATION_SMOOTH_FACTOR: f64 = <span class="number">0.95</span>;
+<a href=#701 id=701 data-nosnippet>701</a>        <span class="kw">const </span>COLLECTION_SMOOTH_FACTOR: f64 = <span class="number">0.5</span>;
+<a href=#702 id=702 data-nosnippet>702</a>        <span class="kw">const </span>TUNING_FACTOR: f64 = <span class="number">0.2</span>;
+<a href=#703 id=703 data-nosnippet>703</a>
+<a href=#704 id=704 data-nosnippet>704</a>        <span class="comment">// Smooth memory/time for allocation/collection
+<a href=#705 id=705 data-nosnippet>705</a>        </span><span class="kw">let </span>smooth = |prev: <span class="prelude-ty">Option</span>&lt;f64&gt;, cur, factor| {
+<a href=#706 id=706 data-nosnippet>706</a>            prev.map(|p| p * factor + cur * (<span class="number">1.0f64 </span>- factor))
+<a href=#707 id=707 data-nosnippet>707</a>                .unwrap_or(cur)
+<a href=#708 id=708 data-nosnippet>708</a>        };
+<a href=#709 id=709 data-nosnippet>709</a>        <span class="kw">let </span>alloc_mem = smooth(
+<a href=#710 id=710 data-nosnippet>710</a>            stats.allocation_pages_prev,
+<a href=#711 id=711 data-nosnippet>711</a>            stats.allocation_pages,
+<a href=#712 id=712 data-nosnippet>712</a>            ALLOCATION_SMOOTH_FACTOR,
+<a href=#713 id=713 data-nosnippet>713</a>        );
+<a href=#714 id=714 data-nosnippet>714</a>        <span class="kw">let </span>alloc_time = smooth(
+<a href=#715 id=715 data-nosnippet>715</a>            stats.allocation_time_prev,
+<a href=#716 id=716 data-nosnippet>716</a>            stats.allocation_time,
+<a href=#717 id=717 data-nosnippet>717</a>            ALLOCATION_SMOOTH_FACTOR,
+<a href=#718 id=718 data-nosnippet>718</a>        );
+<a href=#719 id=719 data-nosnippet>719</a>        <span class="kw">let </span>gc_mem = smooth(
+<a href=#720 id=720 data-nosnippet>720</a>            stats.collection_pages_prev,
+<a href=#721 id=721 data-nosnippet>721</a>            stats.collection_pages,
+<a href=#722 id=722 data-nosnippet>722</a>            COLLECTION_SMOOTH_FACTOR,
+<a href=#723 id=723 data-nosnippet>723</a>        );
+<a href=#724 id=724 data-nosnippet>724</a>        <span class="kw">let </span>gc_time = smooth(
+<a href=#725 id=725 data-nosnippet>725</a>            stats.collection_time_prev,
+<a href=#726 id=726 data-nosnippet>726</a>            stats.collection_time,
+<a href=#727 id=727 data-nosnippet>727</a>            COLLECTION_SMOOTH_FACTOR,
+<a href=#728 id=728 data-nosnippet>728</a>        );
+<a href=#729 id=729 data-nosnippet>729</a>        <span class="macro">trace!</span>(
+<a href=#730 id=730 data-nosnippet>730</a>            <span class="string">"after smoothing, alloc mem = {}, alloc_time = {}"</span>,
+<a href=#731 id=731 data-nosnippet>731</a>            alloc_mem,
+<a href=#732 id=732 data-nosnippet>732</a>            alloc_time
+<a href=#733 id=733 data-nosnippet>733</a>        );
+<a href=#734 id=734 data-nosnippet>734</a>        <span class="macro">trace!</span>(
+<a href=#735 id=735 data-nosnippet>735</a>            <span class="string">"after smoothing, gc mem    = {}, gc_time    = {}"</span>,
+<a href=#736 id=736 data-nosnippet>736</a>            gc_mem,
+<a href=#737 id=737 data-nosnippet>737</a>            gc_time
+<a href=#738 id=738 data-nosnippet>738</a>        );
+<a href=#739 id=739 data-nosnippet>739</a>
+<a href=#740 id=740 data-nosnippet>740</a>        <span class="comment">// We got the smoothed stats. Now save the current stats as previous stats
+<a href=#741 id=741 data-nosnippet>741</a>        </span>stats.allocation_pages_prev = <span class="prelude-val">Some</span>(stats.allocation_pages);
+<a href=#742 id=742 data-nosnippet>742</a>        stats.allocation_pages = <span class="number">0f64</span>;
+<a href=#743 id=743 data-nosnippet>743</a>        stats.allocation_time_prev = <span class="prelude-val">Some</span>(stats.allocation_time);
+<a href=#744 id=744 data-nosnippet>744</a>        stats.allocation_time = <span class="number">0f64</span>;
+<a href=#745 id=745 data-nosnippet>745</a>        stats.collection_pages_prev = <span class="prelude-val">Some</span>(stats.collection_pages);
+<a href=#746 id=746 data-nosnippet>746</a>        stats.collection_pages = <span class="number">0f64</span>;
+<a href=#747 id=747 data-nosnippet>747</a>        stats.collection_time_prev = <span class="prelude-val">Some</span>(stats.collection_time);
+<a href=#748 id=748 data-nosnippet>748</a>        stats.collection_time = <span class="number">0f64</span>;
+<a href=#749 id=749 data-nosnippet>749</a>
+<a href=#750 id=750 data-nosnippet>750</a>        <span class="comment">// Calculate the square root
+<a href=#751 id=751 data-nosnippet>751</a>        </span><span class="kw">let </span>e: f64 = <span class="kw">if </span>alloc_mem != <span class="number">0f64 </span>&amp;&amp; gc_mem != <span class="number">0f64 </span>&amp;&amp; alloc_time != <span class="number">0f64 </span>&amp;&amp; gc_time != <span class="number">0f64
+<a href=#752 id=752 data-nosnippet>752</a>        </span>{
+<a href=#753 id=753 data-nosnippet>753</a>            <span class="kw">let </span><span class="kw-2">mut </span>e = live <span class="kw">as </span>f64;
+<a href=#754 id=754 data-nosnippet>754</a>            e <span class="kw-2">*</span>= alloc_mem / alloc_time;
+<a href=#755 id=755 data-nosnippet>755</a>            e /= TUNING_FACTOR;
+<a href=#756 id=756 data-nosnippet>756</a>            e /= gc_mem / gc_time;
+<a href=#757 id=757 data-nosnippet>757</a>            e.sqrt()
+<a href=#758 id=758 data-nosnippet>758</a>        } <span class="kw">else </span>{
+<a href=#759 id=759 data-nosnippet>759</a>            <span class="comment">// If any collected stat is abnormal, we use the fallback heuristics.
+<a href=#760 id=760 data-nosnippet>760</a>            </span>(live <span class="kw">as </span>f64 * <span class="number">4096f64</span>).sqrt()
+<a href=#761 id=761 data-nosnippet>761</a>        };
 <a href=#762 id=762 data-nosnippet>762</a>
-<a href=#763 id=763 data-nosnippet>763</a>        <span class="comment">// This is the optimal heap limit due to mem balancer. We will need to clamp the value to the defined min/max range.
-<a href=#764 id=764 data-nosnippet>764</a>        </span><span class="kw">let </span>optimal_heap = live + e <span class="kw">as </span>usize + extra_reserve + pending_pages;
-<a href=#765 id=765 data-nosnippet>765</a>        <span class="macro">trace!</span>(
-<a href=#766 id=766 data-nosnippet>766</a>            <span class="string">"optimal = live {} + sqrt(live) {} + extra {}"</span>,
-<a href=#767 id=767 data-nosnippet>767</a>            live,
-<a href=#768 id=768 data-nosnippet>768</a>            e,
-<a href=#769 id=769 data-nosnippet>769</a>            extra_reserve
-<a href=#770 id=770 data-nosnippet>770</a>        );
-<a href=#771 id=771 data-nosnippet>771</a>
-<a href=#772 id=772 data-nosnippet>772</a>        <span class="comment">// The new heap size must be within min/max.
-<a href=#773 id=773 data-nosnippet>773</a>        </span><span class="kw">let </span>new_heap = optimal_heap.clamp(<span class="self">self</span>.min_heap_pages, <span class="self">self</span>.max_heap_pages);
-<a href=#774 id=774 data-nosnippet>774</a>        <span class="macro">debug!</span>(
-<a href=#775 id=775 data-nosnippet>775</a>            <span class="string">"MemBalander: new heap limit = {} pages (optimal = {}, clamped to [{}, {}])"</span>,
-<a href=#776 id=776 data-nosnippet>776</a>            new_heap, optimal_heap, <span class="self">self</span>.min_heap_pages, <span class="self">self</span>.max_heap_pages
-<a href=#777 id=777 data-nosnippet>777</a>        );
-<a href=#778 id=778 data-nosnippet>778</a>        <span class="self">self</span>.current_heap_pages.store(new_heap, Ordering::Relaxed);
-<a href=#779 id=779 data-nosnippet>779</a>    }
-<a href=#780 id=780 data-nosnippet>780</a>}</code></pre></div></section></main></body></html>
+<a href=#763 id=763 data-nosnippet>763</a>        <span class="comment">// Get pending allocations
+<a href=#764 id=764 data-nosnippet>764</a>        </span><span class="kw">let </span>pending_pages = <span class="self">self</span>.pending_pages.load(Ordering::SeqCst);
+<a href=#765 id=765 data-nosnippet>765</a>
+<a href=#766 id=766 data-nosnippet>766</a>        <span class="comment">// This is the optimal heap limit due to mem balancer. We will need to clamp the value to the defined min/max range.
+<a href=#767 id=767 data-nosnippet>767</a>        </span><span class="kw">let </span>optimal_heap = live + e <span class="kw">as </span>usize + extra_reserve + pending_pages;
+<a href=#768 id=768 data-nosnippet>768</a>        <span class="macro">trace!</span>(
+<a href=#769 id=769 data-nosnippet>769</a>            <span class="string">"optimal = live {} + sqrt(live) {} + extra {}"</span>,
+<a href=#770 id=770 data-nosnippet>770</a>            live,
+<a href=#771 id=771 data-nosnippet>771</a>            e,
+<a href=#772 id=772 data-nosnippet>772</a>            extra_reserve
+<a href=#773 id=773 data-nosnippet>773</a>        );
+<a href=#774 id=774 data-nosnippet>774</a>
+<a href=#775 id=775 data-nosnippet>775</a>        <span class="comment">// The new heap size must be within min/max.
+<a href=#776 id=776 data-nosnippet>776</a>        </span><span class="kw">let </span>new_heap = optimal_heap.clamp(<span class="self">self</span>.min_heap_pages, <span class="self">self</span>.max_heap_pages);
+<a href=#777 id=777 data-nosnippet>777</a>        <span class="macro">debug!</span>(
+<a href=#778 id=778 data-nosnippet>778</a>            <span class="string">"MemBalander: new heap limit = {} pages (optimal = {}, clamped to [{}, {}])"</span>,
+<a href=#779 id=779 data-nosnippet>779</a>            new_heap, optimal_heap, <span class="self">self</span>.min_heap_pages, <span class="self">self</span>.max_heap_pages
+<a href=#780 id=780 data-nosnippet>780</a>        );
+<a href=#781 id=781 data-nosnippet>781</a>        <span class="self">self</span>.current_heap_pages.store(new_heap, Ordering::Relaxed);
+<a href=#782 id=782 data-nosnippet>782</a>    }
+<a href=#783 id=783 data-nosnippet>783</a>}</code></pre></div></section></main></body></html>

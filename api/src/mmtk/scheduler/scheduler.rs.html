@@ -569,7 +569,7 @@
 <a href=#569 id=569 data-nosnippet>569</a>        <span class="kw">let </span>mmtk = worker.mmtk;
 <a href=#570 id=570 data-nosnippet>570</a>
 <a href=#571 id=571 data-nosnippet>571</a>        <span class="comment">// Tell GC trigger that GC ended - this happens before we resume mutators.
-<a href=#572 id=572 data-nosnippet>572</a>        </span>mmtk.gc_trigger.policy.on_gc_end(mmtk);
+<a href=#572 id=572 data-nosnippet>572</a>        </span>mmtk.gc_trigger.policy.on_pause_end(mmtk);
 <a href=#573 id=573 data-nosnippet>573</a>
 <a href=#574 id=574 data-nosnippet>574</a>        <span class="comment">// All other workers are parked, so it is safe to access the Plan instance mutably.
 <a href=#575 id=575 data-nosnippet>575</a>        </span><span class="macro">probe!</span>(mmtk, plan_end_of_gc_begin);
