@@ -1,6 +1,7 @@
 //! This module contains `WorkerMonitor` and related types.  It purposes includes:
 //!
-//! -   allowing workers to park,
+//! -   letting workers become active or inactive,
+//! -   letting workers park,
 //! -   letting the last parked worker take action, and
 //! -   letting workers and mutators notify workers when workers are given things to do.
 
@@ -30,15 +31,20 @@ pub(crate) enum LastParkedResult {
 /// -   It allows workers to park and unpark.
 /// -   It allows mutators to notify workers to schedule a GC.
 pub(crate) struct WorkerMonitor {
+    /// The total number of workers.
+    worker_count: usize,
     /// The synchronized part.
     sync: Mutex<WorkerMonitorSync>,
     /// The number of workers that are allowed to execute work after being notified.
     active_workers: AtomicUsize,
-    /// Workers wait on these when idle.  A parked worker is notified if workers have things to
-    /// do.  That include:
+    /// Active workers wait on this when idle.  A parked *active* worker is notified if workers
+    /// have things to do.  That includes:
     /// -   any work packets available, and
     /// -   any field in `sync.goals.requests` set to true.
-    workers_have_anything_to_do: Vec<Condvar>,
+    workers_have_anything_to_do: Condvar,
+    /// Inactive workers wait on this instead.  They are notified whenever the number of active
+    /// workers changes, which may turn them into active workers.
+    active_worker_number_changed: Condvar,
 }
 
 /// The synchronized part of `WorkerMonitor`.
@@ -55,8 +61,6 @@ struct WorkerParker {
     worker_count: usize,
     /// Number of parked workers.
     parked_workers: usize,
-    /// Whether each worker is currently parked.
-    parked: Vec<bool>,
 }
 
 impl WorkerParker {
@@ -64,7 +68,6 @@ impl WorkerParker {
         Self {
             worker_count,
             parked_workers: 0,
-            parked: vec![false; worker_count],
         }
     }
 
@@ -72,49 +75,35 @@ impl WorkerParker {
     /// Called before a worker is parked.
     ///
     /// Return true if all the workers are parked.
-    fn inc_parked_workers(&mut self, ordinal: usize) -> bool {
-        debug_assert!(ordinal < self.worker_count);
-        debug_assert!(!self.parked[ordinal]);
+    fn inc_parked_workers(&mut self) -> bool {
         let old = self.parked_workers;
         debug_assert!(old < self.worker_count);
         let new = old + 1;
         self.parked_workers = new;
-        self.parked[ordinal] = true;
         new == self.worker_count
     }
 
     /// Decrease the packed-workers counter.
     /// Called after a worker is resumed from the parked state.
-    fn dec_parked_workers(&mut self, ordinal: usize) {
-        debug_assert!(ordinal < self.worker_count);
-        debug_assert!(self.parked[ordinal]);
+    fn dec_parked_workers(&mut self) {
         let old = self.parked_workers;
         debug_assert!(old <= self.worker_count);
         debug_assert!(old > 0);
-        let new = old - 1;
-        self.parked_workers = new;
-        self.parked[ordinal] = false;
-    }
-
-    fn first_parked_active_worker(&self, active_workers: usize) -> Option<usize> {
-        self.parked
-            .iter()
-            .take(active_workers)
-            .position(|parked| *parked)
+        self.parked_workers = old - 1;
     }
 }
 
 impl WorkerMonitor {
     pub fn new(worker_count: usize) -> Self {
         Self {
+            worker_count,
             sync: Mutex::new(WorkerMonitorSync {
                 parker: WorkerParker::new(worker_count),
                 goals: Default::default(),
             }),
             active_workers: AtomicUsize::new(worker_count),
-            workers_have_anything_to_do: std::iter::repeat_with(Condvar::new)
-                .take(worker_count)
-                .collect(),
+            workers_have_anything_to_do: Default::default(),
+            active_worker_number_changed: Default::default(),
         }
     }
 
@@ -126,44 +115,58 @@ impl WorkerMonitor {
         ordinal < self.active_workers()
     }
 
+    /// Set the number of workers that are allowed to execute work after being notified.
+    ///
+    /// This only updates the count.  Whenever this changes, the caller must also call
+    /// `notify_work_available(true)` (directly, or indirectly via the `on_last_parked`
+    /// call-back while still holding the monitor's internal lock) so that both active and
+    /// inactive workers wake up and re-evaluate whether they should be active.  We don't do the
+    /// notification here because this function may be called while the current thread is the
+    /// last parked worker executing `on_last_parked`, in which case the notification has to
+    /// happen through the already-held lock instead of acquiring it again.
     pub fn set_active_workers(&self, active_workers: usize) {
-        let worker_count = self.workers_have_anything_to_do.len();
-        let active_workers = active_workers.clamp(1, worker_count);
+        let active_workers = active_workers.clamp(1, self.worker_count);
         self.active_workers.store(active_workers, Ordering::SeqCst);
         debug!(
             "WorkerMonitor active worker count set to {} (worker_count={}).",
-            active_workers, worker_count
+            active_workers, self.worker_count
         );
     }
 
     /// Make a request.  Can be called by a mutator to request the workers to work towards the
     /// given `goal`.
     pub fn make_request(&self, goal: WorkerGoal) {
-        self.set_active_workers(self.workers_have_anything_to_do.len());
+        // A request always needs all workers, including currently inactive ones, to make
+        // progress.
+        self.set_active_workers(self.worker_count);
         let newly_requested = {
             let mut guard = self.sync.lock().unwrap();
             guard.goals.set_request(goal)
         };
         if newly_requested {
-            self.notify_work_available(false);
+            self.notify_work_available(true);
         }
     }
 
     /// Wake up workers when more work packets are made available for workers,
     /// or a mutator has requested the GC workers to schedule a GC.
     pub fn notify_work_available(&self, all: bool) {
+        // We must hold the lock while notifying.  Otherwise a worker that is between checking
+        // its wake-up condition and actually blocking on the CondVar (both of which happen while
+        // holding this lock) could have the notification delivered too early and lost, causing
+        // it to block forever despite the condition it was waiting for having become true.
+        let _guard = self.sync.lock().unwrap();
+        self.notify_work_available_while_locked(all);
+    }
+
+    /// Like `notify_work_available`, but for use by callers that already hold the monitor's
+    /// internal lock (such as `park_and_wait` below), to avoid trying to lock it again.
+    fn notify_work_available_while_locked(&self, all: bool) {
         if all {
-            let active_workers = self.active_workers();
-            for condvar in self.workers_have_anything_to_do.iter().take(active_workers) {
-                condvar.notify_one();
-            }
+            self.workers_have_anything_to_do.notify_all();
+            self.active_worker_number_changed.notify_all();
         } else {
-            let sync = self.sync.lock().unwrap();
-            let active_workers = self.active_workers();
-            if let Some(ordinal) = sync.parker.first_parked_active_worker(active_workers) {
-                debug!("Notifying parked worker {} for available work.", ordinal);
-                self.workers_have_anything_to_do[ordinal].notify_one();
-            }
+            self.workers_have_anything_to_do.notify_one();
         }
     }
 
@@ -187,7 +190,7 @@ impl WorkerMonitor {
         let mut sync = self.sync.lock().unwrap();
 
         // Park this worker
-        let all_parked = sync.parker.inc_parked_workers(ordinal);
+        let all_parked = sync.parker.inc_parked_workers();
         trace!(
             "Worker {} parked.  parked/total: {}/{}.  All parked: {}",
             ordinal,
@@ -209,7 +212,9 @@ impl WorkerMonitor {
                     // Continue without waiting.
                 }
                 LastParkedResult::WakeAll => {
-                    self.notify_work_available(true);
+                    // We are still holding `sync`, so we must not call `notify_work_available`
+                    // (which would try to lock it again and deadlock).
+                    self.notify_work_available_while_locked(true);
                 }
             }
         } else {
@@ -228,7 +233,7 @@ impl WorkerMonitor {
             //      }
             //      unlock();
             //
-            // The actual condition for this `self.workers_have_anything_to_do.wait(sync)` is:
+            // The actual condition for this wait is:
             //
             // 1.  any work packet is available, or
             // 2.  a goal (such as doing GC) is requested
@@ -257,7 +262,16 @@ impl WorkerMonitor {
             // Note that generational barriers may add `ProcessModBuf` work packets when not in GC.
             // This is benign because those work packets are not executed immediately, and are
             // guaranteed to be executed in the next GC.
-
+            //
+            // Whether this worker is currently active is a third condition that this loop waits
+            // on.  An inactive worker waits on `active_worker_number_changed` instead of
+            // `workers_have_anything_to_do`, and both are only ever notified while holding
+            // `self.sync` (see `notify_work_available_while_locked`).  Because a worker holds
+            // `self.sync` continuously from the point it decides to wait until the point it
+            // actually blocks inside `Condvar::wait`, a notification can never be delivered to a
+            // worker that has not started waiting yet: the notifier cannot acquire `self.sync`
+            // (and therefore cannot notify) until the worker has released it by starting to wait.
+            //
             // Notes on spurious wake-up:
             //
             // 1.  The condition variable `workers_have_anything_to_do` is guarded by `self.sync`.
@@ -271,13 +285,15 @@ impl WorkerMonitor {
             //     and park again if not available.  The last parked worker will ensure the two
             //     conditions listed above are both false before blocking.  If either condition is
             //     true, the last parked worker will take action.
-            sync = self.workers_have_anything_to_do[ordinal]
-                .wait(sync)
-                .unwrap();
+            sync = if self.is_worker_active(ordinal) {
+                self.workers_have_anything_to_do.wait(sync).unwrap()
+            } else {
+                self.active_worker_number_changed.wait(sync).unwrap()
+            };
         }
 
         // Unpark this worker.
-        sync.parker.dec_parked_workers(ordinal);
+        sync.parker.dec_parked_workers();
         trace!(
             "Worker {} unparked.  parked/total: {}/{}.",
             ordinal,
