@@ -320,11 +320,24 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         // comment in `disable_unnecessary_buckets`). Reference counting frees objects in
         // `RefCount` pauses too, so skipping those would leave a window in which an entry
         // outlives the object it names -- which is the crash this avoids.
+        let stats = std::env::var_os("MMTK_LXR_STATS").is_some();
+        let t0 = std::time::Instant::now();
         VM::VMCollection::update_weak_processor(true);
+        let t_weak = t0.elapsed();
         <VM as VMBinding>::VMCollection::vm_release();
+        let t_vm = t0.elapsed() - t_weak;
         self.common.los.is_end_of_satb_or_full_gc = false;
         self.common
             .release(tls, pause == Pause::Full || pause == Pause::FinalMark);
+        let t_common = t0.elapsed() - t_weak - t_vm;
+        if stats {
+            eprintln!(
+                "[lxr] release phases: weak={}us vm_release={}us common={}us",
+                t_weak.as_micros(),
+                t_vm.as_micros(),
+                t_common.as_micros(),
+            );
+        }
         if std::env::var_os("MMTK_LXR_STATS").is_some() {
             // Per-object counts are USDT tracepoints rather than counters -- see
             // `lxr_inc_pushed`, `lxr_promote`, `lxr_slot_skipped` and friends in
@@ -332,10 +345,14 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             // on the barrier's fast path, so every mutator thread contended a single cache
             // line on every reference store and no timing taken here meant anything.
             eprintln!(
-                "[lxr] gc#{} release: pause={:?} reserved_pages={}",
+                "[lxr] gc#{} release: pause={:?} reserved_pages={} cm_packets={}",
                 super::GC_COUNT.load(Ordering::SeqCst),
                 pause,
                 self.get_reserved_pages(),
+                // Concurrent tracing packets still outstanding. If this is 0 at the end of an
+                // InitialMark pause, no marking was handed to the concurrent workers and the
+                // whole closure will fall into the next FinalMark pause.
+                super::NUM_CONCURRENT_TRACING_PACKETS.load(Ordering::SeqCst),
             );
             eprintln!(
                 "[lxr] gc#{} sweep dead cycles: zeroed={} kept_marked={}",
@@ -344,9 +361,12 @@ impl<VM: VMBinding> Plan for LXR<VM> {
                 super::SWEEP_KEPT_MARKED.load(Ordering::Relaxed),
             );
         }
+        crate::scheduler::stage_timeline::mark("  release: weak+common");
         self.block_allocation
             .sweep_nursery_blocks(self.immix_space.scheduler(), pause);
+        crate::scheduler::stage_timeline::mark("  release: sweep_nursery_blocks");
         self.block_allocation.sweep_mutator_reused_blocks(pause);
+        crate::scheduler::stage_timeline::mark("  release: sweep_mutator_reused_blocks");
         // Check if we want to do all decs and sweeping in the pause
         if super::disable_lasy_dec_for_current_gc() {
             self.immix_space
@@ -355,8 +375,11 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         } else {
             debug_assert_ne!(pause, Pause::Full);
         }
+        crate::scheduler::stage_timeline::mark("  release: concurrent_packets_in_pause");
         self.immix_space.release_rc();
+        crate::scheduler::stage_timeline::mark("  release: release_rc");
         self.schedule_mature_sweeping(pause);
+        crate::scheduler::stage_timeline::mark("  release: schedule_mature_sweeping");
         // Re-arm every object's log bit for the epoch that starts when mutators resume.
         //
         // The per-object log bit says "this object has not been snapshotted this epoch".

@@ -335,6 +335,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             buckets_updated = buckets_updated || bucket_opened;
             if bucket_opened {
                 probe!(mmtk, bucket_opened, id);
+                // Guarded, not just passed to `mark`: the `format!` would otherwise allocate a
+                // String at every bucket boundary of every pause even with the timeline off.
+                if crate::scheduler::stage_timeline::enabled() {
+                    crate::scheduler::stage_timeline::mark(format!("open {:?}", id));
+                }
                 new_packets = new_packets || !bucket.is_drained();
                 if new_packets {
                     // Quit the loop. There are already new packets in the newly opened buckets.
@@ -507,6 +512,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
                 // During GC, if all workers parked, all open buckets must have been drained.
                 self.assert_all_open_buckets_are_empty();
+
+                // All workers are parked here, so the gap since the previous mark is the wall time
+                // that draining the previous stage took, handshake included.
+                crate::scheduler::stage_timeline::mark("all-parked");
 
                 // Find more work for workers to do.
                 let found_more_work = self.find_more_work_for_workers();
