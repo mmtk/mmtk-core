@@ -43,6 +43,7 @@ pub(crate) static OUT_OF_HEAP_SLOTS: AtomicUsize = AtomicUsize::new(0);
 
 /// Whether to validate the target of every increment before using it, reporting the
 /// slot's provenance if it is not an object. Set `MMTK_LXR_CHECK_INCS=1`.
+#[inline]
 pub(crate) fn check_incs() -> bool {
     static CHECK: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *CHECK.get_or_init(|| std::env::var_os("MMTK_LXR_CHECK_INCS").is_some())
@@ -74,9 +75,16 @@ pub(crate) fn object_is_plausible(_o: ObjectReference) -> bool {
 static LIVE_SET: std::sync::RwLock<Option<std::collections::HashSet<usize>>> =
     std::sync::RwLock::new(None);
 
+/// Whether [`LIVE_SET`] has ever been populated, so that [`is_known_live`] can answer
+/// without taking the lock. It is consulted for every object a decrement takes to zero, by
+/// every GC worker, and a global `RwLock` there is a shared cache line on a hot path even
+/// when the set is empty.
+static LIVE_SET_POPULATED: AtomicBool = AtomicBool::new(false);
+
 /// Record the verifier's live set for the current pause. See [`LIVE_SET`].
 pub fn set_live_set(objects: std::collections::HashSet<usize>) {
     *LIVE_SET.write().unwrap() = Some(objects);
+    LIVE_SET_POPULATED.store(true, Ordering::SeqCst);
 }
 
 /// Reference-counting ledger for objects the verifier says are live: object -> [(gc#, what
@@ -110,15 +118,27 @@ pub fn dump_rc_events(o: ObjectReference) {
 /// The point is the *ledger*: an object that ends a pause with a zero count either received a
 /// decrement it should not have, or never received an increment it was owed, and only the
 /// sequence of events against that one object distinguishes the two.
+/// This sits on every processed increment and decrement, so the disabled case must be a
+/// predictable load and nothing else; the recording itself is out of line and cold.
+#[inline]
 pub(crate) fn record_rc_event(
     old: ObjectReference,
     kind: &'static str,
     src: Option<ObjectReference>,
     slot: crate::util::Address,
 ) {
-    if !check_incs() {
-        return;
+    if check_incs() {
+        record_rc_event_slow(old, kind, src, slot);
     }
+}
+
+#[cold]
+fn record_rc_event_slow(
+    old: ObjectReference,
+    kind: &'static str,
+    src: Option<ObjectReference>,
+    slot: crate::util::Address,
+) {
     // Normally only known-live objects are tracked, to keep this affordable. But an object's
     // *first* increment is the interesting one when it ends up uncounted, and a brand-new object
     // is not in the previous pause's live set, so that gate hides exactly what is being looked
@@ -194,7 +214,11 @@ fn report_dec_of_live_object(o: ObjectReference, origin: &str) {
 }
 
 /// Whether `o` is in the verifier's live set, i.e. reachable from the VM's roots.
+#[inline]
 fn is_known_live(o: ObjectReference) -> bool {
+    if !LIVE_SET_POPULATED.load(Ordering::Relaxed) {
+        return false;
+    }
     let guard = LIVE_SET.read().unwrap();
     match guard.as_ref() {
         Some(set) => set.contains(&o.to_raw_address().as_usize()),
