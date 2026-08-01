@@ -224,6 +224,20 @@ impl<VM: VMBinding> crate::scheduler::GCWork<VM> for CollectNodeRoots<VM> {
                 WorkBucketStage::Closure,
                 tracing::LXRConcurrentTraceObjects::new(to_trace, mmtk),
             );
+        } else if lxr.cm_enabled() && pause == crate::plan::concurrent::Pause::InitialMark {
+            // Hand the root set to the concurrent workers so marking runs alongside the
+            // mutator. `ProcessIncs` does this for roots reported as *slots* (see
+            // `gc_work/rc.rs`), but a binding that reports roots as objects -- Julia does,
+            // via `create_process_pinning_roots_work` -- arrives here instead, and this path
+            // only ever traced in the two stop-the-world pauses.
+            //
+            // Without this, `InitialMark` seeds nothing, so
+            // `concurrent_marking_packets_drained` is trivially true, the trigger in
+            // `LXR::should_do_cycle_collection` fires immediately, and the entire transitive
+            // closure lands in the `FinalMark` pause -- making LXR a stop-the-world marker
+            // with a ~20ms pause regardless of heap size.
+            worker.scheduler().work_buckets[WorkBucketStage::ConcurrentResumable]
+                .add(tracing::LXRConcurrentTraceObjects::new(to_trace, mmtk));
         }
         // Recorded so the matching decrements are applied in the next pause, which is
         // what makes this a root set rather than a permanent increment.
