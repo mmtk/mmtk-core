@@ -1,4 +1,6 @@
 use super::global::LXR;
+use crate::plan::concurrent::global::ConcurrentPlan;
+use crate::plan::lxr::{MATURE_EVACUATION, NURSERY_EVACUATION};
 use crate::plan::tracing::UnsupportedTrace;
 use crate::plan::VectorObjectQueue;
 use crate::scheduler::gc_work::RootKind;
@@ -124,11 +126,109 @@ impl<VM: VMBinding> RootsWorkFactory<VM::VMSlot> for LXRRootsWorkFactory<VM> {
         crate::memory_manager::add_work_packet(self.mmtk, stage, w);
     }
 
-    fn create_process_pinning_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
-        unreachable!("LXR does not support pinning roots");
+    fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+        self.create_node_roots_work(nodes);
     }
 
-    fn create_process_tpinning_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
-        unreachable!("LXR does not support transitive pinning roots");
+    fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+        self.create_node_roots_work(nodes);
+    }
+}
+
+impl<VM: VMBinding> LXRRootsWorkFactory<VM> {
+    /// Handle roots reported as objects rather than as slots.
+    ///
+    /// Bindings report these when they cannot hand out the location a reference lives in
+    /// (Julia does so for conservatively scanned stacks), and ask for the referents to be
+    /// pinned. LXR has no pinning support: it runs its own root path through
+    /// `ProcessIncs`, and the buckets the general pinning implementation uses
+    /// (`PinningRootsTrace`, `TPinningClosure`) are disabled in `LXR::schedule_collection`.
+    ///
+    /// Treating them as ordinary strong roots is only sound because nothing moves. That
+    /// holds when both evacuation modes are compiled out, which is asserted below; a
+    /// moving build must not silently drop the pinning requirement.
+    fn create_node_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+        if NURSERY_EVACUATION || MATURE_EVACUATION {
+            panic!(
+                "LXR cannot honour pinning roots while evacuation is enabled; \
+                 build with the `lxr_no_evac` feature"
+            );
+        }
+        if nodes.is_empty() {
+            return;
+        }
+        let stage = self.mmtk.get_plan().root_scanning_stage();
+        crate::memory_manager::add_work_packet(
+            self.mmtk,
+            stage,
+            CollectNodeRoots::<VM>::new(nodes),
+        );
+    }
+}
+
+/// Reference-counts a set of root objects reported as nodes. See
+/// [`LXRRootsWorkFactory::create_node_roots_work`].
+pub struct CollectNodeRoots<VM: VMBinding> {
+    nodes: Vec<ObjectReference>,
+    _p: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> CollectNodeRoots<VM> {
+    pub fn new(nodes: Vec<ObjectReference>) -> Self {
+        Self {
+            nodes,
+            _p: PhantomData,
+        }
+    }
+}
+
+impl<VM: VMBinding> crate::scheduler::GCWork<VM> for CollectNodeRoots<VM> {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
+        let nodes = std::mem::take(&mut self.nodes);
+        // Route through `ProcessIncs` rather than incrementing here: the zero-to-one
+        // transition has to promote the object, which is what arms its field unlog bits
+        // and counts the objects it refers to.
+        let mut incs = rc::ProcessIncs::<VM, { rc::EDGE_KIND_ROOT }>::new(vec![], lxr);
+        // `uncounted` holds the roots the plan does not reference count. They are traced
+        // below alongside the counted ones, but must never reach `curr_roots`: no count was
+        // raised for them, so a decrement recorded against them would be unmatched.
+        let (roots, uncounted) = incs.process_root_nodes(worker, nodes);
+        // Everything reachable from either set has to be marked.
+        let mut to_trace = roots.clone();
+        to_trace.extend_from_slice(&uncounted);
+        if to_trace.is_empty() {
+            return;
+        }
+        // While marking is running these roots also have to enter the snapshot, or the
+        // cycle collector can conclude their subgraphs are unreachable. The modbuf
+        // packet already takes objects, which is exactly what we have here.
+        if lxr.cm_enabled() && lxr.concurrent_work_in_progress() {
+            worker.add_work(
+                WorkBucketStage::FinishConcurrentWork,
+                tracing::ProcessModBufSATB::new(to_trace.clone()),
+            );
+        }
+        // A tracing pause has to mark from these roots as well. `ProcessIncs` seeds the
+        // stop-the-world trace from root *slots*, but roots reported as objects arrive here
+        // instead and were only ever counted, never traced. With concurrent marking off,
+        // nothing else marked them: the trace then reached almost nothing, and
+        // `SweepDeadCycles` -- which reclaims any counted object it finds unmarked -- took the
+        // live heap for cyclic garbage. Measured at the first `Full` pause of the bootstrap:
+        // 189,960 objects zeroed, 0 kept as marked.
+        let pause = lxr.current_pause().unwrap();
+        if pause == crate::plan::concurrent::Pause::Full
+            || pause == crate::plan::concurrent::Pause::FinalMark
+        {
+            worker.add_work(
+                WorkBucketStage::Closure,
+                tracing::LXRConcurrentTraceObjects::new(to_trace, mmtk),
+            );
+        }
+        // Recorded so the matching decrements are applied in the next pause, which is
+        // what makes this a root set rather than a permanent increment.
+        if !roots.is_empty() {
+            lxr.curr_roots.read().unwrap().push(roots);
+        }
     }
 }

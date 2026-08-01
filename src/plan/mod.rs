@@ -47,7 +47,7 @@ mod sticky;
 mod concurrent;
 pub use concurrent::{ConcurrentPlan, Pause};
 mod immix;
-mod lxr;
+pub mod lxr;
 mod markcompact;
 mod marksweep;
 mod nogc;

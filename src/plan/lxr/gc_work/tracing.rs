@@ -1,9 +1,11 @@
 use super::super::LXR;
 use super::ProcessEdgesBase;
 use crate::plan::concurrent::Pause;
+use crate::plan::lxr::global::LXRSpace;
+use crate::plan::PlanTraceObject;
 use crate::plan::VectorQueue;
+use crate::policy::gc_work::DEFAULT_TRACE;
 use crate::policy::immix::block::Block;
-use crate::policy::space::Space;
 use crate::scheduler::RootKind;
 use crate::util::copy::CopySemantics;
 use crate::util::linear_scan::UnstraddlableRegion;
@@ -65,22 +67,50 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
         if !self.next_objects.is_empty() {
             let objects = self.next_objects.take();
             let worker = unsafe { &mut *self.worker };
-            debug_assert!(self.plan.cm_enabled());
             let w = Self::new(objects, worker.mmtk);
-            worker.add_work(WorkBucketStage::ConcurrentResumable, w);
+            // A stop-the-world tracing pause has to finish its closure before the pause ends, so
+            // the continuation belongs in `Closure`. `ConcurrentResumable` does not run inside a
+            // pause, so routing there unconditionally meant a `Full` pause marked the objects it
+            // was handed and then stopped: 566 objects marked against 188,228 that
+            // `SweepDeadCycles` went on to reclaim as unmarked.
+            let stage = match self.plan.current_pause() {
+                Some(Pause::Full) | Some(Pause::FinalMark) => WorkBucketStage::Closure,
+                _ => {
+                    debug_assert!(self.plan.cm_enabled());
+                    WorkBucketStage::ConcurrentResumable
+                }
+            };
+            worker.add_work(stage, w);
         }
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if self.rc.count(object) == 0 {
-            return object;
-        }
-        if self.plan.immix_space.in_space(object) {
-            self.plan
-                .immix_space
-                .trace_object_without_moving_rc(self, object);
-        } else {
-            self.plan.los().trace_object(self, object);
+        match self.plan.space_of(object) {
+            LXRSpace::Immix => {
+                if self.rc.count(object) == 0 {
+                    return object;
+                }
+                self.plan
+                    .immix_space
+                    .trace_object_without_moving_rc(self, object);
+            }
+            LXRSpace::Los => {
+                if self.rc.count(object) == 0 {
+                    return object;
+                }
+                self.plan.los().trace_object(self, object);
+            }
+            LXRSpace::Common => {
+                // Not reference counted, so the zero reference count check above does
+                // not apply: it would skip the object and leave its referents untraced.
+                // Let the common plan apply whichever mark protocol the owning policy
+                // uses, which enqueues the object for scanning the first time it is
+                // reached.
+                let worker = unsafe { &mut *self.worker };
+                self.plan
+                    .common
+                    .trace_object::<Self, DEFAULT_TRACE>(self, object, worker);
+            }
         }
         object
     }
@@ -218,10 +248,12 @@ impl<VM: VMBinding> GCWork<VM> for ProcessModBufSATB {
             .downcast_ref::<LXR<VM>>()
             .unwrap()
             .current_pause();
-        if current_pause != Some(Pause::FinalMark) {
-            worker.scheduler().work_buckets[WorkBucketStage::ConcurrentResumable].add(w);
-        } else {
+        // In a tracing pause the closure has to complete before the pause ends; running it here
+        // keeps it inside the pause, and its own `flush` continues into `Closure`.
+        if current_pause == Some(Pause::FinalMark) || current_pause == Some(Pause::Full) {
             GCWork::do_work(&mut w, worker, mmtk);
+        } else {
+            worker.scheduler().work_buckets[WorkBucketStage::ConcurrentResumable].add(w);
         }
     }
 }
@@ -335,22 +367,35 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
         debug_assert!(object.is_in_any_space());
         debug_assert!(object.to_raw_address().is_aligned_to(8));
         // debug_assert!(object.class_is_valid::<VM>());
-        if WEAK_ROOT && !Block::containing(object).is_defrag_source() {
+        let space = self.lxr.space_of(object);
+        // A weak root only needs revisiting if its referent can move, which means it
+        // has to be an Immix space object in a block selected as a defrag source.
+        // Testing that first also keeps `Block::containing` away from objects outside
+        // the Immix space, for which it names a block whose metadata is not mapped.
+        if WEAK_ROOT && !(space == LXRSpace::Immix && Block::containing(object).is_defrag_source())
+        {
             return object;
         }
-        let x = if self.lxr.immix_space.in_space(object) {
-            let pause = self.pause;
-            let worker = self.worker();
-            self.lxr.immix_space.rc_trace_object(
-                self,
-                object,
-                CopySemantics::DefaultCopy,
-                pause,
-                true,
-                worker,
-            )
-        } else {
-            self.lxr.los().trace_object(self, object)
+        let x = match space {
+            LXRSpace::Immix => {
+                let pause = self.pause;
+                let worker = self.worker();
+                self.lxr.immix_space.rc_trace_object(
+                    self,
+                    object,
+                    CopySemantics::DefaultCopy,
+                    pause,
+                    true,
+                    worker,
+                )
+            }
+            LXRSpace::Los => self.lxr.los().trace_object(self, object),
+            LXRSpace::Common => {
+                let worker = self.worker();
+                self.lxr
+                    .common
+                    .trace_object::<Self, DEFAULT_TRACE>(self, object, worker)
+            }
         };
         if self.should_record_forwarded_roots {
             self.forwarded_roots.push(x)
@@ -369,10 +414,19 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
         if REMSET && (!object.is_in_any_space() || !object.to_raw_address().is_aligned_to(8)) {
             return object;
         }
-        if self.lxr.rc.count(object) == 0 {
+        let space = self.lxr.space_of(object);
+        // A zero reference count means the object is dead, but only for the spaces LXR
+        // reference counts. Applying the test to the others would stop the closure at
+        // them and leave Immix space objects reachable only through them unforwarded.
+        if space != LXRSpace::Common && self.lxr.rc.count(object) == 0 {
             return object;
         }
-        if WEAK_ROOT && !Block::containing(object).is_defrag_source() {
+        // A weak root only needs revisiting if its referent can move, which means it has
+        // to be an Immix space object in a block selected as a defrag source. Testing
+        // that first also keeps `Block::containing` away from objects outside the Immix
+        // space, for which it names a block whose metadata is not mapped.
+        if WEAK_ROOT && !(space == LXRSpace::Immix && Block::containing(object).is_defrag_source())
+        {
             return object;
         }
         debug_assert!(object.is_in_any_space(), "Invalid {:?}", object);
@@ -383,26 +437,35 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
             self.remset_recorded_slots
         );
         let object = object.get_forwarded_object().unwrap_or(object);
-        let new_object = if self.lxr.immix_space.in_space(object) {
-            if self
-                .lxr
-                .rc
-                .address_is_in_straddle_line(object.to_raw_address())
-            {
-                return object;
+        // Objects that cannot move are still traced, so that the closure reaches the
+        // Immix space objects behind them and forwards those.
+        let new_object = match self.lxr.space_of(object) {
+            LXRSpace::Immix => {
+                if self
+                    .lxr
+                    .rc
+                    .address_is_in_straddle_line(object.to_raw_address())
+                {
+                    return object;
+                }
+                let pause = self.pause;
+                let worker = self.worker();
+                self.lxr.immix_space.rc_trace_object(
+                    self,
+                    object,
+                    CopySemantics::DefaultCopy,
+                    pause,
+                    true,
+                    worker,
+                )
             }
-            let pause = self.pause;
-            let worker = self.worker();
-            self.lxr.immix_space.rc_trace_object(
-                self,
-                object,
-                CopySemantics::DefaultCopy,
-                pause,
-                true,
-                worker,
-            )
-        } else {
-            self.lxr.los().trace_object(self, object)
+            LXRSpace::Los => self.lxr.los().trace_object(self, object),
+            LXRSpace::Common => {
+                let worker = self.worker();
+                self.lxr
+                    .common
+                    .trace_object::<Self, DEFAULT_TRACE>(self, object, worker)
+            }
         };
         if self.should_record_forwarded_roots {
             self.forwarded_roots.push(new_object)

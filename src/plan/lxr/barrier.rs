@@ -13,6 +13,7 @@ use crate::plan::lxr::gc_work::rc::ProcessDecs;
 use crate::plan::lxr::gc_work::rc::ProcessIncs;
 use crate::plan::lxr::gc_work::rc::EDGE_KIND_MATURE;
 use crate::plan::lxr::gc_work::tracing::ProcessModBufSATB;
+use crate::plan::lxr::SkipReason;
 use crate::plan::VectorQueue;
 use crate::scheduler::WorkBucketStage;
 use crate::util::metadata::log_bit::{LOGGED_VALUE, UNLOGGED_VALUE};
@@ -31,6 +32,8 @@ pub struct LXRFieldBarrierSemantics<VM: VMBinding> {
     decs: VectorQueue<ObjectReference>,
     refs: VectorQueue<ObjectReference>,
     lxr: &'static LXR<VM>,
+    /// Which barrier path pushed into `decs`, for diagnostics.
+    dec_origin: &'static str,
 }
 
 impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
@@ -47,6 +50,7 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
             decs: VectorQueue::default(),
             refs: VectorQueue::default(),
             lxr: mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap(),
+            dec_origin: "barrier-unknown",
         }
     }
 
@@ -80,7 +84,44 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
         }
     }
 
+    /// Whether this slot has a field unlog bit to consult.
+    ///
+    /// A slot only has one if it lies within the heap MMTk reserved side metadata for.
+    /// A VM may hand the barrier slots outside it: Julia's arrays can keep their
+    /// elements in a malloc'd buffer, so scanning an array yields slots in memory MMTk
+    /// never mapped metadata for, and computing a metadata address from one of those
+    /// reads unmapped memory.
+    fn slot_has_unlog_bit(slot: VM::VMSlot) -> bool {
+        // Ask whether the field's unlog bit actually exists, by checking that the metadata
+        // address derived from the slot is mapped.
+        //
+        // This used to be an interval test against `vm_layout().heap_start/heap_end`, which
+        // is not the same question: spaces mapped outside that range -- the VM space in
+        // particular -- have perfectly good metadata but fail the interval test, so their
+        // objects were misclassified as living outside the heap and pushed down the
+        // out-of-heap path.
+        address_to_meta_address(&Self::UNLOG_BITS, slot.to_address()).is_mapped()
+    }
+
     fn log_slot_and_get_old_target(&self, slot: VM::VMSlot) -> Result<Option<ObjectReference>, ()> {
+        if !Self::slot_has_unlog_bit(slot) {
+            // No bit to coalesce on, so record the write every time rather than skipping
+            // it. NOT correct: the slot is re-read when its increment is processed, and
+            // nothing keeps memory outside the heap alive until then. Observed to be
+            // millions of stack addresses per GC cycle.
+            probe!(mmtk, lxr_slot_skipped, SkipReason::OutOfHeap);
+            // Short-circuits before the atomic unless the check is actually on.
+            if crate::plan::lxr::check_incs()
+                && crate::plan::lxr::OUT_OF_HEAP_SLOTS.fetch_add(1, Ordering::Relaxed) == 0
+            {
+                eprintln!(
+                    "[lxr] first out-of-heap barrier slot at {}; captured from:\n{}",
+                    slot.to_address(),
+                    std::backtrace::Backtrace::force_capture()
+                );
+            }
+            return Ok(slot.load());
+        }
         if self.get_slot_logging_state(slot) == LOGGED_VALUE {
             return Err(());
         }
@@ -100,11 +141,17 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
     ) {
         // Reference counting
         if let Some(old) = old {
+            crate::plan::lxr::record_rc_event(old, "dec/barrier", _src, slot.to_address());
+            self.dec_origin = "barrier-field";
             self.decs.push(old);
             if self.decs.is_full() {
                 self.flush_decs_and_satb();
             }
         }
+        // A tracepoint rather than a counter: this runs on every reference store that
+        // reaches the barrier slow path, and a global atomic here is one cache line
+        // ping-ponging between every mutator thread in the program.
+        probe!(mmtk, lxr_inc_pushed, slot.to_address().as_usize());
         self.incs.push(slot);
         if self.incs.is_full() {
             self.flush_incs();
@@ -148,14 +195,23 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
     #[cold]
     fn flush_decs_and_satb(&mut self) {
         if !self.decs.is_empty() {
+            let origin = self.dec_origin;
             let w = if self.should_create_satb_packets() {
                 let decs = Arc::new(self.decs.take());
                 self.mmtk.scheduler.work_buckets[WorkBucketStage::FinishConcurrentWork]
                     .add(ProcessModBufSATB::new_arc(decs.clone()));
-                ProcessDecs::new_arc(decs, LazySweepingJobsCounter::new_decs())
+                {
+                    let mut w = ProcessDecs::new_arc(decs, LazySweepingJobsCounter::new_decs());
+                    w.origin = origin;
+                    w
+                }
             } else {
                 let decs = self.decs.take();
-                ProcessDecs::new(decs, LazySweepingJobsCounter::new_decs())
+                {
+                    let mut w = ProcessDecs::new(decs, LazySweepingJobsCounter::new_decs());
+                    w.origin = origin;
+                    w
+                }
             };
             if super::LAZY_DECREMENTS {
                 self.mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent]
@@ -232,7 +288,30 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
     }
 
     fn object_probable_write_slow(&mut self, obj: ObjectReference) {
+        // Recording a slot means re-reading it at the pause, which needs the slot to still
+        // be there and still be the same field. That does not hold for fields outside the
+        // heap: Julia keeps a large `jl_genericmemory`'s elements in a malloc'd buffer, and
+        // is free to realloc or free it before the pause, at which point the increment
+        // reads whatever now occupies that address.
+        //
+        // For such an object, buffer the object rather than its slots and re-derive the
+        // fields at the pause. That keeps the coalescing semantics exactly -- the values
+        // read then are still the epoch-end values -- while making a realloc harmless,
+        // since the object is asked for its fields again. The decrements of the old values
+        // are pushed here either way, which is where they have to happen.
         obj.iterate_fields::<VM, _>(self.tls.0, |s| {
+            if !Self::slot_has_unlog_bit(s) {
+                probe!(mmtk, lxr_slot_skipped, SkipReason::OutOfHeap);
+                return;
+            }
+            // A derived slot cannot survive the trip to the pause: it is only interpretable
+            // together with an offset captured now, and the field it describes is free to
+            // change before then. It also names an object some other slot already names, so
+            // skipping it costs no reachability. See `Slot::is_derived`.
+            if s.is_derived() {
+                probe!(mmtk, lxr_slot_skipped, SkipReason::Derived);
+                return;
+            }
             let _succ = self.enqueue_node(Some(obj), s, None);
         });
     }
