@@ -42,12 +42,19 @@ pub struct ProcessIncs<VM: VMBinding, const KIND: EdgeKind> {
     lxr: &'static LXR<VM>,
     rc: RefCountHelper<VM>,
     survival_ratio_predictor_local: SurvivalRatioPredictorLocal,
+    /// A slice of one promoted object's fields to count, rather than a buffer of increments:
+    /// `(object, chunks, obj_in_defrag)`. See [`ProcessIncs::scan_nursery_object`].
+    promoted_chunks: Option<(ObjectReference, std::ops::Range<usize>, bool)>,
 }
 
 unsafe impl<VM: VMBinding, const KIND: EdgeKind> Send for ProcessIncs<VM, KIND> {}
 
 impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
     const CAPACITY: usize = 1024;
+    /// How many of a large object's chunks one packet counts. Larger wastes the other workers'
+    /// time, smaller pays the packet overhead more often; the point is only that it is a bound
+    /// that does not grow with the object.
+    const PROMOTED_CHUNK_SIZE: usize = 8192;
     const UNLOG_BITS: SideMetadataSpec = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
         .as_spec()
         .extract_side_spec();
@@ -65,6 +72,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             rc: RefCountHelper::NEW,
             root_kind: None,
             survival_ratio_predictor_local: SurvivalRatioPredictorLocal::default(),
+            promoted_chunks: None,
         }
     }
 
@@ -247,47 +255,81 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         // keep reachable objects alive.
         VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(o, Ordering::SeqCst);
         let obj_in_defrag = !los && Block::in_defrag_block(o);
+        // One worker walks one object, and the walk is order-independent, so an object big
+        // enough to dominate a pause is handed to the other workers in pieces instead. Julia's
+        // 100M-element array of references took ~300ms to walk here, in a pause, with every
+        // other worker idle: nothing spills into the increment buffers when the fields all
+        // point at the same already-counted object, so buffer-level splitting cannot reach it.
+        if let Some(count) = o.scan_chunk_count::<VM>() {
+            if count > Self::PROMOTED_CHUNK_SIZE {
+                let mut start = 0;
+                while start < count {
+                    let end = (start + Self::PROMOTED_CHUNK_SIZE).min(count);
+                    let mut w = ProcessIncs::<VM, EDGE_KIND_NURSERY>::new(vec![], self.lxr);
+                    w.depth = _depth + 1;
+                    w.promoted_chunks = Some((o, start..end, obj_in_defrag));
+                    worker.add_work(WorkBucketStage::Unconstrained, w);
+                    start = end;
+                }
+                return;
+            }
+        }
         let tls = worker.tls.0;
         o.iterate_fields::<VM, _>(tls, |slot| {
-            let Some(target) = slot.load() else {
-                return;
-            };
-            debug_assert!(
-                target.to_raw_address().is_mapped(),
-                "Unmapped obj {:?}.{:?} -> {:?}",
-                o,
-                slot,
-                target
-            );
-            debug_assert!(
-                target.is_in_any_space(),
-                "Unmapped obj {:?}.{:?} -> {:?}",
-                o,
-                slot,
-                target
-            );
-            let rc = self.rc.count(target);
-            if rc == 0 {
-                crate::plan::lxr::record_rc_event(
-                    target,
-                    "defer/promote-scan",
-                    Some(o),
-                    slot.to_address(),
-                );
-                self.add_new_slot(worker, slot);
-            } else {
-                crate::plan::lxr::record_rc_event(
-                    target,
-                    "inc/promote-scan",
-                    Some(o),
-                    slot.to_address(),
-                );
-                if rc != crate::util::rc::MAX_REF_COUNT {
-                    let _ = self.rc.inc(target);
-                }
-                self.record_mature_evac_remset2(obj_in_defrag, slot, target);
-            }
+            self.count_promoted_field(worker, o, obj_in_defrag, slot)
         });
+    }
+
+    /// Count one field of a just-promoted object `o`.
+    ///
+    /// An already-counted target is incremented in place. An uncounted one is deferred as a new
+    /// increment, so that it is promoted in turn -- it is the zero-to-one transition that
+    /// promotes, and promotion is what arms an object's field unlog bits.
+    fn count_promoted_field(
+        &mut self,
+        worker: &mut GCWorker<VM>,
+        o: ObjectReference,
+        obj_in_defrag: bool,
+        slot: VM::VMSlot,
+    ) {
+        let Some(target) = slot.load() else {
+            return;
+        };
+        debug_assert!(
+            target.to_raw_address().is_mapped(),
+            "Unmapped obj {:?}.{:?} -> {:?}",
+            o,
+            slot,
+            target
+        );
+        debug_assert!(
+            target.is_in_any_space(),
+            "Unmapped obj {:?}.{:?} -> {:?}",
+            o,
+            slot,
+            target
+        );
+        let rc = self.rc.count(target);
+        if rc == 0 {
+            crate::plan::lxr::record_rc_event(
+                target,
+                "defer/promote-scan",
+                Some(o),
+                slot.to_address(),
+            );
+            self.add_new_slot(worker, slot);
+        } else {
+            crate::plan::lxr::record_rc_event(
+                target,
+                "inc/promote-scan",
+                Some(o),
+                slot.to_address(),
+            );
+            if rc != crate::util::rc::MAX_REF_COUNT {
+                let _ = self.rc.inc(target);
+            }
+            self.record_mature_evac_remset2(obj_in_defrag, slot, target);
+        }
     }
 
     #[cold]
@@ -656,6 +698,15 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
                 self.no_evac = true;
                 NO_EVAC.store(true, Ordering::Relaxed);
             }
+        }
+        // A slice of a large promoted object's fields, rather than an increment buffer. The
+        // parent's `promote` has already armed the unlog bits and marked the object; all that is
+        // left is to count the fields, and the increments this generates are flushed by the same
+        // path as any other.
+        if let Some((o, chunks, obj_in_defrag)) = self.promoted_chunks.take() {
+            o.iterate_fields_in_chunks::<VM, _>(chunks, |slot| {
+                self.count_promoted_field(worker, o, obj_in_defrag, slot)
+            });
         }
         // Process main buffer
         let root_slots = if KIND == EDGE_KIND_ROOT
