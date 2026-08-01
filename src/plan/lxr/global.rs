@@ -291,8 +291,12 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             self.immix_space.scheduler().work_buckets[WorkBucketStage::Unconstrained]
                 .add(ReleaseLOSNursery);
         }
+        // Only the pause that *begins* a mark cycle may clear the immortal/VM-space mark
+        // bits. `FinalMark` closes the cycle that `InitialMark` opened, so clearing there
+        // would throw away everything concurrent marking marked.
+        let starts_mark_cycle = pause == Pause::Full || pause == Pause::InitialMark;
         self.common
-            .prepare(tls, pause == Pause::Full || pause == Pause::InitialMark);
+            .prepare_ext(tls, starts_mark_cycle, starts_mark_cycle);
         if super::MATURE_EVACUATION && (pause == Pause::FinalMark || pause == Pause::Full) {
             self.process_mature_evacuation_remset();
         }
