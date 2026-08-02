@@ -585,11 +585,11 @@
 <a href=#585 id=585 data-nosnippet>585</a>        <span class="kw">let </span>elapsed = start_time.elapsed();
 <a href=#586 id=586 data-nosnippet>586</a>
 <a href=#587 id=587 data-nosnippet>587</a>        <span class="macro">info!</span>(
-<a href=#588 id=588 data-nosnippet>588</a>            <span class="string">"End of GC ({}/{} pages, took {} ms)"</span>,
+<a href=#588 id=588 data-nosnippet>588</a>            <span class="string">"End of GC ({}/{} pages, took {:.2} ms)"</span>,
 <a href=#589 id=589 data-nosnippet>589</a>            mmtk.get_plan().get_reserved_pages(),
 <a href=#590 id=590 data-nosnippet>590</a>            mmtk.get_plan().get_total_pages(),
-<a href=#591 id=591 data-nosnippet>591</a>            elapsed.as_millis()
-<a href=#592 id=592 data-nosnippet>592</a>        );
+<a href=#591 id=591 data-nosnippet>591</a>            elapsed.as_secs_f64() * <span class="number">1000.0
+<a href=#592 id=592 data-nosnippet>592</a>        </span>);
 <a href=#593 id=593 data-nosnippet>593</a>
 <a href=#594 id=594 data-nosnippet>594</a>        <span class="comment">// USDT tracepoint for the end of GC.
 <a href=#595 id=595 data-nosnippet>595</a>        </span><span class="macro">probe!</span>(mmtk, gc_end);
