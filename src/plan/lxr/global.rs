@@ -647,6 +647,7 @@ impl<VM: VMBinding> LXR<VM> {
     }
 
     fn schedule_rc_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        log::info!("Scheduling RC collection...");
         self.disable_unnecessary_buckets(scheduler, Pause::RefCount);
         // Before start yielding, wrap all the roots from the previous GC with work-packets.
         self.process_prev_roots(scheduler);
@@ -661,6 +662,7 @@ impl<VM: VMBinding> LXR<VM> {
     }
 
     fn schedule_concurrent_marking_initial_pause(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        log::info!("Scheduling concurrent marking initial pause...");
         self.disable_unnecessary_buckets(scheduler, Pause::InitialMark);
         self.process_prev_roots(scheduler);
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
@@ -672,6 +674,7 @@ impl<VM: VMBinding> LXR<VM> {
     }
 
     fn schedule_concurrent_marking_final_pause(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        log::info!("Scheduling concurrent marking final pause...");
         self.disable_unnecessary_buckets(scheduler, Pause::FinalMark);
         self.process_prev_roots(scheduler);
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
@@ -684,6 +687,7 @@ impl<VM: VMBinding> LXR<VM> {
     }
 
     fn schedule_emergency_full_heap_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        log::info!("Scheduling emergency full-heap collection...");
         super::DISABLE_LASY_DEC_FOR_CURRENT_GC.store(true, Ordering::SeqCst);
         self.disable_unnecessary_buckets(scheduler, Pause::Full);
         // Before start yielding, wrap all the roots from the previous GC with work-packets.
