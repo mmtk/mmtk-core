@@ -107,7 +107,7 @@ impl WorkerMonitor {
         }
     }
 
-    fn active_workers(&self) -> usize {
+    pub(crate) fn active_workers(&self) -> usize {
         self.active_workers.load(Ordering::SeqCst)
     }
 
