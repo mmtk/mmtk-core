@@ -147,6 +147,8 @@ pub struct MMTKOption<T: Debug + Clone + FromStr> {
     value: T,
     /// The validator to ensure the value is valid.
     validator: fn(&T) -> bool,
+    /// Whether this option has been explicitly set by the user, as opposed to using its built-in default.
+    was_set: bool,
 }
 
 impl<T: Debug + Clone + FromStr> MMTKOption<T> {
@@ -164,16 +166,26 @@ impl<T: Debug + Clone + FromStr> MMTKOption<T> {
         //     "Unable to create MMTKOption: initial value {:?} is invalid",
         //     value
         // );
-        MMTKOption { value, validator }
+        MMTKOption {
+            value,
+            validator,
+            was_set: false,
+        }
     }
 
     /// Set the option to the given value. Returns true if the value is valid, and we set the option to the value.
     pub fn set(&mut self, value: T) -> bool {
         if (self.validator)(&value) {
             self.value = value;
+            self.was_set = true;
             return true;
         }
         false
+    }
+
+    /// Return true if this option has been explicitly set by the user (rather than left at its built-in default).
+    pub fn was_set(&self) -> bool {
+        self.was_set
     }
 }
 
@@ -348,6 +360,18 @@ impl Options {
             HugePageSupport::TransparentHugePages
         } else {
             HugePageSupport::No
+        }
+    }
+
+    /// The number of concurrent threads is set to 1/4 of the total GC threads with a minimal of 1 concurrent threads.
+    fn compute_default_concurrent_threads(gc_threads: usize) -> usize {
+        usize::max(gc_threads / 4, 1)
+    }
+
+    /// Some options may change based on other options. This function resolves those options based on the current values of other options.
+    pub(crate) fn resolve_connected_options(&mut self) {
+        if !self.concurrent_threads.was_set() {
+            self.concurrent_threads.value = Self::compute_default_concurrent_threads(*self.threads);
         }
     }
 }
@@ -878,6 +902,9 @@ options! {
     plan:                   PlanSelector            [always_valid] = PlanSelector::GenImmix,
     /// Number of GC worker threads.
     threads:                usize                   [|v: &usize| *v > 0] = num_cpus::get(),
+    /// Maximum number of GC worker threads that may run concurrent GC work.
+    /// If this exceeds the total number of GC worker threads, all workers may participate.
+    concurrent_threads:     usize                   [|v: &usize| *v > 0] = Options::compute_default_concurrent_threads(num_cpus::get()),
     /// Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans:  bool                    [always_valid] = false,
     /// Enable a return barrier (not supported)
@@ -1101,6 +1128,83 @@ mod tests {
                 *options.work_perf_events,
                 PerfEventOptions { events: vec![] }
             );
+        })
+    }
+
+    #[test]
+    fn test_concurrent_threads_validation() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let concurrent_threads = *options.concurrent_threads;
+            let success = options.concurrent_threads.set(0);
+            assert!(!success);
+            assert_eq!(*options.concurrent_threads, concurrent_threads);
+        })
+    }
+
+    #[test]
+    fn test_compute_default_concurrent_threads() {
+        assert_eq!(Options::compute_default_concurrent_threads(1), 1);
+        assert_eq!(Options::compute_default_concurrent_threads(3), 1);
+        assert_eq!(Options::compute_default_concurrent_threads(4), 1);
+        assert_eq!(Options::compute_default_concurrent_threads(8), 2);
+        assert_eq!(Options::compute_default_concurrent_threads(100), 25);
+    }
+
+    #[test]
+    fn test_concurrent_threads_default_tracks_threads_default() {
+        serial_test(|| {
+            // Rule 1: if `threads` is left at its default, `concurrent_threads` defaults to 1/4 of it.
+            let options = Options::default();
+            assert_eq!(
+                *options.concurrent_threads,
+                Options::compute_default_concurrent_threads(*options.threads)
+            );
+        })
+    }
+
+    #[test]
+    fn test_concurrent_threads_resolves_from_explicit_threads() {
+        serial_test(|| {
+            // Rule 2: if `threads` is explicitly set (and `concurrent_threads` is not),
+            // resolving should derive `concurrent_threads` as 1/4 of the new `threads` value.
+            let mut options = Options::default();
+            assert!(options.threads.set(16));
+            options.resolve_connected_options();
+            assert_eq!(*options.concurrent_threads, 4);
+        })
+    }
+
+    #[test]
+    fn test_concurrent_threads_resolves_from_threads_set_via_string() {
+        serial_test(|| {
+            let mut options = Options::default();
+            assert!(options.set_from_string("threads", "12"));
+            options.resolve_connected_options();
+            assert_eq!(*options.concurrent_threads, 3);
+        })
+    }
+
+    #[test]
+    fn test_concurrent_threads_explicit_value_is_not_overridden() {
+        serial_test(|| {
+            // Rule 3: if `concurrent_threads` is explicitly set, it is kept as-is even if
+            // `threads` is changed afterwards.
+            let mut options = Options::default();
+            assert!(options.concurrent_threads.set(3));
+            assert!(options.threads.set(16));
+            options.resolve_connected_options();
+            assert_eq!(*options.concurrent_threads, 3);
+        })
+    }
+
+    #[test]
+    fn test_concurrent_threads_resolve_without_explicit_set_is_a_noop() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let concurrent_threads = *options.concurrent_threads;
+            options.resolve_connected_options();
+            assert_eq!(*options.concurrent_threads, concurrent_threads);
         })
     }
 
@@ -1331,6 +1435,16 @@ mod tests {
             let success = options.set_from_string("no_finalizer", "true");
             assert!(success);
             assert!(*options.no_finalizer);
+        })
+    }
+
+    #[test]
+    fn test_process_concurrent_threads_valid() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let success = options.set_from_string("concurrent_threads", "2");
+            assert!(success);
+            assert_eq!(*options.concurrent_threads, 2);
         })
     }
 
