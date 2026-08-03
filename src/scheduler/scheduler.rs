@@ -610,7 +610,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let mmtk = worker.mmtk;
 
         // Tell GC trigger that GC ended - this happens before we resume mutators.
-        mmtk.gc_trigger.policy.on_gc_end(mmtk);
+        mmtk.gc_trigger.policy.on_pause_end(mmtk);
 
         // All other workers are parked, so it is safe to access the Plan instance mutably.
         probe!(mmtk, plan_end_of_gc_begin);
@@ -626,10 +626,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let elapsed = start_time.elapsed();
 
         info!(
-            "End of GC ({}/{} pages, took {} ms)",
+            "End of GC ({}/{} pages, took {:.2} ms)",
             mmtk.get_plan().get_reserved_pages(),
             mmtk.get_plan().get_total_pages(),
-            elapsed.as_millis()
+            elapsed.as_secs_f64() * 1000.0
         );
 
         // USDT tracepoint for the end of GC.

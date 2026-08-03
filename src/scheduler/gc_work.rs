@@ -44,9 +44,6 @@ pub struct ScheduleCollection;
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        // Tell GC trigger that GC started.
-        mmtk.gc_trigger.policy.on_gc_start(mmtk);
-
         // Determine collection kind
         let is_emergency = mmtk.state.set_collection_kind(
             mmtk.get_plan().last_collection_was_exhaustive(),
@@ -281,12 +278,14 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
         });
         trace!("stop_all_mutators end");
         mmtk.get_plan().gc_pause_start(&mmtk.scheduler);
+        mmtk.get_plan().notify_mutators_paused(&mmtk.scheduler);
+        mmtk.scheduler.notify_mutators_paused(mmtk);
+        // Tell GC trigger that the pause started.
+        mmtk.gc_trigger.policy.on_pause_start(mmtk);
         if !self.skip_vm_roots {
             let factory = C::make_roots_work_factory(mmtk);
             <C::VM as VMBinding>::VMScanning::scan_vm_specific_roots(worker.tls, factory);
         }
-        mmtk.get_plan().notify_mutators_paused(&mmtk.scheduler);
-        mmtk.scheduler.notify_mutators_paused(mmtk);
     }
 }
 
