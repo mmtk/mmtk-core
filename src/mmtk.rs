@@ -99,7 +99,9 @@ impl MMTKBuilder {
 
     /// Build an MMTk instance from the builder.
     pub fn build<VM: VMBinding>(&self) -> MMTK<VM> {
-        MMTK::new(Arc::new(self.options.clone()))
+        let mut options = self.options.clone();
+        options.resolve_connected_options();
+        MMTK::new(Arc::new(options))
     }
 }
 
