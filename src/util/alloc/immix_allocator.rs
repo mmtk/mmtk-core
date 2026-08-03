@@ -302,6 +302,19 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     block.start(),
                     block.end()
                 );
+                // FIXME: Why don't we need this for LXR? Conix needs this.
+                if !self.immix_space().rc_enabled {
+                    // Bulk clear stale line mark state
+                    Line::MARK_TABLE.bzero_metadata(
+                        block.start(),
+                        crate::policy::immix::block::Block::BYTES,
+                    );
+                    // mark objects if concurrent marking is active
+                    if self.immix_space().should_allocate_as_live() {
+                        let state = self.space.line_mark_state.load(Ordering::Acquire);
+                        Line::eager_mark_lines::<VM>(state, block.start_line()..block.end_line());
+                    }
+                }
                 if self.request_for_large {
                     self.large_bump_pointer.cursor = block.start();
                     self.large_bump_pointer.limit = block.end();

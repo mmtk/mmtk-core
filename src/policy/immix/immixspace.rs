@@ -484,6 +484,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /// Flush the thread-local queues in BlockPageResource
     pub fn flush_page_resource(&self) {
+        // FIXME: Do we need this for LXR? We observed this to cause fails on conix.
+        if !self.rc_enabled {
+            self.reusable_blocks.flush_all();
+        }
         #[cfg(target_pointer_width = "64")]
         self.pr.flush_all()
     }
