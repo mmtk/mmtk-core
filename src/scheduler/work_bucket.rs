@@ -225,13 +225,11 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.notify_one_worker();
     }
 
-    /// Add a work packet to the inactive queue of this bucket.
     pub fn add_deferred(&self, work: Box<dyn GCWork<VM>>) {
         debug_assert!(self.is_enabled());
         self.queue.push_inactive(work);
     }
 
-    /// Like [`Self::add_deferred`], but the work is boxed.
     pub fn bulk_add_deferred(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
         debug_assert!(self.is_enabled());
         self.queue.push_all_inactive(work_vec);
