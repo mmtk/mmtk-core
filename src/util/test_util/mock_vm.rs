@@ -1,10 +1,10 @@
 // Some mock methods may get really complex
 #![allow(clippy::type_complexity)]
 
+use crate::plan::tracing::gc_work::root::DefaultRootsWorkFactory;
+use crate::plan::tracing::gc_work::DefaultObjectTracerContext;
 use crate::plan::tracing::UnsupportedTrace;
 use crate::plan::ObjectQueue;
-use crate::scheduler::gc_work::DefaultObjectTracerContext;
-use crate::scheduler::gc_work::DefaultRootsWorkFactory;
 use crate::scheduler::*;
 use crate::util::alloc::AllocationError;
 use crate::util::copy::*;
@@ -215,7 +215,6 @@ pub struct MockVM {
     pub schedule_finalization: MockMethod<VMWorkerThread, ()>,
     pub post_forwarding: MockMethod<VMWorkerThread, ()>,
     pub vm_live_bytes: MockMethod<(), usize>,
-    pub is_collection_enabled: MockMethod<(), bool>,
     pub create_gc_trigger: MockMethod<(), Box<dyn GCTriggerPolicy<MockVM>>>,
     // object model
     pub copy_object: MockMethod<
@@ -290,7 +289,6 @@ impl Default for MockVM {
             schedule_finalization: MockMethod::new_default(),
             post_forwarding: MockMethod::new_default(),
             vm_live_bytes: MockMethod::new_default(),
-            is_collection_enabled: MockMethod::new_fixed(Box::new(|_| true)),
             create_gc_trigger: MockMethod::new_unimplemented(),
 
             copy_object: MockMethod::new_unimplemented(),
@@ -453,10 +451,6 @@ impl crate::vm::Collection<MockVM> for MockVM {
 
     fn post_forwarding(tls: VMWorkerThread) {
         mock!(post_forwarding(tls))
-    }
-
-    fn is_collection_enabled() -> bool {
-        mock!(is_collection_enabled())
     }
 
     fn vm_live_bytes() -> usize {

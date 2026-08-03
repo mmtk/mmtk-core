@@ -84,4 +84,7 @@ pub trait VMMap: Sync {
     /// Get the space descriptor for the given address. Return SpaceDescriptor::UNINITIALIZED if the
     /// address is not within the MMTk heap range, or not within MMTk spaces.
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor;
+
+    /// Get the minimum extent of contiguous space that the `VMMap` implementation can support.
+    fn min_contiguous_extent(&self) -> usize;
 }

@@ -1,9 +1,10 @@
 use atomic::Ordering;
 
+use crate::plan::tracing::gc_work::closure::{ProcessNodes, ProcessSlots};
 use crate::plan::tracing::Trace;
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
-use crate::scheduler::{gc_work::*, GCWork, GCWorker, WorkBucketStage};
+use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
 use crate::util::os::*;
 use crate::util::ObjectReference;
 use crate::vm::slot::MemorySlice;

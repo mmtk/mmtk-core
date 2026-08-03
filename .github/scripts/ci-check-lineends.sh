@@ -28,7 +28,7 @@ BAD_LINE_ENDS=0
 # make sure the patterns here matches the patterns in '.gitattributes'.
 # Alternatively, find a way to automatically establish the list of files to check
 # from the contents of '.gitattributes'.
-FILES=$(find . -name 'target' -prune -o -type f -a '(' \
+FILES=$(find . -name 'target' -prune -o -name 'book' -prune -o -type f -a '(' \
     -name '.gitignore' \
     -o -name '*.rs' \
     -o -name '*.h' \

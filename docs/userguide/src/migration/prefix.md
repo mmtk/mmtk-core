@@ -32,6 +32,96 @@ Notes for the mmtk-core developers:
 
 ## 0.33.0
 
+### `GCTriggerPolicy::on_gc_start`/`on_gc_end` renamed, and `on_pause_start` now fires after mutators stop
+
+```admonish tldr
+`GCTriggerPolicy::on_gc_start` and `on_gc_end` are renamed to `on_pause_start` and `on_pause_end`.
+In addition, `on_pause_start` is now called after all mutators have stopped, instead of at the very
+start of GC scheduling before mutators are asked to stop.
+```
+
+API changes:
+
+-   trait `util::heap::GCTriggerPolicy`
+    +   `on_gc_start`: Renamed to `on_pause_start`.
+        *   Previously called when GC was scheduled, before mutators were told to stop.
+        *   Now called after all mutators have stopped (i.e. once the world is actually stopped for
+            the pause). Implementations that only use this hook to record a timestamp or the
+            reserved-page count for computing GC time/space overhead should still work correctly,
+            but the recorded time will now reflect the start of the actual pause rather than the
+            start of GC scheduling (which also includes time spent waiting for mutators to reach a
+            safepoint).
+    +   `on_gc_end`: Renamed to `on_pause_end`.
+        *   No change to timing, only the name.
+
+This only affects VM bindings that provide a custom `GCTriggerPolicy` (via
+`Collection::create_gc_trigger`).
+
+### Collection enabling/disabling is now managed by MMTk instead of the VM binding
+
+```admonish tldr
+`Collection::is_collection_enabled()` is removed.  MMTk now tracks whether collection is enabled
+itself, via the new, nestable `disable_collection()`/`enable_collection()` API on `MMTK` (and
+`memory_manager`).
+```
+
+API changes:
+
+-   trait `vm::Collection`
+    +   `is_collection_enabled()`: Removed.
+        *   Previously, the VM binding implemented this method to tell MMTk whether GC is
+            currently allowed. MMTk now manages this state itself, so the binding no longer needs
+            to (and no longer can) answer this question.
+        *   If the binding previously disabled collection at certain times (e.g. before some
+            initialization completed), it should instead call the new `memory_manager::disable_collection()`
+            at the point where it used to start returning `false`, and `memory_manager::enable_collection()`
+            at the point where it used to start returning `true` again.
+-   module `memory_manager`
+    +   `disable_collection()`: now returns `Result<bool, GcStatus>`. `Ok(true)`
+        means this call actually switched collection from enabled to disabled; `Ok(false)` means
+        it only increased the nesting depth of an already-disabled status. `Err(status)` means
+        collection could not be disabled right now, with `status` naming why (e.g. a GC is in
+        progress or has been requested); the VM binding should check safepoints, expect a pause,
+        or wait for the concurrent GC to finish, then call this function again.
+    *   `enable_collection()`: return true if the GC is enabled after the call. Otherwise, the function
+        returns false.
+    +   `is_collection_enabled()`: New. Returns whether collection is currently enabled.
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/pull/1457>
+
+### `Slot` is required to implement `Sync`
+
+```admonish tldr
+`vm::slot::Slot` now needs to implement `Sync`.
+```
+
+API changes:
+-   module `vm::slot`
+    +   `Slot`: Now required to implement `Sync`
+        *   The provided `SimpleSlot` in mmtk-core already implements `Sync`.  If the VM binding
+            uses it, no change is needed.
+        *   If the VM binding's `Slot` implementation does not include raw pointers (`*const T` and
+            `*mut T`), chance is high that it automatically implements `Sync`.  If this is the case,
+            no change is needed.
+        *   Otherwise, the VM binding should declare `unsafe impl Sync for ...` for the slot type.
+
+### Thread IDs require `Debug` instead of `Display`
+
+```admonish tldr
+`mmtk::util::os::OS::ThreadIDType` now needs to implement `Debug` instead of `Display`.
+```
+
+API changes:
+
+-   module `util::os`
+    +   `OS::ThreadIDType`: This associated type now requires `Debug` instead of `Display`.
+        *   This allows platforms where the native thread ID type does not implement `Display`,
+            such as `libc::pthread_t` on musl.
+        *   Bindings that provide an OS implementation should derive or implement `Debug` for
+            their thread ID type.
+
 ### The `<'w>` lifetime in `ObjectTracerContext`
 
 ```admonish tldr

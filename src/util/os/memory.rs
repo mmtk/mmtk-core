@@ -80,7 +80,17 @@ pub trait OSMemory {
         align: usize,
         strategy: MmapStrategy,
         annotation: &MmapAnnotation<'_>,
-    ) -> std::io::Result<Address>;
+    ) -> MmapResult<Address>;
+
+    /// Perform a mmap with `start` as the preferred address. The OS may return a different address.
+    /// The returned range is aligned to `align`.
+    fn dzmmap_preferred(
+        start: Address,
+        size: usize,
+        align: usize,
+        strategy: MmapStrategy,
+        annotation: &MmapAnnotation<'_>,
+    ) -> MmapResult<Address>;
 
     /// Handle mmap errors, possibly by signaling the VM about an out-of-memory condition.
     fn handle_mmap_error<VM: VMBinding>(mmap_error: MmapError, tls: VMThread) {
@@ -256,6 +266,15 @@ impl MmapStrategy {
         huge_page: HugePageSupport::No,
         prot: MmapProtection::ReadWrite,
         replace: false,
+        reserve: true,
+    };
+
+    /// The strategy for raw memory freelist
+    pub const RAW_MEMORY_FREELIST: Self = Self {
+        huge_page: HugePageSupport::No,
+        prot: MmapProtection::ReadWrite,
+        // Raw memory freelist will mmap the address ranges quarantined for the spaces. So we have to allow replace.
+        replace: true,
         reserve: true,
     };
 

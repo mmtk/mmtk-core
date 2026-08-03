@@ -127,11 +127,26 @@ pub fn dzmmap_anywhere(
     align: usize,
     strategy: MmapStrategy,
     annotation: &MmapAnnotation<'_>,
-) -> Result<Address> {
-    let addr = unix_common::mmap_anywhere(size, align, strategy)?;
+) -> MmapResult<Address> {
+    let addr = unix_common::mmap_anywhere(size, align, strategy, annotation)?;
     if !cfg!(feature = "no_mmap_annotation") {
         set_vma_name(addr, size, annotation);
     }
+    Ok(addr)
+}
+
+pub fn dzmmap_preferred(
+    start: Address,
+    size: usize,
+    align: usize,
+    strategy: MmapStrategy,
+    annotation: &MmapAnnotation<'_>,
+) -> MmapResult<Address> {
+    let addr = unix_common::mmap_preferred(start, size, align, strategy, annotation)?;
+    if !cfg!(feature = "no_mmap_annotation") {
+        set_vma_name(addr, size, annotation);
+    }
+    set_hugepage(addr, size, strategy.huge_page).expect("Failed to set huge page option");
     Ok(addr)
 }
 

@@ -345,6 +345,103 @@ where
     }
 }
 
+pub fn find_first_non_zero_bit_in_metadata_bytes(
+    meta_start: Address,
+    meta_end: Address,
+) -> FindMetaBitResult {
+    use crate::util::constants::BYTES_IN_ADDRESS;
+
+    let mmap_granularity = MMAPPER.granularity();
+
+    let mut cursor = meta_start;
+    // We need to check if metadata address is mapped or not.  But we make use of the granularity of
+    // the `Mmapper` to reduce the number of checks.  This records the start of a grain that is
+    // tested to be mapped.
+    let mut mapped_grain = Address::ZERO;
+    while cursor < meta_end {
+        // If we can check the whole word, set step to word size. Otherwise, the step is 1 (byte) and we check byte.
+        let step =
+            if cursor.is_aligned_to(BYTES_IN_ADDRESS) && cursor + BYTES_IN_ADDRESS <= meta_end {
+                BYTES_IN_ADDRESS
+            } else {
+                1
+            };
+        // The value we check has to be in the range.
+        debug_assert!(
+            cursor >= meta_start && cursor < meta_end,
+            "Check metadata value at meta address {}, which is not in the range of [{}, {})",
+            cursor,
+            meta_start,
+            meta_end
+        );
+
+        // If we are looking at an address that is not in a mapped chunk, we need to check if the chunk if mapped.
+        if cursor > mapped_grain {
+            if cursor.is_mapped() {
+                // This is mapped. No need to check for this chunk.
+                mapped_grain = cursor.align_up(mmap_granularity) - 0x1;
+            } else {
+                return FindMetaBitResult::UnmappedMetadata;
+            }
+        }
+
+        if step == BYTES_IN_ADDRESS {
+            // Load and check a usize word
+            let value = unsafe { cursor.load::<usize>() };
+            if value != 0 {
+                let bit = find_first_non_zero_bit::<usize>(value, 0, usize::BITS as u8).unwrap();
+                let byte_offset = bit >> LOG_BITS_IN_BYTE;
+                let bit_offset = bit - ((byte_offset) << LOG_BITS_IN_BYTE);
+                return FindMetaBitResult::Found {
+                    addr: cursor + byte_offset as usize,
+                    bit: bit_offset,
+                };
+            }
+        } else {
+            // Load and check a byte
+            let value = unsafe { cursor.load::<u8>() };
+            if let Some(bit) = find_first_non_zero_bit::<u8>(value, 0, 8) {
+                return FindMetaBitResult::Found { addr: cursor, bit };
+            }
+        }
+        // Move to the address so we can load from it
+        cursor += step;
+    }
+    FindMetaBitResult::NotFound
+}
+
+pub fn find_first_non_zero_bit_in_metadata_bits(
+    addr: Address,
+    start_bit: u8,
+    end_bit: u8,
+) -> FindMetaBitResult {
+    if !addr.is_mapped() {
+        return FindMetaBitResult::UnmappedMetadata;
+    }
+    let byte = unsafe { addr.load::<u8>() };
+    if let Some(bit) = find_first_non_zero_bit::<u8>(byte, start_bit, end_bit) {
+        return FindMetaBitResult::Found { addr, bit };
+    }
+    FindMetaBitResult::NotFound
+}
+
+fn find_first_non_zero_bit<T>(value: T, start: u8, end: u8) -> Option<u8>
+where
+    T: PrimInt + CheckedShl,
+{
+    let mask = match T::one().checked_shl((end - start) as u32) {
+        Some(shl) => (shl - T::one()) << (start as u32),
+        None => T::max_value() << (start as u32),
+    };
+    let masked = value & mask;
+    if masked.is_zero() {
+        None
+    } else {
+        let trailing_zeroes = masked.trailing_zeros();
+        Some(trailing_zeroes as u8)
+    }
+}
+
 pub fn scan_non_zero_bits_in_metadata_bytes(
     meta_start: Address,
     meta_end: Address,

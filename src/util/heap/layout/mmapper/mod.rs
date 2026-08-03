@@ -83,9 +83,21 @@ pub trait Mmapper: Sync {
     fn quarantine_address_range_anywhere(
         &self,
         pages: usize,
+        align: Option<usize>,
         huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
-    ) -> std::io::Result<Address>;
+    ) -> MmapResult<Address>;
+
+    /// Quarantine/reserve an address range, using `start` as a preferred address. The OS may return
+    /// another address, and the returned address is the actual quarantined range start.
+    fn quarantine_address_range_preferred(
+        &self,
+        start: Address,
+        pages: usize,
+        align: Option<usize>,
+        huge_page_option: HugePageSupport,
+        anno: &MmapAnnotation,
+    ) -> MmapResult<Address>;
 
     /// Ensure that a range of pages is mmapped (or equivalent).  If the
     /// pages are not yet mapped, demand-zero map them. Note that mapping

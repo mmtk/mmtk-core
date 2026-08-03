@@ -265,22 +265,20 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 let bin = mi_bin::<VM>(size, align);
                 debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
 
-                if let Some(block) = self.unswept_blocks.get_mut(bin).unwrap().pop() {
-                    block.sweep::<VM>();
-                    if block.has_free_cells() {
-                        // recyclable block
-                        self.add_to_available_blocks(
-                            bin,
-                            block,
-                            self.context.options.is_stress_test_gc_enabled(),
-                        );
-                        return Some(block);
-                    } else {
-                        // nothing was freed from this block
-                        self.consumed_blocks.get_mut(bin).unwrap().push(block);
-                    }
+                let block = self.unswept_blocks.get_mut(bin).unwrap().pop()?;
+
+                block.sweep::<VM>();
+                if block.has_free_cells() {
+                    // recyclable block
+                    self.add_to_available_blocks(
+                        bin,
+                        block,
+                        self.context.options.is_stress_test_gc_enabled(),
+                    );
+                    return Some(block);
                 } else {
-                    return None;
+                    // nothing was freed from this block
+                    self.consumed_blocks.get_mut(bin).unwrap().push(block);
                 }
             }
         }

@@ -120,6 +120,46 @@ impl ChunkStateMmapper {
         }
     }
 
+    /// Update the underlying storage to quarantined for the given range.
+    fn record_quarantined_range(
+        &self,
+        start: Address,
+        bytes: usize,
+        anno: &MmapAnnotation,
+    ) -> MmapResult<()> {
+        let range = ChunkRange::new_aligned(start, bytes);
+        let mappable_limit = self.mappable_limit();
+        if !range.is_within_limit(mappable_limit) {
+            let _ = OS::munmap(start, bytes);
+            return Err(MmapError::new(
+                start,
+                bytes,
+                anno,
+                std::io::Error::other("quarantined range is outside the mappable address space"),
+            ));
+        }
+
+        self.storage
+            .bulk_transition_state(range, |group_range, state| match state {
+                MapState::Unmapped => Ok(Some(MapState::Quarantined)),
+                MapState::Quarantined => {
+                    panic!("Attempted to quarantine already quarantined range {group_range}")
+                }
+                MapState::Mapped => {
+                    panic!("Quarantine returned already mapped range {group_range}")
+                }
+            })
+    }
+
+    fn mappable_limit(&self) -> Address {
+        let log_mappable = self.storage.log_mappable_bytes() as u32;
+        if log_mappable < usize::BITS {
+            unsafe { Address::from_usize(1usize << log_mappable) }
+        } else {
+            Address::MAX
+        }
+    }
+
     #[cfg(test)]
     fn get_state(&self, chunk: Address) -> MapState {
         self.storage.get_state(chunk)
@@ -167,8 +207,7 @@ impl Mmapper for ChunkStateMmapper {
                         Ok(Some(MapState::Quarantined))
                     }
                     MapState::Quarantined => {
-                        trace!("Already quarantine {group_range}");
-                        Ok(None)
+                        panic!("Attempted to quarantine already quarantined range {group_range}")
                     }
                     MapState::Mapped => {
                         trace!("Already mapped {group_range}");
@@ -181,33 +220,40 @@ impl Mmapper for ChunkStateMmapper {
     fn quarantine_address_range_anywhere(
         &self,
         pages: usize,
+        align: Option<usize>,
         huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
-    ) -> std::io::Result<Address> {
+    ) -> MmapResult<Address> {
         let _guard = self.transition_lock.lock().unwrap();
 
         let bytes = pages << LOG_BYTES_IN_PAGE;
-        let align = BYTES_IN_CHUNK;
+        let align = align.unwrap_or(BYTES_IN_CHUNK);
         let mmap_strategy = MmapStrategy::QUARANTINE.huge_page(huge_page_option);
         let start = OS::dzmmap_anywhere(bytes, align, mmap_strategy, anno)?;
-        let range = ChunkRange::new_aligned(start, bytes);
-
-        let log_mappable = self.storage.log_mappable_bytes() as u32;
-        let mappable_limit = if log_mappable < usize::BITS {
-            unsafe { Address::from_usize(1usize << log_mappable) }
-        } else {
-            Address::MAX
-        };
-        if !range.is_within_limit(mappable_limit) {
-            // Unmap and return error if the mapping is outside the addressable range.
-            let _ = OS::munmap(start, bytes);
-            return Err(std::io::Error::other(
-                "quarantined side metadata range is outside the mappable address space",
-            ));
-        }
-
-        self.storage.bulk_set_state(range, MapState::Quarantined);
+        self.record_quarantined_range(start, bytes, anno)?;
         Ok(start)
+    }
+
+    fn quarantine_address_range_preferred(
+        &self,
+        start: Address,
+        pages: usize,
+        align: Option<usize>,
+        huge_page_option: HugePageSupport,
+        anno: &MmapAnnotation,
+    ) -> MmapResult<Address> {
+        let _guard = self.transition_lock.lock().unwrap();
+
+        let bytes = pages << LOG_BYTES_IN_PAGE;
+        let align = align.unwrap_or(BYTES_IN_CHUNK);
+        assert!(
+            start.is_aligned_to(align),
+            "Preferred start {start} is not aligned to {align}"
+        );
+        let mmap_strategy = MmapStrategy::QUARANTINE.huge_page(huge_page_option);
+        let actual_start = OS::dzmmap_preferred(start, bytes, align, mmap_strategy, anno)?;
+        self.record_quarantined_range(actual_start, bytes, anno)?;
+        Ok(actual_start)
     }
 
     fn ensure_mapped(

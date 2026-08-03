@@ -131,6 +131,15 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         unsafe { sft_map.eager_initialize(self.as_sft(), self.start, self.total_bytes) };
     }
 
+    fn initialize_side_metadata(&self) {
+        self.metadata
+            .try_map_metadata_space(self.start, self.total_bytes, self.get_name())
+            .unwrap_or_else(|e| {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory: {e}")
+            });
+    }
+
     fn estimate_side_meta_pages(&self, data_pages: usize) -> usize {
         self.metadata.calculate_reserved_pages(data_pages)
     }
@@ -232,10 +241,35 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         // Create a VM request of fixed size
         let vmrequest = VMRequest::fixed_size(aligned_total_bytes);
         // Reserve the space
-        let VMRequest::Extent { extent, top } = vmrequest else {
-            unreachable!()
+        let (extent, align, top) = match vmrequest {
+            VMRequest::Extent { extent, top } => (extent, None, top),
+            VMRequest::AlignedExtent { extent, align, top } => (extent, Some(align), top),
+            _ => unreachable!(),
         };
-        let start = args.heap.reserve(extent, top);
+        let anno = MmapAnnotation::Space { name: args.name };
+        let huge_page_option = args.options.transparent_hugepages_as_huge_page_support();
+        let reasonable_extent = CommonSpace::estimate_reasonable_contiguous_extent(
+            &args.options,
+            &args.gc_trigger,
+            args.vm_map,
+            extent,
+        );
+        let start = args
+            .heap
+            .reserve_quarantined(
+                reasonable_extent,
+                align,
+                top,
+                args.mmapper,
+                huge_page_option,
+                &anno,
+            )
+            .unwrap_or_else(|mmap_error| {
+                panic!(
+                    "Failed to quarantine contiguous space {} for {} bytes: {}",
+                    args.name, reasonable_extent, mmap_error
+                )
+            });
 
         let space = Self {
             name: args.name,
@@ -255,24 +289,9 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         let strategy = MmapStrategy::default()
             .transparent_hugepages(*args.options.transparent_hugepages)
             .prot(crate::util::os::MmapProtection::ReadWrite)
-            .replace(false)
+            .replace(true)
             .reserve(true);
-        crate::util::os::OS::dzmmap(
-            start,
-            aligned_total_bytes,
-            strategy,
-            &MmapAnnotation::Space {
-                name: space.get_name(),
-            },
-        )
-        .unwrap();
-        space
-            .metadata
-            .try_map_metadata_space(start, aligned_total_bytes, space.get_name())
-            .unwrap_or_else(|e| {
-                // TODO(Javad): handle meta space allocation failure
-                panic!("failed to mmap meta memory: {e}")
-            });
+        crate::util::os::OS::dzmmap(start, aligned_total_bytes, strategy, &anno).unwrap();
 
         space
     }

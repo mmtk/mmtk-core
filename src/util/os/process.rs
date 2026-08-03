@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 use std::io::Result;
 
 /// Representation of a CPU core identifier.
@@ -11,7 +11,7 @@ pub trait OSProcess {
     /// The process ID type for the OS.
     type ProcessIDType: Display + Eq + Copy;
     /// The thread ID type for the OS.
-    type ThreadIDType: Display + Eq + Copy;
+    type ThreadIDType: Debug + Eq + Copy;
 
     /// Get the memory maps for the process. The returned string is a multi-line string.
     /// Fallback: This is only used for debugging. For unimplemented cases, this function can return a placeholder Ok value.

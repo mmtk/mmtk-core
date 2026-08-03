@@ -231,7 +231,11 @@ impl RawMemoryFreeList {
                 name: "RawMemoryFreeList",
             },
         );
-        assert!(res.is_ok(), "Can't get more space with mmap()");
+        assert!(
+            res.is_ok(),
+            "Failed to mmap memory for RawMemoryFreeList: start = {start}, bytes = {bytes}, strategy = {:?}",
+            self.strategy
+        );
     }
     pub fn get_limit(&self) -> Address {
         self.limit

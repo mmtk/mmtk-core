@@ -5,8 +5,8 @@ use std::sync::Mutex;
 use std::vec::Vec;
 
 use crate::plan::is_nursery_gc;
+use crate::plan::tracing::gc_work::DefaultObjectTracerContext;
 use crate::plan::tracing::Trace;
-use crate::scheduler::gc_work::DefaultObjectTracerContext;
 use crate::scheduler::WorkBucketStage;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;

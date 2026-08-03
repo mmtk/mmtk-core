@@ -254,6 +254,10 @@ impl VMMap for Map32 {
             .copied()
             .unwrap_or(SpaceDescriptor::UNINITIALIZED)
     }
+
+    fn min_contiguous_extent(&self) -> usize {
+        BYTES_IN_CHUNK
+    }
 }
 
 impl Map32 {

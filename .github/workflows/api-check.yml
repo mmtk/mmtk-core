@@ -48,7 +48,7 @@ jobs:
     steps:
       # Check if migration guide is updated.
       - name: Get the update status for the migration guide.
-        uses: tj-actions/changed-files@v44
+        uses: tj-actions/changed-files@v46
         id: migration-guide-status
         with:
           files: ${{ env.MIGRATION_GUIDE_PATH }}
