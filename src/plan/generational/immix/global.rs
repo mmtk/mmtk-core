@@ -164,7 +164,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         let did_defrag = self.immix_space.end_of_gc();
         self.last_gc_was_defrag.store(did_defrag, Ordering::Relaxed);
 
-        mmtk.gc_trigger.policy.on_gc_cycle_end(mmtk);
+        mmtk.gc_trigger.policy.on_gc_end(mmtk);
     }
 
     fn current_gc_may_move_object(&self) -> bool {

@@ -97,7 +97,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         self.last_gc_was_defrag
             .store(self.immix_space.end_of_gc(), Ordering::Relaxed);
         self.common.end_of_pause(tls);
-        mmtk.gc_trigger.policy.on_gc_cycle_end(mmtk);
+        mmtk.gc_trigger.policy.on_gc_end(mmtk);
     }
 
     fn current_gc_may_move_object(&self) -> bool {

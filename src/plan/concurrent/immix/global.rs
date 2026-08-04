@@ -258,7 +258,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         // Every pause ends a GC cycle, except `InitialMark`, which is followed by concurrent
         // marking and a `FinalMark` pause before the cycle ends.
         if pause != Pause::InitialMark {
-            mmtk.gc_trigger.policy.on_gc_cycle_end(mmtk);
+            mmtk.gc_trigger.policy.on_gc_end(mmtk);
         }
 
         info!("{:?} end", pause);
@@ -315,7 +315,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         // Every pause starts a new GC cycle, except `FinalMark`, which continues the cycle
         // started by the preceding `InitialMark` pause.
         if pause != Pause::FinalMark {
-            mmtk.gc_trigger.policy.on_gc_cycle_start(mmtk);
+            mmtk.gc_trigger.policy.on_gc_start(mmtk);
         }
 
         info!("{:?} start", pause);

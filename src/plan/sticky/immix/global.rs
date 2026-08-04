@@ -171,7 +171,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
 
         self.immix.common.end_of_pause(tls);
 
-        mmtk.gc_trigger.policy.on_gc_cycle_end(mmtk);
+        mmtk.gc_trigger.policy.on_gc_end(mmtk);
     }
 
     fn collection_required(&self, space_full: bool, space: Option<SpaceStats<Self::VM>>) -> bool {
