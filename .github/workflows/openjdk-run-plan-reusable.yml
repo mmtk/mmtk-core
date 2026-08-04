@@ -47,7 +47,7 @@ on:
         required: true
         type: string
       openjdk_rev:
-        description: mmtk-openjdk (jdk-11) revision, used only to label the result-repo commit message. Computed once by openjdk-perf-config.yml.
+        description: mmtk-openjdk (jdk-21) revision, used only to label the result-repo commit message. Computed once by openjdk-perf-config.yml.
         required: true
         type: string
     secrets:
@@ -58,9 +58,9 @@ env:
   CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
   # Kept in sync with the "Cache OpenJDK+MMTk build" step in perf-regression-ci-openjdk.yml.
   OPENJDK_BUILD_CACHE_PREFIX: openjdk-mmtk-build-
-  CANARY_VERSION: "v0.28.0"
-  CANARY_RELEASE_BINARY_NAME: "jdk-11.0.19-internal+0_linux-x64_bin.tar.gz"
-  CANARY_JDK_NAME: "jdk-11.0.19"
+  CANARY_VERSION: "v0.32.0-jdk-21"
+  CANARY_RELEASE_BINARY_NAME: "jdk-21.0.9-internal_linux-x64_bin.tar.gz"
+  CANARY_JDK_NAME: "jdk-21.0.9"
   CANARY_DIR: "canary"
 
 jobs:

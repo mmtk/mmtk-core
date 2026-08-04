@@ -9,7 +9,7 @@ name: OpenJDK Perf Config (reusable)
 # job's `with:` block when calling a reusable workflow (unlike `env`, which
 # only works in the former).
 #
-# This also resolves the current mmtk-openjdk (jdk-11 branch) revision once
+# This also resolves the current mmtk-openjdk (jdk-21 branch) revision once
 # per workflow run, rather than each openjdk-run-plan-reusable.yml call (one
 # per plan) redundantly re-checking-out the same repo just to read the same
 # commit - it's only used to label the result-repo commit message, nothing
@@ -81,9 +81,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
-          # TODO: We currently use OpenJDK 11 for performance comparison.
-          # We should switch to OpenJDK 21 when we are ready, and start a new epoch.
-          ref: jdk-11
+          ref: jdk-21
           path: mmtk-openjdk
       - id: openjdk-rev
         run: echo "rev=$(git -C mmtk-openjdk rev-parse HEAD)" >> "$GITHUB_OUTPUT"

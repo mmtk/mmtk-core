@@ -57,9 +57,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
-          # TODO: We currently use OpenJDK 11 for performance comparison.
-          # We should switch to OpenJDK 21 when we are ready, and start a new epoch.
-          ref: jdk-11
+          ref: jdk-21
           path: mmtk-openjdk
       - name: Checkout OpenJDK
         if: steps.restore-cache.outputs.cache-hit != 'true'
@@ -83,7 +81,7 @@ jobs:
       - name: Build OpenJDK+MMTk
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: |
-          export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64/
+          export JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-amd64/
           ./ci-perf-kit/scripts/openjdk-build.sh ./mmtk-openjdk ./mmtk-core
       # cache the build for openjdk-run-plan-reusable.yml callers
       - name: Cache OpenJDK+MMTk build
