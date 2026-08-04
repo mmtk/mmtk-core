@@ -552,10 +552,7 @@ impl MemBalancerStats {
     // * allocation = live pages at the start of GC - live pages at the end of last GC
     // * collection = live pages at the end of GC - live pages before release
 
-    fn non_generational_mem_stats_on_gc_start<VM: VMBinding>(
-        &mut self,
-        mmtk: &'static MMTK<VM>,
-    ) {
+    fn non_generational_mem_stats_on_gc_start<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
         self.allocation_pages = mmtk
             .get_plan()
             .get_reserved_pages()
