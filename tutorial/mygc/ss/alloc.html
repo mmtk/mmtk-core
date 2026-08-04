@@ -371,12 +371,18 @@ collection for our GC plan.</p>
     }
 <span class="boring">}</span></code></pre></pre>
 <h4 id="other-methods-in-the-plan-trait"><a class="header" href="#other-methods-in-the-plan-trait">Other methods in the Plan trait</a></h4>
-<p>The trait <code>Plan</code> requires a <code>common()</code> method that should return a
-reference to the common plan. Implement this method now.</p>
+<p>The trait <code>Plan</code> has a <code>common()</code> method (and a <code>common_mut()</code> counterpart) that should
+return a (mutable) reference to the common plan. Implement these methods now. Several default
+method implementations in the <code>Plan</code> trait, such as <code>end_of_pause()</code>, rely on <code>common_mut()</code> to do
+the right thing, so once these are implemented, <code>MyGC</code> does not need to override those methods.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn common(&amp;self) -&gt; &amp;CommonPlan&lt;VM&gt; {
         &amp;self.common
+    }
+
+    fn common_mut(&amp;mut self) -&gt; &amp;mut CommonPlan&lt;VM&gt; {
+        &amp;mut self.common
     }
 <span class="boring">}</span></code></pre></pre>
 <p>Find the helper method <code>base</code> and change it so that it calls the

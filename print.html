@@ -895,12 +895,18 @@ collection for our GC plan.</p>
     }
 <span class="boring">}</span></code></pre></pre>
 <h4 id="other-methods-in-the-plan-trait"><a class="header" href="#other-methods-in-the-plan-trait">Other methods in the Plan trait</a></h4>
-<p>The trait <code>Plan</code> requires a <code>common()</code> method that should return a
-reference to the common plan. Implement this method now.</p>
+<p>The trait <code>Plan</code> has a <code>common()</code> method (and a <code>common_mut()</code> counterpart) that should
+return a (mutable) reference to the common plan. Implement these methods now. Several default
+method implementations in the <code>Plan</code> trait, such as <code>end_of_pause()</code>, rely on <code>common_mut()</code> to do
+the right thing, so once these are implemented, <code>MyGC</code> does not need to override those methods.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn common(&amp;self) -&gt; &amp;CommonPlan&lt;VM&gt; {
         &amp;self.common
+    }
+
+    fn common_mut(&amp;mut self) -&gt; &amp;mut CommonPlan&lt;VM&gt; {
+        &amp;mut self.common
     }
 <span class="boring">}</span></code></pre></pre>
 <p>Find the helper method <code>base</code> and change it so that it calls the
@@ -1226,14 +1232,6 @@ with <code>&amp;mygc_mutator_release</code>.  This function will be called at th
 (at the end of a collection) for each mutator.  It rebinds the allocator for the <code>Default</code>
 allocation semantics to the new tospace. When the mutator threads resume, any new allocations for
 <code>Default</code> will then go to the new tospace.</p>
-<h3 id="end-of-gc"><a class="header" href="#end-of-gc">End of GC</a></h3>
-<p>Find the method <code>end_of_gc()</code> in <code>mygc/global.rs</code>. Call <code>end_of_gc</code> from the common plan instead.</p>
-<pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>    fn end_of_gc(&amp;mut self, tls: VMWorkerThread) {
-        self.common.end_of_gc(tls);
-    }
-<span class="boring">}</span></code></pre></pre>
 <h2 id="implementing-the-trace-trait-for-mygc"><a class="header" href="#implementing-the-trace-trait-for-mygc">Implementing the Trace trait for MyGC</a></h2>
 <p>The <a href="https://docs.mmtk.io/api/mmtk/plan/tracing/trait.Trace.html"><code>Trace</code></a> trait is key for tracing objects in a GC.
 A <code>Trace</code> implementation defines how to trace objects.</p>
@@ -3202,7 +3200,7 @@ Notes for the mmtk-core developers:
 <div id="api-migration-detail-body"><!-- We use JavaScript to process things within this div. -->
 <!-- Insert new versions here -->
 <h2 id="0330"><a class="header" href="#0330">0.33.0</a></h2>
-<h3 id="gctriggerpolicyon_gc_starton_gc_end-renamed-and-on_pause_start-now-fires-after-mutators-stop"><a class="header" href="#gctriggerpolicyon_gc_starton_gc_end-renamed-and-on_pause_start-now-fires-after-mutators-stop"><code>GCTriggerPolicy::on_gc_start</code>/<code>on_gc_end</code> renamed, and <code>on_pause_start</code> now fires after mutators stop</a></h3>
+<h3 id="gctriggerpolicyon_gc_starton_gc_end-repurposed-for-gc-cycles"><a class="header" href="#gctriggerpolicyon_gc_starton_gc_end-repurposed-for-gc-cycles"><code>GCTriggerPolicy::on_gc_start/on_gc_end</code> repurposed for GC cycles</a></h3>
 <div id="admonition-tldr" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-title">
 <div class="admonition-title">
 <div id="admonition-tldr-title">
@@ -3211,9 +3209,13 @@ Notes for the mmtk-core developers:
 <a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr"></a>
 </div>
 <div>
-<p><code>GCTriggerPolicy::on_gc_start</code> and <code>on_gc_end</code> are renamed to <code>on_pause_start</code> and <code>on_pause_end</code>.
-In addition, <code>on_pause_start</code> is now called after all mutators have stopped, instead of at the very
-start of GC scheduling before mutators are asked to stop.</p>
+<p>The old <code>on_gc_start</code> and <code>on_gc_end</code> (called once per STW pause) are renamed to <code>on_pause_start</code>
+and <code>on_pause_end</code>. <code>on_pause_start</code> is now also called after all mutators have stopped, instead of
+at the very start of GC scheduling before mutators are asked to stop. The names <code>on_gc_start</code> and
+<code>on_gc_end</code> are reused for a new pair of hooks with different semantics: they are called once per
+<em>GC cycle</em> rather than once per pause. For stop-the-world GCs, no changes are needed for the delegated
+GC trigger; however, for concurrent GCs, the GC trigger needs to differentiate pauses and GC cycles,
+and use the correct hooks correspondingly.</p>
 </div>
 </div>
 <p>API changes:</p>
@@ -3222,7 +3224,8 @@ start of GC scheduling before mutators are asked to stop.</p>
 <ul>
 <li><code>on_gc_start</code>: Renamed to <code>on_pause_start</code>.
 <ul>
-<li>Previously called when GC was scheduled, before mutators were told to stop.</li>
+<li>Previously called once for every STW pause, when GC was scheduled and before mutators
+were told to stop.</li>
 <li>Now called after all mutators have stopped (i.e. once the world is actually stopped for
 the pause). Implementations that only use this hook to record a timestamp or the
 reserved-page count for computing GC time/space overhead should still work correctly,
@@ -3234,6 +3237,17 @@ safepoint).</li>
 <li><code>on_gc_end</code>: Renamed to <code>on_pause_end</code>.
 <ul>
 <li>No change to timing, only the name.</li>
+</ul>
+</li>
+<li><code>on_gc_start</code>/<code>on_gc_end</code>: New methods that reuse the old names, but with different meaning.
+<ul>
+<li>A GC cycle consists of one or more STW pauses plus any concurrent work in between them.
+These new hooks are called once per GC cycle, rather than once per pause.</li>
+<li>For a stop-the-world plan, a GC cycle is exactly one pause, so <code>on_gc_start</code>/<code>on_gc_end</code>
+fire at the same time as <code>on_pause_start</code>/<code>on_pause_end</code>.</li>
+<li>For a concurrent plan whose cycle spans multiple pauses (e.g. an initial mark pause and
+a final mark pause with concurrent marking in between), <code>on_gc_start</code> is only called for
+the first pause of the cycle, and <code>on_gc_end</code> only for the last.</li>
 </ul>
 </li>
 </ul>

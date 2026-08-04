@@ -55,26 +55,26 @@
 <a href=#55 id=55 data-nosnippet>55</a>        <span class="kw-2">&amp;</span><span class="self">self</span>.common
 <a href=#56 id=56 data-nosnippet>56</a>    }
 <a href=#57 id=57 data-nosnippet>57</a>
-<a href=#58 id=58 data-nosnippet>58</a>    <span class="kw">fn </span>base(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>BasePlan&lt;VM&gt; {
-<a href=#59 id=59 data-nosnippet>59</a>        <span class="kw-2">&amp;</span><span class="self">self</span>.common.base
+<a href=#58 id=58 data-nosnippet>58</a>    <span class="kw">fn </span>common_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>CommonPlan&lt;VM&gt; {
+<a href=#59 id=59 data-nosnippet>59</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>.common
 <a href=#60 id=60 data-nosnippet>60</a>    }
 <a href=#61 id=61 data-nosnippet>61</a>
-<a href=#62 id=62 data-nosnippet>62</a>    <span class="kw">fn </span>base_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>BasePlan&lt;<span class="self">Self</span>::VM&gt; {
-<a href=#63 id=63 data-nosnippet>63</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>.common.base
+<a href=#62 id=62 data-nosnippet>62</a>    <span class="kw">fn </span>base(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>BasePlan&lt;VM&gt; {
+<a href=#63 id=63 data-nosnippet>63</a>        <span class="kw-2">&amp;</span><span class="self">self</span>.common.base
 <a href=#64 id=64 data-nosnippet>64</a>    }
 <a href=#65 id=65 data-nosnippet>65</a>
-<a href=#66 id=66 data-nosnippet>66</a>    <span class="kw">fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
-<a href=#67 id=67 data-nosnippet>67</a>        <span class="self">self</span>.common.prepare(tls, <span class="bool-val">true</span>);
-<a href=#68 id=68 data-nosnippet>68</a>        <span class="self">self</span>.compressor_space.prepare();
-<a href=#69 id=69 data-nosnippet>69</a>    }
-<a href=#70 id=70 data-nosnippet>70</a>
-<a href=#71 id=71 data-nosnippet>71</a>    <span class="kw">fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
-<a href=#72 id=72 data-nosnippet>72</a>        <span class="self">self</span>.common.release(tls, <span class="bool-val">true</span>);
-<a href=#73 id=73 data-nosnippet>73</a>        <span class="self">self</span>.compressor_space.release();
-<a href=#74 id=74 data-nosnippet>74</a>    }
-<a href=#75 id=75 data-nosnippet>75</a>
-<a href=#76 id=76 data-nosnippet>76</a>    <span class="kw">fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
-<a href=#77 id=77 data-nosnippet>77</a>        <span class="self">self</span>.common.end_of_gc(tls);
+<a href=#66 id=66 data-nosnippet>66</a>    <span class="kw">fn </span>base_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>BasePlan&lt;<span class="self">Self</span>::VM&gt; {
+<a href=#67 id=67 data-nosnippet>67</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>.common.base
+<a href=#68 id=68 data-nosnippet>68</a>    }
+<a href=#69 id=69 data-nosnippet>69</a>
+<a href=#70 id=70 data-nosnippet>70</a>    <span class="kw">fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
+<a href=#71 id=71 data-nosnippet>71</a>        <span class="self">self</span>.common.prepare(tls, <span class="bool-val">true</span>);
+<a href=#72 id=72 data-nosnippet>72</a>        <span class="self">self</span>.compressor_space.prepare();
+<a href=#73 id=73 data-nosnippet>73</a>    }
+<a href=#74 id=74 data-nosnippet>74</a>
+<a href=#75 id=75 data-nosnippet>75</a>    <span class="kw">fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
+<a href=#76 id=76 data-nosnippet>76</a>        <span class="self">self</span>.common.release(tls, <span class="bool-val">true</span>);
+<a href=#77 id=77 data-nosnippet>77</a>        <span class="self">self</span>.compressor_space.release();
 <a href=#78 id=78 data-nosnippet>78</a>    }
 <a href=#79 id=79 data-nosnippet>79</a>
 <a href=#80 id=80 data-nosnippet>80</a>    <span class="kw">fn </span>get_allocator_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>EnumMap&lt;AllocationSemantics, AllocatorSelector&gt; {

@@ -586,129 +586,131 @@
 <a href=#586 id=586 data-nosnippet>586</a>        <span class="comment">// All other workers are parked, so it is safe to access the Plan instance mutably.
 <a href=#587 id=587 data-nosnippet>587</a>        </span><span class="macro">probe!</span>(mmtk, plan_end_of_gc_begin);
 <a href=#588 id=588 data-nosnippet>588</a>        <span class="kw">let </span>plan_mut: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; = <span class="kw">unsafe </span>{ mmtk.get_plan_mut() };
-<a href=#589 id=589 data-nosnippet>589</a>        plan_mut.end_of_gc(worker.tls);
-<a href=#590 id=590 data-nosnippet>590</a>        <span class="macro">probe!</span>(mmtk, plan_end_of_gc_end);
-<a href=#591 id=591 data-nosnippet>591</a>
-<a href=#592 id=592 data-nosnippet>592</a>        <span class="comment">// Compute the elapsed time of the GC.
-<a href=#593 id=593 data-nosnippet>593</a>        </span><span class="kw">let </span>start_time = {
-<a href=#594 id=594 data-nosnippet>594</a>            <span class="kw">let </span><span class="kw-2">mut </span>gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
-<a href=#595 id=595 data-nosnippet>595</a>            gc_start_time.take().expect(<span class="string">"GC not started yet?"</span>)
-<a href=#596 id=596 data-nosnippet>596</a>        };
-<a href=#597 id=597 data-nosnippet>597</a>        <span class="kw">let </span>elapsed = start_time.elapsed();
-<a href=#598 id=598 data-nosnippet>598</a>
-<a href=#599 id=599 data-nosnippet>599</a>        <span class="macro">info!</span>(
-<a href=#600 id=600 data-nosnippet>600</a>            <span class="string">"End of GC ({}/{} pages, took {:.2} ms)"</span>,
-<a href=#601 id=601 data-nosnippet>601</a>            mmtk.get_plan().get_reserved_pages(),
-<a href=#602 id=602 data-nosnippet>602</a>            mmtk.get_plan().get_total_pages(),
-<a href=#603 id=603 data-nosnippet>603</a>            elapsed.as_secs_f64() * <span class="number">1000.0
-<a href=#604 id=604 data-nosnippet>604</a>        </span>);
-<a href=#605 id=605 data-nosnippet>605</a>
-<a href=#606 id=606 data-nosnippet>606</a>        <span class="comment">// USDT tracepoint for the end of GC.
-<a href=#607 id=607 data-nosnippet>607</a>        </span><span class="macro">probe!</span>(mmtk, gc_end);
-<a href=#608 id=608 data-nosnippet>608</a>
-<a href=#609 id=609 data-nosnippet>609</a>        <span class="kw">if </span><span class="kw-2">*</span>mmtk.get_options().count_live_bytes_in_gc {
-<a href=#610 id=610 data-nosnippet>610</a>            <span class="comment">// Aggregate the live bytes
-<a href=#611 id=611 data-nosnippet>611</a>            </span><span class="kw">let </span>live_bytes = mmtk
-<a href=#612 id=612 data-nosnippet>612</a>                .scheduler
-<a href=#613 id=613 data-nosnippet>613</a>                .worker_group
-<a href=#614 id=614 data-nosnippet>614</a>                .get_and_clear_worker_live_bytes();
-<a href=#615 id=615 data-nosnippet>615</a>            <span class="kw">let </span><span class="kw-2">mut </span>live_bytes_in_last_gc = mmtk.state.live_bytes_in_last_gc.borrow_mut();
-<a href=#616 id=616 data-nosnippet>616</a>            <span class="kw-2">*</span>live_bytes_in_last_gc = mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
-<a href=#617 id=617 data-nosnippet>617</a>            <span class="comment">// Logging
-<a href=#618 id=618 data-nosnippet>618</a>            </span><span class="kw">for </span>(space_name, <span class="kw-2">&amp;</span>stats) <span class="kw">in </span>live_bytes_in_last_gc.iter() {
-<a href=#619 id=619 data-nosnippet>619</a>                <span class="macro">info!</span>(
-<a href=#620 id=620 data-nosnippet>620</a>                    <span class="string">"{} = {} pages ({:.1}% live)"</span>,
-<a href=#621 id=621 data-nosnippet>621</a>                    space_name,
-<a href=#622 id=622 data-nosnippet>622</a>                    stats.used_pages,
-<a href=#623 id=623 data-nosnippet>623</a>                    stats.live_bytes <span class="kw">as </span>f64 * <span class="number">100.0 </span>/ stats.used_bytes <span class="kw">as </span>f64,
-<a href=#624 id=624 data-nosnippet>624</a>                );
-<a href=#625 id=625 data-nosnippet>625</a>            }
-<a href=#626 id=626 data-nosnippet>626</a>        }
-<a href=#627 id=627 data-nosnippet>627</a>
-<a href=#628 id=628 data-nosnippet>628</a>        mmtk.state
-<a href=#629 id=629 data-nosnippet>629</a>            .set_used_pages_after_last_gc(mmtk.get_plan().get_used_pages());
-<a href=#630 id=630 data-nosnippet>630</a>
-<a href=#631 id=631 data-nosnippet>631</a>        <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
-<a href=#632 id=632 data-nosnippet>632</a>        </span><span class="kw">if </span><span class="kw">crate</span>::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {
-<a href=#633 id=633 data-nosnippet>633</a>            <span class="comment">// reset the logging info at the end of each GC
-<a href=#634 id=634 data-nosnippet>634</a>            </span>mmtk.slot_logger.reset();
-<a href=#635 id=635 data-nosnippet>635</a>        }
-<a href=#636 id=636 data-nosnippet>636</a>
-<a href=#637 id=637 data-nosnippet>637</a>        <span class="comment">// Reset the triggering information.
-<a href=#638 id=638 data-nosnippet>638</a>        </span>mmtk.state.reset_collection_trigger();
-<a href=#639 id=639 data-nosnippet>639</a>
-<a href=#640 id=640 data-nosnippet>640</a>        <span class="kw">let </span>concurrent_work_scheduled = <span class="self">self</span>.schedule_concurrent_packets();
-<a href=#641 id=641 data-nosnippet>641</a>        <span class="self">self</span>.debug_assert_all_stw_buckets_closed();
-<a href=#642 id=642 data-nosnippet>642</a>
-<a href=#643 id=643 data-nosnippet>643</a>        <span class="comment">// Set to NotInGC after everything, and right before resuming mutators.
-<a href=#644 id=644 data-nosnippet>644</a>        </span><span class="kw">if </span>concurrent_work_scheduled {
-<a href=#645 id=645 data-nosnippet>645</a>            mmtk.state.gc_status.set_in_concurrent_gc();
-<a href=#646 id=646 data-nosnippet>646</a>            <span class="comment">// Going to start concurrent GC. Set the number of active workers to the configured number of concurrent threads.
-<a href=#647 id=647 data-nosnippet>647</a>            </span><span class="self">self</span>.set_active_workers(<span class="kw-2">*</span>mmtk.options.concurrent_threads);
-<a href=#648 id=648 data-nosnippet>648</a>            <span class="macro">debug!</span>(
-<a href=#649 id=649 data-nosnippet>649</a>                <span class="string">"Concurrent work started. Active worker count set from concurrent_threads={}."</span>,
-<a href=#650 id=650 data-nosnippet>650</a>                <span class="kw-2">*</span>mmtk.options.concurrent_threads
-<a href=#651 id=651 data-nosnippet>651</a>            );
-<a href=#652 id=652 data-nosnippet>652</a>        } <span class="kw">else </span>{
-<a href=#653 id=653 data-nosnippet>653</a>            mmtk.state.gc_status.set_not_in_gc();
-<a href=#654 id=654 data-nosnippet>654</a>        }
-<a href=#655 id=655 data-nosnippet>655</a>        <span class="kw">if </span>mmtk.stats.get_gathering_stats() {
-<a href=#656 id=656 data-nosnippet>656</a>            mmtk.stats.end_gc();
-<a href=#657 id=657 data-nosnippet>657</a>        }
-<a href=#658 id=658 data-nosnippet>658</a>        &lt;VM <span class="kw">as </span>VMBinding&gt;::VMCollection::resume_mutators(worker.tls);
-<a href=#659 id=659 data-nosnippet>659</a>
-<a href=#660 id=660 data-nosnippet>660</a>        concurrent_work_scheduled
-<a href=#661 id=661 data-nosnippet>661</a>    }
-<a href=#662 id=662 data-nosnippet>662</a>
-<a href=#663 id=663 data-nosnippet>663</a>    <span class="kw">pub fn </span>enable_stat(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-<a href=#664 id=664 data-nosnippet>664</a>        <span class="kw">for </span>worker <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.worker_group.workers_shared {
-<a href=#665 id=665 data-nosnippet>665</a>            <span class="kw">let </span>worker_stat = worker.borrow_stat();
-<a href=#666 id=666 data-nosnippet>666</a>            worker_stat.enable();
-<a href=#667 id=667 data-nosnippet>667</a>        }
-<a href=#668 id=668 data-nosnippet>668</a>    }
-<a href=#669 id=669 data-nosnippet>669</a>
-<a href=#670 id=670 data-nosnippet>670</a>    <span class="kw">pub fn </span>statistics(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; HashMap&lt;String, String&gt; {
-<a href=#671 id=671 data-nosnippet>671</a>        <span class="kw">let </span><span class="kw-2">mut </span>summary = SchedulerStat::default();
-<a href=#672 id=672 data-nosnippet>672</a>        <span class="kw">for </span>worker <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.worker_group.workers_shared {
-<a href=#673 id=673 data-nosnippet>673</a>            <span class="kw">let </span>worker_stat = worker.borrow_stat();
-<a href=#674 id=674 data-nosnippet>674</a>            summary.merge(<span class="kw-2">&amp;</span>worker_stat);
-<a href=#675 id=675 data-nosnippet>675</a>        }
-<a href=#676 id=676 data-nosnippet>676</a>        summary.harness_stat()
-<a href=#677 id=677 data-nosnippet>677</a>    }
-<a href=#678 id=678 data-nosnippet>678</a>
-<a href=#679 id=679 data-nosnippet>679</a>    <span class="kw">pub fn </span>notify_mutators_paused(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-<a href=#680 id=680 data-nosnippet>680</a>        mmtk.state.gc_status.set_in_pause();
-<a href=#681 id=681 data-nosnippet>681</a>        <span class="comment">// The number of active workers should be either the configured number of threads or the configured number of concurrent threads.
-<a href=#682 id=682 data-nosnippet>682</a>        </span><span class="macro">assert!</span>(
-<a href=#683 id=683 data-nosnippet>683</a>            mmtk.scheduler.num_active_workers() == <span class="kw-2">*</span>mmtk.options.threads
-<a href=#684 id=684 data-nosnippet>684</a>                || mmtk.scheduler.num_active_workers() == <span class="kw-2">*</span>mmtk.options.concurrent_threads
-<a href=#685 id=685 data-nosnippet>685</a>        );
-<a href=#686 id=686 data-nosnippet>686</a>        <span class="comment">// Pause started, use all GC threads.
-<a href=#687 id=687 data-nosnippet>687</a>        </span>mmtk.scheduler.set_active_workers(<span class="kw-2">*</span>mmtk.options.threads);
-<a href=#688 id=688 data-nosnippet>688</a>
-<a href=#689 id=689 data-nosnippet>689</a>        <span class="kw">let </span>first_stw_bucket = <span class="kw-2">&amp;</span><span class="self">self</span>.work_buckets[WorkBucketStage::FIRST_STW_STAGE];
-<a href=#690 id=690 data-nosnippet>690</a>        <span class="macro">debug_assert!</span>(!first_stw_bucket.is_open());
-<a href=#691 id=691 data-nosnippet>691</a>        <span class="comment">// Note: This is the only place where a bucket is opened without having all workers parked.
-<a href=#692 id=692 data-nosnippet>692</a>        // We usually require all workers to park before opening new buckets because otherwise
-<a href=#693 id=693 data-nosnippet>693</a>        // packets will be executed out of order.  However, since `Prepare` is the first STW
-<a href=#694 id=694 data-nosnippet>694</a>        // bucket, and all subsequent buckets require all workers to park before opening, workers
-<a href=#695 id=695 data-nosnippet>695</a>        // cannot execute work packets out of order.  This is not generally true if we are not
-<a href=#696 id=696 data-nosnippet>696</a>        // opening the first STW bucket.  In the future, we should redesign the opening condition
-<a href=#697 id=697 data-nosnippet>697</a>        // of work buckets to make the synchronization more robust,
-<a href=#698 id=698 data-nosnippet>698</a>        </span>first_stw_bucket.open();
-<a href=#699 id=699 data-nosnippet>699</a>        <span class="self">self</span>.worker_monitor.notify_work_available(<span class="bool-val">true</span>);
-<a href=#700 id=700 data-nosnippet>700</a>    }
-<a href=#701 id=701 data-nosnippet>701</a>
-<a href=#702 id=702 data-nosnippet>702</a>    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>schedule_concurrent_packets(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-<a href=#703 id=703 data-nosnippet>703</a>        <span class="kw">let </span>concurrent_bucket = <span class="kw-2">&amp;</span><span class="self">self</span>.work_buckets[WorkBucketStage::Concurrent];
-<a href=#704 id=704 data-nosnippet>704</a>        <span class="kw">if </span>!concurrent_bucket.is_empty() {
-<a href=#705 id=705 data-nosnippet>705</a>            concurrent_bucket.set_enabled(<span class="bool-val">true</span>);
-<a href=#706 id=706 data-nosnippet>706</a>            concurrent_bucket.open();
-<a href=#707 id=707 data-nosnippet>707</a>            <span class="bool-val">true
-<a href=#708 id=708 data-nosnippet>708</a>        </span>} <span class="kw">else </span>{
-<a href=#709 id=709 data-nosnippet>709</a>            concurrent_bucket.set_enabled(<span class="bool-val">false</span>);
-<a href=#710 id=710 data-nosnippet>710</a>            concurrent_bucket.close();
-<a href=#711 id=711 data-nosnippet>711</a>            <span class="bool-val">false
-<a href=#712 id=712 data-nosnippet>712</a>        </span>}
-<a href=#713 id=713 data-nosnippet>713</a>    }
-<a href=#714 id=714 data-nosnippet>714</a>}</code></pre></div></section></main></body></html>
+<a href=#589 id=589 data-nosnippet>589</a>        <span class="comment">// This also tells the GC trigger whether the GC cycle has ended (see
+<a href=#590 id=590 data-nosnippet>590</a>        // `Plan::end_of_pause`).
+<a href=#591 id=591 data-nosnippet>591</a>        </span>plan_mut.end_of_pause(mmtk, worker.tls);
+<a href=#592 id=592 data-nosnippet>592</a>        <span class="macro">probe!</span>(mmtk, plan_end_of_gc_end);
+<a href=#593 id=593 data-nosnippet>593</a>
+<a href=#594 id=594 data-nosnippet>594</a>        <span class="comment">// Compute the elapsed time of the GC.
+<a href=#595 id=595 data-nosnippet>595</a>        </span><span class="kw">let </span>start_time = {
+<a href=#596 id=596 data-nosnippet>596</a>            <span class="kw">let </span><span class="kw-2">mut </span>gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
+<a href=#597 id=597 data-nosnippet>597</a>            gc_start_time.take().expect(<span class="string">"GC not started yet?"</span>)
+<a href=#598 id=598 data-nosnippet>598</a>        };
+<a href=#599 id=599 data-nosnippet>599</a>        <span class="kw">let </span>elapsed = start_time.elapsed();
+<a href=#600 id=600 data-nosnippet>600</a>
+<a href=#601 id=601 data-nosnippet>601</a>        <span class="macro">info!</span>(
+<a href=#602 id=602 data-nosnippet>602</a>            <span class="string">"End of GC ({}/{} pages, took {:.2} ms)"</span>,
+<a href=#603 id=603 data-nosnippet>603</a>            mmtk.get_plan().get_reserved_pages(),
+<a href=#604 id=604 data-nosnippet>604</a>            mmtk.get_plan().get_total_pages(),
+<a href=#605 id=605 data-nosnippet>605</a>            elapsed.as_secs_f64() * <span class="number">1000.0
+<a href=#606 id=606 data-nosnippet>606</a>        </span>);
+<a href=#607 id=607 data-nosnippet>607</a>
+<a href=#608 id=608 data-nosnippet>608</a>        <span class="comment">// USDT tracepoint for the end of GC.
+<a href=#609 id=609 data-nosnippet>609</a>        </span><span class="macro">probe!</span>(mmtk, gc_end);
+<a href=#610 id=610 data-nosnippet>610</a>
+<a href=#611 id=611 data-nosnippet>611</a>        <span class="kw">if </span><span class="kw-2">*</span>mmtk.get_options().count_live_bytes_in_gc {
+<a href=#612 id=612 data-nosnippet>612</a>            <span class="comment">// Aggregate the live bytes
+<a href=#613 id=613 data-nosnippet>613</a>            </span><span class="kw">let </span>live_bytes = mmtk
+<a href=#614 id=614 data-nosnippet>614</a>                .scheduler
+<a href=#615 id=615 data-nosnippet>615</a>                .worker_group
+<a href=#616 id=616 data-nosnippet>616</a>                .get_and_clear_worker_live_bytes();
+<a href=#617 id=617 data-nosnippet>617</a>            <span class="kw">let </span><span class="kw-2">mut </span>live_bytes_in_last_gc = mmtk.state.live_bytes_in_last_gc.borrow_mut();
+<a href=#618 id=618 data-nosnippet>618</a>            <span class="kw-2">*</span>live_bytes_in_last_gc = mmtk.aggregate_live_bytes_in_last_gc(live_bytes);
+<a href=#619 id=619 data-nosnippet>619</a>            <span class="comment">// Logging
+<a href=#620 id=620 data-nosnippet>620</a>            </span><span class="kw">for </span>(space_name, <span class="kw-2">&amp;</span>stats) <span class="kw">in </span>live_bytes_in_last_gc.iter() {
+<a href=#621 id=621 data-nosnippet>621</a>                <span class="macro">info!</span>(
+<a href=#622 id=622 data-nosnippet>622</a>                    <span class="string">"{} = {} pages ({:.1}% live)"</span>,
+<a href=#623 id=623 data-nosnippet>623</a>                    space_name,
+<a href=#624 id=624 data-nosnippet>624</a>                    stats.used_pages,
+<a href=#625 id=625 data-nosnippet>625</a>                    stats.live_bytes <span class="kw">as </span>f64 * <span class="number">100.0 </span>/ stats.used_bytes <span class="kw">as </span>f64,
+<a href=#626 id=626 data-nosnippet>626</a>                );
+<a href=#627 id=627 data-nosnippet>627</a>            }
+<a href=#628 id=628 data-nosnippet>628</a>        }
+<a href=#629 id=629 data-nosnippet>629</a>
+<a href=#630 id=630 data-nosnippet>630</a>        mmtk.state
+<a href=#631 id=631 data-nosnippet>631</a>            .set_used_pages_after_last_gc(mmtk.get_plan().get_used_pages());
+<a href=#632 id=632 data-nosnippet>632</a>
+<a href=#633 id=633 data-nosnippet>633</a>        <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
+<a href=#634 id=634 data-nosnippet>634</a>        </span><span class="kw">if </span><span class="kw">crate</span>::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {
+<a href=#635 id=635 data-nosnippet>635</a>            <span class="comment">// reset the logging info at the end of each GC
+<a href=#636 id=636 data-nosnippet>636</a>            </span>mmtk.slot_logger.reset();
+<a href=#637 id=637 data-nosnippet>637</a>        }
+<a href=#638 id=638 data-nosnippet>638</a>
+<a href=#639 id=639 data-nosnippet>639</a>        <span class="comment">// Reset the triggering information.
+<a href=#640 id=640 data-nosnippet>640</a>        </span>mmtk.state.reset_collection_trigger();
+<a href=#641 id=641 data-nosnippet>641</a>
+<a href=#642 id=642 data-nosnippet>642</a>        <span class="kw">let </span>concurrent_work_scheduled = <span class="self">self</span>.schedule_concurrent_packets();
+<a href=#643 id=643 data-nosnippet>643</a>        <span class="self">self</span>.debug_assert_all_stw_buckets_closed();
+<a href=#644 id=644 data-nosnippet>644</a>
+<a href=#645 id=645 data-nosnippet>645</a>        <span class="comment">// Set to NotInGC after everything, and right before resuming mutators.
+<a href=#646 id=646 data-nosnippet>646</a>        </span><span class="kw">if </span>concurrent_work_scheduled {
+<a href=#647 id=647 data-nosnippet>647</a>            mmtk.state.gc_status.set_in_concurrent_gc();
+<a href=#648 id=648 data-nosnippet>648</a>            <span class="comment">// Going to start concurrent GC. Set the number of active workers to the configured number of concurrent threads.
+<a href=#649 id=649 data-nosnippet>649</a>            </span><span class="self">self</span>.set_active_workers(<span class="kw-2">*</span>mmtk.options.concurrent_threads);
+<a href=#650 id=650 data-nosnippet>650</a>            <span class="macro">debug!</span>(
+<a href=#651 id=651 data-nosnippet>651</a>                <span class="string">"Concurrent work started. Active worker count set from concurrent_threads={}."</span>,
+<a href=#652 id=652 data-nosnippet>652</a>                <span class="kw-2">*</span>mmtk.options.concurrent_threads
+<a href=#653 id=653 data-nosnippet>653</a>            );
+<a href=#654 id=654 data-nosnippet>654</a>        } <span class="kw">else </span>{
+<a href=#655 id=655 data-nosnippet>655</a>            mmtk.state.gc_status.set_not_in_gc();
+<a href=#656 id=656 data-nosnippet>656</a>        }
+<a href=#657 id=657 data-nosnippet>657</a>        <span class="kw">if </span>mmtk.stats.get_gathering_stats() {
+<a href=#658 id=658 data-nosnippet>658</a>            mmtk.stats.end_gc();
+<a href=#659 id=659 data-nosnippet>659</a>        }
+<a href=#660 id=660 data-nosnippet>660</a>        &lt;VM <span class="kw">as </span>VMBinding&gt;::VMCollection::resume_mutators(worker.tls);
+<a href=#661 id=661 data-nosnippet>661</a>
+<a href=#662 id=662 data-nosnippet>662</a>        concurrent_work_scheduled
+<a href=#663 id=663 data-nosnippet>663</a>    }
+<a href=#664 id=664 data-nosnippet>664</a>
+<a href=#665 id=665 data-nosnippet>665</a>    <span class="kw">pub fn </span>enable_stat(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+<a href=#666 id=666 data-nosnippet>666</a>        <span class="kw">for </span>worker <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.worker_group.workers_shared {
+<a href=#667 id=667 data-nosnippet>667</a>            <span class="kw">let </span>worker_stat = worker.borrow_stat();
+<a href=#668 id=668 data-nosnippet>668</a>            worker_stat.enable();
+<a href=#669 id=669 data-nosnippet>669</a>        }
+<a href=#670 id=670 data-nosnippet>670</a>    }
+<a href=#671 id=671 data-nosnippet>671</a>
+<a href=#672 id=672 data-nosnippet>672</a>    <span class="kw">pub fn </span>statistics(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; HashMap&lt;String, String&gt; {
+<a href=#673 id=673 data-nosnippet>673</a>        <span class="kw">let </span><span class="kw-2">mut </span>summary = SchedulerStat::default();
+<a href=#674 id=674 data-nosnippet>674</a>        <span class="kw">for </span>worker <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.worker_group.workers_shared {
+<a href=#675 id=675 data-nosnippet>675</a>            <span class="kw">let </span>worker_stat = worker.borrow_stat();
+<a href=#676 id=676 data-nosnippet>676</a>            summary.merge(<span class="kw-2">&amp;</span>worker_stat);
+<a href=#677 id=677 data-nosnippet>677</a>        }
+<a href=#678 id=678 data-nosnippet>678</a>        summary.harness_stat()
+<a href=#679 id=679 data-nosnippet>679</a>    }
+<a href=#680 id=680 data-nosnippet>680</a>
+<a href=#681 id=681 data-nosnippet>681</a>    <span class="kw">pub fn </span>notify_mutators_paused(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+<a href=#682 id=682 data-nosnippet>682</a>        mmtk.state.gc_status.set_in_pause();
+<a href=#683 id=683 data-nosnippet>683</a>        <span class="comment">// The number of active workers should be either the configured number of threads or the configured number of concurrent threads.
+<a href=#684 id=684 data-nosnippet>684</a>        </span><span class="macro">assert!</span>(
+<a href=#685 id=685 data-nosnippet>685</a>            mmtk.scheduler.num_active_workers() == <span class="kw-2">*</span>mmtk.options.threads
+<a href=#686 id=686 data-nosnippet>686</a>                || mmtk.scheduler.num_active_workers() == <span class="kw-2">*</span>mmtk.options.concurrent_threads
+<a href=#687 id=687 data-nosnippet>687</a>        );
+<a href=#688 id=688 data-nosnippet>688</a>        <span class="comment">// Pause started, use all GC threads.
+<a href=#689 id=689 data-nosnippet>689</a>        </span>mmtk.scheduler.set_active_workers(<span class="kw-2">*</span>mmtk.options.threads);
+<a href=#690 id=690 data-nosnippet>690</a>
+<a href=#691 id=691 data-nosnippet>691</a>        <span class="kw">let </span>first_stw_bucket = <span class="kw-2">&amp;</span><span class="self">self</span>.work_buckets[WorkBucketStage::FIRST_STW_STAGE];
+<a href=#692 id=692 data-nosnippet>692</a>        <span class="macro">debug_assert!</span>(!first_stw_bucket.is_open());
+<a href=#693 id=693 data-nosnippet>693</a>        <span class="comment">// Note: This is the only place where a bucket is opened without having all workers parked.
+<a href=#694 id=694 data-nosnippet>694</a>        // We usually require all workers to park before opening new buckets because otherwise
+<a href=#695 id=695 data-nosnippet>695</a>        // packets will be executed out of order.  However, since `Prepare` is the first STW
+<a href=#696 id=696 data-nosnippet>696</a>        // bucket, and all subsequent buckets require all workers to park before opening, workers
+<a href=#697 id=697 data-nosnippet>697</a>        // cannot execute work packets out of order.  This is not generally true if we are not
+<a href=#698 id=698 data-nosnippet>698</a>        // opening the first STW bucket.  In the future, we should redesign the opening condition
+<a href=#699 id=699 data-nosnippet>699</a>        // of work buckets to make the synchronization more robust,
+<a href=#700 id=700 data-nosnippet>700</a>        </span>first_stw_bucket.open();
+<a href=#701 id=701 data-nosnippet>701</a>        <span class="self">self</span>.worker_monitor.notify_work_available(<span class="bool-val">true</span>);
+<a href=#702 id=702 data-nosnippet>702</a>    }
+<a href=#703 id=703 data-nosnippet>703</a>
+<a href=#704 id=704 data-nosnippet>704</a>    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>schedule_concurrent_packets(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#705 id=705 data-nosnippet>705</a>        <span class="kw">let </span>concurrent_bucket = <span class="kw-2">&amp;</span><span class="self">self</span>.work_buckets[WorkBucketStage::Concurrent];
+<a href=#706 id=706 data-nosnippet>706</a>        <span class="kw">if </span>!concurrent_bucket.is_empty() {
+<a href=#707 id=707 data-nosnippet>707</a>            concurrent_bucket.set_enabled(<span class="bool-val">true</span>);
+<a href=#708 id=708 data-nosnippet>708</a>            concurrent_bucket.open();
+<a href=#709 id=709 data-nosnippet>709</a>            <span class="bool-val">true
+<a href=#710 id=710 data-nosnippet>710</a>        </span>} <span class="kw">else </span>{
+<a href=#711 id=711 data-nosnippet>711</a>            concurrent_bucket.set_enabled(<span class="bool-val">false</span>);
+<a href=#712 id=712 data-nosnippet>712</a>            concurrent_bucket.close();
+<a href=#713 id=713 data-nosnippet>713</a>            <span class="bool-val">false
+<a href=#714 id=714 data-nosnippet>714</a>        </span>}
+<a href=#715 id=715 data-nosnippet>715</a>    }
+<a href=#716 id=716 data-nosnippet>716</a>}</code></pre></div></section></main></body></html>
