@@ -15,6 +15,7 @@ use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
+use crate::MMTK;
 use enum_map::EnumMap;
 use mmtk_macros::HasSpaces;
 
@@ -66,7 +67,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         unreachable!()
     }
 
-    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
+    fn end_of_pause(&mut self, _mmtk: &'static MMTK<VM>, _tls: VMWorkerThread) {
         unreachable!()
     }
 

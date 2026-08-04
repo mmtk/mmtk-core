@@ -586,7 +586,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // All other workers are parked, so it is safe to access the Plan instance mutably.
         probe!(mmtk, plan_end_of_gc_begin);
         let plan_mut: &mut dyn Plan<VM = VM> = unsafe { mmtk.get_plan_mut() };
-        plan_mut.end_of_gc(worker.tls);
+        // This also tells the GC trigger whether the GC cycle has ended (see
+        // `Plan::end_of_pause`).
+        plan_mut.end_of_pause(mmtk, worker.tls);
         probe!(mmtk, plan_end_of_gc_end);
 
         // Compute the elapsed time of the GC.

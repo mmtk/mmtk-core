@@ -333,9 +333,23 @@ pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
     /// Failing to do so may result in unnecessay GCs, or result in an infinite loop if the new heap size
     /// can never accomodate the pending allocation.
     fn on_pending_allocation(&self, _pages: usize) {}
-    /// Inform the triggering policy that a pause starts.
+    /// Inform the triggering policy that a GC cycle starts. A GC cycle consists of one or more
+    /// GC pauses (see [`Self::on_pause_start`]) plus any concurrent work in between the pauses.
+    /// For a stop-the-world GC, a GC cycle is just a single pause, and this is called at the same
+    /// time as [`Self::on_pause_start`]. For a concurrent GC that splits a cycle into multiple
+    /// pauses (e.g. an initial mark pause and a final mark pause with concurrent marking in
+    /// between), this is only called once per cycle, for the first pause in the cycle.
+    fn on_gc_start(&self, _mmtk: &'static MMTK<VM>) {}
+    /// Inform the triggering policy that a GC cycle ends. See [`Self::on_gc_start`] for what
+    /// a GC cycle is. This is only called once per GC cycle, for the last pause in the cycle.
+    fn on_gc_end(&self, _mmtk: &'static MMTK<VM>) {}
+    /// Inform the triggering policy that a pause starts. For a concurrent GC, this is called once
+    /// for every STW pause in a GC cycle, not just once per cycle. See
+    /// [`Self::on_gc_start`] for the hook that is only called once per GC cycle.
     fn on_pause_start(&self, _mmtk: &'static MMTK<VM>) {}
-    /// Inform the triggering policy that a pause ends.
+    /// Inform the triggering policy that a pause ends. For a concurrent GC, this is called once
+    /// for every STW pause in a GC cycle, not just once per cycle. See [`Self::on_gc_end`]
+    /// for the hook that is only called once per GC cycle.
     fn on_pause_end(&self, _mmtk: &'static MMTK<VM>) {}
     /// Inform the triggering policy that a GC is about to start the release work. This is called
     /// in the global Release work packet. This means we assume a plan
@@ -483,7 +497,7 @@ impl MemBalancerStats {
     // * allocation = objects in mature space = promoted + pretentured = live pages in mature space before release - live pages at the end of last mature GC
     // * collection = live pages in mature space at the end of GC -  live pages in mature space before release
 
-    fn generational_mem_stats_on_pause_start<VM: VMBinding>(
+    fn generational_mem_stats_on_gc_start<VM: VMBinding>(
         &mut self,
         _plan: &dyn GenerationalPlan<VM = VM>,
     ) {
@@ -514,7 +528,7 @@ impl MemBalancerStats {
         }
     }
     /// Return true if we should compute a new heap limit. Only do so at the end of a mature GC
-    fn generational_mem_stats_on_pause_end<VM: VMBinding>(
+    fn generational_mem_stats_on_gc_end<VM: VMBinding>(
         &mut self,
         plan: &dyn GenerationalPlan<VM = VM>,
     ) -> bool {
@@ -538,10 +552,7 @@ impl MemBalancerStats {
     // * allocation = live pages at the start of GC - live pages at the end of last GC
     // * collection = live pages at the end of GC - live pages before release
 
-    fn non_generational_mem_stats_on_pause_start<VM: VMBinding>(
-        &mut self,
-        mmtk: &'static MMTK<VM>,
-    ) {
+    fn non_generational_mem_stats_on_gc_start<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
         self.allocation_pages = mmtk
             .get_plan()
             .get_reserved_pages()
@@ -557,7 +568,7 @@ impl MemBalancerStats {
         self.gc_release_live_pages = mmtk.get_plan().get_reserved_pages();
         trace!("live before release = {}", self.gc_release_live_pages);
     }
-    fn non_generational_mem_stats_on_pause_end<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
+    fn non_generational_mem_stats_on_gc_end<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
         self.gc_end_live_pages = mmtk.get_plan().get_reserved_pages();
         trace!("live pages = {}", self.gc_end_live_pages);
         // Use live pages as an estimate for pages traversed during GC
@@ -586,8 +597,8 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
         self.pending_pages.fetch_add(pages, Ordering::SeqCst);
     }
 
-    fn on_pause_start(&self, mmtk: &'static MMTK<VM>) {
-        trace!("=== on_pause_start ===");
+    fn on_gc_start(&self, mmtk: &'static MMTK<VM>) {
+        trace!("=== on_gc_start ===");
         self.access_stats(|stats| {
             stats.gc_start_time = Instant::now();
             stats.allocation_time += (stats.gc_start_time - stats.gc_end_time).as_secs_f64();
@@ -598,9 +609,9 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
             );
 
             if let Some(plan) = mmtk.get_plan().generational() {
-                stats.generational_mem_stats_on_pause_start(plan);
+                stats.generational_mem_stats_on_gc_start(plan);
             } else {
-                stats.non_generational_mem_stats_on_pause_start(mmtk);
+                stats.non_generational_mem_stats_on_gc_start(mmtk);
             }
         });
     }
@@ -616,8 +627,8 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
         });
     }
 
-    fn on_pause_end(&self, mmtk: &'static MMTK<VM>) {
-        trace!("=== on_pause_end ===");
+    fn on_gc_end(&self, mmtk: &'static MMTK<VM>) {
+        trace!("=== on_gc_end ===");
         self.access_stats(|stats| {
             stats.gc_end_time = Instant::now();
             stats.collection_time += (stats.gc_end_time - stats.gc_start_time).as_secs_f64();
@@ -628,7 +639,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
             );
 
             if let Some(plan) = mmtk.get_plan().generational() {
-                if stats.generational_mem_stats_on_pause_end(plan) {
+                if stats.generational_mem_stats_on_gc_end(plan) {
                     self.compute_new_heap_limit(
                         mmtk.get_plan().get_reserved_pages(),
                         // We reserve an extra of min nursery. This ensures that we will not trigger
@@ -639,7 +650,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
                     );
                 }
             } else {
-                stats.non_generational_mem_stats_on_pause_end(mmtk);
+                stats.non_generational_mem_stats_on_gc_end(mmtk);
                 self.compute_new_heap_limit(
                     mmtk.get_plan().get_reserved_pages(),
                     mmtk.get_plan().get_collection_reserved_pages(),

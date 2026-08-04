@@ -32,19 +32,24 @@ Notes for the mmtk-core developers:
 
 ## 0.33.0
 
-### `GCTriggerPolicy::on_gc_start`/`on_gc_end` renamed, and `on_pause_start` now fires after mutators stop
+### `GCTriggerPolicy::on_gc_start/on_gc_end` repurposed for GC cycles
 
 ```admonish tldr
-`GCTriggerPolicy::on_gc_start` and `on_gc_end` are renamed to `on_pause_start` and `on_pause_end`.
-In addition, `on_pause_start` is now called after all mutators have stopped, instead of at the very
-start of GC scheduling before mutators are asked to stop.
+The old `on_gc_start` and `on_gc_end` (called once per STW pause) are renamed to `on_pause_start`
+and `on_pause_end`. `on_pause_start` is now also called after all mutators have stopped, instead of
+at the very start of GC scheduling before mutators are asked to stop. The names `on_gc_start` and
+`on_gc_end` are reused for a new pair of hooks with different semantics: they are called once per
+*GC cycle* rather than once per pause. For stop-the-world GCs, no changes are needed for the delegated
+GC trigger; however, for concurrent GCs, the GC trigger needs to differentiate pauses and GC cycles,
+and use the correct hooks correspondingly.
 ```
 
 API changes:
 
 -   trait `util::heap::GCTriggerPolicy`
     +   `on_gc_start`: Renamed to `on_pause_start`.
-        *   Previously called when GC was scheduled, before mutators were told to stop.
+        *   Previously called once for every STW pause, when GC was scheduled and before mutators
+            were told to stop.
         *   Now called after all mutators have stopped (i.e. once the world is actually stopped for
             the pause). Implementations that only use this hook to record a timestamp or the
             reserved-page count for computing GC time/space overhead should still work correctly,
@@ -53,6 +58,14 @@ API changes:
             safepoint).
     +   `on_gc_end`: Renamed to `on_pause_end`.
         *   No change to timing, only the name.
+    +   `on_gc_start`/`on_gc_end`: New methods that reuse the old names, but with different meaning.
+        *   A GC cycle consists of one or more STW pauses plus any concurrent work in between them.
+            These new hooks are called once per GC cycle, rather than once per pause.
+        *   For a stop-the-world plan, a GC cycle is exactly one pause, so `on_gc_start`/`on_gc_end`
+            fire at the same time as `on_pause_start`/`on_pause_end`.
+        *   For a concurrent plan whose cycle spans multiple pauses (e.g. an initial mark pause and
+            a final mark pause with concurrent marking in between), `on_gc_start` is only called for
+            the first pause of the cycle, and `on_gc_end` only for the last.
 
 This only affects VM bindings that provide a custom `GCTriggerPolicy` (via
 `Collection::create_gc_trigger`).
