@@ -176,6 +176,11 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         panic!("Common Plan not handled!")
     }
 
+    /// Get a mutable reference to the common plan. See [`Self::common`].
+    fn common_mut(&mut self) -> &mut CommonPlan<Self::VM> {
+        panic!("Common Plan not handled!")
+    }
+
     /// Return a reference to `GenerationalPlan` to allow
     /// access methods specific to generational plans if the plan is a generational plan.
     fn generational(
@@ -202,7 +207,23 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
 
     /// Called when all mutators are paused. This is called before prepare.
-    fn notify_mutators_paused(&self, _scheduler: &GCWorkScheduler<Self::VM>) {}
+    ///
+    /// A GC cycle consists of one or more STW pauses (see
+    /// [`crate::util::heap::gc_trigger::GCTriggerPolicy::on_pause_start`]), plus any concurrent
+    /// work in between or after the pauses. The default implementation assumes this plan performs
+    /// an entire GC cycle within a single pause (i.e. it is not a `ConcurrentPlan`), and notifies
+    /// the GC trigger that a new GC cycle has started by calling
+    /// [`crate::util::heap::gc_trigger::GCTriggerPolicy::on_gc_cycle_start`]. A plan whose pauses
+    /// do not each start a whole new GC cycle -- e.g. a `ConcurrentPlan` with multiple pauses per
+    /// cycle -- must override this method (as well as [`Self::end_of_pause`]), and call
+    /// `on_gc_cycle_start` itself, only for the pauses that do start a new cycle (if any).
+    fn notify_mutators_paused(&self, mmtk: &'static MMTK<Self::VM>) {
+        assert!(
+            self.concurrent().is_none(),
+            "ConcurrentPlan must override notify_mutators_paused"
+        );
+        mmtk.gc_trigger.policy.on_gc_cycle_start(mmtk);
+    }
 
     /// Prepare the plan before a GC. This is invoked in an initial step in the GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
@@ -217,10 +238,31 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
     fn release(&mut self, tls: VMWorkerThread);
 
-    /// Inform the plan about the end of a GC. It is guaranteed that there is no further work for this GC.
-    /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
-    // TODO: This is actually called at the end of a pause/STW, rather than the end of a GC. It should be renamed.
-    fn end_of_gc(&mut self, _tls: VMWorkerThread);
+    /// Inform the plan about the end of a pause. It is guaranteed that there is no further work
+    /// for this pause. This is invoked once per pause by one worker thread. `tls` is the worker
+    /// thread that executes this method.
+    ///
+    /// Because a GC cycle may consist of more than one pause (see [`Self::notify_mutators_paused`]
+    /// for what a GC cycle is), a plan's implementation of this method is also responsible for
+    /// telling the GC trigger whether the GC cycle has ended, by calling
+    /// [`crate::util::heap::gc_trigger::GCTriggerPolicy::on_gc_cycle_end`]. The default
+    /// implementation calls [`Self::common_mut`]'s `end_of_pause`, and assumes this plan performs
+    /// an entire GC cycle within a single pause (i.e. it is not a `ConcurrentPlan`), so it
+    /// notifies the GC trigger unconditionally. A plan whose pauses do not each end a whole GC
+    /// cycle -- e.g. a `ConcurrentPlan` with multiple pauses per cycle -- must override this
+    /// method, and call `on_gc_cycle_end` itself, only for the pauses that do end a cycle (if
+    /// any). A plan that does more at the end of a pause than just delegating to the common plan
+    /// (e.g. updating its own plan-specific state) must also override this method, but should
+    /// still call `on_gc_cycle_end` (unconditionally, unless it is a `ConcurrentPlan`) to preserve
+    /// this behaviour.
+    fn end_of_pause(&mut self, mmtk: &'static MMTK<Self::VM>, tls: VMWorkerThread) {
+        self.common_mut().end_of_pause(tls);
+        assert!(
+            self.concurrent().is_none(),
+            "ConcurrentPlan must override end_of_pause"
+        );
+        mmtk.gc_trigger.policy.on_gc_cycle_end(mmtk);
+    }
 
     /// Notify the plan that an emergency collection will happen. The plan should try to free as much memory as possible.
     /// The default implementation will force a full heap collection for generational plans.
@@ -663,8 +705,8 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.vm_space.set_side_log_bits();
     }
 
-    pub fn end_of_gc(&mut self, _tls: VMWorkerThread) {
-        // Do nothing here. None of the spaces needs end_of_gc.
+    pub fn end_of_pause(&mut self, _tls: VMWorkerThread) {
+        // Do nothing here. None of the spaces needs end_of_pause.
     }
 
     pub(crate) fn collection_required<P: Plan>(&self, plan: &P, space_full: bool) -> bool {
@@ -801,9 +843,9 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.set_side_log_bits();
     }
 
-    pub fn end_of_gc(&mut self, tls: VMWorkerThread) {
+    pub fn end_of_pause(&mut self, tls: VMWorkerThread) {
         self.end_of_gc_nonmoving_space();
-        self.base.end_of_gc(tls);
+        self.base.end_of_pause(tls);
     }
 
     pub fn get_immortal(&self) -> &ImmortalSpace<VM> {

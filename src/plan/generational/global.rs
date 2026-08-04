@@ -78,9 +78,9 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         self.nursery.release();
     }
 
-    pub fn end_of_gc(&mut self, tls: VMWorkerThread, next_gc_full_heap: bool) {
+    pub fn end_of_pause(&mut self, tls: VMWorkerThread, next_gc_full_heap: bool) {
         self.set_next_gc_full_heap(next_gc_full_heap);
-        self.common.end_of_gc(tls);
+        self.common.end_of_pause(tls);
     }
 
     /// Independent of how many pages remain in the page budget (a function of heap size), we must

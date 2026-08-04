@@ -64,6 +64,10 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         &self.common
     }
 
+    fn common_mut(&mut self) -> &mut CommonPlan<VM> {
+        &mut self.common
+    }
+
     fn prepare(&mut self, _tls: VMWorkerThread) {
         self.common.prepare(_tls, true);
         self.mc_space.prepare();
@@ -72,10 +76,6 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     fn release(&mut self, _tls: VMWorkerThread) {
         self.common.release(_tls, true);
         self.mc_space.release();
-    }
-
-    fn end_of_gc(&mut self, tls: VMWorkerThread) {
-        self.common.end_of_gc(tls);
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

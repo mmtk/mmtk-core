@@ -55,6 +55,10 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
         &self.common
     }
 
+    fn common_mut(&mut self) -> &mut CommonPlan<VM> {
+        &mut self.common
+    }
+
     fn base(&self) -> &BasePlan<VM> {
         &self.common.base
     }
@@ -71,10 +75,6 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         self.compressor_space.release();
-    }
-
-    fn end_of_gc(&mut self, tls: VMWorkerThread) {
-        self.common.end_of_gc(tls);
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

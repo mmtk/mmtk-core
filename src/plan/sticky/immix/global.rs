@@ -21,6 +21,7 @@ use crate::util::statistics::counter::EventCounter;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::Plan;
+use crate::MMTK;
 
 use atomic::Ordering;
 use std::sync::atomic::AtomicBool;
@@ -154,7 +155,11 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         }
     }
 
-    fn end_of_gc(&mut self, tls: crate::util::opaque_pointer::VMWorkerThread) {
+    fn end_of_pause(
+        &mut self,
+        mmtk: &'static MMTK<VM>,
+        tls: crate::util::opaque_pointer::VMWorkerThread,
+    ) {
         let next_gc_full_heap =
             crate::plan::generational::global::CommonGenPlan::should_next_gc_be_full_heap(self);
         self.next_gc_full_heap
@@ -164,7 +169,9 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         self.immix
             .set_last_gc_was_defrag(was_defrag, Ordering::Relaxed);
 
-        self.immix.common.end_of_gc(tls);
+        self.immix.common.end_of_pause(tls);
+
+        mmtk.gc_trigger.policy.on_gc_cycle_end(mmtk);
     }
 
     fn collection_required(&self, space_full: bool, space: Option<SpaceStats<Self::VM>>) -> bool {
