@@ -8,7 +8,7 @@ use std::sync::atomic::Ordering;
 impl VMLocalMarkBitSpec {
     /// Set the mark bit for the object to 1
     pub fn mark<VM: VMBinding>(&self, object: ObjectReference, ordering: Ordering) {
-        self.store_atomic::<VM, u8>(object, 1, None, ordering);
+        self.fetch_or_metadata::<VM, u8>(object, 1, ordering);
     }
 
     /// Test if the mark bit for the object is set (1)
@@ -63,43 +63,33 @@ impl MarkState {
     /// Attempt to mark an object. If the object is marked by this invocation, return true.
     /// Otherwise return false -- the object was marked by others.
     pub fn test_and_mark<VM: VMBinding>(&self, object: ObjectReference) -> bool {
-        loop {
-            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
+        let old_value = match self.state {
+            0 => VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.fetch_and_metadata::<VM, u8>(
                 object,
-                None,
+                0,
                 Ordering::SeqCst,
-            );
-            if old_value == self.state {
-                return false;
-            }
-
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-                .compare_exchange_metadata::<VM, u8>(
-                    object,
-                    old_value,
-                    self.state,
-                    None,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                break;
-            }
-        }
-        true
+            ),
+            1 => VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.fetch_or_metadata::<VM, u8>(
+                object,
+                1,
+                Ordering::SeqCst,
+            ),
+            _ => unreachable!(),
+        };
+        old_value == self.state
     }
 
     /// This has to be called during object initialization.
     pub fn on_object_metadata_initialization<VM: VMBinding>(&self, object: ObjectReference) {
         // If it is in header, we have to set the mark bit for every newly allocated object
         if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_in_header() {
-            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
-                object,
-                self.unmarked_state(),
-                None,
-                Ordering::SeqCst,
-            );
+            unsafe {
+                VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store::<VM, u8>(
+                    object,
+                    self.unmarked_state(),
+                    None,
+                );
+            }
         }
     }
 
