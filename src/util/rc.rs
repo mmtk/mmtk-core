@@ -115,6 +115,12 @@ impl<VM: VMBinding> RefCountHelper<VM> {
     /// Increments object `o`'s reference count by one, leaving it unchanged (saturating) once
     /// it has reached `MAX_REF_COUNT`.
     pub fn inc(&self, o: ObjectReference) -> Result<u8, u8> {
+        #[cfg(feature = "vo_bit")]
+        debug_assert!(
+            crate::util::metadata::vo_bit::is_vo_bit_set(o),
+            "{o}: VO bit not set",
+        );
+
         self.fetch_update(o, |x| {
             debug_assert!(x <= MAX_REF_COUNT);
             if x == MAX_REF_COUNT {
@@ -128,6 +134,12 @@ impl<VM: VMBinding> RefCountHelper<VM> {
     /// Decrements object `o`'s reference count by one, unless it is already zero or has
     /// saturated at `MAX_REF_COUNT` (sticky), in which case it is left unchanged.
     pub fn dec(&self, o: ObjectReference) -> Result<u8, u8> {
+        #[cfg(feature = "vo_bit")]
+        debug_assert!(
+            crate::util::metadata::vo_bit::is_vo_bit_set(o),
+            "{o}: VO bit not set",
+        );
+
         self.fetch_update(o, |x| {
             debug_assert!(x <= MAX_REF_COUNT);
             if x == 0 || x == MAX_REF_COUNT

@@ -88,6 +88,19 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, bytes: usize) {
+        #[cfg(feature = "vo_bit")]
+        crate::util::metadata::vo_bit::set_vo_bit(object);
+        #[cfg(all(feature = "vo_bit", debug_assertions))]
+        {
+            use crate::util::constants::LOG_BYTES_IN_PAGE;
+            let vo_addr = object.to_raw_address();
+            let offset_from_page_start = vo_addr & ((1 << LOG_BYTES_IN_PAGE) - 1) as usize;
+            debug_assert!(
+                offset_from_page_start < crate::util::metadata::vo_bit::VO_BIT_WORD_TO_REGION,
+                "The raw address of ObjectReference is not in the first 512 bytes of a page. The internal pointer searching for LOS won't work."
+            );
+        }
+
         // VO bit: Set for all objects.
         if self.rc_enabled {
             // Add to treadmill nursery
@@ -105,18 +118,6 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
                 }
             }
             return;
-        }
-        #[cfg(feature = "vo_bit")]
-        crate::util::metadata::vo_bit::set_vo_bit(object);
-        #[cfg(all(feature = "vo_bit", debug_assertions))]
-        {
-            use crate::util::constants::LOG_BYTES_IN_PAGE;
-            let vo_addr = object.to_raw_address();
-            let offset_from_page_start = vo_addr & ((1 << LOG_BYTES_IN_PAGE) - 1) as usize;
-            debug_assert!(
-                offset_from_page_start < crate::util::metadata::vo_bit::VO_BIT_WORD_TO_REGION,
-                "The raw address of ObjectReference is not in the first 512 bytes of a page. The internal pointer searching for LOS won't work."
-            );
         }
 
         let allocate_as_live = self.should_allocate_as_live();
@@ -362,10 +363,16 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
-    fn release_object(&self, start: Address) -> usize {
+    fn release_object(&self, object: ObjectReference) -> usize {
+        let start = get_super_page(object.to_object_start::<VM>());
+        #[cfg(feature = "vo_bit")]
+        crate::util::metadata::vo_bit::unset_vo_bit(object);
         if self.rc_enabled {
-            self.rc.set(start.to_object_reference::<VM>(), 0);
+            debug_assert_eq!(self.rc.count(object), 0);
             let pages = self.pr.get_pages(start);
+            // TODO: Currently this code path assumes the collector is LXR and it uses field log bit.
+            // When we can use object log bit for LXR, we should merge with `sweep_large_pages`
+            // and clear object log bit instead.
             VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
                 .as_spec()
                 .extract_side_spec()
@@ -379,7 +386,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         // promote nursery objects or release dead nursery
         for o in self.treadmill.collect_alloc_nursery() {
             if self.rc.count(o) == 0 {
-                self.release_object(o.to_raw_address());
+                self.release_object(o);
             } else {
                 self.treadmill.add_to_treadmill(o, false);
             }
@@ -470,13 +477,14 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     fn sweep_large_pages(&mut self, sweep_nursery: bool) {
         let sweep = |object: ObjectReference| {
-            #[cfg(feature = "vo_bit")]
-            crate::util::metadata::vo_bit::unset_vo_bit(object);
             // Clear log bits for dead objects to prevent a new nursery object having the unlog bit set
+            // TODO: This code path assumes the log bit is object log bit instead of field log bit.
+            // When generational plans and ConcurrentImmix support field log bit,
+            // we can push this clean-up operation into `Self::release_object`.
             if self.clear_log_bit_on_sweep {
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
             }
-            self.release_object(get_super_page(object.to_object_start::<VM>()));
+            self.release_object(object);
         };
         if sweep_nursery {
             for object in self.treadmill.collect_nursery() {
@@ -515,7 +523,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     pub fn rc_free(&self, o: ObjectReference) {
         if self.treadmill.remove_mature(o) {
-            let pages = self.release_object(o.to_raw_address());
+            let pages = self.release_object(o);
             self.num_pages_released_lazy
                 .fetch_add(pages, Ordering::Relaxed);
         }
@@ -584,7 +592,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         self.treadmill.retain_mature(|o| {
             if !is_live(*o) {
                 self.rc.set(*o, 0);
-                let pages = self.release_object(o.to_raw_address());
+                let pages = self.release_object(*o);
                 self.num_pages_released_lazy
                     .fetch_add(pages, Ordering::Relaxed);
                 false

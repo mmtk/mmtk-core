@@ -431,6 +431,9 @@ impl Block {
         mark_histogram: &mut Histogram,
         line_mark_state: Option<u8>,
     ) -> BlockSweepResult {
+        // This method is not called when using RC.
+        assert!(!space.rc_enabled);
+
         self.set_as_defrag_source(false);
         if super::BLOCK_ONLY {
             match self.get_state() {
@@ -538,11 +541,33 @@ impl Block {
             self.set_state(BlockState::Reusable {
                 unavailable_lines: 1 as _,
             });
+
+            // Bulk clear the VO bits of reusable (unmarked) lines.
+            // Lines that are not marked may contain nursery objects that have never received any inc,
+            // and their VO bits need to be cleared before the lines can be reused.
+            #[cfg(feature = "vo_bit")]
+            {
+                let rc_array = RCArray::of(*self);
+
+                for (i, line) in self.lines().enumerate() {
+                    if rc_array.is_dead(i) {
+                        crate::util::metadata::vo_bit::bzero_vo_bit(line.start(), Line::BYTES);
+                    }
+                }
+            }
+
             space.reusable_blocks.push(*self);
             false
         } else {
             debug_assert!(self.rc_dead(), "{:?} has non-zero rc value", self);
             debug_assert_ne!(self.get_state(), super::block::BlockState::Unallocated);
+
+            // Bulk clear the VO bits of the entire block.
+            // This block may contain nursery objects that have never received any inc,
+            // and their VO bits need to be cleared before the block can be reused.
+            #[cfg(feature = "vo_bit")]
+            crate::util::metadata::vo_bit::bzero_vo_bit(self.start(), Self::BYTES);
+
             space.release_block(*self, false);
             true
         }
@@ -565,6 +590,14 @@ impl Block {
         }
         if defrag || self.rc_dead() {
             if self.attempt_dealloc(true) {
+                // Bulk clear the VO bits of the entire block.
+                // Dec operations may reduce some object's RC to 0,
+                // at which time their VO bits are cleared, too.
+                // But some lines may also contain objects that have never received any inc,
+                // and their VO bits need to be cleared before the block can be reused.
+                #[cfg(feature = "vo_bit")]
+                crate::util::metadata::vo_bit::bzero_vo_bit(self.start(), Self::BYTES);
+
                 space.release_block(*self, true);
                 return true;
             }
@@ -589,6 +622,21 @@ impl Block {
                 .is_ok()
             };
             if add_as_reusable {
+                // Bulk clear the VO bits of reusable (unmarked) lines.
+                // Dec operations may reduce some object's RC to 0,
+                // at which time their VO bits are cleared, too.
+                // But some lines may also contain objects that have never received any inc,
+                // and their VO bits need to be cleared before the block can be reused.
+                #[cfg(feature = "vo_bit")]
+                {
+                    let rc_array = RCArray::of(*self);
+
+                    for (i, line) in self.lines().enumerate() {
+                        if rc_array.is_dead(i) {
+                            crate::util::metadata::vo_bit::bzero_vo_bit(line.start(), Line::BYTES);
+                        }
+                    }
+                }
                 space.reusable_blocks.push(*self);
             }
         }

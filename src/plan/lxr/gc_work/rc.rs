@@ -285,6 +285,15 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                     o,
                     CopySemantics::DefaultCopy,
                     self.copy_context(),
+                    |new| {
+                        // Set the VO bit of the new object.
+                        crate::util::metadata::vo_bit::set_vo_bit(new);
+                        // Clear the VO bit of the old object.
+                        // Note that sweeping can also clear the VO bit when the line is freed,
+                        // but no RC inc/dec should be performed on the old object from now on.
+                        // We clear it eagerly to detect inc/dec errors.
+                        crate::util::metadata::vo_bit::unset_vo_bit(o);
+                    },
                 );
                 if let Some(new) = new {
                     self.inc(new);
@@ -615,6 +624,12 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         });
         let in_ix_space = lxr.immix_space.in_space(o);
         if in_ix_space {
+            // Clear the VO bit if `o` is in the immix space.
+            // Note that if the object is in the LOS,
+            // the VO bit will be cleared in `LargeObjectSpace::release_object`.
+            #[cfg(feature = "vo_bit")]
+            crate::util::metadata::vo_bit::unset_vo_bit(o);
+
             self.rc.unmark_straddle_object(o);
         }
         if RefCountHelper::<VM>::SANITY {
@@ -643,7 +658,13 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             };
             let mut dead = false;
             let mut is_los = false;
+            let mut already_run = false;
             let result = self.rc.clone().fetch_update(o, |c| {
+                if already_run {
+                    log::warn!("fetch_update is re-run! o: {o}");
+                } else {
+                    already_run = true;
+                }
                 if c == 1 && !dead {
                     dead = true;
                     is_los = self.process_dead_object(o, lxr);

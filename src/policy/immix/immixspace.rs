@@ -436,8 +436,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             "Number of lines in a block should not exceed BlockState::MARK_MARKED"
         );
 
+        // TODO: The VO bit strategy is only relevant to tracing GC.
+        // LXR currently ignores the strategy.
         #[cfg(feature = "vo_bit")]
-        vo_bit::helper::validate_config::<VM>();
+        if !args.constraints.rc_enabled {
+            vo_bit::helper::validate_config::<VM>();
+        }
+
         let vm_map = args.vm_map;
         let scheduler = args.scheduler.clone();
         let rc_enabled = args.constraints.rc_enabled;
@@ -624,8 +629,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
         }
 
+        // TODO: The VO bit strategy is currently not applicable to RC.
         #[cfg(feature = "vo_bit")]
-        if vo_bit::helper::need_to_clear_vo_bits_before_tracing::<VM>() {
+        if !self.rc_enabled && vo_bit::helper::need_to_clear_vo_bits_before_tracing::<VM>() {
             let maybe_scope = if major_gc {
                 // If it is major GC, we always clear all VO bits because we are doing full-heap
                 // tracing.
@@ -821,6 +827,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         queue: &mut impl ObjectQueue,
         object: ObjectReference,
     ) -> ObjectReference {
+        // This function should not be called during RC.
+        // Otherwise the VO bit handling will be incorrect.
+        debug_assert!(!self.rc_enabled);
+
         #[cfg(feature = "vo_bit")]
         vo_bit::helper::on_trace_object::<VM>(object);
 
@@ -870,6 +880,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         worker: &mut GCWorker<VM>,
         nursery_collection: bool,
     ) -> ObjectReference {
+        // This function should not be called when RC is enabled.
+        // Otherwise the VO bit handling will be incorrect.
+        debug_assert!(!self.rc_enabled);
+
         let copy_context = worker.get_copy_context_mut();
         debug_assert!(!super::BLOCK_ONLY);
 
@@ -934,12 +948,23 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 // mark the block. So we do not need to explicitly mark it here.
                 // Clippy complains if the "vo_bit" feature is not enabled.
                 #[allow(clippy::let_and_return)]
-                let new_object =
-                    object_forwarding::try_forward_object::<VM>(object, semantics, copy_context)
-                        .expect("to-space overflow");
-
-                #[cfg(feature = "vo_bit")]
-                vo_bit::helper::on_object_forwarded::<VM>(new_object);
+                let new_object = object_forwarding::try_forward_object::<VM>(
+                    object,
+                    semantics,
+                    copy_context,
+                    |new_object| {
+                        // post_copy should have set the unlog bit
+                        // if `unlog_traced_object` is true.
+                        debug_assert!(
+                            !self.common.unlog_traced_object
+                                || VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                                    .is_unlogged::<VM>(new_object, Ordering::Relaxed)
+                        );
+                        #[cfg(feature = "vo_bit")]
+                        vo_bit::helper::on_object_forwarded::<VM>(new_object);
+                    },
+                )
+                .expect("to-space overflow");
 
                 new_object
             };
@@ -1010,6 +1035,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 object,
                 CopySemantics::DefaultCopy,
                 copy_context,
+                |_new_object| {
+                    // When using RC, we set the VO bit of the forwarded object.
+                    #[cfg(feature = "vo_bit")]
+                    vo_bit::set_vo_bit(_new_object);
+                },
             )
             .expect("to-space overflow");
             // Transfer RC count

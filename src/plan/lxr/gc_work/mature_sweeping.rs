@@ -38,6 +38,13 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
                 o.to_raw_address().store(0xdeadusize);
             }
         }
+
+        // Clear the VO bit.
+        // Note that if the object is in the LOS,
+        // the VO bit will be cleared in `LargeObjectSpace::release_object`.
+        #[cfg(feature = "vo_bit")]
+        crate::util::metadata::vo_bit::unset_vo_bit(o);
+
         self.rc.unmark_straddle_object(o);
         self.rc.set(o, 0);
     }
