@@ -91,7 +91,7 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
 
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<CompressorWorkContext<VM>>::new(self));
+            .add(Prepare::<CompressorWorkContext<VM>>::new());
 
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding].add(GenerateWork::new(
             &self.compressor_space,
@@ -112,7 +112,7 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
 
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<CompressorWorkContext<VM>>::new(self));
+            .add(Release::<CompressorWorkContext<VM>>::new());
 
         // Reference processing
         if !*self.base().options.no_reference_types {
@@ -167,7 +167,7 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
         }
         #[cfg(feature = "sanity")]
         scheduler.work_buckets[WorkBucketStage::Final]
-            .add(crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self>::new(self));
+            .add(crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self>::new());
     }
 
     fn current_gc_may_move_object(&self) -> bool {
