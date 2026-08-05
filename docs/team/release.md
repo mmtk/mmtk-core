@@ -13,9 +13,9 @@ MMTk releases include MMTk core and the officially supported bindings. They shar
 The current releases include the following bindings:
 * OpenJDK (Both OpenJDK 11 and OpenJDK 21)
 * JikesRVM
-* Julia
 
 The current releases do not include the following bindings:
+* Julia: The binding is in the Julia main repo, and will be released with Julia.
 * Ruby: We have made good progress on the binding development, and we will include it soon.
 
 ## Release Process
