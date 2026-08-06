@@ -160,14 +160,6 @@ with `&mygc_mutator_release`.  This function will be called at the release stage
 allocation semantics to the new tospace. When the mutator threads resume, any new allocations for
 `Default` will then go to the new tospace.
 
-### End of GC
-
-Find the method `end_of_gc()` in `mygc/global.rs`. Call `end_of_gc` from the common plan instead.
-
-```rust
-{{#include ../../code/mygc_semispace/global.rs:end_of_gc}}
-```
-
 ## Implementing the Trace trait for MyGC
 
 The [`Trace`] trait is key for tracing objects in a GC.

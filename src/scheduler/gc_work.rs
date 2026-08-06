@@ -9,9 +9,6 @@ pub struct ScheduleCollection;
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        // Tell GC trigger that GC started.
-        mmtk.gc_trigger.policy.on_gc_start(mmtk);
-
         // Determine collection kind
         let is_emergency = mmtk.state.set_collection_kind(
             mmtk.get_plan().last_collection_was_exhaustive(),
@@ -234,8 +231,12 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
             }
         });
         trace!("stop_all_mutators end");
-        mmtk.get_plan().notify_mutators_paused(&mmtk.scheduler);
+        // This also tells the GC trigger whether a new GC cycle has started (see
+        // `Plan::notify_mutators_paused`).
+        mmtk.get_plan().notify_mutators_paused(mmtk);
         mmtk.scheduler.notify_mutators_paused(mmtk);
+        // Tell GC trigger that the pause started.
+        mmtk.gc_trigger.policy.on_pause_start(mmtk);
         if !self.skip_roots {
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(ScanVMSpecificRoots::<C>::new());

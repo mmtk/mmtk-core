@@ -124,8 +124,10 @@ collection for our GC plan.
 
 #### Other methods in the Plan trait
 
-The trait `Plan` requires a `common()` method that should return a 
-reference to the common plan. Implement this method now.
+The trait `Plan` has a `common()` method (and a `common_mut()` counterpart) that should
+return a (mutable) reference to the common plan. Implement these methods now. Several default
+method implementations in the `Plan` trait, such as `end_of_pause()`, rely on `common_mut()` to do
+the right thing, so once these are implemented, `MyGC` does not need to override those methods.
 
 ```rust
 {{#include ../../code/mygc_semispace/global.rs:plan_common}}

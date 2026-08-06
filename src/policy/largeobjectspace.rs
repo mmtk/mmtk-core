@@ -393,7 +393,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
-    /// Enumerate objects in the to-space.  It is a workaround for Compressor which currently needs
+    /// Enumerate objects in the to-space.  It is a workaround for OVC which currently needs
     /// to enumerate reachable objects for during reference forwarding.
     pub(crate) fn enumerate_to_space_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         // This function is intended to enumerate objects in the to-space.
