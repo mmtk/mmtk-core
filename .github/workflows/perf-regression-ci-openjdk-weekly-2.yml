@@ -2,7 +2,7 @@ name: Performance Regression CI (OpenJDK, weekly batch 2)
 
 # Batch 2 of the plans we don't track on every commit (see weekly-1 for the
 # rest of this split, and perf-regression-ci-openjdk.yml for the ones we do
-# track on every commit): MarkSweep, MarkCompact, Compressor, ConcurrentImmix,
+# track on every commit): MarkSweep, Lisp2, OVC, ConcurrentImmix,
 # and the canary run. Runs against whichever OpenJDK+MMTk build was most
 # recently cached by perf-regression-ci-openjdk.yml's openjdk-build job (see
 # openjdk-run-plan-reusable.yml for the cache lookup and for the canary
@@ -52,12 +52,12 @@ jobs:
             config: running-openjdk-marksweep-complete.yml
             heap_modifier: ${{ needs.config.outputs.large_heap_factor }}
             canary: false
-          - plan_name: markcompact
-            config: running-openjdk-markcompact-complete.yml
+          - plan_name: lisp2
+            config: running-openjdk-lisp2-complete.yml
             heap_modifier: ${{ needs.config.outputs.normal_heap_factor }}
             canary: false
-          - plan_name: compressor
-            config: running-openjdk-compressor-complete.yml
+          - plan_name: ovc
+            config: running-openjdk-ovc-complete.yml
             heap_modifier: ${{ needs.config.outputs.normal_heap_factor }}
             canary: false
           - plan_name: concurrentimmix
