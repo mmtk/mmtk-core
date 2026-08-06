@@ -30,6 +30,14 @@ impl Region for Line {
     fn start(&self) -> Address {
         self.0
     }
+
+    /// This method is ambiguous because an object is not always fully contained in a line.
+    /// To make the intention more explicit, two other methods are available.
+    /// -   [`Line::containing_obj_ref`]
+    /// -   [`Line::containing_obj_start`]
+    fn containing(_object: ObjectReference) -> Self {
+        unimplemented!("Line::containing is intentionally unimplemented.");
+    }
 }
 
 #[allow(clippy::assertions_on_constants)]
@@ -41,32 +49,14 @@ impl Line {
     pub const MARK_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::IX_LINE_MARK;
 
-    /// Align the give address to the line boundary.
-    pub fn align(address: Address) -> Address {
-        debug_assert!(!super::BLOCK_ONLY);
-        address.align_down(Self::BYTES)
+    /// Return the line that contains the starting address of an object.
+    pub fn containing_obj_start<VM: VMBinding>(object: ObjectReference) -> Self {
+        Self::from_unaligned_address(VM::VMObjectModel::ref_to_object_start(object))
     }
 
-    /// Test if the given address is line-aligned
-    pub fn is_aligned(address: Address) -> bool {
-        debug_assert!(!super::BLOCK_ONLY);
-        Self::align(address).as_usize() == address.as_usize()
-    }
-
-    /// Get the line from a given address.
-    /// The address must be line-aligned.
-    pub fn from(address: Address) -> Self {
-        debug_assert!(!super::BLOCK_ONLY);
-        debug_assert!(address.is_aligned_to(Self::BYTES));
-        Self(address)
-    }
-
-    pub fn of(a: Address) -> Self {
-        Self(a.align_down(Self::BYTES))
-    }
-
-    pub fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        Self(VM::VMObjectModel::ref_to_object_start(object).align_down(Self::BYTES))
+    /// Return the line that contains the raw address of the object reference.
+    pub fn containing_obj_ref(object: ObjectReference) -> Self {
+        Self(object.to_raw_address())
     }
 
     /// Get the block containing the line.
@@ -75,19 +65,8 @@ impl Line {
         Block::from_unaligned_address(self.0)
     }
 
-    /// Get line start address
-    pub const fn start(&self) -> Address {
-        debug_assert!(!super::BLOCK_ONLY);
-        self.0
-    }
-
-    pub const fn end(&self) -> Address {
-        debug_assert!(!super::BLOCK_ONLY);
-        unsafe { Address::from_usize(self.0.as_usize() + Self::BYTES) }
-    }
-
     /// Get line index within its containing block.
-    pub const fn get_index_within_block(&self) -> usize {
+    pub fn get_index_within_block(&self) -> usize {
         let addr = self.start();
         addr.get_extent(Block::align(addr)) >> Line::LOG_BYTES
     }

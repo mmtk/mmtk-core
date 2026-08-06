@@ -108,10 +108,6 @@ impl BlockMayHaveObjects for Block {
 }
 
 impl Block {
-    /// Log bytes in block
-    pub const LOG_BYTES: usize = <Self as Region>::LOG_BYTES;
-    /// Bytes in block
-    pub const BYTES: usize = 1 << Self::LOG_BYTES;
     /// Log pages in block
     pub const LOG_PAGES: usize = Self::LOG_BYTES - LOG_BYTES_IN_PAGE as usize;
     /// Pages in block
@@ -148,38 +144,6 @@ impl Block {
 
     pub fn is_zero(&self) -> bool {
         self.0.is_zero()
-    }
-
-    /// Align the address to a block boundary.
-    pub const fn align(address: Address) -> Address {
-        address.align_down(Self::BYTES)
-    }
-
-    /// Get the block from a given address.
-    /// The address must be block-aligned.
-    pub fn from(address: Address) -> Self {
-        debug_assert!(address.is_aligned_to(Self::BYTES));
-        Self(address)
-    }
-
-    pub fn of(a: Address) -> Self {
-        Self::from(Self::align(a))
-    }
-
-    /// Get the block containing the given address.
-    /// The input address does not need to be aligned.
-    pub fn containing(object: ObjectReference) -> Self {
-        Self(object.to_raw_address().align_down(Self::BYTES))
-    }
-
-    /// Get block start address
-    pub const fn start(&self) -> Address {
-        self.0
-    }
-
-    /// Get block end address
-    pub const fn end(&self) -> Address {
-        self.0.add(Self::BYTES)
     }
 
     /// Get the chunk containing the block.
@@ -247,7 +211,7 @@ impl Block {
     }
 
     pub fn address_in_defrag_block(a: Address) -> bool {
-        Block::from(Block::align(a)).is_defrag_source()
+        Block::from_unaligned_address(a).is_defrag_source()
     }
 
     /// Mark the block for defragmentation.

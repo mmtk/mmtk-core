@@ -10,6 +10,7 @@ use crate::policy::immix::block::BlockState;
 use crate::scheduler::gc_work::RootKind;
 use crate::util::copy::CopySemantics;
 use crate::util::copy::GCWorkerCopyContext;
+use crate::util::linear_scan::Region;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::rc::*;
 use crate::vm::slot::Slot;

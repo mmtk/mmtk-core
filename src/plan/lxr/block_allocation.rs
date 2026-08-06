@@ -6,6 +6,7 @@ use crate::policy::immix::block::{Block, BlockState};
 use crate::policy::immix::{ImmixHooks, ImmixSpace};
 use crate::scheduler::{GCWork, GCWorkScheduler, WorkBucketStage};
 use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::linear_scan::Region;
 use crate::vm::VMBinding;
 use atomic::{Atomic, Ordering};
 use std::cell::UnsafeCell;

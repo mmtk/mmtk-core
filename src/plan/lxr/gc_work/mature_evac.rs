@@ -116,7 +116,7 @@ impl<VM: VMBinding> EvacuateMatureObjects<VM> {
         }
         // Check if it is a real oop field
         if lxr.immix_space.address_in_space(s.to_address()) {
-            let block = Block::of(s.to_address());
+            let block = Block::from_unaligned_address(s.to_address());
             if block.get_state() == BlockState::Unallocated {
                 return false;
             }

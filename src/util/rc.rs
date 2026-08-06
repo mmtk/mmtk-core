@@ -212,14 +212,20 @@ impl<VM: VMBinding> RefCountHelper<VM> {
     /// Returns `true` if address `a` falls within a live object whose containing line is marked
     /// as a straddle line.
     pub fn address_is_in_straddle_line(&self, a: Address) -> bool {
-        let line = Line::from(Line::align(a));
+        let line = Line::from_unaligned_address(a);
         self.count(a.to_object_reference::<VM>()) != 0 && self.is_straddle_line(line)
     }
 
     fn mark_straddle_object_with_size(&self, o: ObjectReference, size: usize) {
         debug_assert!(size > Line::BYTES);
-        let start_line = Line::containing::<VM>(o).next();
-        let end_line = Line::from(Line::align(o.to_raw_address() + size));
+        let start = o.to_object_start::<VM>();
+        let end = start + size;
+        let start_line = Line::from_unaligned_address(start).next();
+        let end_line = Line::from_unaligned_address(end);
+        // Note that `end_line` may be the last line overlapping with `o`.
+        // In that case, `end_line` will not be marked.
+        // It is OK because when searching for available lines (`rc_get_next_available_lines`),
+        // it always skips the first line in a hole.
         let mut line = start_line;
         while line != end_line {
             unsafe { RC_STRADDLE_LINES.store(line.start(), 1u8) };
@@ -241,8 +247,14 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         // debug_assert!(crate::args::RC_NURSERY_EVACUATION);
         let size = VM::VMObjectModel::get_current_size(o);
         if size > Line::BYTES {
-            let start_line = Line::containing::<VM>(o).next();
-            let end_line = Line::from(Line::align(o.to_raw_address() + size));
+            let start = o.to_object_start::<VM>();
+            let end = start + size;
+            let start_line = Line::from_unaligned_address(start).next();
+            let end_line = Line::from_unaligned_address(end);
+            // Note that `end_line` may be the last line overlapping with `o`.
+            // In that case, `end_line` will not be marked.
+            // It is OK because when searching for available lines (`rc_get_next_available_lines`),
+            // it always skips the first line in a hole.
             let mut line = start_line;
             while line != end_line {
                 self.set_relaxed(line.start().to_object_reference::<VM>(), 0);

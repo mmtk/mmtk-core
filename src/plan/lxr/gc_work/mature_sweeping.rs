@@ -60,7 +60,7 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
             let c = self.rc.count(o);
             if c != 0 && !immix_space.is_marked(o) {
                 if Line::is_aligned(o.to_raw_address()) {
-                    if c == 1 && self.rc.is_straddle_line(Line::from(o.to_raw_address())) {
+                    if c == 1 && self.rc.is_straddle_line(Line::containing_obj_ref(o)) {
                         continue;
                     } else {
                         std::sync::atomic::fence(Ordering::SeqCst);

@@ -809,8 +809,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if self.attempt_mark(object) {
             let addr = object.to_raw_address().as_usize();
             let straddle = if (addr & 0b11110000) == 0 {
-                self.rc
-                    .is_straddle_line(Line::from(Line::align(object.to_raw_address())))
+                self.rc.is_straddle_line(Line::containing_obj_ref(object))
             } else {
                 false
             };
@@ -836,9 +835,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
         if self.attempt_mark(object) {
             if self.rc_enabled {
-                let straddle = self
-                    .rc
-                    .is_straddle_line(Line::from(Line::align(object.to_raw_address())));
+                let straddle = self.rc.is_straddle_line(Line::containing_obj_ref(object));
                 if straddle {
                     return object;
                 }
@@ -1202,6 +1199,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                         first_free_cursor = Some(i);
                         break;
                     } else if !find_free_line {
+                        // This skips the first line of a hole
+                        // because `mark_straddle_object_with_size` may or may not set the RC
+                        // of the last line an object straddles.
                         find_free_line = true;
                     } else {
                         first_free_cursor = Some(i);
@@ -1228,8 +1228,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
             cursor
         };
-        let start = Line::from(block.start() + (start << Line::LOG_BYTES));
-        let end = Line::from(block.start() + (end << Line::LOG_BYTES));
+        let start = Line::from_aligned_address(block.start()).next_nth(start);
+        let end = Line::from_aligned_address(block.start()).next_nth(end);
         if self.common.needs_log_bit {
             if !copy {
                 Line::clear_field_unlog_table::<VM>(start..end);
