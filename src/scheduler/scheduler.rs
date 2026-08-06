@@ -104,6 +104,18 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_group.as_ref().worker_count()
     }
 
+    pub fn set_active_workers(&self, active_workers: usize) {
+        self.worker_monitor.set_active_workers(active_workers);
+    }
+
+    pub fn num_active_workers(&self) -> usize {
+        self.worker_monitor.active_workers()
+    }
+
+    pub(crate) fn is_worker_active(&self, ordinal: usize) -> bool {
+        self.worker_monitor.is_worker_active(ordinal)
+    }
+
     /// Create GC threads for the first time.  It will also create the `GCWorker` instances.
     ///
     /// Currently GC threads only include worker threads, and we currently have only one worker
@@ -615,7 +627,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // All other workers are parked, so it is safe to access the Plan instance mutably.
         probe!(mmtk, plan_end_of_gc_begin);
         let plan_mut: &mut dyn Plan<VM = VM> = unsafe { mmtk.get_plan_mut() };
-        plan_mut.end_of_gc(worker.tls);
+        // This also tells the GC trigger whether the GC cycle has ended (see
+        // `Plan::end_of_pause`).
+        plan_mut.end_of_pause(mmtk, worker.tls);
         probe!(mmtk, plan_end_of_gc_end);
 
         // Compute the elapsed time of the GC.
@@ -674,6 +688,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // Set to NotInGC after everything, and right before resuming mutators.
         if concurrent_work_scheduled {
             mmtk.state.gc_status.set_in_concurrent_gc();
+            // Going to start concurrent GC. Set the number of active workers to the configured number of concurrent threads.
+            self.set_active_workers(*mmtk.options.concurrent_threads);
+            debug!(
+                "Concurrent work started. Active worker count set from concurrent_threads={}.",
+                *mmtk.options.concurrent_threads
+            );
         } else {
             mmtk.state.gc_status.set_not_in_gc();
         }
@@ -703,6 +723,14 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.state.gc_status.set_in_pause();
+        // The number of active workers should be either the configured number of threads or the configured number of concurrent threads.
+        assert!(
+            mmtk.scheduler.num_active_workers() == *mmtk.options.threads
+                || mmtk.scheduler.num_active_workers() == *mmtk.options.concurrent_threads
+        );
+        // Pause started, use all GC threads.
+        mmtk.scheduler.set_active_workers(*mmtk.options.threads);
+
         let first_stw_bucket = &self.work_buckets[WorkBucketStage::FIRST_STW_STAGE];
         debug_assert!(!first_stw_bucket.is_open());
         // Note: This is the only place where a bucket is opened without having all workers parked.

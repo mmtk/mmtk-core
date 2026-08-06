@@ -1,9 +1,11 @@
 //! This module contains `WorkerMonitor` and related types.  It purposes includes:
 //!
-//! -   allowing workers to park,
+//! -   letting workers become active or inactive,
+//! -   letting workers park,
 //! -   letting the last parked worker take action, and
 //! -   letting workers and mutators notify workers when workers are given things to do.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Condvar, Mutex};
 
 use super::{
@@ -29,12 +31,20 @@ pub(crate) enum LastParkedResult {
 /// -   It allows workers to park and unpark.
 /// -   It allows mutators to notify workers to schedule a GC.
 pub(crate) struct WorkerMonitor {
+    /// The total number of workers.
+    worker_count: usize,
     /// The synchronized part.
     sync: Mutex<WorkerMonitorSync>,
-    /// Workers wait on this when idle.  Notified if workers have things to do.  That include:
+    /// The number of workers that are allowed to execute work after being notified.
+    active_workers: AtomicUsize,
+    /// Active workers wait on this when idle.  A parked *active* worker is notified if workers
+    /// have things to do.  That includes:
     /// -   any work packets available, and
     /// -   any field in `sync.goals.requests` set to true.
     workers_have_anything_to_do: Condvar,
+    /// Inactive workers wait on this instead.  They are notified whenever the number of active
+    /// workers changes, which may turn them into active workers.
+    active_worker_number_changed: Condvar,
 }
 
 /// The synchronized part of `WorkerMonitor`.
@@ -79,37 +89,80 @@ impl WorkerParker {
         let old = self.parked_workers;
         debug_assert!(old <= self.worker_count);
         debug_assert!(old > 0);
-        let new = old - 1;
-        self.parked_workers = new;
+        self.parked_workers = old - 1;
     }
 }
 
 impl WorkerMonitor {
     pub fn new(worker_count: usize) -> Self {
         Self {
+            worker_count,
             sync: Mutex::new(WorkerMonitorSync {
                 parker: WorkerParker::new(worker_count),
                 goals: Default::default(),
             }),
+            active_workers: AtomicUsize::new(worker_count),
             workers_have_anything_to_do: Default::default(),
+            active_worker_number_changed: Default::default(),
         }
+    }
+
+    pub(crate) fn active_workers(&self) -> usize {
+        self.active_workers.load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn is_worker_active(&self, ordinal: usize) -> bool {
+        ordinal < self.active_workers()
+    }
+
+    /// Set the number of workers that are allowed to execute work after being notified.
+    ///
+    /// This only updates the count.  Whenever this changes, the caller must also call
+    /// `notify_work_available(true)` (directly, or indirectly via the `on_last_parked`
+    /// call-back while still holding the monitor's internal lock) so that both active and
+    /// inactive workers wake up and re-evaluate whether they should be active.  We don't do the
+    /// notification here because this function may be called while the current thread is the
+    /// last parked worker executing `on_last_parked`, in which case the notification has to
+    /// happen through the already-held lock instead of acquiring it again.
+    pub fn set_active_workers(&self, active_workers: usize) {
+        let active_workers = active_workers.clamp(1, self.worker_count);
+        self.active_workers.store(active_workers, Ordering::SeqCst);
+        debug!(
+            "WorkerMonitor active worker count set to {} (worker_count={}).",
+            active_workers, self.worker_count
+        );
     }
 
     /// Make a request.  Can be called by a mutator to request the workers to work towards the
     /// given `goal`.
     pub fn make_request(&self, goal: WorkerGoal) {
+        // A request always needs all workers, including currently inactive ones, to make
+        // progress.
+        self.set_active_workers(self.worker_count);
         let mut guard = self.sync.lock().unwrap();
         let newly_requested = guard.goals.set_request(goal);
         if newly_requested {
-            self.notify_work_available(false);
+            self.notify_work_available_while_locked(true);
         }
     }
 
     /// Wake up workers when more work packets are made available for workers,
     /// or a mutator has requested the GC workers to schedule a GC.
     pub fn notify_work_available(&self, all: bool) {
+        // We must hold the lock while notifying.  Otherwise a worker that is between checking
+        // its wake-up condition and actually blocking on the CondVar (both of which happen while
+        // holding this lock) could have the notification delivered too early and lost, causing
+        // it to block forever despite the condition it was waiting for having become true.
+        let _guard = self.sync.lock().unwrap();
+        self.notify_work_available_while_locked(all);
+    }
+
+    /// Like `notify_work_available`, but for use by callers that already hold the monitor's
+    /// internal lock (such as `park_and_wait` below), to avoid trying to lock it again.
+    fn notify_work_available_while_locked(&self, all: bool) {
         if all {
             self.workers_have_anything_to_do.notify_all();
+            self.active_worker_number_changed.notify_all();
         } else {
             self.workers_have_anything_to_do.notify_one();
         }
@@ -157,68 +210,96 @@ impl WorkerMonitor {
                     // Continue without waiting.
                 }
                 LastParkedResult::WakeAll => {
-                    self.notify_work_available(true);
+                    // We are still holding `sync`, so we must not call `notify_work_available`
+                    // (which would try to lock it again and deadlock).
+                    self.notify_work_available_while_locked(true);
                 }
             }
         } else {
             should_wait = true;
         }
 
-        if should_wait {
-            // Notes on CondVar usage:
-            //
-            // Conditional variables are usually tested in a loop while holding a mutex
-            //
-            //      lock();
-            //      while condition() {
-            //          condvar.wait();
-            //      }
-            //      unlock();
-            //
-            // The actual condition for this `self.workers_have_anything_to_do.wait(sync)` is:
-            //
-            // 1.  any work packet is available, or
-            // 2.  a goal (such as doing GC) is requested
-            //
-            // But it is not used like the typical use pattern shown above, mainly because work
-            // packets can be added without holding the mutex `self.sync`.  This means one worker
-            // can add a new work packet (no mutex needed) right after another worker finds no work
-            // packets are available and then park.  In other words, condition (1) can suddenly
-            // become true after a worker sees it is false but before the worker blocks waiting on
-            // the CondVar.  If this happens, the last parked worker will block forever and never
-            // get notified.  This may happen if mutators or the previously existing "coordinator
-            // thread" can add work packets.
-            //
-            // However, after the "coordinator thread" was removed, only GC worker threads can add
-            // work packets during GC.  Parked workers (except the last parked worker) cannot make
-            // more work packets availble (by adding new packets or opening buckets).  For this
-            // reason, the **last** parked worker can be sure that after it finds no packets
-            // available, no other workers can add another work packet (because they all parked).
-            // So the **last** parked worker can open more buckets or declare GC finished.
-            //
-            // Condition (2), i.e. goals added to `sync.goals`, is guarded by the monitor `sync`.
-            // When a mutator adds a goal via `WorkerMonitor::make_request`, it will notify a
-            // worker; and the last parked worker always checks it before waiting.  So this
-            // condition will not be set without any worker noticing.
-            //
-            // Note that generational barriers may add `ProcessModBuf` work packets when not in GC.
-            // This is benign because those work packets are not executed immediately, and are
-            // guaranteed to be executed in the next GC.
-
-            // Notes on spurious wake-up:
-            //
-            // 1.  The condition variable `workers_have_anything_to_do` is guarded by `self.sync`.
-            //     Because the last parked worker is holding the mutex `self.sync` when executing
-            //     `on_last_parked`, no workers can unpark (even if they spuriously wake up) during
-            //     `on_last_parked` because they cannot re-acquire the mutex `self.sync`.
-            //
-            // 2.  Workers may spuriously wake up and unpark when `on_last_parked` is not being
-            //     executed (including the case when the last parked worker is waiting here, too).
-            //     If one or more GC workers spuriously wake up, they will check for work packets,
-            //     and park again if not available.  The last parked worker will ensure the two
-            //     conditions listed above are both false before blocking.  If either condition is
-            //     true, the last parked worker will take action.
+        // Notes on CondVar usage:
+        //
+        // Conditional variables are usually tested in a loop while holding a mutex
+        //
+        //      lock();
+        //      while condition() {
+        //          condvar.wait();
+        //      }
+        //      unlock();
+        //
+        // The actual condition for this wait is:
+        //
+        // 1.  any work packet is available, or
+        // 2.  a goal (such as doing GC) is requested
+        //
+        // But it is not used like the typical use pattern shown above, mainly because work
+        // packets can be added without holding the mutex `self.sync`.  This means one worker
+        // can add a new work packet (no mutex needed) right after another worker finds no work
+        // packets are available and then park.  In other words, condition (1) can suddenly
+        // become true after a worker sees it is false but before the worker blocks waiting on
+        // the CondVar.  If this happens, the last parked worker will block forever and never
+        // get notified.  This may happen if mutators or the previously existing "coordinator
+        // thread" can add work packets.
+        //
+        // However, after the "coordinator thread" was removed, only GC worker threads can add
+        // work packets during GC.  Parked workers (except the last parked worker) cannot make
+        // more work packets availble (by adding new packets or opening buckets).  For this
+        // reason, the **last** parked worker can be sure that after it finds no packets
+        // available, no other workers can add another work packet (because they all parked).
+        // So the **last** parked worker can open more buckets or declare GC finished.
+        //
+        // Condition (2), i.e. goals added to `sync.goals`, is guarded by the monitor `sync`.
+        // When a mutator adds a goal via `WorkerMonitor::make_request`, it will notify a
+        // worker; and the last parked worker always checks it before waiting.  So this
+        // condition will not be set without any worker noticing.
+        //
+        // Note that generational barriers may add `ProcessModBuf` work packets when not in GC.
+        // This is benign because those work packets are not executed immediately, and are
+        // guaranteed to be executed in the next GC.
+        //
+        // Whether this worker is currently active is a third condition this function waits on.
+        // An inactive worker waits on `active_worker_number_changed` instead of
+        // `workers_have_anything_to_do`, and both are only ever notified while holding
+        // `self.sync` (see `notify_work_available_while_locked`).  Because a worker holds
+        // `self.sync` continuously from the point it decides to wait until the point it
+        // actually blocks inside `Condvar::wait`, a notification can never be delivered to a
+        // worker that has not started waiting yet: the notifier cannot acquire `self.sync`
+        // (and therefore cannot notify) until the worker has released it by starting to wait.
+        //
+        // Notes on spurious wake-up:
+        //
+        // 1.  The condition variable `workers_have_anything_to_do` is guarded by `self.sync`.
+        //     Because the last parked worker is holding the mutex `self.sync` when executing
+        //     `on_last_parked`, no workers can unpark (even if they spuriously wake up) during
+        //     `on_last_parked` because they cannot re-acquire the mutex `self.sync`.
+        //
+        // 2.  Workers may spuriously wake up and unpark when `on_last_parked` is not being
+        //     executed (including the case when the last parked worker is waiting here, too).
+        //     If one or more GC workers spuriously wake up, they will check for work packets,
+        //     and park again if not available.  The last parked worker will ensure the two
+        //     conditions listed above are both false before blocking.  If either condition is
+        //     true, the last parked worker will take action.
+        //
+        // `should_wait` is `false` only when this worker is the last parked worker and
+        // `on_last_parked` returned `WakeSelf` or `WakeAll`, meaning work is already known to be
+        // available and this worker must proceed without waiting here.  Note that `should_wait`
+        // says nothing about whether this worker is currently active: a worker that is not the
+        // last parked one (`should_wait == true`) can still be inactive, e.g. if it was
+        // deactivated by `set_active_workers` before it got here.  Such a worker must not wait on
+        // `workers_have_anything_to_do` (it must not consume work packets while inactive), so it
+        // skips straight to the `while` loop below instead.
+        if should_wait && self.is_worker_active(ordinal) {
             sync = self.workers_have_anything_to_do.wait(sync).unwrap();
+        }
+
+        // The worker may be inactive already (see above), or it may become inactive while
+        // waiting above, since its active/inactive status can change at any time `self.sync` is
+        // not held.  Keep waiting on `active_worker_number_changed` -- which is notified whenever
+        // the active worker count changes -- until this worker is (re)activated.
+        while !self.is_worker_active(ordinal) {
+            sync = self.active_worker_number_changed.wait(sync).unwrap();
         }
 
         // Unpark this worker.
@@ -342,5 +423,50 @@ mod tests {
 
         // `on_last_parked` should only be called once.
         assert_eq!(on_last_parked_called.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_only_selected_workers_unpark() {
+        let number_threads = 4;
+        let concurrent_threads = 2;
+        let worker_monitor = Arc::new(WorkerMonitor::new(number_threads));
+        worker_monitor.set_active_workers(concurrent_threads);
+        let first_wave_unparked = AtomicUsize::new(0);
+        let release_everyone = AtomicBool::new(false);
+        let notifier_ran = AtomicBool::new(false);
+
+        std::thread::scope(|scope| {
+            for ordinal in 0..number_threads {
+                let worker_monitor = worker_monitor.clone();
+                let first_wave_unparked = &first_wave_unparked;
+                let release_everyone = &release_everyone;
+                let notifier_ran = &notifier_ran;
+                scope.spawn(move || {
+                    worker_monitor
+                        .park_and_wait(ordinal, |_goals| super::LastParkedResult::WakeAll)
+                        .unwrap();
+
+                    if !release_everyone.load(Ordering::SeqCst) {
+                        first_wave_unparked.fetch_add(1, Ordering::SeqCst);
+                    }
+
+                    if ordinal < concurrent_threads {
+                        while first_wave_unparked.load(Ordering::SeqCst) < concurrent_threads {
+                            std::thread::yield_now();
+                        }
+                        if !notifier_ran.swap(true, Ordering::SeqCst) {
+                            release_everyone.store(true, Ordering::SeqCst);
+                            worker_monitor.set_active_workers(number_threads);
+                            worker_monitor.notify_work_available(true);
+                        }
+                    }
+                });
+            }
+        });
+
+        assert_eq!(
+            first_wave_unparked.load(Ordering::SeqCst),
+            concurrent_threads
+        );
     }
 }
