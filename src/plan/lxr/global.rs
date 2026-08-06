@@ -23,7 +23,6 @@ use crate::policy::immix::ImmixSpaceArgs;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::GcHookWork;
@@ -41,6 +40,7 @@ use crate::vm::ActivePlan;
 use crate::vm::{Collection, ObjectModel, VMBinding};
 use crate::BarrierSelector;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
+use crate::{scheduler::*, MMTK};
 use atomic::{Atomic, Ordering};
 use crossbeam::queue::SegQueue;
 use enum_map::EnumMap;
@@ -279,9 +279,24 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         &self.common
     }
 
-    fn gc_pause_start(&self, _scheduler: &GCWorkScheduler<VM>) {
+    /// Get a mutable reference to the common plan. See [`Self::common`].
+    fn common_mut(&mut self) -> &mut CommonPlan<Self::VM> {
+        &mut self.common
+    }
+
+    fn on_pause_start(&self, mmtk: &'static MMTK<Self::VM>) {
         super::NO_EVAC.store(false, Ordering::SeqCst);
         let pause = self.current_pause().unwrap();
+
+        // Individual RC pauses that don't overlap with concurrent tracing consist of a GC cycle.
+        // Concurrent tracing, including RC pauses in between, counts as one GC cycle.
+        // A Full GC counts as a GC cycle.
+        if pause == Pause::RefCount && !self.concurrent_work_in_progress()
+            || pause == Pause::InitialMark
+            || pause == Pause::Full
+        {
+            mmtk.gc_trigger.policy.on_gc_start(mmtk);
+        }
 
         super::SURVIVAL_RATIO_PREDICTOR
             .set_alloc_size(self.block_allocation.total_young_allocation_in_bytes());
@@ -302,7 +317,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         }
     }
 
-    fn gc_pause_end(&self) {
+    fn on_pause_end(&mut self, mmtk: &'static MMTK<Self::VM>, tls: VMWorkerThread) {
         super::DISABLE_LASY_DEC_FOR_CURRENT_GC.store(false, Ordering::SeqCst);
         // self.immix_space.flush_page_resource();
         let pause = self.current_pause().unwrap();
@@ -323,13 +338,23 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         self.avail_pages_at_end_of_last_gc
             .store(self.get_available_pages(), Ordering::SeqCst);
         HEAP_AFTER_GC.store(self.get_reserved_pages(), Ordering::SeqCst);
+
+        self.common_mut().on_pause_end(tls);
+
+        // Individual RC pauses that don't overlap with concurrent tracing consist of a GC cycle.
+        // Concurrent tracing, including RC pauses in between, counts as one GC cycle.
+        // A Full GC counts as a GC cycle.
+        if pause == Pause::RefCount && !self.concurrent_work_in_progress()
+            || pause == Pause::FinalMark
+            || pause == Pause::Full
+        {
+            mmtk.gc_trigger.policy.on_gc_end(mmtk);
+        }
     }
 
     fn root_scanning_stage(&self) -> WorkBucketStage {
         WorkBucketStage::RCProcessIncs
     }
-
-    fn end_of_gc(&mut self, _tls: VMWorkerThread) {}
 
     fn concurrent(&self) -> Option<&dyn ConcurrentPlan<VM = VM>> {
         Some(self)

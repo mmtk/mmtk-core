@@ -208,13 +208,18 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// This defines what space this plan will allocate objects into for different semantics.
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
 
-    /// Called when all mutators are paused. This is called before prepare.
+    /// Called once all mutators have been stopped.  This is called before `Prepare`, which is right
+    /// before root scanning starts, at the beginning of a GC pause.
     ///
-    /// A plan that overrides this function need to manage the invocation of `GCTriggerPolicy::on_gc_start` at the proper timing for the plan.
-    fn notify_mutators_paused(&self, mmtk: &'static MMTK<Self::VM>) {
+    /// Plans that need to do per-pause setup (e.g. resetting mark tables, flushing mutator state)
+    /// can override this.
+    ///
+    /// A plan that overrides this function need to manage the invocation of
+    /// `GCTriggerPolicy::on_gc_start` at the proper timing for the plan.
+    fn on_pause_start(&self, mmtk: &'static MMTK<Self::VM>) {
         assert!(
             self.concurrent().is_none(),
-            "ConcurrentPlan must override notify_mutators_paused"
+            "ConcurrentPlan must override on_pause_start"
         );
         mmtk.gc_trigger.policy.on_gc_start(mmtk);
     }
@@ -232,17 +237,21 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
     fn release(&mut self, tls: VMWorkerThread);
 
-    /// Inform the plan about the end of a pause. It is guaranteed that there is no further work
-    /// for this pause. This is invoked once per pause by one worker thread. `tls` is the worker
-    /// thread that executes this method.
+    /// Called at the end of a GC pause.  It is guaranteed that there is no further work for this
+    /// pause.  This is invoked once per pause by one worker thread.  `tls` is the worker thread
+    /// that executes this method.
     ///
-    /// A plan that overrides this function need to do whatever the default implementation does at the proper timing
-    /// for the plan, such as calling `CommonPlan::end_of_pause` and `GCTriggerPolicy::on_gc_end`.
-    fn end_of_pause(&mut self, mmtk: &'static MMTK<Self::VM>, tls: VMWorkerThread) {
-        self.common_mut().end_of_pause(tls);
+    /// Plans that need to do per-pause teardown (e.g. recording pause-end statistics) can override
+    /// this.
+    ///
+    /// A plan that overrides this function need to do whatever the default implementation does at
+    /// the proper timing for the plan, such as calling `CommonPlan::on_pause_end`, and selectively
+    /// call `GCTriggerPolicy::on_gc_end` if the pause is the end of a GC.
+    fn on_pause_end(&mut self, mmtk: &'static MMTK<Self::VM>, tls: VMWorkerThread) {
+        self.common_mut().on_pause_end(tls);
         assert!(
             self.concurrent().is_none(),
-            "ConcurrentPlan must override end_of_pause"
+            "ConcurrentPlan must override on_pause_end"
         );
         mmtk.gc_trigger.policy.on_gc_end(mmtk);
     }
@@ -352,15 +361,6 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     fn last_collection_was_exhaustive(&self) -> bool {
         true
     }
-
-    /// Called once all mutators have been stopped, right before root scanning starts, at the
-    /// beginning of a GC pause. Plans that need to do per-pause setup (e.g. resetting mark
-    /// tables, flushing mutator state) can override this. By default, this does nothing.
-    fn gc_pause_start(&self, _scheduler: &GCWorkScheduler<Self::VM>) {}
-    /// Called at the end of a GC pause, after the pause has otherwise finished. Plans that need
-    /// to do per-pause teardown (e.g. recording pause-end statistics) can override this. By
-    /// default, this does nothing.
-    fn gc_pause_end(&self) {}
 
     /// Return the work bucket stage in which mutator (and VM) roots should be scanned for this
     /// plan. By default, roots are scanned in the `Prepare` stage, but concurrent/incremental
@@ -705,8 +705,8 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.vm_space.set_side_log_bits();
     }
 
-    pub fn end_of_pause(&mut self, _tls: VMWorkerThread) {
-        // Do nothing here. None of the spaces needs end_of_pause.
+    pub fn on_pause_end(&mut self, _tls: VMWorkerThread) {
+        // Do nothing here. None of the spaces needs on_pause_end.
     }
 
     pub(crate) fn collection_required<P: Plan>(&self, plan: &P, space_full: bool) -> bool {
@@ -843,9 +843,9 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.set_side_log_bits();
     }
 
-    pub fn end_of_pause(&mut self, tls: VMWorkerThread) {
+    pub fn on_pause_end(&mut self, tls: VMWorkerThread) {
         self.end_of_gc_nonmoving_space();
-        self.base.end_of_pause(tls);
+        self.base.on_pause_end(tls);
     }
 
     pub fn get_immortal(&self) -> &ImmortalSpace<VM> {

@@ -156,11 +156,7 @@ impl<VM: VMBinding> MMTK<VM> {
             *options.threads
         };
 
-        let scheduler = GCWorkScheduler::new(
-            num_workers,
-            usize::min(num_workers, *options.conc_threads),
-            (*options.thread_affinity).clone(),
-        );
+        let scheduler = GCWorkScheduler::new(num_workers, (*options.thread_affinity).clone());
 
         let state = Arc::new(GlobalState::default());
 

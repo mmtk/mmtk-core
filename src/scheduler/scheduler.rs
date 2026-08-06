@@ -39,8 +39,7 @@ pub struct GCWorkScheduler<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Sync for GCWorkScheduler<VM> {}
 
 impl<VM: VMBinding> GCWorkScheduler<VM> {
-    pub fn new(num_workers: usize, num_conc_workers: usize, affinity: AffinityKind) -> Arc<Self> {
-        assert!(num_conc_workers > 0 && num_conc_workers <= num_workers);
+    pub fn new(num_workers: usize, affinity: AffinityKind) -> Arc<Self> {
         assert!(num_workers > 0);
         let worker_monitor: Arc<WorkerMonitor> = Arc::new(WorkerMonitor::new(num_workers));
         let worker_group = WorkerGroup::new(num_workers);
@@ -627,9 +626,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // All other workers are parked, so it is safe to access the Plan instance mutably.
         probe!(mmtk, plan_end_of_gc_begin);
         let plan_mut: &mut dyn Plan<VM = VM> = unsafe { mmtk.get_plan_mut() };
-        // This also tells the GC trigger whether the GC cycle has ended (see
-        // `Plan::end_of_pause`).
-        plan_mut.end_of_pause(mmtk, worker.tls);
+        // This also tells the GC trigger whether the GC cycle has ended (see `Plan::on_pause_end`).
+        plan_mut.on_pause_end(mmtk, worker.tls);
         probe!(mmtk, plan_end_of_gc_end);
 
         // Compute the elapsed time of the GC.
@@ -676,8 +674,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             // reset the logging info at the end of each GC
             mmtk.slot_logger.reset();
         }
-
-        mmtk.get_plan().gc_pause_end();
 
         // Reset the triggering information.
         mmtk.state.reset_collection_trigger();

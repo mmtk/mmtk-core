@@ -277,10 +277,8 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
             }
         });
         trace!("stop_all_mutators end");
-        mmtk.get_plan().gc_pause_start(&mmtk.scheduler);
-        // This also tells the GC trigger whether a new GC cycle has started (see
-        // `Plan::notify_mutators_paused`).
-        mmtk.get_plan().notify_mutators_paused(mmtk);
+        // This also tells the GC trigger whether a new GC cycle has started (see `Plan::gc_pause_start`).
+        mmtk.get_plan().on_pause_start(mmtk);
         mmtk.scheduler.notify_mutators_paused(mmtk);
         // Tell GC trigger that the pause started.
         mmtk.gc_trigger.policy.on_pause_start(mmtk);
