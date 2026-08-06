@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["RESERVED_ALLOCATORS"],"fn":["create_ovc_mutator","ovc_mutator_release"],"struct":["ALLOCATOR_MAPPING","ALLOCATOR_MAPPING_SINGLE_SPACE"]};

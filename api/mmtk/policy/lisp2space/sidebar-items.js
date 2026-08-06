@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["GC_EXTRA_HEADER_BYTES","GC_EXTRA_HEADER_WORD","GC_MARK_BIT_MASK","TRACE_KIND_FORWARD","TRACE_KIND_MARK"],"struct":["Lisp2ObjectSize","Lisp2Space"]};

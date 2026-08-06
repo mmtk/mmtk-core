@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["RESERVED_ALLOCATORS"],"fn":["create_markcompact_mutator","markcompact_mutator_release"],"struct":["ALLOCATOR_MAPPING"]};

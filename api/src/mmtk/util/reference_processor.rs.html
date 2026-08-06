@@ -235,7 +235,7 @@
 <a href=#235 id=235 data-nosnippet>235</a>
 <a href=#236 id=236 data-nosnippet>236</a>    <span class="comment">// These funcions call `trace_object()`, which will ensure the object and its descendents will
 <a href=#237 id=237 data-nosnippet>237</a>    // be traced.  They are only called in steps that expand the transitive closure.  That include
-<a href=#238 id=238 data-nosnippet>238</a>    // retaining soft references, and (for MarkCompact) tracing objects for forwarding.
+<a href=#238 id=238 data-nosnippet>238</a>    // retaining soft references, and (for Lisp2) tracing objects for forwarding.
 <a href=#239 id=239 data-nosnippet>239</a>    // Note that finalizers also expand the transitive closure.
 <a href=#240 id=240 data-nosnippet>240</a>    // These functions are intended to make the code easier to understand.
 <a href=#241 id=241 data-nosnippet>241</a>
@@ -251,7 +251,7 @@
 <a href=#251 id=251 data-nosnippet>251</a>        tracer.trace_object(referent)
 <a href=#252 id=252 data-nosnippet>252</a>    }
 <a href=#253 id=253 data-nosnippet>253</a>
-<a href=#254 id=254 data-nosnippet>254</a>    <span class="doccomment">/// This function is called when forwarding the references and referents (for MarkCompact). It
+<a href=#254 id=254 data-nosnippet>254</a>    <span class="doccomment">/// This function is called when forwarding the references and referents (for Lisp2). It
 <a href=#255 id=255 data-nosnippet>255</a>    /// -   adds the reference or the referent to the tracing queue if not yet reached, so that
 <a href=#256 id=256 data-nosnippet>256</a>    ///     the children of the reference or referent will be visited and forwarded, too, and
 <a href=#257 id=257 data-nosnippet>257</a>    /// -   gets the forwarded object reference of the object.

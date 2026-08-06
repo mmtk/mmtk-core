@@ -5,9 +5,9 @@
 <a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span>std::marker::PhantomData;
 <a href=#7 id=7 data-nosnippet>7</a>
-<a href=#8 id=8 data-nosnippet>8</a><span class="comment">// FIXME: MarkCompact uses linear scanning to discover allocated objects in the MarkCompactSpace.
-<a href=#9 id=9 data-nosnippet>9</a>// It should use a local metadata (specific to the MarkCompactSpace) for that purpose.
-<a href=#10 id=10 data-nosnippet>10</a>// In the future, we should let MarkCompact do linear scanning using its local metadata instead.
+<a href=#8 id=8 data-nosnippet>8</a><span class="comment">// FIXME: Lisp2 uses linear scanning to discover allocated objects in the Lisp2Space.
+<a href=#9 id=9 data-nosnippet>9</a>// It should use a local metadata (specific to the Lisp2Space) for that purpose.
+<a href=#10 id=10 data-nosnippet>10</a>// In the future, we should let Lisp2 do linear scanning using its local metadata instead.
 <a href=#11 id=11 data-nosnippet>11</a>
 <a href=#12 id=12 data-nosnippet>12</a></span><span class="doccomment">/// Iterate over an address range, and find each object by VO bit.
 <a href=#13 id=13 data-nosnippet>13</a>/// ATOMIC_LOAD_VO_BIT can be set to false if it is known that loading VO bit

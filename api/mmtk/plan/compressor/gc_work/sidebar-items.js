@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["AfterCompact","CompressorForwardingWorkContext","CompressorWorkContext","GenerateWork","UpdateReferences"],"type":["ForwardingTrace","MarkingTrace"]};

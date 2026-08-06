@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["OVC_CONSTRAINTS"],"struct":["OVC"]};

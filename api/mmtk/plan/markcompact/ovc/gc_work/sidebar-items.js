@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["AfterCompact","GenerateWork","OVCForwardingWorkContext","OVCWorkContext","UpdateReferences"],"type":["ForwardingTrace","MarkingTrace"]};

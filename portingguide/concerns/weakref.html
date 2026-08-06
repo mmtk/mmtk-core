@@ -637,7 +637,7 @@ entries are immutable, it is sufficient to only visit newly added entries.</li>
 entries and another for young entries.</p>
 <h3 id="copying-versus-non-copying-gc"><a class="header" href="#copying-versus-non-copying-gc">Copying versus non-copying GC</a></h3>
 <p>MMTk provides both copying and non-copying GC plans.  <code>MarkSweep</code> never moves any objects.
-<code>MarkCompact</code>, <code>SemiSpace</code> always moves all objects (except objects in the large object space,
+<code>Lisp2</code>, <code>OVC</code>, <code>SemiSpace</code> always moves all objects (except objects in the large object space,
 immortal space, VM space, etc.).  Immix-based plans sometimes do non-copying GC, and sometimes do
 copying GC.  Regardless of the plan, the VM binding can query if the current GC is a copying GC by
 calling</p>

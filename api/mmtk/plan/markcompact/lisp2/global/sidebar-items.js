@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["LISP2_CONSTRAINTS"],"struct":["Lisp2"]};

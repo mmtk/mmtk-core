@@ -96,10 +96,10 @@
 <a href=#96 id=96 data-nosnippet>96</a>    </span>MS_LOCAL_FREE   = (global: <span class="bool-val">false</span>, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: <span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES),
 <a href=#97 id=97 data-nosnippet>97</a>    <span class="comment">// First cell of thread free list in block for native mimalloc
 <a href=#98 id=98 data-nosnippet>98</a>    </span>MS_THREAD_FREE  = (global: <span class="bool-val">false</span>, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: <span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES),
-<a href=#99 id=99 data-nosnippet>99</a>    <span class="comment">// Start and end marks by Compressor
-<a href=#100 id=100 data-nosnippet>100</a>    </span>COMPRESSOR_MARK = (global: <span class="bool-val">false</span>, log_num_of_bits: <span class="number">0</span>, log_bytes_in_region: LOG_BYTES_IN_WORD <span class="kw">as </span>usize),
-<a href=#101 id=101 data-nosnippet>101</a>    <span class="comment">// Block offset vectors by Compressor
-<a href=#102 id=102 data-nosnippet>102</a>    </span>COMPRESSOR_OFFSET_VECTOR = (global: <span class="bool-val">false</span>, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: <span class="kw">crate</span>::policy::compressor::forwarding::Block::LOG_BYTES),
+<a href=#99 id=99 data-nosnippet>99</a>    <span class="comment">// Start and end marks by OVC
+<a href=#100 id=100 data-nosnippet>100</a>    </span>OVC_MARK = (global: <span class="bool-val">false</span>, log_num_of_bits: <span class="number">0</span>, log_bytes_in_region: LOG_BYTES_IN_WORD <span class="kw">as </span>usize),
+<a href=#101 id=101 data-nosnippet>101</a>    <span class="comment">// Block offset vectors by OVC
+<a href=#102 id=102 data-nosnippet>102</a>    </span>OVC_OFFSET_VECTOR = (global: <span class="bool-val">false</span>, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: <span class="kw">crate</span>::policy::ovc::forwarding::Block::LOG_BYTES),
 <a href=#103 id=103 data-nosnippet>103</a>);
 <a href=#104 id=104 data-nosnippet>104</a>
 <a href=#105 id=105 data-nosnippet>105</a><span class="attr">#[cfg(test)]

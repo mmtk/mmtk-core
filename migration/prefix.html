@@ -208,14 +208,53 @@ Notes for the mmtk-core developers:
 -->
 <div id="api-migration-detail-body"><!-- We use JavaScript to process things within this div. -->
 <!-- Insert new versions here -->
-<h2 id="0330"><a class="header" href="#0330">0.33.0</a></h2>
-<h3 id="gctriggerpolicyon_gc_starton_gc_end-repurposed-for-gc-cycles"><a class="header" href="#gctriggerpolicyon_gc_starton_gc_end-repurposed-for-gc-cycles"><code>GCTriggerPolicy::on_gc_start/on_gc_end</code> repurposed for GC cycles</a></h3>
+<h2 id="0340"><a class="header" href="#0340">0.34.0</a></h2>
+<h3 id="rename-compressor-to-ovc-and-markcompact-to-lisp2"><a class="header" href="#rename-compressor-to-ovc-and-markcompact-to-lisp2">Rename "Compressor" to "OVC", and "MarkCompact" to "Lisp2"</a></h3>
 <div id="admonition-tldr" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-title">
 <div class="admonition-title">
 <div id="admonition-tldr-title">
 <p>TL;DR</p>
 </div>
 <a class="admonition-anchor-link" href="#admonition-tldr"></a>
+</div>
+<div>
+<p>The <code>Compressor</code> plan is renamed to <code>OVC</code>, and the <code>MarkCompact</code> plan is renamed to <code>Lisp2</code>.
+Both plans now live under the shared <code>plan::markcompact</code> module, as
+<code>plan::markcompact::ovc::OVC</code> and <code>plan::markcompact::lisp2::Lisp2</code> respectively. VM bindings that
+select a plan by name (e.g. via <code>MMTK_PLAN</code>), or refer to the renamed types/modules directly, need to
+be updated.</p>
+</div>
+</div>
+<p>API changes:</p>
+<ul>
+<li>enum <code>util::options::PlanSelector</code>
+<ul>
+<li><code>Compressor</code> -&gt; <code>OVC</code></li>
+<li><code>MarkCompact</code> -&gt; <code>Lisp2</code>
+<ul>
+<li>This also changes the string accepted for the <code>plan</code> option (e.g. via the <code>MMTK_PLAN</code>
+environment variable used by some bindings): use <code>"OVC"</code>/<code>"Lisp2"</code> instead of
+<code>"Compressor"</code>/<code>"MarkCompact"</code>.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Cargo feature <code>compressor_single_space</code> -&gt; <code>ovc_single_space</code></li>
+</ul>
+<p>Not API change, but worth noting:</p>
+<ul>
+<li>Any string that names these plans (e.g. the <code>MMTK_PLAN</code> environment variable used by some
+bindings, or benchmark/CI configuration keyed by plan name) must be updated from
+<code>"MarkCompact"</code>/<code>"Compressor"</code> to <code>"Lisp2"</code>/<code>"OVC"</code>.</li>
+</ul>
+<h2 id="0330"><a class="header" href="#0330">0.33.0</a></h2>
+<h3 id="gctriggerpolicyon_gc_starton_gc_end-repurposed-for-gc-cycles"><a class="header" href="#gctriggerpolicyon_gc_starton_gc_end-repurposed-for-gc-cycles"><code>GCTriggerPolicy::on_gc_start/on_gc_end</code> repurposed for GC cycles</a></h3>
+<div id="admonition-tldr-1" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-1-title">
+<div class="admonition-title">
+<div id="admonition-tldr-1-title">
+<p>TL;DR</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-tldr-1"></a>
 </div>
 <div>
 <p>The old <code>on_gc_start</code> and <code>on_gc_end</code> (called once per STW pause) are renamed to <code>on_pause_start</code>
@@ -265,12 +304,12 @@ the first pause of the cycle, and <code>on_gc_end</code> only for the last.</li>
 <p>This only affects VM bindings that provide a custom <code>GCTriggerPolicy</code> (via
 <code>Collection::create_gc_trigger</code>).</p>
 <h3 id="collection-enablingdisabling-is-now-managed-by-mmtk-instead-of-the-vm-binding"><a class="header" href="#collection-enablingdisabling-is-now-managed-by-mmtk-instead-of-the-vm-binding">Collection enabling/disabling is now managed by MMTk instead of the VM binding</a></h3>
-<div id="admonition-tldr-1" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-1-title">
+<div id="admonition-tldr-2" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-2-title">
 <div class="admonition-title">
-<div id="admonition-tldr-1-title">
+<div id="admonition-tldr-2-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-1"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-2"></a>
 </div>
 <div>
 <p><code>Collection::is_collection_enabled()</code> is removed.  MMTk now tracks whether collection is enabled
@@ -318,12 +357,12 @@ returns false.</li>
 <li>PR: <a href="https://github.com/mmtk/mmtk-core/pull/1457">https://github.com/mmtk/mmtk-core/pull/1457</a></li>
 </ul>
 <h3 id="slot-is-required-to-implement-sync"><a class="header" href="#slot-is-required-to-implement-sync"><code>Slot</code> is required to implement <code>Sync</code></a></h3>
-<div id="admonition-tldr-2" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-2-title">
+<div id="admonition-tldr-3" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-3-title">
 <div class="admonition-title">
-<div id="admonition-tldr-2-title">
+<div id="admonition-tldr-3-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-2"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-3"></a>
 </div>
 <div>
 <p><code>vm::slot::Slot</code> now needs to implement <code>Sync</code>.</p>
@@ -347,12 +386,12 @@ no change is needed.</li>
 </li>
 </ul>
 <h3 id="thread-ids-require-debug-instead-of-display"><a class="header" href="#thread-ids-require-debug-instead-of-display">Thread IDs require <code>Debug</code> instead of <code>Display</code></a></h3>
-<div id="admonition-tldr-3" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-3-title">
+<div id="admonition-tldr-4" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-4-title">
 <div class="admonition-title">
-<div id="admonition-tldr-3-title">
+<div id="admonition-tldr-4-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-3"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-4"></a>
 </div>
 <div>
 <p><code>mmtk::util::os::OS::ThreadIDType</code> now needs to implement <code>Debug</code> instead of <code>Display</code>.</p>
@@ -374,12 +413,12 @@ their thread ID type.</li>
 </li>
 </ul>
 <h3 id="the-w-lifetime-in-objecttracercontext"><a class="header" href="#the-w-lifetime-in-objecttracercontext">The <code>&lt;'w&gt;</code> lifetime in <code>ObjectTracerContext</code></a></h3>
-<div id="admonition-tldr-4" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-4-title">
+<div id="admonition-tldr-5" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-5-title">
 <div class="admonition-title">
-<div id="admonition-tldr-4-title">
+<div id="admonition-tldr-5-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-4"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-5"></a>
 </div>
 <div>
 <p>Your existing source code probably still works.</p>
@@ -402,12 +441,12 @@ This has always been true, but we now made it explicit through the lifetime para
 </li>
 </ul>
 <h3 id="type-argument-changes-in-finalizablekeep_alive-module"><a class="header" href="#type-argument-changes-in-finalizablekeep_alive-module">Type argument changes in <code>Finalizable::keep_alive</code> module</a></h3>
-<div id="admonition-tldr-5" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-5-title">
+<div id="admonition-tldr-6" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-6-title">
 <div class="admonition-title">
-<div id="admonition-tldr-5-title">
+<div id="admonition-tldr-6-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-5"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-6"></a>
 </div>
 <div>
 <p><code>Finalizable::keep_alive</code> now has the <code>&lt;OT: ObjectTracer&gt;</code> type parameter.</p>
@@ -425,12 +464,12 @@ same way.</li>
 </li>
 </ul>
 <h3 id="the-cargo-feature-is_mmtk_object-is-removed"><a class="header" href="#the-cargo-feature-is_mmtk_object-is-removed">The Cargo feature "is_mmtk_object" is removed</a></h3>
-<div id="admonition-tldr-6" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-6-title">
+<div id="admonition-tldr-7" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-7-title">
 <div class="admonition-title">
-<div id="admonition-tldr-6-title">
+<div id="admonition-tldr-7-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-6"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-7"></a>
 </div>
 <div>
 <p>The "is_mmtk_object" cargo feature is removed.  Anything previously enabled by the "is_mmtk_object"
@@ -440,12 +479,12 @@ feature are now enabled by the "vo_bit" feature.</p>
 <p>API changes: None.  If a VM binding uses the "is_mmtk_object" feature, it should now use the
 "vo_bit" feature if not already using, and existing code should still compile.</p>
 <h3 id="side-metadata-base-addresses-are-no-longer-constants"><a class="header" href="#side-metadata-base-addresses-are-no-longer-constants">Side metadata base addresses are no longer constants</a></h3>
-<div id="admonition-tldr-7" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-7-title">
+<div id="admonition-tldr-8" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-8-title">
 <div class="admonition-title">
-<div id="admonition-tldr-7-title">
+<div id="admonition-tldr-8-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-7"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-8"></a>
 </div>
 <div>
 <p>Side metadata addresses are now chosen at runtime.  The old address constants are removed and
@@ -488,12 +527,12 @@ boot time. Bindings should fetch them from the accessor functions after MMTk ini
 completed. Bindings can assume the addresses will not change once they are initialized.</p>
 <h2 id="0320"><a class="header" href="#0320">0.32.0</a></h2>
 <h3 id="allocation-options-changed"><a class="header" href="#allocation-options-changed">Allocation options changed</a></h3>
-<div id="admonition-tldr-8" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-8-title">
+<div id="admonition-tldr-9" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-9-title">
 <div class="admonition-title">
-<div id="admonition-tldr-8-title">
+<div id="admonition-tldr-9-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-8"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-9"></a>
 </div>
 <div>
 <p><code>AllocationOptions</code> now has multiple boolean fields instead of one <code>OnAllocationFail</code> field.  Now
@@ -531,12 +570,12 @@ possible.</p>
 <li>PR: <a href="https://github.com/mmtk/mmtk-core/pull/1400">https://github.com/mmtk/mmtk-core/pull/1400</a></li>
 </ul>
 <h3 id="removed-the-notion-of-mmap-chunk"><a class="header" href="#removed-the-notion-of-mmap-chunk">Removed the notion of "mmap chunk"</a></h3>
-<div id="admonition-tldr-9" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-9-title">
+<div id="admonition-tldr-10" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-10-title">
 <div class="admonition-title">
-<div id="admonition-tldr-9-title">
+<div id="admonition-tldr-10-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-9"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-10"></a>
 </div>
 <div>
 <p>Constants such as <code>MMAP_CHUNK_BYTES</code> were related to the implementation details of the memory
@@ -559,12 +598,12 @@ mapper, and should not have been exposed.</p>
 </li>
 </ul>
 <h3 id="options-no-longer-differentiates-between-environment-variables-and-command-line-arguments"><a class="header" href="#options-no-longer-differentiates-between-environment-variables-and-command-line-arguments"><code>Options</code> no longer differentiates between environment variables and command line arguments.</a></h3>
-<div id="admonition-tldr-10" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-10-title">
+<div id="admonition-tldr-11" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-11-title">
 <div class="admonition-title">
-<div id="admonition-tldr-10-title">
+<div id="admonition-tldr-11-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-10"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-11"></a>
 </div>
 <div>
 <p>We replaced both <code>Options::set_from_command_line</code> and <code>Options::set_from_env_var</code> with
@@ -601,12 +640,12 @@ example, <code>options.plan.set(user_input.parse()?);</code>.</li>
 </li>
 </ul>
 <h3 id="the-feature-immix_stress_copying-is-removed"><a class="header" href="#the-feature-immix_stress_copying-is-removed">The feature <code>immix_stress_copying</code> is removed.</a></h3>
-<div id="admonition-tldr-11" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-11-title">
+<div id="admonition-tldr-12" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-12-title">
 <div class="admonition-title">
-<div id="admonition-tldr-11-title">
+<div id="admonition-tldr-12-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-11"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-12"></a>
 </div>
 <div>
 <p>The feature <code>immix_stress_copying</code> is removed. Bindings can use MMTk options with the following values
@@ -630,12 +669,12 @@ to achieve the same behavior as before: <code>immix_always_defrag=true,immix_def
 </ul>
 <h2 id="0300"><a class="header" href="#0300">0.30.0</a></h2>
 <h3 id="live_bytes_in_last_gc-becomes-a-runtime-option-and-returns-a-map-for-live-bytes-in-each-space"><a class="header" href="#live_bytes_in_last_gc-becomes-a-runtime-option-and-returns-a-map-for-live-bytes-in-each-space"><code>live_bytes_in_last_gc</code> becomes a runtime option, and returns a map for live bytes in each space</a></h3>
-<div id="admonition-tldr-12" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-12-title">
+<div id="admonition-tldr-13" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-13-title">
 <div class="admonition-title">
-<div id="admonition-tldr-12-title">
+<div id="admonition-tldr-13-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-12"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-13"></a>
 </div>
 <div>
 <p><code>count_live_bytes_in_gc</code> is now a runtime option instead of a features (build-time), and we collect
@@ -663,12 +702,12 @@ strings for space names, and the values are statistics for live bytes in the spa
 <li>PR: <a href="https://github.com/mmtk/mmtk-core/pull/1238">https://github.com/mmtk/mmtk-core/pull/1238</a></li>
 </ul>
 <h3 id="mmap-related-functions-require-annotation"><a class="header" href="#mmap-related-functions-require-annotation">mmap-related functions require annotation</a></h3>
-<div id="admonition-tldr-13" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-13-title">
+<div id="admonition-tldr-14" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-14-title">
 <div class="admonition-title">
-<div id="admonition-tldr-13-title">
+<div id="admonition-tldr-14-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-13"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-14"></a>
 </div>
 <div>
 <p>Memory-mapping functions in <code>mmtk::util::memory</code> now take an additional <code>MmapAnnotation</code> argument.</p>
@@ -690,12 +729,12 @@ strings for space names, and the values are statistics for live bytes in the spa
 </ul>
 <h2 id="0280"><a class="header" href="#0280">0.28.0</a></h2>
 <h3 id="handle_user_collection_request-returns-bool"><a class="header" href="#handle_user_collection_request-returns-bool"><code>handle_user_collection_request</code> returns <code>bool</code></a></h3>
-<div id="admonition-tldr-14" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-14-title">
+<div id="admonition-tldr-15" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-15-title">
 <div class="admonition-title">
-<div id="admonition-tldr-14-title">
+<div id="admonition-tldr-15-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-14"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-15"></a>
 </div>
 <div>
 <p><code>memory_manager::handle_user_collection_request</code> now returns a boolean value to indicate whether a GC
@@ -722,12 +761,12 @@ Bindings may use the value, or simply ignore it.</li>
 </li>
 </ul>
 <h3 id="objectreference-must-point-inside-an-object"><a class="header" href="#objectreference-must-point-inside-an-object"><code>ObjectReference</code> must point inside an object</a></h3>
-<div id="admonition-tldr-15" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-15-title">
+<div id="admonition-tldr-16" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-16-title">
 <div class="admonition-title">
-<div id="admonition-tldr-15-title">
+<div id="admonition-tldr-16-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-15"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-16"></a>
 </div>
 <div>
 <p><code>ObjectReference</code> is now required to be an address within an object.  The concept of "in-object
@@ -805,12 +844,12 @@ filter out such illegal values.</li>
 </ul>
 <h2 id="0270"><a class="header" href="#0270">0.27.0</a></h2>
 <h3 id="is_mmtk_object-returns-optionobjectreference"><a class="header" href="#is_mmtk_object-returns-optionobjectreference"><code>is_mmtk_object</code> returns <code>Option&lt;ObjectReference&gt;</code></a></h3>
-<div id="admonition-tldr-16" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-16-title">
+<div id="admonition-tldr-17" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-17-title">
 <div class="admonition-title">
-<div id="admonition-tldr-16-title">
+<div id="admonition-tldr-17-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-16"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-17"></a>
 </div>
 <div>
 <p><code>memory_manager::is_mmtk_object</code> now returns <code>Option&lt;ObjectReference&gt;</code> instead of <code>bool</code>.
@@ -831,12 +870,12 @@ Bindings can use the returned object reference instead of computing the object r
 <li>Example: <a href="https://github.com/mmtk/mmtk-ruby/pull/86">https://github.com/mmtk/mmtk-ruby/pull/86</a></li>
 </ul>
 <h3 id="introduce-objectmodelin_object_address_offset"><a class="header" href="#introduce-objectmodelin_object_address_offset">Introduce <code>ObjectModel::IN_OBJECT_ADDRESS_OFFSET</code></a></h3>
-<div id="admonition-tldr-17" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-17-title">
+<div id="admonition-tldr-18" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-18-title">
 <div class="admonition-title">
-<div id="admonition-tldr-17-title">
+<div id="admonition-tldr-18-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-17"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-18"></a>
 </div>
 <div>
 <p>We used to have <code>ObjectModel::ref_to_address</code> and <code>ObjectModel::address_to_ref</code>, and require
@@ -867,12 +906,12 @@ to the word size. This is checked in debug builds when an <code>ObjectReference<
 </ul>
 <h2 id="0260"><a class="header" href="#0260">0.26.0</a></h2>
 <h3 id="rename-edge-to-slot"><a class="header" href="#rename-edge-to-slot">Rename "edge" to "slot"</a></h3>
-<div id="admonition-tldr-18" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-18-title">
+<div id="admonition-tldr-19" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-19-title">
 <div class="admonition-title">
-<div id="admonition-tldr-18-title">
+<div id="admonition-tldr-19-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-18"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-19"></a>
 </div>
 <div>
 <p>The word "edge" <strong>in many identifiers</strong> have been changed to "slot" if it actaully means slot.
@@ -941,12 +980,12 @@ the refactoring/renaming tools in IDEs should be helpful.</p>
 </ul>
 <h2 id="0250"><a class="header" href="#0250">0.25.0</a></h2>
 <h3 id="objectreference-is-no-longer-nullable"><a class="header" href="#objectreference-is-no-longer-nullable"><code>ObjectReference</code> is no longer nullable</a></h3>
-<div id="admonition-tldr-19" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-19-title">
+<div id="admonition-tldr-20" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-20-title">
 <div class="admonition-title">
-<div id="admonition-tldr-19-title">
+<div id="admonition-tldr-20-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-19"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-20"></a>
 </div>
 <div>
 <p><code>ObjectReference</code> can no longer represent a NULL reference.  Some methods of <code>ObjectReference</code> and
@@ -1085,12 +1124,12 @@ by wrapping them into <code>extern "C"</code> functions that return <code>Object
 <li>Example: <a href="https://github.com/mmtk/mmtk-openjdk/pull/273">https://github.com/mmtk/mmtk-openjdk/pull/273</a> (for write barriers)</li>
 </ul>
 <h3 id="instance-methods-of-objectreference-changed"><a class="header" href="#instance-methods-of-objectreference-changed">Instance methods of <code>ObjectReference</code> changed</a></h3>
-<div id="admonition-tldr-20" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-20-title">
+<div id="admonition-tldr-21" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-21-title">
 <div class="admonition-title">
-<div id="admonition-tldr-20-title">
+<div id="admonition-tldr-21-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-20"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-21"></a>
 </div>
 <div>
 <p>Some methods of <code>ObjectReference</code> now have a type parameter <code>&lt;VM&gt;</code>.  <code>ObjectReference::value()</code> is
@@ -1125,12 +1164,12 @@ removed.</p>
 <li>Example: <a href="https://github.com/mmtk/mmtk-openjdk/pull/272">https://github.com/mmtk/mmtk-openjdk/pull/272</a></li>
 </ul>
 <h3 id="the-gc-controller-aka-coordinator-is-removed"><a class="header" href="#the-gc-controller-aka-coordinator-is-removed">The GC controller (a.k.a. coordinator) is removed</a></h3>
-<div id="admonition-tldr-21" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-21-title">
+<div id="admonition-tldr-22" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-22-title">
 <div class="admonition-title">
-<div id="admonition-tldr-21-title">
+<div id="admonition-tldr-22-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tldr-21"></a>
+<a class="admonition-anchor-link" href="#admonition-tldr-22"></a>
 </div>
 <div>
 <p>The GC controller thread is removed from MMTk core.  The VM binding needs to re-implement

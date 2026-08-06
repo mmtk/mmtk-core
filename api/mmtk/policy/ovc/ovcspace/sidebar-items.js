@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["TRACE_KIND_FORWARD_ROOT","TRACE_KIND_MARK"],"struct":["CalculateOffsetVector","Compact","OVCSpace"]};

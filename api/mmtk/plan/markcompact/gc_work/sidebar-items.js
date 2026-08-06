@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["CalculateForwardingAddress","Compact","MarkCompactForwardingGCWorkContext","MarkCompactGCWorkContext","UpdateReferences"],"type":["ForwardingTrace","MarkingTrace"]};

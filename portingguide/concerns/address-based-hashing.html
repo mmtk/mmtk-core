@@ -318,12 +318,12 @@ Hash at the end                    │   Header   │ ordinary fields...       �
 <h3 id="gc-copying-objects"><a class="header" href="#gc-copying-objects">GC: Copying Objects</a></h3>
 <p>MMTk calls the following trait methods implemented by the VM binding during copying GC.</p>
 <ul>
-<li>For non-delayed-copy collectors (all moving plans except MarkCompact)
+<li>For non-delayed-copy collectors (all moving plans except Lisp2 and OVC)
 <ul>
 <li><code>ObjectModel::copy</code></li>
 </ul>
 </li>
-<li>For delayed-copy collectors (MarkCompact)
+<li>For delayed-copy collectors (Lisp2 and OVC)
 <ul>
 <li><code>ObjectModel::copy_to</code></li>
 <li><code>ObjectModel::get_reference_when_copied_to</code></li>

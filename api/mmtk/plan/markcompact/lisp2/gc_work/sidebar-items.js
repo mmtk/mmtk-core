@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["CalculateForwardingAddress","Compact","Lisp2ForwardingGCWorkContext","Lisp2GCWorkContext","UpdateReferences"],"type":["ForwardingTrace","MarkingTrace"]};
