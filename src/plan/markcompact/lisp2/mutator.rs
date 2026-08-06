@@ -37,7 +37,7 @@ pub fn create_lisp2_mutator<VM: VMBinding>(
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, lisp2);
-            vec.push((AllocatorSelector::Lisp2(0), lisp2.mc_space()));
+            vec.push((AllocatorSelector::Lisp2(0), lisp2.lisp2_space()));
             vec
         }),
         prepare_func: &common_prepare_func,

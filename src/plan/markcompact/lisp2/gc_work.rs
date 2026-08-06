@@ -14,18 +14,18 @@ use std::marker::PhantomData;
 
 /// iterate through the heap and calculate the new location of live objects
 pub struct CalculateForwardingAddress<VM: VMBinding> {
-    mc_space: &'static Lisp2Space<VM>,
+    space: &'static Lisp2Space<VM>,
 }
 
 impl<VM: VMBinding> GCWork<VM> for CalculateForwardingAddress<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.mc_space.calculate_forwarding_pointer();
+        self.space.calculate_forwarding_pointer();
     }
 }
 
 impl<VM: VMBinding> CalculateForwardingAddress<VM> {
-    pub fn new(mc_space: &'static Lisp2Space<VM>) -> Self {
-        Self { mc_space }
+    pub fn new(space: &'static Lisp2Space<VM>) -> Self {
+        Self { space }
     }
 }
 
@@ -77,18 +77,18 @@ impl<VM: VMBinding> UpdateReferences<VM> {
 
 /// compact live objects based on forwarding pointers calculated before
 pub struct Compact<VM: VMBinding> {
-    mc_space: &'static Lisp2Space<VM>,
+    space: &'static Lisp2Space<VM>,
 }
 
 impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.mc_space.compact();
+        self.space.compact();
     }
 }
 
 impl<VM: VMBinding> Compact<VM> {
-    pub fn new(mc_space: &'static Lisp2Space<VM>) -> Self {
-        Self { mc_space }
+    pub fn new(space: &'static Lisp2Space<VM>) -> Self {
+        Self { space }
     }
 }
 

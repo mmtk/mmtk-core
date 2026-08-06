@@ -33,7 +33,7 @@ use mmtk_macros::{HasSpaces, PlanTraceObject};
 pub struct Lisp2<VM: VMBinding> {
     #[space]
     #[copy_semantics(CopySemantics::DefaultCopy)]
-    pub mc_space: Lisp2Space<VM>,
+    pub lisp2_space: Lisp2Space<VM>,
     #[parent]
     pub common: CommonPlan<VM>,
 }
@@ -70,12 +70,12 @@ impl<VM: VMBinding> Plan for Lisp2<VM> {
 
     fn prepare(&mut self, _tls: VMWorkerThread) {
         self.common.prepare(_tls, true);
-        self.mc_space.prepare();
+        self.lisp2_space.prepare();
     }
 
     fn release(&mut self, _tls: VMWorkerThread) {
         self.common.release(_tls, true);
-        self.mc_space.release();
+        self.lisp2_space.release();
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -95,10 +95,10 @@ impl<VM: VMBinding> Plan for Lisp2<VM> {
             .add(Prepare::<Lisp2GCWorkContext<VM>>::new(self));
 
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
-            .add(CalculateForwardingAddress::<VM>::new(&self.mc_space));
+            .add(CalculateForwardingAddress::<VM>::new(&self.lisp2_space));
         // do another trace to update references
         scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new(self));
-        scheduler.work_buckets[WorkBucketStage::Compact].add(Compact::<VM>::new(&self.mc_space));
+        scheduler.work_buckets[WorkBucketStage::Compact].add(Compact::<VM>::new(&self.lisp2_space));
 
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
@@ -165,7 +165,7 @@ impl<VM: VMBinding> Plan for Lisp2<VM> {
     }
 
     fn get_used_pages(&self) -> usize {
-        self.mc_space.reserved_pages() + self.common.get_used_pages()
+        self.lisp2_space.reserved_pages() + self.common.get_used_pages()
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
@@ -195,22 +195,22 @@ impl<VM: VMBinding> Lisp2<VM> {
             global_side_metadata_specs,
         };
 
-        let mc_space = Lisp2Space::new(plan_args.get_normal_space_args(
-            "mc",
+        let lisp2_space = Lisp2Space::new(plan_args.get_normal_space_args(
+            "lisp2",
             true,
             false,
             VMRequest::discontiguous(),
         ));
 
         Lisp2 {
-            mc_space,
+            lisp2_space,
             common: CommonPlan::new(plan_args),
         }
     }
 }
 
 impl<VM: VMBinding> Lisp2<VM> {
-    pub fn mc_space(&self) -> &Lisp2Space<VM> {
-        &self.mc_space
+    pub fn lisp2_space(&self) -> &Lisp2Space<VM> {
+        &self.lisp2_space
     }
 }
