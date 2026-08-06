@@ -54,8 +54,8 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::PageProtect => {
             crate::plan::pageprotect::mutator::create_pp_mutator(tls, mmtk)
         }
-        PlanSelector::MarkCompact => {
-            crate::plan::markcompact::mutator::create_markcompact_mutator(tls, mmtk)
+        PlanSelector::Lisp2 => {
+            crate::plan::markcompact::lisp2::mutator::create_lisp2_mutator(tls, mmtk)
         }
         PlanSelector::StickyImmix => {
             crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
@@ -63,9 +63,7 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::ConcurrentImmix => {
             crate::plan::concurrent::immix::mutator::create_concurrent_immix_mutator(tls, mmtk)
         }
-        PlanSelector::Compressor => {
-            crate::plan::compressor::mutator::create_compressor_mutator(tls, mmtk)
-        }
+        PlanSelector::OVC => crate::plan::markcompact::ovc::mutator::create_ovc_mutator(tls, mmtk),
     })
 }
 
@@ -100,8 +98,8 @@ pub fn create_plan<VM: VMBinding>(
         PlanSelector::PageProtect => {
             Box::new(crate::plan::pageprotect::PageProtect::new(args)) as Box<dyn Plan<VM = VM>>
         }
-        PlanSelector::MarkCompact => {
-            Box::new(crate::plan::markcompact::MarkCompact::new(args)) as Box<dyn Plan<VM = VM>>
+        PlanSelector::Lisp2 => {
+            Box::new(crate::plan::markcompact::lisp2::Lisp2::new(args)) as Box<dyn Plan<VM = VM>>
         }
         PlanSelector::StickyImmix => {
             Box::new(crate::plan::sticky::immix::StickyImmix::new(args)) as Box<dyn Plan<VM = VM>>
@@ -110,8 +108,8 @@ pub fn create_plan<VM: VMBinding>(
             Box::new(crate::plan::concurrent::immix::ConcurrentImmix::new(args))
                 as Box<dyn Plan<VM = VM>>
         }
-        PlanSelector::Compressor => {
-            Box::new(crate::plan::compressor::Compressor::new(args)) as Box<dyn Plan<VM = VM>>
+        PlanSelector::OVC => {
+            Box::new(crate::plan::markcompact::ovc::OVC::new(args)) as Box<dyn Plan<VM = VM>>
         }
     }
 }

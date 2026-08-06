@@ -4,7 +4,7 @@
 //! | Policy            | When are VO bits of dead objects cleared                      |
 //! |-------------------|---------------------------------------------------------------|
 //! | MarkSweepSpace    | when sweeping cells of dead objects                           |
-//! | MarkCompactSpace  | when compacting                                               |
+//! | Lisp2Space  | when compacting                                               |
 //! | CopySpace         | when releasing the space                                      |
 //!
 //! The policies listed above trivially clear the VO bits for dead objects (individually or in

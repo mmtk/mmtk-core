@@ -1,7 +1,7 @@
-use super::global::MarkCompact;
+use super::global::Lisp2;
 use crate::plan::tracing::{PlanTrace, UnsupportedTrace};
-use crate::policy::markcompactspace::MarkCompactSpace;
-use crate::policy::markcompactspace::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
+use crate::policy::lisp2space::Lisp2Space;
+use crate::policy::lisp2space::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
 use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
@@ -14,7 +14,7 @@ use std::marker::PhantomData;
 
 /// iterate through the heap and calculate the new location of live objects
 pub struct CalculateForwardingAddress<VM: VMBinding> {
-    mc_space: &'static MarkCompactSpace<VM>,
+    mc_space: &'static Lisp2Space<VM>,
 }
 
 impl<VM: VMBinding> GCWork<VM> for CalculateForwardingAddress<VM> {
@@ -24,7 +24,7 @@ impl<VM: VMBinding> GCWork<VM> for CalculateForwardingAddress<VM> {
 }
 
 impl<VM: VMBinding> CalculateForwardingAddress<VM> {
-    pub fn new(mc_space: &'static MarkCompactSpace<VM>) -> Self {
+    pub fn new(mc_space: &'static Lisp2Space<VM>) -> Self {
         Self { mc_space }
     }
 }
@@ -32,7 +32,7 @@ impl<VM: VMBinding> CalculateForwardingAddress<VM> {
 /// create another round of root scanning work packets
 /// to update object references
 pub struct UpdateReferences<VM: VMBinding> {
-    plan: *const MarkCompact<VM>,
+    plan: *const Lisp2<VM>,
     p: PhantomData<VM>,
 }
 
@@ -44,7 +44,7 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
         VM::VMScanning::prepare_for_roots_re_scanning();
         mmtk.state.prepare_for_stack_scanning();
         // Prepare common and base spaces for the 2nd round of transitive closure
-        let plan_mut = unsafe { &mut *(self.plan as *mut MarkCompact<VM>) };
+        let plan_mut = unsafe { &mut *(self.plan as *mut Lisp2<VM>) };
         plan_mut.common.release(worker.tls, true);
         plan_mut.common.prepare(worker.tls, true);
         #[cfg(feature = "extreme_assertions")]
@@ -57,17 +57,17 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
 
         for mutator in VM::VMActivePlan::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots].add(ScanMutatorRoots::<
-                MarkCompactForwardingGCWorkContext<VM>,
+                Lisp2ForwardingGCWorkContext<VM>,
             >(mutator));
         }
 
         mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]
-            .add(ScanVMSpecificRoots::<MarkCompactForwardingGCWorkContext<VM>>::new());
+            .add(ScanVMSpecificRoots::<Lisp2ForwardingGCWorkContext<VM>>::new());
     }
 }
 
 impl<VM: VMBinding> UpdateReferences<VM> {
-    pub fn new(plan: &MarkCompact<VM>) -> Self {
+    pub fn new(plan: &Lisp2<VM>) -> Self {
         Self {
             plan,
             p: PhantomData,
@@ -77,7 +77,7 @@ impl<VM: VMBinding> UpdateReferences<VM> {
 
 /// compact live objects based on forwarding pointers calculated before
 pub struct Compact<VM: VMBinding> {
-    mc_space: &'static MarkCompactSpace<VM>,
+    mc_space: &'static Lisp2Space<VM>,
 }
 
 impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
@@ -87,28 +87,28 @@ impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
 }
 
 impl<VM: VMBinding> Compact<VM> {
-    pub fn new(mc_space: &'static MarkCompactSpace<VM>) -> Self {
+    pub fn new(mc_space: &'static Lisp2Space<VM>) -> Self {
         Self { mc_space }
     }
 }
 
 /// Marking trace
-pub type MarkingTrace<VM> = PlanTrace<MarkCompact<VM>, TRACE_KIND_MARK>;
+pub type MarkingTrace<VM> = PlanTrace<Lisp2<VM>, TRACE_KIND_MARK>;
 /// Forwarding trace
-pub type ForwardingTrace<VM> = PlanTrace<MarkCompact<VM>, TRACE_KIND_FORWARD>;
+pub type ForwardingTrace<VM> = PlanTrace<Lisp2<VM>, TRACE_KIND_FORWARD>;
 
-pub struct MarkCompactGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
-impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactGCWorkContext<VM> {
+pub struct Lisp2GCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for Lisp2GCWorkContext<VM> {
     type VM = VM;
-    type PlanType = MarkCompact<VM>;
+    type PlanType = Lisp2<VM>;
     type DefaultTrace = MarkingTrace<VM>;
     type PinningTrace = UnsupportedTrace<VM>;
 }
 
-pub struct MarkCompactForwardingGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
-impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactForwardingGCWorkContext<VM> {
+pub struct Lisp2ForwardingGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for Lisp2ForwardingGCWorkContext<VM> {
     type VM = VM;
-    type PlanType = MarkCompact<VM>;
+    type PlanType = Lisp2<VM>;
     type DefaultTrace = ForwardingTrace<VM>;
     type PinningTrace = UnsupportedTrace<VM>;
 }

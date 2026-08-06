@@ -65,7 +65,7 @@ pub trait Trace: 'static + Send + Clone {
     /// ## The enqueued value and the return value
     ///
     /// The return value may be different from the enqueued value.  For example, during the
-    /// forwarding stage of MarkCompact, it returns the new object reference, but enqueues the old
+    /// forwarding stage of Lisp2, it returns the new object reference, but enqueues the old
     /// `object` because the object has not been moved, yet.
     ///
     /// ## The `queue` can be a callback instead of a collection
