@@ -468,11 +468,6 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     fn flush(&mut self) {
         self.flush_remembered_sets();
     }
-    /// Assert that this mutator's barrier has been flushed (i.e. it has no pending remembered-set
-    /// entries buffered). Used for sanity checking.
-    fn assert_is_flushed(&mut self) {
-        // self.barrier().assert_is_flushed();
-    }
     /// Get the mutator thread for this mutator context. This is the same value as the argument supplied in
     /// [`crate::memory_manager::bind_mutator`] when this mutator is created.
     fn get_tls(&self) -> VMMutatorThread;
