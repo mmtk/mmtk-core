@@ -8,7 +8,7 @@ use std::ops::*;
 use std::sync::atomic::Ordering;
 
 use crate::mmtk::{MMAPPER, SFT_MAP};
-use crate::plan::barriers::LOGGED_VALUE;
+use crate::util::metadata::log_bit::LOGGED_VALUE;
 use crate::util::VMThread;
 use crate::util::VMWorkerThread;
 use crate::vm::ObjectModel;

@@ -347,13 +347,6 @@ impl<S: BarrierSemantics> Barrier<S::VM> for FieldBarrier<S> {
     }
 }
 
-/// The value stored in the log bit/byte indicating that the object or field is unlogged, i.e. it
-/// has not yet been recorded in the remembered set and the write barrier should still take its slow path.
-pub const UNLOGGED_VALUE: u8 = 0b1;
-/// The value stored in the log bit/byte indicating that the object or field is logged, i.e. it
-/// has already been recorded in the remembered set and the write barrier can skip its slow path.
-pub const LOGGED_VALUE: u8 = 0b0;
-
 /// A SATB (Snapshot-At-The-Beginning) barrier implementation.
 /// This barrier is basically a pre-write object barrier with a weak reference loading barrier.
 pub struct SATBBarrier<S: BarrierSemantics> {
