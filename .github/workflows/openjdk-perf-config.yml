@@ -1,26 +1,12 @@
 name: OpenJDK Perf Config (reusable)
 
-# Single source of truth for config and other run-scoped values shared across
-# all the OpenJDK performance workflows (the per-commit workflow and both
-# weekly batches). Everything that needs one of these values does
-# `needs: [config]` (with `config:` being
-# `uses: ./.github/workflows/openjdk-perf-config.yml`) and reads
-# `needs.config.outputs.<name>` - this works both in regular steps and in a
-# job's `with:` block when calling a reusable workflow (unlike `env`, which
-# only works in the former).
+# Single source of truth for RESULT_REPO_BRANCH/DEPLOY/CI_PERF_KIT_VERSION
+# and other run-scoped values for OpenJDK, shared by the per-commit and weekly-batch
+# workflows via `needs: [config]` / `needs.config.outputs.<name>` (this
+# works in a reusable workflow's `with:` block, unlike `env`).
 #
-# This also resolves the current mmtk-openjdk (jdk-21 branch) revision once
-# per workflow run, rather than each openjdk-run-plan-reusable.yml call (one
-# per plan) redundantly re-checking-out the same repo just to read the same
-# commit - it's only used to label the result-repo commit message, nothing
-# is built from it here.
-#
-# READ BEFORE ENABLING THE TRIGGER BELOW
-# The env: block below is what the various OpenJDK workflows' "testing in a
-# branch" convention now toggles (RESULT_REPO_BRANCH -> 'test' (MUST),
-# DEPLOY -> false (optional)), instead of duplicating RESULT_REPO_BRANCH/
-# DEPLOY in each of them. You'll still need to enable the commented-out
-# pull_request trigger on whichever workflow you're actually testing.
+# To test in a branch: set RESULT_REPO_BRANCH/DEPLOY below to test values,
+# and add a pull_request trigger to the workflow you're testing.
 
 on:
   workflow_call:
@@ -44,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # The branch to save run data and plot graph from. Use 'self-hosted-chopin'
-      # for master, use 'test' or anything else for testing in a branch.
+      # for master. Use 'chopin-test' or anything else for testing in a branch.
       RESULT_REPO_BRANCH: 'self-hosted-chopin'
       # Whether we deploy the generated page. Set to true for master.
       DEPLOY: true
@@ -54,9 +40,7 @@ jobs:
       CI_PERF_KIT_VERSION: move-to-dacapo-chopin
       # heap_modifier passed to run_benchmarks: a multiple of each benchmark's
       # min heap size. NoGC doesn't use either of these (it sets heap_modifier
-      # to 0, meaning "use the max heap instead"); MarkSweep needs the large
-      # factor since it doesn't compact and so needs more headroom at the same
-      # min-heap multiple; every other plan uses the normal factor.
+      # to 0, meaning "use the max heap instead").
       NORMAL_HEAP_FACTOR: '2.5'
       LARGE_HEAP_FACTOR: '5'
     outputs:

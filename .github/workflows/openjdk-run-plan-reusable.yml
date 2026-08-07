@@ -1,13 +1,8 @@
 name: OpenJDK Run Plan (reusable)
 
-# Runs OpenJDK benchmarks for a single plan against the cached OpenJDK+MMTk
-# build from the openjdk-build job (see perf-regression-ci-openjdk.yml),
-# pushes the result to the result repo, and (re)renders + deploys the report.
-#
-# The build cache is restored using the exact same key (github.sha +
-# openjdk_rev) that the openjdk-build job in this same workflow run just
-# saved it under - see openjdk-build-reusable.yml for why it's always a
-# fresh build, never a stale/skipped one.
+# Runs OpenJDK benchmarks for a single plan against the OpenJDK+MMTk build
+# cached by the openjdk-build job (see openjdk-build-reusable.yml) in this
+# same workflow run, then pushes the result and (re)renders the report.
 on:
   workflow_call:
     inputs:
@@ -49,9 +44,7 @@ on:
 
 env:
   CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
-  # Kept in sync with the same env var in openjdk-build-reusable.yml, whose
-  # "Cache OpenJDK+MMTk build" step saves under this prefix + github.sha +
-  # openjdk_rev.
+  # Kept in sync with the same env var in openjdk-build-reusable.yml.
   OPENJDK_BUILD_CACHE_PREFIX: openjdk-mmtk-build-
   CANARY_VERSION: "v0.32.0-jdk-21"
   CANARY_RELEASE_BINARY_NAME: "jdk-21.0.9-internal_linux-x64_bin.tar.gz"
@@ -103,10 +96,8 @@ jobs:
           export RESULT_REPO=mmtk/ci-perf-result
           export RESULT_REPO_BRANCH=${{ inputs.result_repo_branch }}
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
-          # If you're testing workflow changes in a branch/PR and don't want
-          # to wait for a full 20-invocation run, uncomment this to force 1
-          # invocation instead (faster, less accurate results). Leave this
-          # commented out for production - do not merge it uncommented.
+          # Uncomment for 1 invocation instead of 20 (faster, less accurate
+          # results) when testing workflow changes. Keep commented out in production.
           # export OPENJDK_HISTORY_RUN_TEST_FAST=1
           ./ci-perf-kit/scripts/openjdk-run-plan.sh ${{ inputs.plan_name }} ${{ inputs.config }} ${{ inputs.heap_modifier }} ${{ inputs.openjdk_rev }}
       # render

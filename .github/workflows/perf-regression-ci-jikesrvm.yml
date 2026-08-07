@@ -7,11 +7,9 @@ on:
       - master
 
 env:
-  # The branch to save run data and plot graph from. Use 'self-hosted' for
-  # master, use 'test' or anything else for testing in a branch - a
-  # JikesRVM run and an OpenJDK run for the same commit would otherwise
-  # collide in the same result-repo branch (OpenJDK's production branch is
-  # 'self-hosted-chopin', kept separate from this on purpose).
+  # The branch to save run data and plot graph from. 'self-hosted' for
+  # master (separate from OpenJDK's 'self-hosted-chopin', so runs for the
+  # same commit don't collide); 'test' or anything else for testing.
   RESULT_REPO_BRANCH: 'self-hosted'
   # Whether we deploy the generated page. Set to true for master.
   DEPLOY: true

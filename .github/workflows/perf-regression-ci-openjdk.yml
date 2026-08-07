@@ -14,9 +14,8 @@ jobs:
   config:
     uses: ./.github/workflows/openjdk-perf-config.yml
 
-  # Build OpenJDK+MMTk once per push, and cache it for openjdk-run-plan below
-  # (and for the weekly batch workflows, which also call this and so will
-  # build fresh themselves if that cache is ever missing - e.g. expired).
+  # Build OpenJDK+MMTk fresh for this push, and cache it for openjdk-run-plan
+  # below to restore within this same workflow run.
   openjdk-build:
     needs: [config]
     uses: ./.github/workflows/openjdk-build-reusable.yml
