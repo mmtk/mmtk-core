@@ -10,6 +10,7 @@ use crate::{
         copy::CopySemantics,
         epilogue,
         heap::{BlockPageResource, PageResource},
+        linear_scan::UnstraddlableRegion,
         metadata::{self, side_metadata::SideMetadataSpec, MetadataSpec},
         object_enum::{self, ObjectEnumerator},
         ObjectReference,

@@ -6,7 +6,7 @@ use crate::policy::immix::block::Block;
 use crate::policy::space::Space;
 use crate::scheduler::RootKind;
 use crate::util::copy::CopySemantics;
-use crate::util::linear_scan::Region;
+use crate::util::linear_scan::UnstraddlableRegion;
 use crate::util::rc::RefCountHelper;
 use crate::util::ObjectReference;
 use crate::vm::slot::Slot;

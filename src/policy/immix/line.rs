@@ -30,14 +30,6 @@ impl Region for Line {
     fn start(&self) -> Address {
         self.0
     }
-
-    /// This method is ambiguous because an object is not always fully contained in a line.
-    /// To make the intention more explicit, two other methods are available.
-    /// -   [`Line::containing_obj_ref`]
-    /// -   [`Line::containing_obj_start`]
-    fn containing(_object: ObjectReference) -> Self {
-        unimplemented!("Line::containing is intentionally unimplemented.");
-    }
 }
 
 #[allow(clippy::assertions_on_constants)]

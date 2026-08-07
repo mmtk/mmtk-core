@@ -4,7 +4,7 @@ use super::ImmixSpace;
 use crate::util::constants::*;
 use crate::util::heap::blockpageresource::BlockPool;
 use crate::util::heap::chunk_map::Chunk;
-use crate::util::linear_scan::{Region, RegionIterator};
+use crate::util::linear_scan::{Region, RegionIterator, UnstraddlableRegion};
 use crate::util::metadata::side_metadata::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
@@ -100,6 +100,9 @@ impl Region for Block {
         self.0
     }
 }
+
+/// An objects cannot straddle multiple Immix blocks.
+impl UnstraddlableRegion for Block {}
 
 impl BlockMayHaveObjects for Block {
     fn may_have_objects(&self) -> bool {
