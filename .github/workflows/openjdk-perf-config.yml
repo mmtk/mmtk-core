@@ -34,10 +34,7 @@ jobs:
       RESULT_REPO_BRANCH: 'self-hosted-chopin'
       # Whether we deploy the generated page. Set to true for master.
       DEPLOY: true
-      # TODO: openjdk-build.sh/openjdk-run-plan.sh/openjdk-report.sh only exist on this
-      # branch so far. Pin this back to a released ci-perf-kit version tag (like the
-      # JikesRVM workflow does) once ci-perf-kit cuts a release that includes them.
-      CI_PERF_KIT_VERSION: move-to-dacapo-chopin
+      CI_PERF_KIT_VERSION: '0.9.0'
       # heap_modifier passed to run_benchmarks: a multiple of each benchmark's
       # min heap size. NoGC doesn't use either of these (it sets heap_modifier
       # to 0, meaning "use the max heap instead").

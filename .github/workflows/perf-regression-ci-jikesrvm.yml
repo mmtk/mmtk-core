@@ -16,11 +16,7 @@ env:
   # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
   CI_PERF_KIT_BUILD: ci-perf-kit/upload
   CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
-  # TODO: jikesrvm-history-run.sh's commit-info recording and DaCapo 2006
-  # callback support only exist on this branch so far. Pin this back to a
-  # released ci-perf-kit version tag once ci-perf-kit cuts a release that
-  # includes them.
-  CI_PERF_KIT_VERSION: move-to-dacapo-chopin
+  CI_PERF_KIT_VERSION: '0.9.0'
 
 jobs:
   # JikesRVM
