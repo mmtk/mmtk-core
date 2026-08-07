@@ -184,7 +184,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
         };
         let obj_in_defrag = !los && Block::in_defrag_block(o);
-        o.iterate_fields::<VM, _>(|slot| {
+        o.iterate_fields::<VM, _>(self.worker().tls.0, |slot| {
             let Some(target) = slot.load() else {
                 return;
             };
@@ -602,7 +602,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             lxr.mark(o);
         }
         // Recursively decrease field ref counts
-        o.iterate_fields::<VM, _>(|slot| {
+        o.iterate_fields::<VM, _>(self.worker().tls.0, |slot| {
             if let Some(x) = slot.load() {
                 // println!(" -- rec dec {:?}.{:?} -> {:?}", o, slot, x);
                 let rc = self.rc.count(x);

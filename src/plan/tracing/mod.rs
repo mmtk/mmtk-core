@@ -6,8 +6,8 @@ use std::marker::PhantomData;
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::{GCWorker, EDGES_WORK_BUFFER_SIZE};
-use crate::util::{ObjectReference, VMThread, VMWorkerThread};
-use crate::vm::{Scanning, VMBinding};
+use crate::util::ObjectReference;
+use crate::vm::VMBinding;
 use crate::{Plan, MMTK};
 
 pub(crate) mod gc_work;
@@ -358,49 +358,5 @@ impl<T> Default for VectorQueue<T> {
 impl ObjectQueue for VectorQueue<ObjectReference> {
     fn enqueue(&mut self, v: ObjectReference) {
         self.push(v);
-    }
-}
-
-/// For iterating over the slots of an object.
-// FIXME: This type iterates slots, but all of its current use cases only care about the values in the slots.
-// And it currently only works if the object supports slot enqueuing (i.e. `Scanning::scan_object` is implemented).
-// We may refactor the interface according to <https://github.com/mmtk/mmtk-core/issues/1375>
-pub struct SlotIterator<VM: VMBinding> {
-    _p: PhantomData<VM>,
-}
-
-impl<VM: VMBinding> SlotIterator<VM> {
-    /// Iterate over the slots of an object by applying a function to each slot.
-    pub fn iterate(o: ObjectReference, f: impl FnMut(VM::VMSlot)) {
-        let mut x = SlotIteratorImpl::<VM, _> { f, _p: PhantomData };
-        <VM::VMScanning as Scanning<VM>>::scan_object(
-            VMWorkerThread(VMThread::UNINITIALIZED),
-            o,
-            &mut x,
-        );
-    }
-
-    /// Iterate over the slots of an object by applying a function to each slot.
-    pub fn iterate_fields<F: FnMut(VM::VMSlot)>(object: ObjectReference, _tls: VMThread, mut f: F) {
-        // FIXME: We should use tls from the arguments.
-        // See https://github.com/mmtk/mmtk-core/issues/1375
-        let fake_tls = VMWorkerThread(VMThread::UNINITIALIZED);
-        if !<VM::VMScanning as Scanning<VM>>::support_slot_enqueuing(fake_tls, object) {
-            panic!("SlotIterator::iterate_fields cannot be used on objects that don't support slot-enqueuing");
-        }
-        <VM::VMScanning as Scanning<VM>>::scan_object(fake_tls, object, &mut f);
-    }
-}
-
-struct SlotIteratorImpl<VM: VMBinding, F: FnMut(VM::VMSlot)> {
-    f: F,
-    _p: PhantomData<VM>,
-}
-
-impl<VM: VMBinding, F: FnMut(VM::VMSlot)> crate::vm::SlotVisitor<VM::VMSlot>
-    for SlotIteratorImpl<VM, F>
-{
-    fn visit_slot(&mut self, slot: VM::VMSlot) {
-        (self.f)(slot);
     }
 }

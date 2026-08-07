@@ -26,6 +26,7 @@ use crate::MMTK;
 
 pub struct LXRFieldBarrierSemantics<VM: VMBinding> {
     mmtk: &'static MMTK<VM>,
+    tls: VMMutatorThread,
     incs: VectorQueue<VM::VMSlot>,
     decs: VectorQueue<ObjectReference>,
     refs: VectorQueue<ObjectReference>,
@@ -38,9 +39,10 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
         .extract_side_spec();
 
     #[allow(unused)]
-    pub fn new(mmtk: &'static MMTK<VM>) -> Self {
+    pub fn new(mmtk: &'static MMTK<VM>, tls: VMMutatorThread) -> Self {
         Self {
             mmtk,
+            tls,
             incs: VectorQueue::default(),
             decs: VectorQueue::default(),
             refs: VectorQueue::default(),
@@ -230,7 +232,7 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
     }
 
     fn object_probable_write_slow(&mut self, obj: ObjectReference) {
-        obj.iterate_fields::<VM, _>(|s| {
+        obj.iterate_fields::<VM, _>(self.tls.0, |s| {
             let _succ = self.enqueue_node(Some(obj), s, None);
         });
     }

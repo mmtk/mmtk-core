@@ -8,7 +8,7 @@ use crate::scheduler::RootKind;
 use crate::util::copy::CopySemantics;
 use crate::util::linear_scan::UnstraddlableRegion;
 use crate::util::rc::RefCountHelper;
-use crate::util::ObjectReference;
+use crate::util::{ObjectReference, VMThread};
 use crate::vm::slot::Slot;
 use crate::{
     plan::ObjectQueue,
@@ -92,7 +92,7 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
     }
 
     fn scan_and_enqueue<const CHECK_REMSET: bool>(&mut self, object: ObjectReference) {
-        object.iterate_fields::<VM, _>(|s| {
+        object.iterate_fields::<VM, _>(unsafe { (*self.worker).tls }.0, |s| {
             let Some(t) = s.load() else {
                 return;
             };
@@ -438,7 +438,8 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
 impl<VM: VMBinding, const FULL_GC: bool> ObjectQueue for LXRStopTheWorldProcessEdges<VM, FULL_GC> {
     fn enqueue(&mut self, object: ObjectReference) {
         let limit: usize = if FULL_GC { 8192 } else { 1024 };
-        object.iterate_fields::<VM, _>(|s| {
+        // TODO: Use actual TLS.
+        object.iterate_fields::<VM, _>(VMThread::UNINITIALIZED, |s| {
             let Some(o) = s.load() else {
                 return;
             };

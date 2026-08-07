@@ -9,7 +9,8 @@ use std::sync::atomic::Ordering;
 
 use crate::mmtk::{MMAPPER, SFT_MAP};
 use crate::plan::barriers::LOGGED_VALUE;
-use crate::plan::SlotIterator;
+use crate::util::VMThread;
+use crate::util::VMWorkerThread;
 use crate::vm::ObjectModel;
 
 /// size in bytes
@@ -511,6 +512,7 @@ mod tests {
     }
 }
 
+use crate::vm::Scanning;
 use crate::vm::VMBinding;
 
 /// `ObjectReference` represents address for an object. Compared with `Address`, operations allowed
@@ -753,8 +755,14 @@ impl ObjectReference {
 
     /// Iterate over the slots (fields) of the object, calling `f` for each slot the VM's scanning
     /// implementation reports for this object.
-    pub fn iterate_fields<VM: VMBinding, F: FnMut(VM::VMSlot)>(self, f: F) {
-        SlotIterator::<VM>::iterate(self, f)
+    pub fn iterate_fields<VM: VMBinding, F: FnMut(VM::VMSlot)>(self, _tls: VMThread, mut f: F) {
+        // FIXME: We should use tls from the arguments.
+        // See https://github.com/mmtk/mmtk-core/issues/1375
+        let fake_tls = VMWorkerThread(VMThread::UNINITIALIZED);
+        if !<VM::VMScanning as Scanning<VM>>::support_slot_enqueuing(fake_tls, self) {
+            panic!("SlotIterator::iterate_fields cannot be used on objects that don't support slot-enqueuing");
+        }
+        <VM::VMScanning as Scanning<VM>>::scan_object(fake_tls, self, &mut f);
     }
 }
 
