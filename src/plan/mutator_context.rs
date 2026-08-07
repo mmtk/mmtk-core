@@ -25,7 +25,7 @@ pub(crate) fn unreachable_prepare_func<VM: VMBinding>(
     _mutator: &mut Mutator<VM>,
     _tls: VMWorkerThread,
 ) {
-    // unreachable!("`MutatorConfig::prepare_func` must not be called for the current plan.")
+    unreachable!("`MutatorConfig::prepare_func` must not be called for the current plan.")
 }
 
 /// An mutator prepare implementation for plans that use [`crate::plan::global::CommonPlan`].
