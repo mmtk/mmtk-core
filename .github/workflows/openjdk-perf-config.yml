@@ -43,11 +43,10 @@ jobs:
     # Trivial - no need to occupy the dedicated perf runner for this.
     runs-on: ubuntu-latest
     env:
-      # The branch to save run data and plot graph from. Use 'self-hosted' for master, use 'test' or anything else for testing in a branch.
-      # TESTING: using a dedicated test branch. Revert to 'self-hosted' before merging.
-      RESULT_REPO_BRANCH: 'chopin-test'
+      # The branch to save run data and plot graph from. Use 'self-hosted-chopin'
+      # for master, use 'test' or anything else for testing in a branch.
+      RESULT_REPO_BRANCH: 'self-hosted-chopin'
       # Whether we deploy the generated page. Set to true for master.
-      # TESTING: not deploying to the real GitHub Page. Revert to true before merging.
       DEPLOY: true
       # TODO: openjdk-build.sh/openjdk-run-plan.sh/openjdk-report.sh only exist on this
       # branch so far. Pin this back to a released ci-perf-kit version tag (like the

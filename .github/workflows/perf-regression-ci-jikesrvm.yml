@@ -3,28 +3,16 @@ name: Performance Regression CI (JikesRVM)
 # Triggerred when a new commit is pushed to master
 on:
   push:
-    # TEMPORARILY DISABLED while testing the OpenJDK/JikesRVM Chopin workflow
-    # changes in a PR - only the pull_request trigger below should run.
-    # Revert this before merging.
-    # branches:
-    #   - master
-    branches-ignore:
-      - '**'
-  # See the RESULT_REPO_BRANCH comment below - this uses its own 'test'
-  # branch, separate from the OpenJDK workflows' 'chopin-test'.
-  # TESTING: enabled to validate the JikesRVM Chopin workflow changes.
-  # Revert this before merging.
-  pull_request:
     branches:
       - master
 
 env:
-  # The branch to save run data and plot graph from. Use 'self-hosted' for master, use 'test' or anything else for testing in a branch.
-  # TESTING: using a dedicated test branch (separate from the OpenJDK
-  # workflows' 'chopin-test', since a JikesRVM run and an OpenJDK run for the
-  # same commit would otherwise collide in the same result-repo branch).
-  # Revert to 'self-hosted' before merging.
-  RESULT_REPO_BRANCH: 'test'
+  # The branch to save run data and plot graph from. Use 'self-hosted' for
+  # master, use 'test' or anything else for testing in a branch - a
+  # JikesRVM run and an OpenJDK run for the same commit would otherwise
+  # collide in the same result-repo branch (OpenJDK's production branch is
+  # 'self-hosted-chopin', kept separate from this on purpose).
+  RESULT_REPO_BRANCH: 'self-hosted'
   # Whether we deploy the generated page. Set to true for master.
   DEPLOY: true
   # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh

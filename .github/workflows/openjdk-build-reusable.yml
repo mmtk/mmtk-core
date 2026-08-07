@@ -1,21 +1,30 @@
 name: OpenJDK Build (reusable)
 
-# Builds OpenJDK+MMTk once and caches it, for openjdk-run-plan-reusable.yml
-# callers (the per-commit and both weekly-batch workflows) to run benchmarks
-# against. Skips the actual build (all steps but the cache lookup) when the
-# cache already has a hit, so this is cheap to call from every workflow that
-# needs a build to exist - callers don't need to duplicate this logic or
-# reason about whether some other workflow already built it.
+# Builds OpenJDK+MMTk fresh (always - no cache-hit skip) and caches the
+# result, for openjdk-run-plan-reusable.yml callers (the per-commit and both
+# weekly-batch workflows) within the SAME workflow run to restore from -
+# callers don't need to duplicate this build logic themselves. The cache key
+# is scoped to the exact mmtk-core + mmtk-openjdk commits being tested, so
+# the immediately-following restore in openjdk-run-plan-reusable.yml is
+# guaranteed to get what this job just built, not a stale entry from an
+# earlier commit.
 on:
   workflow_call:
     inputs:
       ci_perf_kit_version:
         required: true
         type: string
+      openjdk_rev:
+        description: mmtk-openjdk (jdk-21) revision being built. Computed once by openjdk-perf-config.yml, and folded into the cache key alongside github.sha (mmtk-core's commit) so the cache is scoped to this exact pair of commits.
+        required: true
+        type: string
 
 env:
   # Directory in ci-perf-kit that will be uploaded as an artifact. Can be found in ci-perf-kit/scripts/common.sh
   CI_PERF_KIT_BUILD: ci-perf-kit/upload
+  # Kept in sync with the same env var in openjdk-run-plan-reusable.yml -
+  # that's where this build is restored from, keyed by the same commits.
+  OPENJDK_BUILD_CACHE_PREFIX: openjdk-mmtk-build-
 
 jobs:
   openjdk-build:
@@ -30,46 +39,24 @@ jobs:
           ref: ${{ inputs.ci_perf_kit_version }}
           path: ci-perf-kit
           submodules: true
-      # TESTING: build OpenJDK+MMTk only once and reuse it for every commit
-      # pushed to this PR, instead of rebuilding on every push. Uses a fixed
-      # cache key (not keyed by github.sha like production) so it's a cache
-      # hit regardless of which commit triggered this run - every step below
-      # is skipped once that's the case. Revert this whole
-      # restore/skip-if-hit mechanism, and the fixed key (here and in
-      # openjdk-run-plan-reusable.yml), before merging.
-      - name: Check for existing OpenJDK+MMTk build cache
-        id: restore-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ci-perf-kit/build
-            ci-perf-kit/probes/out
-            ci-perf-kit/openjdk-probe
-          # Kept in sync with the cache key in openjdk-run-plan-reusable.yml.
-          key: openjdk-mmtk-build-chopin-test-fixed
       - name: Checkout MMTk Core
-        if: steps.restore-cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout OpenJDK Binding
-        if: steps.restore-cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
           ref: jdk-21
           path: mmtk-openjdk
       - name: Checkout OpenJDK
-        if: steps.restore-cache.outputs.cache-hit != 'true'
         working-directory: mmtk-openjdk
         run: |
           ./.github/scripts/ci-checkout.sh
       - name: Setup Rust Toolchain
-        if: steps.restore-cache.outputs.cache-hit != 'true'
         run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
       # setup
       - name: Replace mmtk-core dependency and clean previous build
-        if: steps.restore-cache.outputs.cache-hit != 'true'
         run: |
           # Note that ci-replace-mmtk-dep.sh will apply `realpath()` to the `--mmtk-core-path` option.
           # so we specify the relative path from the PWD to the mmtk-core repo.
@@ -79,23 +66,19 @@ jobs:
           rm -rf mmtk-openjdk/repos/openjdk/build
       # build
       - name: Build OpenJDK+MMTk
-        if: steps.restore-cache.outputs.cache-hit != 'true'
         run: |
           export JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-amd64/
           ./ci-perf-kit/scripts/openjdk-build.sh ./mmtk-openjdk ./mmtk-core
       # cache the build for openjdk-run-plan-reusable.yml callers
       - name: Cache OpenJDK+MMTk build
-        if: steps.restore-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
             ci-perf-kit/build
             ci-perf-kit/probes/out
             ci-perf-kit/openjdk-probe
-          # Kept in sync with the cache key in openjdk-run-plan-reusable.yml.
-          key: openjdk-mmtk-build-chopin-test-fixed
+          key: ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}${{ github.sha }}-${{ inputs.openjdk_rev }}
       - name: Upload build as artifacts
-        if: steps.restore-cache.outputs.cache-hit != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: openjdk-regression-build

@@ -4,17 +4,10 @@ name: OpenJDK Run Plan (reusable)
 # build from the openjdk-build job (see perf-regression-ci-openjdk.yml),
 # pushes the result to the result repo, and (re)renders + deploys the report.
 #
-# Cache lookup is the same regardless of caller: try the exact commit that
-# triggered this workflow run first (github.sha - for a per-commit caller
-# this is the commit that was just built; for a schedule-triggered caller
-# this is master's current tip, which will usually already be cached too),
-# falling back to the most recently saved build under the same prefix if
-# that exact commit hasn't been built yet (or its build failed).
-#
-# TESTING: the above is currently disabled - the cache key below is
-# temporarily fixed (not keyed by github.sha) to match openjdk-build.sh's
-# skip-if-cached fixed key in perf-regression-ci-openjdk.yml, so every push
-# to the test PR reuses the one build. Revert both before merging.
+# The build cache is restored using the exact same key (github.sha +
+# openjdk_rev) that the openjdk-build job in this same workflow run just
+# saved it under - see openjdk-build-reusable.yml for why it's always a
+# fresh build, never a stale/skipped one.
 on:
   workflow_call:
     inputs:
@@ -36,7 +29,7 @@ on:
         type: boolean
         default: false
       result_repo_branch:
-        description: The branch to save run data and plot graph from. Use 'self-hosted' for master, 'test' or anything else for testing in a branch.
+        description: The branch to save run data and plot graph from. Use 'self-hosted-chopin' for master, 'test' or anything else for testing in a branch.
         required: true
         type: string
       deploy:
@@ -56,7 +49,9 @@ on:
 
 env:
   CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
-  # Kept in sync with the "Cache OpenJDK+MMTk build" step in perf-regression-ci-openjdk.yml.
+  # Kept in sync with the same env var in openjdk-build-reusable.yml, whose
+  # "Cache OpenJDK+MMTk build" step saves under this prefix + github.sha +
+  # openjdk_rev.
   OPENJDK_BUILD_CACHE_PREFIX: openjdk-mmtk-build-
   CANARY_VERSION: "v0.32.0-jdk-21"
   CANARY_RELEASE_BINARY_NAME: "jdk-21.0.9-internal_linux-x64_bin.tar.gz"
@@ -82,9 +77,7 @@ jobs:
             ci-perf-kit/build
             ci-perf-kit/probes/out
             ci-perf-kit/openjdk-probe
-          # TESTING: fixed key instead of ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}${{ github.sha }}
-          # + a restore-keys prefix fallback. Revert to that before merging.
-          key: ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}chopin-test-fixed
+          key: ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}${{ github.sha }}-${{ inputs.openjdk_rev }}
           fail-on-cache-miss: true
       - name: Download canary build
         if: ${{ inputs.canary }}
@@ -110,8 +103,11 @@ jobs:
           export RESULT_REPO=mmtk/ci-perf-result
           export RESULT_REPO_BRANCH=${{ inputs.result_repo_branch }}
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
-          # TESTING: only do 1 invocation instead of the usual $history_invocations. Revert this before merging.
-          export OPENJDK_HISTORY_RUN_TEST_FAST=1
+          # If you're testing workflow changes in a branch/PR and don't want
+          # to wait for a full 20-invocation run, uncomment this to force 1
+          # invocation instead (faster, less accurate results). Leave this
+          # commented out for production - do not merge it uncommented.
+          # export OPENJDK_HISTORY_RUN_TEST_FAST=1
           ./ci-perf-kit/scripts/openjdk-run-plan.sh ${{ inputs.plan_name }} ${{ inputs.config }} ${{ inputs.heap_modifier }} ${{ inputs.openjdk_rev }}
       # render
       - name: Regenerate report

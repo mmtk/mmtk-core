@@ -8,23 +8,16 @@ name: Performance Regression CI (OpenJDK, weekly batch 2)
 # openjdk-run-plan-reusable.yml for the cache lookup and for the canary
 # download/setup, which that reusable workflow handles when canary: true).
 on:
-  # TEMPORARILY DISABLED while testing the OpenJDK Chopin workflow changes -
-  # only perf-regression-ci-openjdk.yml should run. Revert this before merging.
   # Times are in UTC; GitHub Actions cron cannot follow daylight saving, so
   # this is pinned to AEST (UTC+10, Canberra standard time): Sunday 00:00
   # AEST = Saturday 14:00 UTC. During AEDT (UTC+11, roughly Oct-Apr) this
   # will actually fire at 1am AU time instead of 0am.
-  # schedule:
-  #   - cron: '0 14 * * 6'
+  schedule:
+    - cron: '0 14 * * 6'
   # Manual trigger, e.g. for testing without waiting for the schedule.
   workflow_dispatch:
   # See openjdk-perf-config.yml for the "testing in a branch" convention -
   # its env: block is what you toggle, not one here.
-  # TESTING: enabled to validate the Chopin workflow changes alongside
-  # perf-regression-ci-openjdk.yml. Revert this before merging.
-  pull_request:
-    branches:
-      - master
 
 jobs:
   # Single source of truth for RESULT_REPO_BRANCH/DEPLOY/CI_PERF_KIT_VERSION,
@@ -41,6 +34,7 @@ jobs:
     uses: ./.github/workflows/openjdk-build-reusable.yml
     with:
       ci_perf_kit_version: ${{ needs.config.outputs.ci_perf_kit_version }}
+      openjdk_rev: ${{ needs.config.outputs.openjdk_rev }}
 
   openjdk-run-plan:
     needs: [config, openjdk-build]

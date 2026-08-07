@@ -3,14 +3,8 @@ name: Extended tests - bindings
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
-    # TEMPORARILY DISABLED while testing the OpenJDK Chopin workflow changes -
-    # only perf-regression-ci-openjdk.yml should run. Revert this before merging.
-    # (Its jobs are already gated on the 'PR-extended-testing' label, so this
-    # wasn't going to actually run anything anyway - disabled for good measure.)
-    # branches:
-    #   - master
-    branches-ignore:
-      - '**'
+    branches:
+      - master
 
 concurrency:
   # Cancels pending runs when a PR gets updated.
