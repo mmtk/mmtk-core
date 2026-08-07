@@ -119,7 +119,7 @@ jobs:
           export RESULT_REPO=mmtk/ci-perf-result
           export RESULT_REPO_BRANCH=${{ inputs.result_repo_branch }}
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
-          ./ci-perf-kit/scripts/openjdk-report.sh ./reports/${{ steps.branch.outputs.branch_name }}
+          ./ci-perf-kit/scripts/openjdk-report.sh ./reports/${{ steps.branch.outputs.branch_name }} ${{ inputs.plan_name }}
       - name: Deploy to Github Page
         if: ${{ inputs.deploy }}
         uses: peaceiris/actions-gh-pages@v4
