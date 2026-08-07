@@ -287,13 +287,16 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                     CopySemantics::DefaultCopy,
                     self.copy_context(),
                     |new| {
-                        // Set the VO bit of the new object.
-                        crate::util::metadata::vo_bit::set_vo_bit(new);
-                        // Clear the VO bit of the old object.
-                        // Note that sweeping can also clear the VO bit when the line is freed,
-                        // but no RC inc/dec should be performed on the old object from now on.
-                        // We clear it eagerly to detect inc/dec errors.
-                        crate::util::metadata::vo_bit::unset_vo_bit(o);
+                        #[cfg(feature = "vo_bit")]
+                        {
+                            // Set the VO bit of the new object.
+                            crate::util::metadata::vo_bit::set_vo_bit(new);
+                            // Clear the VO bit of the old object.
+                            // Note that sweeping can also clear the VO bit when the line is freed,
+                            // but no RC inc/dec should be performed on the old object from now on.
+                            // We clear it eagerly to detect inc/dec errors.
+                            crate::util::metadata::vo_bit::unset_vo_bit(o);
+                        }
                     },
                 );
                 if let Some(new) = new {
