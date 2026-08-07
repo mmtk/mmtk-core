@@ -42,7 +42,11 @@ impl<VM: VMBinding, DT: Trace<VM = VM>, PT: Trace<VM = VM>> Clone
 impl<VM: VMBinding, DT: Trace<VM = VM>, PT: Trace<VM = VM>> RootsWorkFactory<VM::VMSlot>
     for DefaultRootsWorkFactory<VM, DT, PT>
 {
-    fn create_process_roots_work(&mut self, slots: Vec<VM::VMSlot>, _kind: RootKind) {
+    fn create_process_roots_work_with_root_kind(
+        &mut self,
+        slots: Vec<VM::VMSlot>,
+        _kind: RootKind,
+    ) {
         // Note: We should use the same USDT name "mmtk:roots" for all the three kinds of roots. A
         // VM binding may not call all of the three methods in this impl. For example, the OpenJDK
         // binding only calls `create_process_roots_work`, and the Ruby binding only calls

@@ -202,7 +202,11 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
     RootsWorkFactory<VM::VMSlot> for ConcurrentMarkingRootsWorkFactory<VM, P, KIND>
 {
-    fn create_process_roots_work(&mut self, slots: Vec<VM::VMSlot>, _kind: RootKind) {
+    fn create_process_roots_work_with_root_kind(
+        &mut self,
+        slots: Vec<VM::VMSlot>,
+        _kind: RootKind,
+    ) {
         probe!(mmtk, roots, RootsKind::NORMAL, slots.len());
 
         self.debug_assert_initial_mark();

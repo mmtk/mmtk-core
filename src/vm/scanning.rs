@@ -110,9 +110,18 @@ pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
     ///
     /// The work packet may update the slots.
     ///
+    /// Equivalent to `self.create_process_roots_work_experimental(slots, RootKind::Strong)`.
+    ///
     /// Arguments:
     /// * `slots`: A vector of slots.
-    fn create_process_roots_work(&mut self, slots: Vec<SL>, kind: RootKind);
+    fn create_process_roots_work(&mut self, slots: Vec<SL>) {
+        self.create_process_roots_work_with_root_kind(slots, RootKind::Strong);
+    }
+
+    /// An experimental API to support weak and young code cache roots.
+    ///
+    /// Currently only used by the LXR plan and the OpenJDK binding.
+    fn create_process_roots_work_with_root_kind(&mut self, slots: Vec<SL>, kind: RootKind);
 
     /// Create work packets to handle non-transitively pinning roots.
     ///

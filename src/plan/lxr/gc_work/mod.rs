@@ -117,7 +117,7 @@ impl<VM: VMBinding> LXRRootsWorkFactory<VM> {
 }
 
 impl<VM: VMBinding> RootsWorkFactory<VM::VMSlot> for LXRRootsWorkFactory<VM> {
-    fn create_process_roots_work(&mut self, slots: Vec<VM::VMSlot>, kind: RootKind) {
+    fn create_process_roots_work_with_root_kind(&mut self, slots: Vec<VM::VMSlot>, kind: RootKind) {
         let stage = self.mmtk.get_plan().root_scanning_stage();
         let mut w = CollectRoots::new(slots, true, self.mmtk, stage);
         w.root_kind = Some(kind);
