@@ -1,0 +1,80 @@
+name: OpenJDK Build (reusable)
+
+# Builds OpenJDK+MMTk and caches it, keyed by the mmtk-core + mmtk-openjdk
+# commits, for openjdk-run-plan-reusable.yml to restore within the same
+# workflow run.
+on:
+  workflow_call:
+    inputs:
+      ci_perf_kit_version:
+        required: true
+        type: string
+      openjdk_rev:
+        description: mmtk-openjdk (jdk-21) revision being built; used with github.sha in the cache key.
+        required: true
+        type: string
+
+env:
+  # Directory in ci-perf-kit that will be uploaded as an artifact. Can be found in ci-perf-kit/scripts/common.sh
+  CI_PERF_KIT_BUILD: ci-perf-kit/upload
+  # Kept in sync with the same env var in openjdk-run-plan-reusable.yml.
+  OPENJDK_BUILD_CACHE_PREFIX: openjdk-mmtk-build-
+
+jobs:
+  openjdk-build:
+    runs-on: [self-hosted, Linux, freq-scaling-off]
+    timeout-minutes: 1440
+    steps:
+      # checkout perf-kit
+      - name: Checkout Perf Kit
+        uses: actions/checkout@v4
+        with:
+          repository: mmtk/ci-perf-kit
+          ref: ${{ inputs.ci_perf_kit_version }}
+          path: ci-perf-kit
+          submodules: true
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v4
+        with:
+          path: mmtk-core
+      - name: Checkout OpenJDK Binding
+        uses: actions/checkout@v4
+        with:
+          repository: mmtk/mmtk-openjdk
+          ref: jdk-21
+          path: mmtk-openjdk
+      - name: Checkout OpenJDK
+        working-directory: mmtk-openjdk
+        run: |
+          ./.github/scripts/ci-checkout.sh
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
+      # setup
+      - name: Replace mmtk-core dependency and clean previous build
+        run: |
+          # Note that ci-replace-mmtk-dep.sh will apply `realpath()` to the `--mmtk-core-path` option.
+          # so we specify the relative path from the PWD to the mmtk-core repo.
+          ./mmtk-core/.github/scripts/ci-replace-mmtk-dep.sh mmtk-openjdk/mmtk/Cargo.toml \
+            --mmtk-core-path mmtk-core
+          rm -rf mmtk-openjdk/repos/openjdk/scratch
+          rm -rf mmtk-openjdk/repos/openjdk/build
+      # build
+      - name: Build OpenJDK+MMTk
+        run: |
+          export JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-amd64/
+          ./ci-perf-kit/scripts/openjdk-build.sh ./mmtk-openjdk ./mmtk-core
+      # cache the build for openjdk-run-plan-reusable.yml callers
+      - name: Cache OpenJDK+MMTk build
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ci-perf-kit/build
+            ci-perf-kit/probes/out
+            ci-perf-kit/openjdk-probe
+          key: ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}${{ github.sha }}-${{ inputs.openjdk_rev }}
+      - name: Upload build as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openjdk-regression-build
+          path: ${{ env.CI_PERF_KIT_BUILD }}
+          if-no-files-found: error
