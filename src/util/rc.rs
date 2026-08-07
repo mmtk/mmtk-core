@@ -258,9 +258,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
             let mut line = start_line;
             while line != end_line {
                 self.set_relaxed(line.start().to_object_reference::<VM>(), 0);
-                // std::sync::atomic::fence(Ordering::Relaxed);
                 unsafe { RC_STRADDLE_LINES.store(line.start(), 0u8) };
-                // std::sync::atomic::fence(Ordering::Relaxed);
                 line = line.next();
             }
         }
