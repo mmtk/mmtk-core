@@ -5,8 +5,11 @@ on:
   push:
     branches:
       - master
-  # See openjdk-perf-config.yml for the "testing in a branch" convention -
-  # its env: block is what you toggle, not one here.
+  # To test in a branch: uncomment this trigger, and see
+  # openjdk-perf-config.yml for the RESULT_REPO_BRANCH/DEPLOY env to set.
+  # pull_request:
+  #   branches:
+  #     - master
 
 jobs:
   # Single source of truth for RESULT_REPO_BRANCH/DEPLOY/CI_PERF_KIT_VERSION,

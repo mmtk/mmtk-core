@@ -6,7 +6,7 @@ name: OpenJDK Perf Config (reusable)
 # works in a reusable workflow's `with:` block, unlike `env`).
 #
 # To test in a branch: set RESULT_REPO_BRANCH/DEPLOY below to test values,
-# and add a pull_request trigger to the workflow you're testing.
+# and uncomment the pull_request trigger in the workflow you're testing.
 
 on:
   workflow_call:
