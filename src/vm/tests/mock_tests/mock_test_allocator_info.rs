@@ -27,8 +27,8 @@ pub fn test_allocator_info() {
                 | PlanSelector::SemiSpace
                 | PlanSelector::GenCopy
                 | PlanSelector::GenImmix
-                | PlanSelector::MarkCompact
-                | PlanSelector::Compressor
+                | PlanSelector::Lisp2
+                | PlanSelector::OVC
                 | PlanSelector::ConcurrentImmix
                 | PlanSelector::StickyImmix
                 | PlanSelector::LXR => {

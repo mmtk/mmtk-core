@@ -1,15 +1,15 @@
-use super::gc_work::CompressorWorkContext;
+use super::gc_work::OVCWorkContext;
 use super::gc_work::{AfterCompact, ForwardingTrace, GenerateWork, MarkingTrace, UpdateReferences};
-use crate::plan::compressor::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::{BasePlan, CommonPlan};
+use crate::plan::markcompact::ovc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN;
 use crate::plan::tracing::gc_work::weakref::{
     VMForwardWeakRefs, VMPostForwarding, VMProcessWeakRefs,
 };
 use crate::plan::{AllocationSemantics, Plan, PlanConstraints};
-use crate::policy::compressor::CompressorSpace;
+use crate::policy::ovc::OVCSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::{GCWorkScheduler, WorkBucketStage};
@@ -23,28 +23,28 @@ use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
-/// [`Compressor`] implements a stop-the-world and parallel implementation of
+/// [`OVC`] implements a stop-the-world and parallel implementation of
 /// the Compressor, as described in Kermany and Petrank,
 /// [The Compressor: concurrent, incremental, and parallel compaction](https://dl.acm.org/doi/10.1145/1133255.1134023).
 #[derive(HasSpaces, PlanTraceObject)]
-pub struct Compressor<VM: VMBinding> {
+pub struct OVC<VM: VMBinding> {
     #[parent]
     pub common: CommonPlan<VM>,
     #[space]
-    pub compressor_space: CompressorSpace<VM>,
+    pub ovc_space: OVCSpace<VM>,
 }
 
-/// The plan constraints for the Compressor plan.
-pub const COMPRESSOR_CONSTRAINTS: PlanConstraints = PlanConstraints {
+/// The plan constraints for the OVC plan.
+pub const OVC_CONSTRAINTS: PlanConstraints = PlanConstraints {
     max_non_los_default_alloc_bytes: MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
     moves_objects: true,
     needs_forward_after_liveness: true,
     ..PlanConstraints::default()
 };
 
-impl<VM: VMBinding> Plan for Compressor<VM> {
+impl<VM: VMBinding> Plan for OVC<VM> {
     fn constraints(&self) -> &'static PlanConstraints {
-        &COMPRESSOR_CONSTRAINTS
+        &OVC_CONSTRAINTS
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
@@ -69,12 +69,12 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        self.compressor_space.prepare();
+        self.ovc_space.prepare();
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
-        self.compressor_space.release();
+        self.ovc_space.release();
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -87,32 +87,32 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
 
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<CompressorWorkContext<VM>>::new());
+            .add(StopMutators::<OVCWorkContext<VM>>::new());
 
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<CompressorWorkContext<VM>>::new(self));
+            .add(Prepare::<OVCWorkContext<VM>>::new(self));
 
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding].add(GenerateWork::new(
-            &self.compressor_space,
-            CompressorSpace::<VM>::add_offset_vector_tasks,
+            &self.ovc_space,
+            OVCSpace::<VM>::add_offset_vector_tasks,
         ));
 
         // scan roots to update their references
         scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new());
 
         scheduler.work_buckets[WorkBucketStage::Compact].add(GenerateWork::new(
-            &self.compressor_space,
-            CompressorSpace::<VM>::add_compact_tasks,
+            &self.ovc_space,
+            OVCSpace::<VM>::add_compact_tasks,
         ));
 
         scheduler.work_buckets[WorkBucketStage::Compact].set_sentinel(Box::new(
-            AfterCompact::<VM>::new(&self.compressor_space, &self.common.los),
+            AfterCompact::<VM>::new(&self.ovc_space, &self.common.los),
         ));
 
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<CompressorWorkContext<VM>>::new(self));
+            .add(Release::<OVCWorkContext<VM>>::new(self));
 
         // Reference processing
         if !*self.base().options.no_reference_types {
@@ -175,21 +175,21 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
     }
 
     fn get_used_pages(&self) -> usize {
-        self.compressor_space.reserved_pages() + self.common.get_used_pages()
+        self.ovc_space.reserved_pages() + self.common.get_used_pages()
     }
 }
 
-impl<VM: VMBinding> Compressor<VM> {
+impl<VM: VMBinding> OVC<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
         let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
-            constraints: &COMPRESSOR_CONSTRAINTS,
+            constraints: &OVC_CONSTRAINTS,
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
-        Compressor {
-            compressor_space: CompressorSpace::new(plan_args.get_normal_space_args(
-                "compressor_space",
+        OVC {
+            ovc_space: OVCSpace::new(plan_args.get_normal_space_args(
+                "ovc_space",
                 true,
                 false,
                 VMRequest::discontiguous(),

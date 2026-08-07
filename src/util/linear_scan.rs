@@ -5,9 +5,9 @@ use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
-// FIXME: MarkCompact uses linear scanning to discover allocated objects in the MarkCompactSpace.
-// It should use a local metadata (specific to the MarkCompactSpace) for that purpose.
-// In the future, we should let MarkCompact do linear scanning using its local metadata instead.
+// FIXME: Lisp2 uses linear scanning to discover allocated objects in the Lisp2Space.
+// It should use a local metadata (specific to the Lisp2Space) for that purpose.
+// In the future, we should let Lisp2 do linear scanning using its local metadata instead.
 
 /// Iterate over an address range, and find each object by VO bit.
 /// ATOMIC_LOAD_VO_BIT can be set to false if it is known that loading VO bit

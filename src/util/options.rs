@@ -45,9 +45,9 @@ pub enum PlanSelector {
     /// A mark-region collector that allows an opportunistic defragmentation mechanism.
     Immix,
     /// A mark-compact collector that implements the Lisp-2 compaction algorithm.
-    MarkCompact,
-    /// A mark-compact collector that uses Compressor-style bitmaps.
-    Compressor,
+    Lisp2,
+    /// A mark-compact collector that uses offset-vector bitmaps.
+    OVC,
     /// An Immix collector that uses a sticky mark bit to allow generational behaviors without a copying nursery.
     StickyImmix,
     /// LXR GC

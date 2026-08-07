@@ -1,4 +1,4 @@
-// GITHUB-CI: MMTK_PLAN=Immix,GenImmix,StickyImmix,MarkSweep,MarkCompact
+// GITHUB-CI: MMTK_PLAN=Immix,GenImmix,StickyImmix,MarkSweep,Lisp2
 // GITHUB-CI: FEATURES=vo_bit
 
 // Only test this with plans that use LOS. NoGC does not use large object space.

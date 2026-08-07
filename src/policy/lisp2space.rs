@@ -19,20 +19,20 @@ use atomic::Ordering;
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
 pub(crate) const TRACE_KIND_FORWARD: TraceKind = 1;
 
-pub struct MarkCompactSpace<VM: VMBinding> {
+pub struct Lisp2Space<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
 }
 
 const GC_MARK_BIT_MASK: u8 = 1;
 
-/// For each MarkCompact object, we need one extra word for storing forwarding pointer (Lisp-2 implementation).
+/// For each Lisp2 object, we need one extra word for storing forwarding pointer (Lisp-2 implementation).
 /// Note that considering the object alignment, we may end up allocating/reserving more than one word per object.
-/// See [`MarkCompactSpace::HEADER_RESERVED_IN_BYTES`].
+/// See [`Lisp2Space::HEADER_RESERVED_IN_BYTES`].
 pub const GC_EXTRA_HEADER_WORD: usize = 1;
 const GC_EXTRA_HEADER_BYTES: usize = GC_EXTRA_HEADER_WORD << LOG_BYTES_IN_WORD;
 
-impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
+impl<VM: VMBinding> SFT for Lisp2Space<VM> {
     fn name(&self) -> &'static str {
         self.get_name()
     }
@@ -47,12 +47,12 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
 
     #[cfg(feature = "object_pinning")]
     fn pin_object(&self, _object: ObjectReference) -> bool {
-        panic!("Cannot pin/unpin objects of MarkCompactSpace.")
+        panic!("Cannot pin/unpin objects of Lisp2Space.")
     }
 
     #[cfg(feature = "object_pinning")]
     fn unpin_object(&self, _object: ObjectReference) -> bool {
-        panic!("Cannot pin/unpin objects of MarkCompactSpace.")
+        panic!("Cannot pin/unpin objects of Lisp2Space.")
     }
 
     #[cfg(feature = "object_pinning")]
@@ -96,22 +96,22 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
-        // We should not use trace_object for markcompact space.
+        // We should not use trace_object for Lisp2 space.
         // Depending on which trace it is, we should manually call either trace_mark or trace_forward.
         panic!("sft_trace_object() cannot be used with mark compact space")
     }
 
     fn debug_print_object_info(&self, object: ObjectReference) {
-        println!("marked = {}", MarkCompactSpace::<VM>::is_marked(object));
+        println!("marked = {}", Lisp2Space::<VM>::is_marked(object));
         println!(
             "head forwarding pointer = {:?}",
-            MarkCompactSpace::<VM>::get_header_forwarding_pointer(object)
+            Lisp2Space::<VM>::get_header_forwarding_pointer(object)
         );
         self.common.debug_print_object_global_info(object);
     }
 }
 
-impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
+impl<VM: VMBinding> Space<VM> for Lisp2Space<VM> {
     fn as_space(&self) -> &dyn Space<VM> {
         self
     }
@@ -137,7 +137,7 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
-        panic!("markcompactspace only releases pages enmasse")
+        panic!("Lisp2 space only releases pages enmasse")
     }
 
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
@@ -153,7 +153,7 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
     }
 }
 
-impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompactSpace<VM> {
+impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for Lisp2Space<VM> {
     fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         queue: &mut Q,
@@ -163,7 +163,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompac
     ) -> ObjectReference {
         debug_assert!(
             KIND != TRACE_KIND_TRANSITIVE_PIN,
-            "MarkCompact does not support transitive pin trace."
+            "Lisp2 does not support transitive pin trace."
         );
         if KIND == TRACE_KIND_MARK {
             self.trace_mark_object(queue, object)
@@ -184,7 +184,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompac
     }
 }
 
-impl<VM: VMBinding> MarkCompactSpace<VM> {
+impl<VM: VMBinding> Lisp2Space<VM> {
     /// We need one extra header word for each object. Considering the alignment requirement, this is
     /// the actual bytes we need to reserve for each allocation.
     pub const HEADER_RESERVED_IN_BYTES: usize = if VM::MAX_ALIGNMENT > GC_EXTRA_HEADER_BYTES {
@@ -236,7 +236,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         let is_discontiguous = args.vmrequest.is_discontiguous();
         let local_specs = extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]);
         let common = CommonSpace::new(args.into_policy_args(true, false, local_specs));
-        MarkCompactSpace {
+        Lisp2Space {
             pr: if is_discontiguous {
                 MonotonePageResource::new_discontiguous(vm_map)
             } else {
@@ -260,7 +260,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             "{:x}: VO bit not set",
             object
         );
-        if MarkCompactSpace::<VM>::test_and_mark(object) {
+        if Lisp2Space::<VM>::test_and_mark(object) {
             queue.enqueue(object);
         }
         object
@@ -278,7 +278,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         );
         // from this stage and onwards, mark bit is no longer needed
         // therefore, it can be reused to save one extra bit in metadata
-        if MarkCompactSpace::<VM>::test_and_clear_mark(object) {
+        if Lisp2Space::<VM>::test_and_clear_mark(object) {
             queue.enqueue(object);
         }
 
@@ -359,7 +359,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
     /// Linear scan all the live objects in the given memory region
     fn linear_scan_objects(&self, range: Range<Address>) -> impl Iterator<Item = ObjectReference> {
-        crate::util::linear_scan::ObjectIterator::<VM, MarkCompactObjectSize<VM>, true>::new(
+        crate::util::linear_scan::ObjectIterator::<VM, Lisp2ObjectSize<VM>, true>::new(
             range.start,
             range.end,
         )
@@ -447,8 +447,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     }
 }
 
-struct MarkCompactObjectSize<VM>(std::marker::PhantomData<VM>);
-impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MarkCompactObjectSize<VM> {
+struct Lisp2ObjectSize<VM>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for Lisp2ObjectSize<VM> {
     fn size(object: ObjectReference) -> usize {
         VM::VMObjectModel::get_current_size(object)
     }
