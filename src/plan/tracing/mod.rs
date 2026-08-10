@@ -90,8 +90,8 @@ pub trait Trace: 'static + Send + Clone {
 
     /// The post-scan hook to be call after scanning `object`.
     ///
-    /// Each object is scanned by [`Scanning::scan_object`] or
-    /// [`Scanning::scan_object_and_trace_edges`], and this function will be called after scanning
+    /// Each object is scanned by [`crate::vm::Scanning::scan_object`] or
+    /// [`crate::vm::Scanning::scan_object_and_trace_edges`], and this function will be called after scanning
     /// an object as a hook to invoke possible policy-specific post-scan methods.  If `object` is in
     /// a space that needs such a hook, this method should call such hook of the space.  Otherwise,
     /// this method may do nothing.

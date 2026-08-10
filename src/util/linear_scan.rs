@@ -150,6 +150,11 @@ pub trait Region: Copy + PartialEq + PartialOrd {
 /// Because the raw address of a [`ObjectReference`] must be inside an object, an object is in an
 /// [`UnstraddlableRegion`] if an only if the raw address of its [`ObjectReference`] is in the
 /// [`UnstraddlableRegion`].
+// The doc comment above links to `crate::policy::*` items. The `policy` module itself is private
+// (not re-exported at the crate root), so those items are technically unreachable from outside
+// the crate even though they are declared `pub`. `cargo doc --document-private-items` (used by
+// GC implementers and by `ci-doc.sh`) documents them anyway, so the links do resolve there.
+#[allow(rustdoc::private_intra_doc_links)]
 pub trait UnstraddlableRegion: Region {
     /// Return the region that contains the object.
     fn containing(object: ObjectReference) -> Self {
