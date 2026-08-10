@@ -34,7 +34,7 @@ jobs:
       RESULT_REPO_BRANCH: 'self-hosted-chopin'
       # Whether we deploy the generated page. Set to true for master.
       DEPLOY: true
-      CI_PERF_KIT_VERSION: '0.9.0'
+      CI_PERF_KIT_VERSION: '0.9.1'
       # heap_modifier passed to run_benchmarks: a multiple of each benchmark's
       # min heap size. NoGC doesn't use either of these (it sets heap_modifier
       # to 0, meaning "use the max heap instead").
