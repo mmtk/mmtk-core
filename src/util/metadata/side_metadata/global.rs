@@ -1507,12 +1507,6 @@ impl SideMetadataContext {
         // and both policies use the chunk map, we just add the chunk map table globally.
         ret.push(crate::util::heap::chunk_map::ChunkMap::ALLOC_TABLE);
 
-        // `Block::init()` unconditionally records per-block defrag state (e.g. whether a block
-        // is a defrag source) for every Immix-family plan, not just plans with reference
-        // counting enabled. So this table must always be mapped, regardless of which plan
-        // requests it.
-        ret.push(crate::policy::immix::block::Block::DEFRAG_STATE_TABLE);
-
         ret.extend_from_slice(specs);
         ret
     }

@@ -377,9 +377,6 @@ impl<VM: VMBinding> LXR<VM> {
     /// GC-specific initialization.
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Box<Self> {
         let num_workers = args.scheduler.num_workers();
-        // Note: `Block::DEFRAG_STATE_TABLE` doesn't need to be listed here; it's already
-        // registered unconditionally by `SideMetadataContext::new_global_specs` since every
-        // Immix-family plan (not just LXR) requires it.
         let immix_specs = metadata::extract_side_metadata(&[
             MetadataSpec::OnSide(RC_TABLE),
             MetadataSpec::OnSide(
@@ -770,7 +767,7 @@ impl<VM: VMBinding> LXR<VM> {
     /// Returns whether the given object is in a block that was selected for
     /// defragmentation (evacuation) in the current collection.
     pub fn in_defrag(&self, o: ObjectReference) -> bool {
-        Block::in_defrag_block(o)
+        self.immix_space.in_space(o) && Block::in_defrag_block(o)
     }
 
     /// Returns whether the given address is in the Immix space and in a block

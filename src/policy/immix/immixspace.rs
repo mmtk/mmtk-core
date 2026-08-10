@@ -372,6 +372,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     fn side_metadata_specs(rc_enabled: bool) -> Vec<SideMetadataSpec> {
         if rc_enabled {
             let meta = vec![
+                MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 MetadataSpec::OnSide(crate::util::rc::RC_STRADDLE_LINES),
@@ -383,6 +384,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
         metadata::extract_side_metadata(&if super::BLOCK_ONLY {
             vec![
+                MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
@@ -393,6 +395,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         } else {
             vec![
                 MetadataSpec::OnSide(Line::MARK_TABLE),
+                MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,

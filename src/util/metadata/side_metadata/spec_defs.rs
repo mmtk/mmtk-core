@@ -61,8 +61,6 @@ define_side_metadata_specs!(
     SFT_DENSE_CHUNK_MAP_INDEX   = (global: true, log_num_of_bits: 3, log_bytes_in_region: LOG_BYTES_IN_CHUNK),
     // Reference counts
     RC_TABLE = (global: true, log_num_of_bits: crate::util::rc::LOG_REF_COUNT_BITS, log_bytes_in_region: crate::util::rc::LOG_MIN_OBJECT_SIZE),
-    // Record defrag state for immix blocks
-    IX_BLOCK_DEFRAG = (global: true, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
     // Mark chunks (any plan that uses the chunk map should include this spec in their global sidemetadata specs)
     CHUNK_MARK   = (global: true, log_num_of_bits: 3, log_bytes_in_region: crate::util::heap::chunk_map::Chunk::LOG_BYTES),
 );
@@ -77,6 +75,8 @@ define_side_metadata_specs!(
     MS_OFFSET_MALLOC = (global: false, log_num_of_bits: 0, log_bytes_in_region: LOG_MIN_OBJECT_SIZE as usize),
     // Mark lines by immix
     IX_LINE_MARK    = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::line::Line::LOG_BYTES),
+    // Record defrag state for immix blocks
+    IX_BLOCK_DEFRAG = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
     // Mark blocks by immix
     IX_BLOCK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
     // Straddle line marks
