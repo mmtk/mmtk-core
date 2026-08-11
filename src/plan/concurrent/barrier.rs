@@ -15,10 +15,6 @@ use crate::{
     MMTK,
 };
 
-/// A snapshot-at-the-beginning (SATB) barrier, used by concurrent plans (e.g. concurrent Immix)
-/// to preserve the objects that were reachable at the start of concurrent marking. Old values
-/// overwritten by mutators, and referents loaded from weak references, are buffered and later
-/// enqueued as roots for concurrent marking, so they are not incorrectly reclaimed as garbage.
 pub struct SATBBarrierSemantics<
     VM: VMBinding,
     P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,
@@ -34,7 +30,6 @@ pub struct SATBBarrierSemantics<
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
     SATBBarrierSemantics<VM, P, KIND>
 {
-    /// Create a new SATB barrier for the given mutator, with empty SATB/weak-reference buffers.
     pub fn new(mmtk: &'static MMTK<VM>, tls: VMMutatorThread) -> Self {
         Self {
             mmtk,

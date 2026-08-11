@@ -1,6 +1,5 @@
 use atomic::Ordering;
 
-use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
@@ -19,6 +18,7 @@ use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicUsize;
 
 #[allow(unused)]
@@ -41,7 +41,11 @@ pub struct LargeObjectSpace<VM: VMBinding> {
     pub rc_enabled: bool,
     pub(crate) rc: RefCountHelper<VM>,
     pub is_end_of_satb_or_full_gc: bool,
-    pub(crate) lxr: Option<&'static crate::plan::lxr::LXR<VM>>,
+    /// Whether newly allocated LOS objects should bump `LOS_PAGE_REUSE_COUNT` on their pages, so
+    /// remembered-set entries recorded against a page's previous occupant are invalidated. Only
+    /// needed while concurrent marking can be validating a remembered set; set/cleared by the
+    /// owning plan (currently only LXR) as concurrent marking starts/ends.
+    pub(crate) bump_page_reuse_count: AtomicBool,
 }
 
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
@@ -108,8 +112,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             // Initialize mark bit
             self.test_and_mark(object, self.mark_state);
             // Initialize metadata
-            let lxr = self.lxr.unwrap();
-            if lxr.concurrent_work_in_progress() {
+            if self.bump_page_reuse_count.load(Ordering::Acquire) {
                 for off in (0..bytes).step_by(BYTES_IN_PAGE) {
                     let a = object.to_raw_address() + off;
                     let count = LOS_PAGE_REUSE_COUNT.load_atomic::<u8>(a, Ordering::SeqCst);
@@ -359,7 +362,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             rc_enabled: false,
             rc: RefCountHelper::NEW,
             is_end_of_satb_or_full_gc: false,
-            lxr: None,
+            bump_page_reuse_count: AtomicBool::new(false),
         }
     }
 

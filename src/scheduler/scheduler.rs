@@ -8,11 +8,11 @@ use super::worker_goals::{WorkerGoal, WorkerGoals};
 use super::worker_monitor::{LastParkedResult, WorkerMonitor};
 use super::*;
 use crate::mmtk::MMTK;
-use crate::plan::concurrent::Pause;
-use crate::plan::lxr::LXR;
 use crate::plan::tracing::gc_work::weakref::VMForwardWeakRefs;
+use crate::plan::Pause;
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
+use crate::util::options::PlanSelector;
 use crate::vm::Collection;
 use crate::vm::VMBinding;
 use crate::Plan;
@@ -599,7 +599,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     fn do_vm_release(&self, mmtk: &MMTK<VM>) {
-        if mmtk.get_plan().downcast_ref::<LXR<VM>>().is_none() {
+        if *mmtk.get_options().plan != PlanSelector::LXR {
             <VM as VMBinding>::VMCollection::vm_release();
         }
     }
@@ -749,7 +749,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // as if drained, even though unprocessed concurrent-marking work is still sitting in the
         // now-inactive queue. Keep this the same enable/disable-only mechanism as master unless
         // the plan is LXR.
-        let is_lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().is_some();
+        let is_lxr = *mmtk.get_options().plan == PlanSelector::LXR;
         let enable_bucket = |stage: WorkBucketStage, flip: bool| {
             let bucket = &self.work_buckets[stage];
             if flip && is_lxr {

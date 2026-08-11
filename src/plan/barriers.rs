@@ -151,11 +151,8 @@ impl<VM: VMBinding> Barrier<VM> for NoBarrier {}
 /// A barrier is a combination of fast-path behaviour + slow-path semantics.
 /// The fast-path code will decide whether to call the slow-path calls.
 pub trait BarrierSemantics: 'static + Send {
-    /// The VM binding type that this barrier semantics is specialized for.
     type VM: VMBinding;
 
-    /// The metadata spec used to store the unlogged bit that this barrier's fast-path checks and
-    /// slow-path clears/sets.
     const UNLOG_BIT_SPEC: MetadataSpec =
         *<Self::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.as_spec();
 
@@ -282,7 +279,6 @@ pub struct FieldBarrier<S: BarrierSemantics> {
 }
 
 impl<S: BarrierSemantics> FieldBarrier<S> {
-    /// Create a new FieldBarrier with the given semantics.
     pub fn new(semantics: S) -> Self {
         Self { semantics }
     }

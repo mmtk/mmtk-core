@@ -1,8 +1,8 @@
 use super::defrag::StatsForDefrag;
 use super::line::*;
 use super::{block::*, defrag::Defrag};
-use crate::plan::concurrent::Pause;
 use crate::plan::tracing::OptionObjectQueue;
+use crate::plan::Pause;
 use crate::policy::gc_work::{TraceKind, DEFAULT_TRACE, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
@@ -41,6 +41,9 @@ use std::sync::{atomic::AtomicU8, Arc};
 
 pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
 pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
+
+/// Whether RC-mode mature-space evacuation is compiled in.
+const LXR_MATURE_EVACUATION: bool = !cfg!(feature = "lxr_no_mature_evac");
 
 /// Plan-level hooks invoked by ImmixSpace during mutator allocation.
 /// Default impls are no-ops; LXR provides the concrete implementation.
@@ -772,7 +775,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 continue;
             }
             if self.rc_enabled {
-                if crate::plan::lxr::MATURE_EVACUATION && block.is_defrag_source() {
+                if LXR_MATURE_EVACUATION && block.is_defrag_source() {
                     continue;
                 }
                 // Blocks in the `reusable_blocks` queue can be released after some RC collections.
@@ -989,9 +992,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         debug_assert!(self.rc_enabled);
-        if crate::plan::lxr::MATURE_EVACUATION && Block::containing(object).is_defrag_source() {
+        if LXR_MATURE_EVACUATION && Block::containing(object).is_defrag_source() {
             self.trace_forward_rc_mature_object(queue, object, semantics, pause, worker)
-        } else if crate::plan::lxr::MATURE_EVACUATION {
+        } else if LXR_MATURE_EVACUATION {
             self.trace_mark_rc_mature_object(queue, object, pause, mark)
         } else {
             self.trace_object_without_moving(queue, object)

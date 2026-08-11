@@ -13,7 +13,7 @@
 //!
 //! For more about implementing a plan, it is recommended to read the [MMTk tutorial](/docs/tutorial/Tutorial.md).
 
-pub mod barriers;
+mod barriers;
 pub use barriers::BarrierSelector;
 
 mod gc_work;
@@ -44,12 +44,10 @@ mod generational;
 /// Sticky plans (using sticky marks for generational behaviors without a copying nursery)
 mod sticky;
 
-/// Concurrent GC plans, which perform (parts of) tracing concurrently with mutators.
-pub mod concurrent;
-/// The Immix plan, a mostly-copying mark-region GC.
-pub mod immix;
-/// The LXR plan, a low-latency reference-counted GC.
-pub mod lxr;
+mod concurrent;
+pub use concurrent::{ConcurrentPlan, Pause};
+mod immix;
+mod lxr;
 mod markcompact;
 mod marksweep;
 mod nogc;

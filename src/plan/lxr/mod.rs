@@ -9,7 +9,6 @@ use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
 pub use self::global::LXR;
-pub use self::global::LXR_CONSTRAINTS;
 
 use atomic::Atomic;
 use atomic::Ordering;

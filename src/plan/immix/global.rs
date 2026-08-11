@@ -27,16 +27,12 @@ use enum_map::EnumMap;
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
-/// The vanilla (non-concurrent, non-generational) Immix plan. It always does a full-heap,
-/// stop-the-world collection, optionally with defragmentation.
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct Immix<VM: VMBinding> {
-    /// The Immix space in which all objects for this plan are allocated.
     #[post_scan]
     #[space]
     #[copy_semantics(CopySemantics::DefaultCopy)]
     pub immix_space: ImmixSpace<VM>,
-    /// The common plan state (e.g. the immortal, large object and VM spaces) shared by plans.
     #[parent]
     pub common: CommonPlan<VM>,
     last_gc_was_defrag: AtomicBool,
@@ -130,8 +126,6 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 }
 
 impl<VM: VMBinding> Immix<VM> {
-    /// Create a new `Immix` plan with the default (non-mixed-age, movable) Immix space
-    /// configuration.
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
         let plan_args = CreateSpecificPlanArgs {
             global_args: args,
@@ -147,9 +141,6 @@ impl<VM: VMBinding> Immix<VM> {
         )
     }
 
-    /// Create a new `Immix` plan, using the given plan args and Immix space configuration. This
-    /// allows Immix-derived plans (e.g. generational/sticky Immix) to customize the Immix space
-    /// (e.g. to enable mixed-age allocation) while reusing the rest of the plan setup.
     pub fn new_with_args(
         mut plan_args: CreateSpecificPlanArgs<VM>,
         space_args: ImmixSpaceArgs,
