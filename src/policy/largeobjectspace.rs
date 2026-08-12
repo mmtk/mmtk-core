@@ -102,12 +102,13 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
                 "Currently only ConcurrentImmix can allocate as live, and it doesn't unlog allocated objects in LOS."
             );
 
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+            VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
+                .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         } else {
             #[cfg(debug_assertions)]
             if self.common.needs_log_bit {
                 debug_assert_eq!(
-                    VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.load_atomic::<VM, u8>(
+                    VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.load_atomic::<VM, u8>(
                         object,
                         None,
                         Ordering::Acquire
@@ -238,7 +239,7 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 
     fn clear_side_log_bits(&self) {
         let mut enumerator = ClosureObjectEnumerator::<_, VM>::new(|object| {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
+            VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
         });
         // Visit all objects.  It can be ordered arbitrarily with `Self::Release` which sweeps dead
         // objects (removing them from the treadmill) and clears their unlog bits, too.
@@ -247,7 +248,8 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 
     fn set_side_log_bits(&self) {
         let mut enumerator = ClosureObjectEnumerator::<_, VM>::new(|object| {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+            VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
+                .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         });
         // Visit all objects.
         self.treadmill.enumerate_objects(&mut enumerator, true);
@@ -357,8 +359,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 // We also unlog mature objects as their unlog bit may have been unset before the
                 // full-heap GC
                 if self.common.unlog_traced_object {
-                    VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                    VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
                         .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+                    VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+                        .mark_all_fields_as_unlogged::<VM>(object);
                 }
                 queue.enqueue(object);
             } else {
@@ -377,7 +381,9 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             crate::util::metadata::vo_bit::unset_vo_bit(object);
             // Clear log bits for dead objects to prevent a new nursery object having the unlog bit set
             if self.clear_log_bit_on_sweep {
-                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
+                VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
+                    .clear::<VM>(object, Ordering::SeqCst);
+                VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.clear_all_fields::<VM>(object);
             }
             self.pr
                 .release_pages(get_super_page(object.to_object_start::<VM>()));

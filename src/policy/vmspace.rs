@@ -63,7 +63,8 @@ impl<VM: VMBinding> SFT for VMSpace<VM> {
         self.mark_state
             .on_object_metadata_initialization::<VM>(object);
         if self.common.unlog_allocated_object {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+            VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
+                .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(object);
@@ -165,7 +166,7 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
     }
 
     fn clear_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        let log_bit = VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.extract_side_spec();
         let external_pages = self.pr.get_external_pages();
         for ep in external_pages.iter() {
             log_bit.bzero_metadata(ep.start, ep.end - ep.start);
@@ -173,7 +174,7 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
     }
 
     fn set_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        let log_bit = VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.extract_side_spec();
         let external_pages = self.pr.get_external_pages();
         for ep in external_pages.iter() {
             log_bit.bset_metadata(ep.start, ep.end - ep.start);
@@ -291,7 +292,7 @@ impl<VM: VMBinding> VMSpace<VM> {
         if self.common.needs_log_bit {
             // Bulk set unlog bits for all addresses in the VM space. This ensures that any
             // modification to the bootimage is logged
-            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC {
                 side.bset_metadata(_raw_start, _raw_size);
             }
         }
@@ -328,7 +329,7 @@ impl<VM: VMBinding> VMSpace<VM> {
             // bootimage
             #[cfg(feature = "set_unlog_bits_vm_space")]
             if self.common.unlog_traced_object {
-                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
+                VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.store_atomic::<VM, u8>(
                     object,
                     1,
                     None,

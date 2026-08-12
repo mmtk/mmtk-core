@@ -57,7 +57,8 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         self.mark_state
             .on_object_metadata_initialization::<VM>(object);
         if self.common.unlog_allocated_object {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+            VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
+                .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(object);
@@ -121,14 +122,14 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
     }
 
     fn clear_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        let log_bit = VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.extract_side_spec();
         for (start, size) in self.pr.iterate_allocated_regions() {
             log_bit.bzero_metadata(start, size);
         }
     }
 
     fn set_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
+        let log_bit = VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.extract_side_spec();
         for (start, size) in self.pr.iterate_allocated_regions() {
             log_bit.bset_metadata(start, size);
         }
@@ -205,7 +206,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         if self.mark_state.test_and_mark::<VM>(object) {
             // Set the unlog bit if required
             if self.common.unlog_traced_object {
-                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
+                VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.store_atomic::<VM, u8>(
                     object,
                     1,
                     None,

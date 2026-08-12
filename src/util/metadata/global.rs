@@ -39,6 +39,15 @@ impl MetadataSpec {
         }
     }
 
+    /// Extract SideMetadataSpec from a MetadataSpec.  Return `None` if this is not side metadata.
+    /// Equivalent to matching against `MetadataSpec::OnSide`, but can be used for `flatmap`
+    pub const fn extract_side_spec_safe(&self) -> Option<&SideMetadataSpec> {
+        match self {
+            MetadataSpec::OnSide(spec) => Some(spec),
+            MetadataSpec::InHeader(_) => None,
+        }
+    }
+
     /// A function to non-atomically load the specified metadata's content.
     /// Returns the metadata value.
     ///

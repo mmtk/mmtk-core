@@ -333,7 +333,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         }
 
         let spec = crate::util::metadata::extract_side_metadata(&[
-            *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+            *VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC,
         ]);
 
         let mut plan_args = CreateSpecificPlanArgs {

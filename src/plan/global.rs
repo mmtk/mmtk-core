@@ -792,7 +792,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     pub(crate) fn schedule_unlog_bits_op(&mut self, unlog_bits_op: UnlogBitsOperation) {
-        if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
+        if VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.is_on_side() {
             // # Safety: CommonPlan reference is always valid within this collection cycle.
             let common_plan = unsafe { &*(self as *const CommonPlan<VM>) };
 

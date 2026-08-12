@@ -1,13 +1,13 @@
 use atomic::Ordering;
 
 use crate::plan::tracing::gc_work::closure::{ProcessNodes, ProcessSlots};
-use crate::plan::tracing::Trace;
+use crate::plan::tracing::{SlotOfTrace, Trace};
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
 use crate::util::os::*;
 use crate::util::ObjectReference;
-use crate::vm::slot::MemorySlice;
+use crate::vm::slot::{MemorySlice, Slot};
 use crate::vm::*;
 use crate::MMTK;
 use std::marker::PhantomData;
@@ -102,17 +102,59 @@ impl<T: Trace> GCWork<T::VM> for ProcessModBuf<T> {
                     *obj,
                     OS::get_process_memory_maps().unwrap(),
                 );
-                <T::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<T::VM, u8>(
-                    *obj,
-                    1,
-                    None,
-                    Ordering::SeqCst,
-                );
+                <T::VM as VMBinding>::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
+                    .store_atomic::<T::VM, u8>(*obj, 1, None, Ordering::SeqCst);
             }
             // Scan objects in the modbuf and forward pointers
             let modbuf = std::mem::take(&mut self.modbuf);
             GCWork::do_work(
                 &mut ProcessNodes::<T>::new(modbuf, WorkBucketStage::Closure),
+                worker,
+                mmtk,
+            )
+        }
+    }
+}
+
+/// The modbuf contains a list of objects in mature space(s) that
+/// may contain pointers to the nursery space.
+/// This work packet scans the recorded objects and forwards pointers if necessary.
+pub struct ProcessFieldModBuf<T: Trace> {
+    modbuf: Vec<SlotOfTrace<T>>,
+    phantom: PhantomData<T>,
+}
+
+impl<T: Trace> ProcessFieldModBuf<T> {
+    pub fn new(modbuf: Vec<SlotOfTrace<T>>) -> Self {
+        debug_assert!(!modbuf.is_empty());
+        Self {
+            modbuf,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<T: Trace> GCWork<T::VM> for ProcessFieldModBuf<T> {
+    fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
+        // Process and scan modbuf only if the current GC is a nursery GC
+        let gen = mmtk.get_plan().generational().unwrap();
+        if gen.is_current_gc_nursery() {
+            // Flip the per-object unlogged bits to "unlogged" state.
+            for slot in &self.modbuf {
+                let slot_addr = slot.to_address();
+                debug_assert!(
+                    !gen.is_address_in_nursery(slot_addr),
+                    "Slot address {} was logged but is not mature. Dumping process memory maps:\n{}",
+                    slot_addr,
+                    OS::get_process_memory_maps().unwrap(),
+                );
+                <T::VM as VMBinding>::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+                    .mark_as_unlogged::<T::VM>(slot_addr, Ordering::Relaxed);
+            }
+            // Scan objects in the modbuf and forward pointers
+            let modbuf = std::mem::take(&mut self.modbuf);
+            GCWork::do_work(
+                &mut ProcessSlots::<T>::new(modbuf, WorkBucketStage::Closure),
                 worker,
                 mmtk,
             )

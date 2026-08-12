@@ -145,17 +145,27 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
     }
 
     fn clear_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        for (start, size) in self.pr.iterate_allocated_regions() {
-            log_bit.bzero_metadata(start, size);
-        }
+        let clear_if_side = |metadata: &MetadataSpec| {
+            if let Some(log_bit) = metadata.extract_side_spec_safe() {
+                for (start, size) in self.pr.iterate_allocated_regions() {
+                    log_bit.bzero_metadata(start, size);
+                }
+            }
+        };
+        clear_if_side(VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.as_spec());
+        clear_if_side(VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.as_spec());
     }
 
     fn set_side_log_bits(&self) {
-        let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
-        for (start, size) in self.pr.iterate_allocated_regions() {
-            log_bit.bset_metadata(start, size);
-        }
+        let set_if_side = |metadata: &MetadataSpec| {
+            if let Some(log_bit) = metadata.extract_side_spec_safe() {
+                for (start, size) in self.pr.iterate_allocated_regions() {
+                    log_bit.bzero_metadata(start, size);
+                }
+            }
+        };
+        set_if_side(VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC.as_spec());
+        set_if_side(VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.as_spec());
     }
 }
 
@@ -343,8 +353,9 @@ impl<VM: VMBinding> PolicyCopyContext for CopySpaceCopyContext<VM> {
 
     fn post_copy(&mut self, obj: ObjectReference, _bytes: usize) {
         if self.copy_allocator.get_space().common().unlog_traced_object {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+            VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
                 .mark_byte_as_unlogged::<VM>(obj, Ordering::Relaxed);
+            VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.mark_all_fields_as_unlogged::<VM>(obj);
         }
     }
 }

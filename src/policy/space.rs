@@ -811,7 +811,8 @@ impl<VM: VMBinding> CommonSpace<VM> {
             use std::sync::atomic::Ordering;
             println!(
                 "log bit = {}",
-                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::Relaxed),
+                VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
+                    .is_unlogged::<VM>(object, Ordering::Relaxed),
             );
         }
         println!("is live = {}", object.is_live());

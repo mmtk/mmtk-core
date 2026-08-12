@@ -209,8 +209,17 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     fn sanity_check_object(&self, object: crate::util::ObjectReference) -> bool {
         if self.is_current_gc_nursery() {
             // Every reachable object should be logged
-            if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::SeqCst) {
+            if !VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC
+                .is_unlogged::<VM>(object, Ordering::SeqCst)
+            {
                 error!("Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
+                return false;
+            }
+            // The field at the raw address of object should be logged, too.
+            if !VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+                .is_unlogged::<VM>(object.to_raw_address(), Ordering::SeqCst)
+            {
+                error!("Object {} field {} is not unlogged (all objects that have been traced should be unlogged/mature)", object, object.to_raw_address());
                 return false;
             }
 

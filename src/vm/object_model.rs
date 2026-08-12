@@ -87,12 +87,23 @@ pub trait ObjectModel<VM: VMBinding> {
     // Any side metadata offset calculation must consider these to prevent overlaps. A binding should start their
     // side metadata from global_side_metadata_vm_base_address() or LOCAL_SIDE_METADATA_VM_BASE_OFFSET.
 
-    /// A global 1-bit metadata used by generational plans to track cross-generational pointers. It is generally
-    /// located in side metadata.
+    /// A global 1-bit-per-object metadata used by object-logging write barriers.  It can be used by
+    /// generational plans to track cross-generational pointers, and used by SATB barriers to make
+    /// snapshots of objects.
     ///
-    /// Note that for this bit, 0 represents logged (default), and 1 represents unlogged.
-    /// This bit is also referred to as unlogged bit in Java MMTk for this reason.
-    const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec;
+    /// Note that for this bit, 0 represents logged (default), and 1 represents unlogged. This bit
+    /// is also referred to as unlogged bit in Java MMTk for this reason.
+    const GLOBAL_OBJECT_UNLOG_BIT_SPEC: VMGlobalObjectUnlogBitSpec;
+
+    /// A global 1-bit-per-word metadata used by object-logging write barriers.  It can be used by
+    /// generational plans to track cross-generational pointers, and used by SATB barriers to make
+    /// snapshots of objects.
+    ///
+    /// The field unlog bit metadata must be a side metadata.
+    ///
+    /// Note that for this bit, 0 represents logged (default), and 1 represents unlogged. This bit
+    /// is also referred to as unlogged bit in Java MMTk for this reason.
+    const GLOBAL_FIELD_UNLOG_BIT_SPEC: VMGlobalFieldUnlogBitSpec;
 
     /// A local word-size metadata for the forwarding pointer, used by copying plans. It is almost always
     /// located in the object header as it is fine to destroy an object header in order to copy it.
@@ -480,6 +491,7 @@ pub trait ObjectModel<VM: VMBinding> {
 
 pub mod specs {
     use crate::util::constants::LOG_BITS_IN_WORD;
+    use crate::util::constants::LOG_BYTES_IN_ADDRESS;
     use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::constants::LOG_MIN_OBJECT_SIZE;
     use crate::util::metadata::side_metadata::*;
@@ -580,14 +592,24 @@ pub mod specs {
         };
     }
 
-    // Log bit: 1 bit per object, global
+    // Object unlog bit: 1 bit per object, global
     define_vm_metadata_spec!(
         /// 1-bit global metadata to log an object.
-        VMGlobalLogBitSpec,
+        VMGlobalObjectUnlogBitSpec,
         true,
         0,
         LOG_MIN_OBJECT_SIZE
     );
+
+    // Field unlog bit: 1 bit per word, global
+    define_vm_metadata_spec!(
+        /// 1-bit global metadata to log a field.
+        VMGlobalFieldUnlogBitSpec,
+        true,
+        0,
+        LOG_BYTES_IN_ADDRESS
+    );
+
     // Forwarding pointer: word size per object, local
     define_vm_metadata_spec!(
         /// 1-word local metadata for spaces that may copy objects.

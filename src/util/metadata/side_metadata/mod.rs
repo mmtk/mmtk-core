@@ -22,7 +22,8 @@ use crate::vm::VMBinding;
 /// Initialize side metadata runtime state and reserve the side metadata address range.
 pub fn initialize_side_metadata<VM: VMBinding>(options: &Options) {
     let vm_side_metadata_specs = super::extract_side_metadata(&[
-        *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+        *VM::VMObjectModel::GLOBAL_OBJECT_UNLOG_BIT_SPEC,
+        *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC,
         *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
         *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
         *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,

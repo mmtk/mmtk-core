@@ -154,6 +154,19 @@ pub trait Slot: Copy + Send + Sync + Debug + PartialEq + Eq + Hash {
     fn prefetch_store(&self) {
         // no-op by default
     }
+
+    /// Return an address that represents the slot.
+    ///
+    /// The address is used to set the global field unlog bit side metadata.  MMTk-core has no
+    /// requirement about whether the returned address is the actual address that holds the value of
+    /// the field.  MMTk assumes the following statements to be true:
+    ///
+    /// -   The field address is within the address range of the object.
+    /// -   The field address must be word-aligned. (TODO: compressed OOP.)
+    /// -   The field address one-to-one corresponds to a slot.
+    fn to_address(&self) -> Address {
+        unimplemented!()
+    }
 }
 
 /// A simple slot implementation that represents a word-sized slot which holds the raw address of
