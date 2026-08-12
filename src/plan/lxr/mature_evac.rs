@@ -152,12 +152,15 @@ impl MatureEvacuationSet {
     }
 
     pub fn schedule_defrag_selection_packets<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
-        let tasks = space.chunk_map.generate_tasks_batched(|chunks| {
-            Box::new(SelectDefragBlocks {
-                chunks,
-                defrag_threshold: 1,
-            })
-        });
+        let tasks =
+            space
+                .chunk_map
+                .generate_tasks_batched(space.scheduler().num_workers(), |chunks| {
+                    Box::new(SelectDefragBlocks {
+                        chunks,
+                        defrag_threshold: 1,
+                    })
+                });
         self.fragmented_blocks_size.store(0, Ordering::SeqCst);
         SELECT_DEFRAG_BLOCK_JOB_COUNTER.store(tasks.len(), Ordering::SeqCst);
         space.scheduler().work_buckets[WorkBucketStage::Unconstrained].bulk_add(tasks);

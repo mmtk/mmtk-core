@@ -422,12 +422,15 @@ impl<VM: VMBinding> LXR<VM> {
 
     /// Generate chunk sweep work packets.
     fn generate_dead_cycle_sweep_tasks(&self) -> Vec<Box<dyn GCWork<VM>>> {
-        self.immix_space.chunk_map.generate_tasks_batched(|chunks| {
-            Box::new(SweepDeadCycles::new(
-                chunks,
-                LazySweepingJobsCounter::new_decs(),
-            ))
-        })
+        self.immix_space.chunk_map.generate_tasks_batched(
+            self.immix_space.scheduler().num_workers(),
+            |chunks| {
+                Box::new(SweepDeadCycles::new(
+                    chunks,
+                    LazySweepingJobsCounter::new_decs(),
+                ))
+            },
+        )
     }
 
     fn schedule_mature_sweeping(&self, pause: Pause) {
@@ -457,7 +460,9 @@ impl<VM: VMBinding> LXR<VM> {
     fn generate_full_trace_prepare_tasks(&self) -> Vec<Box<dyn GCWork<VM>>> {
         self.immix_space
             .chunk_map
-            .generate_tasks_batched(|chunks| Box::new(PrepareChunksForFullGC { chunks }))
+            .generate_tasks_batched(self.immix_space.scheduler().num_workers(), |chunks| {
+                Box::new(PrepareChunksForFullGC { chunks })
+            })
     }
 
     fn schedule_rc_block_sweeping_tasks(&self, counter: LazySweepingJobsCounter) {
@@ -571,7 +576,9 @@ impl<VM: VMBinding> LXR<VM> {
         let work_packets = self
             .immix_space
             .chunk_map
-            .generate_tasks_batched(|chunks| Box::new(ConcurrentChunkMetadataZeroing { chunks }));
+            .generate_tasks_batched(self.immix_space.scheduler().num_workers(), |chunks| {
+                Box::new(ConcurrentChunkMetadataZeroing { chunks })
+            });
         self.immix_space.scheduler().work_buckets[WorkBucketStage::Unconstrained]
             .bulk_add(work_packets);
         self.zeroing_packets_scheduled.store(true, Ordering::SeqCst);

@@ -9,7 +9,6 @@ use crate::plan::VectorQueue;
 use crate::policy::immix::block::BlockState;
 use crate::scheduler::gc_work::RootKind;
 use crate::util::copy::CopySemantics;
-use crate::util::copy::GCWorkerCopyContext;
 use crate::util::linear_scan::UnstraddlableRegion;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::rc::*;
@@ -41,7 +40,6 @@ pub struct ProcessIncs<VM: VMBinding, const KIND: EdgeKind> {
     lxr: &'static LXR<VM>,
     rc: RefCountHelper<VM>,
     survival_ratio_predictor_local: SurvivalRatioPredictorLocal,
-    copy_context: *mut GCWorkerCopyContext<VM>,
 }
 
 unsafe impl<VM: VMBinding, const KIND: EdgeKind> Send for ProcessIncs<VM, KIND> {}
@@ -51,15 +49,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
     const UNLOG_BITS: SideMetadataSpec = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
         .as_spec()
         .extract_side_spec();
-
-    fn worker(&self) -> &'static mut GCWorker<VM> {
-        GCWorker::<VM>::current()
-    }
-
-    #[allow(clippy::mut_from_ref)]
-    fn copy_context(&self) -> &mut GCWorkerCopyContext<VM> {
-        unsafe { &mut *self.copy_context }
-    }
 
     fn __default(lxr: &'static LXR<VM>) -> Self {
         Self {
@@ -74,15 +63,14 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             rc: RefCountHelper::NEW,
             root_kind: None,
             survival_ratio_predictor_local: SurvivalRatioPredictorLocal::default(),
-            copy_context: std::ptr::null_mut(),
         }
     }
 
-    fn add_new_slot(&mut self, s: VM::VMSlot) {
+    fn add_new_slot(&mut self, worker: &mut GCWorker<VM>, s: VM::VMSlot) {
         self.new_incs.push(s);
         self.new_incs_count += 1;
         if self.new_incs_count as usize >= Self::CAPACITY {
-            self.flush();
+            self.flush(worker);
         }
     }
 
@@ -93,7 +81,14 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         }
     }
 
-    fn promote(&mut self, o: ObjectReference, copied: bool, los: bool, depth: u32) {
+    fn promote(
+        &mut self,
+        worker: &mut GCWorker<VM>,
+        o: ObjectReference,
+        copied: bool,
+        los: bool,
+        depth: u32,
+    ) {
         let size = o.get_size::<VM>();
 
         if !los {
@@ -114,7 +109,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         if self.in_cm || self.pause == Pause::FinalMark {
             debug_assert!(self.lxr.is_marked(o), "{:?} is not marked", o);
         }
-        self.scan_nursery_object(o, los, !copied, depth, size);
+        self.scan_nursery_object(worker, o, los, !copied, depth, size);
     }
 
     fn record_mature_evac_remset2(
@@ -140,6 +135,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
 
     fn scan_nursery_object(
         &mut self,
+        worker: &mut GCWorker<VM>,
         o: ObjectReference,
         los: bool,
         in_place_promotion: bool,
@@ -184,7 +180,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
         };
         let obj_in_defrag = !los && Block::in_defrag_block(o);
-        o.iterate_fields::<VM, _>(self.worker().tls.0, |slot| {
+        let tls = worker.tls.0;
+        o.iterate_fields::<VM, _>(tls, |slot| {
             let Some(target) = slot.load() else {
                 return;
             };
@@ -204,7 +201,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             );
             let rc = self.rc.count(target);
             if rc == 0 {
-                self.add_new_slot(slot);
+                self.add_new_slot(worker, slot);
             } else {
                 if rc != crate::util::rc::MAX_REF_COUNT {
                     let _ = self.rc.inc(target);
@@ -215,12 +212,12 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
     }
 
     #[cold]
-    fn flush(&mut self) {
+    fn flush(&mut self, worker: &mut GCWorker<VM>) {
         if !self.new_incs.is_empty() {
             let new_incs = self.new_incs.take();
             let mut w = ProcessIncs::<VM, EDGE_KIND_NURSERY>::new(new_incs, self.lxr);
             w.depth += 1;
-            self.worker().add_work(WorkBucketStage::Unconstrained, w);
+            worker.add_work(WorkBucketStage::Unconstrained, w);
         }
         self.new_incs_count = 0;
     }
@@ -248,7 +245,12 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         false
     }
 
-    fn process_inc_and_evacuate(&mut self, o: ObjectReference, depth: u32) -> ObjectReference {
+    fn process_inc_and_evacuate(
+        &mut self,
+        worker: &mut GCWorker<VM>,
+        o: ObjectReference,
+        depth: u32,
+    ) -> ObjectReference {
         let los = self.lxr.los().in_space(o);
         if NURSERY_EVACUATION && !los && object_forwarding::is_forwarded_or_being_forwarded::<VM>(o)
         {
@@ -262,13 +264,13 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             };
             let promoted = self.inc(new);
             if promoted && new == o {
-                self.promote(o, false, los, depth);
+                self.promote(worker, o, false, los, depth);
             }
             return new;
         }
         if !NURSERY_EVACUATION || self.dont_evacuate(o, los) {
             if self.inc(o) {
-                self.promote(o, false, los, depth);
+                self.promote(worker, o, false, los, depth);
             }
             return o;
         }
@@ -285,7 +287,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 let new = object_forwarding::try_forward_object::<VM>(
                     o,
                     CopySemantics::DefaultCopy,
-                    self.copy_context(),
+                    worker.get_copy_context_mut(),
                     |_new| {
                         #[cfg(feature = "vo_bit")]
                         {
@@ -301,7 +303,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 );
                 if let Some(new) = new {
                     self.inc(new);
-                    self.promote(new, true, false, depth);
+                    self.promote(worker, new, true, false, depth);
                     new
                 } else {
                     warn!("to-space overflow");
@@ -309,7 +311,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                     let promoted = self.inc(o);
                     object_forwarding::clear_forwarding_bits::<VM>(o);
                     if promoted {
-                        self.promote(o, false, los, depth);
+                        self.promote(worker, o, false, los, depth);
                     }
                     NO_EVAC.store(true, Ordering::Relaxed);
                     self.no_evac = true;
@@ -320,7 +322,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 let promoted = self.inc(o);
                 object_forwarding::clear_forwarding_bits::<VM>(o);
                 if promoted {
-                    self.promote(o, false, los, depth);
+                    self.promote(worker, o, false, los, depth);
                 }
                 o
             }
@@ -342,6 +344,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
 
     fn process_slot<const K: EdgeKind>(
         &mut self,
+        worker: &mut GCWorker<VM>,
         s: VM::VMSlot,
         depth: u32,
         add_root_to_remset: bool,
@@ -353,7 +356,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
         };
         // println!(" - inc {:?}: {:?} rc={}", s, o, self.rc.count(o));
-        let new = self.process_inc_and_evacuate(o, depth);
+        let new = self.process_inc_and_evacuate(worker, o, depth);
         // Put this into remset if this is a mature slot, or a weak root
         if K != EDGE_KIND_ROOT || add_root_to_remset {
             self.record_mature_evac_remset(s, new);
@@ -366,6 +369,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
 
     fn process_incs<const K: EdgeKind>(
         &mut self,
+        worker: &mut GCWorker<VM>,
         mut incs: AddressBuffer<'_, VM::VMSlot>,
         depth: u32,
         add_root_to_remset: bool,
@@ -374,7 +378,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             let roots = incs.as_mut_ptr() as *mut ObjectReference;
             let mut num_roots = 0usize;
             for s in incs.iter() {
-                if let Some(new) = self.process_slot::<K>(*s, depth, add_root_to_remset) {
+                if let Some(new) = self.process_slot::<K>(worker, *s, depth, add_root_to_remset) {
                     unsafe {
                         roots.add(num_roots).write(new);
                     }
@@ -392,7 +396,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
         } else {
             for s in incs.iter() {
-                self.process_slot::<K>(*s, depth, false);
+                self.process_slot::<K>(worker, *s, depth, false);
             }
             None
         }
@@ -433,7 +437,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
         self.lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
         self.pause = self.lxr.current_pause().unwrap();
         self.in_cm = self.lxr.concurrent_work_in_progress();
-        self.copy_context = self.worker().get_copy_context_mut() as *mut GCWorkerCopyContext<VM>;
         if NO_EVAC.load(Ordering::Relaxed) {
             self.no_evac = true;
         } else {
@@ -455,7 +458,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
         };
         let roots = {
             let incs = std::mem::take(&mut self.incs);
-            self.process_incs::<KIND>(AddressBuffer::Owned(incs), self.depth, false)
+            self.process_incs::<KIND>(worker, AddressBuffer::Owned(incs), self.depth, false)
         };
         if let Some(roots) = roots {
             if self.lxr.cm_enabled()
@@ -513,11 +516,16 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
                 let (a, b) = incs.split_at(incs.len() / 2);
                 let mut w = ProcessIncs::<VM, EDGE_KIND_NURSERY>::new(b.to_vec(), self.lxr);
                 w.depth = depth;
-                self.worker().add_work(WorkBucketStage::Unconstrained, w);
+                worker.add_work(WorkBucketStage::Unconstrained, w);
                 incs = a.to_vec();
             }
             if !incs.is_empty() {
-                self.process_incs::<EDGE_KIND_NURSERY>(AddressBuffer::Ref(&mut incs), depth, false);
+                self.process_incs::<EDGE_KIND_NURSERY>(
+                    worker,
+                    AddressBuffer::Ref(&mut incs),
+                    depth,
+                    false,
+                );
             }
         }
         self.survival_ratio_predictor_local.sync();
@@ -538,10 +546,6 @@ pub struct ProcessDecs<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> ProcessDecs<VM> {
-    fn worker(&self) -> &mut GCWorker<VM> {
-        GCWorker::<VM>::current()
-    }
-
     pub fn new(decs: Vec<ObjectReference>, counter: LazySweepingJobsCounter) -> Self {
         Self {
             decs: Some(decs),
@@ -568,46 +572,55 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         }
     }
 
-    fn recursive_dec(&mut self, o: ObjectReference) {
+    fn recursive_dec(&mut self, worker: &mut GCWorker<VM>, o: ObjectReference) {
         self.new_decs.push(o);
         if self.new_decs.is_full() {
-            self.flush()
+            self.flush(worker)
         }
     }
 
-    fn new_work(&self, w: ProcessDecs<VM>) {
-        self.worker().add_work(WorkBucketStage::Unconstrained, w);
+    fn new_work(&self, worker: &mut GCWorker<VM>, w: ProcessDecs<VM>) {
+        worker.add_work(WorkBucketStage::Unconstrained, w);
     }
 
-    fn flush(&mut self) {
-        let mmtk = GCWorker::<VM>::current().mmtk;
+    fn flush(&mut self, worker: &mut GCWorker<VM>) {
+        let mmtk = worker.mmtk;
         if !self.new_decs.is_empty() {
             let new_decs = self.new_decs.take();
-            self.new_work(ProcessDecs::new(new_decs, self.counter.clone_with_decs()));
+            self.new_work(
+                worker,
+                ProcessDecs::new(new_decs, self.counter.clone_with_decs()),
+            );
         }
         if !self.mark_objects.is_empty() {
             let objects = self.mark_objects.take();
             let w = LXRConcurrentTraceObjects::new(objects, mmtk);
             if LAZY_DECREMENTS {
-                self.worker().add_work(WorkBucketStage::Unconstrained, w);
+                worker.add_work(WorkBucketStage::Unconstrained, w);
             } else {
-                self.worker().scheduler().work_buckets[WorkBucketStage::ConcurrentResumable].add(w);
+                worker.scheduler().work_buckets[WorkBucketStage::ConcurrentResumable].add(w);
             }
         }
     }
 
     #[cold]
-    fn process_dead_object(&mut self, o: ObjectReference, lxr: &LXR<VM>) -> bool {
+    fn process_dead_object(
+        &mut self,
+        worker: &mut GCWorker<VM>,
+        o: ObjectReference,
+        lxr: &LXR<VM>,
+    ) -> bool {
         if self.mark_dead_objects {
             lxr.mark(o);
         }
         // Recursively decrease field ref counts
-        o.iterate_fields::<VM, _>(self.worker().tls.0, |slot| {
+        let tls = worker.tls.0;
+        o.iterate_fields::<VM, _>(tls, |slot| {
             if let Some(x) = slot.load() {
                 // println!(" -- rec dec {:?}.{:?} -> {:?}", o, slot, x);
                 let rc = self.rc.count(x);
                 if rc != MAX_REF_COUNT && rc != 0 {
-                    self.recursive_dec(x);
+                    self.recursive_dec(worker, x);
                 }
                 if self.mark_dead_objects && !lxr.is_marked(x) {
                     if cfg!(any(feature = "sanity", debug_assertions)) {
@@ -621,7 +634,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
                     }
                     self.mark_objects.push(x);
                     if self.mark_objects.is_full() {
-                        self.flush();
+                        self.flush(worker);
                     }
                 }
             }
@@ -648,7 +661,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         }
     }
 
-    fn process_decs(&mut self, decs: &[ObjectReference], lxr: &LXR<VM>) {
+    fn process_decs(&mut self, worker: &mut GCWorker<VM>, decs: &[ObjectReference], lxr: &LXR<VM>) {
         for o in decs.iter() {
             if self.rc.is_dead_or_stuck(*o)
                 || (self.mature_sweeping_in_progress && !lxr.is_marked(*o))
@@ -671,7 +684,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
                 }
                 if c == 1 && !dead {
                     dead = true;
-                    is_los = self.process_dead_object(o, lxr);
+                    is_los = self.process_dead_object(worker, o, lxr);
                 }
                 debug_assert!(c <= MAX_REF_COUNT);
                 if c == 0 || c == MAX_REF_COUNT {
@@ -688,7 +701,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for ProcessDecs<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
         self.mark_dead_objects = if LAZY_DECREMENTS {
             lxr.concurrent_work_in_progress() && lxr.previous_pause() != Some(Pause::InitialMark)
@@ -703,17 +716,17 @@ impl<VM: VMBinding> GCWork<VM> for ProcessDecs<VM> {
                 || lxr.current_pause() == Some(Pause::Full)
         };
         if let Some(decs) = std::mem::take(&mut self.decs) {
-            self.process_decs(&decs, lxr);
+            self.process_decs(worker, &decs, lxr);
         } else if let Some(decs) = std::mem::take(&mut self.decs_arc) {
-            self.process_decs(&decs, lxr);
+            self.process_decs(worker, &decs, lxr);
         }
         let mut decs = vec![];
         while !self.new_decs.is_empty() {
             decs.clear();
             self.new_decs.swap(&mut decs);
-            self.process_decs(&decs, lxr);
+            self.process_decs(worker, &decs, lxr);
         }
-        self.flush();
+        self.flush(worker);
     }
 }
 

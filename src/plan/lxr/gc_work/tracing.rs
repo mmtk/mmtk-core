@@ -64,7 +64,7 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
     fn flush(&mut self) {
         if !self.next_objects.is_empty() {
             let objects = self.next_objects.take();
-            let worker = GCWorker::<VM>::current();
+            let worker = unsafe { &mut *self.worker };
             debug_assert!(self.plan.cm_enabled());
             let w = Self::new(objects, worker.mmtk);
             worker.add_work(WorkBucketStage::ConcurrentResumable, w);
