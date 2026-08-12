@@ -38,8 +38,6 @@ pub mod opaque_pointer;
 pub mod options;
 /// Operating system abstractions.
 pub mod os;
-/// Reference counting support.
-pub mod rc;
 #[cfg(feature = "test_private")]
 pub mod test_private;
 /// Test utilities. We need this module for `MockVM` in criterion benches, which does not include code with `cfg(test)`.
@@ -60,6 +58,8 @@ pub(crate) mod logger;
 pub(crate) mod object_enum;
 /// Forwarding word in object copying.
 pub(crate) mod object_forwarding;
+/// Reference counting support.
+pub(crate) mod rc;
 /// Reference processing implementation.
 pub(crate) mod reference_processor;
 /// Utilities funcitons for Rust

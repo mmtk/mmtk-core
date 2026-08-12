@@ -173,6 +173,11 @@ pub fn vo_bit_side_metadata_addr() -> Address {
     crate::util::metadata::vo_bit::vo_bit_side_metadata_addr()
 }
 
+/// Base address of the LXR reference-counting table, public to VM bindings which may need to use this.
+pub fn rc_table_start_address() -> Address {
+    crate::util::rc::RC_TABLE.get_starting_address()
+}
+
 /// The base address for the global side metadata space available to VM bindings, to be used for the per-object metadata.
 /// VM bindings must use this to avoid overlap with core internal global side metadata.
 pub fn global_side_metadata_vm_base_address() -> Address {
