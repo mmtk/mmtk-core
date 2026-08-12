@@ -43,7 +43,6 @@ on:
         required: true
 
 env:
-  CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
   # Kept in sync with the same env var in openjdk-build-reusable.yml.
   OPENJDK_BUILD_CACHE_PREFIX: openjdk-mmtk-build-
   CANARY_VERSION: "v0.32.0-jdk-21"
@@ -116,9 +115,3 @@ jobs:
           publish_dir: ./reports
           publish_branch: gh-pages
           keep_files: true
-      - name: Upload logs as artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: openjdk-regression-logs-${{ inputs.plan_name }}
-          path: ${{ env.CI_PERF_KIT_LOG }}
-          if-no-files-found: error
