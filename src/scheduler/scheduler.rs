@@ -487,12 +487,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     goals.on_current_goal_completed();
 
                     if concurrent_work_scheduled {
-                        // It was the initial mark pause and scheduled concurrent work.
-                        // Wake up all GC workers to do concurrent work.
+                        // We just scheduled concurrent work. Wake up all GC workers to do concurrent work.
                         LastParkedResult::WakeAll
                     } else {
-                        // It was an STW GC or the final mark pause of a concurrent GC.
-                        // Respond to another goal.
+                        // No scheduled concurrent work. Respond to another goal.
                         self.respond_to_requests(worker, goals)
                     }
                 }
@@ -514,7 +512,16 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     ) -> LastParkedResult {
         assert!(goals.current().is_none());
 
-        let Some(goal) = goals.poll_next_goal() else {
+        let mut next_goal = goals.poll_next_goal();
+        if next_goal.is_none() {
+            // No work now. Check if we would like to do a GC poll from GC workers.
+            if worker.mmtk.gc_trigger.poll_from_last_parked_worker() {
+                goals.set_request(WorkerGoal::Gc);
+                next_goal = goals.poll_next_goal();
+            }
+        }
+
+        let Some(goal) = next_goal else {
             // No requests.  Park this worker, too.
             return LastParkedResult::ParkSelf;
         };
