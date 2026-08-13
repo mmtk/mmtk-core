@@ -259,8 +259,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // `VMProcessWeakRefs` packet can be an ordinary packet (doesn't have to be a sentinel)
         // because there are no other packets in the bucket.  We set it as sentinel for
         // consistency.
-        // self.work_buckets[WorkBucketStage::VMRefClosure]
-        //     .set_sentinel(Box::new(VMProcessWeakRefs::<C::DefaultTrace>::new()));
+        self.work_buckets[WorkBucketStage::VMRefClosure]
+            .set_sentinel(Box::new(VMProcessWeakRefs::<C::DefaultTrace>::new()));
 
         if plan.constraints().needs_forward_after_liveness {
             // VM-specific weak ref forwarding
@@ -268,7 +268,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 .add(VMForwardWeakRefs::<C::DefaultTrace>::new());
         }
 
-        // self.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
+        self.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
     }
 
     fn are_buckets_drained(&self, buckets: &[WorkBucketStage]) -> bool {
