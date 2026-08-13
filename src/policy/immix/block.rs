@@ -145,6 +145,7 @@ impl Block {
 
     pub const ZERO: Self = Self(Address::ZERO);
 
+    #[allow(unused)]
     pub fn is_zero(&self) -> bool {
         self.0.is_zero()
     }
