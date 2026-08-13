@@ -36,7 +36,6 @@ pub struct LargeObjectSpace<VM: VMBinding> {
     in_nursery_gc: bool,
     treadmill: TreadMill,
     clear_log_bit_on_sweep: bool,
-    trace_in_progress: bool,
     pub num_pages_released_lazy: AtomicUsize,
     pub rc_enabled: bool,
     pub(crate) rc: RefCountHelper<VM>,
@@ -58,9 +57,6 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
                 return self.is_marked(object) && self.rc.count(object) > 0;
             }
             return self.rc.count(object) > 0;
-        }
-        if self.trace_in_progress {
-            return true;
         }
         self.test_mark_bit(object, self.mark_state)
     }
@@ -357,7 +353,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             in_nursery_gc: false,
             treadmill: TreadMill::new(),
             clear_log_bit_on_sweep,
-            trace_in_progress: false,
             num_pages_released_lazy: Default::default(),
             rc_enabled: false,
             rc: RefCountHelper::NEW,
@@ -397,7 +392,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     pub fn prepare(&mut self, full_heap: bool) {
-        self.trace_in_progress = true;
         if full_heap {
             self.mark_state = MARK_BIT - self.mark_state;
         }
@@ -410,7 +404,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     pub fn release(&mut self, full_heap: bool) {
-        self.trace_in_progress = false;
         if self.rc_enabled {
             self.release_rc_nursery_objects();
             return;
