@@ -1,6 +1,6 @@
 pub mod barrier;
 pub(super) mod concurrent_marking_work;
-pub mod global;
+pub(super) mod global;
 
 pub use self::global::ConcurrentPlan;
 

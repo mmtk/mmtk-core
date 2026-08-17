@@ -222,6 +222,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         self.new_incs_count = 0;
     }
 
+    /// Return true if the object's ref count is incremented and the count was zero before the increment
     fn inc(&self, o: ObjectReference) -> bool {
         self.rc.inc(o) == Ok(0)
     }
@@ -387,7 +388,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
             if num_roots != 0 {
                 let cap = incs.capacity();
-                std::mem::forget(incs);
+                std::mem::forget(incs); // roots references incs now. we dont need incs.
                 let roots =
                     unsafe { Vec::<ObjectReference>::from_raw_parts(roots, num_roots, cap) };
                 Some(roots)

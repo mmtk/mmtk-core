@@ -358,6 +358,10 @@ impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
 
 impl<VM: VMBinding> LXR<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Box<Self> {
+        assert!(
+            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_in_header(),
+            "LXR does not support placing forwarding bits on the side."
+        );
         let num_workers = args.scheduler.num_workers();
         let immix_specs = metadata::extract_side_metadata(&[
             MetadataSpec::OnSide(RC_TABLE),
