@@ -88,6 +88,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, bytes: usize) {
+        // VO bit: Set for all objects.
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(object);
         #[cfg(all(feature = "vo_bit", debug_assertions))]
@@ -101,7 +102,6 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             );
         }
 
-        // VO bit: Set for all objects.
         if self.rc_enabled {
             // Add to treadmill nursery
             self.treadmill.add_to_treadmill(object, true);
