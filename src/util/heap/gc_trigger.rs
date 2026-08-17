@@ -3,7 +3,7 @@ use atomic::Ordering;
 use crate::global_state::{GcStatus, GlobalState};
 use crate::plan::Plan;
 use crate::policy::space::Space;
-use crate::scheduler::GCWorkScheduler;
+use crate::scheduler::{GCWorkScheduler, WorkBucketStage};
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions;
 use crate::util::options::{GCTriggerSelector, Options, DEFAULT_MAX_NURSERY, DEFAULT_MIN_NURSERY};
@@ -85,6 +85,22 @@ impl<VM: VMBinding> GCTrigger<VM> {
         // only returns `Ok` to the thread that actually wins the race to transition the status,
         // so only that thread calls it, instead of every thread that observes the old status.
         match self.state.gc_status.try_request_pause() {
+            Ok(GcStatus::InConcurrentGC) => {
+                // We just interrupted an ongoing concurrent GC (e.g. concurrent marking in
+                // `ConcurrentImmix`) to demand a pause. Rather than let GC workers keep draining
+                // the `Concurrent` work bucket to completion before the pause can even start
+                // (which may take arbitrarily long, e.g. if the heap is full and the mutator
+                // that triggered this needs the pause to run *now*), stop feeding that bucket
+                // immediately. Any work packets already queued in it are picked up and finished
+                // as part of the closure of the upcoming pause instead -- see
+                // `ConcurrentPlan`/`Plan::schedule_collection` and
+                // `WorkBucket::drain_all_packets`. This preserves all marking progress already
+                // made; nothing is reset or re-traced.
+                self.scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(false);
+                probe!(mmtk, gc_requested);
+                self.scheduler.request_schedule_collection();
+                true
+            }
             Ok(_) => {
                 probe!(mmtk, gc_requested);
                 self.scheduler.request_schedule_collection();

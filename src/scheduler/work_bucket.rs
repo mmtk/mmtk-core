@@ -38,6 +38,19 @@ impl<VM: VMBinding> BucketQueue<VM> {
         }
     }
 
+    /// Remove and return every packet currently in this queue, leaving it empty.
+    fn drain(&self) -> Vec<Box<dyn GCWork<VM>>> {
+        let mut items = Vec::new();
+        loop {
+            match self.queue.steal() {
+                Steal::Success(w) => items.push(w),
+                Steal::Retry => continue,
+                Steal::Empty => break,
+            }
+        }
+        items
+    }
+
     /// Dump all the packets in this queue for debugging purpose.
     /// This function may dump items from the queue temporarily, thus should only be called when it is safe to do so
     /// (e.g. when the execution has failed already and the system is going to panic).
@@ -171,6 +184,22 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
     pub fn is_drained(&self) -> bool {
         !self.is_enabled() || (self.is_open() && self.is_empty())
+    }
+
+    /// Remove and return every packet currently queued in this bucket (including the
+    /// prioritized queue, if any), leaving it empty.
+    ///
+    /// This does not synchronize with producers or consumers of this bucket in any way: the
+    /// caller must independently ensure that nothing can be concurrently adding to or polling
+    /// this bucket (e.g. by only calling this once all GC workers are known to be parked, and
+    /// after disabling the bucket so no new packets can be routed to it, as
+    /// `ConcurrentImmix::schedule_concurrent_marking_final_pause` does for `Concurrent`).
+    pub(crate) fn drain_all_packets(&self) -> Vec<Box<dyn GCWork<VM>>> {
+        let mut items = self.queue.drain();
+        if let Some(prioritized_queue) = self.prioritized_queue.as_ref() {
+            items.extend(prioritized_queue.drain());
+        }
+        items
     }
 
     /// Close the bucket

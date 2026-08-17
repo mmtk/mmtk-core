@@ -70,12 +70,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         if !self.satb.is_empty() {
             if self.should_create_satb_packets() {
                 let satb = self.satb.take();
-                let bucket = if self.plan.concurrent_work_in_progress() {
-                    WorkBucketStage::Concurrent
-                } else {
-                    debug_assert_ne!(self.plan.current_pause(), Some(Pause::InitialMark));
-                    WorkBucketStage::Closure
-                };
+                let bucket = self.target_bucket();
                 self.mmtk.scheduler.work_buckets[bucket]
                     .add(ProcessModBufSATB::<VM, P, KIND>::new(satb));
             } else {
@@ -88,14 +83,29 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     fn flush_weak_refs(&mut self) {
         if !self.refs.is_empty() {
             let nodes = self.refs.take();
-            let bucket = if self.plan.concurrent_work_in_progress() {
-                WorkBucketStage::Concurrent
-            } else {
-                debug_assert_ne!(self.plan.current_pause(), Some(Pause::InitialMark));
-                WorkBucketStage::Closure
-            };
+            let bucket = self.target_bucket();
             self.mmtk.scheduler.work_buckets[bucket]
                 .add(ProcessModBufSATB::<VM, P, KIND>::new(nodes));
+        }
+    }
+
+    /// Which bucket newly-flushed concurrent-marking work should be added to.
+    ///
+    /// This must consult the `Concurrent` bucket's actual `enabled` state, not merely
+    /// `ConcurrentPlan::concurrent_work_in_progress`: once a pause has been requested to
+    /// interrupt concurrent marking, `GCTrigger::request` disables the `Concurrent` bucket
+    /// immediately, well before `concurrent_work_in_progress` itself flips to `false` (which
+    /// only happens once mutators are confirmed stopped, in `notify_mutators_paused`). Nothing
+    /// will ever poll a disabled `Concurrent` bucket again this cycle (see
+    /// `ConcurrentImmix::schedule_concurrent_marking_final_pause`), so any work flushed after it
+    /// is disabled -- including the final per-mutator flush done from `notify_mutators_paused`
+    /// itself -- must go straight to `Closure` instead, or it would never be traced.
+    fn target_bucket(&self) -> WorkBucketStage {
+        if self.mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].is_enabled() {
+            WorkBucketStage::Concurrent
+        } else {
+            debug_assert_ne!(self.plan.current_pause(), Some(Pause::InitialMark));
+            WorkBucketStage::Closure
         }
     }
 

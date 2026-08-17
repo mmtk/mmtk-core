@@ -401,6 +401,21 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<ConcurrentImmixGCWorkContext<VM>>::new_no_scan_roots());
 
+        // By the time this runs, we are guaranteed to be the only running GC work packet (we
+        // got here by being the sole worker woken after every worker parked), and the
+        // `Concurrent` bucket has already been disabled (see `GCTrigger::request`), so no
+        // mutator or worker can be concurrently adding to it (see `SATBBarrierSemantics`, which
+        // routes further SATB/weak-ref work to `Closure` once `Concurrent` is disabled). It is
+        // therefore safe to take whatever concurrent-marking work packets are still queued here
+        // and finish them as part of this pause's closure, instead of having drained the
+        // `Concurrent` bucket to completion before this pause could even be scheduled. This
+        // preserves all marking progress already made: we neither reset mark state nor re-trace
+        // anything, we simply continue running the exact same work packets, now inside the
+        // pause.
+        let leftover_concurrent_work =
+            scheduler.work_buckets[WorkBucketStage::Concurrent].drain_all_packets();
+        scheduler.work_buckets[WorkBucketStage::Closure].bulk_add(leftover_concurrent_work);
+
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<ConcurrentImmixGCWorkContext<VM>>::new(self));
 
