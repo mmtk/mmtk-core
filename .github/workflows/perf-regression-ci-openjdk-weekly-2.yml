@@ -1,0 +1,76 @@
+name: Performance Regression CI (OpenJDK, weekly batch 2)
+
+# Batch 2 of the plans we don't track on every commit (see weekly-1 for the
+# rest of this split, and perf-regression-ci-openjdk.yml for the ones we do
+# track on every commit): MarkSweep, Lisp2, OVC, ConcurrentImmix,
+# and the canary run. Runs against whichever OpenJDK+MMTk build was most
+# recently cached by perf-regression-ci-openjdk.yml's openjdk-build job (see
+# openjdk-run-plan-reusable.yml for the cache lookup and for the canary
+# download/setup, which that reusable workflow handles when canary: true).
+on:
+  # Times are in UTC; GitHub Actions cron cannot follow daylight saving, so
+  # this is pinned to AEST (UTC+10, Canberra standard time): Sunday 12:00pm
+  # AEST = Sunday 02:00 UTC. During AEDT (UTC+11, roughly Oct-Apr) this
+  # will actually fire at 1pm AU time instead of noon.
+  schedule:
+    - cron: '0 2 * * 0'
+  # Manual trigger, e.g. for testing without waiting for the schedule.
+  workflow_dispatch:
+  # To test in a branch: uncomment this trigger, and see
+  # openjdk-perf-config.yml for the RESULT_REPO_BRANCH/DEPLOY env to set.
+  # pull_request:
+  #   branches:
+  #     - master
+
+jobs:
+  # Single source of truth for RESULT_REPO_BRANCH/DEPLOY/CI_PERF_KIT_VERSION,
+  # shared with the per-commit and other weekly-batch workflows. See
+  # openjdk-perf-config.yml.
+  config:
+    uses: ./.github/workflows/openjdk-perf-config.yml
+
+  # Build OpenJDK+MMTk fresh for this run (see openjdk-build-reusable.yml).
+  openjdk-build:
+    needs: [config]
+    uses: ./.github/workflows/openjdk-build-reusable.yml
+    with:
+      ci_perf_kit_version: ${{ needs.config.outputs.ci_perf_kit_version }}
+      openjdk_rev: ${{ needs.config.outputs.openjdk_rev }}
+
+  openjdk-run-plan:
+    needs: [config, openjdk-build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - plan_name: marksweep
+            config: running-openjdk-marksweep-complete.yml
+            heap_modifier: ${{ needs.config.outputs.large_heap_factor }}
+            canary: false
+          - plan_name: lisp2
+            config: running-openjdk-lisp2-complete.yml
+            heap_modifier: ${{ needs.config.outputs.normal_heap_factor }}
+            canary: false
+          - plan_name: ovc
+            config: running-openjdk-ovc-complete.yml
+            heap_modifier: ${{ needs.config.outputs.normal_heap_factor }}
+            canary: false
+          - plan_name: concurrentimmix
+            config: running-openjdk-concurrentimmix-complete.yml
+            heap_modifier: ${{ needs.config.outputs.normal_heap_factor }}
+            canary: false
+          - plan_name: canary
+            config: running-openjdk-canary-complete.yml
+            heap_modifier: ${{ needs.config.outputs.normal_heap_factor }}
+            canary: true
+    uses: ./.github/workflows/openjdk-run-plan-reusable.yml
+    with:
+      plan_name: ${{ matrix.plan_name }}
+      config: ${{ matrix.config }}
+      heap_modifier: ${{ matrix.heap_modifier }}
+      canary: ${{ matrix.canary }}
+      result_repo_branch: ${{ needs.config.outputs.result_repo_branch }}
+      deploy: ${{ needs.config.outputs.deploy == 'true' }}
+      ci_perf_kit_version: ${{ needs.config.outputs.ci_perf_kit_version }}
+      openjdk_rev: ${{ needs.config.outputs.openjdk_rev }}
+    secrets: inherit
