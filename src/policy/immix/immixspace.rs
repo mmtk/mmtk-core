@@ -1131,7 +1131,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         true
     }
 
-    /// Atomically mark an object.
+    /// Atomically unmark an object.  Return true if it changed the mark bit from 1 to 0.
     pub fn unmark(&self, object: ObjectReference) -> bool {
         let result = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.fetch_update_metadata::<VM, u8, _>(
             object,
