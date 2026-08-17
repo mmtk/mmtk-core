@@ -345,6 +345,11 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn harness_begin(&self, tls: VMMutatorThread) {
         probe!(mmtk, harness_begin);
         self.handle_user_collection_request(tls, true, true);
+        // Since handle_user_collection_request may not trigger GC if tls is null, we add a
+        // block_for_gc to compensate for this because we force a GC in harness begin.
+        //
+        // TODO: Fix the API of handle_user_collection_request so that we won't need this
+        // workaround.
         if tls.0 .0.is_null() {
             use crate::vm::Collection;
             VM::VMCollection::block_for_gc(tls);
@@ -456,6 +461,11 @@ impl<VM: VMBinding> MMTK<VM> {
             .handle_user_collection_request(force, exhaustive)
         {
             use crate::vm::Collection;
+            // Do not block for GC if the `tls` does not represent a valid mutator thread. This
+            // allows non-mutator threads to trigger GC but not block for GC.
+            //
+            // TODO: Make a proper API that allows `handle_user_collection_request` to be called by
+            // non-mutators and/or not trigger GC.
             if !tls.0 .0.is_null() {
                 VM::VMCollection::block_for_gc(tls);
             }
