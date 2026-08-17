@@ -595,7 +595,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         plan_stats: Option<StatsForDefrag>,
         unlog_bits_op: UnlogBitsOperation,
     ) {
+        // This function should not be called during RC.
+        // Otherwise the VO bit handling will be incorrect.
         debug_assert!(!self.rc_enabled);
+
         if major_gc {
             // Update mark_state
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
@@ -637,9 +640,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
         }
 
-        // TODO: The VO bit strategy is currently not applicable to RC.
         #[cfg(feature = "vo_bit")]
-        if !self.rc_enabled && vo_bit::helper::need_to_clear_vo_bits_before_tracing::<VM>() {
+        if vo_bit::helper::need_to_clear_vo_bits_before_tracing::<VM>() {
             let maybe_scope = if major_gc {
                 // If it is major GC, we always clear all VO bits because we are doing full-heap
                 // tracing.
