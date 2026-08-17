@@ -877,8 +877,11 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     #[allow(dead_code)]
+    #[allow(clippy::needless_return)]
     fn prepare_nonmoving_space(&mut self, _full_heap: bool) {
         // LXR does not support spaces with no LXR support
+        // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
+        // This skip just works around for the nonmoving space (defaults to Immix space), for which we see a panic.
         if *self.base.options.plan == PlanSelector::LXR {
             return;
         }
@@ -894,8 +897,11 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     #[allow(dead_code)]
+    #[allow(clippy::needless_return)]
     fn release_nonmoving_space(&mut self, _full_heap: bool) {
         // LXR does not support spaces with no LXR support
+        // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
+        // This skip just works around for the nonmoving space (defaults to Immix space), for which we see a panic.
         if *self.base.options.plan == PlanSelector::LXR {
             return;
         }
@@ -910,8 +916,11 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
+    #[allow(clippy::needless_return)]
     fn end_of_gc_nonmoving_space(&mut self) {
         // LXR does not support spaces with no LXR support
+        // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
+        // This skip just works around for the nonmoving space (defaults to Immix space), for which we see a panic.
         if *self.base.options.plan == PlanSelector::LXR {
             return;
         }
