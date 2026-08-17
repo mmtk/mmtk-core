@@ -40,7 +40,6 @@ pub use mmtk::MMTK;
 mod global_state;
 pub use crate::global_state::{GcStatus, LiveBytesStats};
 
-#[macro_use]
 mod policy;
 
 pub mod build_info;
