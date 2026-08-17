@@ -799,14 +799,14 @@ impl<VM: VMBinding> CommonPlan<VM> {
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.prepare();
         self.los.prepare(full_heap);
-        // self.prepare_nonmoving_space(full_heap);
+        self.prepare_nonmoving_space(full_heap);
         self.base.prepare(tls, full_heap)
     }
 
     pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.release();
         self.los.release(full_heap);
-        // self.release_nonmoving_space(full_heap);
+        self.release_nonmoving_space(full_heap);
         self.base.release(tls, full_heap)
     }
 

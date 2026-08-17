@@ -47,7 +47,7 @@ pub(crate) fn unreachable_release_func<VM: VMBinding>(
     _mutator: &mut Mutator<VM>,
     _tls: VMWorkerThread,
 ) {
-    // unreachable!("`MutatorConfig::release_func` must not be called for the current plan.")
+    unreachable!("`MutatorConfig::release_func` must not be called for the current plan.")
 }
 
 /// An mutator release implementation for plans that use [`crate::plan::global::CommonPlan`].
