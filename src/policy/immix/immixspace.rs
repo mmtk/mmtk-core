@@ -63,7 +63,7 @@ pub trait ImmixHooks<VM: VMBinding>: Send + Sync {
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
-    pub pr: BlockPageResource<VM, Block>,
+    pr: BlockPageResource<VM, Block>,
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
     /// Current line mark state
