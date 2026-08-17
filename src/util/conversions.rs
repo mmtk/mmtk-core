@@ -34,12 +34,12 @@ pub fn bytes_to_chunks_up(bytes: usize) -> usize {
 
 /// Convert an address to the chunk index (aligned down).
 pub fn address_to_chunk_index(addr: Address) -> usize {
-    (addr - vm_layout().heap_start) >> LOG_BYTES_IN_CHUNK
+    addr >> LOG_BYTES_IN_CHUNK
 }
 
 /// Convert a chunk index to the start address of the chunk.
 pub fn chunk_index_to_address(chunk: usize) -> Address {
-    vm_layout().heap_start + (chunk << LOG_BYTES_IN_CHUNK)
+    unsafe { Address::from_usize(chunk << LOG_BYTES_IN_CHUNK) }
 }
 
 /// Align up an integer to the given alignment. `align` must be a power of two.
