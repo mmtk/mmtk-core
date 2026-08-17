@@ -878,6 +878,10 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
     #[allow(dead_code)]
     fn prepare_nonmoving_space(&mut self, _full_heap: bool) {
+        // LXR does not support spaces with no LXR support
+        if *self.base.options.plan == PlanSelector::LXR {
+            return;
+        }
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {
                 self.nonmoving.prepare();
@@ -891,6 +895,10 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
     #[allow(dead_code)]
     fn release_nonmoving_space(&mut self, _full_heap: bool) {
+        // LXR does not support spaces with no LXR support
+        if *self.base.options.plan == PlanSelector::LXR {
+            return;
+        }
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {
                 self.nonmoving.release();
@@ -903,6 +911,10 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     fn end_of_gc_nonmoving_space(&mut self) {
+        // LXR does not support spaces with no LXR support
+        if *self.base.options.plan == PlanSelector::LXR {
+            return;
+        }
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {
                 // Nothing we need to do for immortal space.
