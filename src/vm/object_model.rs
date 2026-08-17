@@ -379,21 +379,17 @@ pub trait ObjectModel<VM: VMBinding> {
 
     /// Attempt to copy an object, allowing the copy to fail (e.g. under concurrent copying, where
     /// another GC worker may already be copying the same object). Returns the address of the new
-    /// object on success, or `None` if the copy could not be performed. The default implementation
-    /// is unimplemented; bindings/plans that support failable copying (such as LXR) should override
-    /// this method.
+    /// object on success, or `None` if the copy could not be performed.
     ///
     /// Arguments:
     /// * `from`: The address of the object to be copied.
     /// * `semantics`: The copy semantic to use.
     /// * `copy_context`: The `GCWorkerCopyContext` for the GC thread.
     fn try_copy(
-        _from: ObjectReference,
-        _semantics: CopySemantics,
-        _copy_context: &mut GCWorkerCopyContext<VM>,
-    ) -> Option<ObjectReference> {
-        unimplemented!()
-    }
+        from: ObjectReference,
+        semantics: CopySemantics,
+        copy_context: &mut GCWorkerCopyContext<VM>,
+    ) -> Option<ObjectReference>;
 
     /// Copy an object. This is required
     /// for delayed-copy collectors such as compacting collectors. During the

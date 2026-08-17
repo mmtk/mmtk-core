@@ -225,6 +225,14 @@ pub struct MockVM {
         ),
         ObjectReference,
     >,
+    pub try_copy_object: MockMethod<
+        (
+            ObjectReference,
+            CopySemantics,
+            &'static GCWorkerCopyContext<MockVM>,
+        ),
+        Option<ObjectReference>,
+    >,
     pub copy_object_to: MockMethod<(ObjectReference, ObjectReference, Address), Address>,
     pub get_object_size: MockMethod<ObjectReference, usize>,
     pub get_object_size_when_copied: MockMethod<ObjectReference, usize>,
@@ -292,6 +300,7 @@ impl Default for MockVM {
             create_gc_trigger: MockMethod::new_unimplemented(),
 
             copy_object: MockMethod::new_unimplemented(),
+            try_copy_object: MockMethod::new_unimplemented(),
             copy_object_to: MockMethod::new_unimplemented(),
             get_object_size: MockMethod::new_unimplemented(),
             get_object_size_when_copied: MockMethod::new_unimplemented(),
@@ -487,6 +496,14 @@ impl crate::vm::ObjectModel<MockVM> for MockVM {
         copy_context: &mut GCWorkerCopyContext<MockVM>,
     ) -> ObjectReference {
         mock!(copy_object(from, semantics, lifetime!(copy_context)))
+    }
+
+    fn try_copy(
+        from: ObjectReference,
+        semantics: CopySemantics,
+        copy_context: &mut GCWorkerCopyContext<MockVM>,
+    ) -> Option<ObjectReference> {
+        mock!(try_copy_object(from, semantics, lifetime!(copy_context)))
     }
 
     fn copy_to(from: ObjectReference, to: ObjectReference, region: Address) -> Address {

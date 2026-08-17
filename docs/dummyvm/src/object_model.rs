@@ -46,6 +46,14 @@ impl ObjectModel<DummyVM> for VMObjectModel {
         unimplemented!()
     }
 
+    fn try_copy(
+        _from: ObjectReference,
+        _semantics: CopySemantics,
+        _copy_context: &mut GCWorkerCopyContext<DummyVM>,
+    ) -> Option<ObjectReference> {
+        unimplemented!()
+    }
+
     fn copy_to(_from: ObjectReference, _to: ObjectReference, _region: Address) -> Address {
         unimplemented!()
     }
