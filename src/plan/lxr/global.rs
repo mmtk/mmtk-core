@@ -609,8 +609,11 @@ impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
 
 impl<VM: VMBinding> LXR<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Box<Self> {
+        // Only evacuation forwards objects, so a binding that never evacuates (e.g. a
+        // non-moving build) is free to keep its forwarding bits on the side.
         assert!(
-            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_in_header(),
+            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_in_header()
+                || !(super::NURSERY_EVACUATION || super::MATURE_EVACUATION),
             "LXR does not support placing forwarding bits on the side."
         );
         let num_workers = args.scheduler.num_workers();
