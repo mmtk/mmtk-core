@@ -793,13 +793,26 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
         // Process recursively generated buffer
         let mut depth = self.depth;
         let mut incs = vec![];
-        const ACTIVE_PACKET_SPLIT: bool = false;
+        // Hand half of each generation to another worker.
+        //
+        // Without this the promotion trace is a chain, not a tree. `add_new_slot` spills a packet
+        // every `CAPACITY` (1024) slots, and a packet consuming 1024 slots promotes ~512 objects
+        // whose fields are ~1024 new slots -- so each packet produces almost exactly one successor.
+        // Measured on `tree_mutable`: 2.08M increments in 1984 packets, i.e. 1048 slots each, formed
+        // as 13 chains (one per root packet) about 152 packets long. Parallelism was therefore
+        // capped at 13 no matter how many workers existed, and measured ~3x because the root buffers
+        // are uneven -- `ProcessIncs` CPU over pause wall stayed at ~3x whether 4, 16 or 64 workers
+        // were available.
+        //
+        // Splitting each generation converts the chain into a binary tree, whose depth is
+        // logarithmic in the generation size rather than linear in it.
+        let split = crate::plan::lxr::active_packet_split();
         while !self.new_incs.is_empty() {
             self.new_incs_count = 0;
             depth += 1;
             incs.clear();
             self.new_incs.swap(&mut incs);
-            if ACTIVE_PACKET_SPLIT && depth >= 16 && incs.len() > 1 {
+            if incs.len() > split {
                 let (a, b) = incs.split_at(incs.len() / 2);
                 let mut w = ProcessIncs::<VM, EDGE_KIND_NURSERY>::new(b.to_vec(), self.lxr);
                 w.depth = depth;

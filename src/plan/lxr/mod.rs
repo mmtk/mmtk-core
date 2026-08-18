@@ -298,6 +298,20 @@ pub(crate) static OBJ_WRITE_FIELDS: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static INCS_PROCESSED: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static OBJS_PROMOTED: AtomicUsize = AtomicUsize::new(0);
 
+/// Smallest generation of recursively-discovered increments that `ProcessIncs` will split with
+/// another worker instead of processing entirely itself. `usize::MAX` disables splitting, restoring
+/// the chain. Override with `MMTK_LXR_SPLIT_MIN`.
+pub fn active_packet_split() -> usize {
+    static N: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *N.get_or_init(|| match std::env::var("MMTK_LXR_SPLIT_MIN") {
+        Ok(v) => v
+            .trim()
+            .parse()
+            .expect("MMTK_LXR_SPLIT_MIN must be a whole number of slots"),
+        Err(_) => 64,
+    })
+}
+
 /// Whether the `MMTK_LXR_STATS` diagnostics are on.
 pub fn stats() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
