@@ -898,10 +898,35 @@ impl<VM: VMBinding> LXR<VM> {
             );
         }
 
-        // Either final mark pause or full pause for emergency GC
-        if emergency || user_triggered || hint_emergency_gc {
+        // A real emergency: mmtk-core could not satisfy an allocation even after a collection, or
+        // the user asked for a full collection. Stopping the world for the whole trace is the
+        // correct response -- there is no budget left to trace concurrently in.
+        if emergency || user_triggered {
             return if cm_in_progress {
                 Pause::FinalMark
+            } else {
+                Pause::Full
+            };
+        }
+
+        // Free headroom is below `RC_STOP_PERCENT`, so reference counting alone is not keeping up
+        // and the heap needs a trace to find its cycles. That is a reason to *trace*, not a reason
+        // to stop the world: tracing concurrently is what this plan exists for. An `InitialMark`
+        // pause plus the `FinalMark` that closes it measured ~2.4ms + ~17ms on `tree_mutable`
+        // against ~300ms for the full stop-the-world trace this used to choose, and those full
+        // traces were 70% of all pause time.
+        //
+        // The hint fires readily because the headroom test compares the heap budget against
+        // `HEAP_AFTER_GC` less the whole blocks deferred sweeping returned, and LXR reclaims mostly
+        // by recycling lines inside blocks that stay reserved. Reserved pages therefore sit near the
+        // budget whether or not memory is actually short, so this hint cannot carry the weight of a
+        // whole-heap stop -- and does not need to, since a genuine exhaustion still arrives as
+        // `emergency` above.
+        if hint_emergency_gc {
+            return if cm_in_progress {
+                Pause::FinalMark
+            } else if self.cm_enabled() {
+                Pause::InitialMark
             } else {
                 Pause::Full
             };
