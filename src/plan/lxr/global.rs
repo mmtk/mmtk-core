@@ -373,8 +373,18 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         //
         // Done here, at the end of the pause, because the bits must be set before mutators
         // resume and nothing in the pause itself consults them.
-        self.immix_space.set_side_log_bits();
-        self.common.set_side_log_bits();
+        // The whole-heap re-arm that used to happen here is gone. `ImmixSpace::set_side_log_bits`
+        // walks every chunk in the heap single-threaded (and mmtk-core's own `warn!` there says
+        // so), and `CommonPlan::set_side_log_bits` enumerates every LOS object one atomic store at
+        // a time. That made the cost of a pause O(heap) rather than O(work done in the pause): it
+        // measured 1.3ms of the 4.4ms median `RefCount` pause on `tree_mutable`, serially, in a
+        // single `Release` packet, and it grows with the heap.
+        //
+        // It is also unnecessary. Only bits the barrier actually cleared need re-arming, and the
+        // barrier now records what it cleared and re-arms exactly that on flush, in
+        // `LXRFieldBarrierSemantics::rearm_logged_objects`. Mutators are flushed during every
+        // pause, so the re-arm happens before mutators resume, which is the property this
+        // location was chosen for.
         // swap roots
         let mut prev_roots = self.prev_roots.write().unwrap();
         let mut curr_roots = self.curr_roots.write().unwrap();
