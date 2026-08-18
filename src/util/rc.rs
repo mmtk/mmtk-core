@@ -70,13 +70,13 @@ impl<VM: VMBinding> RefCountHelper<VM> {
     }
 
     /// Increases the global increment buffer size counter by `delta`.
+    ///
+    /// A `fetch_add` rather than a load-then-store: every mutator's barrier flush lands here, so a
+    /// read-modify-write that is not atomic loses almost every update under contention. Measured on
+    /// `tree_mutable`, the counter read back 0-10918 for pauses whose `ProcessIncs` packets handled
+    /// millions of increments, which made any trigger built on `inc_buffer_size` inert.
     pub fn increase_inc_buffer_size(&self, delta: usize) {
-        INC_BUFFER_SIZE.store(
-            INC_BUFFER_SIZE
-                .load(Ordering::Relaxed)
-                .saturating_add(delta),
-            Ordering::Relaxed,
-        );
+        INC_BUFFER_SIZE.fetch_add(delta, Ordering::Relaxed);
     }
 
     /// Resets the global increment buffer size counter to zero.
