@@ -876,6 +876,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
+    #[allow(clippy::needless_return)]
     fn prepare_nonmoving_space(&mut self, _full_heap: bool) {
         // LXR does not support spaces with no LXR support
         // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
@@ -894,6 +895,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
+    #[allow(clippy::needless_return)]
     fn release_nonmoving_space(&mut self, _full_heap: bool) {
         // LXR does not support spaces with no LXR support
         // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
@@ -912,6 +914,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
+    #[allow(clippy::needless_return)]
     fn end_of_gc_nonmoving_space(&mut self) {
         // LXR does not support spaces with no LXR support
         // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
