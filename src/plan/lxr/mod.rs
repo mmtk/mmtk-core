@@ -345,6 +345,34 @@ pub fn retain_nursery() -> bool {
     *RETAIN.get_or_init(|| std::env::var_os("MMTK_LXR_RETAIN_NURSERY").is_some())
 }
 
+/// How many nursery blocks a non-`Full` pause may sweep before handing the rest to the
+/// concurrent phase. Override with `MMTK_LXR_STW_SWEEP_BLOCKS`; `usize::MAX` restores sweeping
+/// the whole nursery inside the pause.
+///
+/// Sweeping a nursery block means `Block::rc_sweep_nursery`, which reads the block's reference
+/// count table to decide whether the block is dead, reusable, or promoted in place. That is
+/// O(nursery bytes) of work, it ran single-threaded in the `Release` packet, and it measured
+/// 7-8ms of a 27ms `RefCount` pause on `tree_mutable` -- second only to `RCProcessIncs`.
+///
+/// None of it has to happen while the mutator is stopped. A block being swept is not yet on any
+/// free list, so no mutator can allocate into it either way, and the concurrent phase that runs
+/// it (`RCLazySweepNurseryBlocks`) already reports what it frees through
+/// `num_clean_blocks_released_lazy`, which is what the next pause's sizing decision reads. The
+/// only cost of deferring is that the pages come back a mutator window later.
+///
+/// A `Full` pause still sweeps everything itself: it is already a whole-heap stop, and it must
+/// leave the heap in a state where nothing is owed to a concurrent phase.
+pub fn max_stw_sweep_nursery_blocks() -> usize {
+    static N: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *N.get_or_init(|| match std::env::var("MMTK_LXR_STW_SWEEP_BLOCKS") {
+        Ok(v) => v
+            .trim()
+            .parse()
+            .expect("MMTK_LXR_STW_SWEEP_BLOCKS must be a whole number of blocks"),
+        Err(_) => 0,
+    })
+}
+
 /// Whether to retain every mature block instead of releasing the ones whose objects all have
 /// a zero count. Set `MMTK_LXR_RETAIN_MATURE=1`. Independent of [`retain_nursery`] so that the
 /// two sweeps can be disabled one at a time, which is what tells them apart as suspects.
