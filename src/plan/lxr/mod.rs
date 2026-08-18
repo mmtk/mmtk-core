@@ -416,19 +416,36 @@ impl Drop for LazySweepingJobsCounter {
         }
         if self.counter.fetch_sub(1, Ordering::SeqCst) == 1 {
             if let Some(f) = lazy_sweeping_jobs.end_of_lazy.as_ref() {
-                f()
+                f(lazy_sweeping_jobs.epoch_of(&self.counter))
             }
         }
     }
 }
+
+/// The GC cycle a wave of lazy sweeping jobs belongs to.
+///
+/// A wave is everything that became owed between two consecutive [`LazySweepingJobs::swap`] calls,
+/// and `swap` runs once per pause, so a wave corresponds one-to-one with a pause: the wave moved to
+/// `prev` by the swap at the end of pause N is exactly the work pause N deferred. Draining it is
+/// what makes pause N's reclamation visible, and that is the only moment the collector can size the
+/// next heap target or judge its free headroom.
+///
+/// [`WAVE_STILL_OPEN`] marks the wave that is still accumulating (`curr`). It can hit zero
+/// transiently -- every job so far has finished but more may still be added -- and such a moment
+/// says nothing about any cycle being complete.
+type WaveEpoch = usize;
+
+const WAVE_STILL_OPEN: WaveEpoch = usize::MAX;
 
 struct LazySweepingJobs {
     prev_decs_counter: Option<Arc<AtomicUsize>>,
     curr_decs_counter: Option<Arc<AtomicUsize>>,
     prev_counter: Option<Arc<AtomicUsize>>,
     curr_counter: Option<Arc<AtomicUsize>>,
+    /// The cycle whose deferred work `prev_counter` covers. See [`WaveEpoch`].
+    prev_epoch: WaveEpoch,
     pub end_of_decs: Option<Box<dyn Send + Sync + Fn(LazySweepingJobsCounter)>>,
-    pub end_of_lazy: Option<Box<dyn Send + Sync + Fn()>>,
+    pub end_of_lazy: Option<Box<dyn Send + Sync + Fn(WaveEpoch)>>,
 }
 
 impl LazySweepingJobs {
@@ -438,6 +455,7 @@ impl LazySweepingJobs {
             curr_decs_counter: None,
             prev_counter: None,
             curr_counter: None,
+            prev_epoch: WAVE_STILL_OPEN,
             end_of_decs: None,
             end_of_lazy: None,
         }
@@ -453,11 +471,29 @@ impl LazySweepingJobs {
             == 0
     }
 
-    pub fn swap(&mut self) {
+    /// Which wave a counter belongs to. Identified by pointer rather than carried in
+    /// [`LazySweepingJobsCounter`] because a counter's wave is decided by the swap that closes it,
+    /// which happens after the clones handed to individual work packets were made.
+    fn epoch_of(&self, counter: &Arc<AtomicUsize>) -> WaveEpoch {
+        match self.prev_counter.as_ref() {
+            Some(prev) if Arc::ptr_eq(prev, counter) => self.prev_epoch,
+            _ => WAVE_STILL_OPEN,
+        }
+    }
+
+    /// Close the current wave, attributing it to the cycle `epoch` that is ending, and open a new
+    /// one. Returns the number of jobs the closed wave still owes; zero means the cycle deferred
+    /// nothing (or it has already all run), so nothing will report its completion later.
+    pub fn swap(&mut self, epoch: WaveEpoch) -> usize {
         self.prev_decs_counter = self.curr_decs_counter.take();
         self.curr_decs_counter = Some(Arc::new(AtomicUsize::new(0)));
         self.prev_counter = self.curr_counter.take();
         self.curr_counter = Some(Arc::new(AtomicUsize::new(0)));
+        self.prev_epoch = epoch;
+        self.prev_counter
+            .as_ref()
+            .map(|c| c.load(Ordering::SeqCst))
+            .unwrap_or(0)
     }
 }
 
