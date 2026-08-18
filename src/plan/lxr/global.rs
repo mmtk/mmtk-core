@@ -207,13 +207,33 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         if self.concurrent_work_in_progress() && super::concurrent_marking_packets_drained() {
             return true;
         }
+        // Bound the pause by bounding the work it has to do.
+        //
+        // Every pause drains the increment buffer the barrier has been filling, in
+        // `RCProcessIncs`, and that is what a pause is made of: 12.9ms of a 14.2ms `RefCount`
+        // pause and 5.5ms of a 7.9ms `FinalMark` on `tree_mutable`, with everything else in the
+        // pause under a millisecond. Its size is set by how much the mutator has written since the
+        // last pause, which the heap-occupancy trigger does not bound at all -- a mutation-heavy
+        // program reaches the heap target having queued an unbounded number of increments.
+        //
+        // So collect on the buffer as well as on occupancy. This is `INC_BUFFER_LIMIT` from
+        // upstream LXR, which has always been declared here (`rc::inc_buffer_size` is maintained
+        // on the barrier's flush path and reset in `ImmixSpace::release_rc`) but never read.
+        if let Some(limit) = super::inc_buffer_limit() {
+            if self.rc.inc_buffer_size() >= limit {
+                return true;
+            }
+        }
         // Survival limits
         let total_young_alloc_pages =
             self.block_allocation.total_young_allocation_in_bytes() >> LOG_BYTES_IN_MBYTE;
-        let predicted_survival_mb: usize =
-            ((total_young_alloc_pages as f64 * super::SURVIVAL_RATIO_PREDICTOR.ratio()) as usize)
-                << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER;
-        if predicted_survival_mb >= super::MAX_SURVIVAL_MB {
+        // `promotion_ratio`, not `ratio`: this bound exists to cap the promotion work the next
+        // pause will do, and every promotion costs that work whether or not the object moved.
+        let predicted_survival_mb: usize = ((total_young_alloc_pages as f64
+            * super::SURVIVAL_RATIO_PREDICTOR.promotion_ratio())
+            as usize)
+            << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER;
+        if predicted_survival_mb >= super::max_survival_mb() {
             return true;
         }
         if !self.immix_space.common().contiguous {
@@ -365,10 +385,17 @@ impl<VM: VMBinding> Plan for LXR<VM> {
                 super::NUM_CONCURRENT_TRACING_PACKETS.load(Ordering::SeqCst),
             );
             eprintln!(
-                "[lxr] gc#{} incs: processed={} promoted={}",
+                "[lxr] gc#{} incs: processed={} promoted={} young_mb={} survival_ratio={:.4} predicted_survival_mb={} (limit {})",
                 super::GC_COUNT.load(Ordering::SeqCst),
                 super::INCS_PROCESSED.swap(0, Ordering::Relaxed),
                 super::OBJS_PROMOTED.swap(0, Ordering::Relaxed),
+                self.block_allocation.total_young_allocation_in_bytes() >> LOG_BYTES_IN_MBYTE,
+                super::SURVIVAL_RATIO_PREDICTOR.promotion_ratio(),
+                (((self.block_allocation.total_young_allocation_in_bytes()
+                    >> LOG_BYTES_IN_MBYTE) as f64
+                    * super::SURVIVAL_RATIO_PREDICTOR.promotion_ratio()) as usize)
+                    << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER,
+                super::max_survival_mb(),
             );
             eprintln!(
                 "[lxr] gc#{} slotless barrier: calls={} fields={} inc_buffer={}",

@@ -164,6 +164,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 block.set_as_in_place_promoted();
             }
             self.rc.promote_with_size(o, size);
+            self.survival_ratio_predictor_local.record_promotion(size);
             if copied {
                 self.survival_ratio_predictor_local
                     .record_copied_promotion(size);
