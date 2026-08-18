@@ -1085,6 +1085,10 @@ impl<VM: VMBinding> LXR<VM> {
             None => self.previous_pause().unwrap(),
         };
         self.decide_next_gc_may_perform_cycle_collection(pause);
+        // The flush above is the first moment this cycle's reclamation is visible through
+        // `get_reserved_pages`, so it is the first moment a trigger policy can size the next
+        // heap target from what the collection actually freed.
+        self.base().gc_trigger.policy.on_lazy_reclaim_finished(self);
     }
 
     fn gc_init(&mut self) {

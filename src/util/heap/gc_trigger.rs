@@ -351,6 +351,26 @@ pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
     /// for every STW pause in a GC cycle, not just once per cycle. See [`Self::on_gc_end`]
     /// for the hook that is only called once per GC cycle.
     fn on_pause_end(&self, _mmtk: &'static MMTK<VM>) {}
+    /// Inform the triggering policy that a GC cycle's deferred reclamation has finished, so the
+    /// pages it freed are now visible through [`Plan::get_reserved_pages`].
+    ///
+    /// A plan that reclaims lazily has freed almost nothing by the time [`Self::on_gc_end`] runs:
+    /// LXR hands its nursery and mature block sweeping to the concurrent phase that follows the
+    /// pause, and the page resource is not flushed until that phase drains. A policy that sizes the
+    /// next heap target from the reserved pages it sees at [`Self::on_gc_end`] therefore concludes
+    /// the collection freed nothing, and grows the heap without bound. Such a policy should size
+    /// itself here instead.
+    ///
+    /// Called with no mutators stopped, on whichever worker finished the last deferred job. A plan
+    /// that reclaims everything before [`Self::on_gc_end`] never calls this, so a policy that uses
+    /// it must still leave a usable heap target behind at [`Self::on_gc_end`] -- the previous
+    /// cycle's target is a safe choice, since it is finite and was computed from real numbers.
+    ///
+    /// Takes the plan rather than the [`MMTK`] instance because the plans that reclaim lazily
+    /// reach this from their own bookkeeping, which has no `&'static MMTK` to hand. A policy that
+    /// needs per-cycle facts from the instance (whether the collection was user-triggered, say)
+    /// should latch them in [`Self::on_gc_start`].
+    fn on_lazy_reclaim_finished(&self, _plan: &dyn Plan<VM = VM>) {}
     /// Inform the triggering policy that a GC is about to start the release work. This is called
     /// in the global Release work packet. This means we assume a plan
     /// do not schedule any work that reclaims memory before the global `Release` work. The current plans
