@@ -45,6 +45,11 @@ pub struct ProcessIncs<VM: VMBinding, const KIND: EdgeKind> {
     /// A slice of one promoted object's fields to count, rather than a buffer of increments:
     /// `(object, chunks, obj_in_defrag)`. See [`ProcessIncs::scan_nursery_object`].
     promoted_chunks: Option<(ObjectReference, std::ops::Range<usize>, bool)>,
+    /// Diagnostic tallies for this packet, published once when it finishes. Kept local because a
+    /// global atomic per increment or per promotion is millions of contended updates inside the
+    /// pause -- enough to inflate the pause it is supposed to be measuring by 8x.
+    incs_count: usize,
+    promoted_count: usize,
 }
 
 unsafe impl<VM: VMBinding, const KIND: EdgeKind> Send for ProcessIncs<VM, KIND> {}
@@ -73,6 +78,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             root_kind: None,
             survival_ratio_predictor_local: SurvivalRatioPredictorLocal::default(),
             promoted_chunks: None,
+            incs_count: 0,
+            promoted_count: 0,
         }
     }
 
@@ -146,6 +153,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         los: bool,
         depth: u32,
     ) {
+        self.promoted_count += 1;
         probe!(mmtk, lxr_promote, o.to_raw_address().as_usize());
         let size = o.get_size::<VM>();
 
@@ -615,6 +623,9 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         depth: u32,
         add_root_to_remset: bool,
     ) -> Option<Vec<ObjectReference>> {
+        // One atomic per buffer, not per slot: this is the count the pause's cost gets divided by
+        // to give a cost per increment, so it must not itself cost per increment.
+        self.incs_count += incs.len();
         if K == EDGE_KIND_ROOT {
             // This used to reuse the increment buffer's allocation in place, writing the
             // resulting objects over the slots and handing the same pointer to
@@ -772,6 +783,12 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
             {
                 self.lxr.curr_roots.read().unwrap().push(roots);
             }
+        }
+        if crate::plan::lxr::stats() {
+            crate::plan::lxr::INCS_PROCESSED.fetch_add(self.incs_count, Ordering::Relaxed);
+            crate::plan::lxr::OBJS_PROMOTED.fetch_add(self.promoted_count, Ordering::Relaxed);
+            self.incs_count = 0;
+            self.promoted_count = 0;
         }
         // Process recursively generated buffer
         let mut depth = self.depth;

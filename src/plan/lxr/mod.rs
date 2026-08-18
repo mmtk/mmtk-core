@@ -279,6 +279,31 @@ pub(crate) fn no_full_pauses() -> bool {
     *OFF.get_or_init(|| std::env::var_os("MMTK_LXR_NO_FULL").is_some())
 }
 
+/// How many times the slot-less write barrier had to walk an object because the caller could not
+/// name the field, and how many fields those walks visited in total. Only maintained under
+/// [`stats`]: the barrier's cost is exactly what is being measured, so the counters must not be on
+/// its path otherwise.
+///
+/// Julia calls the slot-less barrier for stores whose field its codegen cannot name. LXR has no
+/// per-slot record for those, so `LXRFieldBarrierSemantics::object_probable_write_slow` walks every
+/// field of the object and records each one. Fields-per-call is therefore the amplification factor
+/// of that path, and for a large `GenericMemory` it is the whole array.
+pub(crate) static OBJ_WRITE_CALLS: AtomicUsize = AtomicUsize::new(0);
+pub(crate) static OBJ_WRITE_FIELDS: AtomicUsize = AtomicUsize::new(0);
+
+/// Slots handed to `ProcessIncs`, and objects it promoted, during the current pause. Only
+/// maintained under [`stats`]. Divided into the pause's `ProcessIncs` time these give the cost of
+/// one increment -- the figure that says whether a pause is expensive because there are many
+/// increments or because each one is slow.
+pub(crate) static INCS_PROCESSED: AtomicUsize = AtomicUsize::new(0);
+pub(crate) static OBJS_PROMOTED: AtomicUsize = AtomicUsize::new(0);
+
+/// Whether the `MMTK_LXR_STATS` diagnostics are on.
+pub fn stats() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("MMTK_LXR_STATS").is_some())
+}
+
 /// Whether to retain every nursery block instead of reclaiming its free lines, so that
 /// live-but-uncounted objects survive. Set `MMTK_LXR_RETAIN_NURSERY=1`. Leaks; bring-up
 /// diagnostic only.

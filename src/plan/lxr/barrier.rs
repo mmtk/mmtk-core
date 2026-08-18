@@ -340,7 +340,13 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
         // read then are still the epoch-end values -- while making a realloc harmless,
         // since the object is asked for its fields again. The decrements of the old values
         // are pushed here either way, which is where they have to happen.
+        // Counted so that the cost of this path can be attributed: it is the whole-object fallback
+        // for a store whose field the caller could not name, and how many fields it walks per call
+        // is the amplification factor. One atomic per call, not per field -- accumulate locally.
+        let stats = crate::plan::lxr::stats();
+        let mut walked = 0usize;
         obj.iterate_fields::<VM, _>(self.tls.0, |s| {
+            walked += 1;
             if !self.slot_has_unlog_bit(s) {
                 probe!(mmtk, lxr_slot_skipped, SkipReason::OutOfHeap);
                 return;
@@ -377,6 +383,10 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
             None,
             Ordering::SeqCst,
         );
+        if stats {
+            super::OBJ_WRITE_CALLS.fetch_add(1, Ordering::Relaxed);
+            super::OBJ_WRITE_FIELDS.fetch_add(walked, Ordering::Relaxed);
+        }
         self.logged_objs.push(obj);
         if self.logged_objs.is_full() {
             // Re-arming early only costs another walk of an object whose fields are all

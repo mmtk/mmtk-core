@@ -355,6 +355,19 @@ impl<VM: VMBinding> Plan for LXR<VM> {
                 super::NUM_CONCURRENT_TRACING_PACKETS.load(Ordering::SeqCst),
             );
             eprintln!(
+                "[lxr] gc#{} incs: processed={} promoted={}",
+                super::GC_COUNT.load(Ordering::SeqCst),
+                super::INCS_PROCESSED.swap(0, Ordering::Relaxed),
+                super::OBJS_PROMOTED.swap(0, Ordering::Relaxed),
+            );
+            eprintln!(
+                "[lxr] gc#{} slotless barrier: calls={} fields={} inc_buffer={}",
+                super::GC_COUNT.load(Ordering::SeqCst),
+                super::OBJ_WRITE_CALLS.swap(0, Ordering::Relaxed),
+                super::OBJ_WRITE_FIELDS.swap(0, Ordering::Relaxed),
+                self.rc.inc_buffer_size(),
+            );
+            eprintln!(
                 "[lxr] gc#{} sweep dead cycles: zeroed={} kept_marked={}",
                 super::GC_COUNT.load(Ordering::SeqCst),
                 super::SWEEP_ZEROED.load(Ordering::Relaxed),
@@ -758,6 +771,17 @@ impl<VM: VMBinding> LXR<VM> {
         let hint_cycle_gc = self.next_gc_is_cycle_gc(mature_space_pages, pause);
         let hint_emergency_gc =
             self.next_gc_is_emergency_gc(total_pages, mature_space_pages, emergency_threshold);
+        if super::stats() {
+            eprintln!(
+                "[lxr] decide: total_pages={} mature_pages={} heap_after_gc={} lazy_freed_blocks={} hint_cycle={} hint_emergency={}",
+                total_pages,
+                mature_space_pages,
+                HEAP_AFTER_GC.load(Ordering::SeqCst),
+                self.num_clean_blocks_released_lazy.load(Ordering::SeqCst),
+                hint_cycle_gc,
+                hint_emergency_gc,
+            );
+        }
         // Update states
         self.hint_cycle_gc.store(hint_cycle_gc, Ordering::SeqCst);
         self.hint_emergency_gc
@@ -816,6 +840,13 @@ impl<VM: VMBinding> LXR<VM> {
         // If CM is finished, do a final mark pause
         if cm_in_progress && cm_packets_drained {
             return Pause::FinalMark;
+        }
+
+        if crate::plan::lxr::stats() && (emergency || user_triggered || hint_emergency_gc) {
+            eprintln!(
+                "[lxr] emergency: emergency={} user_triggered={} hint_emergency={} cm_in_progress={}",
+                emergency, user_triggered, hint_emergency_gc, cm_in_progress
+            );
         }
 
         // Either final mark pause or full pause for emergency GC
