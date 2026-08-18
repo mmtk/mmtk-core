@@ -433,6 +433,23 @@ impl GcStatusWord {
         });
     }
 
+    /// `InConcurrentGC` -> `NotInGC`: the concurrent phase's work has drained and no pause
+    /// follows it. A concurrent plan whose background phase always ends in a pause (such as
+    /// ConcurrentImmix, which finishes concurrent marking with a `FinalMark` pause) never needs
+    /// this; a plan whose background work simply runs out (LXR's concurrent decrements and
+    /// sweeping) does, or the collector would look permanently mid-GC to everything that waits
+    /// for it to be quiescent -- `set_disabled` in particular.
+    ///
+    /// Returns `true` if this call performed the transition, `false` if the status had already
+    /// moved on (a mutator may have requested a pause in the meantime).
+    pub(crate) fn set_concurrent_gc_finished(&self) -> bool {
+        self.try_transition(|status| match status {
+            GcStatus::InConcurrentGC => Some(GcStatus::NotInGC),
+            _ => None,
+        })
+        .is_ok()
+    }
+
     /// `InPause` -> `NotInGC`, e.g. once a GC pause has finished and no concurrent work remains.
     pub(crate) fn set_not_in_gc(&self) {
         self.transition(|status| {
