@@ -1,4 +1,3 @@
-#![allow(static_mut_refs)]
 // Use the `{likely, unlikely}` provided by compiler when using nightly
 #![cfg_attr(feature = "nightly", feature(core_intrinsics))]
 
