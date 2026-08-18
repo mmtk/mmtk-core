@@ -299,12 +299,15 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Schedule "sentinel" work packets for all open buckets.
-    pub(crate) fn schedule_sentinels(&self) -> bool {
-        let mut new_packets = false;
+    ///
+    /// Returns the number of sentinel packets scheduled, so the caller can wake just that many
+    /// workers.
+    pub(crate) fn schedule_sentinels(&self) -> usize {
+        let mut new_packets = 0;
         for (id, work_bucket) in self.work_buckets.iter() {
             if work_bucket.is_open() && work_bucket.maybe_schedule_sentinel() {
                 trace!("Scheduled sentinel packet into {:?}", id);
-                new_packets = true;
+                new_packets += 1;
             }
         }
         new_packets
@@ -316,10 +319,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// No workers will be waked up by this function. The caller is responsible for that.
     ///
     /// Return true if there're any non-empty buckets updated.
-    pub(crate) fn update_buckets(&self) -> bool {
+    pub(crate) fn update_buckets(&self) -> usize {
         debug!("update_buckets");
         let mut buckets_updated = false;
-        let mut new_packets = false;
+        let mut new_packets = 0;
         for i in 0..WorkBucketStage::LENGTH {
             let id = WorkBucketStage::from_usize(i);
             if id.is_always_open() {
@@ -338,23 +341,35 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 // Guarded, not just passed to `mark`: the `format!` would otherwise allocate a
                 // String at every bucket boundary of every pause even with the timeline off.
                 if crate::scheduler::stage_timeline::enabled() {
-                    crate::scheduler::stage_timeline::mark(format!("open {:?}", id));
+                    crate::scheduler::stage_timeline::mark(format!(
+                        "open {:?}({})",
+                        id,
+                        bucket.len()
+                    ));
                 }
-                new_packets = new_packets || !bucket.is_drained();
-                if new_packets {
+                if !bucket.is_drained() {
                     // Quit the loop. There are already new packets in the newly opened buckets.
-                    trace!("Found new packets at stage {:?}.  Break.", id);
+                    new_packets = bucket.len();
+                    trace!(
+                        "Found {} new packets at stage {:?}.  Break.",
+                        new_packets,
+                        id
+                    );
                     break;
                 }
-                new_packets = new_packets || bucket.maybe_schedule_sentinel();
-                if new_packets {
+                if bucket.maybe_schedule_sentinel() {
                     // Quit the loop. A sentinel packet is added to the newly opened buckets.
+                    new_packets = 1;
                     trace!("Sentinel is scheduled at stage {:?}.  Break.", id);
                     break;
                 }
             }
         }
-        buckets_updated && new_packets
+        if buckets_updated {
+            new_packets
+        } else {
+            0
+        }
     }
 
     pub fn close_all_stw_buckets(&self) {
@@ -429,7 +444,18 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 _ => {}
             }
         }
-        // Try steal some packets from any worker
+        // Try steal some packets from any worker.
+        //
+        // This scan is O(workers) contended cache-line reads and every worker runs it at each
+        // work-bucket boundary, which looks like an obvious O(workers^2) waste. It is not worth
+        // bounding: probing only a few random victims left the minimum pause unchanged -- so the
+        // scan is not on an empty pause's critical path -- while median pause and wall time got
+        // much worse (on 32 workers, `strings` median 6.9ms -> 21.7ms, `tree_mutable` wall
+        // 23.0s -> 34.0s), improving monotonically as the probe count rose back to exhaustive.
+        //
+        // `WorkBucket::poll` is a *batch* steal, so an opening bucket's packets land in a few
+        // workers' local deques. That is where the work is, so a worker that fails to find it
+        // parks and the phase serialises. The scan is load-bearing for parallelism.
         for (id, worker_shared) in self.worker_group.workers_shared.iter().enumerate() {
             if id == worker.ordinal {
                 continue;
@@ -520,8 +546,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 // Find more work for workers to do.
                 let found_more_work = self.find_more_work_for_workers();
 
-                if found_more_work {
-                    LastParkedResult::WakeAll
+                if found_more_work != 0 {
+                    if found_more_work == usize::MAX {
+                        LastParkedResult::WakeAll
+                    } else {
+                        LastParkedResult::Wake(found_more_work)
+                    }
                 } else {
                     // GC finished.
                     let concurrent_work_scheduled = self.on_gc_finished(worker);
@@ -586,27 +616,34 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         }
     }
 
-    /// Find more work for workers to do.  Return true if more work is available.
-    fn find_more_work_for_workers(&self) -> bool {
+    /// Find more work for workers to do.
+    ///
+    /// Returns the number of workers worth waking: `0` if there is no more work (the GC is done),
+    /// or `usize::MAX` to mean "wake everyone".
+    fn find_more_work_for_workers(&self) -> usize {
         if self.worker_group.has_designated_work() {
             trace!("Some workers have designated work.");
-            return true;
+            // Designated work belongs to specific workers, and `notify_one` cannot choose which
+            // waiter it wakes, so everyone has to be given the chance to check.
+            return usize::MAX;
         }
 
         // See if any bucket has a sentinel.
-        if self.schedule_sentinels() {
+        let sentinels = self.schedule_sentinels();
+        if sentinels != 0 {
             trace!("Some sentinels are scheduled.");
-            return true;
+            return sentinels;
         }
 
         // Try to open new buckets.
-        if self.update_buckets() {
+        let opened = self.update_buckets();
+        if opened != 0 {
             trace!("Some buckets are opened.");
-            return true;
+            return opened;
         }
 
         // If all of the above failed, it means GC has finished.
-        false
+        0
     }
 
     fn do_vm_release(&self, mmtk: &MMTK<VM>) {
