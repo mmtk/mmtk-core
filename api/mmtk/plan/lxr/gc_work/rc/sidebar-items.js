@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["EDGE_KIND_MATURE","EDGE_KIND_NURSERY","EDGE_KIND_ROOT"],"enum":["AddressBuffer"],"struct":["CollectRoots","ProcessDecs","ProcessIncs"],"type":["EdgeKind"]};

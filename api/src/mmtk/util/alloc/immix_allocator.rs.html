@@ -237,184 +237,188 @@
 <a href=#237 id=237 data-nosnippet>237</a>    </span><span class="kw">fn </span>acquire_recyclable_lines(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; bool {
 <a href=#238 id=238 data-nosnippet>238</a>        <span class="kw">while </span><span class="self">self</span>.line.is_some() || <span class="self">self</span>.acquire_recyclable_block() {
 <a href=#239 id=239 data-nosnippet>239</a>            <span class="kw">let </span>line = <span class="self">self</span>.line.unwrap();
-<a href=#240 id=240 data-nosnippet>240</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>((start_line, end_line)) = <span class="self">self</span>.immix_space().get_next_available_lines(line)
-<a href=#241 id=241 data-nosnippet>241</a>            {
-<a href=#242 id=242 data-nosnippet>242</a>                <span class="comment">// Find recyclable lines. Update the bump allocation cursor and limit.
-<a href=#243 id=243 data-nosnippet>243</a>                </span><span class="self">self</span>.bump_pointer.cursor = start_line.start();
-<a href=#244 id=244 data-nosnippet>244</a>                <span class="self">self</span>.bump_pointer.limit = end_line.start();
-<a href=#245 id=245 data-nosnippet>245</a>                <span class="macro">trace!</span>(
-<a href=#246 id=246 data-nosnippet>246</a>                    <span class="string">"{:?}: acquire_recyclable_lines -&gt; {:?} [{:?}, {:?}) {:?}"</span>,
-<a href=#247 id=247 data-nosnippet>247</a>                    <span class="self">self</span>.tls,
-<a href=#248 id=248 data-nosnippet>248</a>                    <span class="self">self</span>.line,
-<a href=#249 id=249 data-nosnippet>249</a>                    start_line,
-<a href=#250 id=250 data-nosnippet>250</a>                    end_line,
-<a href=#251 id=251 data-nosnippet>251</a>                    <span class="self">self</span>.tls
-<a href=#252 id=252 data-nosnippet>252</a>                );
-<a href=#253 id=253 data-nosnippet>253</a>                <span class="kw">crate</span>::util::memory::zero(
-<a href=#254 id=254 data-nosnippet>254</a>                    <span class="self">self</span>.bump_pointer.cursor,
-<a href=#255 id=255 data-nosnippet>255</a>                    <span class="self">self</span>.bump_pointer.limit - <span class="self">self</span>.bump_pointer.cursor,
-<a href=#256 id=256 data-nosnippet>256</a>                );
-<a href=#257 id=257 data-nosnippet>257</a>                <span class="macro">debug_assert!</span>(
-<a href=#258 id=258 data-nosnippet>258</a>                    align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.bump_pointer.cursor, align, offset) + size
-<a href=#259 id=259 data-nosnippet>259</a>                        &lt;= <span class="self">self</span>.bump_pointer.limit
-<a href=#260 id=260 data-nosnippet>260</a>                );
-<a href=#261 id=261 data-nosnippet>261</a>                <span class="kw">let </span>block = line.block();
-<a href=#262 id=262 data-nosnippet>262</a>                <span class="self">self</span>.line = <span class="kw">if </span>end_line == block.end_line() {
-<a href=#263 id=263 data-nosnippet>263</a>                    <span class="comment">// Hole searching reached the end of a reusable block. Set the hole-searching cursor to None.
-<a href=#264 id=264 data-nosnippet>264</a>                    </span><span class="prelude-val">None
-<a href=#265 id=265 data-nosnippet>265</a>                </span>} <span class="kw">else </span>{
-<a href=#266 id=266 data-nosnippet>266</a>                    <span class="comment">// Update the hole-searching cursor to None.
-<a href=#267 id=267 data-nosnippet>267</a>                    </span><span class="prelude-val">Some</span>(end_line)
-<a href=#268 id=268 data-nosnippet>268</a>                };
-<a href=#269 id=269 data-nosnippet>269</a>                <span class="comment">// mark objects if concurrent marking is active
-<a href=#270 id=270 data-nosnippet>270</a>                </span><span class="kw">if </span><span class="self">self</span>.immix_space().should_allocate_as_live() {
-<a href=#271 id=271 data-nosnippet>271</a>                    <span class="kw">let </span>state = <span class="self">self</span>.space.line_mark_state.load(Ordering::Acquire);
-<a href=#272 id=272 data-nosnippet>272</a>                    Line::eager_mark_lines::&lt;VM&gt;(state, start_line..end_line);
-<a href=#273 id=273 data-nosnippet>273</a>                }
-<a href=#274 id=274 data-nosnippet>274</a>                <span class="kw">return </span><span class="bool-val">true</span>;
-<a href=#275 id=275 data-nosnippet>275</a>            } <span class="kw">else </span>{
-<a href=#276 id=276 data-nosnippet>276</a>                <span class="comment">// No more recyclable lines. Set the hole-searching cursor to None.
-<a href=#277 id=277 data-nosnippet>277</a>                </span><span class="self">self</span>.line = <span class="prelude-val">None</span>;
-<a href=#278 id=278 data-nosnippet>278</a>            }
-<a href=#279 id=279 data-nosnippet>279</a>        }
-<a href=#280 id=280 data-nosnippet>280</a>        <span class="bool-val">false
-<a href=#281 id=281 data-nosnippet>281</a>    </span>}
-<a href=#282 id=282 data-nosnippet>282</a>
-<a href=#283 id=283 data-nosnippet>283</a>    <span class="doccomment">/// Get a recyclable block from ImmixSpace.
-<a href=#284 id=284 data-nosnippet>284</a>    </span><span class="kw">fn </span>acquire_recyclable_block(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; bool {
-<a href=#285 id=285 data-nosnippet>285</a>        <span class="kw">match </span><span class="self">self</span>.immix_space().get_reusable_block(<span class="self">self</span>.copy) {
-<a href=#286 id=286 data-nosnippet>286</a>            <span class="prelude-val">Some</span>(block) =&gt; {
-<a href=#287 id=287 data-nosnippet>287</a>                <span class="macro">trace!</span>(<span class="string">"{:?}: acquire_recyclable_block -&gt; {:?}"</span>, <span class="self">self</span>.tls, block);
-<a href=#288 id=288 data-nosnippet>288</a>                <span class="comment">// Set the hole-searching cursor to the start of this block.
-<a href=#289 id=289 data-nosnippet>289</a>                </span><span class="self">self</span>.line = <span class="prelude-val">Some</span>(block.start_line());
-<a href=#290 id=290 data-nosnippet>290</a>                <span class="bool-val">true
-<a href=#291 id=291 data-nosnippet>291</a>            </span>}
-<a href=#292 id=292 data-nosnippet>292</a>            <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
-<a href=#293 id=293 data-nosnippet>293</a>        }
-<a href=#294 id=294 data-nosnippet>294</a>    }
-<a href=#295 id=295 data-nosnippet>295</a>
-<a href=#296 id=296 data-nosnippet>296</a>    <span class="comment">// Get a clean block from ImmixSpace.
-<a href=#297 id=297 data-nosnippet>297</a>    </span><span class="kw">fn </span>acquire_clean_block(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
-<a href=#298 id=298 data-nosnippet>298</a>        <span class="kw">match </span><span class="self">self</span>.immix_space().get_clean_block(
-<a href=#299 id=299 data-nosnippet>299</a>            <span class="self">self</span>.tls,
-<a href=#300 id=300 data-nosnippet>300</a>            <span class="self">self</span>.copy,
-<a href=#301 id=301 data-nosnippet>301</a>            <span class="self">self</span>.get_context().get_alloc_options(),
-<a href=#302 id=302 data-nosnippet>302</a>        ) {
-<a href=#303 id=303 data-nosnippet>303</a>            <span class="prelude-val">None </span>=&gt; Address::ZERO,
-<a href=#304 id=304 data-nosnippet>304</a>            <span class="prelude-val">Some</span>(block) =&gt; {
-<a href=#305 id=305 data-nosnippet>305</a>                <span class="macro">trace!</span>(
-<a href=#306 id=306 data-nosnippet>306</a>                    <span class="string">"{:?}: Acquired a new block {:?} -&gt; {:?}"</span>,
-<a href=#307 id=307 data-nosnippet>307</a>                    <span class="self">self</span>.tls,
-<a href=#308 id=308 data-nosnippet>308</a>                    block.start(),
-<a href=#309 id=309 data-nosnippet>309</a>                    block.end()
-<a href=#310 id=310 data-nosnippet>310</a>                );
-<a href=#311 id=311 data-nosnippet>311</a>                <span class="comment">// Bulk clear stale line mark state
-<a href=#312 id=312 data-nosnippet>312</a>                </span>Line::MARK_TABLE
-<a href=#313 id=313 data-nosnippet>313</a>                    .bzero_metadata(block.start(), <span class="kw">crate</span>::policy::immix::block::Block::BYTES);
-<a href=#314 id=314 data-nosnippet>314</a>                <span class="comment">// mark objects if concurrent marking is active
-<a href=#315 id=315 data-nosnippet>315</a>                </span><span class="kw">if </span><span class="self">self</span>.immix_space().should_allocate_as_live() {
-<a href=#316 id=316 data-nosnippet>316</a>                    <span class="kw">let </span>state = <span class="self">self</span>.space.line_mark_state.load(Ordering::Acquire);
-<a href=#317 id=317 data-nosnippet>317</a>                    Line::eager_mark_lines::&lt;VM&gt;(state, block.start_line()..block.end_line());
-<a href=#318 id=318 data-nosnippet>318</a>                }
-<a href=#319 id=319 data-nosnippet>319</a>                <span class="kw">if </span><span class="self">self</span>.request_for_large {
-<a href=#320 id=320 data-nosnippet>320</a>                    <span class="self">self</span>.large_bump_pointer.cursor = block.start();
-<a href=#321 id=321 data-nosnippet>321</a>                    <span class="self">self</span>.large_bump_pointer.limit = block.end();
-<a href=#322 id=322 data-nosnippet>322</a>                } <span class="kw">else </span>{
-<a href=#323 id=323 data-nosnippet>323</a>                    <span class="self">self</span>.bump_pointer.cursor = block.start();
-<a href=#324 id=324 data-nosnippet>324</a>                    <span class="self">self</span>.bump_pointer.limit = block.end();
-<a href=#325 id=325 data-nosnippet>325</a>                }
-<a href=#326 id=326 data-nosnippet>326</a>                <span class="self">self</span>.alloc(size, align, offset)
-<a href=#327 id=327 data-nosnippet>327</a>            }
-<a href=#328 id=328 data-nosnippet>328</a>        }
-<a href=#329 id=329 data-nosnippet>329</a>    }
-<a href=#330 id=330 data-nosnippet>330</a>
-<a href=#331 id=331 data-nosnippet>331</a>    <span class="doccomment">/// Return whether the TLAB has been exhausted and we need to acquire a new block. Assumes that
-<a href=#332 id=332 data-nosnippet>332</a>    /// the buffer limits have been restored using [`ImmixAllocator::restore_limit_for_stress`].
-<a href=#333 id=333 data-nosnippet>333</a>    /// Note that this function may implicitly change the limits of the allocator.
-<a href=#334 id=334 data-nosnippet>334</a>    </span><span class="kw">fn </span>require_new_block(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; bool {
-<a href=#335 id=335 data-nosnippet>335</a>        <span class="kw">let </span>result = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.bump_pointer.cursor, align, offset);
-<a href=#336 id=336 data-nosnippet>336</a>        <span class="kw">let </span>new_cursor = result + size;
-<a href=#337 id=337 data-nosnippet>337</a>        <span class="kw">let </span>insufficient_space = new_cursor &gt; <span class="self">self</span>.bump_pointer.limit;
-<a href=#338 id=338 data-nosnippet>338</a>
-<a href=#339 id=339 data-nosnippet>339</a>        <span class="comment">// We want this function to behave as if `alloc()` has been called. Hence, we perform a
-<a href=#340 id=340 data-nosnippet>340</a>        // size check and then return the conditions where `alloc_slow_inline()` would be called
-<a href=#341 id=341 data-nosnippet>341</a>        // in an `alloc()` call, namely when both `overflow_alloc()` and `alloc_slow_hot()` fail
-<a href=#342 id=342 data-nosnippet>342</a>        // to service the allocation request
-<a href=#343 id=343 data-nosnippet>343</a>        </span><span class="kw">if </span>insufficient_space &amp;&amp; get_maximum_aligned_size::&lt;VM&gt;(size, align) &gt; Line::BYTES {
-<a href=#344 id=344 data-nosnippet>344</a>            <span class="kw">let </span>start =
-<a href=#345 id=345 data-nosnippet>345</a>                align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.large_bump_pointer.cursor, align, offset);
-<a href=#346 id=346 data-nosnippet>346</a>            <span class="kw">let </span>end = start + size;
-<a href=#347 id=347 data-nosnippet>347</a>            end &gt; <span class="self">self</span>.large_bump_pointer.limit
-<a href=#348 id=348 data-nosnippet>348</a>        } <span class="kw">else </span>{
-<a href=#349 id=349 data-nosnippet>349</a>            <span class="comment">// We try to acquire recyclable lines here just like `alloc_slow_hot()`
-<a href=#350 id=350 data-nosnippet>350</a>            </span>insufficient_space &amp;&amp; !<span class="self">self</span>.acquire_recyclable_lines(size, align, offset)
-<a href=#351 id=351 data-nosnippet>351</a>        }
-<a href=#352 id=352 data-nosnippet>352</a>    }
-<a href=#353 id=353 data-nosnippet>353</a>
-<a href=#354 id=354 data-nosnippet>354</a>    <span class="doccomment">/// Set fake limits for the bump allocation for stress tests. The fake limit is the remaining
-<a href=#355 id=355 data-nosnippet>355</a>    /// thread local buffer size, which should be always smaller than the bump cursor. This method
-<a href=#356 id=356 data-nosnippet>356</a>    /// may be reentrant. We need to check before setting the values.
-<a href=#357 id=357 data-nosnippet>357</a>    </span><span class="kw">fn </span>set_limit_for_stress(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-<a href=#358 id=358 data-nosnippet>358</a>        <span class="kw">if </span><span class="self">self</span>.bump_pointer.cursor &lt; <span class="self">self</span>.bump_pointer.limit {
-<a href=#359 id=359 data-nosnippet>359</a>            <span class="kw">let </span>old_limit = <span class="self">self</span>.bump_pointer.limit;
-<a href=#360 id=360 data-nosnippet>360</a>            <span class="kw">let </span>new_limit =
-<a href=#361 id=361 data-nosnippet>361</a>                <span class="kw">unsafe </span>{ Address::from_usize(<span class="self">self</span>.bump_pointer.limit - <span class="self">self</span>.bump_pointer.cursor) };
-<a href=#362 id=362 data-nosnippet>362</a>            <span class="self">self</span>.bump_pointer.limit = new_limit;
-<a href=#363 id=363 data-nosnippet>363</a>            <span class="macro">trace!</span>(
-<a href=#364 id=364 data-nosnippet>364</a>                <span class="string">"{:?}: set_limit_for_stress. normal c {} l {} -&gt; {}"</span>,
-<a href=#365 id=365 data-nosnippet>365</a>                <span class="self">self</span>.tls,
-<a href=#366 id=366 data-nosnippet>366</a>                <span class="self">self</span>.bump_pointer.cursor,
-<a href=#367 id=367 data-nosnippet>367</a>                old_limit,
-<a href=#368 id=368 data-nosnippet>368</a>                new_limit,
-<a href=#369 id=369 data-nosnippet>369</a>            );
-<a href=#370 id=370 data-nosnippet>370</a>        }
-<a href=#371 id=371 data-nosnippet>371</a>
-<a href=#372 id=372 data-nosnippet>372</a>        <span class="kw">if </span><span class="self">self</span>.large_bump_pointer.cursor &lt; <span class="self">self</span>.large_bump_pointer.limit {
-<a href=#373 id=373 data-nosnippet>373</a>            <span class="kw">let </span>old_lg_limit = <span class="self">self</span>.large_bump_pointer.limit;
-<a href=#374 id=374 data-nosnippet>374</a>            <span class="kw">let </span>new_lg_limit = <span class="kw">unsafe </span>{
-<a href=#375 id=375 data-nosnippet>375</a>                Address::from_usize(<span class="self">self</span>.large_bump_pointer.limit - <span class="self">self</span>.large_bump_pointer.cursor)
-<a href=#376 id=376 data-nosnippet>376</a>            };
-<a href=#377 id=377 data-nosnippet>377</a>            <span class="self">self</span>.large_bump_pointer.limit = new_lg_limit;
-<a href=#378 id=378 data-nosnippet>378</a>            <span class="macro">trace!</span>(
-<a href=#379 id=379 data-nosnippet>379</a>                <span class="string">"{:?}: set_limit_for_stress. large c {} l {} -&gt; {}"</span>,
-<a href=#380 id=380 data-nosnippet>380</a>                <span class="self">self</span>.tls,
-<a href=#381 id=381 data-nosnippet>381</a>                <span class="self">self</span>.large_bump_pointer.cursor,
-<a href=#382 id=382 data-nosnippet>382</a>                old_lg_limit,
-<a href=#383 id=383 data-nosnippet>383</a>                new_lg_limit,
-<a href=#384 id=384 data-nosnippet>384</a>            );
-<a href=#385 id=385 data-nosnippet>385</a>        }
-<a href=#386 id=386 data-nosnippet>386</a>    }
-<a href=#387 id=387 data-nosnippet>387</a>
-<a href=#388 id=388 data-nosnippet>388</a>    <span class="doccomment">/// Restore the real limits for the bump allocation so we can properly do a thread local
-<a href=#389 id=389 data-nosnippet>389</a>    /// allocation. The fake limit is the remaining thread local buffer size, and we restore the
-<a href=#390 id=390 data-nosnippet>390</a>    /// actual limit from the size and the cursor. This method may be reentrant. We need to check
-<a href=#391 id=391 data-nosnippet>391</a>    /// before setting the values.
-<a href=#392 id=392 data-nosnippet>392</a>    </span><span class="kw">fn </span>restore_limit_for_stress(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-<a href=#393 id=393 data-nosnippet>393</a>        <span class="kw">if </span><span class="self">self</span>.bump_pointer.limit &lt; <span class="self">self</span>.bump_pointer.cursor {
-<a href=#394 id=394 data-nosnippet>394</a>            <span class="kw">let </span>old_limit = <span class="self">self</span>.bump_pointer.limit;
-<a href=#395 id=395 data-nosnippet>395</a>            <span class="kw">let </span>new_limit = <span class="self">self</span>.bump_pointer.cursor + <span class="self">self</span>.bump_pointer.limit.as_usize();
-<a href=#396 id=396 data-nosnippet>396</a>            <span class="self">self</span>.bump_pointer.limit = new_limit;
-<a href=#397 id=397 data-nosnippet>397</a>            <span class="macro">trace!</span>(
-<a href=#398 id=398 data-nosnippet>398</a>                <span class="string">"{:?}: restore_limit_for_stress. normal c {} l {} -&gt; {}"</span>,
-<a href=#399 id=399 data-nosnippet>399</a>                <span class="self">self</span>.tls,
-<a href=#400 id=400 data-nosnippet>400</a>                <span class="self">self</span>.bump_pointer.cursor,
-<a href=#401 id=401 data-nosnippet>401</a>                old_limit,
-<a href=#402 id=402 data-nosnippet>402</a>                new_limit,
-<a href=#403 id=403 data-nosnippet>403</a>            );
-<a href=#404 id=404 data-nosnippet>404</a>        }
-<a href=#405 id=405 data-nosnippet>405</a>
-<a href=#406 id=406 data-nosnippet>406</a>        <span class="kw">if </span><span class="self">self</span>.large_bump_pointer.limit &lt; <span class="self">self</span>.large_bump_pointer.cursor {
-<a href=#407 id=407 data-nosnippet>407</a>            <span class="kw">let </span>old_lg_limit = <span class="self">self</span>.large_bump_pointer.limit;
-<a href=#408 id=408 data-nosnippet>408</a>            <span class="kw">let </span>new_lg_limit =
-<a href=#409 id=409 data-nosnippet>409</a>                <span class="self">self</span>.large_bump_pointer.cursor + <span class="self">self</span>.large_bump_pointer.limit.as_usize();
-<a href=#410 id=410 data-nosnippet>410</a>            <span class="self">self</span>.large_bump_pointer.limit = new_lg_limit;
-<a href=#411 id=411 data-nosnippet>411</a>            <span class="macro">trace!</span>(
-<a href=#412 id=412 data-nosnippet>412</a>                <span class="string">"{:?}: restore_limit_for_stress. large c {} l {} -&gt; {}"</span>,
-<a href=#413 id=413 data-nosnippet>413</a>                <span class="self">self</span>.tls,
-<a href=#414 id=414 data-nosnippet>414</a>                <span class="self">self</span>.large_bump_pointer.cursor,
-<a href=#415 id=415 data-nosnippet>415</a>                old_lg_limit,
-<a href=#416 id=416 data-nosnippet>416</a>                new_lg_limit,
-<a href=#417 id=417 data-nosnippet>417</a>            );
-<a href=#418 id=418 data-nosnippet>418</a>        }
-<a href=#419 id=419 data-nosnippet>419</a>    }
-<a href=#420 id=420 data-nosnippet>420</a>}</code></pre></div></section></main></body></html>
+<a href=#240 id=240 data-nosnippet>240</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>((start_line, end_line)) =
+<a href=#241 id=241 data-nosnippet>241</a>                <span class="self">self</span>.immix_space().get_next_available_lines(<span class="self">self</span>.copy, line)
+<a href=#242 id=242 data-nosnippet>242</a>            {
+<a href=#243 id=243 data-nosnippet>243</a>                <span class="comment">// Find recyclable lines. Update the bump allocation cursor and limit.
+<a href=#244 id=244 data-nosnippet>244</a>                </span><span class="self">self</span>.bump_pointer.cursor = start_line.start();
+<a href=#245 id=245 data-nosnippet>245</a>                <span class="self">self</span>.bump_pointer.limit = end_line.start();
+<a href=#246 id=246 data-nosnippet>246</a>                <span class="macro">trace!</span>(
+<a href=#247 id=247 data-nosnippet>247</a>                    <span class="string">"{:?}: acquire_recyclable_lines -&gt; {:?} [{:?}, {:?}) {:?}"</span>,
+<a href=#248 id=248 data-nosnippet>248</a>                    <span class="self">self</span>.tls,
+<a href=#249 id=249 data-nosnippet>249</a>                    <span class="self">self</span>.line,
+<a href=#250 id=250 data-nosnippet>250</a>                    start_line,
+<a href=#251 id=251 data-nosnippet>251</a>                    end_line,
+<a href=#252 id=252 data-nosnippet>252</a>                    <span class="self">self</span>.tls
+<a href=#253 id=253 data-nosnippet>253</a>                );
+<a href=#254 id=254 data-nosnippet>254</a>                <span class="kw">crate</span>::util::memory::zero(
+<a href=#255 id=255 data-nosnippet>255</a>                    <span class="self">self</span>.bump_pointer.cursor,
+<a href=#256 id=256 data-nosnippet>256</a>                    <span class="self">self</span>.bump_pointer.limit - <span class="self">self</span>.bump_pointer.cursor,
+<a href=#257 id=257 data-nosnippet>257</a>                );
+<a href=#258 id=258 data-nosnippet>258</a>                <span class="macro">debug_assert!</span>(
+<a href=#259 id=259 data-nosnippet>259</a>                    align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.bump_pointer.cursor, align, offset) + size
+<a href=#260 id=260 data-nosnippet>260</a>                        &lt;= <span class="self">self</span>.bump_pointer.limit
+<a href=#261 id=261 data-nosnippet>261</a>                );
+<a href=#262 id=262 data-nosnippet>262</a>                <span class="kw">let </span>block = line.block();
+<a href=#263 id=263 data-nosnippet>263</a>                <span class="self">self</span>.line = <span class="kw">if </span>end_line == block.end_line() {
+<a href=#264 id=264 data-nosnippet>264</a>                    <span class="comment">// Hole searching reached the end of a reusable block. Set the hole-searching cursor to None.
+<a href=#265 id=265 data-nosnippet>265</a>                    </span><span class="prelude-val">None
+<a href=#266 id=266 data-nosnippet>266</a>                </span>} <span class="kw">else </span>{
+<a href=#267 id=267 data-nosnippet>267</a>                    <span class="comment">// Update the hole-searching cursor to None.
+<a href=#268 id=268 data-nosnippet>268</a>                    </span><span class="prelude-val">Some</span>(end_line)
+<a href=#269 id=269 data-nosnippet>269</a>                };
+<a href=#270 id=270 data-nosnippet>270</a>                <span class="comment">// mark objects if concurrent marking is active
+<a href=#271 id=271 data-nosnippet>271</a>                </span><span class="kw">if </span><span class="self">self</span>.immix_space().should_allocate_as_live() {
+<a href=#272 id=272 data-nosnippet>272</a>                    <span class="kw">let </span>state = <span class="self">self</span>.space.line_mark_state.load(Ordering::Acquire);
+<a href=#273 id=273 data-nosnippet>273</a>                    Line::eager_mark_lines::&lt;VM&gt;(state, start_line..end_line);
+<a href=#274 id=274 data-nosnippet>274</a>                }
+<a href=#275 id=275 data-nosnippet>275</a>                <span class="kw">return </span><span class="bool-val">true</span>;
+<a href=#276 id=276 data-nosnippet>276</a>            } <span class="kw">else </span>{
+<a href=#277 id=277 data-nosnippet>277</a>                <span class="comment">// No more recyclable lines. Set the hole-searching cursor to None.
+<a href=#278 id=278 data-nosnippet>278</a>                </span><span class="self">self</span>.line = <span class="prelude-val">None</span>;
+<a href=#279 id=279 data-nosnippet>279</a>            }
+<a href=#280 id=280 data-nosnippet>280</a>        }
+<a href=#281 id=281 data-nosnippet>281</a>        <span class="bool-val">false
+<a href=#282 id=282 data-nosnippet>282</a>    </span>}
+<a href=#283 id=283 data-nosnippet>283</a>
+<a href=#284 id=284 data-nosnippet>284</a>    <span class="doccomment">/// Get a recyclable block from ImmixSpace.
+<a href=#285 id=285 data-nosnippet>285</a>    </span><span class="kw">fn </span>acquire_recyclable_block(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; bool {
+<a href=#286 id=286 data-nosnippet>286</a>        <span class="kw">match </span><span class="self">self</span>.immix_space().get_reusable_block(<span class="self">self</span>.copy) {
+<a href=#287 id=287 data-nosnippet>287</a>            <span class="prelude-val">Some</span>(block) =&gt; {
+<a href=#288 id=288 data-nosnippet>288</a>                <span class="macro">trace!</span>(<span class="string">"{:?}: acquire_recyclable_block -&gt; {:?}"</span>, <span class="self">self</span>.tls, block);
+<a href=#289 id=289 data-nosnippet>289</a>                <span class="comment">// Set the hole-searching cursor to the start of this block.
+<a href=#290 id=290 data-nosnippet>290</a>                </span><span class="self">self</span>.line = <span class="prelude-val">Some</span>(block.start_line());
+<a href=#291 id=291 data-nosnippet>291</a>                <span class="bool-val">true
+<a href=#292 id=292 data-nosnippet>292</a>            </span>}
+<a href=#293 id=293 data-nosnippet>293</a>            <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
+<a href=#294 id=294 data-nosnippet>294</a>        }
+<a href=#295 id=295 data-nosnippet>295</a>    }
+<a href=#296 id=296 data-nosnippet>296</a>
+<a href=#297 id=297 data-nosnippet>297</a>    <span class="comment">// Get a clean block from ImmixSpace.
+<a href=#298 id=298 data-nosnippet>298</a>    </span><span class="kw">fn </span>acquire_clean_block(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
+<a href=#299 id=299 data-nosnippet>299</a>        <span class="kw">match </span><span class="self">self</span>.immix_space().get_clean_block(
+<a href=#300 id=300 data-nosnippet>300</a>            <span class="self">self</span>.tls,
+<a href=#301 id=301 data-nosnippet>301</a>            <span class="self">self</span>.copy,
+<a href=#302 id=302 data-nosnippet>302</a>            <span class="self">self</span>.get_context().get_alloc_options(),
+<a href=#303 id=303 data-nosnippet>303</a>        ) {
+<a href=#304 id=304 data-nosnippet>304</a>            <span class="prelude-val">None </span>=&gt; Address::ZERO,
+<a href=#305 id=305 data-nosnippet>305</a>            <span class="prelude-val">Some</span>(block) =&gt; {
+<a href=#306 id=306 data-nosnippet>306</a>                <span class="macro">trace!</span>(
+<a href=#307 id=307 data-nosnippet>307</a>                    <span class="string">"{:?}: Acquired a new block {:?} -&gt; {:?}"</span>,
+<a href=#308 id=308 data-nosnippet>308</a>                    <span class="self">self</span>.tls,
+<a href=#309 id=309 data-nosnippet>309</a>                    block.start(),
+<a href=#310 id=310 data-nosnippet>310</a>                    block.end()
+<a href=#311 id=311 data-nosnippet>311</a>                );
+<a href=#312 id=312 data-nosnippet>312</a>                <span class="comment">// FIXME: Why don't we need this for LXR? Conix needs this.
+<a href=#313 id=313 data-nosnippet>313</a>                </span><span class="kw">if </span>!<span class="self">self</span>.immix_space().rc_enabled {
+<a href=#314 id=314 data-nosnippet>314</a>                    <span class="comment">// Bulk clear stale line mark state
+<a href=#315 id=315 data-nosnippet>315</a>                    </span>Line::MARK_TABLE
+<a href=#316 id=316 data-nosnippet>316</a>                        .bzero_metadata(block.start(), <span class="kw">crate</span>::policy::immix::block::Block::BYTES);
+<a href=#317 id=317 data-nosnippet>317</a>                    <span class="comment">// mark objects if concurrent marking is active
+<a href=#318 id=318 data-nosnippet>318</a>                    </span><span class="kw">if </span><span class="self">self</span>.immix_space().should_allocate_as_live() {
+<a href=#319 id=319 data-nosnippet>319</a>                        <span class="kw">let </span>state = <span class="self">self</span>.space.line_mark_state.load(Ordering::Acquire);
+<a href=#320 id=320 data-nosnippet>320</a>                        Line::eager_mark_lines::&lt;VM&gt;(state, block.start_line()..block.end_line());
+<a href=#321 id=321 data-nosnippet>321</a>                    }
+<a href=#322 id=322 data-nosnippet>322</a>                }
+<a href=#323 id=323 data-nosnippet>323</a>                <span class="kw">if </span><span class="self">self</span>.request_for_large {
+<a href=#324 id=324 data-nosnippet>324</a>                    <span class="self">self</span>.large_bump_pointer.cursor = block.start();
+<a href=#325 id=325 data-nosnippet>325</a>                    <span class="self">self</span>.large_bump_pointer.limit = block.end();
+<a href=#326 id=326 data-nosnippet>326</a>                } <span class="kw">else </span>{
+<a href=#327 id=327 data-nosnippet>327</a>                    <span class="self">self</span>.bump_pointer.cursor = block.start();
+<a href=#328 id=328 data-nosnippet>328</a>                    <span class="self">self</span>.bump_pointer.limit = block.end();
+<a href=#329 id=329 data-nosnippet>329</a>                }
+<a href=#330 id=330 data-nosnippet>330</a>                <span class="self">self</span>.alloc(size, align, offset)
+<a href=#331 id=331 data-nosnippet>331</a>            }
+<a href=#332 id=332 data-nosnippet>332</a>        }
+<a href=#333 id=333 data-nosnippet>333</a>    }
+<a href=#334 id=334 data-nosnippet>334</a>
+<a href=#335 id=335 data-nosnippet>335</a>    <span class="doccomment">/// Return whether the TLAB has been exhausted and we need to acquire a new block. Assumes that
+<a href=#336 id=336 data-nosnippet>336</a>    /// the buffer limits have been restored using [`ImmixAllocator::restore_limit_for_stress`].
+<a href=#337 id=337 data-nosnippet>337</a>    /// Note that this function may implicitly change the limits of the allocator.
+<a href=#338 id=338 data-nosnippet>338</a>    </span><span class="kw">fn </span>require_new_block(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; bool {
+<a href=#339 id=339 data-nosnippet>339</a>        <span class="kw">let </span>result = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.bump_pointer.cursor, align, offset);
+<a href=#340 id=340 data-nosnippet>340</a>        <span class="kw">let </span>new_cursor = result + size;
+<a href=#341 id=341 data-nosnippet>341</a>        <span class="kw">let </span>insufficient_space = new_cursor &gt; <span class="self">self</span>.bump_pointer.limit;
+<a href=#342 id=342 data-nosnippet>342</a>
+<a href=#343 id=343 data-nosnippet>343</a>        <span class="comment">// We want this function to behave as if `alloc()` has been called. Hence, we perform a
+<a href=#344 id=344 data-nosnippet>344</a>        // size check and then return the conditions where `alloc_slow_inline()` would be called
+<a href=#345 id=345 data-nosnippet>345</a>        // in an `alloc()` call, namely when both `overflow_alloc()` and `alloc_slow_hot()` fail
+<a href=#346 id=346 data-nosnippet>346</a>        // to service the allocation request
+<a href=#347 id=347 data-nosnippet>347</a>        </span><span class="kw">if </span>insufficient_space &amp;&amp; get_maximum_aligned_size::&lt;VM&gt;(size, align) &gt; Line::BYTES {
+<a href=#348 id=348 data-nosnippet>348</a>            <span class="kw">let </span>start =
+<a href=#349 id=349 data-nosnippet>349</a>                align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.large_bump_pointer.cursor, align, offset);
+<a href=#350 id=350 data-nosnippet>350</a>            <span class="kw">let </span>end = start + size;
+<a href=#351 id=351 data-nosnippet>351</a>            end &gt; <span class="self">self</span>.large_bump_pointer.limit
+<a href=#352 id=352 data-nosnippet>352</a>        } <span class="kw">else </span>{
+<a href=#353 id=353 data-nosnippet>353</a>            <span class="comment">// We try to acquire recyclable lines here just like `alloc_slow_hot()`
+<a href=#354 id=354 data-nosnippet>354</a>            </span>insufficient_space &amp;&amp; !<span class="self">self</span>.acquire_recyclable_lines(size, align, offset)
+<a href=#355 id=355 data-nosnippet>355</a>        }
+<a href=#356 id=356 data-nosnippet>356</a>    }
+<a href=#357 id=357 data-nosnippet>357</a>
+<a href=#358 id=358 data-nosnippet>358</a>    <span class="doccomment">/// Set fake limits for the bump allocation for stress tests. The fake limit is the remaining
+<a href=#359 id=359 data-nosnippet>359</a>    /// thread local buffer size, which should be always smaller than the bump cursor. This method
+<a href=#360 id=360 data-nosnippet>360</a>    /// may be reentrant. We need to check before setting the values.
+<a href=#361 id=361 data-nosnippet>361</a>    </span><span class="kw">fn </span>set_limit_for_stress(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+<a href=#362 id=362 data-nosnippet>362</a>        <span class="kw">if </span><span class="self">self</span>.bump_pointer.cursor &lt; <span class="self">self</span>.bump_pointer.limit {
+<a href=#363 id=363 data-nosnippet>363</a>            <span class="kw">let </span>old_limit = <span class="self">self</span>.bump_pointer.limit;
+<a href=#364 id=364 data-nosnippet>364</a>            <span class="kw">let </span>new_limit =
+<a href=#365 id=365 data-nosnippet>365</a>                <span class="kw">unsafe </span>{ Address::from_usize(<span class="self">self</span>.bump_pointer.limit - <span class="self">self</span>.bump_pointer.cursor) };
+<a href=#366 id=366 data-nosnippet>366</a>            <span class="self">self</span>.bump_pointer.limit = new_limit;
+<a href=#367 id=367 data-nosnippet>367</a>            <span class="macro">trace!</span>(
+<a href=#368 id=368 data-nosnippet>368</a>                <span class="string">"{:?}: set_limit_for_stress. normal c {} l {} -&gt; {}"</span>,
+<a href=#369 id=369 data-nosnippet>369</a>                <span class="self">self</span>.tls,
+<a href=#370 id=370 data-nosnippet>370</a>                <span class="self">self</span>.bump_pointer.cursor,
+<a href=#371 id=371 data-nosnippet>371</a>                old_limit,
+<a href=#372 id=372 data-nosnippet>372</a>                new_limit,
+<a href=#373 id=373 data-nosnippet>373</a>            );
+<a href=#374 id=374 data-nosnippet>374</a>        }
+<a href=#375 id=375 data-nosnippet>375</a>
+<a href=#376 id=376 data-nosnippet>376</a>        <span class="kw">if </span><span class="self">self</span>.large_bump_pointer.cursor &lt; <span class="self">self</span>.large_bump_pointer.limit {
+<a href=#377 id=377 data-nosnippet>377</a>            <span class="kw">let </span>old_lg_limit = <span class="self">self</span>.large_bump_pointer.limit;
+<a href=#378 id=378 data-nosnippet>378</a>            <span class="kw">let </span>new_lg_limit = <span class="kw">unsafe </span>{
+<a href=#379 id=379 data-nosnippet>379</a>                Address::from_usize(<span class="self">self</span>.large_bump_pointer.limit - <span class="self">self</span>.large_bump_pointer.cursor)
+<a href=#380 id=380 data-nosnippet>380</a>            };
+<a href=#381 id=381 data-nosnippet>381</a>            <span class="self">self</span>.large_bump_pointer.limit = new_lg_limit;
+<a href=#382 id=382 data-nosnippet>382</a>            <span class="macro">trace!</span>(
+<a href=#383 id=383 data-nosnippet>383</a>                <span class="string">"{:?}: set_limit_for_stress. large c {} l {} -&gt; {}"</span>,
+<a href=#384 id=384 data-nosnippet>384</a>                <span class="self">self</span>.tls,
+<a href=#385 id=385 data-nosnippet>385</a>                <span class="self">self</span>.large_bump_pointer.cursor,
+<a href=#386 id=386 data-nosnippet>386</a>                old_lg_limit,
+<a href=#387 id=387 data-nosnippet>387</a>                new_lg_limit,
+<a href=#388 id=388 data-nosnippet>388</a>            );
+<a href=#389 id=389 data-nosnippet>389</a>        }
+<a href=#390 id=390 data-nosnippet>390</a>    }
+<a href=#391 id=391 data-nosnippet>391</a>
+<a href=#392 id=392 data-nosnippet>392</a>    <span class="doccomment">/// Restore the real limits for the bump allocation so we can properly do a thread local
+<a href=#393 id=393 data-nosnippet>393</a>    /// allocation. The fake limit is the remaining thread local buffer size, and we restore the
+<a href=#394 id=394 data-nosnippet>394</a>    /// actual limit from the size and the cursor. This method may be reentrant. We need to check
+<a href=#395 id=395 data-nosnippet>395</a>    /// before setting the values.
+<a href=#396 id=396 data-nosnippet>396</a>    </span><span class="kw">fn </span>restore_limit_for_stress(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+<a href=#397 id=397 data-nosnippet>397</a>        <span class="kw">if </span><span class="self">self</span>.bump_pointer.limit &lt; <span class="self">self</span>.bump_pointer.cursor {
+<a href=#398 id=398 data-nosnippet>398</a>            <span class="kw">let </span>old_limit = <span class="self">self</span>.bump_pointer.limit;
+<a href=#399 id=399 data-nosnippet>399</a>            <span class="kw">let </span>new_limit = <span class="self">self</span>.bump_pointer.cursor + <span class="self">self</span>.bump_pointer.limit.as_usize();
+<a href=#400 id=400 data-nosnippet>400</a>            <span class="self">self</span>.bump_pointer.limit = new_limit;
+<a href=#401 id=401 data-nosnippet>401</a>            <span class="macro">trace!</span>(
+<a href=#402 id=402 data-nosnippet>402</a>                <span class="string">"{:?}: restore_limit_for_stress. normal c {} l {} -&gt; {}"</span>,
+<a href=#403 id=403 data-nosnippet>403</a>                <span class="self">self</span>.tls,
+<a href=#404 id=404 data-nosnippet>404</a>                <span class="self">self</span>.bump_pointer.cursor,
+<a href=#405 id=405 data-nosnippet>405</a>                old_limit,
+<a href=#406 id=406 data-nosnippet>406</a>                new_limit,
+<a href=#407 id=407 data-nosnippet>407</a>            );
+<a href=#408 id=408 data-nosnippet>408</a>        }
+<a href=#409 id=409 data-nosnippet>409</a>
+<a href=#410 id=410 data-nosnippet>410</a>        <span class="kw">if </span><span class="self">self</span>.large_bump_pointer.limit &lt; <span class="self">self</span>.large_bump_pointer.cursor {
+<a href=#411 id=411 data-nosnippet>411</a>            <span class="kw">let </span>old_lg_limit = <span class="self">self</span>.large_bump_pointer.limit;
+<a href=#412 id=412 data-nosnippet>412</a>            <span class="kw">let </span>new_lg_limit =
+<a href=#413 id=413 data-nosnippet>413</a>                <span class="self">self</span>.large_bump_pointer.cursor + <span class="self">self</span>.large_bump_pointer.limit.as_usize();
+<a href=#414 id=414 data-nosnippet>414</a>            <span class="self">self</span>.large_bump_pointer.limit = new_lg_limit;
+<a href=#415 id=415 data-nosnippet>415</a>            <span class="macro">trace!</span>(
+<a href=#416 id=416 data-nosnippet>416</a>                <span class="string">"{:?}: restore_limit_for_stress. large c {} l {} -&gt; {}"</span>,
+<a href=#417 id=417 data-nosnippet>417</a>                <span class="self">self</span>.tls,
+<a href=#418 id=418 data-nosnippet>418</a>                <span class="self">self</span>.large_bump_pointer.cursor,
+<a href=#419 id=419 data-nosnippet>419</a>                old_lg_limit,
+<a href=#420 id=420 data-nosnippet>420</a>                new_lg_limit,
+<a href=#421 id=421 data-nosnippet>421</a>            );
+<a href=#422 id=422 data-nosnippet>422</a>        }
+<a href=#423 id=423 data-nosnippet>423</a>    }
+<a href=#424 id=424 data-nosnippet>424</a>}</code></pre></div></section></main></body></html>

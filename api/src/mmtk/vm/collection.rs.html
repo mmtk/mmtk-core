@@ -122,66 +122,77 @@
 <a href=#122 id=122 data-nosnippet>122</a>    /// * `tls`: The thread pointer for the current GC thread.
 <a href=#123 id=123 data-nosnippet>123</a>    </span><span class="kw">fn </span>schedule_finalization(_tls: VMWorkerThread) {}
 <a href=#124 id=124 data-nosnippet>124</a>
-<a href=#125 id=125 data-nosnippet>125</a>    <span class="doccomment">/// A hook for the VM to do work after forwarding objects.
-<a href=#126 id=126 data-nosnippet>126</a>    ///
-<a href=#127 id=127 data-nosnippet>127</a>    /// This function is called after all of the following have finished:
-<a href=#128 id=128 data-nosnippet>128</a>    /// -   The life and death of objects are determined.  Objects determined to be live will not
-<a href=#129 id=129 data-nosnippet>129</a>    ///     be reclaimed in this GC.
-<a href=#130 id=130 data-nosnippet>130</a>    /// -   Live objects have been moved to their destinations. (copying GC only)
-<a href=#131 id=131 data-nosnippet>131</a>    /// -   References in objects have been updated to point to new addresses. (copying GC only)
-<a href=#132 id=132 data-nosnippet>132</a>    ///
-<a href=#133 id=133 data-nosnippet>133</a>    /// And this function may run concurrently with the release work of GC, i.e. freeing the space
-<a href=#134 id=134 data-nosnippet>134</a>    /// occupied by dead objects.
-<a href=#135 id=135 data-nosnippet>135</a>    ///
-<a href=#136 id=136 data-nosnippet>136</a>    /// It is safe for the VM to read and write object fields at this time, although GC has not
-<a href=#137 id=137 data-nosnippet>137</a>    /// finished yet.  GC will be reclaiming spaces of dead objects, but will not damage live
-<a href=#138 id=138 data-nosnippet>138</a>    /// objects.  However, the VM cannot allocate new objects at this time.
-<a href=#139 id=139 data-nosnippet>139</a>    ///
-<a href=#140 id=140 data-nosnippet>140</a>    /// One possible use of this hook is enqueuing `{Soft,Weak,Phantom}Reference` instances to
-<a href=#141 id=141 data-nosnippet>141</a>    /// reference queues (for Java).  VMs (including JVM implementations) do not have to handle
-<a href=#142 id=142 data-nosnippet>142</a>    /// weak references this way, but mmtk-core provides this opportunity.
+<a href=#125 id=125 data-nosnippet>125</a>    <span class="doccomment">/// A hook for the VM to update the state of its weak reference processor at the end of the
+<a href=#126 id=126 data-nosnippet>126</a>    /// release phase of a GC. This is currently called by the LXR plan after a full or final-mark
+<a href=#127 id=127 data-nosnippet>127</a>    /// pause, before the reachability of weak references has changed further.
+<a href=#128 id=128 data-nosnippet>128</a>    ///
+<a href=#129 id=129 data-nosnippet>129</a>    /// Arguments:
+<a href=#130 id=130 data-nosnippet>130</a>    /// * `_lxr`: Whether the current GC is being driven by the LXR plan.
+<a href=#131 id=131 data-nosnippet>131</a>    </span><span class="kw">fn </span>update_weak_processor(_lxr: bool) {}
+<a href=#132 id=132 data-nosnippet>132</a>
+<a href=#133 id=133 data-nosnippet>133</a>    <span class="doccomment">/// A hook for the VM to do work after forwarding objects.
+<a href=#134 id=134 data-nosnippet>134</a>    ///
+<a href=#135 id=135 data-nosnippet>135</a>    /// This function is called after all of the following have finished:
+<a href=#136 id=136 data-nosnippet>136</a>    /// -   The life and death of objects are determined.  Objects determined to be live will not
+<a href=#137 id=137 data-nosnippet>137</a>    ///     be reclaimed in this GC.
+<a href=#138 id=138 data-nosnippet>138</a>    /// -   Live objects have been moved to their destinations. (copying GC only)
+<a href=#139 id=139 data-nosnippet>139</a>    /// -   References in objects have been updated to point to new addresses. (copying GC only)
+<a href=#140 id=140 data-nosnippet>140</a>    ///
+<a href=#141 id=141 data-nosnippet>141</a>    /// And this function may run concurrently with the release work of GC, i.e. freeing the space
+<a href=#142 id=142 data-nosnippet>142</a>    /// occupied by dead objects.
 <a href=#143 id=143 data-nosnippet>143</a>    ///
-<a href=#144 id=144 data-nosnippet>144</a>    /// Arguments:
-<a href=#145 id=145 data-nosnippet>145</a>    /// * `tls_worker`: The thread pointer for the worker thread performing this call.
-<a href=#146 id=146 data-nosnippet>146</a>    </span><span class="kw">fn </span>post_forwarding(_tls: VMWorkerThread) {}
-<a href=#147 id=147 data-nosnippet>147</a>
-<a href=#148 id=148 data-nosnippet>148</a>    <span class="doccomment">/// Return the amount of memory (in bytes) which the VM allocated outside the MMTk heap but
-<a href=#149 id=149 data-nosnippet>149</a>    /// wants to include into the current MMTk heap size.  MMTk core will consider the reported
-<a href=#150 id=150 data-nosnippet>150</a>    /// memory as part of MMTk heap for the purpose of heap size accounting.
+<a href=#144 id=144 data-nosnippet>144</a>    /// It is safe for the VM to read and write object fields at this time, although GC has not
+<a href=#145 id=145 data-nosnippet>145</a>    /// finished yet.  GC will be reclaiming spaces of dead objects, but will not damage live
+<a href=#146 id=146 data-nosnippet>146</a>    /// objects.  However, the VM cannot allocate new objects at this time.
+<a href=#147 id=147 data-nosnippet>147</a>    ///
+<a href=#148 id=148 data-nosnippet>148</a>    /// One possible use of this hook is enqueuing `{Soft,Weak,Phantom}Reference` instances to
+<a href=#149 id=149 data-nosnippet>149</a>    /// reference queues (for Java).  VMs (including JVM implementations) do not have to handle
+<a href=#150 id=150 data-nosnippet>150</a>    /// weak references this way, but mmtk-core provides this opportunity.
 <a href=#151 id=151 data-nosnippet>151</a>    ///
-<a href=#152 id=152 data-nosnippet>152</a>    /// This amount should include memory that is kept alive by heap objects and can be released by
-<a href=#153 id=153 data-nosnippet>153</a>    /// executing finalizers (or other language-specific cleaning-up routines) that are executed
-<a href=#154 id=154 data-nosnippet>154</a>    /// when the heap objects are dead.  For example, if a language implementation allocates array
-<a href=#155 id=155 data-nosnippet>155</a>    /// headers in the MMTk heap, but allocates their underlying buffers that hold the actual
-<a href=#156 id=156 data-nosnippet>156</a>    /// elements using `malloc`, then those buffers should be included in this amount.  When the GC
-<a href=#157 id=157 data-nosnippet>157</a>    /// finds such an array dead, its finalizer shall `free` the buffer and reduce this amount.
-<a href=#158 id=158 data-nosnippet>158</a>    ///
-<a href=#159 id=159 data-nosnippet>159</a>    /// If possible, the VM should account off-heap memory in pages.  That is, count the number of
-<a href=#160 id=160 data-nosnippet>160</a>    /// pages occupied by off-heap objects, and report the number of bytes of those whole pages
-<a href=#161 id=161 data-nosnippet>161</a>    /// instead of individual objects.  Because the underlying operating system manages memory at
-<a href=#162 id=162 data-nosnippet>162</a>    /// page granularity, the occupied pages (instead of individual objects) determine the memory
-<a href=#163 id=163 data-nosnippet>163</a>    /// footprint of a process, and how much memory MMTk spaces can obtain from the OS.
-<a href=#164 id=164 data-nosnippet>164</a>    ///
-<a href=#165 id=165 data-nosnippet>165</a>    /// However, if the VM is incapable of accounting off-heap memory in pages (for example, if the
-<a href=#166 id=166 data-nosnippet>166</a>    /// VM uses `malloc` and the implementation of `malloc` is opaque to the VM), the VM binding
-<a href=#167 id=167 data-nosnippet>167</a>    /// can simply return the total number of bytes of those off-heap objects as an approximation.
-<a href=#168 id=168 data-nosnippet>168</a>    ///
-<a href=#169 id=169 data-nosnippet>169</a>    /// # Performance note
-<a href=#170 id=170 data-nosnippet>170</a>    ///
-<a href=#171 id=171 data-nosnippet>171</a>    /// This function will be called when MMTk polls for GC.  It happens every time the MMTk
-<a href=#172 id=172 data-nosnippet>172</a>    /// allocators have allocated a certain amount of memory, usually one or a few blocks.  Because
-<a href=#173 id=173 data-nosnippet>173</a>    /// this function is called very frequently, its implementation must be efficient.  If it is
-<a href=#174 id=174 data-nosnippet>174</a>    /// too expensive to compute the exact amount, an approximate value should be sufficient for
-<a href=#175 id=175 data-nosnippet>175</a>    /// MMTk to trigger GC promptly in order to release off-heap memory, and keep the memory
-<a href=#176 id=176 data-nosnippet>176</a>    /// footprint under control.
-<a href=#177 id=177 data-nosnippet>177</a>    </span><span class="kw">fn </span>vm_live_bytes() -&gt; usize {
-<a href=#178 id=178 data-nosnippet>178</a>        <span class="comment">// By default, MMTk assumes the amount of memory the VM allocates off-heap is negligible.
-<a href=#179 id=179 data-nosnippet>179</a>        </span><span class="number">0
-<a href=#180 id=180 data-nosnippet>180</a>    </span>}
-<a href=#181 id=181 data-nosnippet>181</a>
-<a href=#182 id=182 data-nosnippet>182</a>    <span class="doccomment">/// Ask the binding to create a [`GCTriggerPolicy`] if the option `gc_trigger` is set to
-<a href=#183 id=183 data-nosnippet>183</a>    /// `crate::util::options::GCTriggerSelector::Delegated`.
-<a href=#184 id=184 data-nosnippet>184</a>    </span><span class="kw">fn </span>create_gc_trigger() -&gt; Box&lt;<span class="kw">dyn </span>GCTriggerPolicy&lt;VM&gt;&gt; {
-<a href=#185 id=185 data-nosnippet>185</a>        <span class="macro">unimplemented!</span>()
-<a href=#186 id=186 data-nosnippet>186</a>    }
-<a href=#187 id=187 data-nosnippet>187</a>}</code></pre></div></section></main></body></html>
+<a href=#152 id=152 data-nosnippet>152</a>    /// Arguments:
+<a href=#153 id=153 data-nosnippet>153</a>    /// * `tls_worker`: The thread pointer for the worker thread performing this call.
+<a href=#154 id=154 data-nosnippet>154</a>    </span><span class="kw">fn </span>post_forwarding(_tls: VMWorkerThread) {}
+<a href=#155 id=155 data-nosnippet>155</a>
+<a href=#156 id=156 data-nosnippet>156</a>    <span class="doccomment">/// Inform the VM to do its VM-specific release work at the end of a GC.
+<a href=#157 id=157 data-nosnippet>157</a>    </span><span class="kw">fn </span>vm_release() {}
+<a href=#158 id=158 data-nosnippet>158</a>
+<a href=#159 id=159 data-nosnippet>159</a>    <span class="doccomment">/// Return the amount of memory (in bytes) which the VM allocated outside the MMTk heap but
+<a href=#160 id=160 data-nosnippet>160</a>    /// wants to include into the current MMTk heap size.  MMTk core will consider the reported
+<a href=#161 id=161 data-nosnippet>161</a>    /// memory as part of MMTk heap for the purpose of heap size accounting.
+<a href=#162 id=162 data-nosnippet>162</a>    ///
+<a href=#163 id=163 data-nosnippet>163</a>    /// This amount should include memory that is kept alive by heap objects and can be released by
+<a href=#164 id=164 data-nosnippet>164</a>    /// executing finalizers (or other language-specific cleaning-up routines) that are executed
+<a href=#165 id=165 data-nosnippet>165</a>    /// when the heap objects are dead.  For example, if a language implementation allocates array
+<a href=#166 id=166 data-nosnippet>166</a>    /// headers in the MMTk heap, but allocates their underlying buffers that hold the actual
+<a href=#167 id=167 data-nosnippet>167</a>    /// elements using `malloc`, then those buffers should be included in this amount.  When the GC
+<a href=#168 id=168 data-nosnippet>168</a>    /// finds such an array dead, its finalizer shall `free` the buffer and reduce this amount.
+<a href=#169 id=169 data-nosnippet>169</a>    ///
+<a href=#170 id=170 data-nosnippet>170</a>    /// If possible, the VM should account off-heap memory in pages.  That is, count the number of
+<a href=#171 id=171 data-nosnippet>171</a>    /// pages occupied by off-heap objects, and report the number of bytes of those whole pages
+<a href=#172 id=172 data-nosnippet>172</a>    /// instead of individual objects.  Because the underlying operating system manages memory at
+<a href=#173 id=173 data-nosnippet>173</a>    /// page granularity, the occupied pages (instead of individual objects) determine the memory
+<a href=#174 id=174 data-nosnippet>174</a>    /// footprint of a process, and how much memory MMTk spaces can obtain from the OS.
+<a href=#175 id=175 data-nosnippet>175</a>    ///
+<a href=#176 id=176 data-nosnippet>176</a>    /// However, if the VM is incapable of accounting off-heap memory in pages (for example, if the
+<a href=#177 id=177 data-nosnippet>177</a>    /// VM uses `malloc` and the implementation of `malloc` is opaque to the VM), the VM binding
+<a href=#178 id=178 data-nosnippet>178</a>    /// can simply return the total number of bytes of those off-heap objects as an approximation.
+<a href=#179 id=179 data-nosnippet>179</a>    ///
+<a href=#180 id=180 data-nosnippet>180</a>    /// # Performance note
+<a href=#181 id=181 data-nosnippet>181</a>    ///
+<a href=#182 id=182 data-nosnippet>182</a>    /// This function will be called when MMTk polls for GC.  It happens every time the MMTk
+<a href=#183 id=183 data-nosnippet>183</a>    /// allocators have allocated a certain amount of memory, usually one or a few blocks.  Because
+<a href=#184 id=184 data-nosnippet>184</a>    /// this function is called very frequently, its implementation must be efficient.  If it is
+<a href=#185 id=185 data-nosnippet>185</a>    /// too expensive to compute the exact amount, an approximate value should be sufficient for
+<a href=#186 id=186 data-nosnippet>186</a>    /// MMTk to trigger GC promptly in order to release off-heap memory, and keep the memory
+<a href=#187 id=187 data-nosnippet>187</a>    /// footprint under control.
+<a href=#188 id=188 data-nosnippet>188</a>    </span><span class="kw">fn </span>vm_live_bytes() -&gt; usize {
+<a href=#189 id=189 data-nosnippet>189</a>        <span class="comment">// By default, MMTk assumes the amount of memory the VM allocates off-heap is negligible.
+<a href=#190 id=190 data-nosnippet>190</a>        </span><span class="number">0
+<a href=#191 id=191 data-nosnippet>191</a>    </span>}
+<a href=#192 id=192 data-nosnippet>192</a>
+<a href=#193 id=193 data-nosnippet>193</a>    <span class="doccomment">/// Ask the binding to create a [`GCTriggerPolicy`] if the option `gc_trigger` is set to
+<a href=#194 id=194 data-nosnippet>194</a>    /// `crate::util::options::GCTriggerSelector::Delegated`.
+<a href=#195 id=195 data-nosnippet>195</a>    </span><span class="kw">fn </span>create_gc_trigger() -&gt; Box&lt;<span class="kw">dyn </span>GCTriggerPolicy&lt;VM&gt;&gt; {
+<a href=#196 id=196 data-nosnippet>196</a>        <span class="macro">unimplemented!</span>()
+<a href=#197 id=197 data-nosnippet>197</a>    }
+<a href=#198 id=198 data-nosnippet>198</a>}</code></pre></div></section></main></body></html>

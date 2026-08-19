@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["Line"]};
+window.SIDEBAR_ITEMS = {"constant":["BITS_PER_BLOCK","BITS_PER_LINE","LOG_BITS_PER_BLOCK","LOG_BITS_PER_LINE"],"struct":["Line","RCArray","UInt1024","UInt2048","UInt256","UInt512","Uint"],"trait":["UintType"]};

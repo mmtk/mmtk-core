@@ -22,7 +22,7 @@
 <a href=#22 id=22 data-nosnippet>22</a>///
 <a href=#23 id=23 data-nosnippet>23</a>/// We use the SFT trait to simplify typing for Rust, so our table is a
 <a href=#24 id=24 data-nosnippet>24</a>/// table of SFT rather than Space.
-<a href=#25 id=25 data-nosnippet>25</a></span><span class="kw">pub trait </span>SFT {
+<a href=#25 id=25 data-nosnippet>25</a></span><span class="kw">pub trait </span>SFT: Sync + <span class="lifetime">'static </span>{
 <a href=#26 id=26 data-nosnippet>26</a>    <span class="doccomment">/// The space name
 <a href=#27 id=27 data-nosnippet>27</a>    </span><span class="kw">fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str;
 <a href=#28 id=28 data-nosnippet>28</a>
@@ -150,73 +150,70 @@
 <a href=#150 id=150 data-nosnippet>150</a>    <span class="kw">fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str {
 <a href=#151 id=151 data-nosnippet>151</a>        EMPTY_SFT_NAME
 <a href=#152 id=152 data-nosnippet>152</a>    }
-<a href=#153 id=153 data-nosnippet>153</a>    <span class="kw">fn </span>is_live(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool {
-<a href=#154 id=154 data-nosnippet>154</a>        <span class="macro">panic!</span>(
-<a href=#155 id=155 data-nosnippet>155</a>            <span class="string">"Called is_live() on {:x}, which maps to an empty space"</span>,
-<a href=#156 id=156 data-nosnippet>156</a>            object
-<a href=#157 id=157 data-nosnippet>157</a>        )
-<a href=#158 id=158 data-nosnippet>158</a>    }
-<a href=#159 id=159 data-nosnippet>159</a>    <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
-<a href=#160 id=160 data-nosnippet>160</a>    </span><span class="kw">fn </span>is_sane(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-<a href=#161 id=161 data-nosnippet>161</a>        <span class="macro">warn!</span>(<span class="string">"Object in empty space!"</span>);
-<a href=#162 id=162 data-nosnippet>162</a>        <span class="bool-val">false
-<a href=#163 id=163 data-nosnippet>163</a>    </span>}
-<a href=#164 id=164 data-nosnippet>164</a>    <span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
-<a href=#165 id=165 data-nosnippet>165</a>    </span><span class="kw">fn </span>pin_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
-<a href=#166 id=166 data-nosnippet>166</a>        <span class="macro">panic!</span>(<span class="string">"Cannot pin/unpin objects of EmptySpace."</span>)
-<a href=#167 id=167 data-nosnippet>167</a>    }
-<a href=#168 id=168 data-nosnippet>168</a>    <span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
-<a href=#169 id=169 data-nosnippet>169</a>    </span><span class="kw">fn </span>unpin_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
-<a href=#170 id=170 data-nosnippet>170</a>        <span class="macro">panic!</span>(<span class="string">"Cannot pin/unpin objects of EmptySpace."</span>)
-<a href=#171 id=171 data-nosnippet>171</a>    }
-<a href=#172 id=172 data-nosnippet>172</a>    <span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
-<a href=#173 id=173 data-nosnippet>173</a>    </span><span class="kw">fn </span>is_object_pinned(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
-<a href=#174 id=174 data-nosnippet>174</a>        <span class="bool-val">false
-<a href=#175 id=175 data-nosnippet>175</a>    </span>}
-<a href=#176 id=176 data-nosnippet>176</a>    <span class="kw">fn </span>is_movable(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-<a href=#177 id=177 data-nosnippet>177</a>        <span class="comment">/*
-<a href=#178 id=178 data-nosnippet>178</a>         * FIXME steveb I think this should panic (ie the function should not
-<a href=#179 id=179 data-nosnippet>179</a>         * be invoked on an empty space).   However, JikesRVM currently does
-<a href=#180 id=180 data-nosnippet>180</a>         * call this in an unchecked way and expects 'false' for out of bounds
-<a href=#181 id=181 data-nosnippet>181</a>         * addresses.  So until that is fixed upstream, we'll return false here.
-<a href=#182 id=182 data-nosnippet>182</a>         *
-<a href=#183 id=183 data-nosnippet>183</a>         * panic!("called is_movable() on empty space")
-<a href=#184 id=184 data-nosnippet>184</a>         */
-<a href=#185 id=185 data-nosnippet>185</a>        </span><span class="bool-val">false
+<a href=#153 id=153 data-nosnippet>153</a>    <span class="kw">fn </span>is_live(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
+<a href=#154 id=154 data-nosnippet>154</a>        <span class="bool-val">false
+<a href=#155 id=155 data-nosnippet>155</a>    </span>}
+<a href=#156 id=156 data-nosnippet>156</a>    <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
+<a href=#157 id=157 data-nosnippet>157</a>    </span><span class="kw">fn </span>is_sane(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#158 id=158 data-nosnippet>158</a>        <span class="macro">warn!</span>(<span class="string">"Object in empty space!"</span>);
+<a href=#159 id=159 data-nosnippet>159</a>        <span class="bool-val">false
+<a href=#160 id=160 data-nosnippet>160</a>    </span>}
+<a href=#161 id=161 data-nosnippet>161</a>    <span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
+<a href=#162 id=162 data-nosnippet>162</a>    </span><span class="kw">fn </span>pin_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
+<a href=#163 id=163 data-nosnippet>163</a>        <span class="macro">panic!</span>(<span class="string">"Cannot pin/unpin objects of EmptySpace."</span>)
+<a href=#164 id=164 data-nosnippet>164</a>    }
+<a href=#165 id=165 data-nosnippet>165</a>    <span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
+<a href=#166 id=166 data-nosnippet>166</a>    </span><span class="kw">fn </span>unpin_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
+<a href=#167 id=167 data-nosnippet>167</a>        <span class="macro">panic!</span>(<span class="string">"Cannot pin/unpin objects of EmptySpace."</span>)
+<a href=#168 id=168 data-nosnippet>168</a>    }
+<a href=#169 id=169 data-nosnippet>169</a>    <span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
+<a href=#170 id=170 data-nosnippet>170</a>    </span><span class="kw">fn </span>is_object_pinned(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
+<a href=#171 id=171 data-nosnippet>171</a>        <span class="bool-val">false
+<a href=#172 id=172 data-nosnippet>172</a>    </span>}
+<a href=#173 id=173 data-nosnippet>173</a>    <span class="kw">fn </span>is_movable(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#174 id=174 data-nosnippet>174</a>        <span class="comment">/*
+<a href=#175 id=175 data-nosnippet>175</a>         * FIXME steveb I think this should panic (ie the function should not
+<a href=#176 id=176 data-nosnippet>176</a>         * be invoked on an empty space).   However, JikesRVM currently does
+<a href=#177 id=177 data-nosnippet>177</a>         * call this in an unchecked way and expects 'false' for out of bounds
+<a href=#178 id=178 data-nosnippet>178</a>         * addresses.  So until that is fixed upstream, we'll return false here.
+<a href=#179 id=179 data-nosnippet>179</a>         *
+<a href=#180 id=180 data-nosnippet>180</a>         * panic!("called is_movable() on empty space")
+<a href=#181 id=181 data-nosnippet>181</a>         */
+<a href=#182 id=182 data-nosnippet>182</a>        </span><span class="bool-val">false
+<a href=#183 id=183 data-nosnippet>183</a>    </span>}
+<a href=#184 id=184 data-nosnippet>184</a>    <span class="kw">fn </span>is_in_space(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
+<a href=#185 id=185 data-nosnippet>185</a>        <span class="bool-val">false
 <a href=#186 id=186 data-nosnippet>186</a>    </span>}
-<a href=#187 id=187 data-nosnippet>187</a>    <span class="kw">fn </span>is_in_space(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
-<a href=#188 id=188 data-nosnippet>188</a>        <span class="bool-val">false
-<a href=#189 id=189 data-nosnippet>189</a>    </span>}
-<a href=#190 id=190 data-nosnippet>190</a>    <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-<a href=#191 id=191 data-nosnippet>191</a>    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-<a href=#192 id=192 data-nosnippet>192</a>        <span class="prelude-val">None
-<a href=#193 id=193 data-nosnippet>193</a>    </span>}
-<a href=#194 id=194 data-nosnippet>194</a>    <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-<a href=#195 id=195 data-nosnippet>195</a>    </span><span class="kw">fn </span>find_object_from_internal_pointer(
-<a href=#196 id=196 data-nosnippet>196</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
-<a href=#197 id=197 data-nosnippet>197</a>        _ptr: Address,
-<a href=#198 id=198 data-nosnippet>198</a>        _max_search_bytes: usize,
-<a href=#199 id=199 data-nosnippet>199</a>    ) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-<a href=#200 id=200 data-nosnippet>200</a>        <span class="prelude-val">None
-<a href=#201 id=201 data-nosnippet>201</a>    </span>}
-<a href=#202 id=202 data-nosnippet>202</a>
-<a href=#203 id=203 data-nosnippet>203</a>    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, _bytes: usize) {
-<a href=#204 id=204 data-nosnippet>204</a>        <span class="macro">panic!</span>(
-<a href=#205 id=205 data-nosnippet>205</a>            <span class="string">"Called initialize_object_metadata() on {:x}, which maps to an empty space"</span>,
-<a href=#206 id=206 data-nosnippet>206</a>            object
-<a href=#207 id=207 data-nosnippet>207</a>        )
-<a href=#208 id=208 data-nosnippet>208</a>    }
-<a href=#209 id=209 data-nosnippet>209</a>
-<a href=#210 id=210 data-nosnippet>210</a>    <span class="kw">fn </span>sft_trace_object(
-<a href=#211 id=211 data-nosnippet>211</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
-<a href=#212 id=212 data-nosnippet>212</a>        _queue: <span class="kw-2">&amp;mut </span>OptionObjectQueue,
-<a href=#213 id=213 data-nosnippet>213</a>        object: ObjectReference,
-<a href=#214 id=214 data-nosnippet>214</a>        _worker: GCWorkerMutRef,
-<a href=#215 id=215 data-nosnippet>215</a>    ) -&gt; ObjectReference {
-<a href=#216 id=216 data-nosnippet>216</a>        <span class="comment">// We do not have the `VM` type parameter here, so we cannot forward the call to the VM.
-<a href=#217 id=217 data-nosnippet>217</a>        </span><span class="macro">panic!</span>(
-<a href=#218 id=218 data-nosnippet>218</a>            <span class="string">"Call trace_object() on {}, which maps to an empty space. SFTTrace does not support the fallback to vm_trace_object()."</span>,
-<a href=#219 id=219 data-nosnippet>219</a>            object,
-<a href=#220 id=220 data-nosnippet>220</a>        )
-<a href=#221 id=221 data-nosnippet>221</a>    }
-<a href=#222 id=222 data-nosnippet>222</a>}</code></pre></div></section></main></body></html>
+<a href=#187 id=187 data-nosnippet>187</a>    <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+<a href=#188 id=188 data-nosnippet>188</a>    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+<a href=#189 id=189 data-nosnippet>189</a>        <span class="prelude-val">None
+<a href=#190 id=190 data-nosnippet>190</a>    </span>}
+<a href=#191 id=191 data-nosnippet>191</a>    <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+<a href=#192 id=192 data-nosnippet>192</a>    </span><span class="kw">fn </span>find_object_from_internal_pointer(
+<a href=#193 id=193 data-nosnippet>193</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#194 id=194 data-nosnippet>194</a>        _ptr: Address,
+<a href=#195 id=195 data-nosnippet>195</a>        _max_search_bytes: usize,
+<a href=#196 id=196 data-nosnippet>196</a>    ) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+<a href=#197 id=197 data-nosnippet>197</a>        <span class="prelude-val">None
+<a href=#198 id=198 data-nosnippet>198</a>    </span>}
+<a href=#199 id=199 data-nosnippet>199</a>
+<a href=#200 id=200 data-nosnippet>200</a>    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, _bytes: usize) {
+<a href=#201 id=201 data-nosnippet>201</a>        <span class="macro">panic!</span>(
+<a href=#202 id=202 data-nosnippet>202</a>            <span class="string">"Called initialize_object_metadata() on {:x}, which maps to an empty space"</span>,
+<a href=#203 id=203 data-nosnippet>203</a>            object
+<a href=#204 id=204 data-nosnippet>204</a>        )
+<a href=#205 id=205 data-nosnippet>205</a>    }
+<a href=#206 id=206 data-nosnippet>206</a>
+<a href=#207 id=207 data-nosnippet>207</a>    <span class="kw">fn </span>sft_trace_object(
+<a href=#208 id=208 data-nosnippet>208</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#209 id=209 data-nosnippet>209</a>        _queue: <span class="kw-2">&amp;mut </span>OptionObjectQueue,
+<a href=#210 id=210 data-nosnippet>210</a>        object: ObjectReference,
+<a href=#211 id=211 data-nosnippet>211</a>        _worker: GCWorkerMutRef,
+<a href=#212 id=212 data-nosnippet>212</a>    ) -&gt; ObjectReference {
+<a href=#213 id=213 data-nosnippet>213</a>        <span class="comment">// We do not have the `VM` type parameter here, so we cannot forward the call to the VM.
+<a href=#214 id=214 data-nosnippet>214</a>        </span><span class="macro">panic!</span>(
+<a href=#215 id=215 data-nosnippet>215</a>            <span class="string">"Call trace_object() on {}, which maps to an empty space. SFTTrace does not support the fallback to vm_trace_object()."</span>,
+<a href=#216 id=216 data-nosnippet>216</a>            object,
+<a href=#217 id=217 data-nosnippet>217</a>        )
+<a href=#218 id=218 data-nosnippet>218</a>    }
+<a href=#219 id=219 data-nosnippet>219</a>}</code></pre></div></section></main></body></html>

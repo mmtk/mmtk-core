@@ -157,9 +157,9 @@
 <a href=#157 id=157 data-nosnippet>157</a>            .store(full_heap, Ordering::Relaxed);
 <a href=#158 id=158 data-nosnippet>158</a>    }
 <a href=#159 id=159 data-nosnippet>159</a>
-<a href=#160 id=160 data-nosnippet>160</a>    <span class="kw">fn </span>end_of_pause(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;, tls: VMWorkerThread) {
+<a href=#160 id=160 data-nosnippet>160</a>    <span class="kw">fn </span>on_pause_end(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;, tls: VMWorkerThread) {
 <a href=#161 id=161 data-nosnippet>161</a>        <span class="kw">let </span>next_gc_full_heap = CommonGenPlan::should_next_gc_be_full_heap(<span class="self">self</span>);
-<a href=#162 id=162 data-nosnippet>162</a>        <span class="self">self</span>.gen.end_of_pause(tls, next_gc_full_heap);
+<a href=#162 id=162 data-nosnippet>162</a>        <span class="self">self</span>.gen.on_pause_end(tls, next_gc_full_heap);
 <a href=#163 id=163 data-nosnippet>163</a>
 <a href=#164 id=164 data-nosnippet>164</a>        <span class="kw">let </span>did_defrag = <span class="self">self</span>.immix_space.end_of_gc();
 <a href=#165 id=165 data-nosnippet>165</a>        <span class="self">self</span>.last_gc_was_defrag.store(did_defrag, Ordering::Relaxed);

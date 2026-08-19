@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["Prepare","PrepareCollector","PrepareMutator","Release","ReleaseCollector","ReleaseMutator","ScanMutatorRoots","ScanVMSpecificRoots","ScheduleCollection","StopMutators"]};
+window.SIDEBAR_ITEMS = {"enum":["RootKind"],"struct":["Prepare","PrepareCollector","PrepareMutator","Release","ReleaseCollector","ReleaseMutator","ScanMutatorRoots","ScanVMSpecificRoots","ScheduleCollection","StopMutators"]};

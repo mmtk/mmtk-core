@@ -156,7 +156,7 @@
 <a href=#156 id=156 data-nosnippet>156</a>    }
 <a href=#157 id=157 data-nosnippet>157</a>
 <a href=#158 id=158 data-nosnippet>158</a>    <span class="kw">fn </span>object_probable_write_slow(<span class="kw-2">&amp;mut </span><span class="self">self</span>, obj: ObjectReference) {
-<a href=#159 id=159 data-nosnippet>159</a>        <span class="kw">crate</span>::plan::tracing::SlotIterator::&lt;VM&gt;::iterate_fields(obj, <span class="self">self</span>.tls.<span class="number">0</span>, |s| {
+<a href=#159 id=159 data-nosnippet>159</a>        obj.iterate_fields::&lt;VM, <span class="kw">_</span>&gt;(<span class="self">self</span>.tls.<span class="number">0</span>, |s| {
 <a href=#160 id=160 data-nosnippet>160</a>            <span class="self">self</span>.enqueue_node(<span class="prelude-val">Some</span>(obj), s, <span class="prelude-val">None</span>);
 <a href=#161 id=161 data-nosnippet>161</a>        });
 <a href=#162 id=162 data-nosnippet>162</a>    }

@@ -37,8 +37,8 @@
 <a href=#37 id=37 data-nosnippet>37</a>        <span class="kw">let </span>max_chunks = vm_layout().max_chunks();
 <a href=#38 id=38 data-nosnippet>38</a>        Map32 {
 <a href=#39 id=39 data-nosnippet>39</a>            inner: UnsafeCell::new(Map32Inner {
-<a href=#40 id=40 data-nosnippet>40</a>                prev_link: <span class="macro">vec!</span>[<span class="number">0</span>; max_chunks],
-<a href=#41 id=41 data-nosnippet>41</a>                next_link: <span class="macro">vec!</span>[<span class="number">0</span>; max_chunks],
+<a href=#40 id=40 data-nosnippet>40</a>                prev_link: <span class="macro">vec!</span>[-<span class="number">1</span>; max_chunks],
+<a href=#41 id=41 data-nosnippet>41</a>                next_link: <span class="macro">vec!</span>[-<span class="number">1</span>; max_chunks],
 <a href=#42 id=42 data-nosnippet>42</a>                region_map: IntArrayFreeList::new(max_chunks, max_chunks <span class="kw">as _</span>, <span class="number">1</span>),
 <a href=#43 id=43 data-nosnippet>43</a>                global_page_map: IntArrayFreeList::new(<span class="number">1</span>, <span class="number">1</span>, MAX_SPACES),
 <a href=#44 id=44 data-nosnippet>44</a>                shared_discontig_fl_count: <span class="number">0</span>,
@@ -115,205 +115,207 @@
 <a href=#115 id=115 data-nosnippet>115</a>    ) -&gt; Address {
 <a href=#116 id=116 data-nosnippet>116</a>        <span class="kw">let </span>(_sync, self_mut) = <span class="self">self</span>.mut_self_with_sync();
 <a href=#117 id=117 data-nosnippet>117</a>        <span class="kw">let </span>chunk = self_mut.region_map.alloc(chunks <span class="kw">as _</span>);
-<a href=#118 id=118 data-nosnippet>118</a>        <span class="macro">debug_assert!</span>(chunk != <span class="number">0</span>);
-<a href=#119 id=119 data-nosnippet>119</a>        <span class="kw">if </span>chunk == -<span class="number">1 </span>{
-<a href=#120 id=120 data-nosnippet>120</a>            <span class="kw">return </span>Address::zero();
-<a href=#121 id=121 data-nosnippet>121</a>        }
-<a href=#122 id=122 data-nosnippet>122</a>        self_mut.total_available_discontiguous_chunks -= chunks;
-<a href=#123 id=123 data-nosnippet>123</a>        <span class="kw">let </span>rtn = conversions::chunk_index_to_address(chunk <span class="kw">as _</span>);
-<a href=#124 id=124 data-nosnippet>124</a>        <span class="self">self</span>.insert(rtn, chunks &lt;&lt; LOG_BYTES_IN_CHUNK, descriptor);
-<a href=#125 id=125 data-nosnippet>125</a>        <span class="kw">if </span>head.is_zero() {
-<a href=#126 id=126 data-nosnippet>126</a>            <span class="macro">debug_assert!</span>(<span class="self">self</span>.next_link[chunk <span class="kw">as </span>usize] == <span class="number">0</span>);
-<a href=#127 id=127 data-nosnippet>127</a>        } <span class="kw">else </span>{
-<a href=#128 id=128 data-nosnippet>128</a>            self_mut.next_link[chunk <span class="kw">as </span>usize] = head.chunk_index() <span class="kw">as _</span>;
-<a href=#129 id=129 data-nosnippet>129</a>            self_mut.prev_link[head.chunk_index()] = chunk;
-<a href=#130 id=130 data-nosnippet>130</a>        }
-<a href=#131 id=131 data-nosnippet>131</a>        <span class="macro">debug_assert!</span>(<span class="self">self</span>.prev_link[chunk <span class="kw">as </span>usize] == <span class="number">0</span>);
-<a href=#132 id=132 data-nosnippet>132</a>        rtn
-<a href=#133 id=133 data-nosnippet>133</a>    }
-<a href=#134 id=134 data-nosnippet>134</a>
-<a href=#135 id=135 data-nosnippet>135</a>    <span class="kw">fn </span>get_next_contiguous_region(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; Address {
-<a href=#136 id=136 data-nosnippet>136</a>        <span class="macro">debug_assert!</span>(start == conversions::chunk_align_down(start));
-<a href=#137 id=137 data-nosnippet>137</a>        <span class="kw">let </span>chunk = start.chunk_index();
-<a href=#138 id=138 data-nosnippet>138</a>        <span class="kw">if </span>chunk == <span class="number">0 </span>|| <span class="self">self</span>.next_link[chunk] == <span class="number">0 </span>{
-<a href=#139 id=139 data-nosnippet>139</a>            <span class="kw">unsafe </span>{ Address::zero() }
-<a href=#140 id=140 data-nosnippet>140</a>        } <span class="kw">else </span>{
-<a href=#141 id=141 data-nosnippet>141</a>            <span class="kw">let </span>a = <span class="self">self</span>.next_link[chunk];
-<a href=#142 id=142 data-nosnippet>142</a>            conversions::chunk_index_to_address(a <span class="kw">as _</span>)
-<a href=#143 id=143 data-nosnippet>143</a>        }
-<a href=#144 id=144 data-nosnippet>144</a>    }
-<a href=#145 id=145 data-nosnippet>145</a>
-<a href=#146 id=146 data-nosnippet>146</a>    <span class="kw">fn </span>get_contiguous_region_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; usize {
-<a href=#147 id=147 data-nosnippet>147</a>        <span class="macro">debug_assert!</span>(start == conversions::chunk_align_down(start));
-<a href=#148 id=148 data-nosnippet>148</a>        <span class="kw">let </span>chunk = start.chunk_index();
-<a href=#149 id=149 data-nosnippet>149</a>        <span class="self">self</span>.region_map.size(chunk <span class="kw">as </span>i32) <span class="kw">as _
-<a href=#150 id=150 data-nosnippet>150</a>    </span>}
-<a href=#151 id=151 data-nosnippet>151</a>
-<a href=#152 id=152 data-nosnippet>152</a>    <span class="kw">fn </span>get_contiguous_region_size(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; usize {
-<a href=#153 id=153 data-nosnippet>153</a>        <span class="self">self</span>.get_contiguous_region_chunks(start) &lt;&lt; LOG_BYTES_IN_CHUNK
-<a href=#154 id=154 data-nosnippet>154</a>    }
-<a href=#155 id=155 data-nosnippet>155</a>
-<a href=#156 id=156 data-nosnippet>156</a>    <span class="kw">fn </span>get_available_discontiguous_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-<a href=#157 id=157 data-nosnippet>157</a>        <span class="self">self</span>.total_available_discontiguous_chunks
-<a href=#158 id=158 data-nosnippet>158</a>    }
-<a href=#159 id=159 data-nosnippet>159</a>
-<a href=#160 id=160 data-nosnippet>160</a>    <span class="kw">fn </span>get_chunk_consumer_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-<a href=#161 id=161 data-nosnippet>161</a>        <span class="self">self</span>.shared_discontig_fl_count
-<a href=#162 id=162 data-nosnippet>162</a>    }
-<a href=#163 id=163 data-nosnippet>163</a>    <span class="attr">#[allow(clippy::while_immutable_condition)]
-<a href=#164 id=164 data-nosnippet>164</a>    </span><span class="kw">fn </span>free_all_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>, any_chunk: Address) {
-<a href=#165 id=165 data-nosnippet>165</a>        <span class="macro">debug!</span>(<span class="string">"free_all_chunks: {}"</span>, any_chunk);
-<a href=#166 id=166 data-nosnippet>166</a>        <span class="kw">let </span>(_sync, self_mut) = <span class="self">self</span>.mut_self_with_sync();
-<a href=#167 id=167 data-nosnippet>167</a>        <span class="macro">debug_assert!</span>(any_chunk == conversions::chunk_align_down(any_chunk));
-<a href=#168 id=168 data-nosnippet>168</a>        <span class="kw">if </span>!any_chunk.is_zero() {
-<a href=#169 id=169 data-nosnippet>169</a>            <span class="kw">let </span>chunk = any_chunk.chunk_index();
-<a href=#170 id=170 data-nosnippet>170</a>            <span class="kw">while </span>self_mut.next_link[chunk] != <span class="number">0 </span>{
-<a href=#171 id=171 data-nosnippet>171</a>                <span class="kw">let </span>x = self_mut.next_link[chunk];
-<a href=#172 id=172 data-nosnippet>172</a>                <span class="self">self</span>.free_contiguous_chunks_no_lock(x);
-<a href=#173 id=173 data-nosnippet>173</a>            }
-<a href=#174 id=174 data-nosnippet>174</a>            <span class="kw">while </span>self_mut.prev_link[chunk] != <span class="number">0 </span>{
-<a href=#175 id=175 data-nosnippet>175</a>                <span class="kw">let </span>x = self_mut.prev_link[chunk];
-<a href=#176 id=176 data-nosnippet>176</a>                <span class="self">self</span>.free_contiguous_chunks_no_lock(x);
-<a href=#177 id=177 data-nosnippet>177</a>            }
-<a href=#178 id=178 data-nosnippet>178</a>            <span class="self">self</span>.free_contiguous_chunks_no_lock(chunk <span class="kw">as _</span>);
-<a href=#179 id=179 data-nosnippet>179</a>        }
-<a href=#180 id=180 data-nosnippet>180</a>    }
-<a href=#181 id=181 data-nosnippet>181</a>
-<a href=#182 id=182 data-nosnippet>182</a>    <span class="kw">unsafe fn </span>free_contiguous_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; usize {
-<a href=#183 id=183 data-nosnippet>183</a>        <span class="macro">debug!</span>(<span class="string">"free_contiguous_chunks: {}"</span>, start);
-<a href=#184 id=184 data-nosnippet>184</a>        <span class="kw">let </span>(_sync, <span class="kw">_</span>) = <span class="self">self</span>.mut_self_with_sync();
-<a href=#185 id=185 data-nosnippet>185</a>        <span class="macro">debug_assert!</span>(start == conversions::chunk_align_down(start));
-<a href=#186 id=186 data-nosnippet>186</a>        <span class="kw">let </span>chunk = start.chunk_index();
-<a href=#187 id=187 data-nosnippet>187</a>        <span class="self">self</span>.free_contiguous_chunks_no_lock(chunk <span class="kw">as _</span>)
-<a href=#188 id=188 data-nosnippet>188</a>    }
-<a href=#189 id=189 data-nosnippet>189</a>
-<a href=#190 id=190 data-nosnippet>190</a>    <span class="kw">fn </span>finalize_static_space_map(
-<a href=#191 id=191 data-nosnippet>191</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
-<a href=#192 id=192 data-nosnippet>192</a>        from: Address,
-<a href=#193 id=193 data-nosnippet>193</a>        to: Address,
-<a href=#194 id=194 data-nosnippet>194</a>        on_discontig_start_determined: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(Address),
-<a href=#195 id=195 data-nosnippet>195</a>    ) {
-<a href=#196 id=196 data-nosnippet>196</a>        <span class="comment">// This is only called during boot process by a single thread.
-<a href=#197 id=197 data-nosnippet>197</a>        // It is fine to get a mutable reference.
-<a href=#198 id=198 data-nosnippet>198</a>        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span>Map32Inner = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
-<a href=#199 id=199 data-nosnippet>199</a>        <span class="comment">/* establish bounds of discontiguous space */
-<a href=#200 id=200 data-nosnippet>200</a>        </span><span class="kw">let </span>start_address = from;
-<a href=#201 id=201 data-nosnippet>201</a>        <span class="kw">let </span>first_chunk = start_address.chunk_index();
-<a href=#202 id=202 data-nosnippet>202</a>        <span class="kw">let </span>last_chunk = to.chunk_index();
-<a href=#203 id=203 data-nosnippet>203</a>        <span class="kw">let </span>unavail_start_chunk = last_chunk + <span class="number">1</span>;
-<a href=#204 id=204 data-nosnippet>204</a>        <span class="kw">let </span>trailing_chunks = vm_layout().max_chunks() - unavail_start_chunk;
-<a href=#205 id=205 data-nosnippet>205</a>        <span class="kw">let </span>pages = (<span class="number">1 </span>+ last_chunk - first_chunk) * PAGES_IN_CHUNK;
-<a href=#206 id=206 data-nosnippet>206</a>        <span class="comment">// start_address=0xb0000000, first_chunk=704, last_chunk=703, unavail_start_chunk=704, trailing_chunks=320, pages=0
-<a href=#207 id=207 data-nosnippet>207</a>        // startAddress=0x68000000 firstChunk=416 lastChunk=703 unavailStartChunk=704 trailingChunks=320 pages=294912
-<a href=#208 id=208 data-nosnippet>208</a>        </span>self_mut.global_page_map.resize_freelist(pages, pages <span class="kw">as _</span>);
-<a href=#209 id=209 data-nosnippet>209</a>
-<a href=#210 id=210 data-nosnippet>210</a>        on_discontig_start_determined(start_address);
+<a href=#118 id=118 data-nosnippet>118</a>        <span class="kw">if </span>chunk == -<span class="number">1 </span>{
+<a href=#119 id=119 data-nosnippet>119</a>            <span class="kw">return </span>Address::zero();
+<a href=#120 id=120 data-nosnippet>120</a>        }
+<a href=#121 id=121 data-nosnippet>121</a>        self_mut.total_available_discontiguous_chunks -= chunks;
+<a href=#122 id=122 data-nosnippet>122</a>        <span class="kw">let </span>rtn = conversions::chunk_index_to_address(chunk <span class="kw">as _</span>);
+<a href=#123 id=123 data-nosnippet>123</a>        <span class="self">self</span>.insert(rtn, chunks &lt;&lt; LOG_BYTES_IN_CHUNK, descriptor);
+<a href=#124 id=124 data-nosnippet>124</a>        <span class="kw">if </span>head.is_zero() {
+<a href=#125 id=125 data-nosnippet>125</a>            <span class="macro">debug_assert!</span>(<span class="self">self</span>.next_link[chunk <span class="kw">as </span>usize] == -<span class="number">1</span>);
+<a href=#126 id=126 data-nosnippet>126</a>        } <span class="kw">else </span>{
+<a href=#127 id=127 data-nosnippet>127</a>            self_mut.next_link[chunk <span class="kw">as </span>usize] = head.chunk_index() <span class="kw">as _</span>;
+<a href=#128 id=128 data-nosnippet>128</a>            self_mut.prev_link[head.chunk_index()] = chunk;
+<a href=#129 id=129 data-nosnippet>129</a>        }
+<a href=#130 id=130 data-nosnippet>130</a>        <span class="macro">debug_assert!</span>(<span class="self">self</span>.prev_link[chunk <span class="kw">as </span>usize] == -<span class="number">1</span>);
+<a href=#131 id=131 data-nosnippet>131</a>        rtn
+<a href=#132 id=132 data-nosnippet>132</a>    }
+<a href=#133 id=133 data-nosnippet>133</a>
+<a href=#134 id=134 data-nosnippet>134</a>    <span class="kw">fn </span>get_next_contiguous_region(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; Address {
+<a href=#135 id=135 data-nosnippet>135</a>        <span class="kw">if </span>start.is_zero() {
+<a href=#136 id=136 data-nosnippet>136</a>            <span class="kw">return </span>Address::ZERO;
+<a href=#137 id=137 data-nosnippet>137</a>        }
+<a href=#138 id=138 data-nosnippet>138</a>        <span class="macro">debug_assert!</span>(start == conversions::chunk_align_down(start));
+<a href=#139 id=139 data-nosnippet>139</a>        <span class="kw">let </span>chunk = start.chunk_index();
+<a href=#140 id=140 data-nosnippet>140</a>        <span class="kw">if </span><span class="self">self</span>.next_link[chunk] == -<span class="number">1 </span>{
+<a href=#141 id=141 data-nosnippet>141</a>            <span class="kw">unsafe </span>{ Address::zero() }
+<a href=#142 id=142 data-nosnippet>142</a>        } <span class="kw">else </span>{
+<a href=#143 id=143 data-nosnippet>143</a>            <span class="kw">let </span>a = <span class="self">self</span>.next_link[chunk];
+<a href=#144 id=144 data-nosnippet>144</a>            conversions::chunk_index_to_address(a <span class="kw">as _</span>)
+<a href=#145 id=145 data-nosnippet>145</a>        }
+<a href=#146 id=146 data-nosnippet>146</a>    }
+<a href=#147 id=147 data-nosnippet>147</a>
+<a href=#148 id=148 data-nosnippet>148</a>    <span class="kw">fn </span>get_contiguous_region_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; usize {
+<a href=#149 id=149 data-nosnippet>149</a>        <span class="macro">debug_assert!</span>(start == conversions::chunk_align_down(start));
+<a href=#150 id=150 data-nosnippet>150</a>        <span class="kw">let </span>chunk = start.chunk_index();
+<a href=#151 id=151 data-nosnippet>151</a>        <span class="self">self</span>.region_map.size(chunk <span class="kw">as </span>i32) <span class="kw">as _
+<a href=#152 id=152 data-nosnippet>152</a>    </span>}
+<a href=#153 id=153 data-nosnippet>153</a>
+<a href=#154 id=154 data-nosnippet>154</a>    <span class="kw">fn </span>get_contiguous_region_size(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; usize {
+<a href=#155 id=155 data-nosnippet>155</a>        <span class="self">self</span>.get_contiguous_region_chunks(start) &lt;&lt; LOG_BYTES_IN_CHUNK
+<a href=#156 id=156 data-nosnippet>156</a>    }
+<a href=#157 id=157 data-nosnippet>157</a>
+<a href=#158 id=158 data-nosnippet>158</a>    <span class="kw">fn </span>get_available_discontiguous_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+<a href=#159 id=159 data-nosnippet>159</a>        <span class="self">self</span>.total_available_discontiguous_chunks
+<a href=#160 id=160 data-nosnippet>160</a>    }
+<a href=#161 id=161 data-nosnippet>161</a>
+<a href=#162 id=162 data-nosnippet>162</a>    <span class="kw">fn </span>get_chunk_consumer_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+<a href=#163 id=163 data-nosnippet>163</a>        <span class="self">self</span>.shared_discontig_fl_count
+<a href=#164 id=164 data-nosnippet>164</a>    }
+<a href=#165 id=165 data-nosnippet>165</a>    <span class="attr">#[allow(clippy::while_immutable_condition)]
+<a href=#166 id=166 data-nosnippet>166</a>    </span><span class="kw">fn </span>free_all_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>, any_chunk: Address) {
+<a href=#167 id=167 data-nosnippet>167</a>        <span class="macro">debug!</span>(<span class="string">"free_all_chunks: {}"</span>, any_chunk);
+<a href=#168 id=168 data-nosnippet>168</a>        <span class="kw">let </span>(_sync, self_mut) = <span class="self">self</span>.mut_self_with_sync();
+<a href=#169 id=169 data-nosnippet>169</a>        <span class="macro">debug_assert!</span>(any_chunk == conversions::chunk_align_down(any_chunk));
+<a href=#170 id=170 data-nosnippet>170</a>        <span class="kw">if </span>!any_chunk.is_zero() {
+<a href=#171 id=171 data-nosnippet>171</a>            <span class="kw">let </span>chunk = any_chunk.chunk_index();
+<a href=#172 id=172 data-nosnippet>172</a>            <span class="kw">while </span>self_mut.next_link[chunk] != -<span class="number">1 </span>{
+<a href=#173 id=173 data-nosnippet>173</a>                <span class="kw">let </span>x = self_mut.next_link[chunk];
+<a href=#174 id=174 data-nosnippet>174</a>                <span class="self">self</span>.free_contiguous_chunks_no_lock(x);
+<a href=#175 id=175 data-nosnippet>175</a>            }
+<a href=#176 id=176 data-nosnippet>176</a>            <span class="kw">while </span>self_mut.prev_link[chunk] != -<span class="number">1 </span>{
+<a href=#177 id=177 data-nosnippet>177</a>                <span class="kw">let </span>x = self_mut.prev_link[chunk];
+<a href=#178 id=178 data-nosnippet>178</a>                <span class="self">self</span>.free_contiguous_chunks_no_lock(x);
+<a href=#179 id=179 data-nosnippet>179</a>            }
+<a href=#180 id=180 data-nosnippet>180</a>            <span class="self">self</span>.free_contiguous_chunks_no_lock(chunk <span class="kw">as _</span>);
+<a href=#181 id=181 data-nosnippet>181</a>        }
+<a href=#182 id=182 data-nosnippet>182</a>    }
+<a href=#183 id=183 data-nosnippet>183</a>
+<a href=#184 id=184 data-nosnippet>184</a>    <span class="kw">unsafe fn </span>free_contiguous_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; usize {
+<a href=#185 id=185 data-nosnippet>185</a>        <span class="macro">debug!</span>(<span class="string">"free_contiguous_chunks: {}"</span>, start);
+<a href=#186 id=186 data-nosnippet>186</a>        <span class="kw">let </span>(_sync, <span class="kw">_</span>) = <span class="self">self</span>.mut_self_with_sync();
+<a href=#187 id=187 data-nosnippet>187</a>        <span class="macro">debug_assert!</span>(start == conversions::chunk_align_down(start));
+<a href=#188 id=188 data-nosnippet>188</a>        <span class="kw">let </span>chunk = start.chunk_index();
+<a href=#189 id=189 data-nosnippet>189</a>        <span class="self">self</span>.free_contiguous_chunks_no_lock(chunk <span class="kw">as _</span>)
+<a href=#190 id=190 data-nosnippet>190</a>    }
+<a href=#191 id=191 data-nosnippet>191</a>
+<a href=#192 id=192 data-nosnippet>192</a>    <span class="kw">fn </span>finalize_static_space_map(
+<a href=#193 id=193 data-nosnippet>193</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#194 id=194 data-nosnippet>194</a>        from: Address,
+<a href=#195 id=195 data-nosnippet>195</a>        to: Address,
+<a href=#196 id=196 data-nosnippet>196</a>        on_discontig_start_determined: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(Address),
+<a href=#197 id=197 data-nosnippet>197</a>    ) {
+<a href=#198 id=198 data-nosnippet>198</a>        <span class="comment">// This is only called during boot process by a single thread.
+<a href=#199 id=199 data-nosnippet>199</a>        // It is fine to get a mutable reference.
+<a href=#200 id=200 data-nosnippet>200</a>        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span>Map32Inner = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
+<a href=#201 id=201 data-nosnippet>201</a>        <span class="comment">/* establish bounds of discontiguous space */
+<a href=#202 id=202 data-nosnippet>202</a>        </span><span class="kw">let </span>start_address = from;
+<a href=#203 id=203 data-nosnippet>203</a>        <span class="kw">let </span>first_chunk = start_address.chunk_index();
+<a href=#204 id=204 data-nosnippet>204</a>        <span class="kw">let </span>last_chunk = to.chunk_index();
+<a href=#205 id=205 data-nosnippet>205</a>        <span class="kw">let </span>unavail_start_chunk = last_chunk + <span class="number">1</span>;
+<a href=#206 id=206 data-nosnippet>206</a>        <span class="kw">let </span>trailing_chunks = vm_layout().max_chunks() - unavail_start_chunk;
+<a href=#207 id=207 data-nosnippet>207</a>        <span class="kw">let </span>pages = (<span class="number">1 </span>+ last_chunk - first_chunk) * PAGES_IN_CHUNK;
+<a href=#208 id=208 data-nosnippet>208</a>        <span class="comment">// start_address=0xb0000000, first_chunk=704, last_chunk=703, unavail_start_chunk=704, trailing_chunks=320, pages=0
+<a href=#209 id=209 data-nosnippet>209</a>        // startAddress=0x68000000 firstChunk=416 lastChunk=703 unavailStartChunk=704 trailingChunks=320 pages=294912
+<a href=#210 id=210 data-nosnippet>210</a>        </span>self_mut.global_page_map.resize_freelist(pages, pages <span class="kw">as _</span>);
 <a href=#211 id=211 data-nosnippet>211</a>
-<a href=#212 id=212 data-nosnippet>212</a>        <span class="comment">// [
-<a href=#213 id=213 data-nosnippet>213</a>        //  2: -1073741825
-<a href=#214 id=214 data-nosnippet>214</a>        //  3: -1073741825
-<a href=#215 id=215 data-nosnippet>215</a>        //  5: -2147482624
-<a href=#216 id=216 data-nosnippet>216</a>        //  2048: -2147483648
-<a href=#217 id=217 data-nosnippet>217</a>        //  2049: -2147482624
-<a href=#218 id=218 data-nosnippet>218</a>        //  2050: 1024
-<a href=#219 id=219 data-nosnippet>219</a>        //  2051: 1024
-<a href=#220 id=220 data-nosnippet>220</a>        // ]
-<a href=#221 id=221 data-nosnippet>221</a>        /* set up the region map free list */
-<a href=#222 id=222 data-nosnippet>222</a>        </span>self_mut.region_map.alloc(first_chunk <span class="kw">as _</span>); <span class="comment">// block out entire bottom of address range
-<a href=#223 id=223 data-nosnippet>223</a>        </span><span class="kw">for _ in </span>first_chunk..=last_chunk {
-<a href=#224 id=224 data-nosnippet>224</a>            self_mut.region_map.alloc(<span class="number">1</span>);
-<a href=#225 id=225 data-nosnippet>225</a>        }
-<a href=#226 id=226 data-nosnippet>226</a>        <span class="kw">let </span>alloced_chunk = self_mut.region_map.alloc(trailing_chunks <span class="kw">as _</span>);
-<a href=#227 id=227 data-nosnippet>227</a>        <span class="macro">debug_assert!</span>(
-<a href=#228 id=228 data-nosnippet>228</a>            alloced_chunk == unavail_start_chunk <span class="kw">as </span>i32,
-<a href=#229 id=229 data-nosnippet>229</a>            <span class="string">"{} != {}"</span>,
-<a href=#230 id=230 data-nosnippet>230</a>            alloced_chunk,
-<a href=#231 id=231 data-nosnippet>231</a>            unavail_start_chunk
-<a href=#232 id=232 data-nosnippet>232</a>        );
-<a href=#233 id=233 data-nosnippet>233</a>        <span class="comment">/* set up the global page map and place chunks on free list */
-<a href=#234 id=234 data-nosnippet>234</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>first_page = <span class="number">0</span>;
-<a href=#235 id=235 data-nosnippet>235</a>        <span class="kw">for </span>chunk_index <span class="kw">in </span>first_chunk..=last_chunk {
-<a href=#236 id=236 data-nosnippet>236</a>            self_mut.total_available_discontiguous_chunks += <span class="number">1</span>;
-<a href=#237 id=237 data-nosnippet>237</a>            self_mut.region_map.free(chunk_index <span class="kw">as _</span>, <span class="bool-val">false</span>); <span class="comment">// put this chunk on the free list
-<a href=#238 id=238 data-nosnippet>238</a>            </span>self_mut.global_page_map.set_uncoalescable(first_page);
-<a href=#239 id=239 data-nosnippet>239</a>            <span class="kw">let </span>alloced_pages = self_mut.global_page_map.alloc(PAGES_IN_CHUNK <span class="kw">as _</span>); <span class="comment">// populate the global page map
-<a href=#240 id=240 data-nosnippet>240</a>            </span><span class="macro">debug_assert!</span>(alloced_pages == first_page);
-<a href=#241 id=241 data-nosnippet>241</a>            first_page += PAGES_IN_CHUNK <span class="kw">as </span>i32;
-<a href=#242 id=242 data-nosnippet>242</a>        }
-<a href=#243 id=243 data-nosnippet>243</a>        self_mut.finalized = <span class="bool-val">true</span>;
-<a href=#244 id=244 data-nosnippet>244</a>    }
-<a href=#245 id=245 data-nosnippet>245</a>
-<a href=#246 id=246 data-nosnippet>246</a>    <span class="kw">fn </span>is_finalized(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-<a href=#247 id=247 data-nosnippet>247</a>        <span class="self">self</span>.finalized
-<a href=#248 id=248 data-nosnippet>248</a>    }
-<a href=#249 id=249 data-nosnippet>249</a>
-<a href=#250 id=250 data-nosnippet>250</a>    <span class="kw">fn </span>get_descriptor_for_address(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; SpaceDescriptor {
-<a href=#251 id=251 data-nosnippet>251</a>        <span class="kw">let </span>index = address.chunk_index();
-<a href=#252 id=252 data-nosnippet>252</a>        <span class="self">self</span>.descriptor_map
-<a href=#253 id=253 data-nosnippet>253</a>            .get(index)
-<a href=#254 id=254 data-nosnippet>254</a>            .copied()
-<a href=#255 id=255 data-nosnippet>255</a>            .unwrap_or(SpaceDescriptor::UNINITIALIZED)
-<a href=#256 id=256 data-nosnippet>256</a>    }
-<a href=#257 id=257 data-nosnippet>257</a>
-<a href=#258 id=258 data-nosnippet>258</a>    <span class="kw">fn </span>min_contiguous_extent(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-<a href=#259 id=259 data-nosnippet>259</a>        BYTES_IN_CHUNK
-<a href=#260 id=260 data-nosnippet>260</a>    }
-<a href=#261 id=261 data-nosnippet>261</a>}
-<a href=#262 id=262 data-nosnippet>262</a>
-<a href=#263 id=263 data-nosnippet>263</a><span class="kw">impl </span>Map32 {
-<a href=#264 id=264 data-nosnippet>264</a>    <span class="doccomment">/// # Safety
-<a href=#265 id=265 data-nosnippet>265</a>    ///
-<a href=#266 id=266 data-nosnippet>266</a>    /// The caller needs to guarantee there is no race condition. Either only one single thread
-<a href=#267 id=267 data-nosnippet>267</a>    /// is using this method, or multiple threads are accessing mutally exclusive data (e.g. different indices in arrays).
-<a href=#268 id=268 data-nosnippet>268</a>    /// In other cases, use mut_self_with_sync().
-<a href=#269 id=269 data-nosnippet>269</a>    </span><span class="attr">#[allow(clippy::mut_from_ref)]
-<a href=#270 id=270 data-nosnippet>270</a>    </span><span class="kw">unsafe fn </span>mut_self(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>Map32Inner {
-<a href=#271 id=271 data-nosnippet>271</a>        <span class="kw-2">&amp;mut *</span><span class="self">self</span>.inner.get()
-<a href=#272 id=272 data-nosnippet>272</a>    }
-<a href=#273 id=273 data-nosnippet>273</a>
-<a href=#274 id=274 data-nosnippet>274</a>    <span class="doccomment">/// Get a mutable reference to the inner Map32Inner with a lock.
-<a href=#275 id=275 data-nosnippet>275</a>    /// The caller should only use the mutable reference while holding the lock.
-<a href=#276 id=276 data-nosnippet>276</a>    </span><span class="attr">#[allow(clippy::mut_from_ref)]
-<a href=#277 id=277 data-nosnippet>277</a>    </span><span class="kw">fn </span>mut_self_with_sync(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (MutexGuard&lt;<span class="lifetime">'_</span>, ()&gt;, <span class="kw-2">&amp;mut </span>Map32Inner) {
-<a href=#278 id=278 data-nosnippet>278</a>        <span class="kw">let </span>guard = <span class="self">self</span>.sync.lock().unwrap();
-<a href=#279 id=279 data-nosnippet>279</a>        (guard, <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() })
-<a href=#280 id=280 data-nosnippet>280</a>    }
-<a href=#281 id=281 data-nosnippet>281</a>
-<a href=#282 id=282 data-nosnippet>282</a>    <span class="kw">fn </span>free_contiguous_chunks_no_lock(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk: i32) -&gt; usize {
-<a href=#283 id=283 data-nosnippet>283</a>        <span class="kw">unsafe </span>{
-<a href=#284 id=284 data-nosnippet>284</a>            <span class="kw">let </span>chunks = <span class="self">self</span>.mut_self().region_map.free(chunk, <span class="bool-val">false</span>);
-<a href=#285 id=285 data-nosnippet>285</a>            <span class="self">self</span>.mut_self().total_available_discontiguous_chunks += chunks <span class="kw">as </span>usize;
-<a href=#286 id=286 data-nosnippet>286</a>            <span class="kw">let </span>next = <span class="self">self</span>.next_link[chunk <span class="kw">as </span>usize];
-<a href=#287 id=287 data-nosnippet>287</a>            <span class="kw">let </span>prev = <span class="self">self</span>.prev_link[chunk <span class="kw">as </span>usize];
-<a href=#288 id=288 data-nosnippet>288</a>            <span class="kw">if </span>next != <span class="number">0 </span>{
-<a href=#289 id=289 data-nosnippet>289</a>                <span class="self">self</span>.mut_self().prev_link[next <span class="kw">as </span>usize] = prev
-<a href=#290 id=290 data-nosnippet>290</a>            };
-<a href=#291 id=291 data-nosnippet>291</a>            <span class="kw">if </span>prev != <span class="number">0 </span>{
-<a href=#292 id=292 data-nosnippet>292</a>                <span class="self">self</span>.mut_self().next_link[prev <span class="kw">as </span>usize] = next
-<a href=#293 id=293 data-nosnippet>293</a>            };
-<a href=#294 id=294 data-nosnippet>294</a>            <span class="self">self</span>.mut_self().prev_link[chunk <span class="kw">as </span>usize] = <span class="number">0</span>;
-<a href=#295 id=295 data-nosnippet>295</a>            <span class="self">self</span>.mut_self().next_link[chunk <span class="kw">as </span>usize] = <span class="number">0</span>;
-<a href=#296 id=296 data-nosnippet>296</a>            <span class="kw">for </span>offset <span class="kw">in </span><span class="number">0</span>..chunks {
-<a href=#297 id=297 data-nosnippet>297</a>                <span class="kw">let </span>index = (chunk + offset) <span class="kw">as </span>usize;
-<a href=#298 id=298 data-nosnippet>298</a>                <span class="kw">let </span>chunk_start = conversions::chunk_index_to_address(index);
-<a href=#299 id=299 data-nosnippet>299</a>                <span class="macro">debug!</span>(<span class="string">"Clear descriptor for Chunk {}"</span>, chunk_start);
-<a href=#300 id=300 data-nosnippet>300</a>                <span class="self">self</span>.mut_self().descriptor_map[index] = SpaceDescriptor::UNINITIALIZED;
-<a href=#301 id=301 data-nosnippet>301</a>                SFT_MAP.clear(chunk_start);
-<a href=#302 id=302 data-nosnippet>302</a>            }
-<a href=#303 id=303 data-nosnippet>303</a>            chunks <span class="kw">as _
-<a href=#304 id=304 data-nosnippet>304</a>        </span>}
-<a href=#305 id=305 data-nosnippet>305</a>    }
-<a href=#306 id=306 data-nosnippet>306</a>
-<a href=#307 id=307 data-nosnippet>307</a>    <span class="kw">fn </span>get_discontig_freelist_pr_ordinal(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-<a href=#308 id=308 data-nosnippet>308</a>        <span class="comment">// This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
-<a href=#309 id=309 data-nosnippet>309</a>        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span>Map32Inner = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
-<a href=#310 id=310 data-nosnippet>310</a>        self_mut.shared_discontig_fl_count += <span class="number">1</span>;
-<a href=#311 id=311 data-nosnippet>311</a>        <span class="self">self</span>.shared_discontig_fl_count
-<a href=#312 id=312 data-nosnippet>312</a>    }
-<a href=#313 id=313 data-nosnippet>313</a>}
-<a href=#314 id=314 data-nosnippet>314</a>
-<a href=#315 id=315 data-nosnippet>315</a><span class="kw">impl </span>Default <span class="kw">for </span>Map32 {
-<a href=#316 id=316 data-nosnippet>316</a>    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
-<a href=#317 id=317 data-nosnippet>317</a>        <span class="self">Self</span>::new()
-<a href=#318 id=318 data-nosnippet>318</a>    }
-<a href=#319 id=319 data-nosnippet>319</a>}</code></pre></div></section></main></body></html>
+<a href=#212 id=212 data-nosnippet>212</a>        on_discontig_start_determined(start_address);
+<a href=#213 id=213 data-nosnippet>213</a>
+<a href=#214 id=214 data-nosnippet>214</a>        <span class="comment">// [
+<a href=#215 id=215 data-nosnippet>215</a>        //  2: -1073741825
+<a href=#216 id=216 data-nosnippet>216</a>        //  3: -1073741825
+<a href=#217 id=217 data-nosnippet>217</a>        //  5: -2147482624
+<a href=#218 id=218 data-nosnippet>218</a>        //  2048: -2147483648
+<a href=#219 id=219 data-nosnippet>219</a>        //  2049: -2147482624
+<a href=#220 id=220 data-nosnippet>220</a>        //  2050: 1024
+<a href=#221 id=221 data-nosnippet>221</a>        //  2051: 1024
+<a href=#222 id=222 data-nosnippet>222</a>        // ]
+<a href=#223 id=223 data-nosnippet>223</a>        /* set up the region map free list */
+<a href=#224 id=224 data-nosnippet>224</a>        </span>self_mut.region_map.alloc(first_chunk <span class="kw">as _</span>); <span class="comment">// block out entire bottom of address range
+<a href=#225 id=225 data-nosnippet>225</a>        </span><span class="kw">for _ in </span>first_chunk..=last_chunk {
+<a href=#226 id=226 data-nosnippet>226</a>            self_mut.region_map.alloc(<span class="number">1</span>);
+<a href=#227 id=227 data-nosnippet>227</a>        }
+<a href=#228 id=228 data-nosnippet>228</a>        <span class="kw">let </span>alloced_chunk = self_mut.region_map.alloc(trailing_chunks <span class="kw">as _</span>);
+<a href=#229 id=229 data-nosnippet>229</a>        <span class="macro">debug_assert!</span>(
+<a href=#230 id=230 data-nosnippet>230</a>            alloced_chunk == unavail_start_chunk <span class="kw">as </span>i32,
+<a href=#231 id=231 data-nosnippet>231</a>            <span class="string">"{} != {}"</span>,
+<a href=#232 id=232 data-nosnippet>232</a>            alloced_chunk,
+<a href=#233 id=233 data-nosnippet>233</a>            unavail_start_chunk
+<a href=#234 id=234 data-nosnippet>234</a>        );
+<a href=#235 id=235 data-nosnippet>235</a>        <span class="comment">/* set up the global page map and place chunks on free list */
+<a href=#236 id=236 data-nosnippet>236</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>first_page = <span class="number">0</span>;
+<a href=#237 id=237 data-nosnippet>237</a>        <span class="kw">for </span>chunk_index <span class="kw">in </span>first_chunk..=last_chunk {
+<a href=#238 id=238 data-nosnippet>238</a>            self_mut.total_available_discontiguous_chunks += <span class="number">1</span>;
+<a href=#239 id=239 data-nosnippet>239</a>            self_mut.region_map.free(chunk_index <span class="kw">as _</span>, <span class="bool-val">false</span>); <span class="comment">// put this chunk on the free list
+<a href=#240 id=240 data-nosnippet>240</a>            </span>self_mut.global_page_map.set_uncoalescable(first_page);
+<a href=#241 id=241 data-nosnippet>241</a>            <span class="kw">let </span>alloced_pages = self_mut.global_page_map.alloc(PAGES_IN_CHUNK <span class="kw">as _</span>); <span class="comment">// populate the global page map
+<a href=#242 id=242 data-nosnippet>242</a>            </span><span class="macro">debug_assert!</span>(alloced_pages == first_page);
+<a href=#243 id=243 data-nosnippet>243</a>            first_page += PAGES_IN_CHUNK <span class="kw">as </span>i32;
+<a href=#244 id=244 data-nosnippet>244</a>        }
+<a href=#245 id=245 data-nosnippet>245</a>        self_mut.finalized = <span class="bool-val">true</span>;
+<a href=#246 id=246 data-nosnippet>246</a>    }
+<a href=#247 id=247 data-nosnippet>247</a>
+<a href=#248 id=248 data-nosnippet>248</a>    <span class="kw">fn </span>is_finalized(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#249 id=249 data-nosnippet>249</a>        <span class="self">self</span>.finalized
+<a href=#250 id=250 data-nosnippet>250</a>    }
+<a href=#251 id=251 data-nosnippet>251</a>
+<a href=#252 id=252 data-nosnippet>252</a>    <span class="kw">fn </span>get_descriptor_for_address(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; SpaceDescriptor {
+<a href=#253 id=253 data-nosnippet>253</a>        <span class="kw">let </span>index = address.chunk_index();
+<a href=#254 id=254 data-nosnippet>254</a>        <span class="self">self</span>.descriptor_map
+<a href=#255 id=255 data-nosnippet>255</a>            .get(index)
+<a href=#256 id=256 data-nosnippet>256</a>            .copied()
+<a href=#257 id=257 data-nosnippet>257</a>            .unwrap_or(SpaceDescriptor::UNINITIALIZED)
+<a href=#258 id=258 data-nosnippet>258</a>    }
+<a href=#259 id=259 data-nosnippet>259</a>
+<a href=#260 id=260 data-nosnippet>260</a>    <span class="kw">fn </span>min_contiguous_extent(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+<a href=#261 id=261 data-nosnippet>261</a>        BYTES_IN_CHUNK
+<a href=#262 id=262 data-nosnippet>262</a>    }
+<a href=#263 id=263 data-nosnippet>263</a>}
+<a href=#264 id=264 data-nosnippet>264</a>
+<a href=#265 id=265 data-nosnippet>265</a><span class="kw">impl </span>Map32 {
+<a href=#266 id=266 data-nosnippet>266</a>    <span class="doccomment">/// # Safety
+<a href=#267 id=267 data-nosnippet>267</a>    ///
+<a href=#268 id=268 data-nosnippet>268</a>    /// The caller needs to guarantee there is no race condition. Either only one single thread
+<a href=#269 id=269 data-nosnippet>269</a>    /// is using this method, or multiple threads are accessing mutally exclusive data (e.g. different indices in arrays).
+<a href=#270 id=270 data-nosnippet>270</a>    /// In other cases, use mut_self_with_sync().
+<a href=#271 id=271 data-nosnippet>271</a>    </span><span class="attr">#[allow(clippy::mut_from_ref)]
+<a href=#272 id=272 data-nosnippet>272</a>    </span><span class="kw">unsafe fn </span>mut_self(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>Map32Inner {
+<a href=#273 id=273 data-nosnippet>273</a>        <span class="kw-2">&amp;mut *</span><span class="self">self</span>.inner.get()
+<a href=#274 id=274 data-nosnippet>274</a>    }
+<a href=#275 id=275 data-nosnippet>275</a>
+<a href=#276 id=276 data-nosnippet>276</a>    <span class="doccomment">/// Get a mutable reference to the inner Map32Inner with a lock.
+<a href=#277 id=277 data-nosnippet>277</a>    /// The caller should only use the mutable reference while holding the lock.
+<a href=#278 id=278 data-nosnippet>278</a>    </span><span class="attr">#[allow(clippy::mut_from_ref)]
+<a href=#279 id=279 data-nosnippet>279</a>    </span><span class="kw">fn </span>mut_self_with_sync(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (MutexGuard&lt;<span class="lifetime">'_</span>, ()&gt;, <span class="kw-2">&amp;mut </span>Map32Inner) {
+<a href=#280 id=280 data-nosnippet>280</a>        <span class="kw">let </span>guard = <span class="self">self</span>.sync.lock().unwrap();
+<a href=#281 id=281 data-nosnippet>281</a>        (guard, <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() })
+<a href=#282 id=282 data-nosnippet>282</a>    }
+<a href=#283 id=283 data-nosnippet>283</a>
+<a href=#284 id=284 data-nosnippet>284</a>    <span class="kw">fn </span>free_contiguous_chunks_no_lock(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk: i32) -&gt; usize {
+<a href=#285 id=285 data-nosnippet>285</a>        <span class="kw">unsafe </span>{
+<a href=#286 id=286 data-nosnippet>286</a>            <span class="kw">let </span>chunks = <span class="self">self</span>.mut_self().region_map.free(chunk, <span class="bool-val">false</span>);
+<a href=#287 id=287 data-nosnippet>287</a>            <span class="self">self</span>.mut_self().total_available_discontiguous_chunks += chunks <span class="kw">as </span>usize;
+<a href=#288 id=288 data-nosnippet>288</a>            <span class="kw">let </span>next = <span class="self">self</span>.next_link[chunk <span class="kw">as </span>usize];
+<a href=#289 id=289 data-nosnippet>289</a>            <span class="kw">let </span>prev = <span class="self">self</span>.prev_link[chunk <span class="kw">as </span>usize];
+<a href=#290 id=290 data-nosnippet>290</a>            <span class="kw">if </span>next != -<span class="number">1 </span>{
+<a href=#291 id=291 data-nosnippet>291</a>                <span class="self">self</span>.mut_self().prev_link[next <span class="kw">as </span>usize] = prev
+<a href=#292 id=292 data-nosnippet>292</a>            };
+<a href=#293 id=293 data-nosnippet>293</a>            <span class="kw">if </span>prev != -<span class="number">1 </span>{
+<a href=#294 id=294 data-nosnippet>294</a>                <span class="self">self</span>.mut_self().next_link[prev <span class="kw">as </span>usize] = next
+<a href=#295 id=295 data-nosnippet>295</a>            };
+<a href=#296 id=296 data-nosnippet>296</a>            <span class="self">self</span>.mut_self().prev_link[chunk <span class="kw">as </span>usize] = -<span class="number">1</span>;
+<a href=#297 id=297 data-nosnippet>297</a>            <span class="self">self</span>.mut_self().next_link[chunk <span class="kw">as </span>usize] = -<span class="number">1</span>;
+<a href=#298 id=298 data-nosnippet>298</a>            <span class="kw">for </span>offset <span class="kw">in </span><span class="number">0</span>..chunks {
+<a href=#299 id=299 data-nosnippet>299</a>                <span class="kw">let </span>index = (chunk + offset) <span class="kw">as </span>usize;
+<a href=#300 id=300 data-nosnippet>300</a>                <span class="kw">let </span>chunk_start = conversions::chunk_index_to_address(index);
+<a href=#301 id=301 data-nosnippet>301</a>                <span class="macro">debug!</span>(<span class="string">"Clear descriptor for Chunk {}"</span>, chunk_start);
+<a href=#302 id=302 data-nosnippet>302</a>                <span class="self">self</span>.mut_self().descriptor_map[index] = SpaceDescriptor::UNINITIALIZED;
+<a href=#303 id=303 data-nosnippet>303</a>                SFT_MAP.clear(chunk_start);
+<a href=#304 id=304 data-nosnippet>304</a>            }
+<a href=#305 id=305 data-nosnippet>305</a>            chunks <span class="kw">as _
+<a href=#306 id=306 data-nosnippet>306</a>        </span>}
+<a href=#307 id=307 data-nosnippet>307</a>    }
+<a href=#308 id=308 data-nosnippet>308</a>
+<a href=#309 id=309 data-nosnippet>309</a>    <span class="kw">fn </span>get_discontig_freelist_pr_ordinal(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+<a href=#310 id=310 data-nosnippet>310</a>        <span class="comment">// This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
+<a href=#311 id=311 data-nosnippet>311</a>        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span>Map32Inner = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
+<a href=#312 id=312 data-nosnippet>312</a>        self_mut.shared_discontig_fl_count += <span class="number">1</span>;
+<a href=#313 id=313 data-nosnippet>313</a>        <span class="self">self</span>.shared_discontig_fl_count
+<a href=#314 id=314 data-nosnippet>314</a>    }
+<a href=#315 id=315 data-nosnippet>315</a>}
+<a href=#316 id=316 data-nosnippet>316</a>
+<a href=#317 id=317 data-nosnippet>317</a><span class="kw">impl </span>Default <span class="kw">for </span>Map32 {
+<a href=#318 id=318 data-nosnippet>318</a>    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+<a href=#319 id=319 data-nosnippet>319</a>        <span class="self">Self</span>::new()
+<a href=#320 id=320 data-nosnippet>320</a>    }
+<a href=#321 id=321 data-nosnippet>321</a>}</code></pre></div></section></main></body></html>

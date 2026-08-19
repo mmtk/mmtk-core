@@ -118,9 +118,9 @@
 <a href=#118 id=118 data-nosnippet>118</a>        }
 <a href=#119 id=119 data-nosnippet>119</a>    }
 <a href=#120 id=120 data-nosnippet>120</a>
-<a href=#121 id=121 data-nosnippet>121</a>    <span class="kw">fn </span>end_of_pause(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;, tls: VMWorkerThread) {
+<a href=#121 id=121 data-nosnippet>121</a>    <span class="kw">fn </span>on_pause_end(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;, tls: VMWorkerThread) {
 <a href=#122 id=122 data-nosnippet>122</a>        <span class="kw">let </span>next_gc_full_heap = CommonGenPlan::should_next_gc_be_full_heap(<span class="self">self</span>);
-<a href=#123 id=123 data-nosnippet>123</a>        <span class="self">self</span>.gen.end_of_pause(tls, next_gc_full_heap);
+<a href=#123 id=123 data-nosnippet>123</a>        <span class="self">self</span>.gen.on_pause_end(tls, next_gc_full_heap);
 <a href=#124 id=124 data-nosnippet>124</a>        mmtk.gc_trigger.policy.on_gc_end(mmtk);
 <a href=#125 id=125 data-nosnippet>125</a>    }
 <a href=#126 id=126 data-nosnippet>126</a>

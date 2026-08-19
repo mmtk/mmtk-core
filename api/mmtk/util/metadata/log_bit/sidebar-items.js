@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["UnlogBitsOperation"]};
+window.SIDEBAR_ITEMS = {"constant":["LOGGED_VALUE","UNLOGGED_VALUE"],"enum":["UnlogBitsOperation"]};

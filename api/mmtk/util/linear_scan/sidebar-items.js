@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["DefaultObjectSize","ObjectIterator","RegionIterator"],"trait":["LinearScanObjectSize","Region"]};
+window.SIDEBAR_ITEMS = {"struct":["DefaultObjectSize","ObjectIterator","RegionIterator"],"trait":["LinearScanObjectSize","Region","UnstraddlableRegion"]};

@@ -23,441 +23,443 @@
 <a href=#23 id=23 data-nosnippet>23</a>}
 <a href=#24 id=24 data-nosnippet>24</a>
 <a href=#25 id=25 data-nosnippet>25</a><span class="doccomment">/// Get current worker ordinal. Return `None` if the current thread is not a worker.
-<a href=#26 id=26 data-nosnippet>26</a></span><span class="kw">pub fn </span>current_worker_ordinal() -&gt; ThreadId {
+<a href=#26 id=26 data-nosnippet>26</a></span><span class="kw">pub fn </span>current_worker_ordinal() -&gt; <span class="prelude-ty">Option</span>&lt;ThreadId&gt; {
 <a href=#27 id=27 data-nosnippet>27</a>    <span class="kw">let </span>ordinal = WORKER_ORDINAL.with(|x| x.load(Ordering::Relaxed));
-<a href=#28 id=28 data-nosnippet>28</a>    <span class="macro">debug_assert_ne!</span>(
-<a href=#29 id=29 data-nosnippet>29</a>        ordinal,
-<a href=#30 id=30 data-nosnippet>30</a>        ThreadId::MAX,
-<a href=#31 id=31 data-nosnippet>31</a>        <span class="string">"Thread-local variable WORKER_ORDINAL not set yet."
-<a href=#32 id=32 data-nosnippet>32</a>    </span>);
-<a href=#33 id=33 data-nosnippet>33</a>    ordinal
-<a href=#34 id=34 data-nosnippet>34</a>}
-<a href=#35 id=35 data-nosnippet>35</a>
-<a href=#36 id=36 data-nosnippet>36</a><span class="doccomment">/// The struct has one instance per worker, but is shared between workers via the scheduler
-<a href=#37 id=37 data-nosnippet>37</a>/// instance.  This structure is used for communication between workers, e.g. adding designated
-<a href=#38 id=38 data-nosnippet>38</a>/// work packets, stealing work packets from other workers, and collecting per-worker statistics.
-<a href=#39 id=39 data-nosnippet>39</a></span><span class="kw">pub struct </span>GCWorkerShared&lt;VM: VMBinding&gt; {
-<a href=#40 id=40 data-nosnippet>40</a>    <span class="doccomment">/// Worker-local statistics data.
-<a href=#41 id=41 data-nosnippet>41</a>    </span>stat: AtomicRefCell&lt;WorkerLocalStat&lt;VM&gt;&gt;,
-<a href=#42 id=42 data-nosnippet>42</a>    <span class="doccomment">/// Accumulated bytes for live objects in this GC. When each worker scans
-<a href=#43 id=43 data-nosnippet>43</a>    /// objects, we increase the live bytes. We get this value from each worker
-<a href=#44 id=44 data-nosnippet>44</a>    /// at the end of a GC, and reset this counter.
-<a href=#45 id=45 data-nosnippet>45</a>    /// The live bytes are stored in an array. The index is the index from the space descriptor.
-<a href=#46 id=46 data-nosnippet>46</a>    </span><span class="kw">pub </span>live_bytes_per_space: AtomicRefCell&lt;[usize; MAX_SPACES]&gt;,
-<a href=#47 id=47 data-nosnippet>47</a>    <span class="doccomment">/// A queue of GCWork that can only be processed by the owned thread.
-<a href=#48 id=48 data-nosnippet>48</a>    </span><span class="kw">pub </span>designated_work: ArrayQueue&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
-<a href=#49 id=49 data-nosnippet>49</a>    <span class="doccomment">/// Handle for stealing packets from the current worker
-<a href=#50 id=50 data-nosnippet>50</a>    </span><span class="kw">pub </span>stealer: <span class="prelude-ty">Option</span>&lt;Stealer&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;,
-<a href=#51 id=51 data-nosnippet>51</a>}
-<a href=#52 id=52 data-nosnippet>52</a>
-<a href=#53 id=53 data-nosnippet>53</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorkerShared&lt;VM&gt; {
-<a href=#54 id=54 data-nosnippet>54</a>    <span class="kw">pub fn </span>new(stealer: <span class="prelude-ty">Option</span>&lt;Stealer&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;) -&gt; <span class="self">Self </span>{
-<a href=#55 id=55 data-nosnippet>55</a>        <span class="self">Self </span>{
-<a href=#56 id=56 data-nosnippet>56</a>            stat: Default::default(),
-<a href=#57 id=57 data-nosnippet>57</a>            live_bytes_per_space: AtomicRefCell::new([<span class="number">0</span>; MAX_SPACES]),
-<a href=#58 id=58 data-nosnippet>58</a>            designated_work: ArrayQueue::new(<span class="number">16</span>),
-<a href=#59 id=59 data-nosnippet>59</a>            stealer,
-<a href=#60 id=60 data-nosnippet>60</a>        }
-<a href=#61 id=61 data-nosnippet>61</a>    }
-<a href=#62 id=62 data-nosnippet>62</a>
-<a href=#63 id=63 data-nosnippet>63</a>    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>increase_live_bytes(
-<a href=#64 id=64 data-nosnippet>64</a>        live_bytes_per_space: <span class="kw-2">&amp;mut </span>[usize; MAX_SPACES],
-<a href=#65 id=65 data-nosnippet>65</a>        object: ObjectReference,
-<a href=#66 id=66 data-nosnippet>66</a>    ) {
-<a href=#67 id=67 data-nosnippet>67</a>        <span class="kw">use </span><span class="kw">crate</span>::mmtk::VM_MAP;
-<a href=#68 id=68 data-nosnippet>68</a>        <span class="kw">use </span><span class="kw">crate</span>::vm::object_model::ObjectModel;
-<a href=#69 id=69 data-nosnippet>69</a>
-<a href=#70 id=70 data-nosnippet>70</a>        <span class="comment">// The live bytes of the object
-<a href=#71 id=71 data-nosnippet>71</a>        </span><span class="kw">let </span>bytes = VM::VMObjectModel::get_current_size(object);
-<a href=#72 id=72 data-nosnippet>72</a>        <span class="comment">// Get the space index from descriptor
-<a href=#73 id=73 data-nosnippet>73</a>        </span><span class="kw">let </span>space_descriptor = VM_MAP.get_descriptor_for_address(object.to_raw_address());
-<a href=#74 id=74 data-nosnippet>74</a>        <span class="kw">if </span>space_descriptor != <span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor::UNINITIALIZED {
-<a href=#75 id=75 data-nosnippet>75</a>            <span class="kw">let </span>space_index = space_descriptor.get_index();
-<a href=#76 id=76 data-nosnippet>76</a>            <span class="macro">debug_assert!</span>(
-<a href=#77 id=77 data-nosnippet>77</a>                space_index &lt; MAX_SPACES,
-<a href=#78 id=78 data-nosnippet>78</a>                <span class="string">"Space index {} is not in the range of [0, {})"</span>,
-<a href=#79 id=79 data-nosnippet>79</a>                space_index,
-<a href=#80 id=80 data-nosnippet>80</a>                MAX_SPACES
-<a href=#81 id=81 data-nosnippet>81</a>            );
-<a href=#82 id=82 data-nosnippet>82</a>            <span class="comment">// Accumulate the live bytes for the index
-<a href=#83 id=83 data-nosnippet>83</a>            </span>live_bytes_per_space[space_index] += bytes;
-<a href=#84 id=84 data-nosnippet>84</a>        }
-<a href=#85 id=85 data-nosnippet>85</a>    }
-<a href=#86 id=86 data-nosnippet>86</a>}
-<a href=#87 id=87 data-nosnippet>87</a>
-<a href=#88 id=88 data-nosnippet>88</a><span class="doccomment">/// A GC worker.  This part is privately owned by a worker thread.
-<a href=#89 id=89 data-nosnippet>89</a></span><span class="kw">pub struct </span>GCWorker&lt;VM: VMBinding&gt; {
-<a href=#90 id=90 data-nosnippet>90</a>    <span class="doccomment">/// The VM-specific thread-local state of the GC thread.
-<a href=#91 id=91 data-nosnippet>91</a>    </span><span class="kw">pub </span>tls: VMWorkerThread,
-<a href=#92 id=92 data-nosnippet>92</a>    <span class="doccomment">/// The ordinal of the worker, numbered from 0 to the number of workers minus one.
-<a href=#93 id=93 data-nosnippet>93</a>    </span><span class="kw">pub </span>ordinal: ThreadId,
-<a href=#94 id=94 data-nosnippet>94</a>    <span class="doccomment">/// The reference to the scheduler.
-<a href=#95 id=95 data-nosnippet>95</a>    </span>scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
-<a href=#96 id=96 data-nosnippet>96</a>    <span class="doccomment">/// The copy context, used to implement copying GC.
-<a href=#97 id=97 data-nosnippet>97</a>    </span>copy: GCWorkerCopyContext&lt;VM&gt;,
-<a href=#98 id=98 data-nosnippet>98</a>    <span class="doccomment">/// The reference to the MMTk instance.
-<a href=#99 id=99 data-nosnippet>99</a>    </span><span class="kw">pub </span>mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
-<a href=#100 id=100 data-nosnippet>100</a>    <span class="doccomment">/// Reference to the shared part of the GC worker.  It is used for synchronization.
-<a href=#101 id=101 data-nosnippet>101</a>    </span><span class="kw">pub </span>shared: Arc&lt;GCWorkerShared&lt;VM&gt;&gt;,
-<a href=#102 id=102 data-nosnippet>102</a>    <span class="doccomment">/// Local work packet queue.
-<a href=#103 id=103 data-nosnippet>103</a>    </span><span class="kw">pub </span>local_work_buffer: deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
-<a href=#104 id=104 data-nosnippet>104</a>}
-<a href=#105 id=105 data-nosnippet>105</a>
-<a href=#106 id=106 data-nosnippet>106</a><span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Sync <span class="kw">for </span>GCWorkerShared&lt;VM&gt; {}
-<a href=#107 id=107 data-nosnippet>107</a><span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Send <span class="kw">for </span>GCWorkerShared&lt;VM&gt; {}
-<a href=#108 id=108 data-nosnippet>108</a>
-<a href=#109 id=109 data-nosnippet>109</a><span class="comment">// Error message for borrowing `GCWorkerShared::stat`.
-<a href=#110 id=110 data-nosnippet>110</a></span><span class="kw">const </span>STAT_BORROWED_MSG: <span class="kw-2">&amp;</span>str = <span class="string">"GCWorkerShared.stat is already borrowed.  This may happen if \
-<a href=#111 id=111 data-nosnippet>111</a>    the mutator calls harness_begin or harness_end while the GC is running."</span>;
-<a href=#112 id=112 data-nosnippet>112</a>
-<a href=#113 id=113 data-nosnippet>113</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorkerShared&lt;VM&gt; {
-<a href=#114 id=114 data-nosnippet>114</a>    <span class="kw">pub fn </span>borrow_stat(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AtomicRef&lt;<span class="lifetime">'_</span>, WorkerLocalStat&lt;VM&gt;&gt; {
-<a href=#115 id=115 data-nosnippet>115</a>        <span class="self">self</span>.stat.try_borrow().expect(STAT_BORROWED_MSG)
-<a href=#116 id=116 data-nosnippet>116</a>    }
-<a href=#117 id=117 data-nosnippet>117</a>
-<a href=#118 id=118 data-nosnippet>118</a>    <span class="kw">pub fn </span>borrow_stat_mut(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AtomicRefMut&lt;<span class="lifetime">'_</span>, WorkerLocalStat&lt;VM&gt;&gt; {
-<a href=#119 id=119 data-nosnippet>119</a>        <span class="self">self</span>.stat.try_borrow_mut().expect(STAT_BORROWED_MSG)
-<a href=#120 id=120 data-nosnippet>120</a>    }
-<a href=#121 id=121 data-nosnippet>121</a>}
-<a href=#122 id=122 data-nosnippet>122</a>
-<a href=#123 id=123 data-nosnippet>123</a><span class="doccomment">/// A special error type that indicate a worker should exit.
-<a href=#124 id=124 data-nosnippet>124</a>/// This may happen if the VM needs to fork and asks workers to exit.
-<a href=#125 id=125 data-nosnippet>125</a></span><span class="attr">#[derive(Debug)]
-<a href=#126 id=126 data-nosnippet>126</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WorkerShouldExit;
-<a href=#127 id=127 data-nosnippet>127</a>
-<a href=#128 id=128 data-nosnippet>128</a><span class="doccomment">/// The result type of `GCWorker::pool`.
-<a href=#129 id=129 data-nosnippet>129</a>/// Too many functions return `Option&lt;Box&lt;dyn GCWork&lt;VM&gt;&gt;&gt;`.  In most cases, when `None` is
-<a href=#130 id=130 data-nosnippet>130</a>/// returned, the caller should try getting work packets from another place.  To avoid confusion,
-<a href=#131 id=131 data-nosnippet>131</a>/// we use `Err(WorkerShouldExit)` to clearly indicate that the worker should exit immediately.
-<a href=#132 id=132 data-nosnippet>132</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">type </span>PollResult&lt;VM&gt; = <span class="prelude-ty">Result</span>&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;, WorkerShouldExit&gt;;
-<a href=#133 id=133 data-nosnippet>133</a>
-<a href=#134 id=134 data-nosnippet>134</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorker&lt;VM&gt; {
-<a href=#135 id=135 data-nosnippet>135</a>    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
-<a href=#136 id=136 data-nosnippet>136</a>        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
-<a href=#137 id=137 data-nosnippet>137</a>        ordinal: ThreadId,
-<a href=#138 id=138 data-nosnippet>138</a>        scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
-<a href=#139 id=139 data-nosnippet>139</a>        shared: Arc&lt;GCWorkerShared&lt;VM&gt;&gt;,
-<a href=#140 id=140 data-nosnippet>140</a>        local_work_buffer: deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
-<a href=#141 id=141 data-nosnippet>141</a>    ) -&gt; <span class="self">Self </span>{
-<a href=#142 id=142 data-nosnippet>142</a>        <span class="self">Self </span>{
-<a href=#143 id=143 data-nosnippet>143</a>            tls: VMWorkerThread(VMThread::UNINITIALIZED),
-<a href=#144 id=144 data-nosnippet>144</a>            ordinal,
-<a href=#145 id=145 data-nosnippet>145</a>            <span class="comment">// We will set this later
-<a href=#146 id=146 data-nosnippet>146</a>            </span>copy: GCWorkerCopyContext::new_non_copy(),
-<a href=#147 id=147 data-nosnippet>147</a>            scheduler,
-<a href=#148 id=148 data-nosnippet>148</a>            mmtk,
-<a href=#149 id=149 data-nosnippet>149</a>            shared,
-<a href=#150 id=150 data-nosnippet>150</a>            local_work_buffer,
-<a href=#151 id=151 data-nosnippet>151</a>        }
-<a href=#152 id=152 data-nosnippet>152</a>    }
-<a href=#153 id=153 data-nosnippet>153</a>
-<a href=#154 id=154 data-nosnippet>154</a>    <span class="kw">const </span>LOCALLY_CACHED_WORK_PACKETS: usize = <span class="number">16</span>;
-<a href=#155 id=155 data-nosnippet>155</a>
-<a href=#156 id=156 data-nosnippet>156</a>    <span class="doccomment">/// Add a work packet to the work queue and mark it with a higher priority.
-<a href=#157 id=157 data-nosnippet>157</a>    /// If the bucket is open, the packet will be pushed to the local queue, otherwise it will be
-<a href=#158 id=158 data-nosnippet>158</a>    /// pushed to the global bucket with a higher priority.
-<a href=#159 id=159 data-nosnippet>159</a>    </span><span class="kw">pub fn </span>add_work_prioritized(<span class="kw-2">&amp;mut </span><span class="self">self</span>, bucket: WorkBucketStage, work: <span class="kw">impl </span>GCWork&lt;VM&gt;) {
-<a href=#160 id=160 data-nosnippet>160</a>        <span class="kw">if </span>!<span class="self">self</span>.scheduler().work_buckets[bucket].is_open()
-<a href=#161 id=161 data-nosnippet>161</a>            || <span class="self">self</span>.local_work_buffer.len() &gt;= <span class="self">Self</span>::LOCALLY_CACHED_WORK_PACKETS
-<a href=#162 id=162 data-nosnippet>162</a>        {
-<a href=#163 id=163 data-nosnippet>163</a>            <span class="self">self</span>.scheduler.work_buckets[bucket].add_prioritized(Box::new(work));
-<a href=#164 id=164 data-nosnippet>164</a>            <span class="kw">return</span>;
-<a href=#165 id=165 data-nosnippet>165</a>        }
-<a href=#166 id=166 data-nosnippet>166</a>        <span class="self">self</span>.local_work_buffer.push(Box::new(work));
-<a href=#167 id=167 data-nosnippet>167</a>    }
-<a href=#168 id=168 data-nosnippet>168</a>
-<a href=#169 id=169 data-nosnippet>169</a>    <span class="doccomment">/// Add a work packet to the work queue.
-<a href=#170 id=170 data-nosnippet>170</a>    /// If the bucket is open, the packet will be pushed to the local queue, otherwise it will be
-<a href=#171 id=171 data-nosnippet>171</a>    /// pushed to the global bucket.
-<a href=#172 id=172 data-nosnippet>172</a>    </span><span class="kw">pub fn </span>add_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, bucket: WorkBucketStage, work: <span class="kw">impl </span>GCWork&lt;VM&gt;) {
-<a href=#173 id=173 data-nosnippet>173</a>        <span class="kw">if </span>!<span class="self">self</span>.scheduler().work_buckets[bucket].is_open()
-<a href=#174 id=174 data-nosnippet>174</a>            || <span class="self">self</span>.local_work_buffer.len() &gt;= <span class="self">Self</span>::LOCALLY_CACHED_WORK_PACKETS
-<a href=#175 id=175 data-nosnippet>175</a>        {
-<a href=#176 id=176 data-nosnippet>176</a>            <span class="self">self</span>.scheduler.work_buckets[bucket].add(work);
-<a href=#177 id=177 data-nosnippet>177</a>            <span class="kw">return</span>;
-<a href=#178 id=178 data-nosnippet>178</a>        }
-<a href=#179 id=179 data-nosnippet>179</a>        <span class="self">self</span>.local_work_buffer.push(Box::new(work));
-<a href=#180 id=180 data-nosnippet>180</a>    }
-<a href=#181 id=181 data-nosnippet>181</a>
-<a href=#182 id=182 data-nosnippet>182</a>    <span class="doccomment">/// Get the scheduler. There is only one scheduler per MMTk instance.
-<a href=#183 id=183 data-nosnippet>183</a>    </span><span class="kw">pub fn </span>scheduler(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt; {
-<a href=#184 id=184 data-nosnippet>184</a>        <span class="kw-2">&amp;</span><span class="self">self</span>.scheduler
-<a href=#185 id=185 data-nosnippet>185</a>    }
-<a href=#186 id=186 data-nosnippet>186</a>
-<a href=#187 id=187 data-nosnippet>187</a>    <span class="doccomment">/// Get a mutable reference of the copy context for this worker.
-<a href=#188 id=188 data-nosnippet>188</a>    </span><span class="kw">pub fn </span>get_copy_context_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>GCWorkerCopyContext&lt;VM&gt; {
-<a href=#189 id=189 data-nosnippet>189</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>.copy
-<a href=#190 id=190 data-nosnippet>190</a>    }
-<a href=#191 id=191 data-nosnippet>191</a>
-<a href=#192 id=192 data-nosnippet>192</a>    <span class="doccomment">/// Poll a ready-to-execute work packet in the following order:
-<a href=#193 id=193 data-nosnippet>193</a>    ///
-<a href=#194 id=194 data-nosnippet>194</a>    /// 1. Any packet that should be processed only by this worker.
-<a href=#195 id=195 data-nosnippet>195</a>    /// 2. Poll from the local work queue.
-<a href=#196 id=196 data-nosnippet>196</a>    /// 3. Poll from open global work-buckets
-<a href=#197 id=197 data-nosnippet>197</a>    /// 4. Steal from other workers
-<a href=#198 id=198 data-nosnippet>198</a>    </span><span class="kw">fn </span>poll(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; PollResult&lt;VM&gt; {
-<a href=#199 id=199 data-nosnippet>199</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(work) = <span class="self">self</span>.shared.designated_work.pop() {
-<a href=#200 id=200 data-nosnippet>200</a>            <span class="kw">return </span><span class="prelude-val">Ok</span>(work);
-<a href=#201 id=201 data-nosnippet>201</a>        }
-<a href=#202 id=202 data-nosnippet>202</a>
-<a href=#203 id=203 data-nosnippet>203</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(work) = <span class="self">self</span>.local_work_buffer.pop() {
-<a href=#204 id=204 data-nosnippet>204</a>            <span class="kw">return </span><span class="prelude-val">Ok</span>(work);
-<a href=#205 id=205 data-nosnippet>205</a>        }
-<a href=#206 id=206 data-nosnippet>206</a>
-<a href=#207 id=207 data-nosnippet>207</a>        <span class="self">self</span>.scheduler().poll(<span class="self">self</span>)
-<a href=#208 id=208 data-nosnippet>208</a>    }
-<a href=#209 id=209 data-nosnippet>209</a>
-<a href=#210 id=210 data-nosnippet>210</a>    <span class="doccomment">/// Entry point of the worker thread.
-<a href=#211 id=211 data-nosnippet>211</a>    ///
-<a href=#212 id=212 data-nosnippet>212</a>    /// This function will resolve thread affinity, if it has been specified by the user.
+<a href=#28 id=28 data-nosnippet>28</a>    <span class="kw">if </span>ordinal == ThreadId::MAX {
+<a href=#29 id=29 data-nosnippet>29</a>        <span class="prelude-val">None
+<a href=#30 id=30 data-nosnippet>30</a>    </span>} <span class="kw">else </span>{
+<a href=#31 id=31 data-nosnippet>31</a>        <span class="prelude-val">Some</span>(ordinal)
+<a href=#32 id=32 data-nosnippet>32</a>    }
+<a href=#33 id=33 data-nosnippet>33</a>}
+<a href=#34 id=34 data-nosnippet>34</a>
+<a href=#35 id=35 data-nosnippet>35</a><span class="doccomment">/// The struct has one instance per worker, but is shared between workers via the scheduler
+<a href=#36 id=36 data-nosnippet>36</a>/// instance.  This structure is used for communication between workers, e.g. adding designated
+<a href=#37 id=37 data-nosnippet>37</a>/// work packets, stealing work packets from other workers, and collecting per-worker statistics.
+<a href=#38 id=38 data-nosnippet>38</a></span><span class="kw">pub struct </span>GCWorkerShared&lt;VM: VMBinding&gt; {
+<a href=#39 id=39 data-nosnippet>39</a>    <span class="doccomment">/// Worker-local statistics data.
+<a href=#40 id=40 data-nosnippet>40</a>    </span>stat: AtomicRefCell&lt;WorkerLocalStat&lt;VM&gt;&gt;,
+<a href=#41 id=41 data-nosnippet>41</a>    <span class="doccomment">/// Accumulated bytes for live objects in this GC. When each worker scans
+<a href=#42 id=42 data-nosnippet>42</a>    /// objects, we increase the live bytes. We get this value from each worker
+<a href=#43 id=43 data-nosnippet>43</a>    /// at the end of a GC, and reset this counter.
+<a href=#44 id=44 data-nosnippet>44</a>    /// The live bytes are stored in an array. The index is the index from the space descriptor.
+<a href=#45 id=45 data-nosnippet>45</a>    </span><span class="kw">pub </span>live_bytes_per_space: AtomicRefCell&lt;[usize; MAX_SPACES]&gt;,
+<a href=#46 id=46 data-nosnippet>46</a>    <span class="doccomment">/// A queue of GCWork that can only be processed by the owned thread.
+<a href=#47 id=47 data-nosnippet>47</a>    </span><span class="kw">pub </span>designated_work: ArrayQueue&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
+<a href=#48 id=48 data-nosnippet>48</a>    <span class="doccomment">/// Handle for stealing packets from the current worker
+<a href=#49 id=49 data-nosnippet>49</a>    </span><span class="kw">pub </span>stealer: <span class="prelude-ty">Option</span>&lt;Stealer&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;,
+<a href=#50 id=50 data-nosnippet>50</a>}
+<a href=#51 id=51 data-nosnippet>51</a>
+<a href=#52 id=52 data-nosnippet>52</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorkerShared&lt;VM&gt; {
+<a href=#53 id=53 data-nosnippet>53</a>    <span class="doccomment">/// Create a new `GCWorkerShared` instance, optionally with a `stealer` handle that other
+<a href=#54 id=54 data-nosnippet>54</a>    /// workers can use to steal work packets from this worker's local queue.
+<a href=#55 id=55 data-nosnippet>55</a>    </span><span class="kw">pub fn </span>new(stealer: <span class="prelude-ty">Option</span>&lt;Stealer&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;) -&gt; <span class="self">Self </span>{
+<a href=#56 id=56 data-nosnippet>56</a>        <span class="self">Self </span>{
+<a href=#57 id=57 data-nosnippet>57</a>            stat: Default::default(),
+<a href=#58 id=58 data-nosnippet>58</a>            live_bytes_per_space: AtomicRefCell::new([<span class="number">0</span>; MAX_SPACES]),
+<a href=#59 id=59 data-nosnippet>59</a>            designated_work: ArrayQueue::new(<span class="number">16</span>),
+<a href=#60 id=60 data-nosnippet>60</a>            stealer,
+<a href=#61 id=61 data-nosnippet>61</a>        }
+<a href=#62 id=62 data-nosnippet>62</a>    }
+<a href=#63 id=63 data-nosnippet>63</a>
+<a href=#64 id=64 data-nosnippet>64</a>    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>increase_live_bytes(
+<a href=#65 id=65 data-nosnippet>65</a>        live_bytes_per_space: <span class="kw-2">&amp;mut </span>[usize; MAX_SPACES],
+<a href=#66 id=66 data-nosnippet>66</a>        object: ObjectReference,
+<a href=#67 id=67 data-nosnippet>67</a>    ) {
+<a href=#68 id=68 data-nosnippet>68</a>        <span class="kw">use </span><span class="kw">crate</span>::mmtk::VM_MAP;
+<a href=#69 id=69 data-nosnippet>69</a>        <span class="kw">use </span><span class="kw">crate</span>::vm::object_model::ObjectModel;
+<a href=#70 id=70 data-nosnippet>70</a>
+<a href=#71 id=71 data-nosnippet>71</a>        <span class="comment">// The live bytes of the object
+<a href=#72 id=72 data-nosnippet>72</a>        </span><span class="kw">let </span>bytes = VM::VMObjectModel::get_current_size(object);
+<a href=#73 id=73 data-nosnippet>73</a>        <span class="comment">// Get the space index from descriptor
+<a href=#74 id=74 data-nosnippet>74</a>        </span><span class="kw">let </span>space_descriptor = VM_MAP.get_descriptor_for_address(object.to_raw_address());
+<a href=#75 id=75 data-nosnippet>75</a>        <span class="kw">if </span>space_descriptor != <span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor::UNINITIALIZED {
+<a href=#76 id=76 data-nosnippet>76</a>            <span class="kw">let </span>space_index = space_descriptor.get_index();
+<a href=#77 id=77 data-nosnippet>77</a>            <span class="macro">debug_assert!</span>(
+<a href=#78 id=78 data-nosnippet>78</a>                space_index &lt; MAX_SPACES,
+<a href=#79 id=79 data-nosnippet>79</a>                <span class="string">"Space index {} is not in the range of [0, {})"</span>,
+<a href=#80 id=80 data-nosnippet>80</a>                space_index,
+<a href=#81 id=81 data-nosnippet>81</a>                MAX_SPACES
+<a href=#82 id=82 data-nosnippet>82</a>            );
+<a href=#83 id=83 data-nosnippet>83</a>            <span class="comment">// Accumulate the live bytes for the index
+<a href=#84 id=84 data-nosnippet>84</a>            </span>live_bytes_per_space[space_index] += bytes;
+<a href=#85 id=85 data-nosnippet>85</a>        }
+<a href=#86 id=86 data-nosnippet>86</a>    }
+<a href=#87 id=87 data-nosnippet>87</a>}
+<a href=#88 id=88 data-nosnippet>88</a>
+<a href=#89 id=89 data-nosnippet>89</a><span class="doccomment">/// A GC worker.  This part is privately owned by a worker thread.
+<a href=#90 id=90 data-nosnippet>90</a></span><span class="kw">pub struct </span>GCWorker&lt;VM: VMBinding&gt; {
+<a href=#91 id=91 data-nosnippet>91</a>    <span class="doccomment">/// The VM-specific thread-local state of the GC thread.
+<a href=#92 id=92 data-nosnippet>92</a>    </span><span class="kw">pub </span>tls: VMWorkerThread,
+<a href=#93 id=93 data-nosnippet>93</a>    <span class="doccomment">/// The ordinal of the worker, numbered from 0 to the number of workers minus one.
+<a href=#94 id=94 data-nosnippet>94</a>    </span><span class="kw">pub </span>ordinal: ThreadId,
+<a href=#95 id=95 data-nosnippet>95</a>    <span class="doccomment">/// The reference to the scheduler.
+<a href=#96 id=96 data-nosnippet>96</a>    </span>scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
+<a href=#97 id=97 data-nosnippet>97</a>    <span class="doccomment">/// The copy context, used to implement copying GC.
+<a href=#98 id=98 data-nosnippet>98</a>    </span>copy: GCWorkerCopyContext&lt;VM&gt;,
+<a href=#99 id=99 data-nosnippet>99</a>    <span class="doccomment">/// The reference to the MMTk instance.
+<a href=#100 id=100 data-nosnippet>100</a>    </span><span class="kw">pub </span>mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
+<a href=#101 id=101 data-nosnippet>101</a>    <span class="doccomment">/// Reference to the shared part of the GC worker.  It is used for synchronization.
+<a href=#102 id=102 data-nosnippet>102</a>    </span><span class="kw">pub </span>shared: Arc&lt;GCWorkerShared&lt;VM&gt;&gt;,
+<a href=#103 id=103 data-nosnippet>103</a>    <span class="doccomment">/// Local work packet queue.
+<a href=#104 id=104 data-nosnippet>104</a>    </span><span class="kw">pub </span>local_work_buffer: deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
+<a href=#105 id=105 data-nosnippet>105</a>}
+<a href=#106 id=106 data-nosnippet>106</a>
+<a href=#107 id=107 data-nosnippet>107</a><span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Sync <span class="kw">for </span>GCWorkerShared&lt;VM&gt; {}
+<a href=#108 id=108 data-nosnippet>108</a><span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Send <span class="kw">for </span>GCWorkerShared&lt;VM&gt; {}
+<a href=#109 id=109 data-nosnippet>109</a>
+<a href=#110 id=110 data-nosnippet>110</a><span class="comment">// Error message for borrowing `GCWorkerShared::stat`.
+<a href=#111 id=111 data-nosnippet>111</a></span><span class="kw">const </span>STAT_BORROWED_MSG: <span class="kw-2">&amp;</span>str = <span class="string">"GCWorkerShared.stat is already borrowed.  This may happen if \
+<a href=#112 id=112 data-nosnippet>112</a>    the mutator calls harness_begin or harness_end while the GC is running."</span>;
+<a href=#113 id=113 data-nosnippet>113</a>
+<a href=#114 id=114 data-nosnippet>114</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorkerShared&lt;VM&gt; {
+<a href=#115 id=115 data-nosnippet>115</a>    <span class="doccomment">/// Immutably borrow this worker's local statistics.
+<a href=#116 id=116 data-nosnippet>116</a>    </span><span class="kw">pub fn </span>borrow_stat(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AtomicRef&lt;<span class="lifetime">'_</span>, WorkerLocalStat&lt;VM&gt;&gt; {
+<a href=#117 id=117 data-nosnippet>117</a>        <span class="self">self</span>.stat.try_borrow().expect(STAT_BORROWED_MSG)
+<a href=#118 id=118 data-nosnippet>118</a>    }
+<a href=#119 id=119 data-nosnippet>119</a>
+<a href=#120 id=120 data-nosnippet>120</a>    <span class="doccomment">/// Mutably borrow this worker's local statistics.
+<a href=#121 id=121 data-nosnippet>121</a>    </span><span class="kw">pub fn </span>borrow_stat_mut(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AtomicRefMut&lt;<span class="lifetime">'_</span>, WorkerLocalStat&lt;VM&gt;&gt; {
+<a href=#122 id=122 data-nosnippet>122</a>        <span class="self">self</span>.stat.try_borrow_mut().expect(STAT_BORROWED_MSG)
+<a href=#123 id=123 data-nosnippet>123</a>    }
+<a href=#124 id=124 data-nosnippet>124</a>}
+<a href=#125 id=125 data-nosnippet>125</a>
+<a href=#126 id=126 data-nosnippet>126</a><span class="doccomment">/// A special error type that indicate a worker should exit.
+<a href=#127 id=127 data-nosnippet>127</a>/// This may happen if the VM needs to fork and asks workers to exit.
+<a href=#128 id=128 data-nosnippet>128</a></span><span class="attr">#[derive(Debug)]
+<a href=#129 id=129 data-nosnippet>129</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WorkerShouldExit;
+<a href=#130 id=130 data-nosnippet>130</a>
+<a href=#131 id=131 data-nosnippet>131</a><span class="doccomment">/// The result type of `GCWorker::pool`.
+<a href=#132 id=132 data-nosnippet>132</a>/// Too many functions return `Option&lt;Box&lt;dyn GCWork&lt;VM&gt;&gt;&gt;`.  In most cases, when `None` is
+<a href=#133 id=133 data-nosnippet>133</a>/// returned, the caller should try getting work packets from another place.  To avoid confusion,
+<a href=#134 id=134 data-nosnippet>134</a>/// we use `Err(WorkerShouldExit)` to clearly indicate that the worker should exit immediately.
+<a href=#135 id=135 data-nosnippet>135</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">type </span>PollResult&lt;VM&gt; = <span class="prelude-ty">Result</span>&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;, WorkerShouldExit&gt;;
+<a href=#136 id=136 data-nosnippet>136</a>
+<a href=#137 id=137 data-nosnippet>137</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorker&lt;VM&gt; {
+<a href=#138 id=138 data-nosnippet>138</a>    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
+<a href=#139 id=139 data-nosnippet>139</a>        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
+<a href=#140 id=140 data-nosnippet>140</a>        ordinal: ThreadId,
+<a href=#141 id=141 data-nosnippet>141</a>        scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
+<a href=#142 id=142 data-nosnippet>142</a>        shared: Arc&lt;GCWorkerShared&lt;VM&gt;&gt;,
+<a href=#143 id=143 data-nosnippet>143</a>        local_work_buffer: deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
+<a href=#144 id=144 data-nosnippet>144</a>    ) -&gt; <span class="self">Self </span>{
+<a href=#145 id=145 data-nosnippet>145</a>        <span class="self">Self </span>{
+<a href=#146 id=146 data-nosnippet>146</a>            tls: VMWorkerThread(VMThread::UNINITIALIZED),
+<a href=#147 id=147 data-nosnippet>147</a>            ordinal,
+<a href=#148 id=148 data-nosnippet>148</a>            <span class="comment">// We will set this later
+<a href=#149 id=149 data-nosnippet>149</a>            </span>copy: GCWorkerCopyContext::new_non_copy(),
+<a href=#150 id=150 data-nosnippet>150</a>            scheduler,
+<a href=#151 id=151 data-nosnippet>151</a>            mmtk,
+<a href=#152 id=152 data-nosnippet>152</a>            shared,
+<a href=#153 id=153 data-nosnippet>153</a>            local_work_buffer,
+<a href=#154 id=154 data-nosnippet>154</a>        }
+<a href=#155 id=155 data-nosnippet>155</a>    }
+<a href=#156 id=156 data-nosnippet>156</a>
+<a href=#157 id=157 data-nosnippet>157</a>    <span class="kw">const </span>LOCALLY_CACHED_WORK_PACKETS: usize = <span class="number">16</span>;
+<a href=#158 id=158 data-nosnippet>158</a>
+<a href=#159 id=159 data-nosnippet>159</a>    <span class="doccomment">/// Add a boxed work packet to the work queue, in the given bucket.
+<a href=#160 id=160 data-nosnippet>160</a>    /// Like [`GCWorker::add_work`], but the work packet is already boxed.
+<a href=#161 id=161 data-nosnippet>161</a>    </span><span class="kw">pub fn </span>add_boxed_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, bucket: WorkBucketStage, work: Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;) {
+<a href=#162 id=162 data-nosnippet>162</a>        <span class="kw">if </span>!<span class="self">self</span>.scheduler().work_buckets[bucket].is_open()
+<a href=#163 id=163 data-nosnippet>163</a>            || <span class="self">self</span>.local_work_buffer.len() &gt;= <span class="self">Self</span>::LOCALLY_CACHED_WORK_PACKETS
+<a href=#164 id=164 data-nosnippet>164</a>        {
+<a href=#165 id=165 data-nosnippet>165</a>            <span class="self">self</span>.scheduler.work_buckets[bucket].add_boxed(work);
+<a href=#166 id=166 data-nosnippet>166</a>            <span class="kw">return</span>;
+<a href=#167 id=167 data-nosnippet>167</a>        }
+<a href=#168 id=168 data-nosnippet>168</a>        <span class="self">self</span>.local_work_buffer.push(work);
+<a href=#169 id=169 data-nosnippet>169</a>    }
+<a href=#170 id=170 data-nosnippet>170</a>
+<a href=#171 id=171 data-nosnippet>171</a>    <span class="doccomment">/// Add a work packet to the work queue.
+<a href=#172 id=172 data-nosnippet>172</a>    /// If the bucket is open, the packet will be pushed to the local queue, otherwise it will be
+<a href=#173 id=173 data-nosnippet>173</a>    /// pushed to the global bucket.
+<a href=#174 id=174 data-nosnippet>174</a>    </span><span class="kw">pub fn </span>add_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, bucket: WorkBucketStage, work: <span class="kw">impl </span>GCWork&lt;VM&gt;) {
+<a href=#175 id=175 data-nosnippet>175</a>        <span class="kw">if </span>!<span class="self">self</span>.scheduler().work_buckets[bucket].is_open()
+<a href=#176 id=176 data-nosnippet>176</a>            || <span class="self">self</span>.local_work_buffer.len() &gt;= <span class="self">Self</span>::LOCALLY_CACHED_WORK_PACKETS
+<a href=#177 id=177 data-nosnippet>177</a>        {
+<a href=#178 id=178 data-nosnippet>178</a>            <span class="self">self</span>.scheduler.work_buckets[bucket].add(work);
+<a href=#179 id=179 data-nosnippet>179</a>            <span class="kw">return</span>;
+<a href=#180 id=180 data-nosnippet>180</a>        }
+<a href=#181 id=181 data-nosnippet>181</a>        <span class="self">self</span>.local_work_buffer.push(Box::new(work));
+<a href=#182 id=182 data-nosnippet>182</a>    }
+<a href=#183 id=183 data-nosnippet>183</a>
+<a href=#184 id=184 data-nosnippet>184</a>    <span class="doccomment">/// Get the scheduler. There is only one scheduler per MMTk instance.
+<a href=#185 id=185 data-nosnippet>185</a>    </span><span class="kw">pub fn </span>scheduler(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt; {
+<a href=#186 id=186 data-nosnippet>186</a>        <span class="kw-2">&amp;</span><span class="self">self</span>.scheduler
+<a href=#187 id=187 data-nosnippet>187</a>    }
+<a href=#188 id=188 data-nosnippet>188</a>
+<a href=#189 id=189 data-nosnippet>189</a>    <span class="doccomment">/// Get a mutable reference of the copy context for this worker.
+<a href=#190 id=190 data-nosnippet>190</a>    </span><span class="kw">pub fn </span>get_copy_context_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>GCWorkerCopyContext&lt;VM&gt; {
+<a href=#191 id=191 data-nosnippet>191</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>.copy
+<a href=#192 id=192 data-nosnippet>192</a>    }
+<a href=#193 id=193 data-nosnippet>193</a>
+<a href=#194 id=194 data-nosnippet>194</a>    <span class="doccomment">/// Poll a ready-to-execute work packet in the following order:
+<a href=#195 id=195 data-nosnippet>195</a>    ///
+<a href=#196 id=196 data-nosnippet>196</a>    /// 1. Any packet that should be processed only by this worker.
+<a href=#197 id=197 data-nosnippet>197</a>    /// 2. Poll from the local work queue.
+<a href=#198 id=198 data-nosnippet>198</a>    /// 3. Poll from open global work-buckets
+<a href=#199 id=199 data-nosnippet>199</a>    /// 4. Steal from other workers
+<a href=#200 id=200 data-nosnippet>200</a>    </span><span class="kw">fn </span>poll(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; PollResult&lt;VM&gt; {
+<a href=#201 id=201 data-nosnippet>201</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(work) = <span class="self">self</span>.shared.designated_work.pop() {
+<a href=#202 id=202 data-nosnippet>202</a>            <span class="kw">return </span><span class="prelude-val">Ok</span>(work);
+<a href=#203 id=203 data-nosnippet>203</a>        }
+<a href=#204 id=204 data-nosnippet>204</a>
+<a href=#205 id=205 data-nosnippet>205</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(work) = <span class="self">self</span>.local_work_buffer.pop() {
+<a href=#206 id=206 data-nosnippet>206</a>            <span class="kw">return </span><span class="prelude-val">Ok</span>(work);
+<a href=#207 id=207 data-nosnippet>207</a>        }
+<a href=#208 id=208 data-nosnippet>208</a>
+<a href=#209 id=209 data-nosnippet>209</a>        <span class="self">self</span>.scheduler().poll(<span class="self">self</span>)
+<a href=#210 id=210 data-nosnippet>210</a>    }
+<a href=#211 id=211 data-nosnippet>211</a>
+<a href=#212 id=212 data-nosnippet>212</a>    <span class="doccomment">/// Entry point of the worker thread.
 <a href=#213 id=213 data-nosnippet>213</a>    ///
-<a href=#214 id=214 data-nosnippet>214</a>    /// Each worker will keep polling and executing work packets in a loop.  It runs until the
-<a href=#215 id=215 data-nosnippet>215</a>    /// worker is requested to exit.  Currently a worker may exit after
-<a href=#216 id=216 data-nosnippet>216</a>    /// [`crate::mmtk::MMTK::prepare_to_fork`] is called.
-<a href=#217 id=217 data-nosnippet>217</a>    ///
-<a href=#218 id=218 data-nosnippet>218</a>    /// Arguments:
-<a href=#219 id=219 data-nosnippet>219</a>    /// * `tls`: The VM-specific thread-local storage for this GC worker thread.
-<a href=#220 id=220 data-nosnippet>220</a>    /// * `mmtk`: A reference to an MMTk instance.
-<a href=#221 id=221 data-nosnippet>221</a>    </span><span class="kw">pub fn </span>run(<span class="kw-2">mut </span><span class="self">self</span>: Box&lt;<span class="self">Self</span>&gt;, tls: VMWorkerThread, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-<a href=#222 id=222 data-nosnippet>222</a>        <span class="macro">probe!</span>(mmtk, gcworker_run);
-<a href=#223 id=223 data-nosnippet>223</a>        <span class="macro">debug!</span>(
-<a href=#224 id=224 data-nosnippet>224</a>            <span class="string">"Worker started. ordinal: {}, {}"</span>,
-<a href=#225 id=225 data-nosnippet>225</a>            <span class="self">self</span>.ordinal,
-<a href=#226 id=226 data-nosnippet>226</a>            <span class="kw">crate</span>::util::rust_util::debug_process_thread_id(),
-<a href=#227 id=227 data-nosnippet>227</a>        );
-<a href=#228 id=228 data-nosnippet>228</a>        WORKER_ORDINAL.with(|x| x.store(<span class="self">self</span>.ordinal, Ordering::SeqCst));
-<a href=#229 id=229 data-nosnippet>229</a>        <span class="self">self</span>.scheduler.resolve_affinity(<span class="self">self</span>.ordinal);
-<a href=#230 id=230 data-nosnippet>230</a>        <span class="self">self</span>.tls = tls;
-<a href=#231 id=231 data-nosnippet>231</a>        <span class="self">self</span>.copy = <span class="kw">crate</span>::plan::create_gc_worker_context(tls, mmtk);
-<a href=#232 id=232 data-nosnippet>232</a>        <span class="kw">loop </span>{
-<a href=#233 id=233 data-nosnippet>233</a>            <span class="comment">// Instead of having work_start and work_end tracepoints, we have
-<a href=#234 id=234 data-nosnippet>234</a>            // one tracepoint before polling for more work and one tracepoint
-<a href=#235 id=235 data-nosnippet>235</a>            // before executing the work.
-<a href=#236 id=236 data-nosnippet>236</a>            // This allows measuring the distribution of both the time needed
-<a href=#237 id=237 data-nosnippet>237</a>            // poll work (between work_poll and work), and the time needed to
-<a href=#238 id=238 data-nosnippet>238</a>            // execute work (between work and next work_poll).
-<a href=#239 id=239 data-nosnippet>239</a>            // If we have work_start and work_end, we cannot measure the first
-<a href=#240 id=240 data-nosnippet>240</a>            // poll.
-<a href=#241 id=241 data-nosnippet>241</a>            </span><span class="macro">probe!</span>(mmtk, work_poll);
-<a href=#242 id=242 data-nosnippet>242</a>            <span class="kw">let </span><span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>work) = <span class="self">self</span>.poll() <span class="kw">else </span>{
-<a href=#243 id=243 data-nosnippet>243</a>                <span class="comment">// The worker is asked to exit.  Break from the loop.
-<a href=#244 id=244 data-nosnippet>244</a>                </span><span class="kw">break</span>;
-<a href=#245 id=245 data-nosnippet>245</a>            };
-<a href=#246 id=246 data-nosnippet>246</a>            <span class="comment">// probe! expands to an empty block on unsupported platforms
-<a href=#247 id=247 data-nosnippet>247</a>            </span><span class="attr">#[allow(unused_variables)]
-<a href=#248 id=248 data-nosnippet>248</a>            </span><span class="kw">let </span>typename = work.get_type_name();
-<a href=#249 id=249 data-nosnippet>249</a>
-<a href=#250 id=250 data-nosnippet>250</a>            <span class="attr">#[cfg(feature = <span class="string">"bpftrace_workaround"</span>)]
-<a href=#251 id=251 data-nosnippet>251</a>            </span><span class="comment">// Workaround a problem where bpftrace script cannot see the work packet names,
-<a href=#252 id=252 data-nosnippet>252</a>            // by force loading from the packet name.
-<a href=#253 id=253 data-nosnippet>253</a>            // See the "Known issues" section in `tools/tracing/timeline/README.md`
-<a href=#254 id=254 data-nosnippet>254</a>            </span>std::hint::black_box(<span class="kw">unsafe </span>{ <span class="kw-2">*</span>(typename.as_ptr()) });
-<a href=#255 id=255 data-nosnippet>255</a>
-<a href=#256 id=256 data-nosnippet>256</a>            <span class="macro">probe!</span>(mmtk, work, typename.as_ptr(), typename.len());
-<a href=#257 id=257 data-nosnippet>257</a>            <span class="macro">debug_assert!</span>(
-<a href=#258 id=258 data-nosnippet>258</a>                <span class="self">self</span>.scheduler().is_worker_active(<span class="self">self</span>.ordinal),
-<a href=#259 id=259 data-nosnippet>259</a>                <span class="string">"Worker {} is executing {} while inactive."</span>,
-<a href=#260 id=260 data-nosnippet>260</a>                <span class="self">self</span>.ordinal,
-<a href=#261 id=261 data-nosnippet>261</a>                typename
-<a href=#262 id=262 data-nosnippet>262</a>            );
-<a href=#263 id=263 data-nosnippet>263</a>            work.do_work_with_stat(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk);
-<a href=#264 id=264 data-nosnippet>264</a>        }
-<a href=#265 id=265 data-nosnippet>265</a>        <span class="macro">debug!</span>(
-<a href=#266 id=266 data-nosnippet>266</a>            <span class="string">"Worker exiting. ordinal: {}, {}"</span>,
-<a href=#267 id=267 data-nosnippet>267</a>            <span class="self">self</span>.ordinal,
-<a href=#268 id=268 data-nosnippet>268</a>            <span class="kw">crate</span>::util::rust_util::debug_process_thread_id(),
-<a href=#269 id=269 data-nosnippet>269</a>        );
-<a href=#270 id=270 data-nosnippet>270</a>        <span class="macro">probe!</span>(mmtk, gcworker_exit);
-<a href=#271 id=271 data-nosnippet>271</a>
-<a href=#272 id=272 data-nosnippet>272</a>        mmtk.scheduler.surrender_gc_worker(<span class="self">self</span>);
-<a href=#273 id=273 data-nosnippet>273</a>    }
-<a href=#274 id=274 data-nosnippet>274</a>}
-<a href=#275 id=275 data-nosnippet>275</a>
-<a href=#276 id=276 data-nosnippet>276</a><span class="doccomment">/// Stateful part of [`WorkerGroup`].
-<a href=#277 id=277 data-nosnippet>277</a></span><span class="kw">enum </span>WorkerCreationState&lt;VM: VMBinding&gt; {
-<a href=#278 id=278 data-nosnippet>278</a>    <span class="doccomment">/// The initial state.  `GCWorker` structs have not been created and GC worker threads have not
-<a href=#279 id=279 data-nosnippet>279</a>    /// been spawn.
-<a href=#280 id=280 data-nosnippet>280</a>    </span>Initial {
-<a href=#281 id=281 data-nosnippet>281</a>        <span class="doccomment">/// The local work queues for to-be-created workers.
-<a href=#282 id=282 data-nosnippet>282</a>        </span>local_work_queues: Vec&lt;deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;,
-<a href=#283 id=283 data-nosnippet>283</a>    },
-<a href=#284 id=284 data-nosnippet>284</a>    <span class="doccomment">/// All worker threads are spawn and running.  `GCWorker` structs have been transferred to
-<a href=#285 id=285 data-nosnippet>285</a>    /// worker threads.
-<a href=#286 id=286 data-nosnippet>286</a>    </span>Spawned,
-<a href=#287 id=287 data-nosnippet>287</a>    <span class="doccomment">/// Worker threads are stopping, or have already stopped, for forking. Instances of `GCWorker`
-<a href=#288 id=288 data-nosnippet>288</a>    /// structs are collected here to be reused when GC workers are respawn.
-<a href=#289 id=289 data-nosnippet>289</a>    </span>Surrendered {
-<a href=#290 id=290 data-nosnippet>290</a>        <span class="doccomment">/// `GCWorker` instances not currently owned by active GC worker threads.  Once GC workers
-<a href=#291 id=291 data-nosnippet>291</a>        /// are respawn, they will take ownership of these `GCWorker` instances.
-<a href=#292 id=292 data-nosnippet>292</a>        </span><span class="comment">// Note: Clippy warns about `Vec&lt;Box&lt;T&gt;&gt;` because `Vec&lt;T&gt;` is already in the heap.
-<a href=#293 id=293 data-nosnippet>293</a>        // However, the purpose of this `Vec` is allowing GC worker threads to give their
-<a href=#294 id=294 data-nosnippet>294</a>        // `Box&lt;GCWorker&lt;VM&gt;&gt;` instances back to this pool.  Therefore, the `Box` is necessary.
-<a href=#295 id=295 data-nosnippet>295</a>        </span><span class="attr">#[allow(clippy::vec_box)]
-<a href=#296 id=296 data-nosnippet>296</a>        </span>workers: Vec&lt;Box&lt;GCWorker&lt;VM&gt;&gt;&gt;,
-<a href=#297 id=297 data-nosnippet>297</a>    },
-<a href=#298 id=298 data-nosnippet>298</a>}
-<a href=#299 id=299 data-nosnippet>299</a>
-<a href=#300 id=300 data-nosnippet>300</a><span class="doccomment">/// A worker group to manage all the GC workers.
-<a href=#301 id=301 data-nosnippet>301</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WorkerGroup&lt;VM: VMBinding&gt; {
-<a href=#302 id=302 data-nosnippet>302</a>    <span class="doccomment">/// Shared worker data
-<a href=#303 id=303 data-nosnippet>303</a>    </span><span class="kw">pub </span>workers_shared: Vec&lt;Arc&lt;GCWorkerShared&lt;VM&gt;&gt;&gt;,
-<a href=#304 id=304 data-nosnippet>304</a>    <span class="doccomment">/// The stateful part.  `None` means state transition is underway.
-<a href=#305 id=305 data-nosnippet>305</a>    </span>state: Mutex&lt;<span class="prelude-ty">Option</span>&lt;WorkerCreationState&lt;VM&gt;&gt;&gt;,
-<a href=#306 id=306 data-nosnippet>306</a>}
-<a href=#307 id=307 data-nosnippet>307</a>
-<a href=#308 id=308 data-nosnippet>308</a><span class="doccomment">/// We have to persuade Rust that `WorkerGroup` is safe to share because the compiler thinks one
-<a href=#309 id=309 data-nosnippet>309</a>/// worker can refer to another worker via the path "worker -&gt; scheduler -&gt; worker_group -&gt;
-<a href=#310 id=310 data-nosnippet>310</a>/// `Surrendered::workers` -&gt; worker" which is cyclic reference and unsafe.
-<a href=#311 id=311 data-nosnippet>311</a></span><span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Sync <span class="kw">for </span>WorkerGroup&lt;VM&gt; {}
-<a href=#312 id=312 data-nosnippet>312</a>
-<a href=#313 id=313 data-nosnippet>313</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; WorkerGroup&lt;VM&gt; {
-<a href=#314 id=314 data-nosnippet>314</a>    <span class="doccomment">/// Create a WorkerGroup
-<a href=#315 id=315 data-nosnippet>315</a>    </span><span class="kw">pub fn </span>new(num_workers: usize) -&gt; Arc&lt;<span class="self">Self</span>&gt; {
-<a href=#316 id=316 data-nosnippet>316</a>        <span class="kw">let </span>local_work_queues = (<span class="number">0</span>..num_workers)
-<a href=#317 id=317 data-nosnippet>317</a>            .map(|<span class="kw">_</span>| deque::Worker::new_fifo())
-<a href=#318 id=318 data-nosnippet>318</a>            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
-<a href=#319 id=319 data-nosnippet>319</a>
-<a href=#320 id=320 data-nosnippet>320</a>        <span class="kw">let </span>workers_shared = (<span class="number">0</span>..num_workers)
-<a href=#321 id=321 data-nosnippet>321</a>            .map(|i| {
-<a href=#322 id=322 data-nosnippet>322</a>                Arc::new(GCWorkerShared::&lt;VM&gt;::new(<span class="prelude-val">Some</span>(
-<a href=#323 id=323 data-nosnippet>323</a>                    local_work_queues[i].stealer(),
-<a href=#324 id=324 data-nosnippet>324</a>                )))
-<a href=#325 id=325 data-nosnippet>325</a>            })
-<a href=#326 id=326 data-nosnippet>326</a>            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
-<a href=#327 id=327 data-nosnippet>327</a>
-<a href=#328 id=328 data-nosnippet>328</a>        Arc::new(<span class="self">Self </span>{
-<a href=#329 id=329 data-nosnippet>329</a>            workers_shared,
-<a href=#330 id=330 data-nosnippet>330</a>            state: Mutex::new(<span class="prelude-val">Some</span>(WorkerCreationState::Initial { local_work_queues })),
-<a href=#331 id=331 data-nosnippet>331</a>        })
-<a href=#332 id=332 data-nosnippet>332</a>    }
-<a href=#333 id=333 data-nosnippet>333</a>
-<a href=#334 id=334 data-nosnippet>334</a>    <span class="doccomment">/// Spawn GC worker threads for the first time.
-<a href=#335 id=335 data-nosnippet>335</a>    </span><span class="kw">pub fn </span>initial_spawn(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
-<a href=#336 id=336 data-nosnippet>336</a>        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock().unwrap();
-<a href=#337 id=337 data-nosnippet>337</a>
-<a href=#338 id=338 data-nosnippet>338</a>        <span class="kw">let </span>WorkerCreationState::Initial { local_work_queues } = state.take().unwrap() <span class="kw">else </span>{
-<a href=#339 id=339 data-nosnippet>339</a>            <span class="macro">panic!</span>(<span class="string">"GCWorker structs have already been created"</span>);
-<a href=#340 id=340 data-nosnippet>340</a>        };
-<a href=#341 id=341 data-nosnippet>341</a>
-<a href=#342 id=342 data-nosnippet>342</a>        <span class="kw">let </span>workers = <span class="self">self</span>.create_workers(local_work_queues, mmtk);
-<a href=#343 id=343 data-nosnippet>343</a>        <span class="self">self</span>.spawn(workers, tls);
-<a href=#344 id=344 data-nosnippet>344</a>
-<a href=#345 id=345 data-nosnippet>345</a>        <span class="kw-2">*</span>state = <span class="prelude-val">Some</span>(WorkerCreationState::Spawned);
-<a href=#346 id=346 data-nosnippet>346</a>    }
-<a href=#347 id=347 data-nosnippet>347</a>
-<a href=#348 id=348 data-nosnippet>348</a>    <span class="doccomment">/// Respawn GC threads after stopping for forking.
-<a href=#349 id=349 data-nosnippet>349</a>    </span><span class="kw">pub fn </span>respawn(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread) {
-<a href=#350 id=350 data-nosnippet>350</a>        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock().unwrap();
-<a href=#351 id=351 data-nosnippet>351</a>
-<a href=#352 id=352 data-nosnippet>352</a>        <span class="kw">let </span>WorkerCreationState::Surrendered { workers } = state.take().unwrap() <span class="kw">else </span>{
-<a href=#353 id=353 data-nosnippet>353</a>            <span class="macro">panic!</span>(<span class="string">"GCWorker structs have not been created, yet."</span>);
-<a href=#354 id=354 data-nosnippet>354</a>        };
-<a href=#355 id=355 data-nosnippet>355</a>
-<a href=#356 id=356 data-nosnippet>356</a>        <span class="self">self</span>.spawn(workers, tls);
+<a href=#214 id=214 data-nosnippet>214</a>    /// This function will resolve thread affinity, if it has been specified by the user.
+<a href=#215 id=215 data-nosnippet>215</a>    ///
+<a href=#216 id=216 data-nosnippet>216</a>    /// Each worker will keep polling and executing work packets in a loop.  It runs until the
+<a href=#217 id=217 data-nosnippet>217</a>    /// worker is requested to exit.  Currently a worker may exit after
+<a href=#218 id=218 data-nosnippet>218</a>    /// [`crate::mmtk::MMTK::prepare_to_fork`] is called.
+<a href=#219 id=219 data-nosnippet>219</a>    ///
+<a href=#220 id=220 data-nosnippet>220</a>    /// Arguments:
+<a href=#221 id=221 data-nosnippet>221</a>    /// * `tls`: The VM-specific thread-local storage for this GC worker thread.
+<a href=#222 id=222 data-nosnippet>222</a>    /// * `mmtk`: A reference to an MMTk instance.
+<a href=#223 id=223 data-nosnippet>223</a>    </span><span class="kw">pub fn </span>run(<span class="kw-2">mut </span><span class="self">self</span>: Box&lt;<span class="self">Self</span>&gt;, tls: VMWorkerThread, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+<a href=#224 id=224 data-nosnippet>224</a>        <span class="macro">probe!</span>(mmtk, gcworker_run);
+<a href=#225 id=225 data-nosnippet>225</a>        <span class="macro">debug!</span>(
+<a href=#226 id=226 data-nosnippet>226</a>            <span class="string">"Worker started. ordinal: {}, {}"</span>,
+<a href=#227 id=227 data-nosnippet>227</a>            <span class="self">self</span>.ordinal,
+<a href=#228 id=228 data-nosnippet>228</a>            <span class="kw">crate</span>::util::rust_util::debug_process_thread_id(),
+<a href=#229 id=229 data-nosnippet>229</a>        );
+<a href=#230 id=230 data-nosnippet>230</a>        WORKER_ORDINAL.with(|x| x.store(<span class="self">self</span>.ordinal, Ordering::SeqCst));
+<a href=#231 id=231 data-nosnippet>231</a>        <span class="self">self</span>.scheduler.resolve_affinity(<span class="self">self</span>.ordinal);
+<a href=#232 id=232 data-nosnippet>232</a>        <span class="self">self</span>.tls = tls;
+<a href=#233 id=233 data-nosnippet>233</a>        <span class="self">self</span>.copy = <span class="kw">crate</span>::plan::create_gc_worker_context(tls, mmtk);
+<a href=#234 id=234 data-nosnippet>234</a>        <span class="kw">loop </span>{
+<a href=#235 id=235 data-nosnippet>235</a>            <span class="comment">// Instead of having work_start and work_end tracepoints, we have
+<a href=#236 id=236 data-nosnippet>236</a>            // one tracepoint before polling for more work and one tracepoint
+<a href=#237 id=237 data-nosnippet>237</a>            // before executing the work.
+<a href=#238 id=238 data-nosnippet>238</a>            // This allows measuring the distribution of both the time needed
+<a href=#239 id=239 data-nosnippet>239</a>            // poll work (between work_poll and work), and the time needed to
+<a href=#240 id=240 data-nosnippet>240</a>            // execute work (between work and next work_poll).
+<a href=#241 id=241 data-nosnippet>241</a>            // If we have work_start and work_end, we cannot measure the first
+<a href=#242 id=242 data-nosnippet>242</a>            // poll.
+<a href=#243 id=243 data-nosnippet>243</a>            </span><span class="macro">probe!</span>(mmtk, work_poll);
+<a href=#244 id=244 data-nosnippet>244</a>            <span class="kw">let </span><span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>work) = <span class="self">self</span>.poll() <span class="kw">else </span>{
+<a href=#245 id=245 data-nosnippet>245</a>                <span class="comment">// The worker is asked to exit.  Break from the loop.
+<a href=#246 id=246 data-nosnippet>246</a>                </span><span class="kw">break</span>;
+<a href=#247 id=247 data-nosnippet>247</a>            };
+<a href=#248 id=248 data-nosnippet>248</a>            <span class="comment">// probe! expands to an empty block on unsupported platforms
+<a href=#249 id=249 data-nosnippet>249</a>            </span><span class="attr">#[allow(unused_variables)]
+<a href=#250 id=250 data-nosnippet>250</a>            </span><span class="kw">let </span>typename = work.get_type_name();
+<a href=#251 id=251 data-nosnippet>251</a>
+<a href=#252 id=252 data-nosnippet>252</a>            <span class="attr">#[cfg(feature = <span class="string">"bpftrace_workaround"</span>)]
+<a href=#253 id=253 data-nosnippet>253</a>            </span><span class="comment">// Workaround a problem where bpftrace script cannot see the work packet names,
+<a href=#254 id=254 data-nosnippet>254</a>            // by force loading from the packet name.
+<a href=#255 id=255 data-nosnippet>255</a>            // See the "Known issues" section in `tools/tracing/timeline/README.md`
+<a href=#256 id=256 data-nosnippet>256</a>            </span>std::hint::black_box(<span class="kw">unsafe </span>{ <span class="kw-2">*</span>(typename.as_ptr()) });
+<a href=#257 id=257 data-nosnippet>257</a>
+<a href=#258 id=258 data-nosnippet>258</a>            <span class="macro">probe!</span>(mmtk, work, typename.as_ptr(), typename.len());
+<a href=#259 id=259 data-nosnippet>259</a>            <span class="macro">debug_assert!</span>(
+<a href=#260 id=260 data-nosnippet>260</a>                <span class="self">self</span>.scheduler().is_worker_active(<span class="self">self</span>.ordinal),
+<a href=#261 id=261 data-nosnippet>261</a>                <span class="string">"Worker {} is executing {} while inactive."</span>,
+<a href=#262 id=262 data-nosnippet>262</a>                <span class="self">self</span>.ordinal,
+<a href=#263 id=263 data-nosnippet>263</a>                typename
+<a href=#264 id=264 data-nosnippet>264</a>            );
+<a href=#265 id=265 data-nosnippet>265</a>            work.do_work_with_stat(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk);
+<a href=#266 id=266 data-nosnippet>266</a>        }
+<a href=#267 id=267 data-nosnippet>267</a>        <span class="macro">debug!</span>(
+<a href=#268 id=268 data-nosnippet>268</a>            <span class="string">"Worker exiting. ordinal: {}, {}"</span>,
+<a href=#269 id=269 data-nosnippet>269</a>            <span class="self">self</span>.ordinal,
+<a href=#270 id=270 data-nosnippet>270</a>            <span class="kw">crate</span>::util::rust_util::debug_process_thread_id(),
+<a href=#271 id=271 data-nosnippet>271</a>        );
+<a href=#272 id=272 data-nosnippet>272</a>        <span class="macro">probe!</span>(mmtk, gcworker_exit);
+<a href=#273 id=273 data-nosnippet>273</a>
+<a href=#274 id=274 data-nosnippet>274</a>        mmtk.scheduler.surrender_gc_worker(<span class="self">self</span>);
+<a href=#275 id=275 data-nosnippet>275</a>    }
+<a href=#276 id=276 data-nosnippet>276</a>}
+<a href=#277 id=277 data-nosnippet>277</a>
+<a href=#278 id=278 data-nosnippet>278</a><span class="doccomment">/// Stateful part of [`WorkerGroup`].
+<a href=#279 id=279 data-nosnippet>279</a></span><span class="kw">enum </span>WorkerCreationState&lt;VM: VMBinding&gt; {
+<a href=#280 id=280 data-nosnippet>280</a>    <span class="doccomment">/// The initial state.  `GCWorker` structs have not been created and GC worker threads have not
+<a href=#281 id=281 data-nosnippet>281</a>    /// been spawn.
+<a href=#282 id=282 data-nosnippet>282</a>    </span>Initial {
+<a href=#283 id=283 data-nosnippet>283</a>        <span class="doccomment">/// The local work queues for to-be-created workers.
+<a href=#284 id=284 data-nosnippet>284</a>        </span>local_work_queues: Vec&lt;deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;,
+<a href=#285 id=285 data-nosnippet>285</a>    },
+<a href=#286 id=286 data-nosnippet>286</a>    <span class="doccomment">/// All worker threads are spawn and running.  `GCWorker` structs have been transferred to
+<a href=#287 id=287 data-nosnippet>287</a>    /// worker threads.
+<a href=#288 id=288 data-nosnippet>288</a>    </span>Spawned,
+<a href=#289 id=289 data-nosnippet>289</a>    <span class="doccomment">/// Worker threads are stopping, or have already stopped, for forking. Instances of `GCWorker`
+<a href=#290 id=290 data-nosnippet>290</a>    /// structs are collected here to be reused when GC workers are respawn.
+<a href=#291 id=291 data-nosnippet>291</a>    </span>Surrendered {
+<a href=#292 id=292 data-nosnippet>292</a>        <span class="doccomment">/// `GCWorker` instances not currently owned by active GC worker threads.  Once GC workers
+<a href=#293 id=293 data-nosnippet>293</a>        /// are respawn, they will take ownership of these `GCWorker` instances.
+<a href=#294 id=294 data-nosnippet>294</a>        </span><span class="comment">// Note: Clippy warns about `Vec&lt;Box&lt;T&gt;&gt;` because `Vec&lt;T&gt;` is already in the heap.
+<a href=#295 id=295 data-nosnippet>295</a>        // However, the purpose of this `Vec` is allowing GC worker threads to give their
+<a href=#296 id=296 data-nosnippet>296</a>        // `Box&lt;GCWorker&lt;VM&gt;&gt;` instances back to this pool.  Therefore, the `Box` is necessary.
+<a href=#297 id=297 data-nosnippet>297</a>        </span><span class="attr">#[allow(clippy::vec_box)]
+<a href=#298 id=298 data-nosnippet>298</a>        </span>workers: Vec&lt;Box&lt;GCWorker&lt;VM&gt;&gt;&gt;,
+<a href=#299 id=299 data-nosnippet>299</a>    },
+<a href=#300 id=300 data-nosnippet>300</a>}
+<a href=#301 id=301 data-nosnippet>301</a>
+<a href=#302 id=302 data-nosnippet>302</a><span class="doccomment">/// A worker group to manage all the GC workers.
+<a href=#303 id=303 data-nosnippet>303</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WorkerGroup&lt;VM: VMBinding&gt; {
+<a href=#304 id=304 data-nosnippet>304</a>    <span class="doccomment">/// Shared worker data
+<a href=#305 id=305 data-nosnippet>305</a>    </span><span class="kw">pub </span>workers_shared: Vec&lt;Arc&lt;GCWorkerShared&lt;VM&gt;&gt;&gt;,
+<a href=#306 id=306 data-nosnippet>306</a>    <span class="doccomment">/// The stateful part.  `None` means state transition is underway.
+<a href=#307 id=307 data-nosnippet>307</a>    </span>state: Mutex&lt;<span class="prelude-ty">Option</span>&lt;WorkerCreationState&lt;VM&gt;&gt;&gt;,
+<a href=#308 id=308 data-nosnippet>308</a>}
+<a href=#309 id=309 data-nosnippet>309</a>
+<a href=#310 id=310 data-nosnippet>310</a><span class="doccomment">/// We have to persuade Rust that `WorkerGroup` is safe to share because the compiler thinks one
+<a href=#311 id=311 data-nosnippet>311</a>/// worker can refer to another worker via the path "worker -&gt; scheduler -&gt; worker_group -&gt;
+<a href=#312 id=312 data-nosnippet>312</a>/// `Surrendered::workers` -&gt; worker" which is cyclic reference and unsafe.
+<a href=#313 id=313 data-nosnippet>313</a></span><span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Sync <span class="kw">for </span>WorkerGroup&lt;VM&gt; {}
+<a href=#314 id=314 data-nosnippet>314</a>
+<a href=#315 id=315 data-nosnippet>315</a><span class="kw">impl</span>&lt;VM: VMBinding&gt; WorkerGroup&lt;VM&gt; {
+<a href=#316 id=316 data-nosnippet>316</a>    <span class="doccomment">/// Create a WorkerGroup
+<a href=#317 id=317 data-nosnippet>317</a>    </span><span class="kw">pub fn </span>new(num_workers: usize) -&gt; Arc&lt;<span class="self">Self</span>&gt; {
+<a href=#318 id=318 data-nosnippet>318</a>        <span class="kw">let </span>local_work_queues = (<span class="number">0</span>..num_workers)
+<a href=#319 id=319 data-nosnippet>319</a>            .map(|<span class="kw">_</span>| deque::Worker::new_fifo())
+<a href=#320 id=320 data-nosnippet>320</a>            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+<a href=#321 id=321 data-nosnippet>321</a>
+<a href=#322 id=322 data-nosnippet>322</a>        <span class="kw">let </span>workers_shared = (<span class="number">0</span>..num_workers)
+<a href=#323 id=323 data-nosnippet>323</a>            .map(|i| {
+<a href=#324 id=324 data-nosnippet>324</a>                Arc::new(GCWorkerShared::&lt;VM&gt;::new(<span class="prelude-val">Some</span>(
+<a href=#325 id=325 data-nosnippet>325</a>                    local_work_queues[i].stealer(),
+<a href=#326 id=326 data-nosnippet>326</a>                )))
+<a href=#327 id=327 data-nosnippet>327</a>            })
+<a href=#328 id=328 data-nosnippet>328</a>            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+<a href=#329 id=329 data-nosnippet>329</a>
+<a href=#330 id=330 data-nosnippet>330</a>        Arc::new(<span class="self">Self </span>{
+<a href=#331 id=331 data-nosnippet>331</a>            workers_shared,
+<a href=#332 id=332 data-nosnippet>332</a>            state: Mutex::new(<span class="prelude-val">Some</span>(WorkerCreationState::Initial { local_work_queues })),
+<a href=#333 id=333 data-nosnippet>333</a>        })
+<a href=#334 id=334 data-nosnippet>334</a>    }
+<a href=#335 id=335 data-nosnippet>335</a>
+<a href=#336 id=336 data-nosnippet>336</a>    <span class="doccomment">/// Spawn GC worker threads for the first time.
+<a href=#337 id=337 data-nosnippet>337</a>    </span><span class="kw">pub fn </span>initial_spawn(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+<a href=#338 id=338 data-nosnippet>338</a>        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock().unwrap();
+<a href=#339 id=339 data-nosnippet>339</a>
+<a href=#340 id=340 data-nosnippet>340</a>        <span class="kw">let </span>WorkerCreationState::Initial { local_work_queues } = state.take().unwrap() <span class="kw">else </span>{
+<a href=#341 id=341 data-nosnippet>341</a>            <span class="macro">panic!</span>(<span class="string">"GCWorker structs have already been created"</span>);
+<a href=#342 id=342 data-nosnippet>342</a>        };
+<a href=#343 id=343 data-nosnippet>343</a>
+<a href=#344 id=344 data-nosnippet>344</a>        <span class="kw">let </span>workers = <span class="self">self</span>.create_workers(local_work_queues, mmtk);
+<a href=#345 id=345 data-nosnippet>345</a>        <span class="self">self</span>.spawn(workers, tls);
+<a href=#346 id=346 data-nosnippet>346</a>
+<a href=#347 id=347 data-nosnippet>347</a>        <span class="kw-2">*</span>state = <span class="prelude-val">Some</span>(WorkerCreationState::Spawned);
+<a href=#348 id=348 data-nosnippet>348</a>    }
+<a href=#349 id=349 data-nosnippet>349</a>
+<a href=#350 id=350 data-nosnippet>350</a>    <span class="doccomment">/// Respawn GC threads after stopping for forking.
+<a href=#351 id=351 data-nosnippet>351</a>    </span><span class="kw">pub fn </span>respawn(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread) {
+<a href=#352 id=352 data-nosnippet>352</a>        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock().unwrap();
+<a href=#353 id=353 data-nosnippet>353</a>
+<a href=#354 id=354 data-nosnippet>354</a>        <span class="kw">let </span>WorkerCreationState::Surrendered { workers } = state.take().unwrap() <span class="kw">else </span>{
+<a href=#355 id=355 data-nosnippet>355</a>            <span class="macro">panic!</span>(<span class="string">"GCWorker structs have not been created, yet."</span>);
+<a href=#356 id=356 data-nosnippet>356</a>        };
 <a href=#357 id=357 data-nosnippet>357</a>
-<a href=#358 id=358 data-nosnippet>358</a>        <span class="kw-2">*</span>state = <span class="prelude-val">Some</span>(WorkerCreationState::Spawned)
-<a href=#359 id=359 data-nosnippet>359</a>    }
-<a href=#360 id=360 data-nosnippet>360</a>
-<a href=#361 id=361 data-nosnippet>361</a>    <span class="doccomment">/// Create `GCWorker` instances.
-<a href=#362 id=362 data-nosnippet>362</a>    </span><span class="attr">#[allow(clippy::vec_box)] </span><span class="comment">// See `WorkerCreationState::Surrendered`.
-<a href=#363 id=363 data-nosnippet>363</a>    </span><span class="kw">fn </span>create_workers(
-<a href=#364 id=364 data-nosnippet>364</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
-<a href=#365 id=365 data-nosnippet>365</a>        local_work_queues: Vec&lt;deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;,
-<a href=#366 id=366 data-nosnippet>366</a>        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
-<a href=#367 id=367 data-nosnippet>367</a>    ) -&gt; Vec&lt;Box&lt;GCWorker&lt;VM&gt;&gt;&gt; {
-<a href=#368 id=368 data-nosnippet>368</a>        <span class="macro">debug!</span>(<span class="string">"Creating GCWorker instances..."</span>);
-<a href=#369 id=369 data-nosnippet>369</a>
-<a href=#370 id=370 data-nosnippet>370</a>        <span class="macro">assert_eq!</span>(<span class="self">self</span>.workers_shared.len(), local_work_queues.len());
+<a href=#358 id=358 data-nosnippet>358</a>        <span class="self">self</span>.spawn(workers, tls);
+<a href=#359 id=359 data-nosnippet>359</a>
+<a href=#360 id=360 data-nosnippet>360</a>        <span class="kw-2">*</span>state = <span class="prelude-val">Some</span>(WorkerCreationState::Spawned)
+<a href=#361 id=361 data-nosnippet>361</a>    }
+<a href=#362 id=362 data-nosnippet>362</a>
+<a href=#363 id=363 data-nosnippet>363</a>    <span class="doccomment">/// Create `GCWorker` instances.
+<a href=#364 id=364 data-nosnippet>364</a>    </span><span class="attr">#[allow(clippy::vec_box)] </span><span class="comment">// See `WorkerCreationState::Surrendered`.
+<a href=#365 id=365 data-nosnippet>365</a>    </span><span class="kw">fn </span>create_workers(
+<a href=#366 id=366 data-nosnippet>366</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#367 id=367 data-nosnippet>367</a>        local_work_queues: Vec&lt;deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;,
+<a href=#368 id=368 data-nosnippet>368</a>        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
+<a href=#369 id=369 data-nosnippet>369</a>    ) -&gt; Vec&lt;Box&lt;GCWorker&lt;VM&gt;&gt;&gt; {
+<a href=#370 id=370 data-nosnippet>370</a>        <span class="macro">debug!</span>(<span class="string">"Creating GCWorker instances..."</span>);
 <a href=#371 id=371 data-nosnippet>371</a>
-<a href=#372 id=372 data-nosnippet>372</a>        <span class="comment">// Each `GCWorker` instance corresponds to a `GCWorkerShared` at the same index.
-<a href=#373 id=373 data-nosnippet>373</a>        </span><span class="kw">let </span>workers = (local_work_queues.into_iter())
-<a href=#374 id=374 data-nosnippet>374</a>            .zip(<span class="self">self</span>.workers_shared.iter())
-<a href=#375 id=375 data-nosnippet>375</a>            .enumerate()
-<a href=#376 id=376 data-nosnippet>376</a>            .map(|(ordinal, (queue, shared))| {
-<a href=#377 id=377 data-nosnippet>377</a>                Box::new(GCWorker::new(
-<a href=#378 id=378 data-nosnippet>378</a>                    mmtk,
-<a href=#379 id=379 data-nosnippet>379</a>                    ordinal,
-<a href=#380 id=380 data-nosnippet>380</a>                    mmtk.scheduler.clone(),
-<a href=#381 id=381 data-nosnippet>381</a>                    shared.clone(),
-<a href=#382 id=382 data-nosnippet>382</a>                    queue,
-<a href=#383 id=383 data-nosnippet>383</a>                ))
-<a href=#384 id=384 data-nosnippet>384</a>            })
-<a href=#385 id=385 data-nosnippet>385</a>            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
-<a href=#386 id=386 data-nosnippet>386</a>
-<a href=#387 id=387 data-nosnippet>387</a>        <span class="macro">debug!</span>(<span class="string">"Created {} GCWorker instances."</span>, workers.len());
-<a href=#388 id=388 data-nosnippet>388</a>        workers
-<a href=#389 id=389 data-nosnippet>389</a>    }
-<a href=#390 id=390 data-nosnippet>390</a>
-<a href=#391 id=391 data-nosnippet>391</a>    <span class="doccomment">/// Spawn all the worker threads
-<a href=#392 id=392 data-nosnippet>392</a>    </span><span class="attr">#[allow(clippy::vec_box)] </span><span class="comment">// See `WorkerCreationState::Surrendered`.
-<a href=#393 id=393 data-nosnippet>393</a>    </span><span class="kw">fn </span>spawn(<span class="kw-2">&amp;</span><span class="self">self</span>, workers: Vec&lt;Box&lt;GCWorker&lt;VM&gt;&gt;&gt;, tls: VMThread) {
-<a href=#394 id=394 data-nosnippet>394</a>        <span class="macro">debug!</span>(
-<a href=#395 id=395 data-nosnippet>395</a>            <span class="string">"Spawning GC workers.  {}"</span>,
-<a href=#396 id=396 data-nosnippet>396</a>            <span class="kw">crate</span>::util::rust_util::debug_process_thread_id(),
-<a href=#397 id=397 data-nosnippet>397</a>        );
-<a href=#398 id=398 data-nosnippet>398</a>
-<a href=#399 id=399 data-nosnippet>399</a>        <span class="comment">// We transfer the ownership of each `GCWorker` instance to a GC thread.
-<a href=#400 id=400 data-nosnippet>400</a>        </span><span class="kw">for </span>worker <span class="kw">in </span>workers {
-<a href=#401 id=401 data-nosnippet>401</a>            VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::&lt;VM&gt;::Worker(worker));
-<a href=#402 id=402 data-nosnippet>402</a>        }
-<a href=#403 id=403 data-nosnippet>403</a>
-<a href=#404 id=404 data-nosnippet>404</a>        <span class="macro">debug!</span>(
-<a href=#405 id=405 data-nosnippet>405</a>            <span class="string">"Spawned {} worker threads.  {}"</span>,
-<a href=#406 id=406 data-nosnippet>406</a>            <span class="self">self</span>.worker_count(),
-<a href=#407 id=407 data-nosnippet>407</a>            <span class="kw">crate</span>::util::rust_util::debug_process_thread_id(),
-<a href=#408 id=408 data-nosnippet>408</a>        );
-<a href=#409 id=409 data-nosnippet>409</a>    }
-<a href=#410 id=410 data-nosnippet>410</a>
-<a href=#411 id=411 data-nosnippet>411</a>    <span class="doccomment">/// Prepare the buffer for workers to surrender their `GCWorker` structs.
-<a href=#412 id=412 data-nosnippet>412</a>    </span><span class="kw">pub fn </span>prepare_surrender_buffer(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-<a href=#413 id=413 data-nosnippet>413</a>        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock().unwrap();
-<a href=#414 id=414 data-nosnippet>414</a>        <span class="macro">assert!</span>(<span class="macro">matches!</span>(<span class="kw-2">*</span>state, <span class="prelude-val">Some</span>(WorkerCreationState::Spawned)));
-<a href=#415 id=415 data-nosnippet>415</a>
-<a href=#416 id=416 data-nosnippet>416</a>        <span class="kw-2">*</span>state = <span class="prelude-val">Some</span>(WorkerCreationState::Surrendered {
-<a href=#417 id=417 data-nosnippet>417</a>            workers: Vec::with_capacity(<span class="self">self</span>.worker_count()),
-<a href=#418 id=418 data-nosnippet>418</a>        })
-<a href=#419 id=419 data-nosnippet>419</a>    }
-<a href=#420 id=420 data-nosnippet>420</a>
-<a href=#421 id=421 data-nosnippet>421</a>    <span class="doccomment">/// Return the `GCWorker` struct to the worker group.
-<a href=#422 id=422 data-nosnippet>422</a>    /// This function returns `true` if all workers returned their `GCWorker` structs.
-<a href=#423 id=423 data-nosnippet>423</a>    </span><span class="kw">pub fn </span>surrender_gc_worker(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: Box&lt;GCWorker&lt;VM&gt;&gt;) -&gt; bool {
-<a href=#424 id=424 data-nosnippet>424</a>        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock().unwrap();
-<a href=#425 id=425 data-nosnippet>425</a>        <span class="kw">let </span>WorkerCreationState::Surrendered { <span class="kw-2">ref mut </span>workers } = state.as_mut().unwrap() <span class="kw">else </span>{
-<a href=#426 id=426 data-nosnippet>426</a>            <span class="macro">panic!</span>(<span class="string">"GCWorker structs have not been created, yet."</span>);
-<a href=#427 id=427 data-nosnippet>427</a>        };
-<a href=#428 id=428 data-nosnippet>428</a>        <span class="kw">let </span>ordinal = worker.ordinal;
-<a href=#429 id=429 data-nosnippet>429</a>        workers.push(worker);
-<a href=#430 id=430 data-nosnippet>430</a>        <span class="macro">trace!</span>(
-<a href=#431 id=431 data-nosnippet>431</a>            <span class="string">"Worker {} surrendered. ({}/{})"</span>,
-<a href=#432 id=432 data-nosnippet>432</a>            ordinal,
-<a href=#433 id=433 data-nosnippet>433</a>            workers.len(),
-<a href=#434 id=434 data-nosnippet>434</a>            <span class="self">self</span>.worker_count()
-<a href=#435 id=435 data-nosnippet>435</a>        );
-<a href=#436 id=436 data-nosnippet>436</a>        workers.len() == <span class="self">self</span>.worker_count()
-<a href=#437 id=437 data-nosnippet>437</a>    }
-<a href=#438 id=438 data-nosnippet>438</a>
-<a href=#439 id=439 data-nosnippet>439</a>    <span class="doccomment">/// Get the number of workers in the group
-<a href=#440 id=440 data-nosnippet>440</a>    </span><span class="kw">pub fn </span>worker_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-<a href=#441 id=441 data-nosnippet>441</a>        <span class="self">self</span>.workers_shared.len()
-<a href=#442 id=442 data-nosnippet>442</a>    }
-<a href=#443 id=443 data-nosnippet>443</a>
-<a href=#444 id=444 data-nosnippet>444</a>    <span class="doccomment">/// Return true if there're any pending designated work
-<a href=#445 id=445 data-nosnippet>445</a>    </span><span class="kw">pub fn </span>has_designated_work(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-<a href=#446 id=446 data-nosnippet>446</a>        <span class="self">self</span>.workers_shared
-<a href=#447 id=447 data-nosnippet>447</a>            .iter()
-<a href=#448 id=448 data-nosnippet>448</a>            .any(|w| !w.designated_work.is_empty())
-<a href=#449 id=449 data-nosnippet>449</a>    }
-<a href=#450 id=450 data-nosnippet>450</a>
-<a href=#451 id=451 data-nosnippet>451</a>    <span class="doccomment">/// Get the live bytes data from the worker, and clear the local data.
-<a href=#452 id=452 data-nosnippet>452</a>    </span><span class="kw">pub fn </span>get_and_clear_worker_live_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [usize; MAX_SPACES] {
-<a href=#453 id=453 data-nosnippet>453</a>        <span class="kw">let </span><span class="kw-2">mut </span>ret = [<span class="number">0</span>; MAX_SPACES];
-<a href=#454 id=454 data-nosnippet>454</a>        <span class="self">self</span>.workers_shared.iter().for_each(|w| {
-<a href=#455 id=455 data-nosnippet>455</a>            <span class="kw">let </span><span class="kw-2">mut </span>live_bytes_per_space = w.live_bytes_per_space.borrow_mut();
-<a href=#456 id=456 data-nosnippet>456</a>            <span class="kw">for </span>(idx, val) <span class="kw">in </span>live_bytes_per_space.iter_mut().enumerate() {
-<a href=#457 id=457 data-nosnippet>457</a>                ret[idx] += <span class="kw-2">*</span>val;
-<a href=#458 id=458 data-nosnippet>458</a>                <span class="kw-2">*</span>val = <span class="number">0</span>;
-<a href=#459 id=459 data-nosnippet>459</a>            }
-<a href=#460 id=460 data-nosnippet>460</a>        });
-<a href=#461 id=461 data-nosnippet>461</a>        ret
-<a href=#462 id=462 data-nosnippet>462</a>    }
-<a href=#463 id=463 data-nosnippet>463</a>}</code></pre></div></section></main></body></html>
+<a href=#372 id=372 data-nosnippet>372</a>        <span class="macro">assert_eq!</span>(<span class="self">self</span>.workers_shared.len(), local_work_queues.len());
+<a href=#373 id=373 data-nosnippet>373</a>
+<a href=#374 id=374 data-nosnippet>374</a>        <span class="comment">// Each `GCWorker` instance corresponds to a `GCWorkerShared` at the same index.
+<a href=#375 id=375 data-nosnippet>375</a>        </span><span class="kw">let </span>workers = (local_work_queues.into_iter())
+<a href=#376 id=376 data-nosnippet>376</a>            .zip(<span class="self">self</span>.workers_shared.iter())
+<a href=#377 id=377 data-nosnippet>377</a>            .enumerate()
+<a href=#378 id=378 data-nosnippet>378</a>            .map(|(ordinal, (queue, shared))| {
+<a href=#379 id=379 data-nosnippet>379</a>                Box::new(GCWorker::new(
+<a href=#380 id=380 data-nosnippet>380</a>                    mmtk,
+<a href=#381 id=381 data-nosnippet>381</a>                    ordinal,
+<a href=#382 id=382 data-nosnippet>382</a>                    mmtk.scheduler.clone(),
+<a href=#383 id=383 data-nosnippet>383</a>                    shared.clone(),
+<a href=#384 id=384 data-nosnippet>384</a>                    queue,
+<a href=#385 id=385 data-nosnippet>385</a>                ))
+<a href=#386 id=386 data-nosnippet>386</a>            })
+<a href=#387 id=387 data-nosnippet>387</a>            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+<a href=#388 id=388 data-nosnippet>388</a>
+<a href=#389 id=389 data-nosnippet>389</a>        <span class="macro">debug!</span>(<span class="string">"Created {} GCWorker instances."</span>, workers.len());
+<a href=#390 id=390 data-nosnippet>390</a>        workers
+<a href=#391 id=391 data-nosnippet>391</a>    }
+<a href=#392 id=392 data-nosnippet>392</a>
+<a href=#393 id=393 data-nosnippet>393</a>    <span class="doccomment">/// Spawn all the worker threads
+<a href=#394 id=394 data-nosnippet>394</a>    </span><span class="attr">#[allow(clippy::vec_box)] </span><span class="comment">// See `WorkerCreationState::Surrendered`.
+<a href=#395 id=395 data-nosnippet>395</a>    </span><span class="kw">fn </span>spawn(<span class="kw-2">&amp;</span><span class="self">self</span>, workers: Vec&lt;Box&lt;GCWorker&lt;VM&gt;&gt;&gt;, tls: VMThread) {
+<a href=#396 id=396 data-nosnippet>396</a>        <span class="macro">debug!</span>(
+<a href=#397 id=397 data-nosnippet>397</a>            <span class="string">"Spawning GC workers.  {}"</span>,
+<a href=#398 id=398 data-nosnippet>398</a>            <span class="kw">crate</span>::util::rust_util::debug_process_thread_id(),
+<a href=#399 id=399 data-nosnippet>399</a>        );
+<a href=#400 id=400 data-nosnippet>400</a>
+<a href=#401 id=401 data-nosnippet>401</a>        <span class="comment">// We transfer the ownership of each `GCWorker` instance to a GC thread.
+<a href=#402 id=402 data-nosnippet>402</a>        </span><span class="kw">for </span>worker <span class="kw">in </span>workers {
+<a href=#403 id=403 data-nosnippet>403</a>            VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::&lt;VM&gt;::Worker(worker));
+<a href=#404 id=404 data-nosnippet>404</a>        }
+<a href=#405 id=405 data-nosnippet>405</a>
+<a href=#406 id=406 data-nosnippet>406</a>        <span class="macro">debug!</span>(
+<a href=#407 id=407 data-nosnippet>407</a>            <span class="string">"Spawned {} worker threads.  {}"</span>,
+<a href=#408 id=408 data-nosnippet>408</a>            <span class="self">self</span>.worker_count(),
+<a href=#409 id=409 data-nosnippet>409</a>            <span class="kw">crate</span>::util::rust_util::debug_process_thread_id(),
+<a href=#410 id=410 data-nosnippet>410</a>        );
+<a href=#411 id=411 data-nosnippet>411</a>    }
+<a href=#412 id=412 data-nosnippet>412</a>
+<a href=#413 id=413 data-nosnippet>413</a>    <span class="doccomment">/// Prepare the buffer for workers to surrender their `GCWorker` structs.
+<a href=#414 id=414 data-nosnippet>414</a>    </span><span class="kw">pub fn </span>prepare_surrender_buffer(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+<a href=#415 id=415 data-nosnippet>415</a>        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock().unwrap();
+<a href=#416 id=416 data-nosnippet>416</a>        <span class="macro">assert!</span>(<span class="macro">matches!</span>(<span class="kw-2">*</span>state, <span class="prelude-val">Some</span>(WorkerCreationState::Spawned)));
+<a href=#417 id=417 data-nosnippet>417</a>
+<a href=#418 id=418 data-nosnippet>418</a>        <span class="kw-2">*</span>state = <span class="prelude-val">Some</span>(WorkerCreationState::Surrendered {
+<a href=#419 id=419 data-nosnippet>419</a>            workers: Vec::with_capacity(<span class="self">self</span>.worker_count()),
+<a href=#420 id=420 data-nosnippet>420</a>        })
+<a href=#421 id=421 data-nosnippet>421</a>    }
+<a href=#422 id=422 data-nosnippet>422</a>
+<a href=#423 id=423 data-nosnippet>423</a>    <span class="doccomment">/// Return the `GCWorker` struct to the worker group.
+<a href=#424 id=424 data-nosnippet>424</a>    /// This function returns `true` if all workers returned their `GCWorker` structs.
+<a href=#425 id=425 data-nosnippet>425</a>    </span><span class="kw">pub fn </span>surrender_gc_worker(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: Box&lt;GCWorker&lt;VM&gt;&gt;) -&gt; bool {
+<a href=#426 id=426 data-nosnippet>426</a>        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock().unwrap();
+<a href=#427 id=427 data-nosnippet>427</a>        <span class="kw">let </span>WorkerCreationState::Surrendered { <span class="kw-2">ref mut </span>workers } = state.as_mut().unwrap() <span class="kw">else </span>{
+<a href=#428 id=428 data-nosnippet>428</a>            <span class="macro">panic!</span>(<span class="string">"GCWorker structs have not been created, yet."</span>);
+<a href=#429 id=429 data-nosnippet>429</a>        };
+<a href=#430 id=430 data-nosnippet>430</a>        <span class="kw">let </span>ordinal = worker.ordinal;
+<a href=#431 id=431 data-nosnippet>431</a>        workers.push(worker);
+<a href=#432 id=432 data-nosnippet>432</a>        <span class="macro">trace!</span>(
+<a href=#433 id=433 data-nosnippet>433</a>            <span class="string">"Worker {} surrendered. ({}/{})"</span>,
+<a href=#434 id=434 data-nosnippet>434</a>            ordinal,
+<a href=#435 id=435 data-nosnippet>435</a>            workers.len(),
+<a href=#436 id=436 data-nosnippet>436</a>            <span class="self">self</span>.worker_count()
+<a href=#437 id=437 data-nosnippet>437</a>        );
+<a href=#438 id=438 data-nosnippet>438</a>        workers.len() == <span class="self">self</span>.worker_count()
+<a href=#439 id=439 data-nosnippet>439</a>    }
+<a href=#440 id=440 data-nosnippet>440</a>
+<a href=#441 id=441 data-nosnippet>441</a>    <span class="doccomment">/// Get the number of workers in the group
+<a href=#442 id=442 data-nosnippet>442</a>    </span><span class="kw">pub fn </span>worker_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+<a href=#443 id=443 data-nosnippet>443</a>        <span class="self">self</span>.workers_shared.len()
+<a href=#444 id=444 data-nosnippet>444</a>    }
+<a href=#445 id=445 data-nosnippet>445</a>
+<a href=#446 id=446 data-nosnippet>446</a>    <span class="doccomment">/// Return true if there're any pending designated work
+<a href=#447 id=447 data-nosnippet>447</a>    </span><span class="kw">pub fn </span>has_designated_work(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#448 id=448 data-nosnippet>448</a>        <span class="self">self</span>.workers_shared
+<a href=#449 id=449 data-nosnippet>449</a>            .iter()
+<a href=#450 id=450 data-nosnippet>450</a>            .any(|w| !w.designated_work.is_empty())
+<a href=#451 id=451 data-nosnippet>451</a>    }
+<a href=#452 id=452 data-nosnippet>452</a>
+<a href=#453 id=453 data-nosnippet>453</a>    <span class="doccomment">/// Get the live bytes data from the worker, and clear the local data.
+<a href=#454 id=454 data-nosnippet>454</a>    </span><span class="kw">pub fn </span>get_and_clear_worker_live_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [usize; MAX_SPACES] {
+<a href=#455 id=455 data-nosnippet>455</a>        <span class="kw">let </span><span class="kw-2">mut </span>ret = [<span class="number">0</span>; MAX_SPACES];
+<a href=#456 id=456 data-nosnippet>456</a>        <span class="self">self</span>.workers_shared.iter().for_each(|w| {
+<a href=#457 id=457 data-nosnippet>457</a>            <span class="kw">let </span><span class="kw-2">mut </span>live_bytes_per_space = w.live_bytes_per_space.borrow_mut();
+<a href=#458 id=458 data-nosnippet>458</a>            <span class="kw">for </span>(idx, val) <span class="kw">in </span>live_bytes_per_space.iter_mut().enumerate() {
+<a href=#459 id=459 data-nosnippet>459</a>                ret[idx] += <span class="kw-2">*</span>val;
+<a href=#460 id=460 data-nosnippet>460</a>                <span class="kw-2">*</span>val = <span class="number">0</span>;
+<a href=#461 id=461 data-nosnippet>461</a>            }
+<a href=#462 id=462 data-nosnippet>462</a>        });
+<a href=#463 id=463 data-nosnippet>463</a>        ret
+<a href=#464 id=464 data-nosnippet>464</a>    }
+<a href=#465 id=465 data-nosnippet>465</a>}</code></pre></div></section></main></body></html>

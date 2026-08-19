@@ -162,34 +162,63 @@
 <a href=#162 id=162 data-nosnippet>162</a>        }
 <a href=#163 id=163 data-nosnippet>163</a>    }
 <a href=#164 id=164 data-nosnippet>164</a>
-<a href=#165 id=165 data-nosnippet>165</a>    <span class="doccomment">/// Get chunk state. Return None if the chunk does not belong to the space.
-<a href=#166 id=166 data-nosnippet>166</a>    </span><span class="kw">pub fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk: Chunk) -&gt; <span class="prelude-ty">Option</span>&lt;ChunkState&gt; {
-<a href=#167 id=167 data-nosnippet>167</a>        <span class="kw">let </span>state = <span class="self">self</span>.get_internal(chunk);
-<a href=#168 id=168 data-nosnippet>168</a>        (state.is_allocated() &amp;&amp; state.get_space_index() == <span class="self">self</span>.space_index).then_some(state)
+<a href=#165 id=165 data-nosnippet>165</a>    <span class="kw">pub fn </span>is_allocated(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk: Chunk) -&gt; bool {
+<a href=#166 id=166 data-nosnippet>166</a>        <span class="self">self</span>.get(chunk)
+<a href=#167 id=167 data-nosnippet>167</a>            .map(|state| state.is_allocated())
+<a href=#168 id=168 data-nosnippet>168</a>            .unwrap_or_default()
 <a href=#169 id=169 data-nosnippet>169</a>    }
 <a href=#170 id=170 data-nosnippet>170</a>
-<a href=#171 id=171 data-nosnippet>171</a>    <span class="doccomment">/// Get chunk state, regardless of the space. This should always be private.
-<a href=#172 id=172 data-nosnippet>172</a>    </span><span class="kw">fn </span>get_internal(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk: Chunk) -&gt; ChunkState {
-<a href=#173 id=173 data-nosnippet>173</a>        <span class="kw">let </span>byte = <span class="kw">unsafe </span>{ <span class="self">Self</span>::ALLOC_TABLE.load::&lt;u8&gt;(chunk.start()) };
-<a href=#174 id=174 data-nosnippet>174</a>        ChunkState(byte)
+<a href=#171 id=171 data-nosnippet>171</a>    <span class="doccomment">/// Get chunk state. Return None if the chunk does not belong to the space.
+<a href=#172 id=172 data-nosnippet>172</a>    </span><span class="kw">pub fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk: Chunk) -&gt; <span class="prelude-ty">Option</span>&lt;ChunkState&gt; {
+<a href=#173 id=173 data-nosnippet>173</a>        <span class="kw">let </span>state = <span class="self">self</span>.get_internal(chunk);
+<a href=#174 id=174 data-nosnippet>174</a>        (state.is_allocated() &amp;&amp; state.get_space_index() == <span class="self">self</span>.space_index).then_some(state)
 <a href=#175 id=175 data-nosnippet>175</a>    }
 <a href=#176 id=176 data-nosnippet>176</a>
-<a href=#177 id=177 data-nosnippet>177</a>    <span class="doccomment">/// A range of all allocated chunks by this space in the heap.
-<a href=#178 id=178 data-nosnippet>178</a>    </span><span class="kw">pub fn </span>all_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = Chunk&gt; + <span class="lifetime">'_ </span>{
-<a href=#179 id=179 data-nosnippet>179</a>        <span class="kw">let </span>chunk_range = <span class="self">self</span>.chunk_range.lock();
-<a href=#180 id=180 data-nosnippet>180</a>        RegionIterator::&lt;Chunk&gt;::new(chunk_range.start, chunk_range.end)
-<a href=#181 id=181 data-nosnippet>181</a>            .filter(|c| <span class="self">self</span>.get(<span class="kw-2">*</span>c).is_some())
-<a href=#182 id=182 data-nosnippet>182</a>    }
-<a href=#183 id=183 data-nosnippet>183</a>
-<a href=#184 id=184 data-nosnippet>184</a>    <span class="doccomment">/// Helper function to create per-chunk processing work packets for each allocated chunks.
-<a href=#185 id=185 data-nosnippet>185</a>    </span><span class="kw">pub fn </span>generate_tasks&lt;VM: VMBinding&gt;(
-<a href=#186 id=186 data-nosnippet>186</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
-<a href=#187 id=187 data-nosnippet>187</a>        func: <span class="kw">impl </span>Fn(Chunk) -&gt; Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;,
-<a href=#188 id=188 data-nosnippet>188</a>    ) -&gt; Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; {
-<a href=#189 id=189 data-nosnippet>189</a>        <span class="kw">let </span><span class="kw-2">mut </span>work_packets: Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; = <span class="macro">vec!</span>[];
-<a href=#190 id=190 data-nosnippet>190</a>        <span class="kw">for </span>chunk <span class="kw">in </span><span class="self">self</span>.all_chunks() {
-<a href=#191 id=191 data-nosnippet>191</a>            work_packets.push(func(chunk));
-<a href=#192 id=192 data-nosnippet>192</a>        }
-<a href=#193 id=193 data-nosnippet>193</a>        work_packets
-<a href=#194 id=194 data-nosnippet>194</a>    }
-<a href=#195 id=195 data-nosnippet>195</a>}</code></pre></div></section></main></body></html>
+<a href=#177 id=177 data-nosnippet>177</a>    <span class="doccomment">/// Get chunk state, regardless of the space. This should always be private.
+<a href=#178 id=178 data-nosnippet>178</a>    </span><span class="kw">fn </span>get_internal(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk: Chunk) -&gt; ChunkState {
+<a href=#179 id=179 data-nosnippet>179</a>        <span class="kw">let </span>byte = <span class="kw">unsafe </span>{ <span class="self">Self</span>::ALLOC_TABLE.load::&lt;u8&gt;(chunk.start()) };
+<a href=#180 id=180 data-nosnippet>180</a>        ChunkState(byte)
+<a href=#181 id=181 data-nosnippet>181</a>    }
+<a href=#182 id=182 data-nosnippet>182</a>
+<a href=#183 id=183 data-nosnippet>183</a>    <span class="doccomment">/// A range of all allocated chunks by this space in the heap.
+<a href=#184 id=184 data-nosnippet>184</a>    </span><span class="kw">pub fn </span>all_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = Chunk&gt; + <span class="lifetime">'_ </span>{
+<a href=#185 id=185 data-nosnippet>185</a>        <span class="kw">let </span>chunk_range = <span class="self">self</span>.chunk_range.lock();
+<a href=#186 id=186 data-nosnippet>186</a>        RegionIterator::&lt;Chunk&gt;::new(chunk_range.start, chunk_range.end)
+<a href=#187 id=187 data-nosnippet>187</a>            .filter(|c| <span class="self">self</span>.get(<span class="kw-2">*</span>c).is_some())
+<a href=#188 id=188 data-nosnippet>188</a>    }
+<a href=#189 id=189 data-nosnippet>189</a>
+<a href=#190 id=190 data-nosnippet>190</a>    <span class="doccomment">/// Helper function to create per-chunk processing work packets for each allocated chunks.
+<a href=#191 id=191 data-nosnippet>191</a>    </span><span class="kw">pub fn </span>generate_tasks&lt;VM: VMBinding&gt;(
+<a href=#192 id=192 data-nosnippet>192</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#193 id=193 data-nosnippet>193</a>        func: <span class="kw">impl </span>Fn(Chunk) -&gt; Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;,
+<a href=#194 id=194 data-nosnippet>194</a>    ) -&gt; Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; {
+<a href=#195 id=195 data-nosnippet>195</a>        <span class="kw">let </span><span class="kw-2">mut </span>work_packets: Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; = <span class="macro">vec!</span>[];
+<a href=#196 id=196 data-nosnippet>196</a>        <span class="kw">for </span>chunk <span class="kw">in </span><span class="self">self</span>.all_chunks() {
+<a href=#197 id=197 data-nosnippet>197</a>            work_packets.push(func(chunk));
+<a href=#198 id=198 data-nosnippet>198</a>        }
+<a href=#199 id=199 data-nosnippet>199</a>        work_packets
+<a href=#200 id=200 data-nosnippet>200</a>    }
+<a href=#201 id=201 data-nosnippet>201</a>
+<a href=#202 id=202 data-nosnippet>202</a>    <span class="kw">pub fn </span>generate_tasks_batched&lt;VM: VMBinding&gt;(
+<a href=#203 id=203 data-nosnippet>203</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#204 id=204 data-nosnippet>204</a>        num_workers: usize,
+<a href=#205 id=205 data-nosnippet>205</a>        func: <span class="kw">impl </span>Fn(Range&lt;Chunk&gt;) -&gt; Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;,
+<a href=#206 id=206 data-nosnippet>206</a>    ) -&gt; Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; {
+<a href=#207 id=207 data-nosnippet>207</a>        <span class="kw">let </span><span class="kw-2">mut </span>work_packets: Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; = <span class="macro">vec!</span>[];
+<a href=#208 id=208 data-nosnippet>208</a>        <span class="kw">let </span>chunk_range = <span class="self">self</span>.chunk_range.lock();
+<a href=#209 id=209 data-nosnippet>209</a>        <span class="kw">let </span>chunks = (chunk_range.end.start() - chunk_range.start.start()) &gt;&gt; Chunk::LOG_BYTES;
+<a href=#210 id=210 data-nosnippet>210</a>        <span class="kw">let </span>num_bins = num_workers * <span class="number">8</span>;
+<a href=#211 id=211 data-nosnippet>211</a>        <span class="kw">let </span>bin_size = chunks.div_ceil(num_bins);
+<a href=#212 id=212 data-nosnippet>212</a>        <span class="kw">for </span>i <span class="kw">in </span>(<span class="number">0</span>..chunks).step_by(bin_size) {
+<a href=#213 id=213 data-nosnippet>213</a>            <span class="kw">let </span>start = chunk_range.start.next_nth(i);
+<a href=#214 id=214 data-nosnippet>214</a>            <span class="kw">let </span>end = chunk_range.start.next_nth(i + bin_size);
+<a href=#215 id=215 data-nosnippet>215</a>            <span class="kw">let </span>end = <span class="kw">if </span>end &gt; chunk_range.end {
+<a href=#216 id=216 data-nosnippet>216</a>                chunk_range.end
+<a href=#217 id=217 data-nosnippet>217</a>            } <span class="kw">else </span>{
+<a href=#218 id=218 data-nosnippet>218</a>                end
+<a href=#219 id=219 data-nosnippet>219</a>            };
+<a href=#220 id=220 data-nosnippet>220</a>            work_packets.push(func(start..end));
+<a href=#221 id=221 data-nosnippet>221</a>        }
+<a href=#222 id=222 data-nosnippet>222</a>        work_packets
+<a href=#223 id=223 data-nosnippet>223</a>    }
+<a href=#224 id=224 data-nosnippet>224</a>}</code></pre></div></section></main></body></html>

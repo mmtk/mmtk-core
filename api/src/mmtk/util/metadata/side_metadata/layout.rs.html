@@ -173,51 +173,57 @@
 <a href=#173 id=173 data-nosnippet>173</a>    <span class="kw">crate</span>::util::metadata::vo_bit::vo_bit_side_metadata_addr()
 <a href=#174 id=174 data-nosnippet>174</a>}
 <a href=#175 id=175 data-nosnippet>175</a>
-<a href=#176 id=176 data-nosnippet>176</a><span class="doccomment">/// The base address for the global side metadata space available to VM bindings, to be used for the per-object metadata.
-<a href=#177 id=177 data-nosnippet>177</a>/// VM bindings must use this to avoid overlap with core internal global side metadata.
-<a href=#178 id=178 data-nosnippet>178</a></span><span class="kw">pub fn </span>global_side_metadata_vm_base_address() -&gt; Address {
-<a href=#179 id=179 data-nosnippet>179</a>    <span class="kw">super</span>::spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC.upper_bound_address_for_contiguous()
-<a href=#180 id=180 data-nosnippet>180</a>}
-<a href=#181 id=181 data-nosnippet>181</a>
-<a href=#182 id=182 data-nosnippet>182</a><span class="doccomment">/// Total global side metadata bytes (independent of the runtime base address).
-<a href=#183 id=183 data-nosnippet>183</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>global_side_metadata_bytes() -&gt; usize {
-<a href=#184 id=184 data-nosnippet>184</a>    <span class="kw">let </span>end = <span class="kw">super</span>::spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC.upper_bound_offset();
-<a href=#185 id=185 data-nosnippet>185</a>    end.max(<span class="kw-2">*</span>VM_SIDE_METADATA_UPPER_BOUND_OFFSET.get().unwrap())
-<a href=#186 id=186 data-nosnippet>186</a>}
-<a href=#187 id=187 data-nosnippet>187</a>
-<a href=#188 id=188 data-nosnippet>188</a><span class="comment">// constants
-<a href=#189 id=189 data-nosnippet>189</a>
-<a href=#190 id=190 data-nosnippet>190</a></span><span class="doccomment">/// This constant represents the worst-case ratio of source data size to global side metadata.
-<a href=#191 id=191 data-nosnippet>191</a>/// A value of 2 means the space required for global side metadata must be less than 1/4th of the source data.
-<a href=#192 id=192 data-nosnippet>192</a>/// So, a value of `n` means this ratio must be less than $2^-n$.
-<a href=#193 id=193 data-nosnippet>193</a></span><span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
-<a href=#194 id=194 data-nosnippet>194</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO: usize = <span class="number">3</span>;
-<a href=#195 id=195 data-nosnippet>195</a><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
-<a href=#196 id=196 data-nosnippet>196</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO: usize = <span class="number">1</span>;
-<a href=#197 id=197 data-nosnippet>197</a>
-<a href=#198 id=198 data-nosnippet>198</a><span class="doccomment">/// This constant represents the worst-case ratio of source data size to global+local side metadata.
-<a href=#199 id=199 data-nosnippet>199</a>/// A value of 1 means the space required for global+local side metadata must be less than 1/2nd of the source data.
-<a href=#200 id=200 data-nosnippet>200</a>/// So, a value of `n` means this ratio must be less than $2^-n$.
-<a href=#201 id=201 data-nosnippet>201</a></span><span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
-<a href=#202 id=202 data-nosnippet>202</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = <span class="number">3</span>;
-<a href=#203 id=203 data-nosnippet>203</a><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
-<a href=#204 id=204 data-nosnippet>204</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = <span class="number">1</span>;
-<a href=#205 id=205 data-nosnippet>205</a>
-<a href=#206 id=206 data-nosnippet>206</a><span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
-<a href=#207 id=207 data-nosnippet>207</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOCAL_SIDE_METADATA_PER_CHUNK: usize =
-<a href=#208 id=208 data-nosnippet>208</a>    BYTES_IN_CHUNK &gt;&gt; LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;
-<a href=#209 id=209 data-nosnippet>209</a>
-<a href=#210 id=210 data-nosnippet>210</a><span class="doccomment">/// The base offset for the global side metadata available to VM bindings.
-<a href=#211 id=211 data-nosnippet>211</a></span><span class="kw">pub const </span>GLOBAL_SIDE_METADATA_VM_BASE_OFFSET: usize =
-<a href=#212 id=212 data-nosnippet>212</a>    <span class="kw">super</span>::spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC.upper_bound_offset();
-<a href=#213 id=213 data-nosnippet>213</a>
-<a href=#214 id=214 data-nosnippet>214</a><span class="doccomment">/// The base address for the local side metadata space available to VM bindings, to be used for the per-object metadata.
-<a href=#215 id=215 data-nosnippet>215</a>/// VM bindings must use this to avoid overlap with core internal local side metadata.
-<a href=#216 id=216 data-nosnippet>216</a></span><span class="kw">pub const </span>LOCAL_SIDE_METADATA_VM_BASE_OFFSET: usize =
-<a href=#217 id=217 data-nosnippet>217</a>    <span class="kw">super</span>::spec_defs::LAST_LOCAL_SIDE_METADATA_SPEC.upper_bound_offset();
-<a href=#218 id=218 data-nosnippet>218</a>
-<a href=#219 id=219 data-nosnippet>219</a><span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
-<a href=#220 id=220 data-nosnippet>220</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT: usize = <span class="number">0</span>;
-<a href=#221 id=221 data-nosnippet>221</a><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
-<a href=#222 id=222 data-nosnippet>222</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT: usize =
-<a href=#223 id=223 data-nosnippet>223</a>    side_metadata_offset_after(<span class="kw-2">&amp;</span><span class="kw">super</span>::spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC);</code></pre></div></section></main></body></html>
+<a href=#176 id=176 data-nosnippet>176</a><span class="doccomment">/// Base address of the LXR reference-counting table, public to VM bindings which may need to use this.
+<a href=#177 id=177 data-nosnippet>177</a></span><span class="kw">pub fn </span>rc_table_start_address() -&gt; Address {
+<a href=#178 id=178 data-nosnippet>178</a>    <span class="kw">crate</span>::util::rc::RC_TABLE.get_starting_address()
+<a href=#179 id=179 data-nosnippet>179</a>}
+<a href=#180 id=180 data-nosnippet>180</a>
+<a href=#181 id=181 data-nosnippet>181</a><span class="doccomment">/// The base address for the global side metadata space available to VM bindings, to be used for the per-object metadata.
+<a href=#182 id=182 data-nosnippet>182</a>/// VM bindings must use this to avoid overlap with core internal global side metadata.
+<a href=#183 id=183 data-nosnippet>183</a></span><span class="kw">pub fn </span>global_side_metadata_vm_base_address() -&gt; Address {
+<a href=#184 id=184 data-nosnippet>184</a>    <span class="kw">super</span>::spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC.upper_bound_address_for_contiguous()
+<a href=#185 id=185 data-nosnippet>185</a>}
+<a href=#186 id=186 data-nosnippet>186</a>
+<a href=#187 id=187 data-nosnippet>187</a><span class="doccomment">/// Total global side metadata bytes (independent of the runtime base address).
+<a href=#188 id=188 data-nosnippet>188</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>global_side_metadata_bytes() -&gt; usize {
+<a href=#189 id=189 data-nosnippet>189</a>    <span class="kw">let </span>end = <span class="kw">super</span>::spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC.upper_bound_offset();
+<a href=#190 id=190 data-nosnippet>190</a>    end.max(<span class="kw-2">*</span>VM_SIDE_METADATA_UPPER_BOUND_OFFSET.get().unwrap())
+<a href=#191 id=191 data-nosnippet>191</a>}
+<a href=#192 id=192 data-nosnippet>192</a>
+<a href=#193 id=193 data-nosnippet>193</a><span class="comment">// constants
+<a href=#194 id=194 data-nosnippet>194</a>
+<a href=#195 id=195 data-nosnippet>195</a></span><span class="doccomment">/// This constant represents the worst-case ratio of source data size to global side metadata.
+<a href=#196 id=196 data-nosnippet>196</a>/// A value of 2 means the space required for global side metadata must be less than 1/4th of the source data.
+<a href=#197 id=197 data-nosnippet>197</a>/// So, a value of `n` means this ratio must be less than $2^-n$.
+<a href=#198 id=198 data-nosnippet>198</a></span><span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
+<a href=#199 id=199 data-nosnippet>199</a></span><span class="comment">// FIXME: Increased from 3 to 2 to allow LXR with VO bit (which uses slightly more than 1/8th of the address space)
+<a href=#200 id=200 data-nosnippet>200</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO: usize = <span class="number">2</span>;
+<a href=#201 id=201 data-nosnippet>201</a><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
+<a href=#202 id=202 data-nosnippet>202</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO: usize = <span class="number">1</span>;
+<a href=#203 id=203 data-nosnippet>203</a>
+<a href=#204 id=204 data-nosnippet>204</a><span class="doccomment">/// This constant represents the worst-case ratio of source data size to global+local side metadata.
+<a href=#205 id=205 data-nosnippet>205</a>/// A value of 1 means the space required for global+local side metadata must be less than 1/2nd of the source data.
+<a href=#206 id=206 data-nosnippet>206</a>/// So, a value of `n` means this ratio must be less than $2^-n$.
+<a href=#207 id=207 data-nosnippet>207</a></span><span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
+<a href=#208 id=208 data-nosnippet>208</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = <span class="number">3</span>;
+<a href=#209 id=209 data-nosnippet>209</a><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
+<a href=#210 id=210 data-nosnippet>210</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = <span class="number">1</span>;
+<a href=#211 id=211 data-nosnippet>211</a>
+<a href=#212 id=212 data-nosnippet>212</a><span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
+<a href=#213 id=213 data-nosnippet>213</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOCAL_SIDE_METADATA_PER_CHUNK: usize =
+<a href=#214 id=214 data-nosnippet>214</a>    BYTES_IN_CHUNK &gt;&gt; LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;
+<a href=#215 id=215 data-nosnippet>215</a>
+<a href=#216 id=216 data-nosnippet>216</a><span class="doccomment">/// The base offset for the global side metadata available to VM bindings.
+<a href=#217 id=217 data-nosnippet>217</a></span><span class="kw">pub const </span>GLOBAL_SIDE_METADATA_VM_BASE_OFFSET: usize =
+<a href=#218 id=218 data-nosnippet>218</a>    <span class="kw">super</span>::spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC.upper_bound_offset();
+<a href=#219 id=219 data-nosnippet>219</a>
+<a href=#220 id=220 data-nosnippet>220</a><span class="doccomment">/// The base address for the local side metadata space available to VM bindings, to be used for the per-object metadata.
+<a href=#221 id=221 data-nosnippet>221</a>/// VM bindings must use this to avoid overlap with core internal local side metadata.
+<a href=#222 id=222 data-nosnippet>222</a></span><span class="kw">pub const </span>LOCAL_SIDE_METADATA_VM_BASE_OFFSET: usize =
+<a href=#223 id=223 data-nosnippet>223</a>    <span class="kw">super</span>::spec_defs::LAST_LOCAL_SIDE_METADATA_SPEC.upper_bound_offset();
+<a href=#224 id=224 data-nosnippet>224</a>
+<a href=#225 id=225 data-nosnippet>225</a><span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
+<a href=#226 id=226 data-nosnippet>226</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT: usize = <span class="number">0</span>;
+<a href=#227 id=227 data-nosnippet>227</a><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
+<a href=#228 id=228 data-nosnippet>228</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOCAL_SIDE_METADATA_BASE_OFFSET_FOR_LAYOUT: usize =
+<a href=#229 id=229 data-nosnippet>229</a>    side_metadata_offset_after(<span class="kw-2">&amp;</span><span class="kw">super</span>::spec_defs::LAST_GLOBAL_SIDE_METADATA_SPEC);</code></pre></div></section></main></body></html>

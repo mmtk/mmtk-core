@@ -93,10 +93,10 @@
 <a href=#93 id=93 data-nosnippet>93</a>        <span class="self">self</span>.release_inner(tls, UnlogBitsOperation::NoOp);
 <a href=#94 id=94 data-nosnippet>94</a>    }
 <a href=#95 id=95 data-nosnippet>95</a>
-<a href=#96 id=96 data-nosnippet>96</a>    <span class="kw">fn </span>end_of_pause(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;, tls: VMWorkerThread) {
+<a href=#96 id=96 data-nosnippet>96</a>    <span class="kw">fn </span>on_pause_end(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;, tls: VMWorkerThread) {
 <a href=#97 id=97 data-nosnippet>97</a>        <span class="self">self</span>.last_gc_was_defrag
 <a href=#98 id=98 data-nosnippet>98</a>            .store(<span class="self">self</span>.immix_space.end_of_gc(), Ordering::Relaxed);
-<a href=#99 id=99 data-nosnippet>99</a>        <span class="self">self</span>.common.end_of_pause(tls);
+<a href=#99 id=99 data-nosnippet>99</a>        <span class="self">self</span>.common.on_pause_end(tls);
 <a href=#100 id=100 data-nosnippet>100</a>        mmtk.gc_trigger.policy.on_gc_end(mmtk);
 <a href=#101 id=101 data-nosnippet>101</a>    }
 <a href=#102 id=102 data-nosnippet>102</a>

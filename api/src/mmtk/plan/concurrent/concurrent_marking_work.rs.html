@@ -3,7 +3,7 @@
 <a href=#3 id=3 data-nosnippet>3</a><span class="kw">use </span><span class="kw">crate</span>::plan::tracing::{PlanTrace, Trace};
 <a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span><span class="kw">crate</span>::plan::PlanTraceObject;
 <a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TraceKind;
-<a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span><span class="kw">crate</span>::scheduler::{GCWork, GCWorker, WorkBucketStage};
+<a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span><span class="kw">crate</span>::scheduler::{gc_work::RootKind, GCWork, GCWorker, WorkBucketStage};
 <a href=#7 id=7 data-nosnippet>7</a><span class="kw">use </span><span class="kw">crate</span>::util::{scanning_helper, ObjectReference};
 <a href=#8 id=8 data-nosnippet>8</a><span class="kw">use </span><span class="kw">crate</span>::vm::slot::Slot;
 <a href=#9 id=9 data-nosnippet>9</a><span class="kw">use </span><span class="kw">crate</span>::vm::{RootsKind, RootsWorkFactory, VMBinding};
@@ -202,59 +202,63 @@
 <a href=#202 id=202 data-nosnippet>202</a><span class="kw">impl</span>&lt;VM: VMBinding, P: ConcurrentPlan&lt;VM = VM&gt; + PlanTraceObject&lt;VM&gt;, <span class="kw">const </span>KIND: TraceKind&gt;
 <a href=#203 id=203 data-nosnippet>203</a>    RootsWorkFactory&lt;VM::VMSlot&gt; <span class="kw">for </span>ConcurrentMarkingRootsWorkFactory&lt;VM, P, KIND&gt;
 <a href=#204 id=204 data-nosnippet>204</a>{
-<a href=#205 id=205 data-nosnippet>205</a>    <span class="kw">fn </span>create_process_roots_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, slots: Vec&lt;VM::VMSlot&gt;) {
-<a href=#206 id=206 data-nosnippet>206</a>        <span class="macro">probe!</span>(mmtk, roots, RootsKind::NORMAL, slots.len());
-<a href=#207 id=207 data-nosnippet>207</a>
-<a href=#208 id=208 data-nosnippet>208</a>        <span class="self">self</span>.debug_assert_initial_mark();
-<a href=#209 id=209 data-nosnippet>209</a>
-<a href=#210 id=210 data-nosnippet>210</a>        <span class="comment">// We don't divide the `slots` vector into smaller chunks here.  We assume the VM binding
-<a href=#211 id=211 data-nosnippet>211</a>        // respects the constant `EDGES_WORK_BUFFER_SIZE` and provides lists of slots in reasonable
-<a href=#212 id=212 data-nosnippet>212</a>        // lengths.  Even if a single `ConcurrentTraceObjects` work packet is too large, it can
-<a href=#213 id=213 data-nosnippet>213</a>        // still break up the list during tracing using the constant `CONCURRENT_TRACE_OVERFLOW`.
-<a href=#214 id=214 data-nosnippet>214</a>        </span><span class="kw">let </span>nodes = slots
-<a href=#215 id=215 data-nosnippet>215</a>            .iter()
-<a href=#216 id=216 data-nosnippet>216</a>            .flat_map(|slot| slot.load())
-<a href=#217 id=217 data-nosnippet>217</a>            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
-<a href=#218 id=218 data-nosnippet>218</a>
-<a href=#219 id=219 data-nosnippet>219</a>        <span class="comment">// Note: During concurrent marking, mutators can overwrite the root slots and make the roots unstable.
-<a href=#220 id=220 data-nosnippet>220</a>        // Therefore, instead of recording the root slots, we record the loaded root nodes.
-<a href=#221 id=221 data-nosnippet>221</a>        </span><span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
-<a href=#222 id=222 data-nosnippet>222</a>        </span><span class="self">self</span>.mmtk
-<a href=#223 id=223 data-nosnippet>223</a>            .sanity_checker
-<a href=#224 id=224 data-nosnippet>224</a>            .lock()
-<a href=#225 id=225 data-nosnippet>225</a>            .unwrap()
-<a href=#226 id=226 data-nosnippet>226</a>            .add_root_nodes(nodes.clone());
-<a href=#227 id=227 data-nosnippet>227</a>
-<a href=#228 id=228 data-nosnippet>228</a>        <span class="self">self</span>.create_and_schedule_root_nodes_work(nodes);
-<a href=#229 id=229 data-nosnippet>229</a>    }
-<a href=#230 id=230 data-nosnippet>230</a>
-<a href=#231 id=231 data-nosnippet>231</a>    <span class="kw">fn </span>create_process_pinning_roots_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, nodes: Vec&lt;ObjectReference&gt;) {
-<a href=#232 id=232 data-nosnippet>232</a>        <span class="macro">probe!</span>(mmtk, roots, RootsKind::PINNING, nodes.len());
-<a href=#233 id=233 data-nosnippet>233</a>
-<a href=#234 id=234 data-nosnippet>234</a>        <span class="self">self</span>.debug_assert_initial_mark();
-<a href=#235 id=235 data-nosnippet>235</a>
-<a href=#236 id=236 data-nosnippet>236</a>        <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
-<a href=#237 id=237 data-nosnippet>237</a>        </span><span class="self">self</span>.mmtk
-<a href=#238 id=238 data-nosnippet>238</a>            .sanity_checker
-<a href=#239 id=239 data-nosnippet>239</a>            .lock()
-<a href=#240 id=240 data-nosnippet>240</a>            .unwrap()
-<a href=#241 id=241 data-nosnippet>241</a>            .add_root_nodes(nodes.clone());
-<a href=#242 id=242 data-nosnippet>242</a>
-<a href=#243 id=243 data-nosnippet>243</a>        <span class="self">self</span>.create_and_schedule_root_nodes_work(nodes);
-<a href=#244 id=244 data-nosnippet>244</a>    }
-<a href=#245 id=245 data-nosnippet>245</a>
-<a href=#246 id=246 data-nosnippet>246</a>    <span class="kw">fn </span>create_process_tpinning_roots_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, nodes: Vec&lt;ObjectReference&gt;) {
-<a href=#247 id=247 data-nosnippet>247</a>        <span class="macro">probe!</span>(mmtk, roots, RootsKind::TPINNING, nodes.len());
-<a href=#248 id=248 data-nosnippet>248</a>
-<a href=#249 id=249 data-nosnippet>249</a>        <span class="self">self</span>.debug_assert_initial_mark();
-<a href=#250 id=250 data-nosnippet>250</a>
-<a href=#251 id=251 data-nosnippet>251</a>        <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
-<a href=#252 id=252 data-nosnippet>252</a>        </span><span class="self">self</span>.mmtk
-<a href=#253 id=253 data-nosnippet>253</a>            .sanity_checker
-<a href=#254 id=254 data-nosnippet>254</a>            .lock()
-<a href=#255 id=255 data-nosnippet>255</a>            .unwrap()
-<a href=#256 id=256 data-nosnippet>256</a>            .add_root_nodes(nodes.clone());
-<a href=#257 id=257 data-nosnippet>257</a>
-<a href=#258 id=258 data-nosnippet>258</a>        <span class="self">self</span>.create_and_schedule_root_nodes_work(nodes);
-<a href=#259 id=259 data-nosnippet>259</a>    }
-<a href=#260 id=260 data-nosnippet>260</a>}</code></pre></div></section></main></body></html>
+<a href=#205 id=205 data-nosnippet>205</a>    <span class="kw">fn </span>create_process_roots_work_with_root_kind(
+<a href=#206 id=206 data-nosnippet>206</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+<a href=#207 id=207 data-nosnippet>207</a>        slots: Vec&lt;VM::VMSlot&gt;,
+<a href=#208 id=208 data-nosnippet>208</a>        _kind: RootKind,
+<a href=#209 id=209 data-nosnippet>209</a>    ) {
+<a href=#210 id=210 data-nosnippet>210</a>        <span class="macro">probe!</span>(mmtk, roots, RootsKind::NORMAL, slots.len());
+<a href=#211 id=211 data-nosnippet>211</a>
+<a href=#212 id=212 data-nosnippet>212</a>        <span class="self">self</span>.debug_assert_initial_mark();
+<a href=#213 id=213 data-nosnippet>213</a>
+<a href=#214 id=214 data-nosnippet>214</a>        <span class="comment">// We don't divide the `slots` vector into smaller chunks here.  We assume the VM binding
+<a href=#215 id=215 data-nosnippet>215</a>        // respects the constant `EDGES_WORK_BUFFER_SIZE` and provides lists of slots in reasonable
+<a href=#216 id=216 data-nosnippet>216</a>        // lengths.  Even if a single `ConcurrentTraceObjects` work packet is too large, it can
+<a href=#217 id=217 data-nosnippet>217</a>        // still break up the list during tracing using the constant `CONCURRENT_TRACE_OVERFLOW`.
+<a href=#218 id=218 data-nosnippet>218</a>        </span><span class="kw">let </span>nodes = slots
+<a href=#219 id=219 data-nosnippet>219</a>            .iter()
+<a href=#220 id=220 data-nosnippet>220</a>            .flat_map(|slot| slot.load())
+<a href=#221 id=221 data-nosnippet>221</a>            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+<a href=#222 id=222 data-nosnippet>222</a>
+<a href=#223 id=223 data-nosnippet>223</a>        <span class="comment">// Note: During concurrent marking, mutators can overwrite the root slots and make the roots unstable.
+<a href=#224 id=224 data-nosnippet>224</a>        // Therefore, instead of recording the root slots, we record the loaded root nodes.
+<a href=#225 id=225 data-nosnippet>225</a>        </span><span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
+<a href=#226 id=226 data-nosnippet>226</a>        </span><span class="self">self</span>.mmtk
+<a href=#227 id=227 data-nosnippet>227</a>            .sanity_checker
+<a href=#228 id=228 data-nosnippet>228</a>            .lock()
+<a href=#229 id=229 data-nosnippet>229</a>            .unwrap()
+<a href=#230 id=230 data-nosnippet>230</a>            .add_root_nodes(nodes.clone());
+<a href=#231 id=231 data-nosnippet>231</a>
+<a href=#232 id=232 data-nosnippet>232</a>        <span class="self">self</span>.create_and_schedule_root_nodes_work(nodes);
+<a href=#233 id=233 data-nosnippet>233</a>    }
+<a href=#234 id=234 data-nosnippet>234</a>
+<a href=#235 id=235 data-nosnippet>235</a>    <span class="kw">fn </span>create_process_pinning_roots_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, nodes: Vec&lt;ObjectReference&gt;) {
+<a href=#236 id=236 data-nosnippet>236</a>        <span class="macro">probe!</span>(mmtk, roots, RootsKind::PINNING, nodes.len());
+<a href=#237 id=237 data-nosnippet>237</a>
+<a href=#238 id=238 data-nosnippet>238</a>        <span class="self">self</span>.debug_assert_initial_mark();
+<a href=#239 id=239 data-nosnippet>239</a>
+<a href=#240 id=240 data-nosnippet>240</a>        <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
+<a href=#241 id=241 data-nosnippet>241</a>        </span><span class="self">self</span>.mmtk
+<a href=#242 id=242 data-nosnippet>242</a>            .sanity_checker
+<a href=#243 id=243 data-nosnippet>243</a>            .lock()
+<a href=#244 id=244 data-nosnippet>244</a>            .unwrap()
+<a href=#245 id=245 data-nosnippet>245</a>            .add_root_nodes(nodes.clone());
+<a href=#246 id=246 data-nosnippet>246</a>
+<a href=#247 id=247 data-nosnippet>247</a>        <span class="self">self</span>.create_and_schedule_root_nodes_work(nodes);
+<a href=#248 id=248 data-nosnippet>248</a>    }
+<a href=#249 id=249 data-nosnippet>249</a>
+<a href=#250 id=250 data-nosnippet>250</a>    <span class="kw">fn </span>create_process_tpinning_roots_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, nodes: Vec&lt;ObjectReference&gt;) {
+<a href=#251 id=251 data-nosnippet>251</a>        <span class="macro">probe!</span>(mmtk, roots, RootsKind::TPINNING, nodes.len());
+<a href=#252 id=252 data-nosnippet>252</a>
+<a href=#253 id=253 data-nosnippet>253</a>        <span class="self">self</span>.debug_assert_initial_mark();
+<a href=#254 id=254 data-nosnippet>254</a>
+<a href=#255 id=255 data-nosnippet>255</a>        <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
+<a href=#256 id=256 data-nosnippet>256</a>        </span><span class="self">self</span>.mmtk
+<a href=#257 id=257 data-nosnippet>257</a>            .sanity_checker
+<a href=#258 id=258 data-nosnippet>258</a>            .lock()
+<a href=#259 id=259 data-nosnippet>259</a>            .unwrap()
+<a href=#260 id=260 data-nosnippet>260</a>            .add_root_nodes(nodes.clone());
+<a href=#261 id=261 data-nosnippet>261</a>
+<a href=#262 id=262 data-nosnippet>262</a>        <span class="self">self</span>.create_and_schedule_root_nodes_work(nodes);
+<a href=#263 id=263 data-nosnippet>263</a>    }
+<a href=#264 id=264 data-nosnippet>264</a>}</code></pre></div></section></main></body></html>
