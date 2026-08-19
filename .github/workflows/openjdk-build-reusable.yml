@@ -1,8 +1,13 @@
 name: OpenJDK Build (reusable)
 
-# Builds OpenJDK+MMTk and caches it, keyed by the mmtk-core + mmtk-openjdk
-# commits, for openjdk-run-plan-reusable.yml to restore within the same
-# workflow run.
+# Builds OpenJDK+MMTk and caches it, keyed by build_path + the mmtk-core +
+# mmtk-openjdk commits, for openjdk-run-plan-reusable.yml /
+# openjdk-compare-run-plan-reusable.yml to restore within the same workflow
+# run. mmtk_core_repo/ref and openjdk_binding_repo/ref default to "whatever
+# triggered this run" and "mmtk/mmtk-openjdk@jdk-21" (perf-regression-ci-openjdk's
+# per-commit case); callers comparing two arbitrary refs (e.g.
+# perf-compare-ci.yml) set them explicitly and give each side its own
+# build_path so both builds can coexist under the same ci-perf-kit/build/.
 on:
   workflow_call:
     inputs:
@@ -10,9 +15,34 @@ on:
         required: true
         type: string
       openjdk_rev:
-        description: mmtk-openjdk (jdk-21) revision being built; used with github.sha in the cache key.
+        description: mmtk-openjdk revision being built; used with mmtk_core_ref (or github.sha) in the cache key.
         required: true
         type: string
+      mmtk_core_repo:
+        description: mmtk-core repo to check out, as {owner}/{repo}. Defaults to this workflow's own repo (i.e. whatever triggered this run) - set explicitly for a build that isn't of the triggering commit (e.g. one side of a PR comparison).
+        required: false
+        type: string
+        default: ''
+      mmtk_core_ref:
+        description: mmtk-core ref/sha to check out. Defaults to github.sha. Also used (in place of github.sha) as the mmtk-core half of the cache key, so it must be a specific commit, not a branch name, whenever it's set explicitly.
+        required: false
+        type: string
+        default: ''
+      openjdk_binding_repo:
+        description: mmtk-openjdk repo to check out, as {owner}/{repo}.
+        required: false
+        type: string
+        default: 'mmtk/mmtk-openjdk'
+      openjdk_binding_ref:
+        description: mmtk-openjdk ref/sha to check out.
+        required: false
+        type: string
+        default: 'jdk-21'
+      build_path:
+        description: Name of the build dir under ci-perf-kit/build (and .../upload) this build is left at, and the cache is scoped to. Defaults to 'jdk-mmtk' - the name openjdk-run-plan-reusable.yml expects. Callers building more than one thing in the same workflow run (e.g. a trunk/branch pair) must pass distinct names.
+        required: false
+        type: string
+        default: 'jdk-mmtk'
 
 env:
   # Directory in ci-perf-kit that will be uploaded as an artifact. Can be found in ci-perf-kit/scripts/common.sh
@@ -32,10 +62,10 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-            ci-perf-kit/build
+            ci-perf-kit/build/${{ inputs.build_path }}
             ci-perf-kit/probes/out
             ci-perf-kit/openjdk-probe
-          key: ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}${{ github.sha }}-${{ inputs.openjdk_rev }}
+          key: ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}${{ inputs.build_path }}-${{ inputs.mmtk_core_ref || github.sha }}-${{ inputs.openjdk_rev }}
           lookup-only: true
       # checkout perf-kit
       - name: Checkout Perf Kit
@@ -48,13 +78,15 @@ jobs:
       - name: Checkout MMTk Core
         uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.mmtk_core_repo || github.repository }}
+          ref: ${{ inputs.mmtk_core_ref || github.sha }}
           path: mmtk-core
       - name: Checkout OpenJDK Binding
         if: steps.check-cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
-          repository: mmtk/mmtk-openjdk
-          ref: jdk-21
+          repository: ${{ inputs.openjdk_binding_repo }}
+          ref: ${{ inputs.openjdk_binding_ref }}
           path: mmtk-openjdk
       - name: Checkout OpenJDK
         if: steps.check-cache.outputs.cache-hit != 'true'
@@ -79,21 +111,21 @@ jobs:
         if: steps.check-cache.outputs.cache-hit != 'true'
         run: |
           export JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-amd64/
-          ./ci-perf-kit/scripts/openjdk-build.sh ./mmtk-openjdk ./mmtk-core
-      # cache the build for openjdk-run-plan-reusable.yml callers
+          ./ci-perf-kit/scripts/openjdk-build.sh ./mmtk-openjdk ./mmtk-core ${{ inputs.build_path }}
+      # cache the build for openjdk-run-plan-reusable.yml / openjdk-compare-run-plan-reusable.yml callers
       - name: Cache OpenJDK+MMTk build
         if: steps.check-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
-            ci-perf-kit/build
+            ci-perf-kit/build/${{ inputs.build_path }}
             ci-perf-kit/probes/out
             ci-perf-kit/openjdk-probe
-          key: ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}${{ github.sha }}-${{ inputs.openjdk_rev }}
+          key: ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}${{ inputs.build_path }}-${{ inputs.mmtk_core_ref || github.sha }}-${{ inputs.openjdk_rev }}
       - name: Upload build as artifacts
         if: steps.check-cache.outputs.cache-hit != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: openjdk-regression-build
+          name: openjdk-build-${{ inputs.build_path }}
           path: ${{ env.CI_PERF_KIT_BUILD }}
           if-no-files-found: error

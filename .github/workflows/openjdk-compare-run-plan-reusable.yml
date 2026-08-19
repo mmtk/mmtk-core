@@ -1,0 +1,139 @@
+name: OpenJDK Compare Run Plan (reusable)
+
+# Runs a single plan's trunk-vs-branch OpenJDK comparison, using the two
+# builds cached by two openjdk-build-reusable.yml calls (build_path
+# 'jdk-mmtk-trunk' and 'jdk-mmtk-branch') earlier in the same workflow run,
+# pushes the raw result (logs + comparison table + per-metric plots - see
+# compare_plot.py) to result_repo_branch, and posts the table plus the plots
+# (linked from the just-pushed result_repo_branch commit) as a PR comment.
+on:
+  workflow_call:
+    inputs:
+      plan_name:
+        description: Result dir name under result_repo/openjdk/pr-<pr_number>/ (e.g. stickyimmix)
+        required: true
+        type: string
+      config:
+        description: running-ng config filename under ci-perf-kit/configs (e.g. running-openjdk-stickyimmix-compare.yml)
+        required: true
+        type: string
+      heap_modifier:
+        description: Passed straight to run_benchmarks (0 for NoGC-style fixed heaps)
+        required: true
+        type: string
+      pr_number:
+        description: The mmtk-core pull request this comparison is for
+        required: true
+        type: string
+      ci_perf_kit_version:
+        required: true
+        type: string
+      result_repo_branch:
+        description: The ci-perf-result branch to push raw logs to.
+        required: false
+        type: string
+        default: 'perf-compare-test'
+      trunk_mmtk_core_ref:
+        description: mmtk-core sha the trunk build was built from - must match what the trunk openjdk-build-reusable.yml call used, to restore the same cache.
+        required: true
+        type: string
+      trunk_openjdk_rev:
+        description: mmtk-openjdk sha the trunk build was built from.
+        required: true
+        type: string
+      branch_mmtk_core_ref:
+        description: mmtk-core sha the branch build was built from.
+        required: true
+        type: string
+      branch_openjdk_rev:
+        description: mmtk-openjdk sha the branch build was built from.
+        required: true
+        type: string
+    secrets:
+      CI_ACCESS_TOKEN:
+        required: true
+
+env:
+  # Kept in sync with the same env var in openjdk-build-reusable.yml.
+  OPENJDK_BUILD_CACHE_PREFIX: openjdk-mmtk-build-
+
+jobs:
+  compare-run-plan:
+    runs-on: [self-hosted, Linux, freq-scaling-off]
+    timeout-minutes: 1440
+    steps:
+      - name: Checkout Perf Kit
+        uses: actions/checkout@v4
+        with:
+          repository: mmtk/ci-perf-kit
+          ref: ${{ inputs.ci_perf_kit_version }}
+          path: ci-perf-kit
+          submodules: true
+      - name: Restore trunk OpenJDK+MMTk build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ci-perf-kit/build/jdk-mmtk-trunk
+            ci-perf-kit/probes/out
+            ci-perf-kit/openjdk-probe
+          key: ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}jdk-mmtk-trunk-${{ inputs.trunk_mmtk_core_ref }}-${{ inputs.trunk_openjdk_rev }}
+          fail-on-cache-miss: true
+      - name: Restore branch OpenJDK+MMTk build cache
+        uses: actions/cache/restore@v4
+        with:
+          # probes/openjdk-probe are identical on both sides (they don't
+          # depend on mmtk-core/binding revisions) and were already restored
+          # above, so only the branch build itself needs restoring here.
+          path: |
+            ci-perf-kit/build/jdk-mmtk-branch
+          key: ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}jdk-mmtk-branch-${{ inputs.branch_mmtk_core_ref }}-${{ inputs.branch_openjdk_rev }}
+          fail-on-cache-miss: true
+      - uses: hasura/comment-progress@v2.3.0
+        with:
+          github-token: ${{ secrets.CI_ACCESS_TOKEN }}
+          repository: 'mmtk/mmtk-core'
+          number: ${{ inputs.pr_number }}
+          id: openjdk-compare-${{ inputs.plan_name }}-comment
+          message: 'Running benchmarks for ${{ inputs.plan_name }}...'
+          recreate: true
+      - name: Compare Performance (${{ inputs.plan_name }})
+        run: |
+          export RESULT_REPO=mmtk/ci-perf-result
+          export RESULT_REPO_BRANCH=${{ inputs.result_repo_branch }}
+          export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
+          ./ci-perf-kit/scripts/openjdk-compare-run-plan.sh ${{ inputs.plan_name }} ${{ inputs.config }} ${{ inputs.heap_modifier }} ${{ inputs.pr_number }}
+      - id: run_id
+        run: echo "run_id=$(cat ci-perf-kit/run_id.txt)" >> $GITHUB_OUTPUT
+      # set report.md to output
+      - uses: pCYSl5EDgo/cat@master
+        id: cat
+        with:
+          path: ci-perf-kit/report.md
+      # The plots pushed alongside this run's logs are already public at this
+      # raw.githubusercontent.com URL as soon as commit_result_repo (inside
+      # openjdk-compare-run-plan.sh, above) pushes them - no separate upload
+      # step needed, just link to what's already there.
+      - name: Build plot image links
+        id: images
+        run: |
+          base_url="https://raw.githubusercontent.com/mmtk/ci-perf-result/${{ inputs.result_repo_branch }}/openjdk/pr-${{ inputs.pr_number }}/${{ inputs.plan_name }}/${{ steps.run_id.outputs.run_id }}/plots"
+          body=""
+          for f in ci-perf-kit/logs-ng/${{ steps.run_id.outputs.run_id }}/plots/*.png; do
+            name=$(basename "$f")
+            body="$body"$'\n'"![${name}](${base_url}/${name})"
+          done
+          echo "body<<COMMENT_IMAGES_EOF" >> $GITHUB_OUTPUT
+          echo "$body" >> $GITHUB_OUTPUT
+          echo "COMMENT_IMAGES_EOF" >> $GITHUB_OUTPUT
+      - uses: hasura/comment-progress@v2.3.0
+        if: always()
+        with:
+          github-token: ${{ secrets.CI_ACCESS_TOKEN }}
+          repository: 'mmtk/mmtk-core'
+          number: ${{ inputs.pr_number }}
+          id: openjdk-compare-${{ inputs.plan_name }}-comment
+          message: |
+            ${{ steps.cat.outputs.text }}
+
+            ${{ steps.images.outputs.body }}
+          append: true

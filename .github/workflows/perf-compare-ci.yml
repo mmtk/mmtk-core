@@ -1,6 +1,12 @@
-# This workflow is used to run benchmarks to compare a pull request (specified by the input 'pull_request')
-# and the current master. This workflow assumes the pull requests (mmtk-core PRs and the binding PRs are based on
+# This workflow is used to run a benchmark to compare a pull request (specified by the input 'pull_request')
+# and the current master, for one runtime and one GC plan per manual run.
+# This workflow assumes the pull requests (mmtk-core PRs and the binding PRs are based on
 # their corresponding master). Otherwise the workflow may fail or return unexpected results.
+#
+# Pushes the raw logs, comparison table, and per-metric plots (see
+# ci-perf-kit's compare_plot.py) to the ci-perf-result 'perf-compare-test'
+# branch, under openjdk/pr-<N>/<plan>/<run_id>/, and posts the table and
+# plots as a PR comment.
 
 name: Binding Perf Tests
 
@@ -10,17 +16,33 @@ on:
       pull_request:
         description: The pull request number to run the perf tests. The workflow compares the specified pull request with the trunk.
         required: true
+      runtime:
+        description: Runtime to benchmark. Only openjdk is currently supported.
+        required: true
+        type: choice
+        default: openjdk
+        options:
+          - openjdk
+      plan:
+        description: GC plan to benchmark.
+        required: true
+        type: choice
+        options:
+          - nogc
+          - semispace
+          - gencopy
+          - immix
+          - genimmix
+          - stickyimmix
+          - marksweep
+          - lisp2
+          - ovc
+          - concurrentimmix
 
 concurrency:
   # Cancels pending runs when a PR gets updated.
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
-
-env:
-  # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
-  CI_PERF_KIT_BUILD: ci-perf-kit/upload
-  CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
-  CI_PERF_KIT_VERSION: 0.8.8
 
 jobs:
     # Figure out binding PRs.
@@ -34,7 +56,12 @@ jobs:
       runs-on: ubuntu-22.04
       outputs:
         mmtk_repo: ${{ steps.print.outputs.mmtk_repo }}
-        mmtk-ref: ${{ steps.print.outputs.mmtk_ref }}
+        # NB: previously declared as 'mmtk-ref' (hyphen) while every consumer
+        # read 'outputs.mmtk_ref' (underscore) - since GitHub Actions doesn't
+        # normalize the two, that always resolved empty, silently falling
+        # back to the branch build's default branch instead of the PR's
+        # actual commit. Fixed to match the step output's name below.
+        mmtk_ref: ${{ steps.print.outputs.mmtk_ref }}
       steps:
         - name: Get mmtk-core repo from pull_request
           uses: actions/github-script@v7
@@ -65,208 +92,106 @@ jobs:
             echo "mmtk_repo=${{ steps.core-repo.outputs.result }}" >> $GITHUB_OUTPUT
             echo "mmtk_ref=${{ steps.core-ref.outputs.result }}" >> $GITHUB_OUTPUT
 
-    # Run perf compare for JikesRVM
-    jikesrvm-perf-compare:
-        runs-on: [self-hosted, Linux, freq-scaling-off]
-        needs: [binding-refs, mmtk-refs]
-        timeout-minutes: 1440
-        steps:
-          # Trunk - we always use master from the mmtk org
-          # - binding
-          - name: Checkout JikesRVM Binding Trunk
-            uses: actions/checkout@v4
-            with:
-              repository: mmtk/mmtk-jikesrvm
-              ref: master
-              path: mmtk-jikesrvm-trunk
-          - name: Checkout JikesRVM for Trunk
-            working-directory: mmtk-jikesrvm-trunk
-            run: ./.github/scripts/ci-checkout.sh
-          # - core
-          - name: Checkout MMTk Core
-            uses: actions/checkout@v4
-            with:
-              repository: mmtk/mmtk-core
-              ref: master
-              path: mmtk-core-trunk
-          # Branch
-          # - binding
-          - name: Checkout JikesRVM Binding Branch
-            uses: actions/checkout@v4
-            with:
-              repository: ${{ needs.binding-refs.outputs.jikesrvm_binding_repo }}
-              ref: ${{ needs.binding-refs.outputs.jikesrvm_binding_ref }}
-              path: mmtk-jikesrvm-branch
-          # - core
-          - name: Checkout MMTk Core
-            uses: actions/checkout@v4
-            with:
-              repository: ${{ needs.mmtk-refs.outputs.mmtk_repo }}
-              ref: ${{ needs.mmtk-refs.outputs.mmtk_ref }}
-              path: mmtk-core-branch
-          - name: Checkout JikesRVM for Branch
-            working-directory: mmtk-jikesrvm-branch
-            run: ./.github/scripts/ci-checkout.sh
-          # Checkout perf-kit
-          - name: Checkout Perf Kit
-            uses: actions/checkout@v4
-            with:
-              repository: mmtk/ci-perf-kit
-              token: ${{ secrets.CI_ACCESS_TOKEN }}
-              ref: ${{ env.CI_PERF_KIT_VERSION }}
-              path: ci-perf-kit
-              submodules: true
-          # setup
-          # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
-          - name: Setup Rust Toolchain
-            run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV
-          # run compare
-          - uses: hasura/comment-progress@v2.3.0
-            with:
-                github-token: ${{ secrets.CI_ACCESS_TOKEN }}
-                repository: 'mmtk/mmtk-core'
-                number: ${{ github.event.inputs.pull_request }}
-                id: jikesrvm-perf-compare-comment
-                message: 'Running benchmarks for JikesRVM...'
-                recreate: true
-          - name: Compare Performance
-            id: run
-            run: |
-              JAVA_HOME=/opt/jdk1.6.0_45/ PATH=/opt/apache-ant-1.9.16/bin/:/opt/jdk1.6.0_45/bin/:$PATH ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm-trunk/ mmtk-core-trunk/ mmtk-jikesrvm-branch/ mmtk-core-branch/ jikesrvm-compare-report.md
-          # set report.md to output
-          - uses: pCYSl5EDgo/cat@master
-            id: cat
-            with:
-              path: jikesrvm-compare-report.md
-          # upload run results
-          - name: Upload build as artifacts
-            uses: actions/upload-artifact@v4
-            with:
-              name: jikesrvm-compare-build
-              path: ${{ env.CI_PERF_KIT_BUILD }}
-              if-no-files-found: error
-          - uses: actions/upload-artifact@v4
-            with:
-              name: jikesrvm-compare-report.md
-              path: jikesrvm-compare-report.md
-          # report
-          - uses: hasura/comment-progress@v2.3.0
-            if: always()
-            with:
-                github-token: ${{ secrets.CI_ACCESS_TOKEN }}
-                repository: 'mmtk/mmtk-core'
-                number: ${{ github.event.inputs.pull_request }}
-                id: jikesrvm-perf-compare-comment
-                message: ${{ steps.cat.outputs.text }}
-                append: true
-          # Cleanup logs (this is necessary for self-hosted runners)
-          # [`always()`](https://docs.github.com/en/actions/reference/context-and-expression-syntax-for-github-actions#always) ensures we clean up the logs even if some steps fail
-          - name: Clean up logs and reports
-            if: always()
-            run: |
-              rm -rf ${{ env.CI_PERF_KIT_LOG }}
-              rm jikesrvm-compare-report.md
+    # Guard 'runtime', since a workflow_dispatch 'choice' input only
+    # constrains the UI dropdown, not the underlying API - anyone dispatching
+    # this workflow directly via the API could still pass an unsupported value.
+    validate-inputs:
+      runs-on: ubuntu-22.04
+      steps:
+        - name: Check runtime is supported
+          run: |
+            if [ "${{ github.event.inputs.runtime }}" != "openjdk" ]; then
+              echo "Only runtime=openjdk is currently supported (got '${{ github.event.inputs.runtime }}')."
+              exit 1
+            fi
 
-    openjdk-perf-compare:
-        runs-on: [self-hosted, Linux, freq-scaling-off]
-        needs: [binding-refs, mmtk-refs]
-        timeout-minutes: 1440
-        steps:
-            # Trunk - we use the default repo and branch as specified in pr-binding-refs.
-            # TODO: We currently use OpenJDK 11 for performance comparison.
-            # We should switch to OpenJDK 21 when we are ready, and start a new epoch.
-            # - binding
-            - name: Checkout OpenJDK Binding Trunk
-              uses: actions/checkout@v4
-              with:
-                repository: ${{ needs.binding-refs.outputs.openjdk11_binding_repo_default }}
-                ref: ${{ needs.binding-refs.outputs.openjdk11_binding_ref_default }}
-                path: mmtk-openjdk-trunk
-            - name: Checkout OpenJDK for Trunk
-              working-directory: mmtk-openjdk-trunk
-              run: ./.github/scripts/ci-checkout.sh
-            # -core
-            - name: Checkout MMTk Core
-              uses: actions/checkout@v4
-              with:
-                repository: mmtk/mmtk-core
-                ref: master
-                path: mmtk-core-trunk
-            # Branch
-            # - binding
-            - name: Checkout OpenJDK Binding Branch
-              uses: actions/checkout@v4
-              with:
-                # TODO: We currently use OpenJDK 11 for performance comparison.
-                # We should switch to OpenJDK 21 when we are ready, and start a new epoch.
-                repository: ${{ needs.binding-refs.outputs.openjdk11_binding_repo }}
-                ref: ${{ needs.binding-refs.outputs.openjdk11_binding_ref }}
-                path: mmtk-openjdk-branch
-            - name: Checkout OpenJDK for Branch
-              working-directory: mmtk-openjdk-branch
-              run: ./.github/scripts/ci-checkout.sh
-            # - core
-            - name: Checkout MMTk Core
-              uses: actions/checkout@v4
-              with:
-                repository: ${{ needs.mmtk-refs.outputs.mmtk_repo }}
-                ref: ${{ needs.mmtk-refs.outputs.mmtk_ref }}
-                path: mmtk-core-branch
-            # checkout perf-kit
-            - name: Checkout Perf Kit
-              uses: actions/checkout@v4
-              with:
-                repository: mmtk/ci-perf-kit
-                token: ${{ secrets.CI_ACCESS_TOKEN }}
-                ref: ${{ env.CI_PERF_KIT_VERSION }}
-                path: ci-perf-kit
-                submodules: true
-            # setup
-            # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
-            - name: Setup Rust Toolchain
-              run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV
-            # run compare
-            - uses: hasura/comment-progress@v2.3.0
-              with:
-                github-token: ${{ secrets.CI_ACCESS_TOKEN }}
-                repository: 'mmtk/mmtk-core'
-                number: ${{ github.event.inputs.pull_request }}
-                id: openjdk-perf-compare-comment
-                message: 'Running benchmarks for OpenJDK...'
-                recreate: true
-            - name: Compare Performance
-              id: run
-              run: |
-                ./ci-perf-kit/scripts/openjdk-compare.sh mmtk-openjdk-trunk/ mmtk-core-trunk/ mmtk-openjdk-branch/ mmtk-core-branch/ openjdk-compare-report.md
-            # set report.md to output
-            - uses: pCYSl5EDgo/cat@master
-              id: cat
-              with:
-                path: openjdk-compare-report.md
-            # upload run results
-            - name: Upload build as artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                name: openjdk-compare-build
-                path: ${{ env.CI_PERF_KIT_BUILD }}
-                if-no-files-found: error
-            - uses: actions/upload-artifact@v4
-              with:
-                name: openjdk-compare-report.md
-                path: openjdk-compare-report.md
-            # report
-            - uses: hasura/comment-progress@v2.3.0
-              if: always()
-              with:
-                github-token: ${{ secrets.CI_ACCESS_TOKEN }}
-                repository: 'mmtk/mmtk-core'
-                number: ${{ github.event.inputs.pull_request }}
-                id: openjdk-perf-compare-comment
-                message: ${{ steps.cat.outputs.text }}
-                append: true
-            # Cleanup logs (this is necessary for self-hosted runners)
-            - name: Clean up logs and reports
-              if: always()
-              run: |
-                rm -rf ${{ env.CI_PERF_KIT_LOG }}
-                rm openjdk-compare-report.md
+    # Single source of truth for CI_PERF_KIT_VERSION/heap factors, shared
+    # with perf-regression-ci-openjdk.yml. We only use ci_perf_kit_version
+    # and normal_heap_factor here (result_repo_branch/deploy are for the
+    # production per-commit history, not this workflow - see below).
+    config:
+      needs: [validate-inputs]
+      uses: ./.github/workflows/openjdk-perf-config.yml
+
+    # Resolve master's current mmtk-core commit, so the trunk build's cache
+    # key is a specific commit (not a moving branch name) - same reasoning
+    # as mmtk-refs above, which already does this for the branch side.
+    trunk-core-ref:
+      runs-on: ubuntu-22.04
+      outputs:
+        sha: ${{ steps.sha.outputs.sha }}
+      steps:
+        - uses: actions/checkout@v4
+          with:
+            repository: mmtk/mmtk-core
+            ref: master
+            path: mmtk-core-trunk-ref
+        - id: sha
+          run: echo "sha=$(git -C mmtk-core-trunk-ref rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+    # Resolve the branch's OpenJDK 21 binding ref to a commit, for the same
+    # reason. (The trunk side's binding sha comes from config's own
+    # openjdk_rev output, since config already resolves mmtk/mmtk-openjdk@jdk-21 -
+    # exactly the trunk's binding.)
+    branch-openjdk-binding-ref:
+      runs-on: ubuntu-22.04
+      needs: [binding-refs]
+      outputs:
+        sha: ${{ steps.sha.outputs.sha }}
+      steps:
+        - uses: actions/checkout@v4
+          with:
+            repository: ${{ needs.binding-refs.outputs.openjdk21_binding_repo }}
+            ref: ${{ needs.binding-refs.outputs.openjdk21_binding_ref }}
+            path: mmtk-openjdk-branch-ref
+        - id: sha
+          run: echo "sha=$(git -C mmtk-openjdk-branch-ref rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+    # Build OpenJDK+MMTk for trunk (master + mmtk-openjdk@jdk-21) and cache
+    # it (build_path=jdk-mmtk-trunk) for openjdk-run-plan below.
+    openjdk-build-trunk:
+      needs: [config, trunk-core-ref]
+      uses: ./.github/workflows/openjdk-build-reusable.yml
+      with:
+        ci_perf_kit_version: ${{ needs.config.outputs.ci_perf_kit_version }}
+        openjdk_rev: ${{ needs.config.outputs.openjdk_rev }}
+        mmtk_core_repo: mmtk/mmtk-core
+        mmtk_core_ref: ${{ needs.trunk-core-ref.outputs.sha }}
+        build_path: jdk-mmtk-trunk
+
+    # Build OpenJDK+MMTk for the PR's branch and cache it
+    # (build_path=jdk-mmtk-branch) for openjdk-run-plan below.
+    openjdk-build-branch:
+      needs: [config, binding-refs, mmtk-refs, branch-openjdk-binding-ref]
+      uses: ./.github/workflows/openjdk-build-reusable.yml
+      with:
+        ci_perf_kit_version: ${{ needs.config.outputs.ci_perf_kit_version }}
+        openjdk_rev: ${{ needs.branch-openjdk-binding-ref.outputs.sha }}
+        mmtk_core_repo: ${{ needs.mmtk-refs.outputs.mmtk_repo }}
+        mmtk_core_ref: ${{ needs.mmtk-refs.outputs.mmtk_ref }}
+        openjdk_binding_repo: ${{ needs.binding-refs.outputs.openjdk21_binding_repo }}
+        openjdk_binding_ref: ${{ needs.binding-refs.outputs.openjdk21_binding_ref }}
+        build_path: jdk-mmtk-branch
+
+    # Run the one plan the caller asked for. 'plan' is restricted (via the
+    # workflow_dispatch 'choice' input above) to names that map 1:1 onto an
+    # existing running-openjdk-<plan>-compare.yml, so the config filename is
+    # derived directly from it rather than needing a lookup table.
+    openjdk-run-plan:
+      needs: [config, mmtk-refs, trunk-core-ref, branch-openjdk-binding-ref, openjdk-build-trunk, openjdk-build-branch]
+      uses: ./.github/workflows/openjdk-compare-run-plan-reusable.yml
+      with:
+        plan_name: ${{ github.event.inputs.plan }}
+        config: running-openjdk-${{ github.event.inputs.plan }}-compare.yml
+        # NoGC uses a fixed (max) heap rather than a multiple of min heap;
+        # MarkSweep uses large_heap_factor, matching weekly-2's regression
+        # run for it (every other plan uses normal_heap_factor).
+        heap_modifier: ${{ github.event.inputs.plan == 'nogc' && '0' || (github.event.inputs.plan == 'marksweep' && needs.config.outputs.large_heap_factor) || needs.config.outputs.normal_heap_factor }}
+        pr_number: ${{ github.event.inputs.pull_request }}
+        ci_perf_kit_version: ${{ needs.config.outputs.ci_perf_kit_version }}
+        result_repo_branch: perf-compare-test
+        trunk_mmtk_core_ref: ${{ needs.trunk-core-ref.outputs.sha }}
+        trunk_openjdk_rev: ${{ needs.config.outputs.openjdk_rev }}
+        branch_mmtk_core_ref: ${{ needs.mmtk-refs.outputs.mmtk_ref }}
+        branch_openjdk_rev: ${{ needs.branch-openjdk-binding-ref.outputs.sha }}
+      secrets: inherit

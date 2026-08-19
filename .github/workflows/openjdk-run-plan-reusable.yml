@@ -66,10 +66,14 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-            ci-perf-kit/build
+            ci-perf-kit/build/jdk-mmtk
             ci-perf-kit/probes/out
             ci-perf-kit/openjdk-probe
-          key: ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}${{ github.sha }}-${{ inputs.openjdk_rev }}
+          # Kept in sync with openjdk-build-reusable.yml's cache key, which is
+          # scoped by build_path (always 'jdk-mmtk' for this per-commit flow -
+          # see openjdk-compare-run-plan-reusable.yml for the PR-comparison
+          # equivalent, which builds/restores 'jdk-mmtk-trunk'/'jdk-mmtk-branch').
+          key: ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}jdk-mmtk-${{ github.sha }}-${{ inputs.openjdk_rev }}
           fail-on-cache-miss: true
       - name: Download canary build
         if: ${{ inputs.canary }}
