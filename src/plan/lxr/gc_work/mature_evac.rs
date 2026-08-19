@@ -129,11 +129,6 @@ impl<VM: VMBinding> EvacuateMatureObjects<VM> {
         if !self.address_is_valid_oop_slot(s, reuse, lxr) {
             return false;
         }
-        // Skip objects that are dead or out of the collection set.
-        let v = unsafe { s.to_address().load::<u32>() };
-        if v & 0b111 != 0 {
-            panic!("Invalid slot: {s:?} -> {v:#x}");
-        }
         let Some(o) = s.load() else {
             return false;
         };
