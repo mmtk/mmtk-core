@@ -50,6 +50,8 @@ pub enum PlanSelector {
     OVC,
     /// An Immix collector that uses a sticky mark bit to allow generational behaviors without a copying nursery.
     StickyImmix,
+    /// LXR GC
+    LXR,
     /// Concurrent non-moving immix using SATB
     ConcurrentImmix,
 }
@@ -988,6 +990,8 @@ options! {
     /// there is no core with (perceived) ID 12.
     // XXX: This option is currently only supported on Linux.
     thread_affinity:        AffinityKind            [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
+    /// Verbosity level for GC statistics and logging output, from 0 (quiet) to 10 (most verbose).
+    verbose:                       usize            [|v: &usize| *v <= 10]  = 0,
     /// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
     /// Default to a fixed heap size of 0.5x physical memory.
     gc_trigger:             GCTriggerSelector       [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((OS::get_system_total_memory().unwrap_or(4 * 1024 * 1024 * 1024) as f64 * 0.5f64) as usize),
@@ -1004,7 +1008,7 @@ options! {
     /// Percentage of heap size reserved for defragmentation.
     /// According to [this paper](https://doi.org/10.1145/1375581.1375586), Immix works well with
     /// headroom between 1% to 3% of the heap size.
-    immix_defrag_headroom_percent: usize            [|v: &usize| *v <= 50] = 2,
+    immix_defrag_headroom_percent: usize            [|v: &usize| *v <= 50] = 5,
     /// Disable concurrent marking in ConcurrentImmix. Setting this to true will make ConcurrentImmix behave exactly like full heap Immix. This option is only intended for debugging.
     concurrent_immix_disable_concurrent_marking: bool              [always_valid] = false
 }

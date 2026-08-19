@@ -8,6 +8,10 @@ use std::ops::*;
 use std::sync::atomic::Ordering;
 
 use crate::mmtk::{MMAPPER, SFT_MAP};
+use crate::util::metadata::log_bit::LOGGED_VALUE;
+use crate::util::VMThread;
+use crate::util::VMWorkerThread;
+use crate::vm::ObjectModel;
 
 /// size in bytes
 pub type ByteSize = usize;
@@ -347,6 +351,44 @@ impl Address {
         }
     }
 
+    /// Check whether the field at this address is logged, i.e. whether the field-level write
+    /// barrier has already recorded a write to it and can skip its slow path.
+    pub fn is_field_logged<VM: VMBinding>(self) -> bool {
+        debug_assert!(!self.is_zero());
+        unsafe {
+            VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+                .as_spec()
+                .extract_side_spec()
+                .load::<u8>(self)
+                == LOGGED_VALUE
+        }
+    }
+
+    /// Mark the field(s) covered by this address as unlogged (using a relaxed, non-atomic store),
+    /// so that a subsequent write to them will be caught by the field-level write barrier's slow path again.
+    pub fn unlog_field_relaxed<VM: VMBinding>(self) {
+        debug_assert!(!self.is_zero());
+        let heap_bytes_per_unlog_byte = if VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
+            32usize
+        } else {
+            64
+        };
+        let a = self.align_down(heap_bytes_per_unlog_byte);
+        unsafe {
+            VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+                .as_spec()
+                .extract_side_spec()
+                .store_byte_relaxed(a, 0xffu8)
+        }
+    }
+
+    /// Converts the address to an [`ObjectReference`]. The address must be non-zero and must be
+    /// the raw address of a valid object as defined by the VM's object model.
+    pub fn to_object_reference<VM: VMBinding>(self) -> ObjectReference {
+        debug_assert!(!self.is_zero());
+        unsafe { ObjectReference::from_raw_address_unchecked(self) }
+    }
+
     /// Returns the intersection of the two address ranges. The returned range could
     /// be empty if there is no intersection between the ranges.
     pub fn range_intersection(r1: &Range<Address>, r2: &Range<Address>) -> Range<Address> {
@@ -470,6 +512,7 @@ mod tests {
     }
 }
 
+use crate::vm::Scanning;
 use crate::vm::VMBinding;
 
 /// `ObjectReference` represents address for an object. Compared with `Address`, operations allowed
@@ -703,6 +746,23 @@ impl ObjectReference {
     #[cfg(feature = "sanity")]
     pub fn is_sane(self) -> bool {
         unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_sane()
+    }
+
+    /// Get the current size (in bytes) of the object, as determined by the VM's object model.
+    pub fn get_size<VM: VMBinding>(self) -> usize {
+        VM::VMObjectModel::get_current_size(self)
+    }
+
+    /// Iterate over the slots (fields) of the object, calling `f` for each slot the VM's scanning
+    /// implementation reports for this object.
+    pub fn iterate_fields<VM: VMBinding, F: FnMut(VM::VMSlot)>(self, _tls: VMThread, mut f: F) {
+        // FIXME: We should use tls from the arguments.
+        // See https://github.com/mmtk/mmtk-core/issues/1375
+        let fake_tls = VMWorkerThread(VMThread::UNINITIALIZED);
+        if !<VM::VMScanning as Scanning<VM>>::support_slot_enqueuing(fake_tls, self) {
+            panic!("SlotIterator::iterate_fields cannot be used on objects that don't support slot-enqueuing");
+        }
+        <VM::VMScanning as Scanning<VM>>::scan_object(fake_tls, self, &mut f);
     }
 }
 

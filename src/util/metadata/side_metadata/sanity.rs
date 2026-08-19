@@ -695,10 +695,10 @@ mod tests {
         };
 
         assert!(verify_global_specs_total_size(&[spec_1]).is_ok());
-        #[cfg(target_pointer_width = "64")]
         assert!(verify_global_specs_total_size(&[spec_1, spec_2]).is_ok());
+        // On 32-bit, the budget is 1/4 of the address space, so 2 specs (each 1/8) fit but 3 don't.
         #[cfg(target_pointer_width = "32")]
-        assert!(verify_global_specs_total_size(&[spec_1, spec_2]).is_err());
+        assert!(verify_global_specs_total_size(&[spec_1, spec_2, spec_1]).is_err());
 
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
@@ -732,7 +732,13 @@ mod tests {
         };
 
         assert!(verify_global_specs_total_size(&[spec_1, spec_2]).is_ok());
+        // 3 copies exceed the budget on 64-bit, but not on 32-bit (which has a larger budget
+        // relative to these spec sizes); 5 copies exceed it on both.
+        #[cfg(target_pointer_width = "64")]
         assert!(verify_global_specs_total_size(&[spec_1, spec_2, spec_1]).is_err());
+        #[cfg(target_pointer_width = "32")]
+        assert!(verify_global_specs_total_size(&[spec_1, spec_2, spec_1]).is_ok());
+        assert!(verify_global_specs_total_size(&[spec_1, spec_2, spec_1, spec_2, spec_1]).is_err());
     }
 
     #[test]

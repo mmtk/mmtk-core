@@ -157,9 +157,9 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             .store(full_heap, Ordering::Relaxed);
     }
 
-    fn end_of_pause(&mut self, mmtk: &'static MMTK<VM>, tls: VMWorkerThread) {
+    fn on_pause_end(&mut self, mmtk: &'static MMTK<VM>, tls: VMWorkerThread) {
         let next_gc_full_heap = CommonGenPlan::should_next_gc_be_full_heap(self);
-        self.gen.end_of_pause(tls, next_gc_full_heap);
+        self.gen.on_pause_end(tls, next_gc_full_heap);
 
         let did_defrag = self.immix_space.end_of_gc();
         self.last_gc_was_defrag.store(did_defrag, Ordering::Relaxed);

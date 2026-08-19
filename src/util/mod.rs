@@ -58,6 +58,8 @@ pub(crate) mod logger;
 pub(crate) mod object_enum;
 /// Forwarding word in object copying.
 pub(crate) mod object_forwarding;
+/// Reference counting support.
+pub(crate) mod rc;
 /// Reference processing implementation.
 pub(crate) mod reference_processor;
 /// Utilities funcitons for Rust

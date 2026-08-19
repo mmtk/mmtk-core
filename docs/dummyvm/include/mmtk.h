@@ -71,8 +71,8 @@ extern bool mmtk_is_in_mmtk_spaces(void* object);
 // Return if the address pointed to by `addr` is in memory that is mapped by MMTk
 extern bool mmtk_is_mapped_address(void* addr);
 
-// Request MMTk to trigger a GC. Note that this may not actually trigger a GC
-extern void mmtk_handle_user_collection_request(void* tls);
+// Request MMTk to trigger a GC. Note that this may not actually trigger a GC unless `force` is true
+extern void mmtk_handle_user_collection_request(void* tls, bool force);
 
 // Add a reference to the list of weak references
 extern void mmtk_add_weak_candidate(void* ref);
