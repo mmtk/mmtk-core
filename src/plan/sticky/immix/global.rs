@@ -155,7 +155,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         }
     }
 
-    fn end_of_pause(
+    fn on_pause_end(
         &mut self,
         mmtk: &'static MMTK<VM>,
         tls: crate::util::opaque_pointer::VMWorkerThread,
@@ -169,7 +169,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         self.immix
             .set_last_gc_was_defrag(was_defrag, Ordering::Relaxed);
 
-        self.immix.common.end_of_pause(tls);
+        self.immix.common.on_pause_end(tls);
 
         mmtk.gc_trigger.policy.on_gc_end(mmtk);
     }

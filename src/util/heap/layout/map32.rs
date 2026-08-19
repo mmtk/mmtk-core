@@ -37,8 +37,8 @@ impl Map32 {
         let max_chunks = vm_layout().max_chunks();
         Map32 {
             inner: UnsafeCell::new(Map32Inner {
-                prev_link: vec![0; max_chunks],
-                next_link: vec![0; max_chunks],
+                prev_link: vec![-1; max_chunks],
+                next_link: vec![-1; max_chunks],
                 region_map: IntArrayFreeList::new(max_chunks, max_chunks as _, 1),
                 global_page_map: IntArrayFreeList::new(1, 1, MAX_SPACES),
                 shared_discontig_fl_count: 0,
@@ -115,7 +115,6 @@ impl VMMap for Map32 {
     ) -> Address {
         let (_sync, self_mut) = self.mut_self_with_sync();
         let chunk = self_mut.region_map.alloc(chunks as _);
-        debug_assert!(chunk != 0);
         if chunk == -1 {
             return Address::zero();
         }
@@ -123,19 +122,22 @@ impl VMMap for Map32 {
         let rtn = conversions::chunk_index_to_address(chunk as _);
         self.insert(rtn, chunks << LOG_BYTES_IN_CHUNK, descriptor);
         if head.is_zero() {
-            debug_assert!(self.next_link[chunk as usize] == 0);
+            debug_assert!(self.next_link[chunk as usize] == -1);
         } else {
             self_mut.next_link[chunk as usize] = head.chunk_index() as _;
             self_mut.prev_link[head.chunk_index()] = chunk;
         }
-        debug_assert!(self.prev_link[chunk as usize] == 0);
+        debug_assert!(self.prev_link[chunk as usize] == -1);
         rtn
     }
 
     fn get_next_contiguous_region(&self, start: Address) -> Address {
+        if start.is_zero() {
+            return Address::ZERO;
+        }
         debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = start.chunk_index();
-        if chunk == 0 || self.next_link[chunk] == 0 {
+        if self.next_link[chunk] == -1 {
             unsafe { Address::zero() }
         } else {
             let a = self.next_link[chunk];
@@ -167,11 +169,11 @@ impl VMMap for Map32 {
         debug_assert!(any_chunk == conversions::chunk_align_down(any_chunk));
         if !any_chunk.is_zero() {
             let chunk = any_chunk.chunk_index();
-            while self_mut.next_link[chunk] != 0 {
+            while self_mut.next_link[chunk] != -1 {
                 let x = self_mut.next_link[chunk];
                 self.free_contiguous_chunks_no_lock(x);
             }
-            while self_mut.prev_link[chunk] != 0 {
+            while self_mut.prev_link[chunk] != -1 {
                 let x = self_mut.prev_link[chunk];
                 self.free_contiguous_chunks_no_lock(x);
             }
@@ -285,14 +287,14 @@ impl Map32 {
             self.mut_self().total_available_discontiguous_chunks += chunks as usize;
             let next = self.next_link[chunk as usize];
             let prev = self.prev_link[chunk as usize];
-            if next != 0 {
+            if next != -1 {
                 self.mut_self().prev_link[next as usize] = prev
             };
-            if prev != 0 {
+            if prev != -1 {
                 self.mut_self().next_link[prev as usize] = next
             };
-            self.mut_self().prev_link[chunk as usize] = 0;
-            self.mut_self().next_link[chunk as usize] = 0;
+            self.mut_self().prev_link[chunk as usize] = -1;
+            self.mut_self().next_link[chunk as usize] = -1;
             for offset in 0..chunks {
                 let index = (chunk + offset) as usize;
                 let chunk_start = conversions::chunk_index_to_address(index);

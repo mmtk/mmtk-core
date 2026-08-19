@@ -173,6 +173,11 @@ pub fn vo_bit_side_metadata_addr() -> Address {
     crate::util::metadata::vo_bit::vo_bit_side_metadata_addr()
 }
 
+/// Base address of the LXR reference-counting table, public to VM bindings which may need to use this.
+pub fn rc_table_start_address() -> Address {
+    crate::util::rc::RC_TABLE.get_starting_address()
+}
+
 /// The base address for the global side metadata space available to VM bindings, to be used for the per-object metadata.
 /// VM bindings must use this to avoid overlap with core internal global side metadata.
 pub fn global_side_metadata_vm_base_address() -> Address {
@@ -191,7 +196,8 @@ pub(crate) fn global_side_metadata_bytes() -> usize {
 /// A value of 2 means the space required for global side metadata must be less than 1/4th of the source data.
 /// So, a value of `n` means this ratio must be less than $2^-n$.
 #[cfg(target_pointer_width = "32")]
-pub(super) const LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 3;
+// FIXME: Increased from 3 to 2 to allow LXR with VO bit (which uses slightly more than 1/8th of the address space)
+pub(super) const LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 2;
 #[cfg(target_pointer_width = "64")]
 pub(super) const LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 1;
 

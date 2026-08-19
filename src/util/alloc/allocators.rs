@@ -15,14 +15,14 @@ use crate::MMTK;
 
 use super::allocator::AllocatorContext;
 use super::FreeListAllocator;
-use super::MarkCompactAllocator;
+use super::Lisp2Allocator;
 
 pub(crate) const MAX_BUMP_ALLOCATORS: usize = 6;
 pub(crate) const MAX_LARGE_OBJECT_ALLOCATORS: usize = 2;
 pub(crate) const MAX_MALLOC_ALLOCATORS: usize = 1;
 pub(crate) const MAX_IMMIX_ALLOCATORS: usize = 2;
 pub(crate) const MAX_FREE_LIST_ALLOCATORS: usize = 2;
-pub(crate) const MAX_MARK_COMPACT_ALLOCATORS: usize = 1;
+pub(crate) const MAX_LISP2_ALLOCATORS: usize = 1;
 
 // The allocators set owned by each mutator. We provide a fixed number of allocators for each allocator type in the mutator,
 // and each plan will select part of the allocators to use.
@@ -35,7 +35,7 @@ pub struct Allocators<VM: VMBinding> {
     pub malloc: [MaybeUninit<MallocAllocator<VM>>; MAX_MALLOC_ALLOCATORS],
     pub immix: [MaybeUninit<ImmixAllocator<VM>>; MAX_IMMIX_ALLOCATORS],
     pub free_list: [MaybeUninit<FreeListAllocator<VM>>; MAX_FREE_LIST_ALLOCATORS],
-    pub markcompact: [MaybeUninit<MarkCompactAllocator<VM>>; MAX_MARK_COMPACT_ALLOCATORS],
+    pub lisp2: [MaybeUninit<Lisp2Allocator<VM>>; MAX_LISP2_ALLOCATORS],
 }
 
 impl<VM: VMBinding> Allocators<VM> {
@@ -52,9 +52,7 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_ref(),
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_ref(),
             AllocatorSelector::FreeList(index) => self.free_list[index as usize].assume_init_ref(),
-            AllocatorSelector::MarkCompact(index) => {
-                self.markcompact[index as usize].assume_init_ref()
-            }
+            AllocatorSelector::Lisp2(index) => self.lisp2[index as usize].assume_init_ref(),
             AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
         }
     }
@@ -81,9 +79,7 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_mut(),
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_mut(),
             AllocatorSelector::FreeList(index) => self.free_list[index as usize].assume_init_mut(),
-            AllocatorSelector::MarkCompact(index) => {
-                self.markcompact[index as usize].assume_init_mut()
-            }
+            AllocatorSelector::Lisp2(index) => self.lisp2[index as usize].assume_init_mut(),
             AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
         }
     }
@@ -108,7 +104,7 @@ impl<VM: VMBinding> Allocators<VM> {
             malloc: unsafe { MaybeUninit::uninit().assume_init() },
             immix: unsafe { MaybeUninit::uninit().assume_init() },
             free_list: unsafe { MaybeUninit::uninit().assume_init() },
-            markcompact: unsafe { MaybeUninit::uninit().assume_init() },
+            lisp2: unsafe { MaybeUninit::uninit().assume_init() },
         };
         let context = Arc::new(AllocatorContext::new(mmtk));
 
@@ -150,8 +146,8 @@ impl<VM: VMBinding> Allocators<VM> {
                         context.clone(),
                     ));
                 }
-                AllocatorSelector::MarkCompact(index) => {
-                    ret.markcompact[index as usize].write(MarkCompactAllocator::new(
+                AllocatorSelector::Lisp2(index) => {
+                    ret.lisp2[index as usize].write(Lisp2Allocator::new(
                         mutator_tls.0,
                         space,
                         context.clone(),
@@ -189,8 +185,8 @@ pub enum AllocatorSelector {
     Malloc(u8),
     /// Represents a [`crate::util::alloc::immix_allocator::ImmixAllocator`].
     Immix(u8),
-    /// Represents a [`crate::util::alloc::markcompact_allocator::MarkCompactAllocator`].
-    MarkCompact(u8),
+    /// Represents a [`crate::util::alloc::lisp2_allocator::Lisp2Allocator`].
+    Lisp2(u8),
     /// Represents a [`crate::util::alloc::free_list_allocator::FreeListAllocator`].
     FreeList(u8),
     /// No allocator found.
@@ -241,9 +237,8 @@ impl AllocatorInfo {
                 }
             }
 
-            AllocatorSelector::MarkCompact(_) => {
-                let bump_offset =
-                    base_offset + offset_of!(MarkCompactAllocator<VM>, bump_allocator);
+            AllocatorSelector::Lisp2(_) => {
+                let bump_offset = base_offset + offset_of!(Lisp2Allocator<VM>, bump_allocator);
                 let bump_pointer_offset = offset_of!(BumpAllocator<VM>, bump_pointer);
 
                 AllocatorInfo::BumpPointer {

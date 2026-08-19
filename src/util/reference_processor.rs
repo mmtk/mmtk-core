@@ -235,7 +235,7 @@ impl ReferenceProcessor {
 
     // These funcions call `trace_object()`, which will ensure the object and its descendents will
     // be traced.  They are only called in steps that expand the transitive closure.  That include
-    // retaining soft references, and (for MarkCompact) tracing objects for forwarding.
+    // retaining soft references, and (for Lisp2) tracing objects for forwarding.
     // Note that finalizers also expand the transitive closure.
     // These functions are intended to make the code easier to understand.
 
@@ -251,7 +251,7 @@ impl ReferenceProcessor {
         tracer.trace_object(referent)
     }
 
-    /// This function is called when forwarding the references and referents (for MarkCompact). It
+    /// This function is called when forwarding the references and referents (for Lisp2). It
     /// -   adds the reference or the referent to the tracing queue if not yet reached, so that
     ///     the children of the reference or referent will be visited and forwarded, too, and
     /// -   gets the forwarded object reference of the object.

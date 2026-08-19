@@ -1,18 +1,19 @@
 use super::defrag::Histogram;
-use super::line::Line;
+use super::line::{Line, RCArray};
 use super::ImmixSpace;
 use crate::util::constants::*;
 use crate::util::heap::blockpageresource::BlockPool;
 use crate::util::heap::chunk_map::Chunk;
-use crate::util::linear_scan::{Region, RegionIterator};
-use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpec};
+use crate::util::linear_scan::{Region, RegionIterator, UnstraddlableRegion};
+use crate::util::metadata::side_metadata::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
 #[cfg(feature = "object_pinning")]
 use crate::util::metadata::MetadataSpec;
 use crate::util::object_enum::BlockMayHaveObjects;
-use crate::util::Address;
+use crate::util::{Address, ObjectReference};
 use crate::vm::*;
+use bytemuck::NoUninit;
 use std::sync::atomic::Ordering;
 
 /// The block allocation state.
@@ -20,10 +21,14 @@ use std::sync::atomic::Ordering;
 pub enum BlockState {
     /// the block is not allocated.
     Unallocated,
+    /// the block is a young block.
+    Nursery,
     /// the block is allocated but not marked.
     Unmarked,
     /// the block is allocated and marked.
     Marked,
+    /// RC mutator recycled blocks.
+    Reusing,
     /// the block is marked as reusable.
     Reusable { unavailable_lines: u8 },
 }
@@ -35,6 +40,8 @@ impl BlockState {
     const MARK_UNMARKED: u8 = u8::MAX;
     /// Private constant
     const MARK_MARKED: u8 = u8::MAX - 1;
+    const MARK_NURSERY: u8 = u8::MAX - 2;
+    const MARK_REUSING: u8 = u8::MAX - 3;
 }
 
 impl From<u8> for BlockState {
@@ -43,6 +50,8 @@ impl From<u8> for BlockState {
             Self::MARK_UNALLOCATED => BlockState::Unallocated,
             Self::MARK_UNMARKED => BlockState::Unmarked,
             Self::MARK_MARKED => BlockState::Marked,
+            Self::MARK_NURSERY => BlockState::Nursery,
+            Self::MARK_REUSING => BlockState::Reusing,
             unavailable_lines => BlockState::Reusable { unavailable_lines },
         }
     }
@@ -54,7 +63,12 @@ impl From<BlockState> for u8 {
             BlockState::Unallocated => BlockState::MARK_UNALLOCATED,
             BlockState::Unmarked => BlockState::MARK_UNMARKED,
             BlockState::Marked => BlockState::MARK_MARKED,
-            BlockState::Reusable { unavailable_lines } => unavailable_lines,
+            BlockState::Nursery => BlockState::MARK_NURSERY,
+            BlockState::Reusing => BlockState::MARK_REUSING,
+            BlockState::Reusable { unavailable_lines } => {
+                assert_ne!(unavailable_lines, 0);
+                u8::min(unavailable_lines, u8::MAX - 4)
+            }
         }
     }
 }
@@ -68,7 +82,7 @@ impl BlockState {
 
 /// Data structure to reference an immix block.
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, NoUninit)]
 pub struct Block(Address);
 
 impl Region for Block {
@@ -86,6 +100,9 @@ impl Region for Block {
         self.0
     }
 }
+
+/// An objects cannot straddle multiple Immix blocks.
+impl UnstraddlableRegion for Block {}
 
 impl BlockMayHaveObjects for Block {
     fn may_have_objects(&self) -> bool {
@@ -110,6 +127,28 @@ impl Block {
     /// Block mark table (side)
     pub const MARK_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_MARK;
+    pub const LOG_TABLE: SideMetadataSpec =
+        crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_LOG;
+    pub const NURSERY_PROMOTION_STATE_TABLE: SideMetadataSpec =
+        crate::util::metadata::side_metadata::spec_defs::NURSERY_PROMOTION_STATE;
+
+    pub fn calc_dead_lines(&self) -> usize {
+        let mut dead_lines = 0;
+        let rc_array = RCArray::of(*self);
+        for i in 0..Self::LINES {
+            if rc_array.is_dead(i) {
+                dead_lines += 1;
+            }
+        }
+        dead_lines
+    }
+
+    pub const ZERO: Self = Self(Address::ZERO);
+
+    #[allow(unused)]
+    pub fn is_zero(&self) -> bool {
+        self.0.is_zero()
+    }
 
     /// Get the chunk containing the block.
     pub fn chunk(&self) -> Chunk {
@@ -135,6 +174,30 @@ impl Block {
         Self::MARK_TABLE.store_atomic::<u8>(self.start(), state, Ordering::SeqCst);
     }
 
+    /// Set block mark state.
+    pub fn fetch_update_state(
+        &self,
+        mut f: impl FnMut(BlockState) -> Option<BlockState>,
+    ) -> Result<BlockState, BlockState> {
+        Self::MARK_TABLE
+            .fetch_update_atomic::<u8, _>(self.start(), Ordering::SeqCst, Ordering::SeqCst, |s| {
+                f(s.into()).map(u8::from)
+            })
+            .map(|x| x.into())
+            .map_err(|x| x.into())
+    }
+
+    pub fn attempt_dealloc(&self, ignore_reusing_blocks: bool) -> bool {
+        self.fetch_update_state(|s| {
+            if (ignore_reusing_blocks && s == BlockState::Reusing) || s == BlockState::Unallocated {
+                None
+            } else {
+                Some(BlockState::Unallocated)
+            }
+        })
+        .is_ok()
+    }
+
     // Defrag byte
 
     const DEFRAG_SOURCE_STATE: u8 = u8::MAX;
@@ -145,6 +208,14 @@ impl Block {
         // The byte should be 0 (not defrag source) or 255 (defrag source) if this is a major defrag GC, as we set the values in PrepareBlockState.
         // But it could be any value in a nursery GC.
         byte == Self::DEFRAG_SOURCE_STATE
+    }
+
+    pub fn in_defrag_block(o: ObjectReference) -> bool {
+        Block::containing(o).is_defrag_source()
+    }
+
+    pub fn address_in_defrag_block(a: Address) -> bool {
+        Block::from_unaligned_address(a).is_defrag_source()
     }
 
     /// Mark the block for defragmentation.
@@ -166,18 +237,43 @@ impl Block {
     }
 
     /// Initialize a clean block after acquired from page-resource.
-    pub fn init(&self, copy: bool) {
-        self.set_state(if copy {
-            BlockState::Marked
+    pub fn init<VM: VMBinding>(&self, copy: bool, reuse: bool, space: &ImmixSpace<VM>) {
+        if space.rc_enabled {
+            if !reuse {
+                debug_assert_eq!(self.get_state(), BlockState::Unallocated);
+            }
+            self.clear_in_place_promoted();
+            if !copy && reuse {
+                self.set_state(BlockState::Reusing);
+                debug_assert!(!self.is_defrag_source());
+            } else if copy {
+                if reuse {
+                    debug_assert!(!self.is_defrag_source());
+                }
+                self.set_state(BlockState::Unmarked);
+                self.set_as_defrag_source(false);
+            } else {
+                self.set_state(BlockState::Nursery);
+                self.set_as_defrag_source(false);
+            }
         } else {
-            BlockState::Unmarked
-        });
-        Self::DEFRAG_STATE_TABLE.store_atomic::<u8>(self.start(), 0, Ordering::SeqCst);
+            self.set_state(if copy {
+                BlockState::Marked
+            } else {
+                BlockState::Unmarked
+            });
+            if !reuse {
+                Self::DEFRAG_STATE_TABLE.store_atomic::<u8>(self.start(), 0, Ordering::SeqCst);
+            }
+        }
     }
 
     /// Deinitalize a block before releasing.
-    pub fn deinit(&self) {
+    pub fn deinit<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
         self.set_state(BlockState::Unallocated);
+        if space.rc_enabled {
+            self.set_as_defrag_source(false);
+        }
     }
 
     pub fn start_line(&self) -> Line {
@@ -195,6 +291,107 @@ impl Block {
         RegionIterator::<Line>::new(self.start_line(), self.end_line())
     }
 
+    pub fn clear_rc_table(&self) {
+        crate::util::rc::RC_TABLE.bzero_metadata(self.start(), Block::BYTES);
+    }
+
+    pub fn clear_striddle_table(&self) {
+        crate::util::rc::RC_STRADDLE_LINES.bzero_metadata(self.start(), Block::BYTES);
+    }
+
+    #[allow(unused)]
+    pub(crate) fn clear_mark_table<VM: VMBinding>(&self) {
+        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+            .extract_side_spec()
+            .bzero_metadata(self.start(), Self::BYTES);
+    }
+
+    pub(crate) fn initialize_mark_table_as_marked<VM: VMBinding>(&self) {
+        let meta = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec();
+        let start: *mut u8 = address_to_meta_address(meta, self.start()).to_mut_ptr();
+        let limit: *mut u8 = address_to_meta_address(meta, self.end()).to_mut_ptr();
+        unsafe {
+            let bytes = limit.offset_from(start) as usize;
+            std::ptr::write_bytes(start, 0xffu8, bytes);
+        }
+    }
+
+    pub fn log(&self) -> bool {
+        loop {
+            let old_value: u8 = Self::LOG_TABLE.load_atomic(self.start(), Ordering::Relaxed);
+            if old_value == 1 {
+                return false;
+            }
+            if Self::LOG_TABLE
+                .compare_exchange_atomic(self.start(), 0u8, 1u8, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
+                return true;
+            }
+        }
+    }
+
+    pub fn set_as_in_place_promoted(&self) {
+        if self.is_in_place_promoted() {
+            return;
+        }
+        unsafe { Self::NURSERY_PROMOTION_STATE_TABLE.store(self.start(), 1u8) };
+    }
+
+    pub fn is_in_place_promoted(&self) -> bool {
+        Self::NURSERY_PROMOTION_STATE_TABLE.load_atomic::<u8>(self.start(), Ordering::Relaxed) != 0
+    }
+
+    pub fn clear_in_place_promoted(&self) {
+        unsafe { Self::NURSERY_PROMOTION_STATE_TABLE.store(self.start(), 0u8) };
+    }
+
+    pub fn unlog(&self) {
+        Self::LOG_TABLE.store_atomic(self.start(), 0u8, Ordering::Relaxed);
+    }
+
+    pub fn clear_field_unlog_table<VM: VMBinding>(&self) {
+        VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+            .as_spec()
+            .extract_side_spec()
+            .bzero_metadata(self.start(), Block::BYTES);
+    }
+
+    pub fn initialize_field_unlog_table_as_unlogged<VM: VMBinding>(&self) {
+        let meta = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+            .as_spec()
+            .extract_side_spec();
+        let start: *mut u8 = address_to_meta_address(&meta, self.start()).to_mut_ptr();
+        let limit: *mut u8 = address_to_meta_address(&meta, self.end()).to_mut_ptr();
+        unsafe {
+            let bytes = limit.offset_from(start) as usize;
+            std::ptr::write_bytes(start, 0xffu8, bytes);
+        }
+    }
+
+    #[allow(clippy::assertions_on_constants)]
+    pub fn rc_dead(&self) -> bool {
+        type UInt = u128;
+        const LOG_BITS_IN_UINT: usize =
+            (std::mem::size_of::<UInt>() << 3).trailing_zeros() as usize;
+        debug_assert!(
+            Self::LOG_BYTES - crate::util::rc::LOG_MIN_OBJECT_SIZE
+                + crate::util::rc::LOG_REF_COUNT_BITS
+                >= LOG_BITS_IN_UINT
+        );
+        let start =
+            address_to_meta_address(&crate::util::rc::RC_TABLE, self.start()).to_ptr::<UInt>();
+        let limit =
+            address_to_meta_address(&crate::util::rc::RC_TABLE, self.end()).to_ptr::<UInt>();
+        let rc_table = unsafe { std::slice::from_raw_parts(start, limit.offset_from(start) as _) };
+        for x in rc_table {
+            if *x != 0 {
+                return false;
+            }
+        }
+        true
+    }
+
     /// Sweep this block.
     pub fn sweep<VM: VMBinding>(
         &self,
@@ -202,6 +399,10 @@ impl Block {
         mark_histogram: &mut Histogram,
         line_mark_state: Option<u8>,
     ) -> BlockSweepResult {
+        // This method is not called when using RC.
+        assert!(!space.rc_enabled);
+
+        self.set_as_defrag_source(false);
         if super::BLOCK_ONLY {
             match self.get_state() {
                 BlockState::Unallocated => unreachable!("Must not sweep unallocated block."),
@@ -219,7 +420,7 @@ impl Block {
                     }
 
                     // Release the block if it is allocated but not marked by the current GC.
-                    space.release_block(*self);
+                    space.release_block(*self, false);
                     BlockSweepResult::Swept
                 }
                 BlockState::Marked => {
@@ -269,7 +470,7 @@ impl Block {
                 vo_bit::helper::on_region_swept::<VM, _>(self, false);
 
                 // Release the block if non of its lines are marked.
-                space.release_block(*self);
+                space.release_block(*self, false);
                 BlockSweepResult::Swept
             } else {
                 // There are some marked lines. Keep the block live.
@@ -277,7 +478,7 @@ impl Block {
                 if is_reusable {
                     // There are holes. Mark the block as reusable.
                     self.set_state(BlockState::Reusable {
-                        unavailable_lines: marked_lines as _,
+                        unavailable_lines: usize::min(marked_lines, u8::MAX as usize) as _,
                     });
                     space.reusable_blocks.push(*self)
                 } else {
@@ -299,6 +500,141 @@ impl Block {
                 }
             }
         }
+    }
+
+    pub fn rc_sweep_nursery<VM: VMBinding>(&self, space: &ImmixSpace<VM>) -> bool {
+        let is_in_place_promoted = self.is_in_place_promoted();
+        self.clear_in_place_promoted();
+        if is_in_place_promoted {
+            self.set_state(BlockState::Reusable {
+                unavailable_lines: 1 as _,
+            });
+
+            // Bulk clear the VO bits of reusable (unmarked) lines.
+            // Lines that are not marked may contain nursery objects that have never received any inc,
+            // and their VO bits need to be cleared before the lines can be reused.
+            #[cfg(feature = "vo_bit")]
+            {
+                let rc_array = RCArray::of(*self);
+
+                for (i, line) in self.lines().enumerate() {
+                    if rc_array.is_dead(i) {
+                        crate::util::metadata::vo_bit::bzero_vo_bit(line.start(), Line::BYTES);
+                    }
+                }
+            }
+
+            space.reusable_blocks.push(*self);
+            false
+        } else {
+            debug_assert!(self.rc_dead(), "{:?} has non-zero rc value", self);
+            debug_assert_ne!(self.get_state(), super::block::BlockState::Unallocated);
+
+            // Bulk clear the VO bits of the entire block.
+            // This block may contain nursery objects that have never received any inc,
+            // and their VO bits need to be cleared before the block can be reused.
+            #[cfg(feature = "vo_bit")]
+            crate::util::metadata::vo_bit::bzero_vo_bit(self.start(), Self::BYTES);
+
+            space.release_block(*self, false);
+            true
+        }
+    }
+
+    pub fn attempt_mutator_reuse(&self) -> bool {
+        self.fetch_update_state(|s| {
+            if s.is_reusable() {
+                Some(BlockState::Reusing)
+            } else {
+                None
+            }
+        })
+        .is_ok()
+    }
+
+    pub fn rc_sweep_mature<VM: VMBinding>(&self, space: &ImmixSpace<VM>, defrag: bool) -> bool {
+        if self.get_state() == BlockState::Unallocated || self.get_state() == BlockState::Nursery {
+            return false;
+        }
+        if defrag || self.rc_dead() {
+            if self.attempt_dealloc(true) {
+                // Bulk clear the VO bits of the entire block.
+                // Dec operations may reduce some object's RC to 0,
+                // at which time their VO bits are cleared, too.
+                // But some lines may also contain objects that have never received any inc,
+                // and their VO bits need to be cleared before the block can be reused.
+                #[cfg(feature = "vo_bit")]
+                crate::util::metadata::vo_bit::bzero_vo_bit(self.start(), Self::BYTES);
+
+                space.release_block(*self, true);
+                return true;
+            }
+        } else if !super::BLOCK_ONLY {
+            // See the caller of this function.
+            // At least one object is dead in the block.
+            let add_as_reusable = {
+                let has_holes = self.has_holes();
+                self.fetch_update_state(|s| {
+                    if s == BlockState::Reusing
+                        || s == BlockState::Unallocated
+                        || s.is_reusable()
+                        || !has_holes
+                    {
+                        None
+                    } else {
+                        Some(BlockState::Reusable {
+                            unavailable_lines: 1 as _,
+                        })
+                    }
+                })
+                .is_ok()
+            };
+            if add_as_reusable {
+                // Bulk clear the VO bits of reusable (unmarked) lines.
+                // Dec operations may reduce some object's RC to 0,
+                // at which time their VO bits are cleared, too.
+                // But some lines may also contain objects that have never received any inc,
+                // and their VO bits need to be cleared before the block can be reused.
+                #[cfg(feature = "vo_bit")]
+                {
+                    let rc_array = RCArray::of(*self);
+
+                    for (i, line) in self.lines().enumerate() {
+                        if rc_array.is_dead(i) {
+                            crate::util::metadata::vo_bit::bzero_vo_bit(line.start(), Line::BYTES);
+                        }
+                    }
+                }
+                space.reusable_blocks.push(*self);
+            }
+        }
+        false
+    }
+
+    pub fn rc_table_start(&self) -> Address {
+        address_to_meta_address(&crate::util::rc::RC_TABLE, self.start())
+    }
+
+    pub fn has_holes(&self) -> bool {
+        let rc_array = RCArray::of(*self);
+        let mut found_free_line = false;
+        let mut free_lines = 0;
+        for i in 0..Self::LINES {
+            if rc_array.is_dead(i) {
+                if i == 0 || found_free_line {
+                    free_lines += 1
+                } else if !found_free_line {
+                    found_free_line = true;
+                }
+                if free_lines > 0 {
+                    return true;
+                }
+            } else {
+                free_lines = 0;
+                found_free_line = false;
+            }
+        }
+        false
     }
 
     /// Clear VO bits metadata for unmarked regions.

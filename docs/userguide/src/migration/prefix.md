@@ -30,6 +30,34 @@ Notes for the mmtk-core developers:
 
 <!-- Insert new versions here -->
 
+## 0.34.0
+
+### Rename "Compressor" to "OVC", and "MarkCompact" to "Lisp2"
+
+```admonish tldr
+The `Compressor` plan is renamed to `OVC`, and the `MarkCompact` plan is renamed to `Lisp2`.
+Both plans now live under the shared `plan::markcompact` module, as
+`plan::markcompact::ovc::OVC` and `plan::markcompact::lisp2::Lisp2` respectively. VM bindings that
+select a plan by name (e.g. via `MMTK_PLAN`), or refer to the renamed types/modules directly, need to
+be updated.
+```
+
+API changes:
+
+*   enum `util::options::PlanSelector`
+    -   `Compressor` -> `OVC`
+    -   `MarkCompact` -> `Lisp2`
+        +   This also changes the string accepted for the `plan` option (e.g. via the `MMTK_PLAN`
+            environment variable used by some bindings): use `"OVC"`/`"Lisp2"` instead of
+            `"Compressor"`/`"MarkCompact"`.
+*   Cargo feature `compressor_single_space` -> `ovc_single_space`
+
+Not API change, but worth noting:
+
+*   Any string that names these plans (e.g. the `MMTK_PLAN` environment variable used by some
+    bindings, or benchmark/CI configuration keyed by plan name) must be updated from
+    `"MarkCompact"`/`"Compressor"` to `"Lisp2"`/`"OVC"`.
+
 ## 0.33.0
 
 ### `GCTriggerPolicy::on_gc_start/on_gc_end` repurposed for GC cycles

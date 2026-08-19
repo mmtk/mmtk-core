@@ -126,7 +126,7 @@ collection for our GC plan.
 
 The trait `Plan` has a `common()` method (and a `common_mut()` counterpart) that should
 return a (mutable) reference to the common plan. Implement these methods now. Several default
-method implementations in the `Plan` trait, such as `end_of_pause()`, rely on `common_mut()` to do
+method implementations in the `Plan` trait, such as `on_pause_end()`, rely on `common_mut()` to do
 the right thing, so once these are implemented, `MyGC` does not need to override those methods.
 
 ```rust

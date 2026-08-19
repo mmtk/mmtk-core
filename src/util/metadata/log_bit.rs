@@ -7,15 +7,23 @@ use std::sync::atomic::Ordering;
 
 use super::MetadataSpec;
 
+/// The value stored in the log bit/byte indicating that the object or field is unlogged, i.e. it
+/// has not yet been recorded in the remembered set and the write barrier should still take its slow path.
+pub const UNLOGGED_VALUE: u8 = 0b1;
+
+/// The value stored in the log bit/byte indicating that the object or field is logged, i.e. it
+/// has already been recorded in the remembered set and the write barrier can skip its slow path.
+pub const LOGGED_VALUE: u8 = 0b0;
+
 impl VMGlobalLogBitSpec {
     /// Clear the unlog bit to log object (0 means logged)
     pub fn clear<VM: VMBinding>(&self, object: ObjectReference, order: Ordering) {
-        self.store_atomic::<VM, u8>(object, 0, None, order)
+        self.store_atomic::<VM, u8>(object, LOGGED_VALUE, None, order)
     }
 
     /// Mark the log bit as unlogged (1 means unlogged)
     pub fn mark_as_unlogged<VM: VMBinding>(&self, object: ObjectReference, order: Ordering) {
-        self.store_atomic::<VM, u8>(object, 1, None, order)
+        self.store_atomic::<VM, u8>(object, UNLOGGED_VALUE, None, order)
     }
 
     /// Mark the entire byte as unlogged if the log bit is in the side metadata. As it marks the entire byte,
@@ -35,9 +43,16 @@ impl VMGlobalLogBitSpec {
         }
     }
 
-    /// Check if the log bit represents the unlogged state (the bit is 1).
+    /// Check if the log bit represents the unlogged state.
     pub fn is_unlogged<VM: VMBinding>(&self, object: ObjectReference, order: Ordering) -> bool {
-        self.load_atomic::<VM, u8>(object, None, order) == 1
+        self.load_atomic::<VM, u8>(object, None, order) == UNLOGGED_VALUE
+    }
+}
+
+impl MetadataSpec {
+    /// Mark the log bit as unlogged (1 means unlogged)
+    pub fn mark_as_unlogged<VM: VMBinding>(&self, object: ObjectReference, order: Ordering) {
+        self.store_atomic::<VM, u8>(object, UNLOGGED_VALUE, None, order)
     }
 }
 

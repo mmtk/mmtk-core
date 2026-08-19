@@ -118,9 +118,9 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         }
     }
 
-    fn end_of_pause(&mut self, mmtk: &'static MMTK<VM>, tls: VMWorkerThread) {
+    fn on_pause_end(&mut self, mmtk: &'static MMTK<VM>, tls: VMWorkerThread) {
         let next_gc_full_heap = CommonGenPlan::should_next_gc_be_full_heap(self);
-        self.gen.end_of_pause(tls, next_gc_full_heap);
+        self.gen.on_pause_end(tls, next_gc_full_heap);
         mmtk.gc_trigger.policy.on_gc_end(mmtk);
     }
 

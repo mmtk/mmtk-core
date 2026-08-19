@@ -67,9 +67,9 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         self.common.release(tls, true);
     }
 
-    fn end_of_pause(&mut self, mmtk: &'static MMTK<VM>, tls: VMWorkerThread) {
+    fn on_pause_end(&mut self, mmtk: &'static MMTK<VM>, tls: VMWorkerThread) {
         self.ms.end_of_gc();
-        self.common.end_of_pause(tls);
+        self.common.on_pause_end(tls);
         mmtk.gc_trigger.policy.on_gc_end(mmtk);
     }
 

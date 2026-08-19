@@ -8,13 +8,18 @@ use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::{FreeListPageResource, PageResource};
 use crate::util::metadata;
+use crate::util::metadata::side_metadata::spec_defs::LOS_PAGE_REUSE_COUNT;
+use crate::util::metadata::MetadataSpec;
 use crate::util::object_enum::ClosureObjectEnumerator;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
+use crate::util::rc::RefCountHelper;
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicUsize;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -31,6 +36,15 @@ pub struct LargeObjectSpace<VM: VMBinding> {
     in_nursery_gc: bool,
     treadmill: TreadMill,
     clear_log_bit_on_sweep: bool,
+    pub num_pages_released_lazy: AtomicUsize,
+    pub rc_enabled: bool,
+    pub(crate) rc: RefCountHelper<VM>,
+    pub is_end_of_satb_or_full_gc: bool,
+    /// Whether newly allocated LOS objects should bump `LOS_PAGE_REUSE_COUNT` on their pages, so
+    /// remembered-set entries recorded against a page's previous occupant are invalidated. Only
+    /// needed while concurrent marking can be validating a remembered set; set/cleared by the
+    /// owning plan (currently only LXR) as concurrent marking starts/ends.
+    pub(crate) bump_page_reuse_count: AtomicBool,
 }
 
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
@@ -38,7 +52,20 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         self.get_name()
     }
     fn is_live(&self, object: ObjectReference) -> bool {
+        if self.rc_enabled {
+            if self.is_end_of_satb_or_full_gc {
+                return self.is_marked(object) && self.rc.count(object) > 0;
+            }
+            return self.rc.count(object) > 0;
+        }
         self.test_mark_bit(object, self.mark_state)
+    }
+    fn is_reachable(&self, object: ObjectReference) -> bool {
+        if self.rc_enabled {
+            self.test_mark_bit(object, self.mark_state) && self.rc.count(object) > 0
+        } else {
+            self.is_live(object)
+        }
     }
     #[cfg(feature = "object_pinning")]
     fn pin_object(&self, _object: ObjectReference) -> bool {
@@ -60,7 +87,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         true
     }
 
-    fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize) {
+    fn initialize_object_metadata(&self, object: ObjectReference, bytes: usize) {
         // VO bit: Set for all objects.
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(object);
@@ -73,6 +100,23 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
                 offset_from_page_start < crate::util::metadata::vo_bit::VO_BIT_WORD_TO_REGION,
                 "The raw address of ObjectReference is not in the first 512 bytes of a page. The internal pointer searching for LOS won't work."
             );
+        }
+
+        if self.rc_enabled {
+            // Add to treadmill nursery
+            self.treadmill.add_to_treadmill(object, true);
+            // Initialize mark bit
+            self.test_and_mark(object, self.mark_state);
+            // Initialize metadata
+            if self.bump_page_reuse_count.load(Ordering::Acquire) {
+                for off in (0..bytes).step_by(BYTES_IN_PAGE) {
+                    let a = object.to_raw_address() + off;
+                    let count = LOS_PAGE_REUSE_COUNT.load_atomic::<u8>(a, Ordering::SeqCst);
+                    let new_count = if count == u8::MAX { 0 } else { count + 1 };
+                    LOS_PAGE_REUSE_COUNT.store_atomic::<u8>(a, new_count, Ordering::SeqCst);
+                }
+            }
+            return;
         }
 
         let allocate_as_live = self.should_allocate_as_live();
@@ -280,11 +324,18 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     ) -> Self {
         let is_discontiguous = args.vmrequest.is_discontiguous();
         let vm_map = args.vm_map;
-        let common = CommonSpace::new(args.into_policy_args(
-            false,
-            false,
-            metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC]),
-        ));
+        let rc_enabled = args.constraints.rc_enabled;
+        let specs = if rc_enabled {
+            vec![
+                *VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                MetadataSpec::OnSide(LOS_PAGE_REUSE_COUNT),
+            ]
+        } else {
+            vec![*VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC]
+        };
+        let policy_args =
+            args.into_policy_args(false, false, metadata::extract_side_metadata(&specs));
+        let common = CommonSpace::new(policy_args);
         let mut pr = if is_discontiguous {
             FreeListPageResource::new_discontiguous(vm_map)
         } else {
@@ -302,6 +353,41 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             in_nursery_gc: false,
             treadmill: TreadMill::new(),
             clear_log_bit_on_sweep,
+            num_pages_released_lazy: Default::default(),
+            rc_enabled: false,
+            rc: RefCountHelper::NEW,
+            is_end_of_satb_or_full_gc: false,
+            bump_page_reuse_count: AtomicBool::new(false),
+        }
+    }
+
+    fn release_object(&self, object: ObjectReference) -> usize {
+        let start = get_super_page(object.to_object_start::<VM>());
+        #[cfg(feature = "vo_bit")]
+        crate::util::metadata::vo_bit::unset_vo_bit(object);
+        if self.rc_enabled {
+            debug_assert_eq!(self.rc.count(object), 0);
+            let pages = self.pr.get_pages(start);
+            // TODO: Currently this code path assumes the collector is LXR and it uses field log bit.
+            // When we can use object log bit for LXR, we should merge with `sweep_large_pages`
+            // and clear object log bit instead.
+            VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+                .as_spec()
+                .extract_side_spec()
+                .bzero_metadata(start, pages * BYTES_IN_PAGE);
+        }
+        self.pr.release_pages(start)
+    }
+
+    pub fn release_rc_nursery_objects(&self) {
+        debug_assert!(self.rc_enabled);
+        // promote nursery objects or release dead nursery
+        for o in self.treadmill.collect_alloc_nursery() {
+            if self.rc.count(o) == 0 {
+                self.release_object(o);
+            } else {
+                self.treadmill.add_to_treadmill(o, false);
+            }
         }
     }
 
@@ -309,11 +395,19 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if full_heap {
             self.mark_state = MARK_BIT - self.mark_state;
         }
+        self.num_pages_released_lazy.store(0, Ordering::Relaxed);
+        if self.rc_enabled {
+            return;
+        }
         self.treadmill.flip(full_heap);
         self.in_nursery_gc = !full_heap;
     }
 
     pub fn release(&mut self, full_heap: bool) {
+        if self.rc_enabled {
+            self.release_rc_nursery_objects();
+            return;
+        }
         // We swapped the allocation nursery and the collection nursery when GC starts, and we don't
         // add objects to the allocation nursery during GC.  It should have remained empty during
         // the whole GC.
@@ -341,6 +435,12 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             "{:x}: VO bit not set",
             object
         );
+        if self.rc_enabled {
+            if self.test_and_mark(object, self.mark_state) {
+                queue.enqueue(object);
+            }
+            return object;
+        }
         let nursery_object = self.is_in_nursery(object);
         trace!(
             "LOS object {} {} a nursery object",
@@ -373,14 +473,14 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     fn sweep_large_pages(&mut self, sweep_nursery: bool) {
         let sweep = |object: ObjectReference| {
-            #[cfg(feature = "vo_bit")]
-            crate::util::metadata::vo_bit::unset_vo_bit(object);
             // Clear log bits for dead objects to prevent a new nursery object having the unlog bit set
+            // TODO: This code path assumes the log bit is object log bit instead of field log bit.
+            // When generational plans and ConcurrentImmix support field log bit,
+            // we can push this clean-up operation into `Self::release_object`.
             if self.clear_log_bit_on_sweep {
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.clear::<VM>(object, Ordering::SeqCst);
             }
-            self.pr
-                .release_pages(get_super_page(object.to_object_start::<VM>()));
+            self.release_object(object);
         };
         if sweep_nursery {
             for object in self.treadmill.collect_nursery() {
@@ -393,7 +493,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
-    /// Enumerate objects in the to-space.  It is a workaround for Compressor which currently needs
+    /// Enumerate objects in the to-space.  It is a workaround for OVC which currently needs
     /// to enumerate reachable objects for during reference forwarding.
     pub(crate) fn enumerate_to_space_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         // This function is intended to enumerate objects in the to-space.
@@ -413,13 +513,27 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         self.acquire(tls, pages, alloc_options)
     }
 
+    pub fn attempt_mark(&self, object: ObjectReference) -> bool {
+        self.test_and_mark(object, self.mark_state)
+    }
+
+    pub fn rc_free(&self, o: ObjectReference) {
+        if self.treadmill.remove_mature(o) {
+            let pages = self.release_object(o);
+            self.num_pages_released_lazy
+                .fetch_add(pages, Ordering::Relaxed);
+        }
+    }
+
     /// Test if the object's mark bit is the same as the given value. If it is not the same,
     /// the method will attemp to mark the object and clear its nursery bit. If the attempt
     /// succeeds, the method will return true, meaning the object is marked by this invocation.
     /// Otherwise, it returns false.
     fn test_and_mark(&self, object: ObjectReference, value: u8) -> bool {
         loop {
-            let mask = if self.in_nursery_gc {
+            let mask = if self.rc_enabled {
+                MARK_BIT
+            } else if self.in_nursery_gc {
                 LOS_BIT_MASK
             } else {
                 MARK_BIT
@@ -468,6 +582,20 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             Ordering::Relaxed,
         ) & NURSERY_BIT
             == NURSERY_BIT
+    }
+
+    pub fn sweep_rc_mature_objects_after_satb(&self, is_live: &impl Fn(ObjectReference) -> bool) {
+        self.treadmill.retain_mature(|o| {
+            if !is_live(*o) {
+                self.rc.set(*o, 0);
+                let pages = self.release_object(*o);
+                self.num_pages_released_lazy
+                    .fetch_add(pages, Ordering::Relaxed);
+                false
+            } else {
+                true
+            }
+        });
     }
 
     pub fn is_marked(&self, object: ObjectReference) -> bool {

@@ -2,25 +2,29 @@ use super::defrag::StatsForDefrag;
 use super::line::*;
 use super::{block::*, defrag::Defrag};
 use crate::plan::tracing::OptionObjectQueue;
+use crate::plan::Pause;
 use crate::policy::gc_work::{TraceKind, DEFAULT_TRACE, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::sft_map::SFTMap;
 use crate::policy::space::{CommonSpace, Space};
+use crate::scheduler::gc_work::PrepareCollector;
 use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::alloc::allocator::AllocatorContext;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;
 use crate::util::heap::BlockPageResource;
 use crate::util::heap::PageResource;
-use crate::util::linear_scan::{Region, RegionIterator};
+use crate::util::linear_scan::{Region, RegionIterator, UnstraddlableRegion};
 use crate::util::metadata::log_bit::UnlogBitsOperation;
-use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::metadata::side_metadata::spec_defs::IX_LINE_REUSE_COUNT;
+use crate::util::metadata::side_metadata::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
 use crate::util::metadata::{self, MetadataSpec};
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::object_forwarding;
+use crate::util::rc::RefCountHelper;
 use crate::util::{copy::*, epilogue, object_enum};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -31,10 +35,31 @@ use crate::{
     MMTK,
 };
 use atomic::Ordering;
-use std::sync::{atomic::AtomicU8, atomic::AtomicUsize, Arc};
+use std::sync::atomic::AtomicUsize;
+use std::sync::OnceLock;
+use std::sync::{atomic::AtomicU8, Arc};
 
 pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
 pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
+
+/// Whether RC-mode mature-space evacuation is compiled in.
+const LXR_MATURE_EVACUATION: bool = !cfg!(feature = "lxr_no_mature_evac");
+
+/// Plan-level hooks invoked by ImmixSpace during mutator allocation.
+/// Default impls are no-ops; LXR provides the concrete implementation.
+pub trait ImmixHooks<VM: VMBinding>: Send + Sync {
+    /// Called after a fresh clean block is acquired. `copy` distinguishes
+    /// mutator vs. GC-copy allocation. The hook owns any plan-specific
+    /// per-block bookkeeping (e.g. nursery list, mark-table init).
+    fn on_clean_block_acquired(&self, _block: Block, _copy: bool) {}
+    /// Called after a reusable block is handed out to a mutator.
+    fn on_reusable_block_acquired(&self, _block: Block, _copy: bool) {}
+    /// Whether tracing is in progress; consulted on the mutator
+    /// reused-line fast path so newly handed-out lines can be marked.
+    fn cm_in_progress_or_final_mark(&self) -> bool {
+        false
+    }
+}
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -51,12 +76,17 @@ pub struct ImmixSpace<VM: VMBinding> {
     pub(super) defrag: Defrag,
     /// How many lines have been consumed since last GC?
     lines_consumed: AtomicUsize,
+    reused_lines_consumed: AtomicUsize,
     /// Object mark state
     mark_state: u8,
     /// Work packet scheduler
     scheduler: Arc<GCWorkScheduler<VM>>,
     /// Some settings for this space
     space_args: ImmixSpaceArgs,
+    hooks: OnceLock<&'static dyn ImmixHooks<VM>>,
+    pub rc_enabled: bool,
+    pub is_end_of_satb_or_full_gc: bool,
+    pub rc: RefCountHelper<VM>,
 }
 
 /// Some arguments for Immix Space.
@@ -92,6 +122,35 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
+        if self.rc_enabled {
+            if self.is_end_of_satb_or_full_gc {
+                if self.is_marked(object) {
+                    let block = Block::containing(object);
+                    if block.is_defrag_source() {
+                        if object_forwarding::is_forwarded::<VM>(object) {
+                            let forwarded =
+                                object_forwarding::read_forwarding_pointer::<VM>(object);
+                            return self.is_marked(forwarded) && self.rc.count(forwarded) > 0;
+                        } else {
+                            return false;
+                        }
+                    }
+                    return self.rc.count(object) > 0;
+                } else if object_forwarding::is_forwarded::<VM>(object) {
+                    let forwarded = object_forwarding::read_forwarding_pointer::<VM>(object);
+                    debug_assert!(
+                        forwarded.to_raw_address().is_mapped(),
+                        "Invalid forwarded object: {:?} -> {:?}",
+                        object,
+                        forwarded
+                    );
+                    return self.is_marked(forwarded) && self.rc.count(forwarded) > 0;
+                } else {
+                    return false;
+                }
+            }
+            return self.rc.count(object) > 0 || object_forwarding::is_forwarded::<VM>(object);
+        }
         // If the mark bit is set, it is live.
         if self.is_marked(object) {
             return true;
@@ -104,6 +163,18 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
 
         // If the object is forwarded, it is live, too.
         object_forwarding::is_forwarded::<VM>(object)
+    }
+
+    fn is_reachable(&self, object: ObjectReference) -> bool {
+        if self.rc_enabled {
+            if object_forwarding::is_forwarded::<VM>(object) {
+                let forwarded = object_forwarding::read_forwarding_pointer::<VM>(object);
+                return self.is_marked(forwarded) && self.rc.count(forwarded) > 0;
+            }
+            self.is_marked(object) && self.rc.count(object) > 0
+        } else {
+            self.is_live(object)
+        }
     }
     #[cfg(feature = "object_pinning")]
     fn pin_object(&self, object: ObjectReference) -> bool {
@@ -166,10 +237,14 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
 
     fn debug_print_object_info(&self, object: ObjectReference) {
         println!("marked  = {}", self.is_marked(object));
-        println!(
-            "line marked = {}",
-            Line::from_unaligned_address(object.to_raw_address()).is_marked(self.mark_state)
-        );
+        // The line mark table isn't mapped when RC is enabled (LXR tracks liveness via
+        // block state and reference counts instead), so skip it in that case.
+        if !self.rc_enabled {
+            println!(
+                "line marked = {}",
+                Line::from_unaligned_address(object.to_raw_address()).is_marked(self.mark_state)
+            );
+        }
         println!(
             "block state = {:?}",
             Block::from_unaligned_address(object.to_raw_address()).get_state()
@@ -281,8 +356,8 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         } else if KIND == DEFAULT_TRACE {
             // FIXME: This is hacky. When we do a default trace, this should be a nonmoving space.
             // The only exception is the nursery GC for sticky immix, for which, we use default trace.
-            // This function is only used for PlanTrace, and for sticky immix nursery GC, we use
-            // GenNurseryTrace. So it still works. But this is quite hacky anyway.
+            // This function is only used for PlanProcessEdges, and for sticky immix nursery GC, we use
+            // GenNurseryProcessEdges. So it still works. But this is quite hacky anyway.
             // See https://github.com/mmtk/mmtk-core/issues/1314 for details.
             false
         } else {
@@ -297,7 +372,21 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     const MARKED_STATE: u8 = 1;
 
     /// Get side metadata specs
-    fn side_metadata_specs() -> Vec<SideMetadataSpec> {
+    fn side_metadata_specs(rc_enabled: bool) -> Vec<SideMetadataSpec> {
+        if rc_enabled {
+            let meta = vec![
+                MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
+                MetadataSpec::OnSide(Block::MARK_TABLE),
+                *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+                MetadataSpec::OnSide(crate::util::rc::RC_STRADDLE_LINES),
+                MetadataSpec::OnSide(Block::LOG_TABLE),
+                MetadataSpec::OnSide(Block::NURSERY_PROMOTION_STATE_TABLE),
+                MetadataSpec::OnSide(IX_LINE_REUSE_COUNT),
+            ];
+            return metadata::extract_side_metadata(&meta);
+        }
         metadata::extract_side_metadata(&if super::BLOCK_ONLY {
             vec![
                 MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
@@ -355,12 +444,21 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             "Number of lines in a block should not exceed BlockState::MARK_MARKED"
         );
 
+        // TODO: The VO bit strategy is only relevant to tracing GC.
+        // LXR currently ignores the strategy.
         #[cfg(feature = "vo_bit")]
-        vo_bit::helper::validate_config::<VM>();
+        if !args.constraints.rc_enabled {
+            vo_bit::helper::validate_config::<VM>();
+        }
+
         let vm_map = args.vm_map;
         let scheduler = args.scheduler.clone();
-        let common =
-            CommonSpace::new(args.into_policy_args(true, false, Self::side_metadata_specs()));
+        let rc_enabled = args.constraints.rc_enabled;
+        let common = CommonSpace::new(args.into_policy_args(
+            true,
+            false,
+            Self::side_metadata_specs(rc_enabled),
+        ));
         let space_index = common.descriptor.get_index();
         ImmixSpace {
             pr: if common.vmrequest.is_discontiguous() {
@@ -383,18 +481,26 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
             lines_consumed: AtomicUsize::new(0),
+            reused_lines_consumed: AtomicUsize::new(0),
             reusable_blocks: ReusableBlockPool::new(scheduler.num_workers()),
             defrag: Defrag::default(),
             // Set to the correct mark state when inititialized. We cannot rely on prepare to set it (prepare may get skipped in nursery GCs).
             mark_state: Self::MARKED_STATE,
-            scheduler: scheduler.clone(),
+            scheduler,
             space_args,
+            hooks: OnceLock::new(),
+            rc_enabled,
+            is_end_of_satb_or_full_gc: false,
+            rc: RefCountHelper::NEW,
         }
     }
 
     /// Flush the thread-local queues in BlockPageResource
     pub fn flush_page_resource(&self) {
-        self.reusable_blocks.flush_all();
+        // FIXME: Do we need this for LXR? We observed this to cause fails on conix.
+        if !self.rc_enabled {
+            self.reusable_blocks.flush_all();
+        }
         #[cfg(target_pointer_width = "64")]
         self.pr.flush_all()
     }
@@ -426,14 +532,61 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             user_triggered_collection,
             self.reusable_blocks.len() == 0,
             full_heap_system_gc,
+            self.rc_enabled,
             *self.common.options.immix_always_defrag,
         );
         self.defrag.in_defrag()
     }
 
     /// Get work packet scheduler
-    fn scheduler(&self) -> &GCWorkScheduler<VM> {
+    pub fn scheduler(&self) -> &GCWorkScheduler<VM> {
         &self.scheduler
+    }
+
+    /// Install the plan-level hooks. Called once by the owning plan during `gc_init`.
+    pub fn install_hooks(&self, hooks: &'static dyn ImmixHooks<VM>) {
+        self.hooks
+            .set(hooks)
+            .unwrap_or_else(|_| panic!("ImmixSpace::install_hooks called more than once"));
+    }
+
+    fn hooks(&self) -> Option<&'static dyn ImmixHooks<VM>> {
+        self.hooks.get().copied()
+    }
+
+    pub fn prepare_rc(&mut self, pause: Pause) {
+        // Initialize mark state for tracing
+        if pause == Pause::Full || pause == Pause::InitialMark {
+            // Update mark_state
+            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
+                self.mark_state = Self::MARKED_STATE;
+            } else {
+                // For header metadata, we use cyclic mark bits.
+                unimplemented!("cyclic mark bits is not supported at the moment");
+            }
+        }
+        // Release nursery blocks
+        if pause != Pause::RefCount {
+            if pause == Pause::Full {
+                // Reset worker TLABs.
+                // The block of the current worker TLAB may be selected as part of the mature evacuation set.
+                for w in &self.scheduler().worker_group.workers_shared {
+                    let result = w.designated_work.push(Box::new(PrepareCollector));
+                    debug_assert!(result.is_ok());
+                }
+            }
+            self.flush_page_resource();
+        }
+        if pause == Pause::FinalMark || pause == Pause::Full {
+            self.is_end_of_satb_or_full_gc = true;
+        }
+    }
+
+    pub fn release_rc(&mut self) {
+        self.flush_page_resource();
+        self.rc.reset_inc_buffer_size();
+        self.is_end_of_satb_or_full_gc = false;
+        self.reused_lines_consumed.store(0, Ordering::Relaxed);
     }
 
     pub(crate) fn prepare(
@@ -442,6 +595,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         plan_stats: Option<StatsForDefrag>,
         unlog_bits_op: UnlogBitsOperation,
     ) {
+        // This function should not be called during RC.
+        // Otherwise the VO bit handling will be incorrect.
+        debug_assert!(!self.rc_enabled);
+
         if major_gc {
             // Update mark_state
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
@@ -522,6 +679,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /// Release for the immix space.
     pub(crate) fn release(&mut self, major_gc: bool, unlog_bits_op: UnlogBitsOperation) {
+        debug_assert!(!self.rc_enabled);
         if major_gc {
             // Update line_unavail_state for hole searching after this GC.
             if !super::BLOCK_ONLY {
@@ -574,8 +732,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Release a block.
-    pub fn release_block(&self, block: Block) {
-        block.deinit();
+    pub fn release_block(&self, block: Block, zero_unlog_table: bool) {
+        if zero_unlog_table {
+            block.clear_field_unlog_table::<VM>();
+        }
+        block.deinit(self);
         self.pr.release_block(block);
     }
 
@@ -590,12 +751,19 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if block_address.is_zero() {
             return None;
         }
-        self.defrag.notify_new_clean_block(copy);
         let block = Block::from_aligned_address(block_address);
-        block.init(copy);
+        if !self.rc_enabled || self.defrag.in_defrag() {
+            self.defrag.notify_new_clean_block(copy);
+        }
+        if let Some(hooks) = self.hooks() {
+            hooks.on_clean_block_acquired(block, copy);
+        }
+        block.init(copy, false, self);
         self.chunk_map.set_allocated(block.chunk(), true);
-        self.lines_consumed
-            .fetch_add(Block::LINES, Ordering::SeqCst);
+        if !self.rc_enabled {
+            self.lines_consumed
+                .fetch_add(Block::LINES, Ordering::SeqCst);
+        }
         Some(block)
     }
 
@@ -606,25 +774,60 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
         loop {
             let block = self.reusable_blocks.pop()?;
-
             // Skip blocks that should be evacuated.
             if copy && block.is_defrag_source() {
                 continue;
             }
-
-            // Get available lines. Do this before block.init which will reset block state.
-            let lines_delta = match block.get_state() {
-                BlockState::Reusable { unavailable_lines } => {
-                    Block::LINES - unavailable_lines as usize
+            if self.rc_enabled {
+                if LXR_MATURE_EVACUATION && block.is_defrag_source() {
+                    continue;
                 }
-                BlockState::Unmarked => Block::LINES,
-                _ => unreachable!("{:?} {:?}", block, block.get_state()),
-            };
-            self.lines_consumed.fetch_add(lines_delta, Ordering::SeqCst);
+                // Blocks in the `reusable_blocks` queue can be released after some RC collections.
+                // These blocks can either have `Unallocated` state, or be reallocated again.
+                // Skip these cases and only return the truly reusable blocks.
+                if !block.get_state().is_reusable() {
+                    continue;
+                }
+                if !block.attempt_mutator_reuse() {
+                    continue;
+                }
+                if let Some(hooks) = self.hooks() {
+                    hooks.on_reusable_block_acquired(block, copy);
+                }
+            } else {
+                // Get available lines. Do this before block.init which will reset block state.
+                let lines_delta = match block.get_state() {
+                    BlockState::Reusable { unavailable_lines } => {
+                        Block::LINES - unavailable_lines as usize
+                    }
+                    BlockState::Unmarked => Block::LINES,
+                    _ => unreachable!("{:?} {:?}", block, block.get_state()),
+                };
+                self.lines_consumed.fetch_add(lines_delta, Ordering::SeqCst);
+            }
 
-            block.init(copy);
+            block.init(copy, true, self);
             return Some(block);
         }
+    }
+
+    pub fn trace_object_without_moving_rc(
+        &self,
+        queue: &mut impl ObjectQueue,
+        object: ObjectReference,
+    ) -> ObjectReference {
+        if self.attempt_mark(object) {
+            let addr = object.to_raw_address().as_usize();
+            let straddle = if (addr & 0b11110000) == 0 {
+                self.rc.is_straddle_line(Line::containing_obj_ref(object))
+            } else {
+                false
+            };
+            if !straddle {
+                queue.enqueue(object);
+            }
+        }
+        object
     }
 
     /// Trace and mark objects without evacuation.
@@ -633,25 +836,49 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         queue: &mut impl ObjectQueue,
         object: ObjectReference,
     ) -> ObjectReference {
-        #[cfg(feature = "vo_bit")]
-        vo_bit::helper::on_trace_object::<VM>(object);
+        // This function should not be called during RC if mature evacuation is not enabled.
+        debug_assert!(!LXR_MATURE_EVACUATION || !self.rc_enabled);
 
-        if self.attempt_mark(object, self.mark_state) {
-            // Mark block and lines
-            if !super::BLOCK_ONLY {
-                if !super::MARK_LINE_AT_SCAN_TIME {
-                    self.mark_lines(object);
+        #[cfg(feature = "vo_bit")]
+        if !self.rc_enabled {
+            // The VO bit strategy is currently not applicable to RC.
+            // RC clears VO bits during sweeping.
+            vo_bit::helper::on_trace_object::<VM>(object);
+        }
+
+        if self.attempt_mark(object) {
+            if self.rc_enabled {
+                let straddle = self.rc.is_straddle_line(Line::containing_obj_ref(object));
+                if straddle {
+                    return object;
                 }
             } else {
-                Block::containing(object).set_state(BlockState::Marked);
+                // Mark block and lines
+                if !super::BLOCK_ONLY {
+                    if !super::MARK_LINE_AT_SCAN_TIME {
+                        self.mark_lines(object);
+                    }
+                } else {
+                    let block = Block::containing(object);
+                    let state = block.get_state();
+                    if state != BlockState::Nursery && state != BlockState::Marked {
+                        block.set_state(BlockState::Marked);
+                    }
+                }
             }
 
             #[cfg(feature = "vo_bit")]
-            vo_bit::helper::on_object_marked::<VM>(object);
+            if !self.rc_enabled {
+                // The VO bit strategy is currently not applicable to RC.
+                // RC clears VO bits during sweeping.
+                vo_bit::helper::on_object_marked::<VM>(object);
+            }
 
             // Visit node
             queue.enqueue(object);
-            self.unlog_object_if_needed(object);
+            if !self.rc_enabled {
+                self.unlog_object_if_needed(object);
+            }
             return object;
         }
         object
@@ -667,6 +894,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         worker: &mut GCWorker<VM>,
         nursery_collection: bool,
     ) -> ObjectReference {
+        // This function should not be called when RC is enabled.
+        // Otherwise the VO bit handling will be incorrect.
+        debug_assert!(!self.rc_enabled);
+
         let copy_context = worker.get_copy_context_mut();
         debug_assert!(!super::BLOCK_ONLY);
 
@@ -708,10 +939,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         } else {
             // We won the forwarding race; actually forward and copy the object if it is not pinned
             // and we have sufficient space in our copy allocator
+            debug_assert!(!nursery_collection || !self.rc_enabled);
             let new_object = if self.is_pinned(object)
                 || (!nursery_collection && self.defrag.space_exhausted())
             {
-                self.attempt_mark(object, self.mark_state);
+                self.attempt_mark(object);
                 object_forwarding::clear_forwarding_bits::<VM>(object);
                 Block::containing(object).set_state(BlockState::Marked);
 
@@ -728,8 +960,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             } else {
                 // We are forwarding objects. When the copy allocator allocates the block, it should
                 // mark the block. So we do not need to explicitly mark it here.
-
-                object_forwarding::forward_object::<VM>(
+                // Clippy complains if the "vo_bit" feature is not enabled.
+                #[allow(clippy::let_and_return)]
+                let new_object = object_forwarding::try_forward_object::<VM>(
                     object,
                     semantics,
                     copy_context,
@@ -745,11 +978,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                         vo_bit::helper::on_object_forwarded::<VM>(new_object);
                     },
                 )
+                .expect("to-space overflow");
+
+                new_object
             };
-            debug_assert_eq!(
-                Block::containing(new_object).get_state(),
-                BlockState::Marked
-            );
+            debug_assert!({
+                let state = Block::containing(new_object).get_state();
+                state == BlockState::Marked || state == BlockState::Nursery
+            });
 
             queue.enqueue(new_object);
             debug_assert!(new_object.is_live());
@@ -757,7 +993,90 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     }
 
+    pub fn rc_trace_object<Q: ObjectQueue>(
+        &self,
+        queue: &mut Q,
+        object: ObjectReference,
+        semantics: CopySemantics,
+        pause: Pause,
+        mark: bool,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        debug_assert!(self.rc_enabled);
+        if LXR_MATURE_EVACUATION && Block::containing(object).is_defrag_source() {
+            self.trace_forward_rc_mature_object(queue, object, semantics, pause, worker)
+        } else if LXR_MATURE_EVACUATION {
+            self.trace_mark_rc_mature_object(queue, object, pause, mark)
+        } else {
+            self.trace_object_without_moving(queue, object)
+        }
+    }
+
+    pub fn trace_mark_rc_mature_object(
+        &self,
+        queue: &mut impl ObjectQueue,
+        object: ObjectReference,
+        _pause: Pause,
+        mark: bool,
+    ) -> ObjectReference {
+        debug_assert!(
+            !object_forwarding::is_forwarded::<VM>(object),
+            "object {:?} is forwarded",
+            object
+        );
+        if mark && self.attempt_mark(object) {
+            queue.enqueue(object);
+        }
+        object
+    }
+
+    #[allow(clippy::assertions_on_constants)]
+    pub fn trace_forward_rc_mature_object<Q: ObjectQueue>(
+        &self,
+        queue: &mut Q,
+        object: ObjectReference,
+        _semantics: CopySemantics,
+        _pause: Pause,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        let copy_context = worker.get_copy_context_mut();
+        let forwarding_status = object_forwarding::attempt_to_forward::<VM>(object);
+        if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
+            object_forwarding::spin_and_get_forwarded_object::<VM>(object, forwarding_status)
+        } else {
+            // Evacuate the mature object
+            let new = object_forwarding::try_forward_object::<VM>(
+                object,
+                CopySemantics::DefaultCopy,
+                copy_context,
+                |_new_object| {
+                    // When using RC, we set the VO bit of the forwarded object.
+                    #[cfg(feature = "vo_bit")]
+                    vo_bit::set_vo_bit(_new_object);
+                },
+            )
+            .expect("to-space overflow");
+            // Transfer RC count
+            if new.get_size::<VM>() > Line::BYTES {
+                self.rc.mark_straddle_object(new);
+            }
+            self.rc.set(new, self.rc.count(object));
+            self.attempt_mark(new);
+            self.unmark(object);
+            queue.enqueue(new);
+            debug_assert_ne!(
+                self.rc.count(new),
+                0,
+                "ERROR Invalid {:?} rc={}",
+                new,
+                self.rc.count(new)
+            );
+            new
+        }
+    }
+
     fn unlog_object_if_needed(&self, object: ObjectReference) {
+        debug_assert!(!self.rc_enabled);
         if self.common.unlog_traced_object {
             // Make sure the side metadata for the line can fit into one byte. For smaller line size, we should
             // use `mark_as_unlogged` instead to mark the bit.
@@ -784,18 +1103,21 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[allow(clippy::assertions_on_constants)]
     pub fn mark_lines(&self, object: ObjectReference) {
         debug_assert!(!super::BLOCK_ONLY);
+        if self.rc_enabled {
+            return;
+        }
         Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::Acquire));
     }
 
     /// Atomically mark an object.
-    fn attempt_mark(&self, object: ObjectReference, mark_state: u8) -> bool {
+    pub fn attempt_mark(&self, object: ObjectReference) -> bool {
         loop {
             let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
                 object,
                 None,
                 Ordering::SeqCst,
             );
-            if old_value == mark_state {
+            if old_value == self.mark_state {
                 return false;
             }
 
@@ -803,7 +1125,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 .compare_exchange_metadata::<VM, u8>(
                     object,
                     old_value,
-                    mark_state,
+                    self.mark_state,
                     None,
                     Ordering::SeqCst,
                     Ordering::SeqCst,
@@ -816,7 +1138,22 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         true
     }
 
-    /// Check if an object is marked.
+    /// Atomically unmark an object.  Return true if it changed the mark bit from 1 to 0.
+    pub fn unmark(&self, object: ObjectReference) -> bool {
+        let result = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.fetch_update_metadata::<VM, u8, _>(
+            object,
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+            |v| {
+                if v != 1 {
+                    return None;
+                }
+                Some(0)
+            },
+        );
+        result.is_ok()
+    }
+
     fn is_marked_with(&self, object: ObjectReference, mark_state: u8) -> bool {
         let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
             object,
@@ -847,8 +1184,94 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     ///
     /// Returns None if the search could not find any more holes.
     #[allow(clippy::assertions_on_constants)]
-    pub fn get_next_available_lines(&self, search_start: Line) -> Option<(Line, Line)> {
+    pub fn get_next_available_lines(&self, copy: bool, search_start: Line) -> Option<(Line, Line)> {
         debug_assert!(!super::BLOCK_ONLY);
+        if self.rc_enabled {
+            self.rc_get_next_available_lines(copy, search_start)
+        } else {
+            self.normal_get_next_available_lines(search_start)
+        }
+    }
+
+    /// Search holes by ref-counts instead of line marks
+    #[allow(clippy::assertions_on_constants)]
+    pub fn rc_get_next_available_lines(
+        &self,
+        copy: bool,
+        search_start: Line,
+    ) -> Option<(Line, Line)> {
+        debug_assert!(!super::BLOCK_ONLY);
+        debug_assert!(self.rc_enabled);
+        let block = search_start.block();
+        let rc_array = RCArray::of(block);
+        let limit = Block::LINES;
+        // Find start
+        let first_free_cursor = {
+            let start_cursor = search_start.get_index_within_block();
+            let mut first_free_cursor = None;
+            let mut find_free_line = false;
+            for i in start_cursor..limit {
+                if rc_array.is_dead(i) {
+                    if i == 0 {
+                        first_free_cursor = Some(i);
+                        break;
+                    } else if !find_free_line {
+                        // This skips the first line of a hole
+                        // because `mark_straddle_object_with_size` may or may not set the RC
+                        // of the last line an object straddles.
+                        find_free_line = true;
+                    } else {
+                        first_free_cursor = Some(i);
+                        break;
+                    }
+                } else {
+                    find_free_line = false;
+                }
+            }
+            first_free_cursor
+        };
+        let start = match first_free_cursor {
+            Some(c) => c,
+            _ => return None,
+        };
+        // Find limit
+        let end = {
+            let mut cursor = start + 1;
+            while cursor < limit {
+                if !rc_array.is_dead(cursor) {
+                    break;
+                }
+                cursor += 1;
+            }
+            cursor
+        };
+        let start = Line::from_aligned_address(block.start()).next_nth(start);
+        let end = Line::from_aligned_address(block.start()).next_nth(end);
+        if self.common.needs_log_bit {
+            if !copy {
+                Line::clear_field_unlog_table::<VM>(start..end);
+            } else {
+                Line::initialize_field_unlog_table_as_unlogged::<VM>(start..end);
+            }
+        }
+        let num_lines = Line::steps_between(&start, &end).unwrap();
+        if !copy {
+            self.reused_lines_consumed
+                .fetch_add(num_lines, Ordering::Relaxed);
+        }
+        if self
+            .hooks()
+            .is_some_and(|h| h.cm_in_progress_or_final_mark())
+        {
+            Line::initialize_mark_table_as_marked::<VM>(start..end);
+            Line::inc_reuse_counts(start..end);
+        }
+        Some((start, end))
+    }
+
+    #[allow(clippy::assertions_on_constants)]
+    pub fn normal_get_next_available_lines(&self, search_start: Line) -> Option<(Line, Line)> {
+        debug_assert!(!self.rc_enabled);
         let unavail_state = self.line_unavail_state.load(Ordering::Acquire);
         let current_state = self.line_mark_state.load(Ordering::Acquire);
         let block = search_start.block();
@@ -890,12 +1313,22 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     }
 
+    pub(crate) fn get_mutator_recycled_lines_in_pages(&self) -> usize {
+        debug_assert!(self.rc_enabled);
+        self.reused_lines_consumed.load(Ordering::Relaxed)
+            >> (LOG_BYTES_IN_PAGE - Line::LOG_BYTES as u8)
+    }
+
     pub(crate) fn get_pages_allocated(&self) -> usize {
-        self.lines_consumed.load(Ordering::SeqCst) >> (LOG_BYTES_IN_PAGE - Line::LOG_BYTES as u8)
+        debug_assert!(!self.rc_enabled);
+        self.lines_consumed.load(Ordering::Relaxed) >> (LOG_BYTES_IN_PAGE - Line::LOG_BYTES as u8)
     }
 
     /// Post copy routine for Immix copy contexts
     fn post_copy(&self, object: ObjectReference, _bytes: usize) {
+        if self.rc_enabled {
+            return;
+        }
         // Mark the object
         VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
             object,
@@ -1191,7 +1624,7 @@ impl<VM: VMBinding> ImmixHybridCopyContext<VM> {
         space: &'static ImmixSpace<VM>,
     ) -> Self {
         ImmixHybridCopyContext {
-            copy_allocator: ImmixAllocator::new(tls.0, Some(space), context.clone(), false),
+            copy_allocator: ImmixAllocator::new(tls.0, Some(space), context.clone(), true),
             defrag_allocator: ImmixAllocator::new(tls.0, Some(space), context, true),
         }
     }

@@ -2,7 +2,7 @@
 
 use super::mock_test_prelude::*;
 use crate::global_state::GcStatus;
-use crate::util::{OpaquePointer, VMMutatorThread, VMThread};
+use crate::util::{Address, OpaquePointer, VMMutatorThread, VMThread};
 use std::sync::{Condvar, Mutex};
 use std::time::Duration;
 
@@ -59,8 +59,11 @@ pub fn disable_collection_fails_while_gc_in_progress() {
             // Thread A: trigger a GC. `handle_user_collection_request` blocks the calling
             // thread in (our mocked) `block_for_gc` until the GC finishes.
             let thread_to_trigger_gc = std::thread::spawn(move || {
-                let tls = VMMutatorThread(VMThread(OpaquePointer::UNINITIALIZED));
-                memory_manager::handle_user_collection_request(mmtk, tls);
+                // FIXME: We should use a null address as tls. Use 1 to work around a strange impl in handle_user_collection_request.
+                let tls = VMMutatorThread(VMThread(OpaquePointer::from_address(unsafe {
+                    Address::from_usize(1)
+                })));
+                memory_manager::handle_user_collection_request(mmtk, tls, true);
                 {
                     let mut sync = SHARED_DATA.mutex.lock().unwrap();
                     sync.thread_a_finished = true;
