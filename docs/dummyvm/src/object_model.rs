@@ -19,6 +19,8 @@ impl ObjectModel<DummyVM> for VMObjectModel {
     // Global metadata
 
     const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::side_first();
+    const GLOBAL_FIELD_UNLOG_BIT_SPEC: VMGlobalFieldUnlogBitSpec =
+        VMGlobalFieldUnlogBitSpec::side_after(Self::GLOBAL_LOG_BIT_SPEC.as_spec());
 
     // Local metadata
 
@@ -41,6 +43,14 @@ impl ObjectModel<DummyVM> for VMObjectModel {
         _semantics: CopySemantics,
         _copy_context: &mut GCWorkerCopyContext<DummyVM>,
     ) -> ObjectReference {
+        unimplemented!()
+    }
+
+    fn try_copy(
+        _from: ObjectReference,
+        _semantics: CopySemantics,
+        _copy_context: &mut GCWorkerCopyContext<DummyVM>,
+    ) -> Option<ObjectReference> {
         unimplemented!()
     }
 

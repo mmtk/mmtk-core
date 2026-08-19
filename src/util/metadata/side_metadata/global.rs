@@ -537,6 +537,27 @@ impl SideMetadataSpec {
         )
     }
 
+    /// Non-atomically load a raw byte from the side metadata byte that is mapped to the data address.
+    /// Unlike [`SideMetadataSpec::load`], this always reads a whole byte regardless of the number of
+    /// bits used by this spec, and does not mask/shift out unrelated bits sharing that byte.
+    pub fn load_byte(&self, data_addr: Address) -> u8 {
+        let meta_addr = address_to_meta_address(self, data_addr);
+        unsafe { meta_addr.load::<u8>() }
+    }
+
+    /// Non-atomically store a raw byte to the side metadata byte that is mapped to the data address.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because:
+    ///
+    /// 1. Concurrent access to this operation is undefined behaviour.
+    /// 2. Interleaving non-atomic and atomic operations is undefined behaviour.
+    pub unsafe fn store_byte_relaxed(&self, data_addr: Address, byte: u8) {
+        let meta_addr = address_to_meta_address(self, data_addr);
+        meta_addr.store::<u8>(byte);
+    }
+
     /// Loads a value from the side metadata for the given address.
     /// This method has similar semantics to `store` in Rust atomics.
     pub fn load_atomic<T: MetadataValue>(&self, data_addr: Address, order: Ordering) -> T {
@@ -927,13 +948,21 @@ impl SideMetadataSpec {
     /// Fetches the value for this side metadata for the given address, and applies a function to it that returns an optional new value.
     /// This method has similar semantics to `fetch_update` in Rust atomics.
     /// Returns a Result of Ok(previous_value) if the function returned Some(_), else Err(previous_value).
-    pub fn fetch_update_atomic<T: MetadataValue, F: FnMut(T) -> Option<T> + Copy>(
+    pub fn fetch_update_atomic<T: MetadataValue, F: FnMut(T) -> Option<T>>(
         &self,
         data_addr: Address,
         set_order: Ordering,
         fetch_order: Ordering,
         mut f: F,
     ) -> std::result::Result<T, T> {
+        // `f` may have side effects (e.g. it may capture and mutate local state), so under
+        // `extreme_assertions` we must not call it a second time just to recompute the new
+        // value for the sanity check. Instead, stash the new value computed during the actual
+        // update here, and have the verify closure read it back.
+        #[cfg(feature = "extreme_assertions")]
+        let last_new_val: std::cell::Cell<Option<T>> = std::cell::Cell::new(None);
+        #[cfg(feature = "extreme_assertions")]
+        let last_new_val_ref = &last_new_val;
         self.side_metadata_access::<true, T, _, _, _>(
             data_addr,
             None,
@@ -950,7 +979,10 @@ impl SideMetadataSpec {
                             fetch_order,
                             |raw_byte: u8| {
                                 let old_val = (raw_byte & mask) >> lshift;
-                                f(FromPrimitive::from_u8(old_val).unwrap()).map(|new_val| {
+                                let new_val = f(FromPrimitive::from_u8(old_val).unwrap());
+                                #[cfg(feature = "extreme_assertions")]
+                                last_new_val_ref.set(new_val);
+                                new_val.map(|new_val| {
                                     (raw_byte & !mask)
                                         | ((new_val.to_u8().unwrap() << lshift) & mask)
                                 })
@@ -960,13 +992,25 @@ impl SideMetadataSpec {
                     .map(|x| FromPrimitive::from_u8((x & mask) >> lshift).unwrap())
                     .map_err(|x| FromPrimitive::from_u8((x & mask) >> lshift).unwrap())
                 } else {
-                    unsafe { T::fetch_update(meta_addr, set_order, fetch_order, f) }
+                    unsafe {
+                        T::fetch_update(meta_addr, set_order, fetch_order, |old_val| {
+                            let new_val = f(old_val);
+                            #[cfg(feature = "extreme_assertions")]
+                            last_new_val_ref.set(new_val);
+                            new_val
+                        })
+                    }
                 }
             },
             |_result| {
                 #[cfg(feature = "extreme_assertions")]
                 if let Ok(old_val) = _result {
-                    sanity::verify_update::<T>(self, data_addr, old_val, f(old_val).unwrap())
+                    sanity::verify_update::<T>(
+                        self,
+                        data_addr,
+                        old_val,
+                        last_new_val_ref.get().unwrap(),
+                    )
                 }
             },
         )

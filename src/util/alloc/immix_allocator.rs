@@ -237,7 +237,8 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     fn acquire_recyclable_lines(&mut self, size: usize, align: usize, offset: usize) -> bool {
         while self.line.is_some() || self.acquire_recyclable_block() {
             let line = self.line.unwrap();
-            if let Some((start_line, end_line)) = self.immix_space().get_next_available_lines(line)
+            if let Some((start_line, end_line)) =
+                self.immix_space().get_next_available_lines(self.copy, line)
             {
                 // Find recyclable lines. Update the bump allocation cursor and limit.
                 self.bump_pointer.cursor = start_line.start();
@@ -308,13 +309,16 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     block.start(),
                     block.end()
                 );
-                // Bulk clear stale line mark state
-                Line::MARK_TABLE
-                    .bzero_metadata(block.start(), crate::policy::immix::block::Block::BYTES);
-                // mark objects if concurrent marking is active
-                if self.immix_space().should_allocate_as_live() {
-                    let state = self.space.line_mark_state.load(Ordering::Acquire);
-                    Line::eager_mark_lines::<VM>(state, block.start_line()..block.end_line());
+                // FIXME: Why don't we need this for LXR? Conix needs this.
+                if !self.immix_space().rc_enabled {
+                    // Bulk clear stale line mark state
+                    Line::MARK_TABLE
+                        .bzero_metadata(block.start(), crate::policy::immix::block::Block::BYTES);
+                    // mark objects if concurrent marking is active
+                    if self.immix_space().should_allocate_as_live() {
+                        let state = self.space.line_mark_state.load(Ordering::Acquire);
+                        Line::eager_mark_lines::<VM>(state, block.start_line()..block.end_line());
+                    }
                 }
                 if self.request_for_large {
                     self.large_bump_pointer.cursor = block.start();

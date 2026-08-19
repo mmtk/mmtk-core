@@ -3,7 +3,7 @@ use crate::plan::concurrent::Pause;
 use crate::plan::tracing::{PlanTrace, Trace};
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
-use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
+use crate::scheduler::{gc_work::RootKind, GCWork, GCWorker, WorkBucketStage};
 use crate::util::{scanning_helper, ObjectReference};
 use crate::vm::slot::Slot;
 use crate::vm::{RootsKind, RootsWorkFactory, VMBinding};
@@ -202,7 +202,11 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
     RootsWorkFactory<VM::VMSlot> for ConcurrentMarkingRootsWorkFactory<VM, P, KIND>
 {
-    fn create_process_roots_work(&mut self, slots: Vec<VM::VMSlot>) {
+    fn create_process_roots_work_with_root_kind(
+        &mut self,
+        slots: Vec<VM::VMSlot>,
+        _kind: RootKind,
+    ) {
         probe!(mmtk, roots, RootsKind::NORMAL, slots.len());
 
         self.debug_assert_initial_mark();

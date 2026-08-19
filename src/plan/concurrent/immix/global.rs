@@ -172,6 +172,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             }
             Pause::InitialMark => self.schedule_concurrent_marking_initial_pause(scheduler),
             Pause::FinalMark => self.schedule_concurrent_marking_final_pause(scheduler),
+            Pause::RefCount => unreachable!(),
         }
     }
 
@@ -205,6 +206,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
                     .schedule_unlog_bits_op(UnlogBitsOperation::BulkSet);
             }
             Pause::FinalMark => (),
+            Pause::RefCount => unreachable!(),
         }
     }
 
@@ -233,10 +235,11 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
                     // we will need to clear the unlog bits at an appropriate place.
                 }
             }
+            Pause::RefCount => unreachable!(),
         }
     }
 
-    fn end_of_pause(&mut self, mmtk: &'static MMTK<VM>, _tls: VMWorkerThread) {
+    fn on_pause_end(&mut self, mmtk: &'static MMTK<VM>, _tls: VMWorkerThread) {
         self.last_gc_was_defrag
             .store(self.immix_space.end_of_gc(), Ordering::Relaxed);
 
@@ -288,7 +291,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         &self.common
     }
 
-    fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
+    fn on_pause_start(&self, mmtk: &'static MMTK<VM>) {
         use crate::vm::ActivePlan;
         let pause = self.current_pause().unwrap();
         match pause {
@@ -310,6 +313,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
                 }
                 self.set_concurrent_marking_state(false);
             }
+            Pause::RefCount => unreachable!(),
         }
 
         // Every pause starts a new GC cycle, except `FinalMark`, which continues the cycle

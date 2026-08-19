@@ -24,6 +24,8 @@ pub(crate) use work::GCWorkContext;
 mod work_bucket;
 pub use work_bucket::WorkBucketStage;
 
+/// GC worker threads: the [`worker::GCWorker`] struct representing a single worker, the
+/// (crate-private) `WorkerGroup` that manages all workers, and per-worker shared state.
 mod worker;
 mod worker_goals;
 mod worker_monitor;
@@ -32,3 +34,4 @@ pub use worker::GCWorker;
 pub(crate) use worker::GCWorkerShared;
 
 pub(crate) mod gc_work;
+pub use gc_work::RootKind;

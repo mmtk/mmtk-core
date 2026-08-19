@@ -162,6 +162,12 @@ impl ChunkMap {
         }
     }
 
+    pub fn is_allocated(&self, chunk: Chunk) -> bool {
+        self.get(chunk)
+            .map(|state| state.is_allocated())
+            .unwrap_or_default()
+    }
+
     /// Get chunk state. Return None if the chunk does not belong to the space.
     pub fn get(&self, chunk: Chunk) -> Option<ChunkState> {
         let state = self.get_internal(chunk);
@@ -189,6 +195,29 @@ impl ChunkMap {
         let mut work_packets: Vec<Box<dyn GCWork<VM>>> = vec![];
         for chunk in self.all_chunks() {
             work_packets.push(func(chunk));
+        }
+        work_packets
+    }
+
+    pub fn generate_tasks_batched<VM: VMBinding>(
+        &self,
+        num_workers: usize,
+        func: impl Fn(Range<Chunk>) -> Box<dyn GCWork<VM>>,
+    ) -> Vec<Box<dyn GCWork<VM>>> {
+        let mut work_packets: Vec<Box<dyn GCWork<VM>>> = vec![];
+        let chunk_range = self.chunk_range.lock();
+        let chunks = (chunk_range.end.start() - chunk_range.start.start()) >> Chunk::LOG_BYTES;
+        let num_bins = num_workers * 8;
+        let bin_size = chunks.div_ceil(num_bins);
+        for i in (0..chunks).step_by(bin_size) {
+            let start = chunk_range.start.next_nth(i);
+            let end = chunk_range.start.next_nth(i + bin_size);
+            let end = if end > chunk_range.end {
+                chunk_range.end
+            } else {
+                end
+            };
+            work_packets.push(func(start..end));
         }
         work_packets
     }

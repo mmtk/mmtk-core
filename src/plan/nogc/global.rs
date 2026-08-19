@@ -67,7 +67,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         unreachable!()
     }
 
-    fn end_of_pause(&mut self, _mmtk: &'static MMTK<VM>, _tls: VMWorkerThread) {
+    fn on_pause_end(&mut self, _mmtk: &'static MMTK<VM>, _tls: VMWorkerThread) {
         unreachable!()
     }
 
