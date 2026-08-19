@@ -836,12 +836,15 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         queue: &mut impl ObjectQueue,
         object: ObjectReference,
     ) -> ObjectReference {
-        // This function should not be called during RC.
-        // Otherwise the VO bit handling will be incorrect.
-        debug_assert!(!self.rc_enabled);
+        // This function should not be called during RC if mature evacuation is not enabled.
+        debug_assert!(!LXR_MATURE_EVACUATION || !self.rc_enabled);
 
         #[cfg(feature = "vo_bit")]
-        vo_bit::helper::on_trace_object::<VM>(object);
+        if !self.rc_enabled {
+            // The VO bit strategy is currently not applicable to RC.
+            // RC clears VO bits during sweeping.
+            vo_bit::helper::on_trace_object::<VM>(object);
+        }
 
         if self.attempt_mark(object) {
             if self.rc_enabled {
@@ -865,7 +868,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
 
             #[cfg(feature = "vo_bit")]
-            vo_bit::helper::on_object_marked::<VM>(object);
+            if !self.rc_enabled {
+                // The VO bit strategy is currently not applicable to RC.
+                // RC clears VO bits during sweeping.
+                vo_bit::helper::on_object_marked::<VM>(object);
+            }
 
             // Visit node
             queue.enqueue(object);
