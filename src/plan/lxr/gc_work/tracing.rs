@@ -1,7 +1,7 @@
 use super::super::LXR;
-use super::ProcessEdgesBase;
 use crate::plan::concurrent::Pause;
-use crate::plan::VectorQueue;
+use crate::plan::tracing::OptionObjectQueue;
+use crate::plan::{VectorObjectQueue, VectorQueue};
 use crate::policy::immix::block::Block;
 use crate::policy::space::Space;
 use crate::scheduler::RootKind;
@@ -17,7 +17,6 @@ use crate::{
     MMTK,
 };
 use atomic::Ordering;
-use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 pub struct LXRConcurrentTraceObjects<VM: VMBinding> {
@@ -229,7 +228,11 @@ impl<VM: VMBinding> GCWork<VM> for ProcessModBufSATB {
 pub struct LXRStopTheWorldProcessEdges<VM: VMBinding, const FULL_GC: bool> {
     lxr: &'static LXR<VM>,
     pause: Pause,
-    base: ProcessEdgesBase<VM>,
+    slots: Vec<VM::VMSlot>,
+    roots: bool,
+    pub root_kind: Option<RootKind>,
+    bucket: WorkBucketStage,
+    nodes: VectorObjectQueue,
     forwarded_roots: Vec<ObjectReference>,
     next_slots: VectorQueue<VM::VMSlot>,
     next_slot_count: u32,
@@ -252,11 +255,14 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
         mmtk: &'static MMTK<VM>,
         bucket: WorkBucketStage,
     ) -> Self {
-        let base = ProcessEdgesBase::new(slots, roots, mmtk, bucket);
-        let lxr = base.plan().downcast_ref::<LXR<VM>>().unwrap();
+        let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
         Self {
             lxr,
-            base,
+            slots,
+            roots,
+            root_kind: if roots { Some(RootKind::Strong) } else { None },
+            bucket,
+            nodes: Default::default(),
             pause: Pause::RefCount,
             forwarded_roots: vec![],
             next_slots: VectorQueue::new(),
@@ -267,18 +273,17 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
     }
 
     #[cold]
-    fn flush(&mut self) {
+    fn flush(&mut self, worker: &mut GCWorker<VM>) {
         if !self.next_slots.is_empty() {
             let slots = self.next_slots.take();
-            let w = Self::new(slots, false, self.mmtk(), self.bucket);
-            self.worker()
-                .add_boxed_work(WorkBucketStage::Unconstrained, Box::new(w));
+            let w = Self::new(slots, false, worker.mmtk, self.bucket);
+            worker.add_boxed_work(WorkBucketStage::Unconstrained, Box::new(w));
         }
         assert!(self.nodes.is_empty());
         self.next_slot_count = 0;
     }
 
-    fn process_slots(&mut self) {
+    fn process_slots(&mut self, worker: &mut GCWorker<VM>) {
         self.should_record_forwarded_roots = self.roots
             && !self
                 .root_kind
@@ -290,11 +295,11 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
         }
         let slots = std::mem::take(&mut self.slots);
         if self.roots && self.root_kind == Some(RootKind::Weak) {
-            self.process_slots_impl::<true, false>(&slots);
+            self.process_slots_impl::<true, false>(worker, &slots);
         } else if self.remset_recorded_slots {
-            self.process_slots_impl::<false, true>(&slots);
+            self.process_slots_impl::<false, true>(worker, &slots);
         } else {
-            self.process_slots_impl::<false, false>(&slots);
+            self.process_slots_impl::<false, false>(worker, &slots);
         }
         self.roots = false;
         self.remset_recorded_slots = false;
@@ -305,9 +310,9 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
             self.next_slot_count = 0;
             slots.clear();
             self.next_slots.swap(&mut slots);
-            self.process_slots_impl::<false, false>(&slots);
+            self.process_slots_impl::<false, false>(worker, &slots);
         }
-        self.flush();
+        self.flush(worker);
         if should_record_forwarded_roots {
             let roots = std::mem::take(&mut self.forwarded_roots);
             self.lxr.curr_roots.read().unwrap().push(roots);
@@ -317,10 +322,9 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
 
 impl<VM: VMBinding, const FULL_GC: bool> GCWork<VM> for LXRStopTheWorldProcessEdges<VM, FULL_GC> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.set_worker(worker);
-        self.process_slots();
+        self.process_slots(worker);
         if !self.nodes.is_empty() {
-            self.flush();
+            self.flush(worker);
         }
     }
 }
@@ -329,6 +333,7 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
     #[inline]
     fn full_gc_trace_object<const WEAK_ROOT: bool>(
         &mut self,
+        worker: &mut GCWorker<VM>,
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(FULL_GC);
@@ -338,11 +343,11 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
         if WEAK_ROOT && !Block::containing(object).is_defrag_source() {
             return object;
         }
+        let mut queue = OptionObjectQueue::default();
         let x = if self.lxr.immix_space.in_space(object) {
             let pause = self.pause;
-            let worker = self.worker();
             self.lxr.immix_space.rc_trace_object(
-                self,
+                &mut queue,
                 object,
                 CopySemantics::DefaultCopy,
                 pause,
@@ -350,8 +355,11 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
                 worker,
             )
         } else {
-            self.lxr.los().trace_object(self, object)
+            self.lxr.los().trace_object(&mut queue, object)
         };
+        if let Some(enqueued_object) = queue {
+            self.enqueue(worker, enqueued_object);
+        }
         if self.should_record_forwarded_roots {
             self.forwarded_roots.push(x)
         }
@@ -361,6 +369,7 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
     #[inline]
     fn mature_evac_trace_object<const WEAK_ROOT: bool, const REMSET: bool>(
         &mut self,
+        worker: &mut GCWorker<VM>,
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(!FULL_GC);
@@ -383,6 +392,7 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
             self.remset_recorded_slots
         );
         let object = object.get_forwarded_object().unwrap_or(object);
+        let mut queue = OptionObjectQueue::default();
         let new_object = if self.lxr.immix_space.in_space(object) {
             if self
                 .lxr
@@ -392,9 +402,8 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
                 return object;
             }
             let pause = self.pause;
-            let worker = self.worker();
             self.lxr.immix_space.rc_trace_object(
-                self,
+                &mut queue,
                 object,
                 CopySemantics::DefaultCopy,
                 pause,
@@ -402,8 +411,12 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
                 worker,
             )
         } else {
-            self.lxr.los().trace_object(self, object)
+            self.lxr.los().trace_object(&mut queue, object)
         };
+        if let Some(enqueued_object) = queue {
+            self.enqueue(worker, enqueued_object);
+        }
+
         if self.should_record_forwarded_roots {
             self.forwarded_roots.push(new_object)
         }
@@ -411,14 +424,18 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
     }
 
     #[inline]
-    fn __process_slot<const WEAK_ROOT: bool, const REMSET: bool>(&mut self, slot: VM::VMSlot) {
+    fn __process_slot<const WEAK_ROOT: bool, const REMSET: bool>(
+        &mut self,
+        worker: &mut GCWorker<VM>,
+        slot: VM::VMSlot,
+    ) {
         let Some(object) = slot.load() else {
             return;
         };
         let new_object = if !FULL_GC {
-            self.mature_evac_trace_object::<WEAK_ROOT, REMSET>(object)
+            self.mature_evac_trace_object::<WEAK_ROOT, REMSET>(worker, object)
         } else {
-            self.full_gc_trace_object::<WEAK_ROOT>(object)
+            self.full_gc_trace_object::<WEAK_ROOT>(worker, object)
         };
         if Self::OVERWRITE_REFERENCE && new_object != object {
             slot.store(new_object);
@@ -427,16 +444,17 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
 
     fn process_slots_impl<const WEAK_ROOT: bool, const REMSET: bool>(
         &mut self,
+        worker: &mut GCWorker<VM>,
         slots: &[VM::VMSlot],
     ) {
         for s in slots {
-            self.__process_slot::<WEAK_ROOT, REMSET>(*s);
+            self.__process_slot::<WEAK_ROOT, REMSET>(worker, *s);
         }
     }
 }
 
-impl<VM: VMBinding, const FULL_GC: bool> ObjectQueue for LXRStopTheWorldProcessEdges<VM, FULL_GC> {
-    fn enqueue(&mut self, object: ObjectReference) {
+impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC> {
+    fn enqueue(&mut self, worker: &mut GCWorker<VM>, object: ObjectReference) {
         let limit: usize = if FULL_GC { 8192 } else { 1024 };
         // TODO: Use actual TLS.
         object.iterate_fields::<VM, _>(VMThread::UNINITIALIZED, |s| {
@@ -449,21 +467,8 @@ impl<VM: VMBinding, const FULL_GC: bool> ObjectQueue for LXRStopTheWorldProcessE
             self.next_slots.push(s);
             self.next_slot_count += 1;
             if self.next_slot_count as usize >= limit {
-                self.flush();
+                self.flush(worker);
             }
         });
-    }
-}
-
-impl<VM: VMBinding, const FULL_GC: bool> Deref for LXRStopTheWorldProcessEdges<VM, FULL_GC> {
-    type Target = ProcessEdgesBase<VM>;
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
-
-impl<VM: VMBinding, const FULL_GC: bool> DerefMut for LXRStopTheWorldProcessEdges<VM, FULL_GC> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
     }
 }

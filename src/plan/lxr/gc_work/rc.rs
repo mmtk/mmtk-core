@@ -4,7 +4,6 @@ use super::super::LXR;
 use super::super::{LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURSERY_EVACUATION};
 use super::tracing::LXRConcurrentTraceObjects;
 use super::tracing::LXRStopTheWorldProcessEdges;
-use super::ProcessEdgesBase;
 use crate::plan::VectorQueue;
 use crate::policy::immix::block::BlockState;
 use crate::scheduler::gc_work::RootKind;
@@ -732,44 +731,24 @@ impl<VM: VMBinding> GCWork<VM> for ProcessDecs<VM> {
 }
 
 pub struct CollectRoots<VM: VMBinding> {
-    base: ProcessEdgesBase<VM>,
+    slots: Vec<VM::VMSlot>,
+    root_kind: RootKind,
 }
 
 impl<VM: VMBinding> CollectRoots<VM> {
-    pub fn new(
-        slots: Vec<VM::VMSlot>,
-        roots: bool,
-        mmtk: &'static MMTK<VM>,
-        bucket: WorkBucketStage,
-    ) -> Self {
-        debug_assert!(roots);
-        let base = ProcessEdgesBase::new(slots, roots, mmtk, bucket);
-        Self { base }
+    pub fn new(slots: Vec<VM::VMSlot>, root_kind: RootKind) -> Self {
+        Self { slots, root_kind }
     }
 }
 
 impl<VM: VMBinding> GCWork<VM> for CollectRoots<VM> {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.set_worker(worker);
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         if !self.slots.is_empty() {
-            let lxr = self.mmtk().get_plan().downcast_ref::<LXR<VM>>().unwrap();
+            let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
             let roots = std::mem::take(&mut self.slots);
             let mut w = ProcessIncs::<_, EDGE_KIND_ROOT>::new(roots, lxr);
-            w.root_kind = self.root_kind;
-            GCWork::do_work(&mut w, self.worker(), self.mmtk());
+            w.root_kind = Some(self.root_kind);
+            GCWork::do_work(&mut w, worker, mmtk)
         }
-    }
-}
-
-impl<VM: VMBinding> Deref for CollectRoots<VM> {
-    type Target = ProcessEdgesBase<VM>;
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
-
-impl<VM: VMBinding> DerefMut for CollectRoots<VM> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
     }
 }
