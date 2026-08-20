@@ -819,7 +819,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if self.attempt_mark(object) {
             let addr = object.to_raw_address().as_usize();
             let straddle = if (addr & 0b11110000) == 0 {
-                self.rc.is_straddle_line(Line::containing_obj_ref(object))
+                self.rc.object_is_in_straddle_line_no_rc_check(object)
             } else {
                 false
             };
@@ -848,7 +848,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
         if self.attempt_mark(object) {
             if self.rc_enabled {
-                let straddle = self.rc.is_straddle_line(Line::containing_obj_ref(object));
+                let straddle = self.rc.object_is_in_straddle_line_no_rc_check(object);
                 if straddle {
                     return object;
                 }
