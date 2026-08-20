@@ -163,9 +163,22 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         unsafe { RC_TABLE.store(o.to_raw_address(), count) }
     }
 
+    /// Sets the reference count for the line containing object `o` to `count` using a non-atomic store,
+    /// for use where the caller can guarantee there is no concurrent access.
+    pub fn set_line_relaxed(&self, line: Line, count: u8) {
+        unsafe { RC_TABLE.store(line.start(), count) }
+    }
+
     /// Returns object `o`'s current reference count.
     pub fn count(&self, o: ObjectReference) -> u8 {
         RC_TABLE.load_atomic(o.to_raw_address(), Ordering::Relaxed)
+    }
+
+    /// Returns the reference count stored in the RC table at address `addr`. If this
+    /// returns a non-zero value, it indicates that `addr` is the address of an object reference,
+    /// or the start of a straddle line.
+    pub fn count_by_address(&self, addr: Address) -> u8 {
+        RC_TABLE.load_atomic(addr, Ordering::Relaxed)
     }
 
     /// Returns `true` if the RC table entry at `o`'s address is zero. Used for both individual
@@ -203,17 +216,18 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         v == 0 || v == MAX_REF_COUNT
     }
 
-    /// Returns `true` if `line` is marked as being straddled by an object that spans multiple lines.
-    pub fn is_straddle_line(&self, line: Line) -> bool {
-        let v: u8 = unsafe { RC_STRADDLE_LINES.load::<u8>(line.start()) };
-        v != 0
+    /// Returns `true` if object `o` is in a straddle line. The function does not check rc table.
+    pub fn object_is_in_straddle_line_no_rc_check(&self, o: ObjectReference) -> bool {
+        // This directly reads line-granularity straddle line metadata with an unaligned address.
+        // It is still correct, but may break side metadata assertions.
+        unsafe { RC_STRADDLE_LINES.load::<u8>(o.to_raw_address()) != 0 }
     }
 
     /// Returns `true` if address `a` falls within a live object whose containing line is marked
     /// as a straddle line.
-    pub fn address_is_in_straddle_line(&self, a: Address) -> bool {
-        let line = Line::from_unaligned_address(a);
-        self.count(a.to_object_reference::<VM>()) != 0 && self.is_straddle_line(line)
+    pub fn object_is_in_straddle_line(&self, o: ObjectReference) -> bool {
+        let line = Line::from_unaligned_address(o.to_raw_address());
+        self.count(o) != 0 && unsafe { RC_STRADDLE_LINES.load::<u8>(line.start()) != 0 }
     }
 
     fn mark_straddle_object_with_size(&self, o: ObjectReference, size: usize) {
@@ -229,7 +243,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         let mut line = start_line;
         while line != end_line {
             unsafe { RC_STRADDLE_LINES.store(line.start(), 1u8) };
-            self.set_relaxed(line.start().to_object_reference::<VM>(), 1);
+            self.set_line_relaxed(line, 1);
             line = line.next();
         }
     }
@@ -257,7 +271,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
             // it always skips the first line in a hole.
             let mut line = start_line;
             while line != end_line {
-                self.set_relaxed(line.start().to_object_reference::<VM>(), 0);
+                self.set_line_relaxed(line, 0);
                 unsafe { RC_STRADDLE_LINES.store(line.start(), 0u8) };
                 line = line.next();
             }
@@ -270,7 +284,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         let size = VM::VMObjectModel::get_current_size(o);
         for i in (0..size).step_by(MIN_OBJECT_SIZE) {
             let a = o.to_raw_address() + i;
-            assert_eq!(0, self.count(a.to_object_reference::<VM>()));
+            assert_eq!(0, self.count_by_address(a));
         }
     }
 

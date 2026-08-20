@@ -47,11 +47,6 @@ impl Line {
         Self::from_unaligned_address(VM::VMObjectModel::ref_to_object_start(object))
     }
 
-    /// Return the line that contains the raw address of the object reference.
-    pub fn containing_obj_ref(object: ObjectReference) -> Self {
-        Self(object.to_raw_address())
-    }
-
     /// Get the block containing the line.
     pub fn block(&self) -> Block {
         debug_assert!(!super::BLOCK_ONLY);

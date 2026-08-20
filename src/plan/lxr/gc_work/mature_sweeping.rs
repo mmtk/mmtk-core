@@ -55,24 +55,31 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
         let mut cursor = block.start();
         let limit = block.end();
         while cursor < limit {
-            let o = unsafe { cursor.to_object_reference::<VM>() };
+            let cur_cursor = cursor;
             cursor += rc::MIN_OBJECT_SIZE;
-            let c = self.rc.count(o);
-            if c != 0 && !immix_space.is_marked(o) {
-                if Line::is_aligned(o.to_raw_address()) {
-                    if c == 1 && self.rc.is_straddle_line(Line::containing_obj_ref(o)) {
-                        continue;
-                    } else {
-                        std::sync::atomic::fence(Ordering::SeqCst);
-                        if self.rc.count(o) == 0 {
+            let c = self.rc.count_by_address(cur_cursor);
+            if c != 0 {
+                // Safety: cur_cursor is either a valid object reference, or a straddle line
+                let o = unsafe { ObjectReference::from_raw_address_unchecked(cur_cursor) };
+                if !immix_space.is_marked(o) {
+                    if Line::is_aligned(o.to_raw_address()) {
+                        if c == 1 && self.rc.object_is_in_straddle_line_no_rc_check(o) {
+                            // this is a straddle line, skip
                             continue;
+                        } else {
+                            // Now o is a valid object reference
+                            std::sync::atomic::fence(Ordering::SeqCst);
+                            if self.rc.count(o) == 0 {
+                                continue;
+                            }
                         }
                     }
+                    // o is still a valid object here.
+                    self.process_dead_object(o);
+                    has_dead_object = true;
+                } else {
+                    has_live = true;
                 }
-                self.process_dead_object(o);
-                has_dead_object = true;
-            } else if c != 0 {
-                has_live = true;
             }
         }
         if has_dead_object || !has_live {

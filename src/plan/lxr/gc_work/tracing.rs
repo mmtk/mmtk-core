@@ -384,11 +384,7 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
         );
         let object = object.get_forwarded_object().unwrap_or(object);
         let new_object = if self.lxr.immix_space.in_space(object) {
-            if self
-                .lxr
-                .rc
-                .address_is_in_straddle_line(object.to_raw_address())
-            {
+            if self.lxr.rc.object_is_in_straddle_line(object) {
                 return object;
             }
             let pause = self.pause;
