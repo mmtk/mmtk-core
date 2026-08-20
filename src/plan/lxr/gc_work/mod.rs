@@ -1,9 +1,10 @@
 use super::global::LXR;
+use crate::plan::lxr::gc_work::rc::{ProcessIncs, EDGE_KIND_ROOT};
 use crate::plan::tracing::UnsupportedTrace;
 use crate::scheduler::gc_work::RootKind;
 use crate::util::ObjectReference;
 use crate::vm::{RootsWorkFactory, VMBinding};
-use crate::MMTK;
+use crate::{Plan, MMTK};
 use std::marker::PhantomData;
 
 pub mod mature_evac;
@@ -12,8 +13,6 @@ pub mod nursery_sweeping;
 pub mod prepare;
 pub mod rc;
 pub mod tracing;
-
-use rc::CollectRoots;
 
 /// The [`crate::scheduler::GCWorkContext`] for LXR.
 ///
@@ -55,8 +54,10 @@ impl<VM: VMBinding> LXRRootsWorkFactory<VM> {
 
 impl<VM: VMBinding> RootsWorkFactory<VM::VMSlot> for LXRRootsWorkFactory<VM> {
     fn create_process_roots_work_with_root_kind(&mut self, slots: Vec<VM::VMSlot>, kind: RootKind) {
-        let stage = self.mmtk.get_plan().root_scanning_stage();
-        let w = CollectRoots::new(slots, kind);
+        let lxr = self.mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
+        let stage = lxr.root_scanning_stage();
+        let mut w = ProcessIncs::<_, EDGE_KIND_ROOT>::new(slots, lxr);
+        w.root_kind = Some(kind);
         crate::memory_manager::add_work_packet(self.mmtk, stage, w);
     }
 

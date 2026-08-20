@@ -729,26 +729,3 @@ impl<VM: VMBinding> GCWork<VM> for ProcessDecs<VM> {
         self.flush(worker);
     }
 }
-
-pub struct CollectRoots<VM: VMBinding> {
-    slots: Vec<VM::VMSlot>,
-    root_kind: RootKind,
-}
-
-impl<VM: VMBinding> CollectRoots<VM> {
-    pub fn new(slots: Vec<VM::VMSlot>, root_kind: RootKind) -> Self {
-        Self { slots, root_kind }
-    }
-}
-
-impl<VM: VMBinding> GCWork<VM> for CollectRoots<VM> {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        if !self.slots.is_empty() {
-            let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
-            let roots = std::mem::take(&mut self.slots);
-            let mut w = ProcessIncs::<_, EDGE_KIND_ROOT>::new(roots, lxr);
-            w.root_kind = Some(self.root_kind);
-            GCWork::do_work(&mut w, worker, mmtk)
-        }
-    }
-}
