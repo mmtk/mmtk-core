@@ -41,12 +41,6 @@ impl Line {
     pub const MARK_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::IX_LINE_MARK;
 
-    /// Return the line that contains the starting address of an object.
-    #[allow(unused)]
-    pub fn containing_obj_start<VM: VMBinding>(object: ObjectReference) -> Self {
-        Self::from_unaligned_address(VM::VMObjectModel::ref_to_object_start(object))
-    }
-
     /// Get the block containing the line.
     pub fn block(&self) -> Block {
         debug_assert!(!super::BLOCK_ONLY);
