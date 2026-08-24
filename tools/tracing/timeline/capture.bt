@@ -34,6 +34,8 @@ usdt:$MMTK:mmtk:harness_end {
 }
 
 usdt:$MMTK:mmtk:gc_start {
+    // Close the "GC_REQUEST_WAIT" span opened at `gc_requested`, right before opening "GC".
+    printf("GC_REQUEST_WAIT,E,%d,%lu\n", tid, nsecs);
     printf("GC,B,%d,%lu\n", tid, nsecs);
     // bpftrace warns that signed `%` operator may have undefiend behavior.
     if ((uint64)@gc_count % $EVERY == 0 && @stats_enabled) {
@@ -152,6 +154,8 @@ usdt:$MMTK:mmtk:concurrent_trace_objects {
 
 usdt:$MMTK:mmtk:gc_requested {
     printf("gc_requested,i,%d,%lu\n", tid, nsecs);
+    // Open a "GC_REQUEST_WAIT" span that lasts until the GC actually starts (see `gc_start`).
+    printf("GC_REQUEST_WAIT,B,%d,%lu\n", tid, nsecs);
 }
 
 usdt:$MMTK:mmtk:add_schedule_collection_packet {
