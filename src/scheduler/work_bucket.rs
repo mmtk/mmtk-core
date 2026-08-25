@@ -76,7 +76,14 @@ impl<VM: VMBinding> BucketQueue<VM> {
     fn drain(&self) -> Vec<Box<dyn GCWork<VM>>> {
         let mut items = Vec::new();
         loop {
-            match self.queue.steal() {
+            match self.queue0.steal() {
+                Steal::Success(w) => items.push(w),
+                Steal::Retry => continue,
+                Steal::Empty => break,
+            }
+        }
+        loop {
+            match self.queue1.steal() {
                 Steal::Success(w) => items.push(w),
                 Steal::Retry => continue,
                 Steal::Empty => break,
@@ -223,11 +230,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
     /// after disabling the bucket so no new packets can be routed to it, as
     /// `ConcurrentImmix::schedule_concurrent_marking_final_pause` does for `Concurrent`).
     pub(crate) fn drain_all_packets(&self) -> Vec<Box<dyn GCWork<VM>>> {
-        let mut items = self.queue.drain();
-        if let Some(prioritized_queue) = self.prioritized_queue.as_ref() {
-            items.extend(prioritized_queue.drain());
-        }
-        items
+        self.queue.drain()
     }
 
     /// Close the bucket

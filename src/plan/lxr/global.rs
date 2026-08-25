@@ -354,6 +354,10 @@ impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
     fn concurrent_work_in_progress(&self) -> bool {
         self.in_concurrent_marking.load(Ordering::Acquire)
     }
+
+    fn on_concurrent_work_interrupted(&self) {
+        // Do nothing
+    }
 }
 
 impl<VM: VMBinding> LXR<VM> {
