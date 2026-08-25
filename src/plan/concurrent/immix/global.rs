@@ -505,4 +505,12 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentImmix<VM> {
     fn concurrent_work_in_progress(&self) -> bool {
         self.concurrent_marking_in_progress()
     }
+
+    fn on_concurrent_work_interrupted(&self) {
+        // A pause is requested when we are doing concurrent marking.
+        // Set concurrent bucket as disabled now. Later (during collection scheduling),
+        // we will move all the remaining work to a STW bucket and continue.
+        // This preserves all marking progress already made; nothing is reset or re-traced.
+        self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(false);
+    }
 }
