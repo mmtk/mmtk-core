@@ -479,9 +479,7 @@ impl GcStatusWord {
     /// `NotInGC`/`InConcurrentGC` -> `PauseRequested`, unless collection is disabled, MMTk is not
     /// yet initialized, or a pause has already been requested, in which case `Err` is returned
     /// with the status that prevented the transition (`Disabled(_)`, `Uninitialized`, or
-    /// `PauseRequested` respectively). On success, returns `Ok` with the status transitioned
-    /// *from*, so the caller can tell whether a concurrent GC (as opposed to no GC at all) was
-    /// just interrupted by this pause request.
+    /// `PauseRequested` respectively). On success, returns `Ok` with the status transitioned from.
     pub(crate) fn try_request_pause(&self) -> Result<GcStatus, GcStatus> {
         self.try_transition(|status| match status {
             GcStatus::Disabled(_) | GcStatus::Uninitialized | GcStatus::PauseRequested => None,

@@ -90,16 +90,6 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 
     /// Which bucket newly-flushed concurrent-marking work should be added to.
-    ///
-    /// This must consult the `Concurrent` bucket's actual `enabled` state, not merely
-    /// `ConcurrentPlan::concurrent_work_in_progress`: once a pause has been requested to
-    /// interrupt concurrent marking, `GCTrigger::request` disables the `Concurrent` bucket
-    /// immediately, well before `concurrent_work_in_progress` itself flips to `false` (which
-    /// only happens once mutators are confirmed stopped, in `notify_mutators_paused`). Nothing
-    /// will ever poll a disabled `Concurrent` bucket again this cycle (see
-    /// `ConcurrentImmix::schedule_concurrent_marking_final_pause`), so any work flushed after it
-    /// is disabled -- including the final per-mutator flush done from `notify_mutators_paused`
-    /// itself -- must go straight to `Closure` instead, or it would never be traced.
     fn target_bucket(&self) -> WorkBucketStage {
         if self.mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].is_enabled() {
             WorkBucketStage::Concurrent

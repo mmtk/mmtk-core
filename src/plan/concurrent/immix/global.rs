@@ -52,6 +52,7 @@ pub struct ConcurrentImmix<VM: VMBinding> {
     previous_pause: Atomic<Option<Pause>>,
     should_do_full_gc: AtomicBool,
     concurrent_marking_active: AtomicBool,
+    unfinished_concurrent_marking: AtomicBool,
 }
 
 /// The plan constraints for the concurrent immix plan.
@@ -372,6 +373,7 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             previous_pause: Atomic::new(None),
             should_do_full_gc: AtomicBool::new(false),
             concurrent_marking_active: AtomicBool::new(false),
+            unfinished_concurrent_marking: AtomicBool::new(false),
         }
     }
 
@@ -392,6 +394,8 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
         self.set_ref_closure_buckets_enabled(false);
 
+        assert!(!self.unfinished_concurrent_marking.load(Ordering::SeqCst), "We have unfinished concurrent marking work, but we are starting a new concurrent marking cycle. This should not happen.");
+
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<ConcurrentImmixGCWorkContext<VM>>::new());
         scheduler.work_buckets[WorkBucketStage::Prepare]
@@ -405,20 +409,17 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<ConcurrentImmixGCWorkContext<VM>>::new_no_scan_roots());
 
-        // By the time this runs, we are guaranteed to be the only running GC work packet (we
-        // got here by being the sole worker woken after every worker parked), and the
-        // `Concurrent` bucket has already been disabled (see `GCTrigger::request`), so no
-        // mutator or worker can be concurrently adding to it (see `SATBBarrierSemantics`, which
-        // routes further SATB/weak-ref work to `Closure` once `Concurrent` is disabled). It is
-        // therefore safe to take whatever concurrent-marking work packets are still queued here
-        // and finish them as part of this pause's closure, instead of having drained the
-        // `Concurrent` bucket to completion before this pause could even be scheduled. This
-        // preserves all marking progress already made: we neither reset mark state nor re-trace
-        // anything, we simply continue running the exact same work packets, now inside the
-        // pause.
-        let leftover_concurrent_work =
-            scheduler.work_buckets[WorkBucketStage::Concurrent].drain_all_packets();
-        scheduler.work_buckets[WorkBucketStage::Closure].bulk_add(leftover_concurrent_work);
+        // If we have unfinished concurrent marking work, do it here.
+        if self.unfinished_concurrent_marking.load(Ordering::SeqCst) {
+            info!(
+                "Concurrent marking was interrupted. Moving remaining work to STW closure bucket."
+            );
+            let leftover_concurrent_work =
+                scheduler.work_buckets[WorkBucketStage::Concurrent].drain_all_packets();
+            scheduler.work_buckets[WorkBucketStage::Closure].bulk_add(leftover_concurrent_work);
+            self.unfinished_concurrent_marking
+                .store(false, Ordering::SeqCst);
+        }
 
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<ConcurrentImmixGCWorkContext<VM>>::new(self));
@@ -511,10 +512,13 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentImmix<VM> {
     }
 
     fn on_concurrent_work_interrupted(&self) {
+        assert!(!self.unfinished_concurrent_marking.load(Ordering::SeqCst));
         // A pause is requested when we are doing concurrent marking.
         // Set concurrent bucket as disabled now. Later (during collection scheduling),
         // we will move all the remaining work to a STW bucket and continue.
         // This preserves all marking progress already made; nothing is reset or re-traced.
         self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(false);
+        self.unfinished_concurrent_marking
+            .store(true, Ordering::SeqCst);
     }
 }
