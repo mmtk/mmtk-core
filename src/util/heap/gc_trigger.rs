@@ -194,6 +194,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 // we end up with deadlock. So we just return true to the caller, and let the caller do the request.
                 Ok(_) => {
                     probe!(mmtk, gc_requested);
+                    self.state.record_pause_requested_time();
                     info!(
                         "[POLL] Requesting a concurrent GC's closing pause from the last parked GC worker"
                     );
