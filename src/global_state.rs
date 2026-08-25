@@ -1,7 +1,7 @@
 use atomic_refcell::AtomicRefCell;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// This stores some global states for an MMTK instance.
 /// Some MMTK components like plans and allocators may keep an reference to the struct, and can access it.
@@ -15,8 +15,12 @@ use std::time::Instant;
 pub struct GlobalState {
     /// The current GC status.
     pub(crate) gc_status: GcStatusWord,
-    /// When did the last GC start? Only accessed by the last parked worker.
-    pub(crate) gc_start_time: AtomicRefCell<Option<Instant>>,
+    /// The time when a GC pause is requested. Used to calculate the time-to-yield metric.
+    pub(crate) pause_requested_time: AtomicRefCell<Option<Instant>>,
+    /// When did the current GC pause begin, i.e. when did all mutators finish stopping (see
+    /// `pause_requested_time`)? Consumed once the pause ends (mutators are about to resume) to
+    /// compute the "pause time" statistic: the duration mutators spend stopped for the pause.
+    pub(crate) pause_start_time: AtomicRefCell<Option<Instant>>,
     /// Is the current GC an emergency collection? Emergency means we may run out of memory soon, and we should
     /// attempt to collect as much as we can.
     pub(crate) emergency_collection: AtomicBool,
@@ -192,13 +196,57 @@ impl GlobalState {
     pub(crate) fn get_used_pages_after_last_gc(&self) -> usize {
         self.used_pages_after_last_gc.load(Ordering::Relaxed)
     }
+
+    /// Record that a GC pause has just been successfully requested. Called by `GCTrigger::request()`
+    /// on the thread that won the race to move the GC status to `PauseRequested`.
+    pub(crate) fn record_pause_requested_time(&self) {
+        let mut pause_requested_time = self.pause_requested_time.borrow_mut();
+        assert!(
+            pause_requested_time.is_none(),
+            "A pause was requested while a previous pause request time is still pending"
+        );
+        *pause_requested_time = Some(Instant::now());
+    }
+
+    /// Take the time-to-yield duration: the time elapsed since the pause was requested (i.e.
+    /// since `record_pause_requested_time` was last called). This should be called exactly once
+    /// all mutators have stopped for the pause.
+    pub(crate) fn take_time_to_yield(&self) -> Duration {
+        self.pause_requested_time
+            .borrow_mut()
+            .take()
+            .expect("Pause requested time was not recorded")
+            .elapsed()
+    }
+
+    /// Record that a GC pause has just begun, i.e. all mutators have just finished stopping.
+    pub(crate) fn record_pause_start_time(&self) {
+        let mut pause_start_time = self.pause_start_time.borrow_mut();
+        assert!(
+            pause_start_time.is_none(),
+            "A pause was started while a previous pause start time is still pending"
+        );
+        *pause_start_time = Some(Instant::now());
+    }
+
+    /// Take the pause time duration: the time elapsed since the pause began (i.e. since
+    /// `record_pause_start_time` was last called). This should be called exactly once the pause
+    /// is about to end, i.e. right before mutators are resumed.
+    pub(crate) fn take_pause_time(&self) -> Duration {
+        self.pause_start_time
+            .borrow_mut()
+            .take()
+            .expect("Pause start time was not recorded")
+            .elapsed()
+    }
 }
 
 impl Default for GlobalState {
     fn default() -> Self {
         Self {
             gc_status: GcStatusWord::new(GcStatus::Uninitialized),
-            gc_start_time: AtomicRefCell::new(None),
+            pause_requested_time: AtomicRefCell::new(None),
+            pause_start_time: AtomicRefCell::new(None),
             stacks_prepared: AtomicBool::new(false),
             emergency_collection: AtomicBool::new(false),
             user_triggered_collection: AtomicBool::new(false),
