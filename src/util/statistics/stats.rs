@@ -53,11 +53,7 @@ pub struct Stats {
     perfmon: Perfmon,
     pub shared: Arc<SharedStats>,
     counters: Mutex<Vec<Arc<Mutex<dyn Counter + Send>>>>,
-    /// Tracks "time-to-yield": the latency, for each GC pause, between MMTk successfully
-    /// requesting the pause and the point all mutators have actually stopped.
     time_to_yield: Arc<Mutex<LatencySampler>>,
-    /// Tracks "pause time": the duration, for each GC pause, that mutators spend stopped (from
-    /// the point all mutators have stopped to the point they are resumed).
     pause_time: Arc<Mutex<LatencySampler>>,
 }
 

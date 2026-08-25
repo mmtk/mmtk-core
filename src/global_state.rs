@@ -17,10 +17,7 @@ pub struct GlobalState {
     pub(crate) gc_status: GcStatusWord,
     /// When did the last GC start? Only accessed by the last parked worker.
     pub(crate) gc_start_time: AtomicRefCell<Option<Instant>>,
-    /// When was a GC pause last successfully requested (`GCTrigger::request()` winning the race
-    /// to transition the GC status to `PauseRequested`)? Consumed once all mutators have stopped
-    /// to compute the "time-to-yield" statistic: the latency between requesting a pause and the
-    /// point all threads are actually stopped.
+    /// The time when a GC pause is requested. Used to calculate the time-to-yield metric.
     pub(crate) pause_requested_time: AtomicRefCell<Option<Instant>>,
     /// When did the current GC pause begin, i.e. when did all mutators finish stopping (see
     /// `pause_requested_time`)? Consumed once the pause ends (mutators are about to resume) to

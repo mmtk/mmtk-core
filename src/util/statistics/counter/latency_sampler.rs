@@ -8,7 +8,7 @@ use std::sync::Arc;
 ///
 /// This is a thin wrapper around an [`EventCounter`]: it reuses the inner counter's
 /// `start`/`stop`/`phase_change` machinery unchanged to accumulate one sample per pause into the
-/// per-phase array (always recorded in the STW phase). It only overrides how the counter is
+/// per-phase array. It only overrides how the counter is
 /// named and printed, bending two parts of the [`Counter`] contract to do so:
 ///
 /// - [`Counter::merge_phases`] always returns `true`.
@@ -44,7 +44,13 @@ impl LatencySampler {
     /// `record`), so only the odd-indexed phase counts hold real values; the even-indexed
     /// (mutator-phase) ones are always 0 and are skipped here.
     fn samples(&self) -> Vec<u64> {
-        self.inner.count.iter().skip(1).step_by(2).copied().collect()
+        self.inner
+            .count
+            .iter()
+            .skip(1)
+            .step_by(2)
+            .copied()
+            .collect()
     }
 }
 
