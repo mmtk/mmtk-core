@@ -87,6 +87,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
         match self.state.gc_status.try_request_pause() {
             Ok(_) => {
                 probe!(mmtk, gc_requested);
+                self.state.record_pause_requested_time();
                 self.scheduler.request_schedule_collection();
                 true
             },

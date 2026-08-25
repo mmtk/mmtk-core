@@ -695,6 +695,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         } else {
             mmtk.state.gc_status.set_not_in_gc();
         }
+        // The pause is about to end (mutators are about to resume): this is the end of the
+        // "pause time" window that started when all mutators finished stopping (see
+        // `StopMutators::do_work`). Record it before `end_gc()` flips the phase, so the sample
+        // lands in the current (STW) phase's counter slot.
+        mmtk.stats.record_pause_time(mmtk.state.take_pause_time());
         if mmtk.stats.get_gathering_stats() {
             mmtk.stats.end_gc();
         }
