@@ -174,6 +174,12 @@ class LogProcessor:
             case "gc_requested":
                 result["tid"] = 1
 
+            case "GC_REQUEST_WAIT":
+                # Put the "GC requested but not yet started" span on the same virtual
+                # thread as "GC" so it renders as the slice immediately preceding each
+                # GC on the same timeline row.
+                result["tid"] = 0
+
             case _:
                 if self.enrich_event_extra is not None:
                     # Call ``enrich_event_extra`` in the extension script if defined.

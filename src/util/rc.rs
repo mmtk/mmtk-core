@@ -163,9 +163,22 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         unsafe { RC_TABLE.store(o.to_raw_address(), count) }
     }
 
+    /// Sets the reference count for the line containing object `o` to `count` using a non-atomic store,
+    /// for use where the caller can guarantee there is no concurrent access.
+    pub fn set_line_relaxed(&self, line: Line, count: u8) {
+        unsafe { RC_TABLE.store(line.start(), count) }
+    }
+
     /// Returns object `o`'s current reference count.
     pub fn count(&self, o: ObjectReference) -> u8 {
         RC_TABLE.load_atomic(o.to_raw_address(), Ordering::Relaxed)
+    }
+
+    /// Returns the reference count stored in the RC table at address `addr`. If this
+    /// returns a non-zero value, it indicates that `addr` is the address of an object reference,
+    /// or the start of a straddle line.
+    pub fn count_by_address(&self, addr: Address) -> u8 {
+        RC_TABLE.load_atomic(addr, Ordering::Relaxed)
     }
 
     /// Returns `true` if the RC table entry at `o`'s address is zero. Used for both individual
@@ -223,7 +236,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
     /// Returns `true` if address `a` holds a synthetic occupancy mark, i.e. it is covered by an
     /// object that starts elsewhere and so is not itself something to trace or sweep.
     pub fn address_is_in_straddle_line(&self, a: Address) -> bool {
-        self.count(a.to_object_reference::<VM>()) != 0 && self.is_straddle_granule(a)
+        self.count_by_address(a) != 0 && self.is_straddle_granule(a)
     }
 
     /// Marks every line (other than the one holding the object's own count) spanned by object
@@ -251,7 +264,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         let size = VM::VMObjectModel::get_current_size(o);
         for i in (0..size).step_by(MIN_OBJECT_SIZE) {
             let a = o.to_raw_address() + i;
-            assert_eq!(0, self.count(a.to_object_reference::<VM>()));
+            assert_eq!(0, self.count_by_address(a));
         }
     }
 

@@ -75,7 +75,7 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
         for i in -4i64..=4 {
             let n = a.as_usize() as i64 + i * (rc::MIN_OBJECT_SIZE as i64);
             let n = unsafe { crate::util::Address::from_usize(n as usize) };
-            let c = self.rc.count(unsafe { n.to_object_reference::<VM>() });
+            let c = self.rc.count_by_address(n);
             eprint!("{}{}", if i == 0 { " >" } else { " " }, c);
         }
         eprintln!();
@@ -96,35 +96,39 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
         let mut cursor = block.start();
         let limit = block.end();
         while cursor < limit {
-            let o = unsafe { cursor.to_object_reference::<VM>() };
+            let cur_cursor = cursor;
             cursor += rc::MIN_OBJECT_SIZE;
-            let c = self.rc.count(o);
-            if c != 0 && !immix_space.is_marked(o) {
-                // A straddle bit on this granule means the count is a synthetic line-occupancy
-                // mark, not an object: `set_occupied_line_marks` writes one for every line an
-                // object touches besides the one holding its own count, so the hole finder does
-                // not read those lines as free. Sizing one reads a type tag from whatever
-                // precedes it.
-                //
-                // The bit is checked at the granule, not at the line. The mark for the line
-                // holding an object's header sits at the header word; for Julia, whose reference
-                // address is one word past the allocation start, that lands on the last word of
-                // the preceding line whenever an object begins exactly on a line boundary. Those
-                // granules (`offset_in_line=248`) are what crashed the sweep, and a per-line bit
-                // could not describe them.
-                if self.rc.is_straddle_granule(o.to_raw_address()) {
-                    continue;
+            let c = self.rc.count_by_address(cur_cursor);
+            if c != 0 {
+                // Safety: cur_cursor is either a valid object reference, or a straddle line
+                let o = unsafe { ObjectReference::from_raw_address_unchecked(cur_cursor) };
+                if !immix_space.is_marked(o) {
+                    // A straddle bit on this granule means the count is a synthetic line-occupancy
+                    // mark, not an object: `set_occupied_line_marks` writes one for every line an
+                    // object touches besides the one holding its own count, so the hole finder does
+                    // not read those lines as free. Sizing one reads a type tag from whatever
+                    // precedes it.
+                    //
+                    // The bit is checked at the granule, not at the line. The mark for the line
+                    // holding an object's header sits at the header word; for Julia, whose reference
+                    // address is one word past the allocation start, that lands on the last word of
+                    // the preceding line whenever an object begins exactly on a line boundary. Those
+                    // granules (`offset_in_line=248`) are what crashed the sweep, and a per-line bit
+                    // could not describe them.
+                    if self.rc.is_straddle_granule(o.to_raw_address()) {
+                        continue;
+                    }
+                    std::sync::atomic::fence(Ordering::SeqCst);
+                    if self.rc.count(o) == 0 {
+                        continue;
+                    }
+                    crate::plan::lxr::SWEEP_ZEROED.fetch_add(1, Ordering::Relaxed);
+                    self.process_dead_object(o);
+                    has_dead_object = true;
+                } else {
+                    crate::plan::lxr::SWEEP_KEPT_MARKED.fetch_add(1, Ordering::Relaxed);
+                    has_live = true;
                 }
-                std::sync::atomic::fence(Ordering::SeqCst);
-                if self.rc.count(o) == 0 {
-                    continue;
-                }
-                crate::plan::lxr::SWEEP_ZEROED.fetch_add(1, Ordering::Relaxed);
-                self.process_dead_object(o);
-                has_dead_object = true;
-            } else if c != 0 {
-                crate::plan::lxr::SWEEP_KEPT_MARKED.fetch_add(1, Ordering::Relaxed);
-                has_live = true;
             }
         }
         if has_dead_object || !has_live {

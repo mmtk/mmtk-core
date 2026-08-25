@@ -382,13 +382,6 @@ impl Address {
         }
     }
 
-    /// Converts the address to an [`ObjectReference`]. The address must be non-zero and must be
-    /// the raw address of a valid object as defined by the VM's object model.
-    pub fn to_object_reference<VM: VMBinding>(self) -> ObjectReference {
-        debug_assert!(!self.is_zero());
-        unsafe { ObjectReference::from_raw_address_unchecked(self) }
-    }
-
     /// Returns the intersection of the two address ranges. The returned range could
     /// be empty if there is no intersection between the ranges.
     pub fn range_intersection(r1: &Range<Address>, r2: &Range<Address>) -> Range<Address> {
