@@ -5,6 +5,41 @@ use crate::*;
 use std::marker::PhantomData;
 use std::sync::atomic::Ordering;
 
+/// The kind of a set of roots. Used by LXR to decide how roots should be processed
+/// (e.g. reference counting and remembered-set recording).
+#[repr(u8)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+pub enum RootKind {
+    /// Ordinary strong roots, e.g. mutator stacks and globals.  These are reference-counted and
+    /// marked like any other strong reference.
+    Strong,
+    /// Roots held by recently JIT-compiled ("young") code-cache entries.  These are recorded into
+    /// the remembered set (instead of being reference-counted) so the code cache can be
+    /// re-scanned on a later GC.
+    YoungCodeCacheRoots,
+    /// Roots that hold weak references.  These must not keep their referents alive and are not
+    /// reference-counted.
+    Weak,
+}
+
+impl RootKind {
+    /// Whether roots of this kind should be recorded into the remembered set rather than being
+    /// processed like normal roots.
+    pub fn should_record_remset(&self) -> bool {
+        matches!(self, RootKind::YoungCodeCacheRoots)
+    }
+
+    /// Whether roots of this kind should skip marking and reference-count decrements.
+    pub fn should_skip_mark_and_decs(&self) -> bool {
+        matches!(self, RootKind::YoungCodeCacheRoots) || matches!(self, RootKind::Weak)
+    }
+
+    /// Whether roots of this kind should skip reference-count decrements.
+    pub fn should_skip_decs(&self) -> bool {
+        matches!(self, RootKind::YoungCodeCacheRoots) || matches!(self, RootKind::Weak)
+    }
+}
+
 pub struct ScheduleCollection;
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
@@ -187,9 +222,12 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseCollector {
 /// TODO: Smaller work granularity
 #[derive(Default)]
 pub struct StopMutators<C: GCWorkContext> {
-    /// If this is true, we skip creating root-scanning work packets.
+    /// If this is true, we skip creating [`ScanMutatorRoots`] work packets for mutators.
     /// By default, this is false.
-    skip_roots: bool,
+    skip_mutator_roots: bool,
+    /// If this is true, we skip scanning VM-specific roots.
+    /// By default, this is false.
+    skip_vm_roots: bool,
     /// Flush mutators once they are stopped. By default this is false. [`ScanMutatorRoots`] will flush mutators.
     flush_mutator: bool,
     phantom: PhantomData<C>,
@@ -198,16 +236,24 @@ pub struct StopMutators<C: GCWorkContext> {
 impl<C: GCWorkContext> StopMutators<C> {
     pub fn new() -> Self {
         Self {
-            skip_roots: false,
+            skip_mutator_roots: false,
+            skip_vm_roots: false,
             flush_mutator: false,
             phantom: PhantomData,
         }
     }
 
+    pub fn new_with_flush() -> Self {
+        let mut me = Self::new();
+        me.flush_mutator = true;
+        me
+    }
+
     /// Create a `StopMutators` work packet that does not create any root-scanning work packets, and will simply flush mutators.
     pub fn new_no_scan_roots() -> Self {
         Self {
-            skip_roots: true,
+            skip_mutator_roots: true,
+            skip_vm_roots: true,
             flush_mutator: true,
             phantom: PhantomData,
         }
@@ -225,21 +271,20 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
             if self.flush_mutator {
                 mutator.flush();
             }
-            if !self.skip_roots {
-                mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+            if !self.skip_mutator_roots {
+                mmtk.scheduler.work_buckets[mmtk.get_plan().root_scanning_stage()]
                     .add(ScanMutatorRoots::<C>(mutator));
             }
         });
         trace!("stop_all_mutators end");
-        // This also tells the GC trigger whether a new GC cycle has started (see
-        // `Plan::notify_mutators_paused`).
-        mmtk.get_plan().notify_mutators_paused(mmtk);
+        // This also tells the GC trigger whether a new GC cycle has started (see `Plan::gc_pause_start`).
+        mmtk.get_plan().on_pause_start(mmtk);
         mmtk.scheduler.notify_mutators_paused(mmtk);
         // Tell GC trigger that the pause started.
         mmtk.gc_trigger.policy.on_pause_start(mmtk);
-        if !self.skip_roots {
-            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                .add(ScanVMSpecificRoots::<C>::new());
+        if !self.skip_vm_roots {
+            let factory = C::make_roots_work_factory(mmtk);
+            <C::VM as VMBinding>::VMScanning::scan_vm_specific_roots(worker.tls, factory);
         }
     }
 }

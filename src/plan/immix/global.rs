@@ -93,10 +93,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         self.release_inner(tls, UnlogBitsOperation::NoOp);
     }
 
-    fn end_of_pause(&mut self, mmtk: &'static MMTK<VM>, tls: VMWorkerThread) {
+    fn on_pause_end(&mut self, mmtk: &'static MMTK<VM>, tls: VMWorkerThread) {
         self.last_gc_was_defrag
             .store(self.immix_space.end_of_gc(), Ordering::Relaxed);
-        self.common.end_of_pause(tls);
+        self.common.on_pause_end(tls);
         mmtk.gc_trigger.policy.on_gc_end(mmtk);
     }
 

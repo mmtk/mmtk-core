@@ -122,7 +122,7 @@ MMTk uses a pinned Rust version in the repository (recorded in the `rust-toolcha
 our tests and benchmarks using the pinned Rust version. We recommend using the pinned Rust version
 for development. We update the pinned Rust version between releases of mmtk-core to keep it close to
 the latest Rust stable release. The release cycle of mmtk-core is six weeks, roughly the same as
-Rust itself. 
+Rust itself.
 
 Our minimum support Rust version (MSRV) policy is "N-1" (note that N is *NOT* the current stable Rust release).  That means we also ensure mmtk-core works
 properly with the Rust toolchain that is one minor version before the version specified in

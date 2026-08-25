@@ -531,6 +531,7 @@ pub struct CommonSpace<VM: VMBinding> {
     /// This field equals to needs_log_bit in the plan constraints.
     // TODO: This should be a constant for performance.
     pub needs_log_bit: bool,
+    pub needs_field_log_bit: bool,
     pub unlog_allocated_object: bool,
     pub unlog_traced_object: bool,
 
@@ -607,6 +608,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             vm_map: args.plan_args.vm_map,
             mmapper: args.plan_args.mmapper,
             needs_log_bit: args.plan_args.constraints.needs_log_bit,
+            needs_field_log_bit: args.plan_args.constraints.needs_field_log_bit,
             unlog_allocated_object: args.plan_args.unlog_allocated_object,
             unlog_traced_object: args.plan_args.unlog_traced_object,
             gc_trigger: args.plan_args.gc_trigger.clone(),

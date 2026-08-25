@@ -1,4 +1,5 @@
 use crate::plan::Mutator;
+use crate::scheduler::gc_work::RootKind;
 use crate::scheduler::GCWorker;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
@@ -109,9 +110,18 @@ pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
     ///
     /// The work packet may update the slots.
     ///
+    /// Equivalent to `self.create_process_roots_work_experimental(slots, RootKind::Strong)`.
+    ///
     /// Arguments:
     /// * `slots`: A vector of slots.
-    fn create_process_roots_work(&mut self, slots: Vec<SL>);
+    fn create_process_roots_work(&mut self, slots: Vec<SL>) {
+        self.create_process_roots_work_with_root_kind(slots, RootKind::Strong);
+    }
+
+    /// An experimental API to support weak and young code cache roots.
+    ///
+    /// Currently only used by the LXR plan and the OpenJDK binding.
+    fn create_process_roots_work_with_root_kind(&mut self, slots: Vec<SL>, kind: RootKind);
 
     /// Create work packets to handle non-transitively pinning roots.
     ///
@@ -197,10 +207,10 @@ pub trait Scanning<VM: VMBinding> {
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
     /// * `slot_visitor`: Called back for each field.
-    fn scan_object<SV: SlotVisitor<VM::VMSlot>>(
+    fn scan_object(
         tls: VMWorkerThread,
         object: ObjectReference,
-        slot_visitor: &mut SV,
+        slot_visitor: &mut impl SlotVisitor<VM::VMSlot>,
     );
 
     /// Delegated scanning of a object, visiting each reference field encountered, and tracing the

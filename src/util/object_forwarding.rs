@@ -74,6 +74,33 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
     }
 }
 
+pub fn try_forward_object<VM: VMBinding>(
+    object: ObjectReference,
+    semantics: CopySemantics,
+    copy_context: &mut GCWorkerCopyContext<VM>,
+    on_after_forwarding: impl FnOnce(ObjectReference),
+) -> Option<ObjectReference> {
+    let new_object = VM::VMObjectModel::try_copy(object, semantics, copy_context)?;
+    on_after_forwarding(new_object);
+    if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {
+        VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
+            object,
+            new_object.to_raw_address().as_usize() | ((FORWARDED as usize) << shift),
+            None,
+            Ordering::SeqCst,
+        )
+    } else {
+        write_forwarding_pointer::<VM>(object, new_object);
+        VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.store_atomic::<VM, u8>(
+            object,
+            FORWARDED,
+            None,
+            Ordering::SeqCst,
+        );
+    }
+    Some(new_object)
+}
+
 /// Copy an object and set the forwarding state.
 ///
 /// The caller can use `on_after_forwarding` to set extra metadata (including VO bits, mark bits,
@@ -130,7 +157,7 @@ pub fn is_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
     get_forwarding_status::<VM>(object) == FORWARDED
 }
 
-fn is_being_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
+pub fn is_being_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
     get_forwarding_status::<VM>(object) == BEING_FORWARDED
 }
 
