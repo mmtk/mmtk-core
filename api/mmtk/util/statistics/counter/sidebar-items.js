@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["event_counter","long_counter","size_counter"],"struct":["MonotoneNanoTime"],"trait":["Counter","Diffable"]};
+window.SIDEBAR_ITEMS = {"mod":["event_counter","latency_sampler","long_counter","size_counter"],"struct":["MonotoneNanoTime"],"trait":["Counter","Diffable"]};

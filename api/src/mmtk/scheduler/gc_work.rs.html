@@ -277,53 +277,57 @@
 <a href=#277 id=277 data-nosnippet>277</a>            }
 <a href=#278 id=278 data-nosnippet>278</a>        });
 <a href=#279 id=279 data-nosnippet>279</a>        <span class="macro">trace!</span>(<span class="string">"stop_all_mutators end"</span>);
-<a href=#280 id=280 data-nosnippet>280</a>        <span class="comment">// This also tells the GC trigger whether a new GC cycle has started (see `Plan::gc_pause_start`).
-<a href=#281 id=281 data-nosnippet>281</a>        </span>mmtk.get_plan().on_pause_start(mmtk);
-<a href=#282 id=282 data-nosnippet>282</a>        mmtk.scheduler.notify_mutators_paused(mmtk);
-<a href=#283 id=283 data-nosnippet>283</a>        <span class="comment">// Tell GC trigger that the pause started.
-<a href=#284 id=284 data-nosnippet>284</a>        </span>mmtk.gc_trigger.policy.on_pause_start(mmtk);
-<a href=#285 id=285 data-nosnippet>285</a>        <span class="kw">if </span>!<span class="self">self</span>.skip_vm_roots {
-<a href=#286 id=286 data-nosnippet>286</a>            <span class="kw">let </span>factory = C::make_roots_work_factory(mmtk);
-<a href=#287 id=287 data-nosnippet>287</a>            &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_vm_specific_roots(worker.tls, factory);
-<a href=#288 id=288 data-nosnippet>288</a>        }
-<a href=#289 id=289 data-nosnippet>289</a>    }
-<a href=#290 id=290 data-nosnippet>290</a>}
-<a href=#291 id=291 data-nosnippet>291</a>
-<a href=#292 id=292 data-nosnippet>292</a><span class="kw">pub struct </span>ScanMutatorRoots&lt;C: GCWorkContext&gt;(<span class="kw">pub </span><span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;C::VM&gt;);
-<a href=#293 id=293 data-nosnippet>293</a>
-<a href=#294 id=294 data-nosnippet>294</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>ScanMutatorRoots&lt;C&gt; {
-<a href=#295 id=295 data-nosnippet>295</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
-<a href=#296 id=296 data-nosnippet>296</a>        <span class="macro">trace!</span>(<span class="string">"ScanMutatorRoots for mutator {:?}"</span>, <span class="self">self</span>.<span class="number">0</span>.get_tls());
-<a href=#297 id=297 data-nosnippet>297</a>        <span class="kw">let </span>mutators = &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::number_of_mutators();
-<a href=#298 id=298 data-nosnippet>298</a>        <span class="kw">let </span>factory = C::make_roots_work_factory(mmtk);
-<a href=#299 id=299 data-nosnippet>299</a>        &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_roots_in_mutator_thread(
-<a href=#300 id=300 data-nosnippet>300</a>            worker.tls,
-<a href=#301 id=301 data-nosnippet>301</a>            <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>) },
-<a href=#302 id=302 data-nosnippet>302</a>            factory,
-<a href=#303 id=303 data-nosnippet>303</a>        );
-<a href=#304 id=304 data-nosnippet>304</a>        <span class="self">self</span>.<span class="number">0</span>.flush();
-<a href=#305 id=305 data-nosnippet>305</a>
-<a href=#306 id=306 data-nosnippet>306</a>        <span class="kw">if </span>mmtk.state.inform_stack_scanned(mutators) {
-<a href=#307 id=307 data-nosnippet>307</a>            &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::notify_initial_thread_scan_complete(
-<a href=#308 id=308 data-nosnippet>308</a>                <span class="bool-val">false</span>, worker.tls,
-<a href=#309 id=309 data-nosnippet>309</a>            );
-<a href=#310 id=310 data-nosnippet>310</a>        }
-<a href=#311 id=311 data-nosnippet>311</a>    }
-<a href=#312 id=312 data-nosnippet>312</a>}
-<a href=#313 id=313 data-nosnippet>313</a>
-<a href=#314 id=314 data-nosnippet>314</a><span class="attr">#[derive(Default)]
-<a href=#315 id=315 data-nosnippet>315</a></span><span class="kw">pub struct </span>ScanVMSpecificRoots&lt;C: GCWorkContext&gt;(PhantomData&lt;C&gt;);
-<a href=#316 id=316 data-nosnippet>316</a>
-<a href=#317 id=317 data-nosnippet>317</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; ScanVMSpecificRoots&lt;C&gt; {
-<a href=#318 id=318 data-nosnippet>318</a>    <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
-<a href=#319 id=319 data-nosnippet>319</a>        <span class="self">Self</span>(PhantomData)
-<a href=#320 id=320 data-nosnippet>320</a>    }
-<a href=#321 id=321 data-nosnippet>321</a>}
-<a href=#322 id=322 data-nosnippet>322</a>
-<a href=#323 id=323 data-nosnippet>323</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>ScanVMSpecificRoots&lt;C&gt; {
-<a href=#324 id=324 data-nosnippet>324</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
-<a href=#325 id=325 data-nosnippet>325</a>        <span class="macro">trace!</span>(<span class="string">"ScanStaticRoots"</span>);
-<a href=#326 id=326 data-nosnippet>326</a>        <span class="kw">let </span>factory = C::make_roots_work_factory(mmtk);
-<a href=#327 id=327 data-nosnippet>327</a>        &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_vm_specific_roots(worker.tls, factory);
-<a href=#328 id=328 data-nosnippet>328</a>    }
-<a href=#329 id=329 data-nosnippet>329</a>}</code></pre></div></section></main></body></html>
+<a href=#280 id=280 data-nosnippet>280</a>        <span class="comment">// All mutators have just stopped: this is the end of the "time-to-yield" window
+<a href=#281 id=281 data-nosnippet>281</a>        </span>mmtk.stats
+<a href=#282 id=282 data-nosnippet>282</a>            .record_time_to_yield(mmtk.state.take_time_to_yield());
+<a href=#283 id=283 data-nosnippet>283</a>        mmtk.state.record_pause_start_time();
+<a href=#284 id=284 data-nosnippet>284</a>        <span class="comment">// This also tells the GC trigger whether a new GC cycle has started (see `Plan::gc_pause_start`).
+<a href=#285 id=285 data-nosnippet>285</a>        </span>mmtk.get_plan().on_pause_start(mmtk);
+<a href=#286 id=286 data-nosnippet>286</a>        mmtk.scheduler.notify_mutators_paused(mmtk);
+<a href=#287 id=287 data-nosnippet>287</a>        <span class="comment">// Tell GC trigger that the pause started.
+<a href=#288 id=288 data-nosnippet>288</a>        </span>mmtk.gc_trigger.policy.on_pause_start(mmtk);
+<a href=#289 id=289 data-nosnippet>289</a>        <span class="kw">if </span>!<span class="self">self</span>.skip_vm_roots {
+<a href=#290 id=290 data-nosnippet>290</a>            <span class="kw">let </span>factory = C::make_roots_work_factory(mmtk);
+<a href=#291 id=291 data-nosnippet>291</a>            &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_vm_specific_roots(worker.tls, factory);
+<a href=#292 id=292 data-nosnippet>292</a>        }
+<a href=#293 id=293 data-nosnippet>293</a>    }
+<a href=#294 id=294 data-nosnippet>294</a>}
+<a href=#295 id=295 data-nosnippet>295</a>
+<a href=#296 id=296 data-nosnippet>296</a><span class="kw">pub struct </span>ScanMutatorRoots&lt;C: GCWorkContext&gt;(<span class="kw">pub </span><span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;C::VM&gt;);
+<a href=#297 id=297 data-nosnippet>297</a>
+<a href=#298 id=298 data-nosnippet>298</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>ScanMutatorRoots&lt;C&gt; {
+<a href=#299 id=299 data-nosnippet>299</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
+<a href=#300 id=300 data-nosnippet>300</a>        <span class="macro">trace!</span>(<span class="string">"ScanMutatorRoots for mutator {:?}"</span>, <span class="self">self</span>.<span class="number">0</span>.get_tls());
+<a href=#301 id=301 data-nosnippet>301</a>        <span class="kw">let </span>mutators = &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::number_of_mutators();
+<a href=#302 id=302 data-nosnippet>302</a>        <span class="kw">let </span>factory = C::make_roots_work_factory(mmtk);
+<a href=#303 id=303 data-nosnippet>303</a>        &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_roots_in_mutator_thread(
+<a href=#304 id=304 data-nosnippet>304</a>            worker.tls,
+<a href=#305 id=305 data-nosnippet>305</a>            <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>) },
+<a href=#306 id=306 data-nosnippet>306</a>            factory,
+<a href=#307 id=307 data-nosnippet>307</a>        );
+<a href=#308 id=308 data-nosnippet>308</a>        <span class="self">self</span>.<span class="number">0</span>.flush();
+<a href=#309 id=309 data-nosnippet>309</a>
+<a href=#310 id=310 data-nosnippet>310</a>        <span class="kw">if </span>mmtk.state.inform_stack_scanned(mutators) {
+<a href=#311 id=311 data-nosnippet>311</a>            &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::notify_initial_thread_scan_complete(
+<a href=#312 id=312 data-nosnippet>312</a>                <span class="bool-val">false</span>, worker.tls,
+<a href=#313 id=313 data-nosnippet>313</a>            );
+<a href=#314 id=314 data-nosnippet>314</a>        }
+<a href=#315 id=315 data-nosnippet>315</a>    }
+<a href=#316 id=316 data-nosnippet>316</a>}
+<a href=#317 id=317 data-nosnippet>317</a>
+<a href=#318 id=318 data-nosnippet>318</a><span class="attr">#[derive(Default)]
+<a href=#319 id=319 data-nosnippet>319</a></span><span class="kw">pub struct </span>ScanVMSpecificRoots&lt;C: GCWorkContext&gt;(PhantomData&lt;C&gt;);
+<a href=#320 id=320 data-nosnippet>320</a>
+<a href=#321 id=321 data-nosnippet>321</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; ScanVMSpecificRoots&lt;C&gt; {
+<a href=#322 id=322 data-nosnippet>322</a>    <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+<a href=#323 id=323 data-nosnippet>323</a>        <span class="self">Self</span>(PhantomData)
+<a href=#324 id=324 data-nosnippet>324</a>    }
+<a href=#325 id=325 data-nosnippet>325</a>}
+<a href=#326 id=326 data-nosnippet>326</a>
+<a href=#327 id=327 data-nosnippet>327</a><span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>ScanVMSpecificRoots&lt;C&gt; {
+<a href=#328 id=328 data-nosnippet>328</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
+<a href=#329 id=329 data-nosnippet>329</a>        <span class="macro">trace!</span>(<span class="string">"ScanStaticRoots"</span>);
+<a href=#330 id=330 data-nosnippet>330</a>        <span class="kw">let </span>factory = C::make_roots_work_factory(mmtk);
+<a href=#331 id=331 data-nosnippet>331</a>        &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_vm_specific_roots(worker.tls, factory);
+<a href=#332 id=332 data-nosnippet>332</a>    }
+<a href=#333 id=333 data-nosnippet>333</a>}</code></pre></div></section></main></body></html>
