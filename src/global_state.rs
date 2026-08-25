@@ -15,8 +15,6 @@ use std::time::{Duration, Instant};
 pub struct GlobalState {
     /// The current GC status.
     pub(crate) gc_status: GcStatusWord,
-    /// When did the last GC start? Only accessed by the last parked worker.
-    pub(crate) gc_start_time: AtomicRefCell<Option<Instant>>,
     /// The time when a GC pause is requested. Used to calculate the time-to-yield metric.
     pub(crate) pause_requested_time: AtomicRefCell<Option<Instant>>,
     /// When did the current GC pause begin, i.e. when did all mutators finish stopping (see
@@ -247,7 +245,6 @@ impl Default for GlobalState {
     fn default() -> Self {
         Self {
             gc_status: GcStatusWord::new(GcStatus::Uninitialized),
-            gc_start_time: AtomicRefCell::new(None),
             pause_requested_time: AtomicRefCell::new(None),
             pause_start_time: AtomicRefCell::new(None),
             stacks_prepared: AtomicBool::new(false),
