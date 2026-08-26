@@ -3,7 +3,7 @@
 <a href=#3 id=3 data-nosnippet>3</a><span class="kw">use </span>std::sync::Arc;
 <a href=#4 id=4 data-nosnippet>4</a>
 <a href=#5 id=5 data-nosnippet>5</a><span class="doccomment">/// A [`Counter`] that records one latency sample per event (e.g. one per GC pause, for things
-<a href=#6 id=6 data-nosnippet>6</a>/// like time-to-yield or pause time) and reports it as `avg`/`p9999` columns instead of a raw
+<a href=#6 id=6 data-nosnippet>6</a>/// like time-to-yield or pause time) and reports it as `p50`/`p9999` columns instead of a raw
 <a href=#7 id=7 data-nosnippet>7</a>/// per-phase total.
 <a href=#8 id=8 data-nosnippet>8</a>///
 <a href=#9 id=9 data-nosnippet>9</a>/// This is a thin wrapper around an [`EventCounter`]: it reuses the inner counter's
@@ -13,9 +13,9 @@
 <a href=#13 id=13 data-nosnippet>13</a>///
 <a href=#14 id=14 data-nosnippet>14</a>/// - [`Counter::merge_phases`] always returns `true`.
 <a href=#15 id=15 data-nosnippet>15</a>/// - [`Counter::name`] returns a compound, tab-separated pair of column names (e.g.
-<a href=#16 id=16 data-nosnippet>16</a>///   `"pause-time.avg\tpause-time.p9999"`), so the single `print!("{}\t", c.name())` call site
+<a href=#16 id=16 data-nosnippet>16</a>///   `"pause-time.p50\tpause-time.p9999"`), so the single `print!("{}\t", c.name())` call site
 <a href=#17 id=17 data-nosnippet>17</a>///   in [`crate::util::statistics::stats::Stats::print_column_names`] prints both headers.
-<a href=#18 id=18 data-nosnippet>18</a>/// - [`Counter::print_total`] prints `"{avg}\t{p9999}"` (two tab-separated values, ignoring the
+<a href=#18 id=18 data-nosnippet>18</a>/// - [`Counter::print_total`] prints `"{p50}\t{p9999}"` (two tab-separated values, ignoring the
 <a href=#19 id=19 data-nosnippet>19</a>///   `other` argument), so the single `c.print_total(None)` call site in
 <a href=#20 id=20 data-nosnippet>20</a>///   [`crate::util::statistics::stats::Stats::print_stats`] prints both values.
 <a href=#21 id=21 data-nosnippet>21</a>///
@@ -23,7 +23,7 @@
 <a href=#23 id=23 data-nosnippet>23</a>/// code) anywhere in the codebase; if that changes, this would need revisiting.
 <a href=#24 id=24 data-nosnippet>24</a></span><span class="kw">pub struct </span>LatencySampler {
 <a href=#25 id=25 data-nosnippet>25</a>    inner: EventCounter,
-<a href=#26 id=26 data-nosnippet>26</a>    <span class="doccomment">/// A compound `"{name}.avg\t{name}.p9999"` string, returned by `name()`.
+<a href=#26 id=26 data-nosnippet>26</a>    <span class="doccomment">/// A compound `"{name}.p50\t{name}.p9999"` string, returned by `name()`.
 <a href=#27 id=27 data-nosnippet>27</a>    </span>display_name: String,
 <a href=#28 id=28 data-nosnippet>28</a>}
 <a href=#29 id=29 data-nosnippet>29</a>
@@ -31,7 +31,7 @@
 <a href=#31 id=31 data-nosnippet>31</a>    <span class="kw">pub fn </span>new(name: <span class="kw-2">&amp;</span>str, stats: Arc&lt;SharedStats&gt;, implicitly_start: bool) -&gt; <span class="self">Self </span>{
 <a href=#32 id=32 data-nosnippet>32</a>        LatencySampler {
 <a href=#33 id=33 data-nosnippet>33</a>            inner: EventCounter::new(name.to_string(), stats, implicitly_start, <span class="bool-val">false</span>),
-<a href=#34 id=34 data-nosnippet>34</a>            display_name: <span class="macro">format!</span>(<span class="string">"{name}.avg\t{name}.p9999"</span>),
+<a href=#34 id=34 data-nosnippet>34</a>            display_name: <span class="macro">format!</span>(<span class="string">"{name}.p50\t{name}.p9999"</span>),
 <a href=#35 id=35 data-nosnippet>35</a>        }
 <a href=#36 id=36 data-nosnippet>36</a>    }
 <a href=#37 id=37 data-nosnippet>37</a>
@@ -78,40 +78,43 @@
 <a href=#78 id=78 data-nosnippet>78</a>    <span class="kw">fn </span>print_total(<span class="kw-2">&amp;</span><span class="self">self</span>, _other: <span class="prelude-ty">Option</span>&lt;bool&gt;) {
 <a href=#79 id=79 data-nosnippet>79</a>        <span class="kw">let </span><span class="kw-2">mut </span>samples = <span class="self">self</span>.samples();
 <a href=#80 id=80 data-nosnippet>80</a>        <span class="kw">if </span>samples.is_empty() {
-<a href=#81 id=81 data-nosnippet>81</a>            <span class="macro">print!</span>(<span class="string">"n/a\tn/a"</span>);
+<a href=#81 id=81 data-nosnippet>81</a>            <span class="macro">print!</span>(<span class="string">"0\t0"</span>);
 <a href=#82 id=82 data-nosnippet>82</a>            <span class="kw">return</span>;
 <a href=#83 id=83 data-nosnippet>83</a>        }
-<a href=#84 id=84 data-nosnippet>84</a>        <span class="kw">let </span>avg_ns = samples.iter().sum::&lt;u64&gt;() <span class="kw">as </span>f64 / samples.len() <span class="kw">as </span>f64;
-<a href=#85 id=85 data-nosnippet>85</a>        <span class="comment">// Exact p9999 (99.99th percentile), computed by sorting all samples and using the
-<a href=#86 id=86 data-nosnippet>86</a>        // nearest-rank method. Note that with fewer than 10,000 samples, this is guaranteed to
-<a href=#87 id=87 data-nosnippet>87</a>        // just return the maximum.
-<a href=#88 id=88 data-nosnippet>88</a>        </span>samples.sort_unstable();
-<a href=#89 id=89 data-nosnippet>89</a>        <span class="kw">let </span>rank = ((<span class="number">99.99 </span>/ <span class="number">100.0</span>) * samples.len() <span class="kw">as </span>f64).ceil() <span class="kw">as </span>usize;
-<a href=#90 id=90 data-nosnippet>90</a>        <span class="kw">let </span>p9999_ns = samples[rank.clamp(<span class="number">1</span>, samples.len()) - <span class="number">1</span>];
-<a href=#91 id=91 data-nosnippet>91</a>        <span class="macro">print!</span>(<span class="string">"{:.2}\t{:.2}"</span>, avg_ns / <span class="number">1e6</span>, p9999_ns <span class="kw">as </span>f64 / <span class="number">1e6</span>);
-<a href=#92 id=92 data-nosnippet>92</a>    }
-<a href=#93 id=93 data-nosnippet>93</a>
-<a href=#94 id=94 data-nosnippet>94</a>    <span class="kw">fn </span>print_min(<span class="kw-2">&amp;</span><span class="self">self</span>, other: bool) {
-<a href=#95 id=95 data-nosnippet>95</a>        <span class="self">self</span>.inner.print_min(other);
-<a href=#96 id=96 data-nosnippet>96</a>    }
-<a href=#97 id=97 data-nosnippet>97</a>
-<a href=#98 id=98 data-nosnippet>98</a>    <span class="kw">fn </span>print_max(<span class="kw-2">&amp;</span><span class="self">self</span>, other: bool) {
-<a href=#99 id=99 data-nosnippet>99</a>        <span class="self">self</span>.inner.print_max(other);
-<a href=#100 id=100 data-nosnippet>100</a>    }
-<a href=#101 id=101 data-nosnippet>101</a>
-<a href=#102 id=102 data-nosnippet>102</a>    <span class="kw">fn </span>print_last(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-<a href=#103 id=103 data-nosnippet>103</a>        <span class="self">self</span>.inner.print_last();
-<a href=#104 id=104 data-nosnippet>104</a>    }
-<a href=#105 id=105 data-nosnippet>105</a>
-<a href=#106 id=106 data-nosnippet>106</a>    <span class="kw">fn </span>merge_phases(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-<a href=#107 id=107 data-nosnippet>107</a>        <span class="bool-val">true
-<a href=#108 id=108 data-nosnippet>108</a>    </span>}
-<a href=#109 id=109 data-nosnippet>109</a>
-<a href=#110 id=110 data-nosnippet>110</a>    <span class="kw">fn </span>implicitly_start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-<a href=#111 id=111 data-nosnippet>111</a>        <span class="self">self</span>.inner.implicitly_start()
-<a href=#112 id=112 data-nosnippet>112</a>    }
-<a href=#113 id=113 data-nosnippet>113</a>
-<a href=#114 id=114 data-nosnippet>114</a>    <span class="kw">fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>String {
-<a href=#115 id=115 data-nosnippet>115</a>        <span class="kw-2">&amp;</span><span class="self">self</span>.display_name
-<a href=#116 id=116 data-nosnippet>116</a>    }
-<a href=#117 id=117 data-nosnippet>117</a>}</code></pre></div></section></main></body></html>
+<a href=#84 id=84 data-nosnippet>84</a>        <span class="comment">// Exact percentiles, computed by sorting all samples and using the nearest-rank method.
+<a href=#85 id=85 data-nosnippet>85</a>        // Note that with fewer than 10,000 samples, p9999 is guaranteed to just return the
+<a href=#86 id=86 data-nosnippet>86</a>        // maximum.
+<a href=#87 id=87 data-nosnippet>87</a>        </span>samples.sort_unstable();
+<a href=#88 id=88 data-nosnippet>88</a>        <span class="kw">let </span>percentile = |p: f64| {
+<a href=#89 id=89 data-nosnippet>89</a>            <span class="kw">let </span>rank = ((p / <span class="number">100.0</span>) * samples.len() <span class="kw">as </span>f64).ceil() <span class="kw">as </span>usize;
+<a href=#90 id=90 data-nosnippet>90</a>            samples[rank.clamp(<span class="number">1</span>, samples.len()) - <span class="number">1</span>]
+<a href=#91 id=91 data-nosnippet>91</a>        };
+<a href=#92 id=92 data-nosnippet>92</a>        <span class="kw">let </span>p50_ns = percentile(<span class="number">50.0</span>);
+<a href=#93 id=93 data-nosnippet>93</a>        <span class="kw">let </span>p9999_ns = percentile(<span class="number">99.99</span>);
+<a href=#94 id=94 data-nosnippet>94</a>        <span class="macro">print!</span>(<span class="string">"{:.2}\t{:.2}"</span>, p50_ns <span class="kw">as </span>f64 / <span class="number">1e6</span>, p9999_ns <span class="kw">as </span>f64 / <span class="number">1e6</span>);
+<a href=#95 id=95 data-nosnippet>95</a>    }
+<a href=#96 id=96 data-nosnippet>96</a>
+<a href=#97 id=97 data-nosnippet>97</a>    <span class="kw">fn </span>print_min(<span class="kw-2">&amp;</span><span class="self">self</span>, other: bool) {
+<a href=#98 id=98 data-nosnippet>98</a>        <span class="self">self</span>.inner.print_min(other);
+<a href=#99 id=99 data-nosnippet>99</a>    }
+<a href=#100 id=100 data-nosnippet>100</a>
+<a href=#101 id=101 data-nosnippet>101</a>    <span class="kw">fn </span>print_max(<span class="kw-2">&amp;</span><span class="self">self</span>, other: bool) {
+<a href=#102 id=102 data-nosnippet>102</a>        <span class="self">self</span>.inner.print_max(other);
+<a href=#103 id=103 data-nosnippet>103</a>    }
+<a href=#104 id=104 data-nosnippet>104</a>
+<a href=#105 id=105 data-nosnippet>105</a>    <span class="kw">fn </span>print_last(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+<a href=#106 id=106 data-nosnippet>106</a>        <span class="self">self</span>.inner.print_last();
+<a href=#107 id=107 data-nosnippet>107</a>    }
+<a href=#108 id=108 data-nosnippet>108</a>
+<a href=#109 id=109 data-nosnippet>109</a>    <span class="kw">fn </span>merge_phases(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#110 id=110 data-nosnippet>110</a>        <span class="bool-val">true
+<a href=#111 id=111 data-nosnippet>111</a>    </span>}
+<a href=#112 id=112 data-nosnippet>112</a>
+<a href=#113 id=113 data-nosnippet>113</a>    <span class="kw">fn </span>implicitly_start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#114 id=114 data-nosnippet>114</a>        <span class="self">self</span>.inner.implicitly_start()
+<a href=#115 id=115 data-nosnippet>115</a>    }
+<a href=#116 id=116 data-nosnippet>116</a>
+<a href=#117 id=117 data-nosnippet>117</a>    <span class="kw">fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>String {
+<a href=#118 id=118 data-nosnippet>118</a>        <span class="kw-2">&amp;</span><span class="self">self</span>.display_name
+<a href=#119 id=119 data-nosnippet>119</a>    }
+<a href=#120 id=120 data-nosnippet>120</a>}</code></pre></div></section></main></body></html>
