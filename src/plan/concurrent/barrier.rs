@@ -6,7 +6,7 @@ use crate::policy::gc_work::TraceKind;
 use crate::util::VMMutatorThread;
 use crate::{
     plan::{barriers::BarrierSemantics, concurrent::global::ConcurrentPlan, VectorQueue},
-    scheduler::WorkBucketStage,
+    scheduler::{GCWork, WorkBucketStage},
     util::ObjectReference,
     vm::{
         slot::{MemorySlice, Slot},
@@ -70,9 +70,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         if !self.satb.is_empty() {
             if self.should_create_satb_packets() {
                 let satb = self.satb.take();
-                let bucket = self.target_bucket();
-                self.mmtk.scheduler.work_buckets[bucket]
-                    .add(ProcessModBufSATB::<VM, P, KIND>::new(satb));
+                self.add_work(ProcessModBufSATB::<VM, P, KIND>::new(satb));
             } else {
                 let _ = self.satb.take();
             };
@@ -83,19 +81,25 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     fn flush_weak_refs(&mut self) {
         if !self.refs.is_empty() {
             let nodes = self.refs.take();
-            let bucket = self.target_bucket();
-            self.mmtk.scheduler.work_buckets[bucket]
-                .add(ProcessModBufSATB::<VM, P, KIND>::new(nodes));
+            self.add_work(ProcessModBufSATB::<VM, P, KIND>::new(nodes));
         }
     }
 
-    /// Which bucket newly-flushed concurrent-marking work should be added to.
-    fn target_bucket(&self) -> WorkBucketStage {
-        if self.mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].is_enabled() {
+    fn add_work(&self, work: impl GCWork<VM>) {
+        let bucket_stage = if self.plan.concurrent_work_in_progress() {
             WorkBucketStage::Concurrent
         } else {
             debug_assert_ne!(self.plan.current_pause(), Some(Pause::InitialMark));
             WorkBucketStage::Closure
+        };
+        let bucket = &self.mmtk.scheduler.work_buckets[bucket_stage];
+        // If the bucket is disabled, we still add the work, but we dont need to notify a worker.
+        if bucket.is_enabled() {
+            // If there is a race, and the bucket is disabled now, it is fine.
+            // We just additionally notify the worker, which is harmless.
+            bucket.add(work);
+        } else {
+            bucket.add_no_notify(work);
         }
     }
 

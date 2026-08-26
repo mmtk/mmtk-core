@@ -323,6 +323,22 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             mmtk.gc_trigger.policy.on_gc_start(mmtk);
         }
 
+        // If we have unfinished concurrent marking work, do it here.
+        if self.unfinished_concurrent_marking.load(Ordering::SeqCst) {
+            info!(
+                "Concurrent marking was interrupted. Moving remaining work to STW closure bucket."
+            );
+            // We have unfinihsed concurrent marking work, so this pause has to be the final mark pause.
+            // If we want to allow full pause to interrupte concurrent marking, the unfinished work needs to be dropped.
+            assert!(pause == Pause::FinalMark);
+            let leftover_concurrent_work =
+                mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].drain_all_packets();
+            mmtk.scheduler.work_buckets[WorkBucketStage::FinishConcurrentWork]
+                .bulk_add(leftover_concurrent_work);
+            self.unfinished_concurrent_marking
+                .store(false, Ordering::SeqCst);
+        }
+
         info!("{:?} start", pause);
     }
 
@@ -394,8 +410,6 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
 
         self.set_ref_closure_buckets_enabled(false);
 
-        assert!(!self.unfinished_concurrent_marking.load(Ordering::SeqCst), "We have unfinished concurrent marking work, but we are starting a new concurrent marking cycle. This should not happen.");
-
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<ConcurrentImmixGCWorkContext<VM>>::new());
         scheduler.work_buckets[WorkBucketStage::Prepare]
@@ -408,18 +422,6 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
         // Skip root scanning in the final mark
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<ConcurrentImmixGCWorkContext<VM>>::new_no_scan_roots());
-
-        // If we have unfinished concurrent marking work, do it here.
-        if self.unfinished_concurrent_marking.load(Ordering::SeqCst) {
-            info!(
-                "Concurrent marking was interrupted. Moving remaining work to STW closure bucket."
-            );
-            let leftover_concurrent_work =
-                scheduler.work_buckets[WorkBucketStage::Concurrent].drain_all_packets();
-            scheduler.work_buckets[WorkBucketStage::Closure].bulk_add(leftover_concurrent_work);
-            self.unfinished_concurrent_marking
-                .store(false, Ordering::SeqCst);
-        }
 
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<ConcurrentImmixGCWorkContext<VM>>::new(self));

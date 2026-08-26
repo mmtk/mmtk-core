@@ -243,27 +243,37 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.open.store(false, Ordering::Relaxed);
     }
 
+    fn warn_notify_add_if_disabled(&self) {
+        #[cfg(debug_assertions)]
+        if !self.is_enabled() {
+            // This is usually benign if it happens occasionally. But if we keep adding work to a disabled bucket,
+            // we keep waking up workers for new work that they can't work on.
+            warn!(
+                "Add a work to a disabled bucket with notifying one worker {:?}",
+                self.stage
+            );
+        }
+    }
+
     /// Add a work packet to this bucket
     pub fn add<W: GCWork<VM>>(&self, work: W) {
-        debug_assert!(self.is_enabled());
+        self.warn_notify_add_if_disabled();
         self.queue.push(Box::new(work));
         self.notify_one_worker();
     }
 
     /// Add a work packet to this bucket
     pub fn add_boxed(&self, work: Box<dyn GCWork<VM>>) {
-        debug_assert!(self.is_enabled());
+        self.warn_notify_add_if_disabled();
         self.queue.push(work);
         self.notify_one_worker();
     }
 
     pub fn add_deferred(&self, work: Box<dyn GCWork<VM>>) {
-        debug_assert!(self.is_enabled());
         self.queue.push_inactive(work);
     }
 
     pub fn bulk_add_deferred(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
-        debug_assert!(self.is_enabled());
         self.queue.push_all_inactive(work_vec);
     }
 
