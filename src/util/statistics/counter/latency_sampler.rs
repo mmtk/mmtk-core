@@ -3,7 +3,7 @@ use crate::util::statistics::stats::SharedStats;
 use std::sync::Arc;
 
 /// A [`Counter`] that records one latency sample per event (e.g. one per GC pause, for things
-/// like time-to-yield or pause time) and reports it as `avg`/`p9999` columns instead of a raw
+/// like time-to-yield or pause time) and reports it as `p50`/`p9999` columns instead of a raw
 /// per-phase total.
 ///
 /// This is a thin wrapper around an [`EventCounter`]: it reuses the inner counter's
@@ -13,9 +13,9 @@ use std::sync::Arc;
 ///
 /// - [`Counter::merge_phases`] always returns `true`.
 /// - [`Counter::name`] returns a compound, tab-separated pair of column names (e.g.
-///   `"pause-time.avg\tpause-time.p9999"`), so the single `print!("{}\t", c.name())` call site
+///   `"pause-time.p50\tpause-time.p9999"`), so the single `print!("{}\t", c.name())` call site
 ///   in [`crate::util::statistics::stats::Stats::print_column_names`] prints both headers.
-/// - [`Counter::print_total`] prints `"{avg}\t{p9999}"` (two tab-separated values, ignoring the
+/// - [`Counter::print_total`] prints `"{p50}\t{p9999}"` (two tab-separated values, ignoring the
 ///   `other` argument), so the single `c.print_total(None)` call site in
 ///   [`crate::util::statistics::stats::Stats::print_stats`] prints both values.
 ///
@@ -23,7 +23,7 @@ use std::sync::Arc;
 /// code) anywhere in the codebase; if that changes, this would need revisiting.
 pub struct LatencySampler {
     inner: EventCounter,
-    /// A compound `"{name}.avg\t{name}.p9999"` string, returned by `name()`.
+    /// A compound `"{name}.p50\t{name}.p9999"` string, returned by `name()`.
     display_name: String,
 }
 
@@ -31,7 +31,7 @@ impl LatencySampler {
     pub fn new(name: &str, stats: Arc<SharedStats>, implicitly_start: bool) -> Self {
         LatencySampler {
             inner: EventCounter::new(name.to_string(), stats, implicitly_start, false),
-            display_name: format!("{name}.avg\t{name}.p9999"),
+            display_name: format!("{name}.p50\t{name}.p9999"),
         }
     }
 
@@ -78,17 +78,20 @@ impl Counter for LatencySampler {
     fn print_total(&self, _other: Option<bool>) {
         let mut samples = self.samples();
         if samples.is_empty() {
-            print!("n/a\tn/a");
+            print!("0\t0");
             return;
         }
-        let avg_ns = samples.iter().sum::<u64>() as f64 / samples.len() as f64;
-        // Exact p9999 (99.99th percentile), computed by sorting all samples and using the
-        // nearest-rank method. Note that with fewer than 10,000 samples, this is guaranteed to
-        // just return the maximum.
+        // Exact percentiles, computed by sorting all samples and using the nearest-rank method.
+        // Note that with fewer than 10,000 samples, p9999 is guaranteed to just return the
+        // maximum.
         samples.sort_unstable();
-        let rank = ((99.99 / 100.0) * samples.len() as f64).ceil() as usize;
-        let p9999_ns = samples[rank.clamp(1, samples.len()) - 1];
-        print!("{:.2}\t{:.2}", avg_ns / 1e6, p9999_ns as f64 / 1e6);
+        let percentile = |p: f64| {
+            let rank = ((p / 100.0) * samples.len() as f64).ceil() as usize;
+            samples[rank.clamp(1, samples.len()) - 1]
+        };
+        let p50_ns = percentile(50.0);
+        let p9999_ns = percentile(99.99);
+        print!("{:.2}\t{:.2}", p50_ns as f64 / 1e6, p9999_ns as f64 / 1e6);
     }
 
     fn print_min(&self, other: bool) {
