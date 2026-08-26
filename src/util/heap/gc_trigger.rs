@@ -88,7 +88,10 @@ impl<VM: VMBinding> GCTrigger<VM> {
         // winner's request already delivered and that the workers may already be acting on,
         // tripping the `debug_is_requested` assertion in `GCWorkScheduler::on_last_parked`.
         match self.state.gc_status.try_request_pause() {
-            Ok(_) => {
+            Ok(cur_status) => {
+                if cur_status == GcStatus::InConcurrentGC {
+                    self.plan().concurrent().unwrap().on_concurrent_work_interrupted();
+                }
                 probe!(mmtk, gc_requested);
                 self.state.record_pause_requested_time();
                 self.scheduler.request_schedule_collection();
