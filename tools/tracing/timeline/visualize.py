@@ -180,6 +180,12 @@ class LogProcessor:
                 # GC on the same timeline row.
                 result["tid"] = 0
 
+            case "heap_stats":
+                result["args"] |= {
+                    "reserved_pages": int(args[0]),
+                    "total_pages": int(args[1]),
+                }
+
             case _:
                 if self.enrich_event_extra is not None:
                     # Call ``enrich_event_extra`` in the extension script if defined.
