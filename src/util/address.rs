@@ -675,6 +675,15 @@ impl ObjectReference {
             object_start,
             VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
         );
+        debug_assert!(
+            self.to_raw_address()
+                <= object_start + VM::VMObjectModel::OBJECT_REF_OFFSET_UPPER_BOUND,
+            "The invariant `object_ref <= object_start + OBJECT_REF_OFFSET_UPPER_BOUND` is violated. \
+            object_ref: {}, object_start: {}, OBJECT_REF_OFFSET_UPPER_BOUND: {}",
+            self.to_raw_address(),
+            object_start,
+            VM::VMObjectModel::OBJECT_REF_OFFSET_UPPER_BOUND,
+        );
         object_start
     }
 

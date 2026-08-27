@@ -80,13 +80,21 @@ define_side_metadata_specs!(
     // Mark blocks by immix
     IX_BLOCK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
     // Straddle line marks
-    // One entry per reference-counted granule, not per line. A synthetic line-occupancy mark has
-    // to be distinguishable from a real object start by the sweeper, and two objects can touch the
-    // same line -- one's header mark can share a line with another's body -- so a per-line bit is
-    // cleared by whichever dies first and orphans the other's mark. See `set_occupied_line_marks`.
-    // One *bit* per granule: this is a boolean, and at granule granularity a byte each would cost
-    // one metadata byte per heap word.
-    RC_STRADDLE_LINES = (global: false, log_num_of_bits: 0, log_bytes_in_region: crate::util::rc::LOG_MIN_OBJECT_SIZE),
+    // One dedicated byte per line, matching upstream's footprint exactly (never packed with any
+    // other line's bits). Within that byte, several independently-addressable bits rather than a
+    // single boolean: a synthetic line-occupancy mark can sit at a line's own start, or at one of
+    // the few granules trailing a line that OBJECT_REF_OFFSET_UPPER_BOUND makes reachable by a
+    // header (see `RefCountHelper::straddle_bit` and `mark_straddle_object_with_size`), and two of
+    // those positions can be independently occupied within the same line -- one by a real
+    // object's own reference address, another by an unrelated object's synthetic mark -- so they
+    // need separate bits, set and cleared with atomic fetch_or/fetch_and rather than a plain
+    // store. This applies even to a VM with UNIFIED_OBJECT_REFERENCE_ADDRESS, where only the
+    // line-start bit is ever used: an object's tail line is marked even when the object does not
+    // fill it (see `mark_straddle_object_with_size`'s doc), which leaves room in that same line
+    // for an unrelated, ordinary object to be placed -- so querying "is this line marked at all"
+    // is not sufficient, only "is this exact position marked" is (see
+    // `RefCountHelper::object_is_in_straddle_line_no_rc_check`'s unified fast path).
+    RC_STRADDLE_LINES = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::line::Line::LOG_BYTES),
     // LXR Block logging bits
     IX_BLOCK_LOG   = (global: false, log_num_of_bits: 0, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
     NURSERY_PROMOTION_STATE   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),

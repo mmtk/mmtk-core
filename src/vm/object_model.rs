@@ -471,6 +471,24 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * object ref >= object_start + OBJECT_REF_OFFSET_LOWER_BOUND
     const OBJECT_REF_OFFSET_LOWER_BOUND: isize;
 
+    /// The counterpart to [`Self::OBJECT_REF_OFFSET_LOWER_BOUND`]: this constant defines the
+    /// largest possible offset between an object's allocation result (object_start) and the raw
+    /// address of its object reference. As with the lower bound, the offset need not be constant
+    /// across all objects -- this is the largest value it can take for any of them.
+    ///
+    /// This lets MMTk bound how far past an object's start its reference address can fall, which
+    /// matters for algorithms that need to tell a real object reference apart from other data
+    /// positioned relative to an allocation's start (for example, LXR's line-occupancy marks; see
+    /// `RefCountHelper::mark_straddle_object_with_size`) without being able to inspect the object
+    /// to compute the exact offset.
+    ///
+    /// Defaults to [`Self::OBJECT_REF_OFFSET_LOWER_BOUND`], i.e. a fixed offset, which holds for
+    /// every binding that does not override this.
+    ///
+    /// We should have the invariant:
+    /// * object ref <= object_start + OBJECT_REF_OFFSET_UPPER_BOUND
+    const OBJECT_REF_OFFSET_UPPER_BOUND: isize = Self::OBJECT_REF_OFFSET_LOWER_BOUND;
+
     /// Return the lowest address of the storage associated with an object. This should be
     /// the address that a binding gets by an allocation call ([`crate::memory_manager::alloc`]).
     ///
