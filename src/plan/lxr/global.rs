@@ -105,42 +105,18 @@ pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints
     ..PlanConstraints::default()
 });
 
-/// Identifies which policy owns an object, from the point of view of LXR's
-/// reference counting and tracing.
-///
-/// LXR only reference counts the objects it allocates itself, which live either in
-/// its Immix space or in the large object space. A plan also has an immortal space,
-/// a non-moving space, and (under the `vm_space` feature) a space describing a boot
-/// image supplied by the VM. Objects there have no reference count and no line
-/// marks, so none of the RC or Immix metadata may be consulted for them, but they
-/// still have to be traced because they can refer to reference counted objects.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum LXRSpace {
-    /// LXR's Immix space: reference counted, line marked, and possibly evacuated.
-    Immix,
-    /// The large object space: reference counted, never moved.
-    Los,
-    /// A space owned by the common plan: the immortal space, the non-moving space,
-    /// or the VM space. Not reference counted and never moved by LXR.
-    Common,
-}
-
 impl<VM: VMBinding> LXR<VM> {
-    /// Returns which policy owns `o`. See [`LXRSpace`].
-    pub fn space_of(&self, o: ObjectReference) -> LXRSpace {
-        if self.immix_space.in_space(o) {
-            LXRSpace::Immix
-        } else if self.common.los.in_space(o) {
-            LXRSpace::Los
-        } else {
-            LXRSpace::Common
-        }
-    }
-
     /// Returns whether `o` carries a reference count, i.e. whether it lives in the
     /// Immix space or the large object space.
+    ///
+    /// LXR only reference counts the objects it allocates itself, which live either in
+    /// its Immix space or in the large object space. A plan also has an immortal space,
+    /// a non-moving space, and (under the `vm_space` feature) a space describing a boot
+    /// image supplied by the VM. Objects there have no reference count and no line
+    /// marks, so none of the RC or Immix metadata may be consulted for them, but they
+    /// still have to be traced because they can refer to reference counted objects.
     pub fn is_rc_object(&self, o: ObjectReference) -> bool {
-        self.space_of(o) != LXRSpace::Common
+        self.immix_space.in_space(o) || self.common.los.in_space(o)
     }
 
     /// Whether any Immix line this object occupies currently reads as free.
@@ -152,7 +128,7 @@ impl<VM: VMBinding> LXR<VM> {
         use crate::policy::immix::line::{Line, RCArray};
         use crate::util::linear_scan::Region;
         use crate::util::linear_scan::UnstraddlableRegion;
-        if self.space_of(o) != LXRSpace::Immix {
+        if !self.immix_space.in_space(o) {
             return false;
         }
         let start = VM::VMObjectModel::ref_to_object_start(o);
@@ -1139,10 +1115,13 @@ impl<VM: VMBinding> LXR<VM> {
     /// are unconditionally live, so marking them is a no-op that reports no work
     /// done.
     pub fn mark(&self, o: ObjectReference) -> bool {
-        match self.space_of(o) {
-            LXRSpace::Immix => self.immix_space.attempt_mark(o),
-            LXRSpace::Los => self.common.los.attempt_mark(o),
-            LXRSpace::Common => false,
+        if self.immix_space.in_space(o) {
+            self.immix_space.attempt_mark(o)
+        } else if self.common.los.in_space(o) {
+            self.common.los.attempt_mark(o)
+        } else {
+            debug_assert!(o.is_live());
+            false
         }
     }
 
@@ -1163,10 +1142,13 @@ impl<VM: VMBinding> LXR<VM> {
     /// reported as marked. Callers use this to decide whether an object still needs
     /// to be retained or revisited, and neither is ever true for them.
     pub fn is_marked(&self, o: ObjectReference) -> bool {
-        match self.space_of(o) {
-            LXRSpace::Immix => self.immix_space.is_marked(o),
-            LXRSpace::Los => self.common.los.is_marked(o),
-            LXRSpace::Common => true,
+        if self.immix_space.in_space(o) {
+            self.immix_space.is_marked(o)
+        } else if self.common.los.in_space(o) {
+            self.common.los.is_marked(o)
+        } else {
+            debug_assert!(o.is_live());
+            true
         }
     }
 

@@ -5,7 +5,6 @@ use super::super::{check_incs, LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURS
 use super::tracing::LXRConcurrentTraceObjects;
 use super::tracing::LXRStopTheWorldProcessEdges;
 use super::ProcessEdgesBase;
-use crate::plan::lxr::global::LXRSpace;
 use crate::plan::VectorQueue;
 use crate::policy::immix::block::BlockState;
 use crate::scheduler::gc_work::RootKind;
@@ -473,6 +472,10 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             EDGE_KIND_NURSERY => "nursery",
             _ => "mature (write barrier)",
         };
+        let space_name = |o: ObjectReference| -> &'static str {
+            use crate::mmtk::SFT_MAP;
+            SFT_MAP.get_checked(o.to_raw_address()).name()
+        };
         let a = s.to_address();
         let layout = crate::util::heap::layout::vm_layout::vm_layout();
         let in_heap = a >= layout.heap_start && a < layout.heap_end;
@@ -483,17 +486,14 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         );
         eprintln!("  kind      = {kind}");
         eprintln!("  slot      = {a}  (in heap: {in_heap})");
-        eprintln!("  loaded    = {o:?}  space={:?}", self.lxr.space_of(o));
+        eprintln!("  loaded    = {o:?}  space={}", space_name(o));
         eprintln!("  loaded rc = {}", self.rc.count(o));
         if self.lxr.immix_space.in_space(o) {
             eprintln!("  loaded blk= {:?}", Block::containing(o).get_state());
         }
         if in_heap {
             let slot_as_obj = ObjectReference::from_raw_address(a.align_down(8));
-            eprintln!(
-                "  slot space= {:?}",
-                slot_as_obj.map(|x| self.lxr.space_of(x))
-            );
+            eprintln!("  slot space= {:?}", slot_as_obj.map(space_name));
             if slot_as_obj.is_some_and(|x| self.lxr.immix_space.in_space(x)) {
                 eprintln!(
                     "  slot blk  = {:?}",
@@ -520,10 +520,10 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
             match owner {
                 Some(owner) => eprintln!(
-                    "  slot owner= {owner:?} +{} rc={} space={:?}",
+                    "  slot owner= {owner:?} +{} rc={} space={}",
                     a - owner.to_raw_address(),
                     self.rc.count(owner),
-                    self.lxr.space_of(owner)
+                    space_name(owner)
                 ),
                 None => eprintln!("  slot owner= <no well-formed header within 512 words>"),
             }
@@ -949,14 +949,12 @@ impl<VM: VMBinding> ProcessDecs<VM> {
                 }
             }
         });
-        let space = lxr.space_of(o);
-        debug_assert_ne!(
-            space,
-            LXRSpace::Common,
+        let in_ix_space = lxr.immix_space.in_space(o);
+        debug_assert!(
+            in_ix_space || lxr.common.los.in_space(o),
             "{:?} is not reference counted, so its count can never reach zero",
             o
         );
-        let in_ix_space = space == LXRSpace::Immix;
         if in_ix_space {
             // Clear the VO bit if `o` is in the immix space.
             // Note that if the object is in the LOS,
@@ -976,7 +974,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         } else {
             // Only the large object space frees objects individually, and the caller
             // uses this to decide whether to ask it to.
-            space == LXRSpace::Los
+            lxr.common.los.in_space(o)
         }
     }
 
