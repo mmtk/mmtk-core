@@ -962,7 +962,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 // mark the block. So we do not need to explicitly mark it here.
                 // Clippy complains if the "vo_bit" feature is not enabled.
                 #[allow(clippy::let_and_return)]
-                let new_object = object_forwarding::try_forward_object::<VM>(
+                let new_object = object_forwarding::forward_object::<VM>(
                     object,
                     semantics,
                     copy_context,
@@ -978,7 +978,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                         vo_bit::helper::on_object_forwarded::<VM>(new_object);
                     },
                 )
-                .expect("to-space overflow");
+                .expect("to-space overflow"); // TODO: Fall back to non-moving marking.
 
                 new_object
             };
@@ -1045,7 +1045,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             object_forwarding::spin_and_get_forwarded_object::<VM>(object, forwarding_status)
         } else {
             // Evacuate the mature object
-            let new = object_forwarding::try_forward_object::<VM>(
+            let new = object_forwarding::forward_object::<VM>(
                 object,
                 CopySemantics::DefaultCopy,
                 copy_context,
@@ -1055,7 +1055,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     vo_bit::set_vo_bit(_new_object);
                 },
             )
-            .expect("to-space overflow");
+            .expect("to-space overflow"); // TODO: Stop evacuating if out of space.
             // Transfer RC count
             if new.get_size::<VM>() > Line::BYTES {
                 self.rc.mark_straddle_object(new);
