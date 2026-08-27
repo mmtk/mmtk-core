@@ -269,6 +269,21 @@ class LogProcessor:
 
                     roots_list.append(root_dict)
 
+                    if gc is not None:
+                        if "roots" not in gc["args"]:
+                            gc["args"]["roots"] = {
+                                "normal_roots": 0,
+                                "pinning_roots": 0,
+                                "tpinning_roots": 0,
+                            }
+                        match kind_id:
+                            case RootsKind.NORMAL.value:
+                                gc["args"]["roots"]["normal_roots"] += num
+                            case RootsKind.PINNING.value:
+                                gc["args"]["roots"]["pinning_roots"] += num
+                            case RootsKind.TPINNING.value:
+                                gc["args"]["roots"]["tpinning_roots"] += num
+
                 case "process_root_nodes":
                     wp["args"] |= {
                         "num_roots": int(args[0]),
@@ -314,11 +329,23 @@ class LogProcessor:
                     }
 
                 case "sweep_chunk_immix":
+                    swept_blocks, reused_blocks, unreused_blocks = [int(arg) for arg in args]
                     wp["args"] |= {
-                        "swept_blocks": int(args[0]),
-                        "reused_blocks": int(args[1]),
-                        "unreused_blocks": int(args[2]),
+                        "swept_blocks": swept_blocks,
+                        "reused_blocks": reused_blocks,
+                        "unreused_blocks": unreused_blocks,
                     }
+
+                    if gc is not None:
+                        if "sweep_chunk_immix" not in gc["args"]:
+                            gc["args"]["sweep_chunk_immix"] = {
+                                "swept_blocks": 0,
+                                "reused_blocks": 0,
+                                "unreused_blocks": 0,
+                            }
+                        gc["args"]["sweep_chunk_immix"]["swept_blocks"] += swept_blocks
+                        gc["args"]["sweep_chunk_immix"]["reused_blocks"] += reused_blocks
+                        gc["args"]["sweep_chunk_immix"]["unreused_blocks"] += unreused_blocks
 
                 case "finalization":
                     wp["args"] |= {
