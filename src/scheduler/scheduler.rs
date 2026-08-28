@@ -11,8 +11,10 @@ use crate::mmtk::MMTK;
 use crate::plan::tracing::gc_work::weakref::{
     VMForwardWeakRefs, VMPostForwarding, VMProcessWeakRefs,
 };
+use crate::plan::Pause;
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
+use crate::util::options::PlanSelector;
 use crate::vm::Collection;
 use crate::vm::VMBinding;
 use crate::Plan;
@@ -20,7 +22,6 @@ use crossbeam::deque::Steal;
 use enum_map::{Enum, EnumMap};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
 
 pub struct GCWorkScheduler<VM: VMBinding> {
     /// Work buckets
@@ -40,6 +41,7 @@ unsafe impl<VM: VMBinding> Sync for GCWorkScheduler<VM> {}
 
 impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn new(num_workers: usize, affinity: AffinityKind) -> Arc<Self> {
+        assert!(num_workers > 0);
         let worker_monitor: Arc<WorkerMonitor> = Arc::new(WorkerMonitor::new(num_workers));
         let worker_group = WorkerGroup::new(num_workers);
 
@@ -77,6 +79,25 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             worker_monitor,
             affinity,
         })
+    }
+
+    pub fn process_concurrent_packets_in_pause(&self) {
+        let mut packets = vec![];
+        // Buggy
+        let bucket = &self.work_buckets[WorkBucketStage::Concurrent];
+        loop {
+            if bucket.is_empty() {
+                break;
+            }
+            match bucket.get_queue().steal() {
+                Steal::Success(w) => packets.push(w),
+                Steal::Empty => break,
+                Steal::Retry => {}
+            }
+        }
+        if !packets.is_empty() {
+            self.work_buckets[WorkBucketStage::STWRCDecsAndSweep].bulk_add(packets);
+        }
     }
 
     pub fn num_workers(&self) -> usize {
@@ -360,6 +381,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub(crate) fn assert_all_open_buckets_are_empty(&self) {
         let mut error_example = None;
         for (id, bucket) in self.work_buckets.iter() {
+            if id == WorkBucketStage::ConcurrentResumable {
+                // Concurrent resumable bucket is a special case. It can be non-empty.
+                continue;
+            }
             if bucket.is_enabled() && bucket.is_open() && !bucket.is_empty() {
                 error!("Work bucket {:?} is not drained!", id);
                 error!("Queue: {:?}", bucket.get_queue().debug_dump_packets());
@@ -383,7 +408,15 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             return Steal::Success(w);
         }
         // Try get a packet from a work bucket.
-        for work_bucket in self.work_buckets.values() {
+        let plan = worker.mmtk.get_plan();
+        let in_concurrent_or_final_mark = plan
+            .concurrent()
+            .map(|c| c.current_pause().is_none() || c.current_pause() == Some(Pause::FinalMark))
+            .unwrap_or(false);
+        for (stage, work_bucket) in self.work_buckets.iter() {
+            if !in_concurrent_or_final_mark && stage == WorkBucketStage::ConcurrentResumable {
+                continue;
+            }
             match work_bucket.poll(&worker.local_work_buffer) {
                 Steal::Success(w) => return Steal::Success(w),
                 Steal::Retry => should_retry = true,
@@ -487,12 +520,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     goals.on_current_goal_completed();
 
                     if concurrent_work_scheduled {
-                        // It was the initial mark pause and scheduled concurrent work.
-                        // Wake up all GC workers to do concurrent work.
+                        // We just scheduled concurrent work. Wake up all GC workers to do concurrent work.
                         LastParkedResult::WakeAll
                     } else {
-                        // It was an STW GC or the final mark pause of a concurrent GC.
-                        // Respond to another goal.
+                        // No scheduled concurrent work. Respond to another goal.
                         self.respond_to_requests(worker, goals)
                     }
                 }
@@ -514,7 +545,16 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     ) -> LastParkedResult {
         assert!(goals.current().is_none());
 
-        let Some(goal) = goals.poll_next_goal() else {
+        let mut next_goal = goals.poll_next_goal();
+        if next_goal.is_none() {
+            // No work now. Check if we would like to do a GC poll from GC workers.
+            if worker.mmtk.gc_trigger.poll_from_last_parked_worker() {
+                goals.set_request(WorkerGoal::Gc);
+                next_goal = goals.poll_next_goal();
+            }
+        }
+
+        let Some(goal) = next_goal else {
             // No requests.  Park this worker, too.
             return LastParkedResult::ParkSelf;
         };
@@ -526,12 +566,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 // We set the eBPF trace point here so that bpftrace scripts can start recording
                 // work packet events before the `ScheduleCollection` work packet starts.
                 probe!(mmtk, gc_start);
-
-                {
-                    let mut gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
-                    assert!(gc_start_time.is_none(), "GC already started?");
-                    *gc_start_time = Some(Instant::now());
-                }
 
                 self.add_schedule_collection_packet();
                 LastParkedResult::WakeSelf
@@ -566,6 +600,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         false
     }
 
+    fn do_vm_release(&self, mmtk: &MMTK<VM>) {
+        if *mmtk.get_options().plan != PlanSelector::LXR {
+            <VM as VMBinding>::VMCollection::vm_release();
+        }
+    }
+
     /// Called when GC has finished, i.e. when all work packets have been executed.
     ///
     /// Return `true` if any concurrent work packets have been scheduled.
@@ -578,6 +618,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.close_all_stw_buckets();
         self.debug_assert_all_stw_buckets_closed();
 
+        self.do_vm_release(worker.mmtk);
+
         let mmtk = worker.mmtk;
 
         // Tell GC trigger that GC ended - this happens before we resume mutators.
@@ -586,18 +628,22 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // All other workers are parked, so it is safe to access the Plan instance mutably.
         probe!(mmtk, plan_end_of_gc_begin);
         let plan_mut: &mut dyn Plan<VM = VM> = unsafe { mmtk.get_plan_mut() };
-        plan_mut.end_of_gc(worker.tls);
+        // This also tells the GC trigger whether the GC cycle has ended (see `Plan::on_pause_end`).
+        plan_mut.on_pause_end(mmtk, worker.tls);
         probe!(mmtk, plan_end_of_gc_end);
 
-        // Compute the elapsed time of the GC.
-        let start_time = {
-            let mut gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
-            gc_start_time.take().expect("GC not started yet?")
-        };
-        let elapsed = start_time.elapsed();
+        // Compute the elapsed time of the pause so far. `pause_start_time` is taken (and the
+        // "pause-time" stat recorded) further down, once the pause is truly about to end.
+        let elapsed = mmtk
+            .state
+            .pause_start_time
+            .borrow()
+            .as_ref()
+            .expect("Pause start time was not recorded")
+            .elapsed();
 
         info!(
-            "End of GC ({}/{} pages, took {:.2} ms)",
+            "End of Pause ({}/{} pages, took {:.2} ms)",
             mmtk.get_plan().get_reserved_pages(),
             mmtk.get_plan().get_total_pages(),
             elapsed.as_secs_f64() * 1000.0
@@ -637,7 +683,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // Reset the triggering information.
         mmtk.state.reset_collection_trigger();
 
-        let concurrent_work_scheduled = self.schedule_concurrent_packets();
+        let concurrent_work_scheduled = self.schedule_concurrent_packets(mmtk);
         self.debug_assert_all_stw_buckets_closed();
 
         // Set to NotInGC after everything, and right before resuming mutators.
@@ -652,6 +698,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         } else {
             mmtk.state.gc_status.set_not_in_gc();
         }
+        // The pause is about to end (mutators are about to resume)
+        mmtk.stats.record_pause_time(mmtk.state.take_pause_time());
         if mmtk.stats.get_gathering_stats() {
             mmtk.stats.end_gc();
         }
@@ -699,16 +747,33 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_monitor.notify_work_available(true);
     }
 
-    pub(super) fn schedule_concurrent_packets(&self) -> bool {
-        let concurrent_bucket = &self.work_buckets[WorkBucketStage::Concurrent];
-        if !concurrent_bucket.is_empty() {
-            concurrent_bucket.set_enabled(true);
-            concurrent_bucket.open();
-            true
-        } else {
-            concurrent_bucket.set_enabled(false);
-            concurrent_bucket.close();
-            false
-        }
+    pub(super) fn schedule_concurrent_packets(&self, mmtk: &MMTK<VM>) -> bool {
+        // Only LXR defers work into the inactive queue (via `add_deferred`/`bulk_add_deferred`),
+        // so only LXR needs the `Concurrent` bucket's queue flipped here. For every other plan
+        // (e.g. the generic `ConcurrentImmix`), flipping would silently orphan any packets left
+        // in the currently-active queue when a STW pause interrupts an in-progress concurrent
+        // phase: `is_empty()` would check the other (empty) queue and the bucket would be closed
+        // as if drained, even though unprocessed concurrent-marking work is still sitting in the
+        // now-inactive queue. Keep this the same enable/disable-only mechanism as master unless
+        // the plan is LXR.
+        let is_lxr = *mmtk.get_options().plan == PlanSelector::LXR;
+        let enable_bucket = |stage: WorkBucketStage, flip: bool| {
+            let bucket = &self.work_buckets[stage];
+            if flip && is_lxr {
+                bucket.flip();
+            }
+            if !bucket.is_empty() {
+                bucket.set_enabled(true);
+                bucket.open();
+                true
+            } else {
+                bucket.set_enabled(false);
+                bucket.close();
+                false
+            }
+        };
+        let a = enable_bucket(WorkBucketStage::Concurrent, true);
+        let b = enable_bucket(WorkBucketStage::ConcurrentResumable, false);
+        a || b
     }
 }

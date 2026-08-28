@@ -18,7 +18,6 @@ env:
   RESULT_REPO_BRANCH: 'self-hosted'
   # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
   CI_PERF_KIT_BUILD: ci-perf-kit/upload
-  CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
   CI_PERF_KIT_VERSION: 0.8.8
 
 jobs:
@@ -67,12 +66,6 @@ jobs:
           name: jikesrvm-baseline-build
           path: ${{ env.CI_PERF_KIT_BUILD }}
           if-no-files-found: error
-      - name: Upload logs as artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: jikesrvm-baseline-logs
-          path: ${{ env.CI_PERF_KIT_LOG }}
-          if-no-files-found: error
 
   openjdk-baseline:
     runs-on: [self-hosted, Linux, freq-scaling-off]
@@ -118,10 +111,4 @@ jobs:
         with:
           name: openjdk-baseline-build
           path: ${{ env.CI_PERF_KIT_BUILD }}
-          if-no-files-found: error
-      - name: Upload logs as artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: openjdk-baseline-logs
-          path: ${{ env.CI_PERF_KIT_LOG }}
           if-no-files-found: error

@@ -7,35 +7,89 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub(super) struct BucketQueue<VM: VMBinding> {
-    queue: Injector<Box<dyn GCWork<VM>>>,
+    flag: AtomicBool,
+    queue0: Injector<Box<dyn GCWork<VM>>>,
+    queue1: Injector<Box<dyn GCWork<VM>>>,
 }
 
 impl<VM: VMBinding> BucketQueue<VM> {
     fn new() -> Self {
         Self {
-            queue: Injector::new(),
+            flag: AtomicBool::new(false),
+            queue0: Injector::new(),
+            queue1: Injector::new(),
+        }
+    }
+
+    fn active_queue(&self) -> &Injector<Box<dyn GCWork<VM>>> {
+        if self.flag.load(Ordering::Relaxed) {
+            &self.queue1
+        } else {
+            &self.queue0
+        }
+    }
+
+    fn inactive_queue(&self) -> &Injector<Box<dyn GCWork<VM>>> {
+        if self.flag.load(Ordering::Relaxed) {
+            &self.queue0
+        } else {
+            &self.queue1
         }
     }
 
     fn is_empty(&self) -> bool {
-        self.queue.is_empty()
+        self.active_queue().is_empty()
+    }
+
+    pub(super) fn steal(&self) -> Steal<Box<dyn GCWork<VM>>> {
+        self.active_queue().steal()
     }
 
     fn steal_batch_and_pop(
         &self,
         dest: &Worker<Box<dyn GCWork<VM>>>,
     ) -> Steal<Box<dyn GCWork<VM>>> {
-        self.queue.steal_batch_and_pop(dest)
+        self.active_queue().steal_batch_and_pop(dest)
     }
 
     fn push(&self, w: Box<dyn GCWork<VM>>) {
-        self.queue.push(w);
+        self.active_queue().push(w);
     }
 
     fn push_all(&self, ws: Vec<Box<dyn GCWork<VM>>>) {
         for w in ws {
-            self.queue.push(w);
+            self.active_queue().push(w);
         }
+    }
+
+    fn push_inactive(&self, w: Box<dyn GCWork<VM>>) {
+        self.inactive_queue().push(w);
+    }
+
+    fn push_all_inactive(&self, ws: Vec<Box<dyn GCWork<VM>>>) {
+        for w in ws {
+            self.inactive_queue().push(w);
+        }
+    }
+
+    /// Remove and return every packet currently in this queue, leaving it empty.
+    fn drain(&self) -> Vec<Box<dyn GCWork<VM>>> {
+        let mut items = Vec::new();
+        loop {
+            match self.queue0.steal() {
+                Steal::Success(w) => items.push(w),
+                Steal::Retry => continue,
+                Steal::Empty => break,
+            }
+        }
+        loop {
+            match self.queue1.steal() {
+                Steal::Success(w) => items.push(w),
+                Steal::Retry => continue,
+                Steal::Empty => break,
+            }
+        }
+        items
     }
 
     /// Dump all the packets in this queue for debugging purpose.
@@ -43,11 +97,12 @@ impl<VM: VMBinding> BucketQueue<VM> {
     /// (e.g. when the execution has failed already and the system is going to panic).
     pub fn debug_dump_packets(&self) -> Vec<String> {
         let mut items = Vec::new();
+        let queue = self.active_queue();
 
         {
             // Drain queue by stealing until empty
             loop {
-                match self.queue.steal() {
+                match queue.steal() {
                     crossbeam::deque::Steal::Success(work) => {
                         items.push(work);
                     }
@@ -66,7 +121,7 @@ impl<VM: VMBinding> BucketQueue<VM> {
         // Push items back into the queue
         {
             for work in items {
-                self.queue.push(work);
+                queue.push(work);
             }
         }
 
@@ -87,7 +142,6 @@ pub struct WorkBucket<VM: VMBinding> {
     /// The stage name of this bucket.
     stage: WorkBucketStage,
     queue: BucketQueue<VM>,
-    prioritized_queue: Option<BucketQueue<VM>>,
     monitor: Arc<WorkerMonitor>,
     /// The open condition for a bucket. If this is `Some`, the bucket will be open
     /// when the condition is met. If this is `None`, the bucket needs to be open manually.
@@ -113,7 +167,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
             enabled: AtomicBool::new(stage.is_enabled_by_default()),
             stage,
             queue: BucketQueue::new(),
-            prioritized_queue: None,
             monitor,
             can_open: None,
             sentinel: Mutex::new(None),
@@ -128,8 +181,8 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.enabled.load(Ordering::Relaxed)
     }
 
-    pub fn enable_prioritized_queue(&mut self) {
-        self.prioritized_queue = Some(BucketQueue::new());
+    pub fn flip(&self) {
+        self.queue.flag.fetch_xor(true, Ordering::SeqCst);
     }
 
     fn notify_one_worker(&self) {
@@ -162,15 +215,22 @@ impl<VM: VMBinding> WorkBucket<VM> {
     /// Test if the bucket is drained
     pub fn is_empty(&self) -> bool {
         self.queue.is_empty()
-            && self
-                .prioritized_queue
-                .as_ref()
-                .map(|q| q.is_empty())
-                .unwrap_or(true)
     }
 
     pub fn is_drained(&self) -> bool {
         !self.is_enabled() || (self.is_open() && self.is_empty())
+    }
+
+    /// Remove and return every packet currently queued in this bucket (including the
+    /// prioritized queue, if any), leaving it empty.
+    ///
+    /// This does not synchronize with producers or consumers of this bucket in any way: the
+    /// caller must independently ensure that nothing can be concurrently adding to or polling
+    /// this bucket (e.g. by only calling this once all GC workers are known to be parked, and
+    /// after disabling the bucket so no new packets can be routed to it, as
+    /// `ConcurrentImmix::schedule_concurrent_marking_final_pause` does for `Concurrent`).
+    pub(crate) fn drain_all_packets(&self) -> Vec<Box<dyn GCWork<VM>>> {
+        self.queue.drain()
     }
 
     /// Close the bucket
@@ -183,23 +243,38 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.open.store(false, Ordering::Relaxed);
     }
 
-    /// Add a work packet to this bucket
-    /// Panic if this bucket cannot receive prioritized packets.
-    pub fn add_prioritized(&self, work: Box<dyn GCWork<VM>>) {
-        self.prioritized_queue.as_ref().unwrap().push(work);
-        self.notify_one_worker();
+    fn warn_notify_add_if_disabled(&self) {
+        #[cfg(debug_assertions)]
+        if !self.is_enabled() {
+            // This is usually benign if it happens occasionally. But if we keep adding work to a disabled bucket,
+            // we keep waking up workers for new work that they can't work on.
+            warn!(
+                "Add a work to a disabled bucket with notifying one worker {:?}",
+                self.stage
+            );
+        }
     }
 
     /// Add a work packet to this bucket
     pub fn add<W: GCWork<VM>>(&self, work: W) {
+        self.warn_notify_add_if_disabled();
         self.queue.push(Box::new(work));
         self.notify_one_worker();
     }
 
     /// Add a work packet to this bucket
     pub fn add_boxed(&self, work: Box<dyn GCWork<VM>>) {
+        self.warn_notify_add_if_disabled();
         self.queue.push(work);
         self.notify_one_worker();
+    }
+
+    pub fn add_deferred(&self, work: Box<dyn GCWork<VM>>) {
+        self.queue.push_inactive(work);
+    }
+
+    pub fn bulk_add_deferred(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
+        self.queue.push_all_inactive(work_vec);
     }
 
     /// Add a work packet to this bucket, but do not notify any workers.
@@ -215,20 +290,21 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.queue.push(work);
     }
 
-    /// Add multiple packets with a higher priority.
-    /// Panic if this bucket cannot receive prioritized packets.
-    pub fn bulk_add_prioritized(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
-        self.prioritized_queue.as_ref().unwrap().push_all(work_vec);
-        self.notify_all_workers();
-    }
-
     /// Add multiple packets
     pub fn bulk_add(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
+        debug_assert!(self.is_enabled());
         if work_vec.is_empty() {
             return;
         }
+        let len = work_vec.len();
         self.queue.push_all(work_vec);
-        self.notify_all_workers();
+        if self.is_open() {
+            if len == 1 {
+                self.notify_one_worker();
+            } else {
+                self.notify_all_workers();
+            }
+        }
     }
 
     /// Get a work packet from this bucket
@@ -236,13 +312,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
         if !self.is_enabled() || !self.is_open() || self.is_empty() {
             return Steal::Empty;
         }
-        if let Some(prioritized_queue) = self.prioritized_queue.as_ref() {
-            prioritized_queue
-                .steal_batch_and_pop(worker)
-                .or_else(|| self.queue.steal_batch_and_pop(worker))
-        } else {
-            self.queue.steal_batch_and_pop(worker)
-        }
+        self.queue.steal_batch_and_pop(worker)
     }
 
     pub fn set_open_condition(
@@ -304,7 +374,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
 /// This enum defines all the work bucket types. The scheduler
 /// will instantiate a work bucket for each stage defined here.
-#[derive(Debug, Enum, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Enum, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum WorkBucketStage {
     /// This bucket is always open.
     Unconstrained,
@@ -312,6 +382,18 @@ pub enum WorkBucketStage {
     /// work in the unconstrained bucket will always be consumed during STW. Users can disable this bucket
     /// and cache some concurrent work during STW, and only enable this bucket and allow concurrent execution once a STW is done.
     Concurrent,
+    /// Concurrent work that may be resumed across a stop-the-world pause (LXR-specific), such as
+    /// concurrent marking packets discovered while processing reference-count increments during
+    /// `InitialMark`.  Unlike other stages, this bucket is allowed to remain non-empty when a STW
+    /// pause ends.
+    ConcurrentResumable,
+    /// The first stop-the-world stage (see [`WorkBucketStage::FIRST_STW_STAGE`]).  Used to join
+    /// outstanding concurrent work, e.g. flushing SATB mod-buffer packets recorded by the LXR
+    /// barrier, before the rest of the STW stages proceed.
+    FinishConcurrentWork,
+    /// Process reference-count increments recorded by the LXR barrier.  LXR also uses this stage
+    /// to scan roots (see `root_scanning_stage`).
+    RCProcessIncs,
     /// Preparation work.  Plans, spaces, GC workers, mutators, etc. should be prepared for GC at
     /// this stage.
     Prepare,
@@ -364,14 +446,20 @@ pub enum WorkBucketStage {
     /// Work packets that should be done just before GC shall go here.  This includes releasing
     /// resources and setting states in plans, spaces, GC workers, mutators, etc.
     Release,
+    /// Process reference-count decrements recorded by the LXR barrier, and sweep objects whose
+    /// reference count has dropped to zero, during a stop-the-world pause.  This is used when
+    /// lazy (concurrent) decrements are disabled for the current GC.
+    STWRCDecsAndSweep,
     /// Resume mutators and end GC.
     Final,
 }
 
+// Alias
+#[allow(non_upper_case_globals)]
 impl WorkBucketStage {
     /// The first stop-the-world stage. This stage has no open condition, and will be opened manually
     /// once all the mutators threads are stopped.
-    pub const FIRST_STW_STAGE: Self = WorkBucketStage::Prepare;
+    pub const FIRST_STW_STAGE: Self = WorkBucketStage::FinishConcurrentWork;
 
     /// Is this the first stop-the-world stage? See [`Self::FIRST_STW_STAGE`].
     pub const fn is_first_stw_stage(&self) -> bool {
@@ -387,13 +475,16 @@ impl WorkBucketStage {
     pub const fn is_open_by_default(&self) -> bool {
         matches!(
             self,
-            WorkBucketStage::Unconstrained | WorkBucketStage::Concurrent
+            WorkBucketStage::Unconstrained
+                | WorkBucketStage::Concurrent
+                | WorkBucketStage::ConcurrentResumable
         )
     }
 
     /// Is this stage enabled by default?
     pub const fn is_enabled_by_default(&self) -> bool {
         !matches!(self, WorkBucketStage::Concurrent)
+            && !matches!(self, WorkBucketStage::ConcurrentResumable)
     }
 
     /// Is this stage sequentially opened? All the stop-the-world stages, except the first one, are sequentially opened.
@@ -410,7 +501,14 @@ impl WorkBucketStage {
     pub const fn is_concurrent(&self) -> bool {
         matches!(
             self,
-            WorkBucketStage::Unconstrained | WorkBucketStage::Concurrent
+            WorkBucketStage::Unconstrained
+                | WorkBucketStage::Concurrent
+                | WorkBucketStage::ConcurrentResumable
         )
     }
+
+    /// Alias for [`WorkBucketStage::Closure`], used by LXR when scheduling mature-space
+    /// evacuation remset packets so that they are processed as part of the transitive closure
+    /// stage.
+    pub const RCEvacuateMature: Self = Self::Closure;
 }

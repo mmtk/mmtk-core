@@ -69,11 +69,31 @@ impl TreadMill {
         std::mem::take(&mut sync.collect_nursery)
     }
 
+    /// Take all objects from the `alloc_nursery`.
+    pub fn collect_alloc_nursery(&self) -> impl IntoIterator<Item = ObjectReference> {
+        let mut sync = self.sync.lock().unwrap();
+        std::mem::take(&mut sync.alloc_nursery)
+    }
+
     /// Take all objects from the `from_space`.  This is called during sweeping at which time all
     /// unreachable old objects are in the from-space.
     pub fn collect_mature(&self) -> impl IntoIterator<Item = ObjectReference> {
         let mut sync = self.sync.lock().unwrap();
         std::mem::take(&mut sync.from_space)
+    }
+
+    /// Retain objects in the to-space that satisfy the given predicate.  This is called during LXR's SATB sweeping
+    pub fn retain_mature(&self, f: impl FnMut(&ObjectReference) -> bool) {
+        let mut sync = self.sync.lock().unwrap();
+        sync.to_space.retain(f);
+    }
+
+    /// Remove an object from whichever set contains it.  Returns true if the object was found.
+    /// Called by `rc_free` when an object's reference count reaches zero.
+    pub fn remove_mature(&self, object: ObjectReference) -> bool {
+        let mut sync = self.sync.lock().unwrap();
+        assert!(sync.from_space.is_empty());
+        sync.to_space.remove(&object)
     }
 
     /// Move an object to `to_space`.  Called when an object is determined to be reachable.

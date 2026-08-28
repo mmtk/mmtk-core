@@ -1,0 +1,826 @@
+use super::block_allocation::BlockAllocation;
+use super::gc_work::nursery_sweeping::ReleaseLOSNursery;
+use super::gc_work::prepare::FastRCPrepare;
+use super::gc_work::rc::ProcessDecs;
+use super::gc_work::LXRGCWorkContext;
+use super::mature_evac::MatureEvacuationSet;
+use super::mutator::ALLOCATOR_MAPPING;
+use super::{LazySweepingJobsCounter, LAZY_SWEEPING_JOBS};
+use crate::plan::concurrent::global::ConcurrentPlan;
+use crate::plan::concurrent::Pause;
+use crate::plan::global::CommonPlan;
+use crate::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
+use crate::plan::lxr::gc_work::mature_sweeping::{RCSweepMatureAfterSATBLOS, SweepDeadCycles};
+use crate::plan::lxr::gc_work::nursery_sweeping::SweepBlocksAfterDecs;
+use crate::plan::lxr::gc_work::prepare::{ConcurrentChunkMetadataZeroing, PrepareChunksForFullGC};
+use crate::plan::lxr::mature_evac::MatureEvecRemSet;
+use crate::plan::AllocationSemantics;
+use crate::plan::MutatorContext;
+use crate::plan::Plan;
+use crate::plan::PlanConstraints;
+use crate::policy::immix::block::Block;
+use crate::policy::immix::ImmixSpaceArgs;
+use crate::policy::largeobjectspace::LargeObjectSpace;
+use crate::policy::space::Space;
+use crate::scheduler::gc_work::*;
+use crate::util::alloc::allocators::AllocatorSelector;
+#[cfg(feature = "analysis")]
+use crate::util::analysis::GcHookWork;
+use crate::util::constants::*;
+use crate::util::copy::*;
+use crate::util::heap::{SpaceStats, VMRequest};
+use crate::util::metadata::side_metadata::SideMetadataContext;
+use crate::util::metadata::MetadataSpec;
+use crate::util::rc::{RefCountHelper, RC_TABLE};
+#[cfg(feature = "sanity")]
+use crate::util::sanity::sanity_checker::*;
+use crate::util::{metadata, Address, ObjectReference};
+use crate::vm::ActivePlan;
+use crate::vm::{Collection, ObjectModel, VMBinding};
+use crate::BarrierSelector;
+use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
+use crate::{scheduler::*, MMTK};
+use atomic::{Atomic, Ordering};
+use crossbeam::queue::SegQueue;
+use enum_map::EnumMap;
+use spin::Lazy;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::sync::{Condvar, Mutex, RwLock};
+
+const LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER: usize = 1;
+
+static HEAP_AFTER_GC: AtomicUsize = AtomicUsize::new(0);
+
+use mmtk_macros::{HasSpaces, PlanTraceObject};
+
+#[derive(HasSpaces, PlanTraceObject)]
+pub struct LXR<VM: VMBinding> {
+    #[post_scan]
+    #[space]
+    #[copy_semantics(CopySemantics::DefaultCopy)]
+    pub immix_space: ImmixSpace<VM>,
+    #[parent]
+    pub common: CommonPlan<VM>,
+    /// Always true for non-rc immix.
+    /// For RC immix, this is used for enable backup tracing.
+    perform_cycle_collection: AtomicBool,
+    current_pause: Atomic<Option<Pause>>,
+    previous_pause: Atomic<Option<Pause>>,
+    hint_cycle_gc: AtomicBool,
+    hint_emergency_gc: AtomicBool,
+    avail_pages_at_end_of_last_gc: AtomicUsize,
+    zeroing_packets_scheduled: AtomicBool,
+    decide_cycle_collection: (Mutex<bool>, Condvar),
+    in_concurrent_marking: AtomicBool,
+    pub prev_roots: RwLock<SegQueue<Vec<ObjectReference>>>,
+    pub curr_roots: RwLock<SegQueue<Vec<ObjectReference>>>,
+    pub rc: RefCountHelper<VM>,
+    block_allocation: BlockAllocation<VM>,
+    pub(super) evac_set: MatureEvacuationSet,
+    pub(super) mature_evac_remset: MatureEvecRemSet<VM>,
+    pub(super) num_clean_blocks_released_lazy: AtomicUsize,
+    pub(super) possibly_dead_mature_blocks: SegQueue<(Block, bool)>,
+}
+
+pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints {
+    moves_objects: true,
+    // Max immix object size is half of a block.
+    max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
+    barrier: BarrierSelector::FieldBarrier,
+    needs_log_bit: true,
+    needs_field_log_bit: true,
+    rc_enabled: true,
+    needs_prepare_mutator: false,
+    ..PlanConstraints::default()
+});
+
+impl<VM: VMBinding> Plan for LXR<VM> {
+    fn current_gc_may_move_object(&self) -> bool {
+        true
+    }
+
+    fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
+        // Spaces or heap full
+        if self.base().collection_required(self, space_full) {
+            return true;
+        }
+        // SATB is finished
+        if self.concurrent_work_in_progress() && super::concurrent_marking_packets_drained() {
+            return true;
+        }
+        // Survival limits
+        let total_young_alloc_pages =
+            self.block_allocation.total_young_allocation_in_bytes() >> LOG_BYTES_IN_MBYTE;
+        let predicted_survival_mb: usize =
+            ((total_young_alloc_pages as f64 * super::SURVIVAL_RATIO_PREDICTOR.ratio()) as usize)
+                << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER;
+        if predicted_survival_mb >= super::MAX_SURVIVAL_MB {
+            return true;
+        }
+        if !self.immix_space.common().contiguous {
+            let available_to_space = self.get_total_pages() - self.get_used_pages();
+            if predicted_survival_mb >= available_to_space {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn last_collection_was_exhaustive(&self) -> bool {
+        self.previous_pause.load(Ordering::SeqCst) == Some(Pause::Full)
+    }
+
+    fn constraints(&self) -> &'static PlanConstraints {
+        &LXR_CONSTRAINTS
+    }
+
+    fn create_copy_config(&'static self) -> CopyConfig<VM> {
+        use enum_map::enum_map;
+        CopyConfig {
+            copy_mapping: enum_map! {
+                CopySemantics::DefaultCopy => CopySelector::Immix(0),
+                _ => CopySelector::Unused,
+            },
+            space_mapping: vec![(CopySelector::Immix(0), &self.immix_space)],
+            constraints: &LXR_CONSTRAINTS,
+        }
+    }
+
+    fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        if !super::LazySweepingJobs::all_finished() {
+            warn!("LXR Lazy Sweeping Not Finished");
+        }
+        let pause = self.select_collection_kind();
+        // Wait for concurrent packets
+        // Mark table zeroing
+        if pause == Pause::InitialMark || pause == Pause::Full {
+            self.schedule_mark_table_zeroing_tasks(Some(pause))
+        }
+        self.zeroing_packets_scheduled
+            .store(false, Ordering::SeqCst);
+        // Set current pause kind
+        self.current_pause.store(Some(pause), Ordering::SeqCst);
+        self.perform_cycle_collection
+            .store(pause != Pause::RefCount, Ordering::SeqCst);
+        // Schedule work
+        match pause {
+            Pause::Full => self.schedule_emergency_full_heap_collection(scheduler),
+            Pause::RefCount => self.schedule_rc_collection(scheduler),
+            Pause::InitialMark => self.schedule_concurrent_marking_initial_pause(scheduler),
+            Pause::FinalMark => self.schedule_concurrent_marking_final_pause(scheduler),
+        }
+        // Analysis routine that is ran. It is generally recommended to take advantage
+        // of the scheduling system we have in place for more performance
+        #[cfg(feature = "analysis")]
+        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
+        // Resume mutators
+        if pause == Pause::Full || pause == Pause::FinalMark {
+            #[cfg(feature = "sanity")]
+            scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC::<Self>::new(self));
+        }
+    }
+
+    fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
+        &ALLOCATOR_MAPPING
+    }
+
+    fn prepare(&mut self, tls: VMWorkerThread) {
+        let pause = self.current_pause().unwrap();
+        if pause == Pause::FinalMark || pause == Pause::Full {
+            self.common.los.is_end_of_satb_or_full_gc = true;
+            // release nursery memory before mature evacuation, to reduce the chance of to-space overflow.
+            self.immix_space.scheduler().work_buckets[WorkBucketStage::Unconstrained]
+                .add(ReleaseLOSNursery);
+        }
+        self.common
+            .prepare(tls, pause == Pause::Full || pause == Pause::InitialMark);
+        if super::MATURE_EVACUATION && (pause == Pause::FinalMark || pause == Pause::Full) {
+            self.process_mature_evacuation_remset();
+        }
+        if super::MATURE_EVACUATION && (pause == Pause::InitialMark || pause == Pause::Full) {
+            // Select mature evacuation set
+            self.schedule_defrag_selection_packets();
+        }
+        self.num_clean_blocks_released_lazy
+            .store(0, Ordering::SeqCst);
+        self.immix_space.prepare_rc(pause);
+        self.block_allocation
+            .reset_block_mark_for_mutator_reused_blocks(pause);
+    }
+
+    fn release(&mut self, tls: VMWorkerThread) {
+        let _new_ratio = super::SURVIVAL_RATIO_PREDICTOR.update_ratio();
+        let pause = self.current_pause().unwrap();
+        if pause == Pause::FinalMark || pause == Pause::Full {
+            VM::VMCollection::update_weak_processor(false);
+        }
+        <VM as VMBinding>::VMCollection::vm_release();
+        self.common.los.is_end_of_satb_or_full_gc = false;
+        self.common
+            .release(tls, pause == Pause::Full || pause == Pause::FinalMark);
+        self.block_allocation
+            .sweep_nursery_blocks(self.immix_space.scheduler(), pause);
+        self.block_allocation.sweep_mutator_reused_blocks(pause);
+        // Check if we want to do all decs and sweeping in the pause
+        if super::disable_lasy_dec_for_current_gc() {
+            self.immix_space
+                .scheduler()
+                .process_concurrent_packets_in_pause();
+        } else {
+            debug_assert_ne!(pause, Pause::Full);
+        }
+        self.immix_space.release_rc();
+        self.schedule_mature_sweeping(pause);
+        // swap roots
+        let mut prev_roots = self.prev_roots.write().unwrap();
+        let mut curr_roots = self.curr_roots.write().unwrap();
+        std::mem::swap::<SegQueue<_>>(&mut prev_roots, &mut curr_roots);
+        debug_assert!(curr_roots.is_empty());
+    }
+
+    fn get_collection_reserved_pages(&self) -> usize {
+        let survival = {
+            let predicted_survival = (self.block_allocation.clean_nursery_mb() as f64
+                * super::SURVIVAL_RATIO_PREDICTOR.ratio())
+                as usize;
+            predicted_survival << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER
+        };
+        survival + self.immix_space.defrag_headroom_pages()
+    }
+
+    fn get_used_pages(&self) -> usize {
+        self.immix_space.reserved_pages() + self.common.get_used_pages()
+    }
+
+    fn base(&self) -> &BasePlan<VM> {
+        &self.common.base
+    }
+
+    fn base_mut(&mut self) -> &mut BasePlan<VM> {
+        &mut self.common.base
+    }
+
+    fn common(&self) -> &CommonPlan<VM> {
+        &self.common
+    }
+
+    /// Get a mutable reference to the common plan. See [`Self::common`].
+    fn common_mut(&mut self) -> &mut CommonPlan<Self::VM> {
+        &mut self.common
+    }
+
+    fn on_pause_start(&self, mmtk: &'static MMTK<Self::VM>) {
+        super::NO_EVAC.store(false, Ordering::SeqCst);
+        let pause = self.current_pause().unwrap();
+
+        // Individual RC pauses that don't overlap with concurrent tracing consist of a GC cycle.
+        // Concurrent tracing, including RC pauses in between, counts as one GC cycle.
+        // A Full GC counts as a GC cycle.
+        if pause == Pause::RefCount && !self.concurrent_work_in_progress()
+            || pause == Pause::InitialMark
+            || pause == Pause::Full
+        {
+            mmtk.gc_trigger.policy.on_gc_start(mmtk);
+        }
+
+        super::SURVIVAL_RATIO_PREDICTOR
+            .set_alloc_size(self.block_allocation.total_young_allocation_in_bytes());
+
+        if pause == Pause::Full || pause == Pause::InitialMark {
+            // Reset block mark and object mark table.
+            let work_packets = self.generate_full_trace_prepare_tasks();
+            self.immix_space.scheduler().work_buckets[WorkBucketStage::RCProcessIncs]
+                .bulk_add(work_packets);
+        }
+
+        for mutator in <VM as VMBinding>::VMActivePlan::mutators() {
+            mutator.flush();
+        }
+
+        if pause == Pause::FinalMark {
+            self.set_concurrent_marking_state(false);
+        }
+    }
+
+    fn on_pause_end(&mut self, mmtk: &'static MMTK<Self::VM>, tls: VMWorkerThread) {
+        super::DISABLE_LASY_DEC_FOR_CURRENT_GC.store(false, Ordering::SeqCst);
+        // self.immix_space.flush_page_resource();
+        let pause = self.current_pause().unwrap();
+        if pause == Pause::InitialMark {
+            self.set_concurrent_marking_state(true);
+        }
+        self.previous_pause.store(Some(pause), Ordering::SeqCst);
+        self.current_pause.store(None, Ordering::SeqCst);
+        LAZY_SWEEPING_JOBS.write().swap();
+        if super::LAZY_DECREMENTS {
+            let perform_cycle_collection =
+                self.get_available_pages() < super::CYCLE_TRIGGER_THRESHOLD;
+            self.hint_cycle_gc
+                .store(perform_cycle_collection, Ordering::SeqCst);
+            self.hint_emergency_gc.store(false, Ordering::SeqCst);
+            self.perform_cycle_collection.store(false, Ordering::SeqCst);
+        }
+        self.avail_pages_at_end_of_last_gc
+            .store(self.get_available_pages(), Ordering::SeqCst);
+        HEAP_AFTER_GC.store(self.get_reserved_pages(), Ordering::SeqCst);
+
+        self.common_mut().on_pause_end(tls);
+
+        // Individual RC pauses that don't overlap with concurrent tracing consist of a GC cycle.
+        // Concurrent tracing, including RC pauses in between, counts as one GC cycle.
+        // A Full GC counts as a GC cycle.
+        if pause == Pause::RefCount && !self.concurrent_work_in_progress()
+            || pause == Pause::FinalMark
+            || pause == Pause::Full
+        {
+            mmtk.gc_trigger.policy.on_gc_end(mmtk);
+        }
+    }
+
+    fn root_scanning_stage(&self) -> WorkBucketStage {
+        WorkBucketStage::RCProcessIncs
+    }
+
+    fn concurrent(&self) -> Option<&dyn ConcurrentPlan<VM = VM>> {
+        Some(self)
+    }
+}
+
+impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
+    fn current_pause(&self) -> Option<Pause> {
+        self.current_pause.load(Ordering::SeqCst)
+    }
+
+    fn concurrent_work_in_progress(&self) -> bool {
+        self.in_concurrent_marking.load(Ordering::Acquire)
+    }
+
+    fn on_concurrent_work_interrupted(&self) {
+        // Do nothing
+    }
+}
+
+impl<VM: VMBinding> LXR<VM> {
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Box<Self> {
+        assert!(
+            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_in_header(),
+            "LXR does not support placing forwarding bits on the side."
+        );
+        let num_workers = args.scheduler.num_workers();
+        let immix_specs = metadata::extract_side_metadata(&[
+            MetadataSpec::OnSide(RC_TABLE),
+            MetadataSpec::OnSide(
+                *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+                    .as_spec()
+                    .extract_side_spec(),
+            ),
+        ]);
+        let global_side_metadata_specs = SideMetadataContext::new_global_specs(&immix_specs);
+        let mut plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &LXR_CONSTRAINTS,
+            global_side_metadata_specs,
+        };
+        let immix_space = ImmixSpace::new(
+            plan_args.get_mature_space_args("immix", true, false, VMRequest::discontiguous()),
+            ImmixSpaceArgs {
+                never_move_objects: false,
+                mixed_age: false,
+            },
+        );
+        let mut lxr = Box::new(LXR {
+            immix_space,
+            common: CommonPlan::new(plan_args),
+            perform_cycle_collection: AtomicBool::new(false),
+            hint_cycle_gc: AtomicBool::new(false),
+            hint_emergency_gc: AtomicBool::new(false),
+            current_pause: Atomic::new(None),
+            previous_pause: Atomic::new(None),
+            avail_pages_at_end_of_last_gc: AtomicUsize::new(0),
+            zeroing_packets_scheduled: AtomicBool::new(false),
+            decide_cycle_collection: (Mutex::new(true), Condvar::new()),
+            in_concurrent_marking: AtomicBool::new(false),
+            prev_roots: Default::default(),
+            curr_roots: Default::default(),
+            rc: RefCountHelper::NEW,
+            block_allocation: BlockAllocation::new(),
+            evac_set: MatureEvacuationSet::default(),
+            mature_evac_remset: MatureEvecRemSet::new(num_workers),
+            possibly_dead_mature_blocks: Default::default(),
+            num_clean_blocks_released_lazy: Default::default(),
+        });
+
+        lxr.gc_init();
+
+        // Note: `verify_side_metadata_sanity` is invoked later by `MMTK::new`, after the dynamic
+        // side metadata base address has been initialized. It must not be called here during plan
+        // construction, as the side metadata layout is not yet registered at this point.
+
+        lxr
+    }
+
+    pub fn cm_enabled(&self) -> bool {
+        !cfg!(feature = "lxr_no_cm")
+    }
+
+    fn schedule_defrag_selection_packets(&self) {
+        self.evac_set
+            .schedule_defrag_selection_packets(&self.immix_space)
+    }
+
+    /// Generate chunk sweep work packets.
+    fn generate_dead_cycle_sweep_tasks(&self) -> Vec<Box<dyn GCWork<VM>>> {
+        self.immix_space.chunk_map.generate_tasks_batched(
+            self.immix_space.scheduler().num_workers(),
+            |chunks| {
+                Box::new(SweepDeadCycles::new(
+                    chunks,
+                    LazySweepingJobsCounter::new_decs(),
+                ))
+            },
+        )
+    }
+
+    fn schedule_mature_sweeping(&self, pause: Pause) {
+        if pause == Pause::Full || pause == Pause::FinalMark {
+            self.evac_set
+                .sweep_mature_evac_candidates(&self.immix_space);
+            let disable_lasy_dec_for_current_gc =
+                crate::plan::lxr::disable_lasy_dec_for_current_gc();
+            let dead_cycle_sweep_packets = self.generate_dead_cycle_sweep_tasks();
+            let sweep_los = RCSweepMatureAfterSATBLOS::new(LazySweepingJobsCounter::new_decs());
+            if super::LAZY_DECREMENTS && !disable_lasy_dec_for_current_gc {
+                debug_assert_ne!(pause, Pause::Full);
+                let concurrent_bucket =
+                    &self.immix_space.scheduler().work_buckets[WorkBucketStage::Concurrent];
+                concurrent_bucket.bulk_add_deferred(dead_cycle_sweep_packets);
+                concurrent_bucket.add_deferred(Box::new(sweep_los));
+            } else {
+                self.immix_space.scheduler().work_buckets[WorkBucketStage::STWRCDecsAndSweep]
+                    .bulk_add(dead_cycle_sweep_packets);
+                self.immix_space.scheduler().work_buckets[WorkBucketStage::STWRCDecsAndSweep]
+                    .add(sweep_los);
+            }
+        }
+    }
+
+    /// Generate chunk sweep work packets.
+    fn generate_full_trace_prepare_tasks(&self) -> Vec<Box<dyn GCWork<VM>>> {
+        self.immix_space
+            .chunk_map
+            .generate_tasks_batched(self.immix_space.scheduler().num_workers(), |chunks| {
+                Box::new(PrepareChunksForFullGC { chunks })
+            })
+    }
+
+    fn schedule_rc_block_sweeping_tasks(&self, counter: LazySweepingJobsCounter) {
+        // while let Some(x) = self.last_mutator_recycled_blocks.pop() {
+        //     x.set_state(BlockState::Marked);
+        // }
+        // This may happen either within a pause, or in concurrent.
+        let size = self.possibly_dead_mature_blocks.len();
+        let num_bins = self.immix_space.scheduler().num_workers();
+        let bin_cap = size / num_bins + if size % num_bins == 0 { 0 } else { 1 };
+        let mut bins = (0..num_bins)
+            .map(|_| Vec::with_capacity(bin_cap))
+            .collect::<Vec<Vec<(Block, bool)>>>();
+        'out: for bin in bins.iter_mut() {
+            for _ in 0..bin_cap {
+                if let Some(block) = self.possibly_dead_mature_blocks.pop() {
+                    bin.push(block);
+                } else {
+                    break 'out;
+                }
+            }
+        }
+        let packets = bins
+            .into_iter()
+            .map::<Box<dyn GCWork<VM>>, _>(|blocks| {
+                Box::new(SweepBlocksAfterDecs::new(blocks, counter.clone()))
+            })
+            .collect();
+        self.immix_space.scheduler().work_buckets[WorkBucketStage::Unconstrained].bulk_add(packets);
+    }
+
+    pub(super) fn process_mature_evacuation_remset(&self) {
+        self.mature_evac_remset.flush_all();
+        let packets = self.mature_evac_remset.take_global_packets();
+        self.immix_space.scheduler().work_buckets[WorkBucketStage::RCEvacuateMature]
+            .bulk_add(packets);
+    }
+
+    pub(super) fn add_to_possibly_dead_mature_blocks(&self, block: Block, is_defrag_source: bool) {
+        if block.log() {
+            self.possibly_dead_mature_blocks
+                .push((block, is_defrag_source));
+        }
+    }
+
+    fn next_gc_is_emergency_gc(
+        &self,
+        total_pages: usize,
+        mature_space_pages: usize,
+        emergency_threshold: usize,
+    ) -> bool {
+        let min_avail_pages = usize::min(total_pages * emergency_threshold / 100, 1 << 30 >> 12);
+        total_pages < min_avail_pages + mature_space_pages
+    }
+
+    fn next_gc_is_cycle_gc(&self, mature_space_pages: usize, pause: Pause) -> bool {
+        if pause == Pause::FinalMark || pause == Pause::Full {
+            super::MATURE_LIVE_PREDICTOR.update(mature_space_pages);
+        }
+        let live_mature_pages = super::MATURE_LIVE_PREDICTOR.live_pages() as usize;
+        let garbage = mature_space_pages.saturating_sub(live_mature_pages);
+        let total_pages = self.get_total_pages();
+        !self.concurrent_work_in_progress()
+            && (self.cm_enabled() && garbage * 100 >= super::TRACE_THRESHOLD * total_pages)
+    }
+
+    fn decide_next_gc_may_perform_cycle_collection(&self, pause: Pause) {
+        let (lock, cvar) = &self.decide_cycle_collection;
+        let notify = || {
+            let mut decide_cycle_collection = lock.lock().unwrap();
+            *decide_cycle_collection = true;
+            cvar.notify_one();
+        };
+        // Reset states
+        self.hint_cycle_gc.store(false, Ordering::SeqCst);
+        self.hint_emergency_gc.store(false, Ordering::SeqCst);
+        let emergency_threshold = super::RC_STOP_PERCENT;
+        // Calculate mature space size
+        let total_pages = self.get_total_pages();
+        let mature_space_pages = {
+            let released_los_pages = self.los().num_pages_released_lazy.load(Ordering::SeqCst);
+            HEAP_AFTER_GC
+                .load(Ordering::SeqCst)
+                .saturating_sub(
+                    self.num_clean_blocks_released_lazy.load(Ordering::SeqCst) << Block::LOG_PAGES,
+                )
+                .saturating_sub(released_los_pages)
+        };
+        // Decide next GC kind
+        let hint_cycle_gc = self.next_gc_is_cycle_gc(mature_space_pages, pause);
+        let hint_emergency_gc =
+            self.next_gc_is_emergency_gc(total_pages, mature_space_pages, emergency_threshold);
+        // Update states
+        self.hint_cycle_gc.store(hint_cycle_gc, Ordering::SeqCst);
+        self.hint_emergency_gc
+            .store(hint_emergency_gc, Ordering::SeqCst);
+        // Eager mark-table zeroing
+        if !cfg!(feature = "sanity") && hint_cycle_gc {
+            self.schedule_mark_table_zeroing_tasks(None);
+        }
+        notify();
+    }
+
+    fn schedule_mark_table_zeroing_tasks(&self, pause: Option<Pause>) {
+        if let Some(pause) = pause {
+            assert!(pause == Pause::InitialMark || pause == Pause::Full);
+            if self.zeroing_packets_scheduled.load(Ordering::SeqCst) {
+                return;
+            }
+        }
+        let work_packets = self
+            .immix_space
+            .chunk_map
+            .generate_tasks_batched(self.immix_space.scheduler().num_workers(), |chunks| {
+                Box::new(ConcurrentChunkMetadataZeroing { chunks })
+            });
+        self.immix_space.scheduler().work_buckets[WorkBucketStage::Unconstrained]
+            .bulk_add(work_packets);
+        self.zeroing_packets_scheduled.store(true, Ordering::SeqCst);
+    }
+
+    fn wait_for_decide_cycle_collection(&self) {
+        let (lock, cvar) = &self.decide_cycle_collection;
+        let mut decide_cycle_collection = lock.lock().unwrap();
+        while !*decide_cycle_collection {
+            decide_cycle_collection = cvar.wait(decide_cycle_collection).unwrap();
+        }
+        *decide_cycle_collection = false;
+    }
+
+    fn select_collection_kind(&self) -> Pause {
+        self.wait_for_decide_cycle_collection();
+
+        let emergency = self.base().global_state.is_emergency_collection();
+        let user_triggered = self.base().global_state.is_user_triggered_collection();
+        let cm_in_progress = self.concurrent_work_in_progress();
+        let cm_packets_drained = super::concurrent_marking_packets_drained();
+        let hint_cycle_gc = self.hint_cycle_gc.load(Ordering::SeqCst);
+        let hint_emergency_gc = self.hint_emergency_gc.load(Ordering::SeqCst);
+        // If CM is finished, do a final mark pause
+        if cm_in_progress && cm_packets_drained {
+            return Pause::FinalMark;
+        }
+
+        // Either final mark pause or full pause for emergency GC
+        if emergency || user_triggered || hint_emergency_gc {
+            return if cm_in_progress {
+                Pause::FinalMark
+            } else {
+                Pause::Full
+            };
+        }
+
+        // Should trigger CM?
+        if hint_cycle_gc && !cm_in_progress {
+            if self.cm_enabled() {
+                Pause::InitialMark
+            } else {
+                Pause::Full
+            }
+        } else {
+            Pause::RefCount
+        }
+    }
+
+    fn disable_unnecessary_buckets(&'static self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
+        // Set conditional buckets
+        scheduler.work_buckets[WorkBucketStage::RCProcessIncs].set_enabled(true);
+        scheduler.work_buckets[WorkBucketStage::Prepare].set_enabled(pause != Pause::RefCount);
+        let final_mark_or_full = pause == Pause::FinalMark || pause == Pause::Full;
+        scheduler.work_buckets[WorkBucketStage::Closure].set_enabled(final_mark_or_full);
+        scheduler.work_buckets[WorkBucketStage::WeakRefClosure].set_enabled(final_mark_or_full);
+        scheduler.work_buckets[WorkBucketStage::FinalRefClosure].set_enabled(final_mark_or_full);
+        scheduler.work_buckets[WorkBucketStage::PhantomRefClosure].set_enabled(final_mark_or_full);
+        scheduler.work_buckets[WorkBucketStage::STWRCDecsAndSweep]
+            .set_enabled(!(super::LAZY_DECREMENTS && pause != Pause::Full));
+        // Always enabled
+        scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(true);
+        scheduler.work_buckets[WorkBucketStage::ConcurrentResumable].set_enabled(true);
+        // Always disabled
+        scheduler.work_buckets[WorkBucketStage::TPinningClosure].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::PinningRootsTrace].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::SoftRefClosure].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::CalculateForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::SecondRoots].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::RefForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::FinalizableForwarding].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::Compact].set_enabled(false);
+    }
+
+    fn schedule_rc_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        log::info!("Scheduling RC collection...");
+        self.disable_unnecessary_buckets(scheduler, Pause::RefCount);
+        // Before start yielding, wrap all the roots from the previous GC with work-packets.
+        self.process_prev_roots(scheduler);
+        // Stop & scan mutators (mutator scanning can happen before STW)
+        scheduler.work_buckets[WorkBucketStage::Unconstrained]
+            .add(StopMutators::<LXRGCWorkContext<VM>>::new_with_flush());
+        // Prepare global/collectors/mutators
+        scheduler.work_buckets[WorkBucketStage::RCProcessIncs].add(FastRCPrepare);
+        // Release global/collectors/mutators
+        scheduler.work_buckets[WorkBucketStage::Release]
+            .add(Release::<LXRGCWorkContext<VM>>::new(self));
+    }
+
+    fn schedule_concurrent_marking_initial_pause(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        log::info!("Scheduling concurrent marking initial pause...");
+        self.disable_unnecessary_buckets(scheduler, Pause::InitialMark);
+        self.process_prev_roots(scheduler);
+        scheduler.work_buckets[WorkBucketStage::Unconstrained]
+            .add(StopMutators::<LXRGCWorkContext<VM>>::new_with_flush());
+        scheduler.work_buckets[WorkBucketStage::Prepare]
+            .add(Prepare::<LXRGCWorkContext<VM>>::new(self));
+        scheduler.work_buckets[WorkBucketStage::Release]
+            .add(Release::<LXRGCWorkContext<VM>>::new(self));
+    }
+
+    fn schedule_concurrent_marking_final_pause(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        log::info!("Scheduling concurrent marking final pause...");
+        self.disable_unnecessary_buckets(scheduler, Pause::FinalMark);
+        self.process_prev_roots(scheduler);
+        scheduler.work_buckets[WorkBucketStage::Unconstrained]
+            .add(StopMutators::<LXRGCWorkContext<VM>>::new_with_flush());
+
+        scheduler.work_buckets[WorkBucketStage::Prepare]
+            .add(Prepare::<LXRGCWorkContext<VM>>::new(self));
+        scheduler.work_buckets[WorkBucketStage::Release]
+            .add(Release::<LXRGCWorkContext<VM>>::new(self));
+    }
+
+    fn schedule_emergency_full_heap_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        log::info!("Scheduling emergency full-heap collection...");
+        super::DISABLE_LASY_DEC_FOR_CURRENT_GC.store(true, Ordering::SeqCst);
+        self.disable_unnecessary_buckets(scheduler, Pause::Full);
+        // Before start yielding, wrap all the roots from the previous GC with work-packets.
+        self.process_prev_roots(scheduler);
+        // Stop & scan mutators (mutator scanning can happen before STW)
+        scheduler.work_buckets[WorkBucketStage::Unconstrained]
+            .add(StopMutators::<LXRGCWorkContext<VM>>::new_with_flush());
+        // Prepare global/collectors/mutators
+        scheduler.work_buckets[WorkBucketStage::Prepare]
+            .add(Prepare::<LXRGCWorkContext<VM>>::new(self));
+        // Release global/collectors/mutators
+        scheduler.work_buckets[WorkBucketStage::Release]
+            .add(Release::<LXRGCWorkContext<VM>>::new(self));
+    }
+
+    fn process_prev_roots(&self, scheduler: &GCWorkScheduler<VM>) {
+        let prev_roots = self.prev_roots.read().unwrap();
+        let mut work_packets: Vec<Box<dyn GCWork<VM>>> = Vec::with_capacity(prev_roots.len());
+        while let Some(decs) = prev_roots.pop() {
+            work_packets.push(Box::new(ProcessDecs::new(
+                decs,
+                LazySweepingJobsCounter::new_decs(),
+            )))
+        }
+        if work_packets.is_empty() {
+            work_packets.push(Box::new(ProcessDecs::new(
+                vec![],
+                LazySweepingJobsCounter::new_decs(),
+            )));
+        }
+        if super::LAZY_DECREMENTS {
+            scheduler.work_buckets[WorkBucketStage::Concurrent].bulk_add_deferred(work_packets);
+        } else {
+            scheduler.work_buckets[WorkBucketStage::STWRCDecsAndSweep].bulk_add(work_packets);
+        }
+    }
+
+    pub fn current_pause(&self) -> Option<Pause> {
+        self.current_pause.load(Ordering::SeqCst)
+    }
+
+    pub fn previous_pause(&self) -> Option<Pause> {
+        self.previous_pause.load(Ordering::SeqCst)
+    }
+
+    pub fn in_defrag(&self, o: ObjectReference) -> bool {
+        self.immix_space.in_space(o) && Block::in_defrag_block(o)
+    }
+
+    pub fn address_in_defrag(&self, a: Address) -> bool {
+        self.immix_space.address_in_space(a) && Block::address_in_defrag_block(a)
+    }
+
+    pub fn mark(&self, o: ObjectReference) -> bool {
+        if self.immix_space.in_space(o) {
+            self.immix_space.attempt_mark(o)
+        } else {
+            self.common.los.attempt_mark(o)
+        }
+    }
+
+    pub fn is_marked(&self, o: ObjectReference) -> bool {
+        if self.immix_space.in_space(o) {
+            self.immix_space.is_marked(o)
+        } else {
+            self.common.los.is_marked(o)
+        }
+    }
+
+    pub const fn los(&self) -> &LargeObjectSpace<VM> {
+        &self.common.los
+    }
+
+    fn on_lazy_decs_finished(&self, c: LazySweepingJobsCounter) {
+        self.schedule_rc_block_sweeping_tasks(c);
+    }
+
+    fn on_lazy_sweeping_finished(&self) {
+        self.immix_space.flush_page_resource();
+        // Update counters
+        if !super::LAZY_DECREMENTS {
+            HEAP_AFTER_GC.store(self.get_used_pages(), Ordering::SeqCst);
+        }
+        let pause = match self.current_pause() {
+            Some(p) => p,
+            None => self.previous_pause().unwrap(),
+        };
+        self.decide_next_gc_may_perform_cycle_collection(pause);
+    }
+
+    fn gc_init(&mut self) {
+        self.immix_space.rc_enabled = true;
+        self.common.los.rc_enabled = true;
+        unsafe {
+            let me: &'static Self = &*(self as *const Self);
+            me.block_allocation.init(&me.immix_space, me);
+            me.immix_space.install_hooks(&me.block_allocation);
+        }
+        let mut lazy_sweeping_jobs = LAZY_SWEEPING_JOBS.write();
+        lazy_sweeping_jobs.swap();
+        let lxr_ptr = self as *const Self as usize;
+        lazy_sweeping_jobs.end_of_decs = Some(Box::new(move |c| {
+            let lxr = unsafe { &*(lxr_ptr as *const Self) };
+            lxr.on_lazy_decs_finished(c);
+        }));
+        lazy_sweeping_jobs.end_of_lazy = Some(Box::new(move || {
+            let lxr = unsafe { &*(lxr_ptr as *const Self) };
+            lxr.on_lazy_sweeping_finished();
+        }));
+    }
+
+    fn set_concurrent_marking_state(&self, active: bool) {
+        self.in_concurrent_marking.store(active, Ordering::SeqCst);
+        self.common
+            .los
+            .bump_page_reuse_count
+            .store(active, Ordering::SeqCst);
+    }
+}

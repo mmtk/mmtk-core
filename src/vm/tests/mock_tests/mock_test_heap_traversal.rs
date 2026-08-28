@@ -1,8 +1,8 @@
-// GITHUB-CI: MMTK_PLAN=NoGC,MarkSweep,MarkCompact,SemiSpace,Immix
+// GITHUB-CI: MMTK_PLAN=NoGC,MarkSweep,Lisp2,SemiSpace,Immix
 // GITHUB-CI: FEATURES=vo_bit
 
 // Note on the plans chosen for CI:
-// - Those plans cover the MarkSweepSpace, MarkCompactSpace, CopySpace and ImmixSpace.
+// - Those plans cover the MarkSweepSpace, Lisp2Space, CopySpace and ImmixSpace.
 //   Each plan other than NoGC also include ImmortalSpace and LOS.
 // - PageProtect consumes too much memory and the test will fail with the default heap size
 //   chosen by the MutatorFixture.

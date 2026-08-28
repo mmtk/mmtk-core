@@ -44,9 +44,10 @@ mod generational;
 /// Sticky plans (using sticky marks for generational behaviors without a copying nursery)
 mod sticky;
 
-mod compressor;
 mod concurrent;
+pub use concurrent::{ConcurrentPlan, Pause};
 mod immix;
+mod lxr;
 mod markcompact;
 mod marksweep;
 mod nogc;
@@ -62,7 +63,7 @@ pub(crate) use generational::global::GenerationalPlan;
 pub use generational::copying::GENCOPY_CONSTRAINTS;
 pub use generational::immix::GENIMMIX_CONSTRAINTS;
 pub use immix::IMMIX_CONSTRAINTS;
-pub use markcompact::MARKCOMPACT_CONSTRAINTS;
+pub use markcompact::LISP2_CONSTRAINTS;
 pub use marksweep::MS_CONSTRAINTS;
 pub use nogc::NOGC_CONSTRAINTS;
 pub use pageprotect::PP_CONSTRAINTS;

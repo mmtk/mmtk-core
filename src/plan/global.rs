@@ -54,18 +54,17 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::PageProtect => {
             crate::plan::pageprotect::mutator::create_pp_mutator(tls, mmtk)
         }
-        PlanSelector::MarkCompact => {
-            crate::plan::markcompact::mutator::create_markcompact_mutator(tls, mmtk)
+        PlanSelector::Lisp2 => {
+            crate::plan::markcompact::lisp2::mutator::create_lisp2_mutator(tls, mmtk)
         }
         PlanSelector::StickyImmix => {
             crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
         }
+        PlanSelector::LXR => crate::plan::lxr::mutator::create_lxr_mutator(tls, mmtk),
         PlanSelector::ConcurrentImmix => {
             crate::plan::concurrent::immix::mutator::create_concurrent_immix_mutator(tls, mmtk)
         }
-        PlanSelector::Compressor => {
-            crate::plan::compressor::mutator::create_compressor_mutator(tls, mmtk)
-        }
+        PlanSelector::OVC => crate::plan::markcompact::ovc::mutator::create_ovc_mutator(tls, mmtk),
     })
 }
 
@@ -100,18 +99,19 @@ pub fn create_plan<VM: VMBinding>(
         PlanSelector::PageProtect => {
             Box::new(crate::plan::pageprotect::PageProtect::new(args)) as Box<dyn Plan<VM = VM>>
         }
-        PlanSelector::MarkCompact => {
-            Box::new(crate::plan::markcompact::MarkCompact::new(args)) as Box<dyn Plan<VM = VM>>
+        PlanSelector::Lisp2 => {
+            Box::new(crate::plan::markcompact::lisp2::Lisp2::new(args)) as Box<dyn Plan<VM = VM>>
         }
         PlanSelector::StickyImmix => {
             Box::new(crate::plan::sticky::immix::StickyImmix::new(args)) as Box<dyn Plan<VM = VM>>
         }
+        PlanSelector::LXR => crate::plan::lxr::LXR::new(args) as Box<dyn Plan<VM = VM>>,
         PlanSelector::ConcurrentImmix => {
             Box::new(crate::plan::concurrent::immix::ConcurrentImmix::new(args))
                 as Box<dyn Plan<VM = VM>>
         }
-        PlanSelector::Compressor => {
-            Box::new(crate::plan::compressor::Compressor::new(args)) as Box<dyn Plan<VM = VM>>
+        PlanSelector::OVC => {
+            Box::new(crate::plan::markcompact::ovc::OVC::new(args)) as Box<dyn Plan<VM = VM>>
         }
     }
 }
@@ -176,6 +176,11 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         panic!("Common Plan not handled!")
     }
 
+    /// Get a mutable reference to the common plan. See [`Self::common`].
+    fn common_mut(&mut self) -> &mut CommonPlan<Self::VM> {
+        panic!("Common Plan not handled!")
+    }
+
     /// Return a reference to `GenerationalPlan` to allow
     /// access methods specific to generational plans if the plan is a generational plan.
     fn generational(
@@ -201,8 +206,21 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// This defines what space this plan will allocate objects into for different semantics.
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
 
-    /// Called when all mutators are paused. This is called before prepare.
-    fn notify_mutators_paused(&self, _scheduler: &GCWorkScheduler<Self::VM>) {}
+    /// Called once all mutators have been stopped.  This is called before `Prepare`, which is right
+    /// before root scanning starts, at the beginning of a GC pause.
+    ///
+    /// Plans that need to do per-pause setup (e.g. resetting mark tables, flushing mutator state)
+    /// can override this.
+    ///
+    /// A plan that overrides this function need to manage the invocation of
+    /// `GCTriggerPolicy::on_gc_start` at the proper timing for the plan.
+    fn on_pause_start(&self, mmtk: &'static MMTK<Self::VM>) {
+        assert!(
+            self.concurrent().is_none(),
+            "ConcurrentPlan must override on_pause_start"
+        );
+        mmtk.gc_trigger.policy.on_gc_start(mmtk);
+    }
 
     /// Prepare the plan before a GC. This is invoked in an initial step in the GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
@@ -217,10 +235,24 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
     fn release(&mut self, tls: VMWorkerThread);
 
-    /// Inform the plan about the end of a GC. It is guaranteed that there is no further work for this GC.
-    /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
-    // TODO: This is actually called at the end of a pause/STW, rather than the end of a GC. It should be renamed.
-    fn end_of_gc(&mut self, _tls: VMWorkerThread);
+    /// Called at the end of a GC pause.  It is guaranteed that there is no further work for this
+    /// pause.  This is invoked once per pause by one worker thread.  `tls` is the worker thread
+    /// that executes this method.
+    ///
+    /// Plans that need to do per-pause teardown (e.g. recording pause-end statistics) can override
+    /// this.
+    ///
+    /// A plan that overrides this function need to do whatever the default implementation does at
+    /// the proper timing for the plan, such as calling `CommonPlan::on_pause_end`, and selectively
+    /// call `GCTriggerPolicy::on_gc_end` if the pause is the end of a GC.
+    fn on_pause_end(&mut self, mmtk: &'static MMTK<Self::VM>, tls: VMWorkerThread) {
+        self.common_mut().on_pause_end(tls);
+        assert!(
+            self.concurrent().is_none(),
+            "ConcurrentPlan must override on_pause_end"
+        );
+        mmtk.gc_trigger.policy.on_gc_end(mmtk);
+    }
 
     /// Notify the plan that an emergency collection will happen. The plan should try to free as much memory as possible.
     /// The default implementation will force a full heap collection for generational plans.
@@ -326,6 +358,14 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// For example, for Immix, fast collection (no defragmentation) is not an exhaustive collection.
     fn last_collection_was_exhaustive(&self) -> bool {
         true
+    }
+
+    /// Return the work bucket stage in which mutator (and VM) roots should be scanned for this
+    /// plan. By default, roots are scanned in the `Prepare` stage, but concurrent/incremental
+    /// plans may schedule root scanning into a different stage (e.g. alongside reference
+    /// counting increments).
+    fn root_scanning_stage(&self) -> WorkBucketStage {
+        WorkBucketStage::Prepare
     }
 
     /// Return whether the current GC may move any object.  The VM binding can make use of this
@@ -663,8 +703,8 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.vm_space.set_side_log_bits();
     }
 
-    pub fn end_of_gc(&mut self, _tls: VMWorkerThread) {
-        // Do nothing here. None of the spaces needs end_of_gc.
+    pub fn on_pause_end(&mut self, _tls: VMWorkerThread) {
+        // Do nothing here. None of the spaces needs on_pause_end.
     }
 
     pub(crate) fn collection_required<P: Plan>(&self, plan: &P, space_full: bool) -> bool {
@@ -801,9 +841,9 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.set_side_log_bits();
     }
 
-    pub fn end_of_gc(&mut self, tls: VMWorkerThread) {
+    pub fn on_pause_end(&mut self, tls: VMWorkerThread) {
         self.end_of_gc_nonmoving_space();
-        self.base.end_of_gc(tls);
+        self.base.on_pause_end(tls);
     }
 
     pub fn get_immortal(&self) -> &ImmortalSpace<VM> {
@@ -836,7 +876,14 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
+    #[allow(clippy::needless_return)]
     fn prepare_nonmoving_space(&mut self, _full_heap: bool) {
+        // LXR does not support spaces with no LXR support
+        // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
+        // This skip just works around for the nonmoving space (defaults to Immix space), for which we see a panic.
+        if *self.base.options.plan == PlanSelector::LXR {
+            return;
+        }
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {
                 self.nonmoving.prepare();
@@ -848,7 +895,14 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
+    #[allow(clippy::needless_return)]
     fn release_nonmoving_space(&mut self, _full_heap: bool) {
+        // LXR does not support spaces with no LXR support
+        // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
+        // This skip just works around for the nonmoving space (defaults to Immix space), for which we see a panic.
+        if *self.base.options.plan == PlanSelector::LXR {
+            return;
+        }
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {
                 self.nonmoving.release();
@@ -860,7 +914,14 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
+    #[allow(clippy::needless_return)]
     fn end_of_gc_nonmoving_space(&mut self) {
+        // LXR does not support spaces with no LXR support
+        // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
+        // This skip just works around for the nonmoving space (defaults to Immix space), for which we see a panic.
+        if *self.base.options.plan == PlanSelector::LXR {
+            return;
+        }
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {
                 // Nothing we need to do for immortal space.

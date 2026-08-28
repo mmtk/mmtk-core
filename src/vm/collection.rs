@@ -122,6 +122,14 @@ pub trait Collection<VM: VMBinding> {
     /// * `tls`: The thread pointer for the current GC thread.
     fn schedule_finalization(_tls: VMWorkerThread) {}
 
+    /// A hook for the VM to update the state of its weak reference processor at the end of the
+    /// release phase of a GC. This is currently called by the LXR plan after a full or final-mark
+    /// pause, before the reachability of weak references has changed further.
+    ///
+    /// Arguments:
+    /// * `_lxr`: Whether the current GC is being driven by the LXR plan.
+    fn update_weak_processor(_lxr: bool) {}
+
     /// A hook for the VM to do work after forwarding objects.
     ///
     /// This function is called after all of the following have finished:
@@ -144,6 +152,9 @@ pub trait Collection<VM: VMBinding> {
     /// Arguments:
     /// * `tls_worker`: The thread pointer for the worker thread performing this call.
     fn post_forwarding(_tls: VMWorkerThread) {}
+
+    /// Inform the VM to do its VM-specific release work at the end of a GC.
+    fn vm_release() {}
 
     /// Return the amount of memory (in bytes) which the VM allocated outside the MMTk heap but
     /// wants to include into the current MMTk heap size.  MMTk core will consider the reported
