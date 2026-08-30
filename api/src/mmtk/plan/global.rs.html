@@ -877,155 +877,157 @@
 <a href=#877 id=877 data-nosnippet>877</a>    }
 <a href=#878 id=878 data-nosnippet>878</a>
 <a href=#879 id=879 data-nosnippet>879</a>    <span class="attr">#[allow(clippy::needless_return)]
-<a href=#880 id=880 data-nosnippet>880</a>    </span><span class="kw">fn </span>prepare_nonmoving_space(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _full_heap: bool) {
-<a href=#881 id=881 data-nosnippet>881</a>        <span class="comment">// LXR does not support spaces with no LXR support
-<a href=#882 id=882 data-nosnippet>882</a>        // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
-<a href=#883 id=883 data-nosnippet>883</a>        // This skip just works around for the nonmoving space (defaults to Immix space), for which we see a panic.
-<a href=#884 id=884 data-nosnippet>884</a>        </span><span class="kw">if </span><span class="kw-2">*</span><span class="self">self</span>.base.options.plan == PlanSelector::LXR {
-<a href=#885 id=885 data-nosnippet>885</a>            <span class="kw">return</span>;
-<a href=#886 id=886 data-nosnippet>886</a>        }
-<a href=#887 id=887 data-nosnippet>887</a>        <span class="macro">cfg_if::cfg_if!</span> {
-<a href=#888 id=888 data-nosnippet>888</a>            <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">"immortal_as_nonmoving"</span>)] </span>{
-<a href=#889 id=889 data-nosnippet>889</a>                <span class="self">self</span>.nonmoving.prepare();
-<a href=#890 id=890 data-nosnippet>890</a>            } <span class="kw">else if </span><span class="attr">#[cfg(feature = <span class="string">"marksweep_as_nonmoving"</span>)] </span>{
-<a href=#891 id=891 data-nosnippet>891</a>                <span class="self">self</span>.nonmoving.prepare(_full_heap);
-<a href=#892 id=892 data-nosnippet>892</a>            } <span class="kw">else </span>{
-<a href=#893 id=893 data-nosnippet>893</a>                <span class="self">self</span>.nonmoving.prepare(_full_heap, <span class="prelude-val">None</span>, UnlogBitsOperation::NoOp);
-<a href=#894 id=894 data-nosnippet>894</a>            }
-<a href=#895 id=895 data-nosnippet>895</a>        }
-<a href=#896 id=896 data-nosnippet>896</a>    }
-<a href=#897 id=897 data-nosnippet>897</a>
-<a href=#898 id=898 data-nosnippet>898</a>    <span class="attr">#[allow(clippy::needless_return)]
-<a href=#899 id=899 data-nosnippet>899</a>    </span><span class="kw">fn </span>release_nonmoving_space(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _full_heap: bool) {
-<a href=#900 id=900 data-nosnippet>900</a>        <span class="comment">// LXR does not support spaces with no LXR support
-<a href=#901 id=901 data-nosnippet>901</a>        // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
-<a href=#902 id=902 data-nosnippet>902</a>        // This skip just works around for the nonmoving space (defaults to Immix space), for which we see a panic.
-<a href=#903 id=903 data-nosnippet>903</a>        </span><span class="kw">if </span><span class="kw-2">*</span><span class="self">self</span>.base.options.plan == PlanSelector::LXR {
-<a href=#904 id=904 data-nosnippet>904</a>            <span class="kw">return</span>;
-<a href=#905 id=905 data-nosnippet>905</a>        }
-<a href=#906 id=906 data-nosnippet>906</a>        <span class="macro">cfg_if::cfg_if!</span> {
-<a href=#907 id=907 data-nosnippet>907</a>            <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">"immortal_as_nonmoving"</span>)] </span>{
-<a href=#908 id=908 data-nosnippet>908</a>                <span class="self">self</span>.nonmoving.release();
-<a href=#909 id=909 data-nosnippet>909</a>            } <span class="kw">else if </span><span class="attr">#[cfg(feature = <span class="string">"marksweep_as_nonmoving"</span>)] </span>{
-<a href=#910 id=910 data-nosnippet>910</a>                <span class="self">self</span>.nonmoving.prepare(_full_heap);
-<a href=#911 id=911 data-nosnippet>911</a>            } <span class="kw">else </span>{
-<a href=#912 id=912 data-nosnippet>912</a>                <span class="self">self</span>.nonmoving.release(_full_heap, UnlogBitsOperation::NoOp);
-<a href=#913 id=913 data-nosnippet>913</a>            }
-<a href=#914 id=914 data-nosnippet>914</a>        }
-<a href=#915 id=915 data-nosnippet>915</a>    }
-<a href=#916 id=916 data-nosnippet>916</a>
-<a href=#917 id=917 data-nosnippet>917</a>    <span class="attr">#[allow(clippy::needless_return)]
-<a href=#918 id=918 data-nosnippet>918</a>    </span><span class="kw">fn </span>end_of_gc_nonmoving_space(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-<a href=#919 id=919 data-nosnippet>919</a>        <span class="comment">// LXR does not support spaces with no LXR support
-<a href=#920 id=920 data-nosnippet>920</a>        // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
-<a href=#921 id=921 data-nosnippet>921</a>        // This skip just works around for the nonmoving space (defaults to Immix space), for which we see a panic.
-<a href=#922 id=922 data-nosnippet>922</a>        </span><span class="kw">if </span><span class="kw-2">*</span><span class="self">self</span>.base.options.plan == PlanSelector::LXR {
-<a href=#923 id=923 data-nosnippet>923</a>            <span class="kw">return</span>;
-<a href=#924 id=924 data-nosnippet>924</a>        }
-<a href=#925 id=925 data-nosnippet>925</a>        <span class="macro">cfg_if::cfg_if!</span> {
-<a href=#926 id=926 data-nosnippet>926</a>            <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">"immortal_as_nonmoving"</span>)] </span>{
-<a href=#927 id=927 data-nosnippet>927</a>                <span class="comment">// Nothing we need to do for immortal space.
-<a href=#928 id=928 data-nosnippet>928</a>            </span>} <span class="kw">else if </span><span class="attr">#[cfg(feature = <span class="string">"marksweep_as_nonmoving"</span>)] </span>{
-<a href=#929 id=929 data-nosnippet>929</a>                <span class="self">self</span>.nonmoving.end_of_gc();
-<a href=#930 id=930 data-nosnippet>930</a>            } <span class="kw">else </span>{
+<a href=#880 id=880 data-nosnippet>880</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>prepare_nonmoving_space(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _full_heap: bool) {
+<a href=#881 id=881 data-nosnippet>881</a>        <span class="comment">// FIXME: We need to handle nonmoving space properly.
+<a href=#882 id=882 data-nosnippet>882</a>        // Nonmoving space is a bit special for LXR, as it could be a second ImmixSpace (as opposed to the default ImmixSpace).
+<a href=#883 id=883 data-nosnippet>883</a>        // It is arguable whether we should use an LXR ImmixSpace here, or use a normal Immix space.
+<a href=#884 id=884 data-nosnippet>884</a>        // If we use an LXR ImmixSpace, we don't have a test case right now to know its correctness.
+<a href=#885 id=885 data-nosnippet>885</a>        // If we use a normal ImmixSpace, our side metadata sanity does not allow this right, as both LXR ImmixSpace and normal
+<a href=#886 id=886 data-nosnippet>886</a>        // ImmixSpace are ImmixSpace, and our sanity expects them to use a same set of side metadata.
+<a href=#887 id=887 data-nosnippet>887</a>        // This might be another reason why LXR ImmixSpace should be a separate policy.
+<a href=#888 id=888 data-nosnippet>888</a>        </span><span class="kw">if </span><span class="kw-2">*</span><span class="self">self</span>.base.options.plan == PlanSelector::LXR {
+<a href=#889 id=889 data-nosnippet>889</a>            <span class="kw">return</span>;
+<a href=#890 id=890 data-nosnippet>890</a>        }
+<a href=#891 id=891 data-nosnippet>891</a>        <span class="macro">cfg_if::cfg_if!</span> {
+<a href=#892 id=892 data-nosnippet>892</a>            <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">"immortal_as_nonmoving"</span>)] </span>{
+<a href=#893 id=893 data-nosnippet>893</a>                <span class="self">self</span>.nonmoving.prepare();
+<a href=#894 id=894 data-nosnippet>894</a>            } <span class="kw">else if </span><span class="attr">#[cfg(feature = <span class="string">"marksweep_as_nonmoving"</span>)] </span>{
+<a href=#895 id=895 data-nosnippet>895</a>                <span class="self">self</span>.nonmoving.prepare(_full_heap);
+<a href=#896 id=896 data-nosnippet>896</a>            } <span class="kw">else </span>{
+<a href=#897 id=897 data-nosnippet>897</a>                <span class="self">self</span>.nonmoving.prepare(_full_heap, <span class="prelude-val">None</span>, UnlogBitsOperation::NoOp);
+<a href=#898 id=898 data-nosnippet>898</a>            }
+<a href=#899 id=899 data-nosnippet>899</a>        }
+<a href=#900 id=900 data-nosnippet>900</a>    }
+<a href=#901 id=901 data-nosnippet>901</a>
+<a href=#902 id=902 data-nosnippet>902</a>    <span class="attr">#[allow(clippy::needless_return)]
+<a href=#903 id=903 data-nosnippet>903</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>release_nonmoving_space(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _full_heap: bool) {
+<a href=#904 id=904 data-nosnippet>904</a>        <span class="comment">// FIXME: We need to handle nonmoving space properly.
+<a href=#905 id=905 data-nosnippet>905</a>        // See comments in prepare_non_moving_space
+<a href=#906 id=906 data-nosnippet>906</a>        </span><span class="kw">if </span><span class="kw-2">*</span><span class="self">self</span>.base.options.plan == PlanSelector::LXR {
+<a href=#907 id=907 data-nosnippet>907</a>            <span class="kw">return</span>;
+<a href=#908 id=908 data-nosnippet>908</a>        }
+<a href=#909 id=909 data-nosnippet>909</a>        <span class="macro">cfg_if::cfg_if!</span> {
+<a href=#910 id=910 data-nosnippet>910</a>            <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">"immortal_as_nonmoving"</span>)] </span>{
+<a href=#911 id=911 data-nosnippet>911</a>                <span class="self">self</span>.nonmoving.release();
+<a href=#912 id=912 data-nosnippet>912</a>            } <span class="kw">else if </span><span class="attr">#[cfg(feature = <span class="string">"marksweep_as_nonmoving"</span>)] </span>{
+<a href=#913 id=913 data-nosnippet>913</a>                <span class="self">self</span>.nonmoving.prepare(_full_heap);
+<a href=#914 id=914 data-nosnippet>914</a>            } <span class="kw">else </span>{
+<a href=#915 id=915 data-nosnippet>915</a>                <span class="self">self</span>.nonmoving.release(_full_heap, UnlogBitsOperation::NoOp);
+<a href=#916 id=916 data-nosnippet>916</a>            }
+<a href=#917 id=917 data-nosnippet>917</a>        }
+<a href=#918 id=918 data-nosnippet>918</a>    }
+<a href=#919 id=919 data-nosnippet>919</a>
+<a href=#920 id=920 data-nosnippet>920</a>    <span class="attr">#[allow(clippy::needless_return)]
+<a href=#921 id=921 data-nosnippet>921</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>end_of_gc_nonmoving_space(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+<a href=#922 id=922 data-nosnippet>922</a>        <span class="comment">// FIXME: We need to handle nonmoving space properly.
+<a href=#923 id=923 data-nosnippet>923</a>        // See comments in prepare_non_moving_space
+<a href=#924 id=924 data-nosnippet>924</a>        </span><span class="kw">if </span><span class="kw-2">*</span><span class="self">self</span>.base.options.plan == PlanSelector::LXR {
+<a href=#925 id=925 data-nosnippet>925</a>            <span class="kw">return</span>;
+<a href=#926 id=926 data-nosnippet>926</a>        }
+<a href=#927 id=927 data-nosnippet>927</a>        <span class="macro">cfg_if::cfg_if!</span> {
+<a href=#928 id=928 data-nosnippet>928</a>            <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">"immortal_as_nonmoving"</span>)] </span>{
+<a href=#929 id=929 data-nosnippet>929</a>                <span class="comment">// Nothing we need to do for immortal space.
+<a href=#930 id=930 data-nosnippet>930</a>            </span>} <span class="kw">else if </span><span class="attr">#[cfg(feature = <span class="string">"marksweep_as_nonmoving"</span>)] </span>{
 <a href=#931 id=931 data-nosnippet>931</a>                <span class="self">self</span>.nonmoving.end_of_gc();
-<a href=#932 id=932 data-nosnippet>932</a>            }
-<a href=#933 id=933 data-nosnippet>933</a>        }
-<a href=#934 id=934 data-nosnippet>934</a>    }
-<a href=#935 id=935 data-nosnippet>935</a>}
-<a href=#936 id=936 data-nosnippet>936</a>
-<a href=#937 id=937 data-nosnippet>937</a><span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TraceKind;
-<a href=#938 id=938 data-nosnippet>938</a><span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
-<a href=#939 id=939 data-nosnippet>939</a>
-<a href=#940 id=940 data-nosnippet>940</a><span class="doccomment">/// A trait for anything that contains spaces.
-<a href=#941 id=941 data-nosnippet>941</a>/// Examples include concrete plans as well as `Gen`, `CommonPlan` and `BasePlan`.
-<a href=#942 id=942 data-nosnippet>942</a>/// All plans must implement this trait.
-<a href=#943 id=943 data-nosnippet>943</a>///
-<a href=#944 id=944 data-nosnippet>944</a>/// This trait provides methods for enumerating spaces in a struct, including spaces in nested
-<a href=#945 id=945 data-nosnippet>945</a>/// struct.
-<a href=#946 id=946 data-nosnippet>946</a>///
-<a href=#947 id=947 data-nosnippet>947</a>/// This trait can be implemented automatically by adding the `#[derive(HasSpaces)]` attribute to a
-<a href=#948 id=948 data-nosnippet>948</a>/// struct.  It uses the derive macro defined in the `mmtk-macros` crate.
-<a href=#949 id=949 data-nosnippet>949</a>///
-<a href=#950 id=950 data-nosnippet>950</a>/// This trait visits spaces as `dyn`, so it should only be used when performance is not critical.
-<a href=#951 id=951 data-nosnippet>951</a>/// For performance critical methods that visit spaces in a plan, such as `trace_object`, it is
-<a href=#952 id=952 data-nosnippet>952</a>/// recommended to define a trait (such as `PlanTraceObject`) for concrete plans to implement, and
-<a href=#953 id=953 data-nosnippet>953</a>/// implement (by hand or automatically) the method without `dyn`.
-<a href=#954 id=954 data-nosnippet>954</a></span><span class="kw">pub trait </span>HasSpaces {
-<a href=#955 id=955 data-nosnippet>955</a>    <span class="comment">// The type of the VM.
-<a href=#956 id=956 data-nosnippet>956</a>    </span><span class="kw">type </span>VM: VMBinding;
-<a href=#957 id=957 data-nosnippet>957</a>
-<a href=#958 id=958 data-nosnippet>958</a>    <span class="doccomment">/// Visit each space field immutably.
-<a href=#959 id=959 data-nosnippet>959</a>    ///
-<a href=#960 id=960 data-nosnippet>960</a>    /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
-<a href=#961 id=961 data-nosnippet>961</a>    /// in the outer struct first.
-<a href=#962 id=962 data-nosnippet>962</a>    </span><span class="kw">fn </span>for_each_space(<span class="kw-2">&amp;</span><span class="self">self</span>, func: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;));
-<a href=#963 id=963 data-nosnippet>963</a>
-<a href=#964 id=964 data-nosnippet>964</a>    <span class="doccomment">/// Visit each space field mutably.
-<a href=#965 id=965 data-nosnippet>965</a>    ///
-<a href=#966 id=966 data-nosnippet>966</a>    /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
-<a href=#967 id=967 data-nosnippet>967</a>    /// in the outer struct first.
-<a href=#968 id=968 data-nosnippet>968</a>    </span><span class="kw">fn </span>for_each_space_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>, func: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(<span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;));
-<a href=#969 id=969 data-nosnippet>969</a>}
-<a href=#970 id=970 data-nosnippet>970</a>
-<a href=#971 id=971 data-nosnippet>971</a><span class="doccomment">/// A plan that uses [`PlanTrace`] needs to provide an implementation for this trait.
-<a href=#972 id=972 data-nosnippet>972</a>/// Generally a plan does not need to manually implement this trait. Instead, we provide
-<a href=#973 id=973 data-nosnippet>973</a>/// a procedural macro that helps generate an implementation. Please check `macros/trace_object`.
-<a href=#974 id=974 data-nosnippet>974</a>///
-<a href=#975 id=975 data-nosnippet>975</a>/// A plan could also manually implement this trait. For the sake of performance, the implementation
-<a href=#976 id=976 data-nosnippet>976</a>/// of this trait should mark methods as `[inline(always)]`.
-<a href=#977 id=977 data-nosnippet>977</a>///
-<a href=#978 id=978 data-nosnippet>978</a>/// [`PlanTrace`]: crate::plan::tracing::PlanTrace
-<a href=#979 id=979 data-nosnippet>979</a></span><span class="kw">pub trait </span>PlanTraceObject&lt;VM: VMBinding&gt; {
-<a href=#980 id=980 data-nosnippet>980</a>    <span class="doccomment">/// Trace objects in the plan.
-<a href=#981 id=981 data-nosnippet>981</a>    ///
-<a href=#982 id=982 data-nosnippet>982</a>    /// See [`crate::plan::tracing::Trace::trace_object`].
-<a href=#983 id=983 data-nosnippet>983</a>    </span><span class="kw">fn </span>trace_object&lt;Q: ObjectQueue, <span class="kw">const </span>KIND: TraceKind&gt;(
-<a href=#984 id=984 data-nosnippet>984</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
-<a href=#985 id=985 data-nosnippet>985</a>        queue: <span class="kw-2">&amp;mut </span>Q,
-<a href=#986 id=986 data-nosnippet>986</a>        object: ObjectReference,
-<a href=#987 id=987 data-nosnippet>987</a>        worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
-<a href=#988 id=988 data-nosnippet>988</a>    ) -&gt; ObjectReference;
-<a href=#989 id=989 data-nosnippet>989</a>
-<a href=#990 id=990 data-nosnippet>990</a>    <span class="doccomment">/// Post-scan objects in the plan.
-<a href=#991 id=991 data-nosnippet>991</a>    ///
-<a href=#992 id=992 data-nosnippet>992</a>    /// See [`crate::plan::tracing::Trace::post_scan_object`].
-<a href=#993 id=993 data-nosnippet>993</a>    </span><span class="kw">fn </span>post_scan_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference);
-<a href=#994 id=994 data-nosnippet>994</a>
-<a href=#995 id=995 data-nosnippet>995</a>    <span class="doccomment">/// Whether objects in this plan may move.
-<a href=#996 id=996 data-nosnippet>996</a>    ///
-<a href=#997 id=997 data-nosnippet>997</a>    /// See [`crate::plan::tracing::Trace::post_scan_object`].
-<a href=#998 id=998 data-nosnippet>998</a>    </span><span class="kw">fn </span>may_move_objects&lt;<span class="kw">const </span>KIND: TraceKind&gt;() -&gt; bool;
-<a href=#999 id=999 data-nosnippet>999</a>}
-<a href=#1000 id=1000 data-nosnippet>1000</a>
-<a href=#1001 id=1001 data-nosnippet>1001</a><span class="kw">use </span>enum_map::Enum;
-<a href=#1002 id=1002 data-nosnippet>1002</a><span class="doccomment">/// Allocation semantics that MMTk provides.
-<a href=#1003 id=1003 data-nosnippet>1003</a>/// Each allocation request requires a desired semantic for the object to allocate.
-<a href=#1004 id=1004 data-nosnippet>1004</a></span><span class="attr">#[repr(i32)]
-<a href=#1005 id=1005 data-nosnippet>1005</a>#[derive(Clone, Copy, Debug, Enum, PartialEq, Eq)]
-<a href=#1006 id=1006 data-nosnippet>1006</a></span><span class="kw">pub enum </span>AllocationSemantics {
-<a href=#1007 id=1007 data-nosnippet>1007</a>    <span class="doccomment">/// The default semantic. This means there is no specific requirement for the allocation.
-<a href=#1008 id=1008 data-nosnippet>1008</a>    /// The actual semantic of the default will depend on the GC plan in use.
-<a href=#1009 id=1009 data-nosnippet>1009</a>    </span>Default = <span class="number">0</span>,
-<a href=#1010 id=1010 data-nosnippet>1010</a>    <span class="doccomment">/// Immortal objects will not be reclaimed. MMTk still traces immortal objects, but will not
-<a href=#1011 id=1011 data-nosnippet>1011</a>    /// reclaim the objects even if they are dead.
-<a href=#1012 id=1012 data-nosnippet>1012</a>    </span>Immortal = <span class="number">1</span>,
-<a href=#1013 id=1013 data-nosnippet>1013</a>    <span class="doccomment">/// Large objects. It is usually desirable to allocate large objects specially. Large objects
-<a href=#1014 id=1014 data-nosnippet>1014</a>    /// are allocated with page granularity and will not be moved.
-<a href=#1015 id=1015 data-nosnippet>1015</a>    /// Each plan provides `max_non_los_default_alloc_bytes` (see [`crate::plan::PlanConstraints`]),
-<a href=#1016 id=1016 data-nosnippet>1016</a>    /// which defines a threshold for objects that can be allocated with the default semantic. Any object that is larger than the
-<a href=#1017 id=1017 data-nosnippet>1017</a>    /// threshold must be allocated with the `Los` semantic.
-<a href=#1018 id=1018 data-nosnippet>1018</a>    /// This semantic may get removed and MMTk will transparently allocate into large object space for large objects.
-<a href=#1019 id=1019 data-nosnippet>1019</a>    </span>Los = <span class="number">2</span>,
-<a href=#1020 id=1020 data-nosnippet>1020</a>    <span class="doccomment">/// Code objects have execution permission.
-<a href=#1021 id=1021 data-nosnippet>1021</a>    /// Note that we do not currently support this semantic.
-<a href=#1022 id=1022 data-nosnippet>1022</a>    </span>Code = <span class="number">3</span>,
-<a href=#1023 id=1023 data-nosnippet>1023</a>    <span class="doccomment">/// Read-only objects cannot be mutated once it is initialized.
-<a href=#1024 id=1024 data-nosnippet>1024</a>    /// Note that we do not currently support this semantic.
-<a href=#1025 id=1025 data-nosnippet>1025</a>    </span>ReadOnly = <span class="number">4</span>,
-<a href=#1026 id=1026 data-nosnippet>1026</a>    <span class="doccomment">/// Los + Code.
-<a href=#1027 id=1027 data-nosnippet>1027</a>    /// Note that we do not currently support this semantic.
-<a href=#1028 id=1028 data-nosnippet>1028</a>    </span>LargeCode = <span class="number">5</span>,
-<a href=#1029 id=1029 data-nosnippet>1029</a>    <span class="doccomment">/// Non moving objects will not be moved by GC.
-<a href=#1030 id=1030 data-nosnippet>1030</a>    </span>NonMoving = <span class="number">6</span>,
-<a href=#1031 id=1031 data-nosnippet>1031</a>}</code></pre></div></section></main></body></html>
+<a href=#932 id=932 data-nosnippet>932</a>            } <span class="kw">else </span>{
+<a href=#933 id=933 data-nosnippet>933</a>                <span class="self">self</span>.nonmoving.end_of_gc();
+<a href=#934 id=934 data-nosnippet>934</a>            }
+<a href=#935 id=935 data-nosnippet>935</a>        }
+<a href=#936 id=936 data-nosnippet>936</a>    }
+<a href=#937 id=937 data-nosnippet>937</a>}
+<a href=#938 id=938 data-nosnippet>938</a>
+<a href=#939 id=939 data-nosnippet>939</a><span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TraceKind;
+<a href=#940 id=940 data-nosnippet>940</a><span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<a href=#941 id=941 data-nosnippet>941</a>
+<a href=#942 id=942 data-nosnippet>942</a><span class="doccomment">/// A trait for anything that contains spaces.
+<a href=#943 id=943 data-nosnippet>943</a>/// Examples include concrete plans as well as `Gen`, `CommonPlan` and `BasePlan`.
+<a href=#944 id=944 data-nosnippet>944</a>/// All plans must implement this trait.
+<a href=#945 id=945 data-nosnippet>945</a>///
+<a href=#946 id=946 data-nosnippet>946</a>/// This trait provides methods for enumerating spaces in a struct, including spaces in nested
+<a href=#947 id=947 data-nosnippet>947</a>/// struct.
+<a href=#948 id=948 data-nosnippet>948</a>///
+<a href=#949 id=949 data-nosnippet>949</a>/// This trait can be implemented automatically by adding the `#[derive(HasSpaces)]` attribute to a
+<a href=#950 id=950 data-nosnippet>950</a>/// struct.  It uses the derive macro defined in the `mmtk-macros` crate.
+<a href=#951 id=951 data-nosnippet>951</a>///
+<a href=#952 id=952 data-nosnippet>952</a>/// This trait visits spaces as `dyn`, so it should only be used when performance is not critical.
+<a href=#953 id=953 data-nosnippet>953</a>/// For performance critical methods that visit spaces in a plan, such as `trace_object`, it is
+<a href=#954 id=954 data-nosnippet>954</a>/// recommended to define a trait (such as `PlanTraceObject`) for concrete plans to implement, and
+<a href=#955 id=955 data-nosnippet>955</a>/// implement (by hand or automatically) the method without `dyn`.
+<a href=#956 id=956 data-nosnippet>956</a></span><span class="kw">pub trait </span>HasSpaces {
+<a href=#957 id=957 data-nosnippet>957</a>    <span class="comment">// The type of the VM.
+<a href=#958 id=958 data-nosnippet>958</a>    </span><span class="kw">type </span>VM: VMBinding;
+<a href=#959 id=959 data-nosnippet>959</a>
+<a href=#960 id=960 data-nosnippet>960</a>    <span class="doccomment">/// Visit each space field immutably.
+<a href=#961 id=961 data-nosnippet>961</a>    ///
+<a href=#962 id=962 data-nosnippet>962</a>    /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
+<a href=#963 id=963 data-nosnippet>963</a>    /// in the outer struct first.
+<a href=#964 id=964 data-nosnippet>964</a>    </span><span class="kw">fn </span>for_each_space(<span class="kw-2">&amp;</span><span class="self">self</span>, func: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;));
+<a href=#965 id=965 data-nosnippet>965</a>
+<a href=#966 id=966 data-nosnippet>966</a>    <span class="doccomment">/// Visit each space field mutably.
+<a href=#967 id=967 data-nosnippet>967</a>    ///
+<a href=#968 id=968 data-nosnippet>968</a>    /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
+<a href=#969 id=969 data-nosnippet>969</a>    /// in the outer struct first.
+<a href=#970 id=970 data-nosnippet>970</a>    </span><span class="kw">fn </span>for_each_space_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>, func: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(<span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;));
+<a href=#971 id=971 data-nosnippet>971</a>}
+<a href=#972 id=972 data-nosnippet>972</a>
+<a href=#973 id=973 data-nosnippet>973</a><span class="doccomment">/// A plan that uses [`PlanTrace`] needs to provide an implementation for this trait.
+<a href=#974 id=974 data-nosnippet>974</a>/// Generally a plan does not need to manually implement this trait. Instead, we provide
+<a href=#975 id=975 data-nosnippet>975</a>/// a procedural macro that helps generate an implementation. Please check `macros/trace_object`.
+<a href=#976 id=976 data-nosnippet>976</a>///
+<a href=#977 id=977 data-nosnippet>977</a>/// A plan could also manually implement this trait. For the sake of performance, the implementation
+<a href=#978 id=978 data-nosnippet>978</a>/// of this trait should mark methods as `[inline(always)]`.
+<a href=#979 id=979 data-nosnippet>979</a>///
+<a href=#980 id=980 data-nosnippet>980</a>/// [`PlanTrace`]: crate::plan::tracing::PlanTrace
+<a href=#981 id=981 data-nosnippet>981</a></span><span class="kw">pub trait </span>PlanTraceObject&lt;VM: VMBinding&gt; {
+<a href=#982 id=982 data-nosnippet>982</a>    <span class="doccomment">/// Trace objects in the plan.
+<a href=#983 id=983 data-nosnippet>983</a>    ///
+<a href=#984 id=984 data-nosnippet>984</a>    /// See [`crate::plan::tracing::Trace::trace_object`].
+<a href=#985 id=985 data-nosnippet>985</a>    </span><span class="kw">fn </span>trace_object&lt;Q: ObjectQueue, <span class="kw">const </span>KIND: TraceKind&gt;(
+<a href=#986 id=986 data-nosnippet>986</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#987 id=987 data-nosnippet>987</a>        queue: <span class="kw-2">&amp;mut </span>Q,
+<a href=#988 id=988 data-nosnippet>988</a>        object: ObjectReference,
+<a href=#989 id=989 data-nosnippet>989</a>        worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
+<a href=#990 id=990 data-nosnippet>990</a>    ) -&gt; ObjectReference;
+<a href=#991 id=991 data-nosnippet>991</a>
+<a href=#992 id=992 data-nosnippet>992</a>    <span class="doccomment">/// Post-scan objects in the plan.
+<a href=#993 id=993 data-nosnippet>993</a>    ///
+<a href=#994 id=994 data-nosnippet>994</a>    /// See [`crate::plan::tracing::Trace::post_scan_object`].
+<a href=#995 id=995 data-nosnippet>995</a>    </span><span class="kw">fn </span>post_scan_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference);
+<a href=#996 id=996 data-nosnippet>996</a>
+<a href=#997 id=997 data-nosnippet>997</a>    <span class="doccomment">/// Whether objects in this plan may move.
+<a href=#998 id=998 data-nosnippet>998</a>    ///
+<a href=#999 id=999 data-nosnippet>999</a>    /// See [`crate::plan::tracing::Trace::post_scan_object`].
+<a href=#1000 id=1000 data-nosnippet>1000</a>    </span><span class="kw">fn </span>may_move_objects&lt;<span class="kw">const </span>KIND: TraceKind&gt;() -&gt; bool;
+<a href=#1001 id=1001 data-nosnippet>1001</a>}
+<a href=#1002 id=1002 data-nosnippet>1002</a>
+<a href=#1003 id=1003 data-nosnippet>1003</a><span class="kw">use </span>enum_map::Enum;
+<a href=#1004 id=1004 data-nosnippet>1004</a><span class="doccomment">/// Allocation semantics that MMTk provides.
+<a href=#1005 id=1005 data-nosnippet>1005</a>/// Each allocation request requires a desired semantic for the object to allocate.
+<a href=#1006 id=1006 data-nosnippet>1006</a></span><span class="attr">#[repr(i32)]
+<a href=#1007 id=1007 data-nosnippet>1007</a>#[derive(Clone, Copy, Debug, Enum, PartialEq, Eq)]
+<a href=#1008 id=1008 data-nosnippet>1008</a></span><span class="kw">pub enum </span>AllocationSemantics {
+<a href=#1009 id=1009 data-nosnippet>1009</a>    <span class="doccomment">/// The default semantic. This means there is no specific requirement for the allocation.
+<a href=#1010 id=1010 data-nosnippet>1010</a>    /// The actual semantic of the default will depend on the GC plan in use.
+<a href=#1011 id=1011 data-nosnippet>1011</a>    </span>Default = <span class="number">0</span>,
+<a href=#1012 id=1012 data-nosnippet>1012</a>    <span class="doccomment">/// Immortal objects will not be reclaimed. MMTk still traces immortal objects, but will not
+<a href=#1013 id=1013 data-nosnippet>1013</a>    /// reclaim the objects even if they are dead.
+<a href=#1014 id=1014 data-nosnippet>1014</a>    </span>Immortal = <span class="number">1</span>,
+<a href=#1015 id=1015 data-nosnippet>1015</a>    <span class="doccomment">/// Large objects. It is usually desirable to allocate large objects specially. Large objects
+<a href=#1016 id=1016 data-nosnippet>1016</a>    /// are allocated with page granularity and will not be moved.
+<a href=#1017 id=1017 data-nosnippet>1017</a>    /// Each plan provides `max_non_los_default_alloc_bytes` (see [`crate::plan::PlanConstraints`]),
+<a href=#1018 id=1018 data-nosnippet>1018</a>    /// which defines a threshold for objects that can be allocated with the default semantic. Any object that is larger than the
+<a href=#1019 id=1019 data-nosnippet>1019</a>    /// threshold must be allocated with the `Los` semantic.
+<a href=#1020 id=1020 data-nosnippet>1020</a>    /// This semantic may get removed and MMTk will transparently allocate into large object space for large objects.
+<a href=#1021 id=1021 data-nosnippet>1021</a>    </span>Los = <span class="number">2</span>,
+<a href=#1022 id=1022 data-nosnippet>1022</a>    <span class="doccomment">/// Code objects have execution permission.
+<a href=#1023 id=1023 data-nosnippet>1023</a>    /// Note that we do not currently support this semantic.
+<a href=#1024 id=1024 data-nosnippet>1024</a>    </span>Code = <span class="number">3</span>,
+<a href=#1025 id=1025 data-nosnippet>1025</a>    <span class="doccomment">/// Read-only objects cannot be mutated once it is initialized.
+<a href=#1026 id=1026 data-nosnippet>1026</a>    /// Note that we do not currently support this semantic.
+<a href=#1027 id=1027 data-nosnippet>1027</a>    </span>ReadOnly = <span class="number">4</span>,
+<a href=#1028 id=1028 data-nosnippet>1028</a>    <span class="doccomment">/// Los + Code.
+<a href=#1029 id=1029 data-nosnippet>1029</a>    /// Note that we do not currently support this semantic.
+<a href=#1030 id=1030 data-nosnippet>1030</a>    </span>LargeCode = <span class="number">5</span>,
+<a href=#1031 id=1031 data-nosnippet>1031</a>    <span class="doccomment">/// Non moving objects will not be moved by GC.
+<a href=#1032 id=1032 data-nosnippet>1032</a>    </span>NonMoving = <span class="number">6</span>,
+<a href=#1033 id=1033 data-nosnippet>1033</a>}</code></pre></div></section></main></body></html>
