@@ -307,6 +307,8 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             self.common.immortal.prepare();
             #[cfg(feature = "vm_space")]
             self.common.base.vm_space.prepare();
+            // TODO: We haven't tested these spaces. But ideally they should be handled in the same way here.
+            self.common.prepare_nonmoving_space(starts_mark_cycle);
             #[cfg(feature = "code_space")]
             self.common.base.code_space.prepare();
             #[cfg(feature = "code_space")]
@@ -535,6 +537,10 @@ impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
 
     fn concurrent_work_in_progress(&self) -> bool {
         self.in_concurrent_marking.load(Ordering::Acquire)
+    }
+
+    fn on_concurrent_work_interrupted(&self) {
+        // Do nothing
     }
 }
 
@@ -1035,6 +1041,8 @@ impl<VM: VMBinding> LXR<VM> {
         } else if self.common.los.in_space(o) {
             self.common.los.attempt_mark(o)
         } else {
+            // TODO: We need to properly handle this case.
+            // This is a temporary solution for Julia -- the only other spaces it uses are immortal space and vm space, where objects won't die.
             debug_assert!(o.is_live());
             false
         }
@@ -1062,6 +1070,8 @@ impl<VM: VMBinding> LXR<VM> {
         } else if self.common.los.in_space(o) {
             self.common.los.is_marked(o)
         } else {
+            // TODO: We need to properly handle this case.
+            // This is a temporary solution for Julia -- the only other spaces it uses are immortal space and vm space, where objects won't die.
             debug_assert!(o.is_live());
             true
         }
