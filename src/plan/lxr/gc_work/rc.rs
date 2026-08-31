@@ -119,8 +119,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         nodes: Vec<ObjectReference>,
     ) {
         let lxr = self.lxr;
-        // `uncounted` must not reach `curr_roots`: no count was raised for it, so a
-        // decrement recorded against it would be unmatched. Both sets still need tracing.
+        // `uncounted` must not reach `curr_roots`: no count was raised for it.
         let (roots, uncounted) = self.process_root_nodes(worker, nodes);
         let mut to_trace = roots.clone();
         to_trace.extend_from_slice(&uncounted);
@@ -144,9 +143,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 LXRConcurrentTraceObjects::new(to_trace, mmtk),
             );
         } else if lxr.cm_enabled() && pause == Pause::InitialMark {
-            // Seed concurrent marking with these roots, same as `ProcessIncs::do_work`
-            // does for root slots. Without this, `InitialMark` seeds nothing for node
-            // roots, and the whole trace would fall onto the `FinalMark` pause instead.
+            // Seed concurrent marking with these roots, like `ProcessIncs::do_work` does
+            // for root slots -- otherwise node roots seed nothing until `FinalMark`.
             worker.scheduler().work_buckets[WorkBucketStage::ConcurrentResumable]
                 .add(LXRConcurrentTraceObjects::new(to_trace, mmtk));
         }

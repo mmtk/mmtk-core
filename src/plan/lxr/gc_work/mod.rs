@@ -118,10 +118,8 @@ impl<VM: VMBinding> LXRRootsWorkFactory<VM> {
 
 impl<VM: VMBinding> RootsWorkFactory<VM::VMSlot> for LXRRootsWorkFactory<VM> {
     fn create_process_roots_work_with_root_kind(&mut self, slots: Vec<VM::VMSlot>, kind: RootKind) {
-        // Slot roots are processed in `RCProcessIncs`, not `root_scanning_stage()`: unlike node
-        // roots, they may evacuate the objects they point to, so they must run after
-        // `RCProcessRootNodes` has finished reference-counting (and thus pinning in place) every
-        // node root for this pause.
+        // Slot roots may evacuate, so they run in `RCProcessIncs`, not `root_scanning_stage()`.
+        // See `WorkBucketStage::RCProcessRootNodes`.
         let stage = WorkBucketStage::RCProcessIncs;
         let mut w = CollectRoots::new(slots, true, self.mmtk, stage);
         w.root_kind = Some(kind);
@@ -140,11 +138,8 @@ impl<VM: VMBinding> RootsWorkFactory<VM::VMSlot> for LXRRootsWorkFactory<VM> {
 impl<VM: VMBinding> LXRRootsWorkFactory<VM> {
     /// Handle roots reported as objects rather than as slots (e.g. Julia's conservatively
     /// scanned stacks). LXR has no pinning support, so it treats these as ordinary strong
-    /// roots instead; that's only sound because they are reference-counted in
-    /// `RCProcessRootNodes`, a stage that runs (and fully drains) before `RCProcessIncs` --
-    /// the stage that may evacuate objects via slot roots or nursery edges -- even opens. By
-    /// the time any evacuation-capable code could reach one of these objects, its count is
-    /// already non-zero, and `dont_evacuate` skips it. See `WorkBucketStage::RCProcessRootNodes`.
+    /// roots instead -- safe because `RCProcessRootNodes` reference-counts them before
+    /// `RCProcessIncs` (which may evacuate) even opens. See that stage's doc comment.
     fn create_node_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         if nodes.is_empty() {
             return;
