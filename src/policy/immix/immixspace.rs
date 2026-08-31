@@ -817,7 +817,21 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         if self.attempt_mark(object) {
-            let straddle = self.rc.object_is_in_straddle_line_no_rc_check(object);
+            // A straddle mark for a UNIFIED_OBJECT_REFERENCE_ADDRESS VM only ever sits at a
+            // line's own start (offset 0), so this cheaply rules out the large majority of
+            // addresses (any not in the first 16 bytes of their line) before touching metadata.
+            // That is not true for a VM whose reference address can trail the allocation start
+            // (e.g. Julia): a mark can also sit in the last few bytes of a line (see
+            // `RefCountHelper::straddle_bit`), which this filter would wrongly rule out, so it
+            // is skipped there in favour of the exact check.
+            let addr = object.to_raw_address().as_usize();
+            let straddle = if !VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS
+                || (addr & 0b11110000) == 0
+            {
+                self.rc.object_is_in_straddle_line_no_rc_check(object)
+            } else {
+                false
+            };
             if !straddle {
                 queue.enqueue(object);
             }
