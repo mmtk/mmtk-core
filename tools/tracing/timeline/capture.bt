@@ -192,3 +192,27 @@ usdt:$MMTK:mmtk:heap_stats {
     // We ignore @enable_print.
     printf("heap_stats,C,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
 }
+
+usdt:$MMTK:mmtk:defrag_prepare {
+    // It is printed per defrag GC which rarely happens.
+    // We ignore @enable_print.
+    printf("defrag_prepare,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
+}
+
+usdt:$MMTK:mmtk:immix_stats {
+    // It is printed per Immix full heap GC which rarely happens.
+    // We ignore @enable_print.
+    printf("immix_stats,C,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+}
+
+usdt:$MMTK:mmtk:immix_copied {
+    // It is printed per Immix full heap GC which rarely happens.
+    // We ignore @enable_print.
+    printf("immix_copied,C,%d,%lu,%lu\n", tid, nsecs, arg0);
+}
+
+usdt:$MMTK:mmtk:immix_prepare_block_state {
+    // It is printed per Immix defrag GC which rarely happens.
+    // We ignore @enable_print.
+    printf("immix_prepare_block_state,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+}

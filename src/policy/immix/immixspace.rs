@@ -1402,6 +1402,9 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         // Clear object mark table for this chunk
         self.reset_object_mark();
+        // The number of defrag source blocks.  For debugging.
+        let mut num_defrag_source_blocks = 0;
+        let mut num_blocks_prepared = 0;
         // Iterate over all blocks in this chunk
         for block in self.chunk.iter_region::<Block>() {
             let state = block.get_state();
@@ -1409,6 +1412,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             if state == BlockState::Unallocated {
                 continue;
             }
+            num_blocks_prepared += 1;
             // Check if this block needs to be defragmented.
             let is_defrag_source = if !self.space.is_defrag_enabled() {
                 // Do not set any block as defrag source if defrag is disabled.
@@ -1423,12 +1427,22 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
                 // Not a defrag GC.
                 false
             };
+            if is_defrag_source {
+                num_defrag_source_blocks += 1;
+            }
             block.set_as_defrag_source(is_defrag_source);
             // Clear block mark data.
             block.set_state(BlockState::Unmarked);
             debug_assert!(!block.get_state().is_reusable());
             debug_assert_ne!(block.get_state(), BlockState::Marked);
         }
+
+        probe!(
+            mmtk,
+            immix_prepare_block_state,
+            num_blocks_prepared,
+            num_defrag_source_blocks
+        );
 
         self.unlog_bits_op
             .execute::<VM>(self.chunk.start(), Chunk::BYTES);

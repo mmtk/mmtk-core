@@ -379,6 +379,32 @@ class LogProcessor:
                         "num_retained": int(args[2]),
                     }
 
+                case "defrag_prepare":
+                    gc["args"] |= {
+                        "defrag_prepare": {
+                            "defrag_spill_threshold": int(args[0]),
+                            "available_clean_pages_for_defrag": int(args[1]),
+                            "new_available_clean_pages_for_defrag": int(args[2]),
+                        },
+                    }
+
+                case "immix_prepare_block_state":
+                    num_blocks_prepared, num_defrag_source_blocks = [int(x) for x in args]
+                    wp["args"] |= {
+                        "num_blocks_prepared": num_blocks_prepared,
+                        "num_defrag_source_blocks": num_defrag_source_blocks,
+                    }
+
+                    if gc is not None:
+                        if "immix_prepare_block_state" not in gc["args"]:
+                            gc["args"]["immix_prepare_block_state"] = {
+                                "num_blocks_prepared": 0,
+                                "num_defrag_source_blocks": 0,
+                            }
+                        gc["args"]["immix_prepare_block_state"]["num_blocks_prepared"] += num_blocks_prepared
+                        gc["args"]["immix_prepare_block_state"]["num_defrag_source_blocks"] += num_defrag_source_blocks
+
+
                 case _:
                     processed_for_wp = False
         else:
