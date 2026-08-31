@@ -274,7 +274,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     Line::eager_mark_lines::<VM>(state, start_line..end_line);
                     // Objects allocated here are not in the SATB snapshot, log them.
                     if self.immix_space().common().needs_log_bit {
-                        VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_region_as_logged(
+                        VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.bulk_mark_as_logged(
                             start_line.start(),
                             end_line.start() - start_line.start(),
                         );
@@ -329,7 +329,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                         // Objects allocated here are not in the SATB snapshot, log them
                         if self.immix_space().common().needs_log_bit {
                             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                                .mark_region_as_logged(block.start(), Block::BYTES);
+                                .bulk_mark_as_logged(block.start(), Block::BYTES);
                         }
                     }
                 }

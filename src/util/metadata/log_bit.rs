@@ -21,8 +21,8 @@ impl VMGlobalLogBitSpec {
         self.store_atomic::<VM, u8>(object, LOGGED_VALUE, None, order)
     }
 
-    /// Clear the unlog bits for a whole region
-    pub fn mark_region_as_logged(&self, start: Address, size: usize) {
+    /// Bulk clear the unlog bits for a memory range
+    pub fn bulk_mark_as_logged(&self, start: Address, size: usize) {
         if let MetadataSpec::OnSide(side) = self.as_spec() {
             side.bzero_metadata(start, size);
         }
