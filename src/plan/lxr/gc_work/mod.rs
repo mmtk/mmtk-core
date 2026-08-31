@@ -1,5 +1,4 @@
 use super::global::LXR;
-use crate::plan::lxr::{MATURE_EVACUATION, NURSERY_EVACUATION};
 use crate::plan::tracing::UnsupportedTrace;
 use crate::plan::VectorObjectQueue;
 use crate::scheduler::gc_work::RootKind;
@@ -119,7 +118,11 @@ impl<VM: VMBinding> LXRRootsWorkFactory<VM> {
 
 impl<VM: VMBinding> RootsWorkFactory<VM::VMSlot> for LXRRootsWorkFactory<VM> {
     fn create_process_roots_work_with_root_kind(&mut self, slots: Vec<VM::VMSlot>, kind: RootKind) {
-        let stage = self.mmtk.get_plan().root_scanning_stage();
+        // Slot roots are processed in `RCProcessIncs`, not `root_scanning_stage()`: unlike node
+        // roots, they may evacuate the objects they point to, so they must run after
+        // `RCProcessRootNodes` has finished reference-counting (and thus pinning in place) every
+        // node root for this pause.
+        let stage = WorkBucketStage::RCProcessIncs;
         let mut w = CollectRoots::new(slots, true, self.mmtk, stage);
         w.root_kind = Some(kind);
         crate::memory_manager::add_work_packet(self.mmtk, stage, w);
@@ -136,15 +139,13 @@ impl<VM: VMBinding> RootsWorkFactory<VM::VMSlot> for LXRRootsWorkFactory<VM> {
 
 impl<VM: VMBinding> LXRRootsWorkFactory<VM> {
     /// Handle roots reported as objects rather than as slots (e.g. Julia's conservatively
-    /// scanned stacks). LXR has no pinning support, so these are only safe to treat as
-    /// ordinary strong roots because nothing moves; the panic below is the guard for that.
+    /// scanned stacks). LXR has no pinning support, so it treats these as ordinary strong
+    /// roots instead; that's only sound because they are reference-counted in
+    /// `RCProcessRootNodes`, a stage that runs (and fully drains) before `RCProcessIncs` --
+    /// the stage that may evacuate objects via slot roots or nursery edges -- even opens. By
+    /// the time any evacuation-capable code could reach one of these objects, its count is
+    /// already non-zero, and `dont_evacuate` skips it. See `WorkBucketStage::RCProcessRootNodes`.
     fn create_node_roots_work(&mut self, nodes: Vec<ObjectReference>) {
-        if NURSERY_EVACUATION || MATURE_EVACUATION {
-            panic!(
-                "LXR cannot honour pinning roots while evacuation is enabled; \
-                 build with the `lxr_no_evac` feature"
-            );
-        }
         if nodes.is_empty() {
             return;
         }

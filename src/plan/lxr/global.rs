@@ -356,7 +356,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn root_scanning_stage(&self) -> WorkBucketStage {
-        WorkBucketStage::RCProcessIncs
+        WorkBucketStage::RCProcessRootNodes
     }
 
     fn concurrent(&self) -> Option<&dyn ConcurrentPlan<VM = VM>> {
@@ -656,6 +656,7 @@ impl<VM: VMBinding> LXR<VM> {
 
     fn disable_unnecessary_buckets(&'static self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
         // Set conditional buckets
+        scheduler.work_buckets[WorkBucketStage::RCProcessRootNodes].set_enabled(true);
         scheduler.work_buckets[WorkBucketStage::RCProcessIncs].set_enabled(true);
         scheduler.work_buckets[WorkBucketStage::Prepare].set_enabled(pause != Pause::RefCount);
         let final_mark_or_full = pause == Pause::FinalMark || pause == Pause::Full;
