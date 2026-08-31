@@ -806,6 +806,12 @@ impl<VM: VMBinding> LXR<VM> {
         &self.common.los
     }
 
+    /// Whether `o` lives in a space LXR reference-counts (immix space or LOS). Objects
+    /// elsewhere (e.g. Julia's sysimage in the immortal/VM space) carry no reference count.
+    pub fn is_rc_object(&self, o: ObjectReference) -> bool {
+        self.immix_space.in_space(o) || self.common.los.in_space(o)
+    }
+
     fn on_lazy_decs_finished(&self, c: LazySweepingJobsCounter) {
         self.schedule_rc_block_sweeping_tasks(c);
     }

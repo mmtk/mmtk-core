@@ -1,4 +1,5 @@
 use super::global::LXR;
+use crate::plan::lxr::{MATURE_EVACUATION, NURSERY_EVACUATION};
 use crate::plan::tracing::UnsupportedTrace;
 use crate::plan::VectorObjectQueue;
 use crate::scheduler::gc_work::RootKind;
@@ -15,7 +16,7 @@ pub mod prepare;
 pub mod rc;
 pub mod tracing;
 
-use rc::CollectRoots;
+use rc::{CollectNodeRoots, CollectRoots};
 
 /// Common base fields shared by LXR's custom root/closure work packets.
 ///
@@ -124,11 +125,34 @@ impl<VM: VMBinding> RootsWorkFactory<VM::VMSlot> for LXRRootsWorkFactory<VM> {
         crate::memory_manager::add_work_packet(self.mmtk, stage, w);
     }
 
-    fn create_process_pinning_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
-        unreachable!("LXR does not support pinning roots");
+    fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+        self.create_node_roots_work(nodes);
     }
 
-    fn create_process_tpinning_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
-        unreachable!("LXR does not support transitive pinning roots");
+    fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+        self.create_node_roots_work(nodes);
+    }
+}
+
+impl<VM: VMBinding> LXRRootsWorkFactory<VM> {
+    /// Handle roots reported as objects rather than as slots (e.g. Julia's conservatively
+    /// scanned stacks). LXR has no pinning support, so these are only safe to treat as
+    /// ordinary strong roots because nothing moves; the panic below is the guard for that.
+    fn create_node_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+        if NURSERY_EVACUATION || MATURE_EVACUATION {
+            panic!(
+                "LXR cannot honour pinning roots while evacuation is enabled; \
+                 build with the `lxr_no_evac` feature"
+            );
+        }
+        if nodes.is_empty() {
+            return;
+        }
+        let stage = self.mmtk.get_plan().root_scanning_stage();
+        crate::memory_manager::add_work_packet(
+            self.mmtk,
+            stage,
+            CollectNodeRoots::<VM>::new(nodes),
+        );
     }
 }
