@@ -15,7 +15,7 @@ env:
   DEPLOY: true
   # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
   CI_PERF_KIT_BUILD: ci-perf-kit/upload
-  CI_PERF_KIT_VERSION: '0.9.3'
+  CI_PERF_KIT_VERSION: '0.9.4'
 
 jobs:
   # JikesRVM
