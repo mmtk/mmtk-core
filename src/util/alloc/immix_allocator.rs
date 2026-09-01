@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap, AllocatorContext};
 use super::BumpPointer;
+use crate::policy::immix::block::Block;
 use crate::policy::immix::line::*;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
@@ -271,6 +272,13 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                 if self.immix_space().should_allocate_as_live() {
                     let state = self.space.line_mark_state.load(Ordering::Acquire);
                     Line::eager_mark_lines::<VM>(state, start_line..end_line);
+                    // Objects allocated here are not in the SATB snapshot, log them.
+                    if self.immix_space().common().needs_log_bit {
+                        VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.bulk_mark_as_logged(
+                            start_line.start(),
+                            end_line.start() - start_line.start(),
+                        );
+                    }
                 }
                 return true;
             } else {
@@ -318,6 +326,11 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     if self.immix_space().should_allocate_as_live() {
                         let state = self.space.line_mark_state.load(Ordering::Acquire);
                         Line::eager_mark_lines::<VM>(state, block.start_line()..block.end_line());
+                        // Objects allocated here are not in the SATB snapshot, log them
+                        if self.immix_space().common().needs_log_bit {
+                            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                                .bulk_mark_as_logged(block.start(), Block::BYTES);
+                        }
                     }
                 }
                 if self.request_for_large {
