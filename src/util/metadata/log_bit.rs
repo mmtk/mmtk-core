@@ -21,6 +21,13 @@ impl VMGlobalLogBitSpec {
         self.store_atomic::<VM, u8>(object, LOGGED_VALUE, None, order)
     }
 
+    /// Bulk clear the unlog bits for a memory range
+    pub fn bulk_mark_as_logged(&self, start: Address, size: usize) {
+        if let MetadataSpec::OnSide(side) = self.as_spec() {
+            side.bzero_metadata(start, size);
+        }
+    }
+
     /// Mark the log bit as unlogged (1 means unlogged)
     pub fn mark_as_unlogged<VM: VMBinding>(&self, object: ObjectReference, order: Ordering) {
         self.store_atomic::<VM, u8>(object, UNLOGGED_VALUE, None, order)
