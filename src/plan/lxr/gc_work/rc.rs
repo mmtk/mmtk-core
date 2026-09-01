@@ -4,6 +4,7 @@ use super::super::LXR;
 use super::super::{LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURSERY_EVACUATION};
 use super::tracing::LXRConcurrentTraceObjects;
 use super::tracing::LXRStopTheWorldProcessEdges;
+use super::tracing::LXRStopTheWorldProcessNodes;
 use super::tracing::ProcessModBufSATB;
 use super::ProcessEdgesBase;
 use crate::plan::VectorQueue;
@@ -94,12 +95,21 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         let mut roots = Vec::with_capacity(nodes.len());
         let mut uncounted = vec![];
         for o in nodes {
+            // A root node has no slot, so nothing could ever update it if `o` had already
+            // moved by the time it got here. Catch that rather than silently register a
+            // stale reference as this pause's root set.
+            debug_assert!(
+                !object_forwarding::is_forwarded::<VM>(o),
+                "root node {:?} was already forwarded",
+                o
+            );
             if !self.lxr.is_rc_object(o) {
                 uncounted.push(o);
                 continue;
             }
             let los = self.lxr.los().in_space(o);
             if self.inc(o) {
+                // Promote without moving
                 self.promote(worker, o, false, los, 0);
             }
             roots.push(o);
@@ -135,12 +145,29 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             );
         }
         let pause = lxr.current_pause().unwrap();
-        if pause == Pause::Full || pause == Pause::FinalMark {
+        if pause == Pause::FinalMark {
             // Nodes, unlike slots, are never re-scanned, so a stop-the-world pause has to
-            // trace them directly here or they're never marked.
+            // trace them directly here or they're never marked. Uses
+            // `LXRStopTheWorldProcessNodes` in `PinningRootsTrace` -- which always runs
+            // (and drains) before `Closure` opens -- not `LXRConcurrentTraceObjects`,
+            // whose continuations resume in `ConcurrentResumable`, not guaranteed to drain
+            // before this pause ends.
             worker.add_work(
-                WorkBucketStage::Closure,
-                LXRConcurrentTraceObjects::new(to_trace, mmtk),
+                WorkBucketStage::PinningRootsTrace,
+                LXRStopTheWorldProcessNodes::<VM, false>::new(
+                    to_trace,
+                    mmtk,
+                    WorkBucketStage::PinningRootsTrace,
+                ),
+            );
+        } else if pause == Pause::Full {
+            worker.add_work(
+                WorkBucketStage::PinningRootsTrace,
+                LXRStopTheWorldProcessNodes::<VM, true>::new(
+                    to_trace,
+                    mmtk,
+                    WorkBucketStage::PinningRootsTrace,
+                ),
             );
         } else if lxr.cm_enabled() && pause == Pause::InitialMark {
             // Seed concurrent marking with these roots, like `ProcessIncs::do_work` does

@@ -338,7 +338,7 @@ impl<VM: VMBinding, const FULL_GC: bool> GCWork<VM> for LXRStopTheWorldProcessEd
 
 impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC> {
     #[inline]
-    fn full_gc_trace_object<const WEAK_ROOT: bool>(
+    fn full_gc_trace_object<const WEAK_ROOT: bool, const NO_MOVE: bool>(
         &mut self,
         object: ObjectReference,
     ) -> ObjectReference {
@@ -353,14 +353,23 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
         let x = if in_immix_space {
             let pause = self.pause;
             let worker = self.worker();
-            self.lxr.immix_space.rc_trace_object(
-                self,
-                object,
-                CopySemantics::DefaultCopy,
-                pause,
-                true,
-                worker,
-            )
+            if NO_MOVE {
+                // Mark only: never consult `is_defrag_source()`, so a caller that cannot
+                // update a stale reference (there's no slot to write into) is safe
+                // regardless of whether this object's block was picked for defrag.
+                self.lxr
+                    .immix_space
+                    .trace_mark_rc_mature_object(self, object, pause, true)
+            } else {
+                self.lxr.immix_space.rc_trace_object(
+                    self,
+                    object,
+                    CopySemantics::DefaultCopy,
+                    pause,
+                    true,
+                    worker,
+                )
+            }
         } else if self.lxr.los().in_space(object) {
             self.lxr.los().trace_object(self, object)
         } else {
@@ -376,7 +385,7 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
     }
 
     #[inline]
-    fn mature_evac_trace_object<const WEAK_ROOT: bool, const REMSET: bool>(
+    fn mature_evac_trace_object<const WEAK_ROOT: bool, const REMSET: bool, const NO_MOVE: bool>(
         &mut self,
         object: ObjectReference,
     ) -> ObjectReference {
@@ -410,14 +419,21 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
             }
             let pause = self.pause;
             let worker = self.worker();
-            self.lxr.immix_space.rc_trace_object(
-                self,
-                object,
-                CopySemantics::DefaultCopy,
-                pause,
-                true,
-                worker,
-            )
+            if NO_MOVE {
+                // See the matching branch in `full_gc_trace_object`.
+                self.lxr
+                    .immix_space
+                    .trace_mark_rc_mature_object(self, object, pause, true)
+            } else {
+                self.lxr.immix_space.rc_trace_object(
+                    self,
+                    object,
+                    CopySemantics::DefaultCopy,
+                    pause,
+                    true,
+                    worker,
+                )
+            }
         } else if self.lxr.los().in_space(object) {
             self.lxr.los().trace_object(self, object)
         } else {
@@ -438,9 +454,9 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
             return;
         };
         let new_object = if !FULL_GC {
-            self.mature_evac_trace_object::<WEAK_ROOT, REMSET>(object)
+            self.mature_evac_trace_object::<WEAK_ROOT, REMSET, false>(object)
         } else {
-            self.full_gc_trace_object::<WEAK_ROOT>(object)
+            self.full_gc_trace_object::<WEAK_ROOT, false>(object)
         };
         if Self::OVERWRITE_REFERENCE && new_object != object {
             slot.store(new_object);
@@ -487,5 +503,71 @@ impl<VM: VMBinding, const FULL_GC: bool> Deref for LXRStopTheWorldProcessEdges<V
 impl<VM: VMBinding, const FULL_GC: bool> DerefMut for LXRStopTheWorldProcessEdges<VM, FULL_GC> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
+    }
+}
+
+/// Traces a set of root objects reported as nodes rather than as slots, inside a
+/// stop-the-world tracing pause (`FinalMark`/`Full`). There is no slot to update if one
+/// moved, so callers must guarantee none of them can be evacuated by this trace -- LXR's
+/// node roots are reference-counted before this ever runs, which makes `dont_evacuate`
+/// treat them as ineligible for nursery eviction, and the tracing here always runs with
+/// `NO_MOVE = true`, which makes mature evacuation ineligible too.
+///
+/// Node-shaped counterpart of [`LXRStopTheWorldProcessEdges`]: wraps one (with no slots of
+/// its own) and reuses its per-object tracing directly, rather than going through a slot.
+/// Once a node's fields are discovered they're ordinary slots, so the rest of the closure
+/// -- and any continuation past this pass -- runs as plain `LXRStopTheWorldProcessEdges`.
+pub struct LXRStopTheWorldProcessNodes<VM: VMBinding, const FULL_GC: bool> {
+    inner: LXRStopTheWorldProcessEdges<VM, FULL_GC>,
+    nodes: Vec<ObjectReference>,
+}
+
+impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessNodes<VM, FULL_GC> {
+    pub fn new(
+        nodes: Vec<ObjectReference>,
+        mmtk: &'static MMTK<VM>,
+        bucket: WorkBucketStage,
+    ) -> Self {
+        Self {
+            inner: LXRStopTheWorldProcessEdges::new(vec![], false, mmtk, bucket),
+            nodes,
+        }
+    }
+}
+
+impl<VM: VMBinding, const FULL_GC: bool> GCWork<VM> for LXRStopTheWorldProcessNodes<VM, FULL_GC> {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        self.inner.set_worker(worker);
+        self.inner.pause = self.inner.lxr.current_pause().unwrap();
+        for o in std::mem::take(&mut self.nodes) {
+            // A node root has no slot to update if it moves, so its block must never be
+            // evacuated while it's a live root -- not just by *this* trace (`NO_MOVE`,
+            // below), but by any other edge that reaches the same object later in this
+            // pause. Mature defrag-source selection happens earlier than this (in
+            // `Prepare` for `InitialMark`/`Full`, or an entirely earlier pause for
+            // `FinalMark`, since defrag selection doesn't rerun there), so it can't already
+            // know about this pause's roots; deselecting the block here, strictly before
+            // `Closure` (or anything else in this pause) can start evacuating anything,
+            // makes every such edge take the mark-only path instead. Sweeping at the end of
+            // the pause already tolerates a block whose `is_defrag_source` flag no longer
+            // matches its `defrag_blocks` bookkeeping (see `sweep_mature_evac_candidates`).
+            if self.inner.lxr.immix_space.in_space(o) {
+                let block = Block::containing(o);
+                if block.is_defrag_source() {
+                    block.set_as_defrag_source(false);
+                }
+            }
+            // `NO_MOVE = true`: there's no slot to update if this moved, so the trace must
+            // never evacuate it, regardless of whether its block was picked for defrag.
+            let new_object = if FULL_GC {
+                self.inner.full_gc_trace_object::<false, true>(o)
+            } else {
+                self.inner.mature_evac_trace_object::<false, false, true>(o)
+            };
+            // Catches the object having already been moved by some other path before we
+            // got to it (e.g. reached and evacuated through an ordinary, movable edge).
+            debug_assert_eq!(new_object, o, "root node {:?} was moved", o);
+        }
+        GCWork::do_work(&mut self.inner, worker, mmtk);
     }
 }

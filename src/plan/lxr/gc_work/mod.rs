@@ -118,8 +118,7 @@ impl<VM: VMBinding> LXRRootsWorkFactory<VM> {
 
 impl<VM: VMBinding> RootsWorkFactory<VM::VMSlot> for LXRRootsWorkFactory<VM> {
     fn create_process_roots_work_with_root_kind(&mut self, slots: Vec<VM::VMSlot>, kind: RootKind) {
-        // Slot roots may evacuate, so they run in `RCProcessIncs`, not `root_scanning_stage()`.
-        // See `WorkBucketStage::RCProcessRootNodes`.
+        // Slot roots may evacuate, so they run in `RCProcessIncs`.
         let stage = WorkBucketStage::RCProcessIncs;
         let mut w = CollectRoots::new(slots, true, self.mmtk, stage);
         w.root_kind = Some(kind);
@@ -136,18 +135,32 @@ impl<VM: VMBinding> RootsWorkFactory<VM::VMSlot> for LXRRootsWorkFactory<VM> {
 }
 
 impl<VM: VMBinding> LXRRootsWorkFactory<VM> {
-    /// Handle roots reported as objects rather than as slots (e.g. Julia's conservatively
-    /// scanned stacks). LXR has no pinning support, so it treats these as ordinary strong
-    /// roots instead -- safe because `RCProcessRootNodes` reference-counts them before
-    /// `RCProcessIncs` (which may evacuate) even opens. See that stage's doc comment.
+    /// Reference-counts and, if needed, traces a set of roots reported as objects rather
+    /// than slots.
+    ///
+    /// This always schedules into `RCProcessRootNodes`, regardless of pause: that stage is
+    /// what reference-counts (and, for a nursery object, promotes) these roots, which is
+    /// what makes them ineligible for nursery eviction. `RCProcessRootNodes` is guaranteed
+    /// to fully drain before `RCProcessIncs` opens, so the counting has to happen there even
+    /// when there's nothing to trace yet -- `RCProcessIncs` processes ordinary slots to the
+    /// very same objects, and its nursery-eviction decision only skips an object once its rc
+    /// count is already nonzero. Scheduling this work into a later stage instead (e.g.
+    /// `PinningRootsTrace`, conditional on pause) would leave that window open for every
+    /// pause but `RefCount`.
+    ///
+    /// The *tracing* of these roots, in contrast, is deferred by
+    /// [`rc::ProcessIncs::process_and_schedule_root_nodes`] to whichever stage suits the
+    /// current pause -- `PinningRootsTrace` for a pause with a `Closure` phase, since nodes,
+    /// unlike slots, are never re-scanned and so must be traced directly before `Closure`
+    /// opens; nothing for `RefCount`, which has no `Closure` phase at all. Only the counting
+    /// has to be this early.
     fn create_node_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         if nodes.is_empty() {
             return;
         }
-        let stage = self.mmtk.get_plan().root_scanning_stage();
         crate::memory_manager::add_work_packet(
             self.mmtk,
-            stage,
+            WorkBucketStage::RCProcessRootNodes,
             CollectNodeRoots::<VM>::new(nodes),
         );
     }

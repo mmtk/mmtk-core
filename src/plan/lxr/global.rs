@@ -659,6 +659,11 @@ impl<VM: VMBinding> LXR<VM> {
         scheduler.work_buckets[WorkBucketStage::RCProcessRootNodes].set_enabled(true);
         scheduler.work_buckets[WorkBucketStage::RCProcessIncs].set_enabled(true);
         scheduler.work_buckets[WorkBucketStage::Prepare].set_enabled(pause != Pause::RefCount);
+        // Node roots for any pause other than `RefCount` are processed here (see
+        // `LXRRootsWorkFactory::create_node_roots_work`), including `InitialMark`, which has
+        // no `Closure` phase of its own but still needs this bucket open to run them.
+        scheduler.work_buckets[WorkBucketStage::PinningRootsTrace]
+            .set_enabled(pause != Pause::RefCount);
         let final_mark_or_full = pause == Pause::FinalMark || pause == Pause::Full;
         scheduler.work_buckets[WorkBucketStage::Closure].set_enabled(final_mark_or_full);
         scheduler.work_buckets[WorkBucketStage::WeakRefClosure].set_enabled(final_mark_or_full);
@@ -671,7 +676,6 @@ impl<VM: VMBinding> LXR<VM> {
         scheduler.work_buckets[WorkBucketStage::ConcurrentResumable].set_enabled(true);
         // Always disabled
         scheduler.work_buckets[WorkBucketStage::TPinningClosure].set_enabled(false);
-        scheduler.work_buckets[WorkBucketStage::PinningRootsTrace].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::SoftRefClosure].set_enabled(false);
