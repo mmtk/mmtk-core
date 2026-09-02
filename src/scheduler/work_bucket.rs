@@ -41,6 +41,10 @@ impl<VM: VMBinding> BucketQueue<VM> {
         self.active_queue().is_empty()
     }
 
+    fn len(&self) -> usize {
+        self.active_queue().len()
+    }
+
     pub(super) fn steal(&self) -> Steal<Box<dyn GCWork<VM>>> {
         self.active_queue().steal()
     }
@@ -70,26 +74,6 @@ impl<VM: VMBinding> BucketQueue<VM> {
         for w in ws {
             self.inactive_queue().push(w);
         }
-    }
-
-    /// Remove and return every packet currently in this queue, leaving it empty.
-    fn drain(&self) -> Vec<Box<dyn GCWork<VM>>> {
-        let mut items = Vec::new();
-        loop {
-            match self.queue0.steal() {
-                Steal::Success(w) => items.push(w),
-                Steal::Retry => continue,
-                Steal::Empty => break,
-            }
-        }
-        loop {
-            match self.queue1.steal() {
-                Steal::Success(w) => items.push(w),
-                Steal::Retry => continue,
-                Steal::Empty => break,
-            }
-        }
-        items
     }
 
     /// Dump all the packets in this queue for debugging purpose.
@@ -217,20 +201,17 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.queue.is_empty()
     }
 
-    pub fn is_drained(&self) -> bool {
-        !self.is_enabled() || (self.is_open() && self.is_empty())
+    /// Number of packets currently queued.
+    ///
+    /// Used to decide how many workers to wake when this bucket opens, so that a bucket holding a
+    /// single packet does not wake every worker.  Only meaningful when no worker can be stealing
+    /// concurrently, i.e. when called by the last parked worker.
+    pub fn len(&self) -> usize {
+        self.queue.len()
     }
 
-    /// Remove and return every packet currently queued in this bucket (including the
-    /// prioritized queue, if any), leaving it empty.
-    ///
-    /// This does not synchronize with producers or consumers of this bucket in any way: the
-    /// caller must independently ensure that nothing can be concurrently adding to or polling
-    /// this bucket (e.g. by only calling this once all GC workers are known to be parked, and
-    /// after disabling the bucket so no new packets can be routed to it, as
-    /// `ConcurrentImmix::schedule_concurrent_marking_final_pause` does for `Concurrent`).
-    pub(crate) fn drain_all_packets(&self) -> Vec<Box<dyn GCWork<VM>>> {
-        self.queue.drain()
+    pub fn is_drained(&self) -> bool {
+        !self.is_enabled() || (self.is_open() && self.is_empty())
     }
 
     /// Close the bucket
@@ -243,37 +224,27 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.open.store(false, Ordering::Relaxed);
     }
 
-    fn warn_notify_add_if_disabled(&self) {
-        #[cfg(debug_assertions)]
-        if !self.is_enabled() {
-            // This is usually benign if it happens occasionally. But if we keep adding work to a disabled bucket,
-            // we keep waking up workers for new work that they can't work on.
-            warn!(
-                "Add a work to a disabled bucket with notifying one worker {:?}",
-                self.stage
-            );
-        }
-    }
-
     /// Add a work packet to this bucket
     pub fn add<W: GCWork<VM>>(&self, work: W) {
-        self.warn_notify_add_if_disabled();
+        debug_assert!(self.is_enabled());
         self.queue.push(Box::new(work));
         self.notify_one_worker();
     }
 
     /// Add a work packet to this bucket
     pub fn add_boxed(&self, work: Box<dyn GCWork<VM>>) {
-        self.warn_notify_add_if_disabled();
+        debug_assert!(self.is_enabled());
         self.queue.push(work);
         self.notify_one_worker();
     }
 
     pub fn add_deferred(&self, work: Box<dyn GCWork<VM>>) {
+        debug_assert!(self.is_enabled());
         self.queue.push_inactive(work);
     }
 
     pub fn bulk_add_deferred(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
+        debug_assert!(self.is_enabled());
         self.queue.push_all_inactive(work_vec);
     }
 

@@ -80,7 +80,13 @@ define_side_metadata_specs!(
     // Mark blocks by immix
     IX_BLOCK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
     // Straddle line marks
-    RC_STRADDLE_LINES = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::line::Line::LOG_BYTES),
+    // One entry per reference-counted granule, not per line. A synthetic line-occupancy mark has
+    // to be distinguishable from a real object start by the sweeper, and two objects can touch the
+    // same line -- one's header mark can share a line with another's body -- so a per-line bit is
+    // cleared by whichever dies first and orphans the other's mark. See `set_occupied_line_marks`.
+    // One *bit* per granule: this is a boolean, and at granule granularity a byte each would cost
+    // one metadata byte per heap word.
+    RC_STRADDLE_LINES = (global: false, log_num_of_bits: 0, log_bytes_in_region: crate::util::rc::LOG_MIN_OBJECT_SIZE),
     // LXR Block logging bits
     IX_BLOCK_LOG   = (global: false, log_num_of_bits: 0, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
     NURSERY_PROMOTION_STATE   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),

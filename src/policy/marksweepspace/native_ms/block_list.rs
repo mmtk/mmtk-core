@@ -322,16 +322,18 @@ fn mi_bin_from_size(size: usize) -> usize {
     // adapted from _mi_bin in mimalloc
     let mut wsize: usize = mi_wsize_from_size(size);
     debug_assert!(wsize <= MI_LARGE_OBJ_WSIZE_MAX);
+    let bin: u8;
     if wsize <= 1 {
-        1
+        bin = 1;
     } else if wsize <= 8 {
-        wsize
+        bin = wsize as u8;
         // bin = ((wsize + 1) & !1) as u8; // round to double word sizes
     } else {
         wsize -= 1;
         let b = (MI_INTPTR_BITS - 1 - usize::leading_zeros(wsize) as usize) as u8; // note: wsize != 0
-        (((b << 2) + ((wsize >> (b - 2)) & 0x03) as u8) - 3) as usize
+        bin = ((b << 2) + ((wsize >> (b - 2)) & 0x03) as u8) - 3;
     }
+    bin as usize
 }
 
 #[cfg(test)]

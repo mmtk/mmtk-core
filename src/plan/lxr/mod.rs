@@ -5,6 +5,7 @@ pub(super) mod global;
 mod mature_evac;
 pub(super) mod mutator;
 
+use crate::util::ObjectReference;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
@@ -21,7 +22,365 @@ static NUM_CONCURRENT_TRACING_PACKETS: AtomicUsize = AtomicUsize::new(0);
 static DISABLE_LASY_DEC_FOR_CURRENT_GC: AtomicBool = AtomicBool::new(false);
 static NO_EVAC: AtomicBool = AtomicBool::new(false);
 
+/// Why the barrier declined to record a slot, for the `lxr_slot_skipped` USDT tracepoint.
+/// Keep in sync with `tools/tracing/README.md`.
+#[repr(usize)]
+pub(crate) enum SkipReason {
+    /// The slot lies outside the heap, so it has no field unlog bit and nothing keeps its
+    /// memory alive until the increment is processed.
+    OutOfHeap = 0,
+    /// The slot is derived, so re-reading it at the pause would not yield its referent.
+    /// See [`crate::vm::slot::Slot::is_derived`].
+    Derived = 1,
+}
+
 // --- LXR-specific global constants/flags ---
+
+/// Counts barrier slots that lie outside the heap and so have no field unlog bit. Such
+/// a slot is recorded and re-read when its increment is processed, which is only sound
+/// if the memory holding it is still there at that point.
+pub(crate) static OUT_OF_HEAP_SLOTS: AtomicUsize = AtomicUsize::new(0);
+
+/// Whether to validate the target of every increment before using it, reporting the
+/// slot's provenance if it is not an object. Set `MMTK_LXR_CHECK_INCS=1`.
+#[inline]
+pub(crate) fn check_incs() -> bool {
+    static CHECK: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CHECK.get_or_init(|| std::env::var_os("MMTK_LXR_CHECK_INCS").is_some())
+}
+
+/// Whether an address really holds an object, for the diagnostics above.
+///
+/// MMTk answers this from the valid-object bit, which is only maintained when built with
+/// the `vo_bit` feature. There is no VM-neutral way to ask otherwise, so without it this
+/// says yes to everything and the reports below go quiet. A binding that wants
+/// `MMTK_LXR_CHECK_INCS` to find anything has to enable `vo_bit` too.
+pub(crate) fn object_is_plausible(_o: ObjectReference) -> bool {
+    #[cfg(feature = "vo_bit")]
+    {
+        crate::memory_manager::is_mmtk_object(_o.to_raw_address()).is_some()
+    }
+    #[cfg(not(feature = "vo_bit"))]
+    {
+        true
+    }
+}
+
+/// The set of live objects as computed by the binding's verifier just before sweeping,
+/// used to catch a decrement that takes a still-reachable object to zero *at the moment it
+/// happens*, which is the only way to learn where that decrement came from.
+///
+/// Populated by [`set_live_set`] under `MMTK_LXR_VERIFY=1`; empty otherwise, and every
+/// check against it is skipped when empty.
+static LIVE_SET: std::sync::RwLock<Option<std::collections::HashSet<usize>>> =
+    std::sync::RwLock::new(None);
+
+/// Whether [`LIVE_SET`] has ever been populated, so that [`is_known_live`] can answer
+/// without taking the lock. It is consulted for every object a decrement takes to zero, by
+/// every GC worker, and a global `RwLock` there is a shared cache line on a hot path even
+/// when the set is empty.
+static LIVE_SET_POPULATED: AtomicBool = AtomicBool::new(false);
+
+/// Record the verifier's live set for the current pause. See [`LIVE_SET`].
+pub fn set_live_set(objects: std::collections::HashSet<usize>) {
+    *LIVE_SET.write().unwrap() = Some(objects);
+    LIVE_SET_POPULATED.store(true, Ordering::SeqCst);
+}
+
+/// Reference-counting ledger for objects the verifier says are live: object -> [(gc#, what
+/// happened, the object whose field it was, the slot)]. Only live objects are tracked, which is
+/// what keeps this affordable; without it a zero-count report can only show the GC worker's own
+/// stack, which never names the store responsible.
+type RcEvent = (usize, &'static str, usize, usize);
+static DEC_SITES: std::sync::RwLock<Option<std::collections::HashMap<usize, Vec<RcEvent>>>> =
+    std::sync::RwLock::new(None);
+
+/// Dump the recorded ledger for `o`, most recent last. Empty output means no increment and no
+/// decrement was ever applied to it while it was known live.
+pub fn dump_rc_events(o: ObjectReference) {
+    let guard = DEC_SITES.read().unwrap();
+    let Some(events) = guard
+        .as_ref()
+        .and_then(|m| m.get(&o.to_raw_address().as_usize()))
+    else {
+        eprintln!("[lxr-verify]       ledger: empty (never inc'd or dec'd while live)");
+        return;
+    };
+    for (gc, kind, src, slot) in events {
+        eprintln!("[lxr-verify]       ledger: gc#{gc} {kind} src={src:#x} slot={slot:#x}");
+    }
+}
+
+/// Record one reference-counting event against `old`. `kind` says what happened and where it
+/// came from ("dec barrier", "inc mature", ...). Only called under [`check_incs`], and only for
+/// objects the verifier knows to be live, which is what keeps the map small enough to afford.
+///
+/// The point is the *ledger*: an object that ends a pause with a zero count either received a
+/// decrement it should not have, or never received an increment it was owed, and only the
+/// sequence of events against that one object distinguishes the two.
+/// This sits on every processed increment and decrement, so the disabled case must be a
+/// predictable load and nothing else; the recording itself is out of line and cold.
+#[inline]
+pub(crate) fn record_rc_event(
+    old: ObjectReference,
+    kind: &'static str,
+    src: Option<ObjectReference>,
+    slot: crate::util::Address,
+) {
+    if check_incs() {
+        record_rc_event_slow(old, kind, src, slot);
+    }
+}
+
+#[cold]
+fn record_rc_event_slow(
+    old: ObjectReference,
+    kind: &'static str,
+    src: Option<ObjectReference>,
+    slot: crate::util::Address,
+) {
+    // Normally only known-live objects are tracked, to keep this affordable. But an object's
+    // *first* increment is the interesting one when it ends up uncounted, and a brand-new object
+    // is not in the previous pause's live set, so that gate hides exactly what is being looked
+    // for. Slots outside the heap -- fields of VM-space (sysimage) objects -- are few enough
+    // (~16k per collection) to record unconditionally, and that is the class under suspicion.
+    let slot_in_vm_space = {
+        let layout = crate::util::heap::layout::vm_layout::vm_layout();
+        !slot.is_zero() && (slot < layout.heap_start || slot >= layout.heap_end)
+    };
+    if !slot_in_vm_space && !is_known_live(old) {
+        return;
+    }
+    let mut guard = DEC_SITES.write().unwrap();
+    let map = guard.get_or_insert_with(Default::default);
+    // Never reset per collection: the sites are recorded during the epoch *before* the pause
+    // whose `STWRCDecsAndSweep` applies them, so a per-collection clear would discard exactly
+    // the entries the report needs. Cap the size instead.
+    if map.len() >= 4_000_000 {
+        return;
+    }
+    let entry = map.entry(old.to_raw_address().as_usize()).or_default();
+    if entry.len() < 32 {
+        entry.push((
+            GC_COUNT.load(Ordering::SeqCst),
+            kind,
+            src.map(|s| s.to_raw_address().as_usize()).unwrap_or(0),
+            slot.as_usize(),
+        ));
+    }
+}
+
+/// Diagnostic: the coalescing state of the field at `a`, as the barrier sees it. `Some(true)`
+/// means the field is logged, i.e. the barrier has already snapshotted it this epoch and will
+/// skip further writes to it; `Some(false)` means the next write will be recorded; `None` means
+/// the address has no field unlog bit at all.
+///
+/// Used by the bring-up verifier to ask, of an edge that was never counted, whether the barrier
+/// believed it had already handled it.
+pub fn field_is_logged<VM: crate::vm::VMBinding>(a: crate::util::Address) -> Option<bool> {
+    use crate::vm::ObjectModel;
+    let spec = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+        .as_spec()
+        .extract_side_spec();
+    if !crate::util::metadata::side_metadata::address_to_meta_address(&spec, a).is_mapped() {
+        return None;
+    }
+    Some(unsafe { spec.load::<u8>(a) } == crate::util::metadata::log_bit::LOGGED_VALUE)
+}
+
+/// Diagnostic counterpart of [`field_is_logged`] for the per-object log bit, which is what a
+/// binding whose inlined barrier cannot name the field (Julia's `mmtk_gc_wb_fast`) gates on.
+/// `true` means unlogged, i.e. the fast path will take the slow path on the next write.
+pub fn object_is_unlogged<VM: crate::vm::VMBinding>(o: ObjectReference) -> bool {
+    use crate::vm::ObjectModel;
+    VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(o, Ordering::SeqCst)
+}
+
+/// Report a decrement that took a live object to zero, with a backtrace naming its origin.
+#[cold]
+fn report_dec_of_live_object(o: ObjectReference, origin: &str) {
+    static REPORTED: AtomicUsize = AtomicUsize::new(0);
+    if REPORTED.fetch_add(1, Ordering::Relaxed) >= 3 {
+        return;
+    }
+    eprintln!(
+        "[lxr] gc#{} BUG: decremented a live object to zero: {:?} (decrements from: {})",
+        GC_COUNT.load(Ordering::SeqCst),
+        o,
+        origin,
+    );
+    // The recording site is the interesting part; the worker's own stack is not.
+    dump_rc_events(o);
+}
+
+/// Whether `o` is in the verifier's live set, i.e. reachable from the VM's roots.
+#[inline]
+fn is_known_live(o: ObjectReference) -> bool {
+    if !LIVE_SET_POPULATED.load(Ordering::Relaxed) {
+        return false;
+    }
+    let guard = LIVE_SET.read().unwrap();
+    match guard.as_ref() {
+        Some(set) => set.contains(&o.to_raw_address().as_usize()),
+        None => false,
+    }
+}
+
+/// The quantities these used to count are now USDT tracepoints, because one of them
+/// (`lxr_inc_pushed`) sat on the barrier's fast path where a global atomic is a cache line
+/// shared by every mutator thread on every reference store. See `tools/tracing/README.md`
+/// for what each reports and how to aggregate them:
+///
+/// - `lxr_promote` -- promotions, i.e. zero-to-one count transitions.
+/// - `lxr_inc_pushed` / `lxr_inc_processed` -- slots the barrier buffered against
+///   increments actually applied. Every buffered slot must be processed in the pause that
+///   follows: a logged field is not recorded again, so a dropped slot loses its increment
+///   permanently while the matching decrement was already taken.
+/// - `lxr_slot_skipped` -- slots the barrier declined, tagged with a [`SkipReason`].
+///
+/// Objects `SweepDeadCycles` reclaimed as unmarked cyclic garbage, against those it kept because
+/// tracing had marked them. If the trace marked the heap, "kept" must dominate; the reverse means
+/// the sweep is reclaiming the live heap because the marks it consults were never set. These stay
+/// as counters because the verifier reads them programmatically, and they are GC-time rather than
+/// mutator-time.
+pub(crate) static SWEEP_ZEROED: AtomicUsize = AtomicUsize::new(0);
+pub(crate) static SWEEP_KEPT_MARKED: AtomicUsize = AtomicUsize::new(0);
+
+/// Cumulative `(zeroed, kept_marked)` from [`SWEEP_ZEROED`] / [`SWEEP_KEPT_MARKED`]. The plan's own
+/// stats print runs inside `release`, which is *before* the sweep, so it always reports zeroes;
+/// read this from a post-sweep hook instead.
+pub fn sweep_dead_cycle_counts() -> (usize, usize) {
+    (
+        SWEEP_ZEROED.load(Ordering::Relaxed),
+        SWEEP_KEPT_MARKED.load(Ordering::Relaxed),
+    )
+}
+
+/// Collections started so far, so diagnostics can say which GC they belong to.
+pub(crate) static GC_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+/// Read [`GC_COUNT`], so binding-side diagnostics can label their output with the same
+/// collection number the plan's own `MMTK_LXR_STATS` lines use.
+pub fn gc_count() -> usize {
+    GC_COUNT.load(Ordering::SeqCst)
+}
+
+/// Set once `LXR::release` begins. VM-side sweeping runs from there and decides liveness
+/// by reference count, so any increment processed after this point is read too late.
+pub(crate) static RELEASE_STARTED: AtomicBool = AtomicBool::new(false);
+
+/// Increment packets that ran after `LXR::release` began. Must be zero.
+pub(crate) static INCS_AFTER_RELEASE: AtomicUsize = AtomicUsize::new(0);
+
+/// Whether to force every pause to be `RefCount`, so nothing is ever traced. Isolates the
+/// reference-counting path from tracing and mature sweeping. Leaks cycles; diagnostic only.
+pub(crate) fn no_full_pauses() -> bool {
+    static OFF: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *OFF.get_or_init(|| std::env::var_os("MMTK_LXR_NO_FULL").is_some())
+}
+
+/// How many pending reference-count increments force a collection, bounding the `RCProcessIncs`
+/// work a single pause has to do. `None` (spelled `0`) leaves the pause bounded only by heap
+/// occupancy, which does not bound mutation at all.
+///
+/// Override with `MMTK_LXR_INC_BUFFER_LIMIT`, in entries. Each entry is one slot the barrier
+/// recorded, so the limit is roughly "words of reference stores between pauses".
+pub fn inc_buffer_limit() -> Option<usize> {
+    static N: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
+    *N.get_or_init(|| {
+        let v = match std::env::var("MMTK_LXR_INC_BUFFER_LIMIT") {
+            Ok(v) => v.trim().parse().expect(
+                "MMTK_LXR_INC_BUFFER_LIMIT must be a whole number of entries, or 0 for none",
+            ),
+            Err(_) => 0usize,
+        };
+        (v != 0).then_some(v)
+    })
+}
+
+/// How many times the slot-less write barrier had to walk an object because the caller could not
+/// name the field, and how many fields those walks visited in total. Only maintained under
+/// [`stats`]: the barrier's cost is exactly what is being measured, so the counters must not be on
+/// its path otherwise.
+///
+/// Julia calls the slot-less barrier for stores whose field its codegen cannot name. LXR has no
+/// per-slot record for those, so `LXRFieldBarrierSemantics::object_probable_write_slow` walks every
+/// field of the object and records each one. Fields-per-call is therefore the amplification factor
+/// of that path, and for a large `GenericMemory` it is the whole array.
+pub(crate) static OBJ_WRITE_CALLS: AtomicUsize = AtomicUsize::new(0);
+pub(crate) static OBJ_WRITE_FIELDS: AtomicUsize = AtomicUsize::new(0);
+
+/// Slots handed to `ProcessIncs`, and objects it promoted, during the current pause. Only
+/// maintained under [`stats`]. Divided into the pause's `ProcessIncs` time these give the cost of
+/// one increment -- the figure that says whether a pause is expensive because there are many
+/// increments or because each one is slow.
+pub(crate) static INCS_PROCESSED: AtomicUsize = AtomicUsize::new(0);
+pub(crate) static OBJS_PROMOTED: AtomicUsize = AtomicUsize::new(0);
+
+/// Smallest generation of recursively-discovered increments that `ProcessIncs` will split with
+/// another worker instead of processing entirely itself. `usize::MAX` disables splitting, restoring
+/// the chain. Override with `MMTK_LXR_SPLIT_MIN`.
+pub fn active_packet_split() -> usize {
+    static N: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *N.get_or_init(|| match std::env::var("MMTK_LXR_SPLIT_MIN") {
+        Ok(v) => v
+            .trim()
+            .parse()
+            .expect("MMTK_LXR_SPLIT_MIN must be a whole number of slots"),
+        Err(_) => 64,
+    })
+}
+
+/// Whether the `MMTK_LXR_STATS` diagnostics are on.
+pub fn stats() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("MMTK_LXR_STATS").is_some())
+}
+
+/// Whether to retain every nursery block instead of reclaiming its free lines, so that
+/// live-but-uncounted objects survive. Set `MMTK_LXR_RETAIN_NURSERY=1`. Leaks; bring-up
+/// diagnostic only.
+pub fn retain_nursery() -> bool {
+    static RETAIN: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *RETAIN.get_or_init(|| std::env::var_os("MMTK_LXR_RETAIN_NURSERY").is_some())
+}
+
+/// How many nursery blocks a non-`Full` pause may sweep before handing the rest to the
+/// concurrent phase. Override with `MMTK_LXR_STW_SWEEP_BLOCKS`; `usize::MAX` restores sweeping
+/// the whole nursery inside the pause.
+///
+/// Sweeping a nursery block means `Block::rc_sweep_nursery`, which reads the block's reference
+/// count table to decide whether the block is dead, reusable, or promoted in place. That is
+/// O(nursery bytes) of work, it ran single-threaded in the `Release` packet, and it measured
+/// 7-8ms of a 27ms `RefCount` pause on `tree_mutable` -- second only to `RCProcessIncs`.
+///
+/// None of it has to happen while the mutator is stopped. A block being swept is not yet on any
+/// free list, so no mutator can allocate into it either way, and the concurrent phase that runs
+/// it (`RCLazySweepNurseryBlocks`) already reports what it frees through
+/// `num_clean_blocks_released_lazy`, which is what the next pause's sizing decision reads. The
+/// only cost of deferring is that the pages come back a mutator window later.
+///
+/// A `Full` pause still sweeps everything itself: it is already a whole-heap stop, and it must
+/// leave the heap in a state where nothing is owed to a concurrent phase.
+pub fn max_stw_sweep_nursery_blocks() -> usize {
+    static N: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *N.get_or_init(|| match std::env::var("MMTK_LXR_STW_SWEEP_BLOCKS") {
+        Ok(v) => v
+            .trim()
+            .parse()
+            .expect("MMTK_LXR_STW_SWEEP_BLOCKS must be a whole number of blocks"),
+        Err(_) => 0,
+    })
+}
+
+/// Whether to retain every mature block instead of releasing the ones whose objects all have
+/// a zero count. Set `MMTK_LXR_RETAIN_MATURE=1`. Independent of [`retain_nursery`] so that the
+/// two sweeps can be disabled one at a time, which is what tells them apart as suspects.
+/// Leaks; bring-up diagnostic only.
+pub fn retain_mature() -> bool {
+    static RETAIN: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *RETAIN.get_or_init(|| std::env::var_os("MMTK_LXR_RETAIN_MATURE").is_some())
+}
 
 /// Enable Lazy Decrements
 const LAZY_DECREMENTS: bool = !cfg!(feature = "lxr_no_lazy");
@@ -35,8 +394,26 @@ pub(crate) const MATURE_EVACUATION: bool = !cfg!(feature = "lxr_no_mature_evac")
 /// Stop triggering CM or RC pauses, and trigger Full GCs instead if the available heap after a RC pause is still small.
 const RC_STOP_PERCENT: usize = 15;
 
-/// Trigger an RC pause when the predicted max survival size is larger than this threshold.
-const MAX_SURVIVAL_MB: usize = 128;
+/// Trigger an RC pause when the predicted max survival size is larger than this threshold, in MB.
+///
+/// This is the bound that actually limits pause time. A pause's cost is dominated by
+/// `RCProcessIncs` promoting the young objects that survived -- the bucket opens with a dozen
+/// packets and fans out to thousands as the promotion trace walks their fields -- so the pause is
+/// proportional to *surviving* young data, not to how much was allocated or how many references
+/// were written. `inc_buffer_size` counts only the slots the barrier recorded and so does not bound
+/// it; this does.
+///
+/// Override with `MMTK_LXR_MAX_SURVIVAL_MB`.
+pub fn max_survival_mb() -> usize {
+    static N: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *N.get_or_init(|| match std::env::var("MMTK_LXR_MAX_SURVIVAL_MB") {
+        Ok(v) => v
+            .trim()
+            .parse()
+            .expect("MMTK_LXR_MAX_SURVIVAL_MB must be a whole number of megabytes"),
+        Err(_) => 128,
+    })
+}
 
 /// Trigger a concurrent marking cycle when the predicted mature size is larger than this threshold.
 const TRACE_THRESHOLD: usize = 20;
@@ -104,19 +481,36 @@ impl Drop for LazySweepingJobsCounter {
         }
         if self.counter.fetch_sub(1, Ordering::SeqCst) == 1 {
             if let Some(f) = lazy_sweeping_jobs.end_of_lazy.as_ref() {
-                f()
+                f(lazy_sweeping_jobs.epoch_of(&self.counter))
             }
         }
     }
 }
+
+/// The GC cycle a wave of lazy sweeping jobs belongs to.
+///
+/// A wave is everything that became owed between two consecutive [`LazySweepingJobs::swap`] calls,
+/// and `swap` runs once per pause, so a wave corresponds one-to-one with a pause: the wave moved to
+/// `prev` by the swap at the end of pause N is exactly the work pause N deferred. Draining it is
+/// what makes pause N's reclamation visible, and that is the only moment the collector can size the
+/// next heap target or judge its free headroom.
+///
+/// [`WAVE_STILL_OPEN`] marks the wave that is still accumulating (`curr`). It can hit zero
+/// transiently -- every job so far has finished but more may still be added -- and such a moment
+/// says nothing about any cycle being complete.
+type WaveEpoch = usize;
+
+const WAVE_STILL_OPEN: WaveEpoch = usize::MAX;
 
 struct LazySweepingJobs {
     prev_decs_counter: Option<Arc<AtomicUsize>>,
     curr_decs_counter: Option<Arc<AtomicUsize>>,
     prev_counter: Option<Arc<AtomicUsize>>,
     curr_counter: Option<Arc<AtomicUsize>>,
+    /// The cycle whose deferred work `prev_counter` covers. See [`WaveEpoch`].
+    prev_epoch: WaveEpoch,
     pub end_of_decs: Option<Box<dyn Send + Sync + Fn(LazySweepingJobsCounter)>>,
-    pub end_of_lazy: Option<Box<dyn Send + Sync + Fn()>>,
+    pub end_of_lazy: Option<Box<dyn Send + Sync + Fn(WaveEpoch)>>,
 }
 
 impl LazySweepingJobs {
@@ -126,6 +520,7 @@ impl LazySweepingJobs {
             curr_decs_counter: None,
             prev_counter: None,
             curr_counter: None,
+            prev_epoch: WAVE_STILL_OPEN,
             end_of_decs: None,
             end_of_lazy: None,
         }
@@ -141,11 +536,29 @@ impl LazySweepingJobs {
             == 0
     }
 
-    pub fn swap(&mut self) {
+    /// Which wave a counter belongs to. Identified by pointer rather than carried in
+    /// [`LazySweepingJobsCounter`] because a counter's wave is decided by the swap that closes it,
+    /// which happens after the clones handed to individual work packets were made.
+    fn epoch_of(&self, counter: &Arc<AtomicUsize>) -> WaveEpoch {
+        match self.prev_counter.as_ref() {
+            Some(prev) if Arc::ptr_eq(prev, counter) => self.prev_epoch,
+            _ => WAVE_STILL_OPEN,
+        }
+    }
+
+    /// Close the current wave, attributing it to the cycle `epoch` that is ending, and open a new
+    /// one. Returns the number of jobs the closed wave still owes; zero means the cycle deferred
+    /// nothing (or it has already all run), so nothing will report its completion later.
+    pub fn swap(&mut self, epoch: WaveEpoch) -> usize {
         self.prev_decs_counter = self.curr_decs_counter.take();
         self.curr_decs_counter = Some(Arc::new(AtomicUsize::new(0)));
         self.prev_counter = self.curr_counter.take();
         self.curr_counter = Some(Arc::new(AtomicUsize::new(0)));
+        self.prev_epoch = epoch;
+        self.prev_counter
+            .as_ref()
+            .map(|c| c.load(Ordering::SeqCst))
+            .unwrap_or(0)
     }
 }
 
@@ -154,14 +567,20 @@ static LAZY_SWEEPING_JOBS: Lazy<RwLock<LazySweepingJobs>> =
 
 static SURVIVAL_RATIO_PREDICTOR: SurvivalRatioPredictor = SurvivalRatioPredictor {
     prev_ratio: Atomic::new(0.01),
+    prev_promote_ratio: Atomic::new(0.01),
     alloc_vol: AtomicUsize::new(0),
     copy_promote_vol: AtomicUsize::new(0),
+    promote_vol: AtomicUsize::new(0),
 };
 
 struct SurvivalRatioPredictor {
     prev_ratio: Atomic<f64>,
+    /// As `prev_ratio`, but counting every promotion rather than only the copied ones. See
+    /// [`SurvivalRatioPredictor::promotion_ratio`].
+    prev_promote_ratio: Atomic<f64>,
     alloc_vol: AtomicUsize,
     copy_promote_vol: AtomicUsize,
+    promote_vol: AtomicUsize,
 }
 
 impl SurvivalRatioPredictor {
@@ -170,36 +589,65 @@ impl SurvivalRatioPredictor {
         self.alloc_vol.store(size, Ordering::SeqCst);
     }
 
+    /// Fraction of young allocation that survived *by being copied*. This is what sizing a
+    /// to-space wants, and it is legitimately zero when evacuation is off.
     pub fn ratio(&self) -> f64 {
         self.prev_ratio.load(Ordering::Relaxed)
+    }
+
+    /// Fraction of young allocation that survived at all, copied or promoted in place.
+    ///
+    /// This is the one to use to predict how much work the next pause will do, because a pause pays
+    /// for every promotion: `ProcessIncs` scans each promoted object's fields and generates further
+    /// increments from them, whether or not the object moved. [`Self::ratio`] cannot serve that
+    /// purpose -- it counts only copied promotions, so with evacuation disabled (which is permanent
+    /// for the Julia binding) it is pinned at zero. Anything predicting survival from it therefore
+    /// predicted zero, which is how `MAX_SURVIVAL_MB` came to be unreachable: measured on
+    /// `tree_mutable`, ~887k objects and ~27MB were promoted per pause while the prediction stayed
+    /// at 0MB against a 128MB limit, so the bound that exists to cap pause time never once fired.
+    pub fn promotion_ratio(&self) -> f64 {
+        self.prev_promote_ratio.load(Ordering::Relaxed)
     }
 
     pub fn update_ratio(&self) -> f64 {
         if self.alloc_vol.load(Ordering::SeqCst) == 0 {
             self.copy_promote_vol.store(0, Ordering::SeqCst);
+            self.promote_vol.store(0, Ordering::SeqCst);
             return self.ratio();
         }
-        let prev = self.prev_ratio.load(Ordering::SeqCst);
-        let curr = self.copy_promote_vol.load(Ordering::SeqCst) as f64
-            / self.alloc_vol.load(Ordering::SeqCst) as f64;
-        let curr = f64::min(curr, 1.0);
-        let ratio = (curr * 3f64 + prev) / 4f64;
-        let ratio = f64::min(ratio, 1.0);
+        let alloc = self.alloc_vol.load(Ordering::SeqCst) as f64;
+        let smooth = |prev: f64, curr: f64| {
+            let curr = f64::min(curr, 1.0);
+            f64::min((curr * 3f64 + prev) / 4f64, 1.0)
+        };
+        let ratio = smooth(
+            self.prev_ratio.load(Ordering::SeqCst),
+            self.copy_promote_vol.load(Ordering::SeqCst) as f64 / alloc,
+        );
+        let promote_ratio = smooth(
+            self.prev_promote_ratio.load(Ordering::SeqCst),
+            self.promote_vol.load(Ordering::SeqCst) as f64 / alloc,
+        );
         self.prev_ratio.store(ratio, Ordering::SeqCst);
+        self.prev_promote_ratio
+            .store(promote_ratio, Ordering::SeqCst);
         self.alloc_vol.store(0, Ordering::SeqCst);
         self.copy_promote_vol.store(0, Ordering::SeqCst);
+        self.promote_vol.store(0, Ordering::SeqCst);
         ratio
     }
 }
 
 struct SurvivalRatioPredictorLocal {
     copy_promote_vol: AtomicUsize,
+    promote_vol: AtomicUsize,
 }
 
 impl Default for SurvivalRatioPredictorLocal {
     fn default() -> Self {
         Self {
             copy_promote_vol: AtomicUsize::new(0),
+            promote_vol: AtomicUsize::new(0),
         }
     }
 }
@@ -212,11 +660,24 @@ impl SurvivalRatioPredictorLocal {
         );
     }
 
+    /// Record a promotion of any kind. Per-worker and non-atomic like the above, published by
+    /// [`Self::sync`], so it stays off the shared cache line that a global counter would put on the
+    /// path of every promoted object.
+    pub fn record_promotion(&self, size: usize) {
+        self.promote_vol.store(
+            self.promote_vol.load(Ordering::Relaxed) + size,
+            Ordering::Relaxed,
+        );
+    }
+
     pub fn sync(&self) {
         SURVIVAL_RATIO_PREDICTOR.copy_promote_vol.fetch_add(
             self.copy_promote_vol.load(Ordering::Relaxed),
             Ordering::Relaxed,
         );
+        SURVIVAL_RATIO_PREDICTOR
+            .promote_vol
+            .fetch_add(self.promote_vol.load(Ordering::Relaxed), Ordering::Relaxed);
     }
 }
 

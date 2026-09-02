@@ -83,17 +83,10 @@ impl<VM: VMBinding> GCTrigger<VM> {
         // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
         // with GC workers, which is expensive for functions like `poll`. `try_request_pause`
         // only returns `Ok` to the thread that actually wins the race to transition the status,
-        // so only that thread calls it, instead of every thread that observes the old status:
-        // calling it unconditionally would re-queue a `WorkerGoal::Gc` request that a previous
-        // winner's request already delivered and that the workers may already be acting on,
-        // tripping the `debug_is_requested` assertion in `GCWorkScheduler::on_last_parked`.
+        // so only that thread calls it, instead of every thread that observes the old status.
         match self.state.gc_status.try_request_pause() {
-            Ok(cur_status) => {
-                if cur_status == GcStatus::InConcurrentGC {
-                    self.plan().concurrent().unwrap().on_concurrent_work_interrupted();
-                }
+            Ok(_) => {
                 probe!(mmtk, gc_requested);
-                self.state.record_pause_requested_time();
                 self.scheduler.request_schedule_collection();
                 true
             },
@@ -167,51 +160,6 @@ impl<VM: VMBinding> GCTrigger<VM> {
             return self.request();
         }
         false
-    }
-
-    /// For [`crate::scheduler::GCWorkScheduler::on_last_parked`]'s use when the last parked GC
-    /// worker is about to go idle with no mutator-requested goal pending: check if we should poll
-    /// from a GC worker.
-    pub(crate) fn poll_from_last_parked_worker(&self) -> bool {
-        if !self.is_collection_enabled() {
-            return false;
-        }
-
-        // Currently only poll if a concurrent GC is in progress, and only if that work has actually drained.
-        let Some(concurrent_plan) = self.plan().concurrent() else {
-            return false;
-        };
-        if !concurrent_plan.concurrent_work_in_progress() {
-            return false;
-        }
-        if !self.scheduler.work_buckets[crate::scheduler::WorkBucketStage::Concurrent].is_drained()
-        {
-            return false;
-        }
-
-        let plan = self.plan();
-        if self.policy.is_gc_required(false, None, plan) {
-            match self.state.gc_status.try_request_pause() {
-                // This call won the race to request a GC. However, we cannot call request() now.
-                // The caller of this function is holding a mutex, and if we do request() here,
-                // we end up with deadlock. So we just return true to the caller, and let the caller do the request.
-                Ok(_) => {
-                    probe!(mmtk, gc_requested);
-                    self.state.record_pause_requested_time();
-                    info!(
-                        "[POLL] Requesting a concurrent GC's closing pause from the last parked GC worker"
-                    );
-                    true
-                }
-                Err(GcStatus::Disabled(_)) | Err(GcStatus::PauseRequested) => false,
-                Err(GcStatus::Uninitialized) => panic!(
-                    "GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."
-                ),
-                _ => unreachable!(),
-            }
-        } else {
-            false
-        }
     }
 
     /// This method is called when the user manually requests a collection, such as `System.gc()` in Java.
@@ -403,6 +351,26 @@ pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
     /// for every STW pause in a GC cycle, not just once per cycle. See [`Self::on_gc_end`]
     /// for the hook that is only called once per GC cycle.
     fn on_pause_end(&self, _mmtk: &'static MMTK<VM>) {}
+    /// Inform the triggering policy that a GC cycle's deferred reclamation has finished, so the
+    /// pages it freed are now visible through [`Plan::get_reserved_pages`].
+    ///
+    /// A plan that reclaims lazily has freed almost nothing by the time [`Self::on_gc_end`] runs:
+    /// LXR hands its nursery and mature block sweeping to the concurrent phase that follows the
+    /// pause, and the page resource is not flushed until that phase drains. A policy that sizes the
+    /// next heap target from the reserved pages it sees at [`Self::on_gc_end`] therefore concludes
+    /// the collection freed nothing, and grows the heap without bound. Such a policy should size
+    /// itself here instead.
+    ///
+    /// Called with no mutators stopped, on whichever worker finished the last deferred job. A plan
+    /// that reclaims everything before [`Self::on_gc_end`] never calls this, so a policy that uses
+    /// it must still leave a usable heap target behind at [`Self::on_gc_end`] -- the previous
+    /// cycle's target is a safe choice, since it is finite and was computed from real numbers.
+    ///
+    /// Takes the plan rather than the [`MMTK`] instance because the plans that reclaim lazily
+    /// reach this from their own bookkeeping, which has no `&'static MMTK` to hand. A policy that
+    /// needs per-cycle facts from the instance (whether the collection was user-triggered, say)
+    /// should latch them in [`Self::on_gc_start`].
+    fn on_lazy_reclaim_finished(&self, _plan: &dyn Plan<VM = VM>) {}
     /// Inform the triggering policy that a GC is about to start the release work. This is called
     /// in the global Release work packet. This means we assume a plan
     /// do not schedule any work that reclaims memory before the global `Release` work. The current plans

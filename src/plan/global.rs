@@ -659,7 +659,13 @@ impl<VM: VMBinding> BasePlan<VM> {
         pages
     }
 
-    pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
+    pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
+        self.prepare_ext(tls, full_heap, true)
+    }
+
+    /// As [`BasePlan::prepare`], but `reset_mark_state` selects whether the spaces whose
+    /// `prepare` clears mark metadata actually do so. See [`CommonPlan::prepare_ext`].
+    pub fn prepare_ext(&mut self, _tls: VMWorkerThread, _full_heap: bool, _reset_mark_state: bool) {
         #[cfg(feature = "code_space")]
         self.code_space.prepare();
         #[cfg(feature = "code_space")]
@@ -667,7 +673,9 @@ impl<VM: VMBinding> BasePlan<VM> {
         #[cfg(feature = "ro_space")]
         self.ro_space.prepare();
         #[cfg(feature = "vm_space")]
-        self.vm_space.prepare();
+        if _reset_mark_state {
+            self.vm_space.prepare();
+        }
     }
 
     pub fn release(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
@@ -797,10 +805,28 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
-        self.immortal.prepare();
+        self.prepare_ext(tls, full_heap, true)
+    }
+
+    /// As [`CommonPlan::prepare`], but `reset_mark_state` selects whether the immortal and VM
+    /// spaces clear their mark metadata.
+    ///
+    /// `ImmortalSpace::prepare` and `VMSpace::prepare` bzero the mark bits of every region
+    /// they own. For a plan whose mark cycle is one pause that is exactly right. For a plan
+    /// that marks across several pauses -- LXR marks concurrently between `InitialMark` and
+    /// `FinalMark` -- calling it at the closing pause discards everything the concurrent
+    /// marking established, and the pause re-traces the whole graph. Julia's sysimage lives
+    /// in the VM space, so that was ~1.77M objects re-marked in every `FinalMark`.
+    ///
+    /// Pass `true` (what [`CommonPlan::prepare`] does) unless the pause continues a mark
+    /// cycle that an earlier pause began.
+    pub fn prepare_ext(&mut self, tls: VMWorkerThread, full_heap: bool, reset_mark_state: bool) {
+        if reset_mark_state {
+            self.immortal.prepare();
+        }
         self.los.prepare(full_heap);
         self.prepare_nonmoving_space(full_heap);
-        self.base.prepare(tls, full_heap)
+        self.base.prepare_ext(tls, full_heap, reset_mark_state)
     }
 
     pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {
@@ -877,14 +903,10 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     #[allow(clippy::needless_return)]
-    pub(crate) fn prepare_nonmoving_space(&mut self, _full_heap: bool) {
-        // FIXME: We need to handle nonmoving space properly.
-        // Nonmoving space is a bit special for LXR, as it could be a second ImmixSpace (as opposed to the default ImmixSpace).
-        // It is arguable whether we should use an LXR ImmixSpace here, or use a normal Immix space.
-        // If we use an LXR ImmixSpace, we don't have a test case right now to know its correctness.
-        // If we use a normal ImmixSpace, our side metadata sanity does not allow this right, as both LXR ImmixSpace and normal
-        // ImmixSpace are ImmixSpace, and our sanity expects them to use a same set of side metadata.
-        // This might be another reason why LXR ImmixSpace should be a separate policy.
+    fn prepare_nonmoving_space(&mut self, _full_heap: bool) {
+        // LXR does not support spaces with no LXR support
+        // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
+        // This skip just works around for the nonmoving space (defaults to Immix space), for which we see a panic.
         if *self.base.options.plan == PlanSelector::LXR {
             return;
         }
@@ -900,9 +922,10 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     #[allow(clippy::needless_return)]
-    pub(crate) fn release_nonmoving_space(&mut self, _full_heap: bool) {
-        // FIXME: We need to handle nonmoving space properly.
-        // See comments in prepare_non_moving_space
+    fn release_nonmoving_space(&mut self, _full_heap: bool) {
+        // LXR does not support spaces with no LXR support
+        // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
+        // This skip just works around for the nonmoving space (defaults to Immix space), for which we see a panic.
         if *self.base.options.plan == PlanSelector::LXR {
             return;
         }
@@ -918,9 +941,10 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     #[allow(clippy::needless_return)]
-    pub(crate) fn end_of_gc_nonmoving_space(&mut self) {
-        // FIXME: We need to handle nonmoving space properly.
-        // See comments in prepare_non_moving_space
+    fn end_of_gc_nonmoving_space(&mut self) {
+        // LXR does not support spaces with no LXR support
+        // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
+        // This skip just works around for the nonmoving space (defaults to Immix space), for which we see a panic.
         if *self.base.options.plan == PlanSelector::LXR {
             return;
         }

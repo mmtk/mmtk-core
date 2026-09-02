@@ -18,6 +18,10 @@ mod stat;
 mod work_counter;
 
 pub(crate) mod work;
+/// Diagnostic per-work-packet-type timing (see [`work::packet_timing`]).
+pub use work::packet_timing;
+/// Diagnostic wall-clock pause timeline (see [`work::stage_timeline`]).
+pub use work::stage_timeline;
 pub use work::GCWork;
 pub(crate) use work::GCWorkContext;
 

@@ -1,14 +1,16 @@
 use super::super::LazySweepingJobsCounter;
 use super::super::SurvivalRatioPredictorLocal;
 use super::super::LXR;
-use super::super::{LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURSERY_EVACUATION};
+use super::super::{check_incs, LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURSERY_EVACUATION};
 use super::tracing::LXRConcurrentTraceObjects;
 use super::tracing::LXRStopTheWorldProcessEdges;
 use super::ProcessEdgesBase;
+use crate::plan::lxr::global::LXRSpace;
 use crate::plan::VectorQueue;
 use crate::policy::immix::block::BlockState;
 use crate::scheduler::gc_work::RootKind;
 use crate::util::copy::CopySemantics;
+use crate::util::linear_scan::Region;
 use crate::util::linear_scan::UnstraddlableRegion;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::rc::*;
@@ -40,12 +42,24 @@ pub struct ProcessIncs<VM: VMBinding, const KIND: EdgeKind> {
     lxr: &'static LXR<VM>,
     rc: RefCountHelper<VM>,
     survival_ratio_predictor_local: SurvivalRatioPredictorLocal,
+    /// A slice of one promoted object's fields to count, rather than a buffer of increments:
+    /// `(object, chunks, obj_in_defrag)`. See [`ProcessIncs::scan_nursery_object`].
+    promoted_chunks: Option<(ObjectReference, std::ops::Range<usize>, bool)>,
+    /// Diagnostic tallies for this packet, published once when it finishes. Kept local because a
+    /// global atomic per increment or per promotion is millions of contended updates inside the
+    /// pause -- enough to inflate the pause it is supposed to be measuring by 8x.
+    incs_count: usize,
+    promoted_count: usize,
 }
 
 unsafe impl<VM: VMBinding, const KIND: EdgeKind> Send for ProcessIncs<VM, KIND> {}
 
 impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
     const CAPACITY: usize = 1024;
+    /// How many of a large object's chunks one packet counts. Larger wastes the other workers'
+    /// time, smaller pays the packet overhead more often; the point is only that it is a bound
+    /// that does not grow with the object.
+    const PROMOTED_CHUNK_SIZE: usize = 8192;
     const UNLOG_BITS: SideMetadataSpec = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
         .as_spec()
         .extract_side_spec();
@@ -63,6 +77,9 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             rc: RefCountHelper::NEW,
             root_kind: None,
             survival_ratio_predictor_local: SurvivalRatioPredictorLocal::default(),
+            promoted_chunks: None,
+            incs_count: 0,
+            promoted_count: 0,
         }
     }
 
@@ -81,6 +98,53 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         }
     }
 
+    /// Increment root objects that were reported as objects rather than as slots.
+    ///
+    /// This is the node-shaped counterpart of the slot path: incrementing is not enough
+    /// on its own, because it is the zero-to-one transition that promotes an object,
+    /// and promotion is what arms its field unlog bits and increments the objects it
+    /// refers to. A bare increment leaves a nursery root's referents at zero, and they
+    /// are then swept even though the root keeps them reachable.
+    ///
+    /// Returns `(counted, uncounted)`. `counted` is the objects whose count was raised,
+    /// which is the set to record as the root set so the matching decrements are applied
+    /// later. `uncounted` is the roots the plan never reference counts -- objects in the
+    /// common plan's spaces, above all Julia's loaded sysimage -- which get no count and so
+    /// must not be recorded for decrementing.
+    ///
+    /// Both sets still have to be traced. An uncounted root used to be dropped here
+    /// outright, and then nothing ever scanned it: a tracing pause marks from the root sets
+    /// this returns, and the sysimage object was in neither. Anything in the heap held only
+    /// by a sysimage root was therefore never marked, and `SweepDeadCycles` -- which
+    /// reclaims any counted object it finds unmarked -- zeroed its count while it was still
+    /// reachable. Nothing in the bootstrap stage runs with a sysimage loaded, which is why
+    /// this only ever showed up when building `Base`.
+    pub fn process_root_nodes(
+        &mut self,
+        worker: &mut GCWorker<VM>,
+        nodes: Vec<ObjectReference>,
+    ) -> (Vec<ObjectReference>, Vec<ObjectReference>) {
+        self.pause = self.lxr.current_pause().unwrap();
+        self.in_cm = self.lxr.concurrent_work_in_progress();
+        let mut roots = Vec::with_capacity(nodes.len());
+        let mut uncounted = vec![];
+        for o in nodes {
+            if !self.lxr.is_rc_object(o) {
+                uncounted.push(o);
+                continue;
+            }
+            let los = self.lxr.los().in_space(o);
+            if self.inc(o) {
+                self.promote(worker, o, false, los, 0);
+            }
+            roots.push(o);
+        }
+        // Promotion above can queue further increments; hand them on rather than
+        // dropping them.
+        self.flush(worker);
+        (roots, uncounted)
+    }
+
     fn promote(
         &mut self,
         worker: &mut GCWorker<VM>,
@@ -89,6 +153,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         los: bool,
         depth: u32,
     ) {
+        self.promoted_count += 1;
+        probe!(mmtk, lxr_promote, o.to_raw_address().as_usize());
         let size = o.get_size::<VM>();
 
         if !los {
@@ -98,6 +164,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 block.set_as_in_place_promoted();
             }
             self.rc.promote_with_size(o, size);
+            self.survival_ratio_predictor_local.record_promotion(size);
             if copied {
                 self.survival_ratio_predictor_local
                     .record_copied_promotion(size);
@@ -162,16 +229,25 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
             o.to_raw_address().unlog_field_relaxed::<VM>();
         } else if in_place_promotion {
-            let header_size = if VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
-                12usize
-            } else {
-                16
-            };
+            // Arm every unlog bit covering the object, starting from the granule that holds its
+            // first byte.
+            //
+            // This used to start from `o + header_size` and then align *down*, meaning to skip
+            // the header. But aligning down never moves forward, so whenever `o + header_size`
+            // landed in the next granule -- i.e. whenever the reference address sits in the last
+            // `header_size` bytes of one -- arming began one granule late and the bits covering
+            // the object's first fields were never armed at all. A recycled line has those bits
+            // cleared to `LOGGED`, so the barrier then treated those fields as already
+            // snapshotted for the rest of the program: no decrement, no increment, and the
+            // reference stored there was never counted. Objects keeping a reference in their
+            // first words (`TypeMapEntry.next`, `Array.ref_`) were reclaimed while still live.
+            //
+            // Over-arming is harmless -- it only makes the barrier record a field it need not --
+            // so cover the whole allocation and let the granule rounding fall where it may.
             let step = heap_bytes_per_unlog_byte << 2;
-            let end = o.to_raw_address() + size;
-            let aligned_end = end.align_up(step);
-            let cursor = o.to_raw_address() + header_size;
-            let mut cursor = cursor.align_down(step);
+            let start = VM::VMObjectModel::ref_to_object_start(o);
+            let aligned_end = (start + size).align_up(step);
+            let mut cursor = start.align_down(step);
             let mut meta = side_metadata::address_to_meta_address(&Self::UNLOG_BITS, cursor);
             while cursor < aligned_end {
                 unsafe { meta.store(0xffffffffu32) }
@@ -179,36 +255,90 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 cursor += step;
             }
         };
+        // Promotion above arms the per-field unlog bits, which is what LXR's own barrier
+        // consults. Bindings whose inlined write-barrier fast path cannot name the field
+        // instead gate on the per-object log bit (Julia does this in `mmtk_gc_wb_fast`),
+        // and nothing else sets it for an object promoted through the reference-counting
+        // path rather than through tracing. Leaving it clear makes such a binding skip
+        // the barrier for every mature object, losing the decrements and increments that
+        // keep reachable objects alive.
+        VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(o, Ordering::SeqCst);
         let obj_in_defrag = !los && Block::in_defrag_block(o);
+        // One worker walks one object, and the walk is order-independent, so an object big
+        // enough to dominate a pause is handed to the other workers in pieces instead. Julia's
+        // 100M-element array of references took ~300ms to walk here, in a pause, with every
+        // other worker idle: nothing spills into the increment buffers when the fields all
+        // point at the same already-counted object, so buffer-level splitting cannot reach it.
+        if let Some(count) = o.scan_chunk_count::<VM>() {
+            if count > Self::PROMOTED_CHUNK_SIZE {
+                let mut start = 0;
+                while start < count {
+                    let end = (start + Self::PROMOTED_CHUNK_SIZE).min(count);
+                    let mut w = ProcessIncs::<VM, EDGE_KIND_NURSERY>::new(vec![], self.lxr);
+                    w.depth = _depth + 1;
+                    w.promoted_chunks = Some((o, start..end, obj_in_defrag));
+                    worker.add_work(WorkBucketStage::Unconstrained, w);
+                    start = end;
+                }
+                return;
+            }
+        }
         let tls = worker.tls.0;
         o.iterate_fields::<VM, _>(tls, |slot| {
-            let Some(target) = slot.load() else {
-                return;
-            };
-            debug_assert!(
-                target.to_raw_address().is_mapped(),
-                "Unmapped obj {:?}.{:?} -> {:?}",
-                o,
-                slot,
-                target
-            );
-            debug_assert!(
-                target.is_in_any_space(),
-                "Unmapped obj {:?}.{:?} -> {:?}",
-                o,
-                slot,
-                target
-            );
-            let rc = self.rc.count(target);
-            if rc == 0 {
-                self.add_new_slot(worker, slot);
-            } else {
-                if rc != crate::util::rc::MAX_REF_COUNT {
-                    let _ = self.rc.inc(target);
-                }
-                self.record_mature_evac_remset2(obj_in_defrag, slot, target);
-            }
+            self.count_promoted_field(worker, o, obj_in_defrag, slot)
         });
+    }
+
+    /// Count one field of a just-promoted object `o`.
+    ///
+    /// An already-counted target is incremented in place. An uncounted one is deferred as a new
+    /// increment, so that it is promoted in turn -- it is the zero-to-one transition that
+    /// promotes, and promotion is what arms an object's field unlog bits.
+    fn count_promoted_field(
+        &mut self,
+        worker: &mut GCWorker<VM>,
+        o: ObjectReference,
+        obj_in_defrag: bool,
+        slot: VM::VMSlot,
+    ) {
+        let Some(target) = slot.load() else {
+            return;
+        };
+        debug_assert!(
+            target.to_raw_address().is_mapped(),
+            "Unmapped obj {:?}.{:?} -> {:?}",
+            o,
+            slot,
+            target
+        );
+        debug_assert!(
+            target.is_in_any_space(),
+            "Unmapped obj {:?}.{:?} -> {:?}",
+            o,
+            slot,
+            target
+        );
+        let rc = self.rc.count(target);
+        if rc == 0 {
+            crate::plan::lxr::record_rc_event(
+                target,
+                "defer/promote-scan",
+                Some(o),
+                slot.to_address(),
+            );
+            self.add_new_slot(worker, slot);
+        } else {
+            crate::plan::lxr::record_rc_event(
+                target,
+                "inc/promote-scan",
+                Some(o),
+                slot.to_address(),
+            );
+            if rc != crate::util::rc::MAX_REF_COUNT {
+                let _ = self.rc.inc(target);
+            }
+            self.record_mature_evac_remset2(obj_in_defrag, slot, target);
+        }
     }
 
     #[cold]
@@ -330,15 +460,111 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         }
     }
 
+    /// Report an increment whose slot holds something that is not an object, and abort.
+    ///
+    /// The interesting question is never the bad value itself but where the slot came
+    /// from, so this reconstructs as much of that as it can: the kind of increment, what
+    /// owns the slot's memory, and — by walking back from the slot to the nearest
+    /// well-formed header that covers it — which object the slot is a field of.
+    #[cold]
+    fn report_malformed_inc<const K: EdgeKind>(&self, s: VM::VMSlot, o: ObjectReference) -> ! {
+        let kind = match K {
+            EDGE_KIND_ROOT => "root",
+            EDGE_KIND_NURSERY => "nursery",
+            _ => "mature (write barrier)",
+        };
+        let a = s.to_address();
+        let layout = crate::util::heap::layout::vm_layout::vm_layout();
+        let in_heap = a >= layout.heap_start && a < layout.heap_end;
+        eprintln!(
+            "[lxr] gc#{} malformed increment (out_of_heap_slots so far: {})",
+            crate::plan::lxr::GC_COUNT.load(Ordering::SeqCst),
+            crate::plan::lxr::OUT_OF_HEAP_SLOTS.load(Ordering::Relaxed)
+        );
+        eprintln!("  kind      = {kind}");
+        eprintln!("  slot      = {a}  (in heap: {in_heap})");
+        eprintln!("  loaded    = {o:?}  space={:?}", self.lxr.space_of(o));
+        eprintln!("  loaded rc = {}", self.rc.count(o));
+        if self.lxr.immix_space.in_space(o) {
+            eprintln!("  loaded blk= {:?}", Block::containing(o).get_state());
+        }
+        if in_heap {
+            let slot_as_obj = ObjectReference::from_raw_address(a.align_down(8));
+            eprintln!(
+                "  slot space= {:?}",
+                slot_as_obj.map(|x| self.lxr.space_of(x))
+            );
+            if slot_as_obj.is_some_and(|x| self.lxr.immix_space.in_space(x)) {
+                eprintln!(
+                    "  slot blk  = {:?}",
+                    Block::from_unaligned_address(a).get_state()
+                );
+            }
+            // Walk back for the object this slot is a field of. Objects are at least a
+            // header apart, so stepping a word at a time cannot miss a start.
+            let mut owner = None;
+            let mut cursor = a.align_down(8);
+            for _ in 0..512 {
+                if let Some(c) = ObjectReference::from_raw_address(cursor) {
+                    if crate::plan::lxr::object_is_plausible(c)
+                        && c.to_raw_address() + c.get_size::<VM>() > a
+                    {
+                        owner = Some(c);
+                        break;
+                    }
+                }
+                if cursor <= layout.heap_start + 8usize {
+                    break;
+                }
+                cursor -= 8usize;
+            }
+            match owner {
+                Some(owner) => eprintln!(
+                    "  slot owner= {owner:?} +{} rc={} space={:?}",
+                    a - owner.to_raw_address(),
+                    self.rc.count(owner),
+                    self.lxr.space_of(owner)
+                ),
+                None => eprintln!("  slot owner= <no well-formed header within 512 words>"),
+            }
+            eprint!("  words     =");
+            let base = a.align_down(8) - 32usize;
+            for i in 0..9 {
+                let w = base + i * 8usize;
+                eprint!(
+                    "{}{:#x}",
+                    if w == a.align_down(8) { " >" } else { " " },
+                    unsafe { w.load::<usize>() }
+                );
+            }
+            eprintln!();
+        }
+        panic!("malformed increment from a {kind} slot at {a}");
+    }
+
     /// Return `None` if the increment of the slot should be delayed
     fn unlog_and_load_rc_object<const K: EdgeKind>(
         &mut self,
         s: VM::VMSlot,
     ) -> Option<ObjectReference> {
         let o = s.load();
-        // unlog slot
+        // Re-arm the field so the next epoch's first write to it is recorded again. A slot with
+        // no unlog bit has nothing to re-arm, and deriving a metadata address from one would
+        // read unmapped memory, so the mapped-metadata test is the guard.
+        //
+        // It must be *that* test and not "is the slot inside the heap". Objects in the VM space
+        // -- Julia's loaded sysimage, mapped well outside the heap range -- do have field unlog
+        // bits, armed by `VMSpace::set_side_metadata`. Guarding on the heap range meant a
+        // sysimage field was logged by its first barriered write and then never re-armed, so
+        // every later write to it was invisible: references the sysimage stored into the heap
+        // went uncounted and were reclaimed while live. That is the whole `sysbase` stage
+        // failure -- ~2800 undercounted objects at the second collection, with referrers at
+        // `0x740f…` addresses reporting `field_logged=Some(true)` forever.
         if K == EDGE_KIND_MATURE {
-            s.to_address().unlog_field_relaxed::<VM>();
+            let a = s.to_address();
+            if side_metadata::address_to_meta_address(&Self::UNLOG_BITS, a).is_mapped() {
+                a.unlog_field_relaxed::<VM>();
+            }
         }
         o
     }
@@ -350,12 +576,35 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         depth: u32,
         add_root_to_remset: bool,
     ) -> Option<ObjectReference> {
+        if K == EDGE_KIND_MATURE {
+            probe!(mmtk, lxr_inc_processed, s.to_address().as_usize());
+        }
         let o = match self.unlog_and_load_rc_object::<K>(s) {
             Some(o) => o,
             _ => {
                 return None;
             }
         };
+        // Objects the plan never reclaims carry no reference count, so there is
+        // nothing to increment and nothing to evacuate. Reporting them as absent also
+        // keeps them out of the recorded root set, which exists so that the matching
+        // decrements can be applied later.
+        if !self.lxr.is_rc_object(o) {
+            return None;
+        }
+        if check_incs() && !crate::plan::lxr::object_is_plausible(o) {
+            self.report_malformed_inc::<K>(s, o);
+        }
+        crate::plan::lxr::record_rc_event(
+            o,
+            match K {
+                EDGE_KIND_ROOT => "inc/root",
+                EDGE_KIND_NURSERY => "inc/nursery",
+                _ => "inc/mature",
+            },
+            None,
+            s.to_address(),
+        );
         // println!(" - inc {:?}: {:?} rc={}", s, o, self.rc.count(o));
         let new = self.process_inc_and_evacuate(worker, o, depth);
         // Put this into remset if this is a mature slot, or a weak root
@@ -371,29 +620,32 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
     fn process_incs<const K: EdgeKind>(
         &mut self,
         worker: &mut GCWorker<VM>,
-        mut incs: AddressBuffer<'_, VM::VMSlot>,
+        incs: AddressBuffer<'_, VM::VMSlot>,
         depth: u32,
         add_root_to_remset: bool,
     ) -> Option<Vec<ObjectReference>> {
+        // One atomic per buffer, not per slot: this is the count the pause's cost gets divided by
+        // to give a cost per increment, so it must not itself cost per increment.
+        self.incs_count += incs.len();
         if K == EDGE_KIND_ROOT {
-            let roots = incs.as_mut_ptr() as *mut ObjectReference;
-            let mut num_roots = 0usize;
+            // This used to reuse the increment buffer's allocation in place, writing the
+            // resulting objects over the slots and handing the same pointer to
+            // `Vec::from_raw_parts`. That is only sound when a slot and an
+            // `ObjectReference` have identical layout. A VM whose slot type is larger --
+            // Julia's `JuliaVMSlot` is an enum over a plain and an offset slot, three
+            // words wide -- would hand the resulting `Vec` a capacity counted in slots,
+            // and dropping it would free the allocation with a size three times too
+            // small, corrupting the allocator. Collect into its own buffer instead.
+            let mut roots = Vec::with_capacity(incs.len());
             for s in incs.iter() {
                 if let Some(new) = self.process_slot::<K>(worker, *s, depth, add_root_to_remset) {
-                    unsafe {
-                        roots.add(num_roots).write(new);
-                    }
-                    num_roots += 1;
+                    roots.push(new);
                 }
             }
-            if num_roots != 0 {
-                let cap = incs.capacity();
-                std::mem::forget(incs); // roots references incs now. we dont need incs.
-                let roots =
-                    unsafe { Vec::<ObjectReference>::from_raw_parts(roots, num_roots, cap) };
-                Some(roots)
-            } else {
+            if roots.is_empty() {
                 None
+            } else {
+                Some(roots)
             }
         } else {
             for s in incs.iter() {
@@ -436,6 +688,16 @@ impl<S: Slot> DerefMut for AddressBuffer<'_, S> {
 impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         self.lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
+        if crate::plan::lxr::RELEASE_STARTED.load(Ordering::SeqCst)
+            && crate::plan::lxr::INCS_AFTER_RELEASE.fetch_add(1, Ordering::SeqCst) == 0
+        {
+            eprintln!(
+                "[lxr] gc#{} BUG: increments are still being processed after Release \
+                 began. Release decides what to reclaim from reference counts, so it has \
+                 already treated these objects as dead.",
+                crate::plan::lxr::GC_COUNT.load(Ordering::SeqCst)
+            );
+        }
         self.pause = self.lxr.current_pause().unwrap();
         self.in_cm = self.lxr.concurrent_work_in_progress();
         if NO_EVAC.load(Ordering::Relaxed) {
@@ -449,6 +711,15 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
                 NO_EVAC.store(true, Ordering::Relaxed);
             }
         }
+        // A slice of a large promoted object's fields, rather than an increment buffer. The
+        // parent's `promote` has already armed the unlog bits and marked the object; all that is
+        // left is to count the fields, and the increments this generates are flushed by the same
+        // path as any other.
+        if let Some((o, chunks, obj_in_defrag)) = self.promoted_chunks.take() {
+            o.iterate_fields_in_chunks::<VM, _>(chunks, |slot| {
+                self.count_promoted_field(worker, o, obj_in_defrag, slot)
+            });
+        }
         // Process main buffer
         let root_slots = if KIND == EDGE_KIND_ROOT
             && (self.pause == Pause::FinalMark || self.pause == Pause::Full)
@@ -461,6 +732,35 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
             let incs = std::mem::take(&mut self.incs);
             self.process_incs::<KIND>(worker, AddressBuffer::Owned(incs), self.depth, false)
         };
+        // Seed the stop-the-world trace from the root *slots*, independently of whether any
+        // of them turned out to hold a reference counted object. `process_incs` reports only
+        // the counted objects, and a packet holding nothing but sysimage roots reports none
+        // at all -- so gating the trace on that result silently dropped those roots from
+        // marking, and anything held only by them was swept while reachable.
+        if (self.pause == Pause::FinalMark || self.pause == Pause::Full)
+            && !root_slots.is_empty()
+            && self.root_kind != Some(RootKind::Weak)
+        {
+            if self.pause == Pause::FinalMark {
+                let mut w = LXRStopTheWorldProcessEdges::<_, false>::new(
+                    root_slots,
+                    true,
+                    mmtk,
+                    WorkBucketStage::Closure,
+                );
+                w.root_kind = self.root_kind;
+                worker.add_work(WorkBucketStage::Closure, w)
+            } else {
+                let mut w = LXRStopTheWorldProcessEdges::<_, true>::new(
+                    root_slots,
+                    true,
+                    mmtk,
+                    WorkBucketStage::Closure,
+                );
+                w.root_kind = self.root_kind;
+                worker.add_work(WorkBucketStage::Closure, w)
+            };
+        }
         if let Some(roots) = roots {
             if self.lxr.cm_enabled()
                 && self.pause == Pause::InitialMark
@@ -478,42 +778,42 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
                 worker.scheduler().work_buckets[WorkBucketStage::ConcurrentResumable]
                     .add(LXRConcurrentTraceObjects::new(roots.clone(), mmtk));
             }
-            if self.pause == Pause::FinalMark || self.pause == Pause::Full {
-                if !root_slots.is_empty() && self.root_kind != Some(RootKind::Weak) {
-                    if self.pause == Pause::FinalMark {
-                        let mut w = LXRStopTheWorldProcessEdges::<_, false>::new(
-                            root_slots,
-                            true,
-                            mmtk,
-                            WorkBucketStage::Closure,
-                        );
-                        w.root_kind = self.root_kind;
-                        worker.add_work(WorkBucketStage::Closure, w)
-                    } else {
-                        let mut w = LXRStopTheWorldProcessEdges::<_, true>::new(
-                            root_slots,
-                            true,
-                            mmtk,
-                            WorkBucketStage::Closure,
-                        );
-                        w.root_kind = self.root_kind;
-                        worker.add_work(WorkBucketStage::Closure, w)
-                    };
-                }
-            } else if !self.root_kind.unwrap().should_skip_decs() {
+            if self.pause != Pause::FinalMark
+                && self.pause != Pause::Full
+                && !self.root_kind.unwrap().should_skip_decs()
+            {
                 self.lxr.curr_roots.read().unwrap().push(roots);
             }
+        }
+        if crate::plan::lxr::stats() {
+            crate::plan::lxr::INCS_PROCESSED.fetch_add(self.incs_count, Ordering::Relaxed);
+            crate::plan::lxr::OBJS_PROMOTED.fetch_add(self.promoted_count, Ordering::Relaxed);
+            self.incs_count = 0;
+            self.promoted_count = 0;
         }
         // Process recursively generated buffer
         let mut depth = self.depth;
         let mut incs = vec![];
-        const ACTIVE_PACKET_SPLIT: bool = false;
+        // Hand half of each generation to another worker.
+        //
+        // Without this the promotion trace is a chain, not a tree. `add_new_slot` spills a packet
+        // every `CAPACITY` (1024) slots, and a packet consuming 1024 slots promotes ~512 objects
+        // whose fields are ~1024 new slots -- so each packet produces almost exactly one successor.
+        // Measured on `tree_mutable`: 2.08M increments in 1984 packets, i.e. 1048 slots each, formed
+        // as 13 chains (one per root packet) about 152 packets long. Parallelism was therefore
+        // capped at 13 no matter how many workers existed, and measured ~3x because the root buffers
+        // are uneven -- `ProcessIncs` CPU over pause wall stayed at ~3x whether 4, 16 or 64 workers
+        // were available.
+        //
+        // Splitting each generation converts the chain into a binary tree, whose depth is
+        // logarithmic in the generation size rather than linear in it.
+        let split = crate::plan::lxr::active_packet_split();
         while !self.new_incs.is_empty() {
             self.new_incs_count = 0;
             depth += 1;
             incs.clear();
             self.new_incs.swap(&mut incs);
-            if ACTIVE_PACKET_SPLIT && depth >= 16 && incs.len() > 1 {
+            if incs.len() > split {
                 let (a, b) = incs.split_at(incs.len() / 2);
                 let mut w = ProcessIncs::<VM, EDGE_KIND_NURSERY>::new(b.to_vec(), self.lxr);
                 w.depth = depth;
@@ -544,6 +844,10 @@ pub struct ProcessDecs<VM: VMBinding> {
     mark_dead_objects: bool,
     mature_sweeping_in_progress: bool,
     rc: RefCountHelper<VM>,
+    /// Where these decrements came from, for diagnostics only. The two buffered sources --
+    /// the write barrier's overwritten field values and the previous pause's root set --
+    /// are indistinguishable in a backtrace, because both arrive as a plain packet.
+    pub origin: &'static str,
 }
 
 impl<VM: VMBinding> ProcessDecs<VM> {
@@ -557,6 +861,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             mark_dead_objects: false,
             mature_sweeping_in_progress: false,
             rc: RefCountHelper::NEW,
+            origin: "unknown",
         }
     }
 
@@ -570,6 +875,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             mark_dead_objects: false,
             mature_sweeping_in_progress: false,
             rc: RefCountHelper::NEW,
+            origin: "unknown",
         }
     }
 
@@ -588,10 +894,13 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         let mmtk = worker.mmtk;
         if !self.new_decs.is_empty() {
             let new_decs = self.new_decs.take();
-            self.new_work(
-                worker,
-                ProcessDecs::new(new_decs, self.counter.clone_with_decs()),
-            );
+            let mut w = ProcessDecs::new(new_decs, self.counter.clone_with_decs());
+            w.origin = if self.origin == "unknown" {
+                "cascade"
+            } else {
+                self.origin
+            };
+            self.new_work(worker, w);
         }
         if !self.mark_objects.is_empty() {
             let objects = self.mark_objects.take();
@@ -640,7 +949,14 @@ impl<VM: VMBinding> ProcessDecs<VM> {
                 }
             }
         });
-        let in_ix_space = lxr.immix_space.in_space(o);
+        let space = lxr.space_of(o);
+        debug_assert_ne!(
+            space,
+            LXRSpace::Common,
+            "{:?} is not reference counted, so its count can never reach zero",
+            o
+        );
+        let in_ix_space = space == LXRSpace::Immix;
         if in_ix_space {
             // Clear the VO bit if `o` is in the immix space.
             // Note that if the object is in the LOS,
@@ -658,7 +974,9 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             lxr.add_to_possibly_dead_mature_blocks(block, false);
             false
         } else {
-            true
+            // Only the large object space frees objects individually, and the caller
+            // uses this to decide whether to ask it to.
+            space == LXRSpace::Los
         }
     }
 
@@ -674,6 +992,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             } else {
                 *o
             };
+            crate::plan::lxr::record_rc_event(o, "dec/applied", None, crate::util::Address::ZERO);
             let mut dead = false;
             let mut is_los = false;
             let mut already_run = false;
@@ -685,6 +1004,9 @@ impl<VM: VMBinding> ProcessDecs<VM> {
                 }
                 if c == 1 && !dead {
                     dead = true;
+                    if crate::plan::lxr::is_known_live(o) {
+                        crate::plan::lxr::report_dec_of_live_object(o, self.origin);
+                    }
                     is_los = self.process_dead_object(worker, o, lxr);
                 }
                 debug_assert!(c <= MAX_REF_COUNT);

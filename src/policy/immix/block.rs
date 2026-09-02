@@ -505,6 +505,14 @@ impl Block {
     pub fn rc_sweep_nursery<VM: VMBinding>(&self, space: &ImmixSpace<VM>) -> bool {
         let is_in_place_promoted = self.is_in_place_promoted();
         self.clear_in_place_promoted();
+        if crate::plan::lxr::retain_nursery() {
+            // Bring-up diagnostic: keep every nursery block whole, so no line in it is
+            // ever handed back to the allocator. This makes an object that is live but
+            // uncounted survive anyway, which distinguishes "reachability/counting missed
+            // an object" from "something else corrupts the heap".
+            self.set_state(BlockState::Unmarked);
+            return false;
+        }
         if is_in_place_promoted {
             self.set_state(BlockState::Reusable {
                 unavailable_lines: 1 as _,
@@ -526,8 +534,19 @@ impl Block {
 
             space.reusable_blocks.push(*self);
             false
+        } else if !self.rc_dead() {
+            // The in-place-promotion flag is set by `promote`, but reaching a non-zero
+            // reference count is what actually makes an object live. Trusting the flag
+            // alone frees the whole block whenever the two disagree, taking live objects
+            // with it. Checking the counts is authoritative, so do that rather than
+            // assert it: the assertion was compiled out of release builds, which is
+            // where the block was being freed out from under live data.
+            self.set_state(BlockState::Reusable {
+                unavailable_lines: 1 as _,
+            });
+            space.reusable_blocks.push(*self);
+            false
         } else {
-            debug_assert!(self.rc_dead(), "{:?} has non-zero rc value", self);
             debug_assert_ne!(self.get_state(), super::block::BlockState::Unallocated);
 
             // Bulk clear the VO bits of the entire block.
@@ -554,6 +573,11 @@ impl Block {
 
     pub fn rc_sweep_mature<VM: VMBinding>(&self, space: &ImmixSpace<VM>, defrag: bool) -> bool {
         if self.get_state() == BlockState::Unallocated || self.get_state() == BlockState::Nursery {
+            return false;
+        }
+        if crate::plan::lxr::retain_nursery() || crate::plan::lxr::retain_mature() {
+            // See `rc_sweep_nursery`: retaining the nursery is only meaningful if the
+            // mature sweep does not then reclaim the same blocks.
             return false;
         }
         if defrag || self.rc_dead() {
