@@ -433,7 +433,11 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
         // Objects that cannot move are still traced, so that the closure reaches the
         // Immix space objects behind them and forwards those.
         let new_object = if self.lxr.immix_space.in_space(object) {
-            if self.lxr.rc.object_is_in_straddle_line(object) {
+            if self
+                .lxr
+                .rc
+                .address_is_in_straddle_line(object.to_raw_address())
+            {
                 return object;
             }
             let pause = self.pause;

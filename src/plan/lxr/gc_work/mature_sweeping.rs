@@ -68,11 +68,8 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
             self.rc.count(o),
             Line::is_aligned(a),
             a - line.start(),
-            self.rc.object_is_in_straddle_line_no_rc_check(o),
-            self.rc
-                .object_is_in_straddle_line_no_rc_check(unsafe {
-                    ObjectReference::from_raw_address_unchecked(line.start())
-                }),
+            self.rc.is_straddle_granule(a),
+            self.rc.is_straddle_line(line),
         );
         eprint!("  neighbour counts =");
         for i in -4i64..=4 {
@@ -118,7 +115,7 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
                     // the preceding line whenever an object begins exactly on a line boundary. Those
                     // granules (`offset_in_line=248`) are what crashed the sweep, and a per-line bit
                     // could not describe them.
-                    if self.rc.object_is_in_straddle_line_no_rc_check(o) {
+                    if self.rc.is_straddle_granule(o.to_raw_address()) {
                         continue;
                     }
                     std::sync::atomic::fence(Ordering::SeqCst);

@@ -817,7 +817,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         if self.attempt_mark(object) {
-            let straddle = self.rc.object_is_in_straddle_line_no_rc_check(object);
+            // Straddle marks are per granule now, so ask about this address directly rather than
+            // guessing from its low bits which addresses could carry one.
+            let straddle = self.rc.is_straddle_granule(object.to_raw_address());
             if !straddle {
                 queue.enqueue(object);
             }
@@ -843,8 +845,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
         if self.attempt_mark(object) {
             if self.rc_enabled {
-                let straddle = self.rc.object_is_in_straddle_line_no_rc_check(object);
-                if straddle {
+                if self.rc.is_straddle_granule(object.to_raw_address()) {
                     return object;
                 }
             } else {
