@@ -78,6 +78,22 @@ Currently, the core provides the following tracepoints.
     `num_live` is the number of live reference objects, and `num_retained` is the number of
     referents retained.
 
+The LXR plan adds the following.  They are tracepoints rather than counters because the first of
+them runs on every reference store that reaches the barrier's slow path, where a global counter
+would be a single cache line contended by every mutator thread in the program.
+
+-   `mmtk:lxr_inc_pushed(slot: int)`: the barrier buffered a slot for an increment.
+-   `mmtk:lxr_inc_processed(slot: int)`: an increment was applied for a mature slot.  Every slot
+    buffered above must be processed in the pause that follows: a logged field is not recorded
+    again, so a dropped slot loses its increment permanently while the matching decrement has
+    already been taken.  These two must track each other.
+-   `mmtk:lxr_slot_skipped(reason: int)`: the barrier declined to record a slot.  `reason` is 0 if
+    the slot lies outside the heap and so has no field unlog bit, or 1 if the slot is derived and
+    could not be re-read at the pause.
+-   `mmtk:lxr_promote(object: int)`: an object was promoted, i.e. its reference count went from
+    zero to one.
+
+
 ## Tracing tools
 
 Each sub-directory contains a set of scripts.

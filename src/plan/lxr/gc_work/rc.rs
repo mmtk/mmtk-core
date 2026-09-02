@@ -1,7 +1,7 @@
 use super::super::LazySweepingJobsCounter;
 use super::super::SurvivalRatioPredictorLocal;
 use super::super::LXR;
-use super::super::{LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURSERY_EVACUATION};
+use super::super::{check_incs, LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURSERY_EVACUATION};
 use super::tracing::LXRConcurrentTraceObjects;
 use super::tracing::LXRStopTheWorldProcessEdges;
 use super::ProcessEdgesBase;
@@ -9,6 +9,7 @@ use crate::plan::VectorQueue;
 use crate::policy::immix::block::BlockState;
 use crate::scheduler::gc_work::RootKind;
 use crate::util::copy::CopySemantics;
+use crate::util::linear_scan::Region;
 use crate::util::linear_scan::UnstraddlableRegion;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::rc::*;
@@ -43,6 +44,11 @@ pub struct ProcessIncs<VM: VMBinding, const KIND: EdgeKind> {
     /// A slice of one promoted object's fields to count, rather than a buffer of increments:
     /// `(object, chunks, obj_in_defrag)`. See [`ProcessIncs::scan_nursery_object`].
     promoted_chunks: Option<(ObjectReference, std::ops::Range<usize>, bool)>,
+    /// Diagnostic tallies for this packet, published once when it finishes. Kept local because a
+    /// global atomic per increment or per promotion is millions of contended updates inside the
+    /// pause -- enough to inflate the pause it is supposed to be measuring by 8x.
+    incs_count: usize,
+    promoted_count: usize,
 }
 
 unsafe impl<VM: VMBinding, const KIND: EdgeKind> Send for ProcessIncs<VM, KIND> {}
@@ -71,6 +77,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             root_kind: None,
             survival_ratio_predictor_local: SurvivalRatioPredictorLocal::default(),
             promoted_chunks: None,
+            incs_count: 0,
+            promoted_count: 0,
         }
     }
 
@@ -144,6 +152,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         los: bool,
         depth: u32,
     ) {
+        self.promoted_count += 1;
+        probe!(mmtk, lxr_promote, o.to_raw_address().as_usize());
         let size = o.get_size::<VM>();
 
         if !los {
@@ -309,8 +319,20 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         );
         let rc = self.rc.count(target);
         if rc == 0 {
+            crate::plan::lxr::record_rc_event(
+                target,
+                "defer/promote-scan",
+                Some(o),
+                slot.to_address(),
+            );
             self.add_new_slot(worker, slot);
         } else {
+            crate::plan::lxr::record_rc_event(
+                target,
+                "inc/promote-scan",
+                Some(o),
+                slot.to_address(),
+            );
             if rc != crate::util::rc::MAX_REF_COUNT {
                 let _ = self.rc.inc(target);
             }
@@ -437,6 +459,89 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         }
     }
 
+    /// Report an increment whose slot holds something that is not an object, and abort.
+    ///
+    /// The interesting question is never the bad value itself but where the slot came
+    /// from, so this reconstructs as much of that as it can: the kind of increment, what
+    /// owns the slot's memory, and — by walking back from the slot to the nearest
+    /// well-formed header that covers it — which object the slot is a field of.
+    #[cold]
+    fn report_malformed_inc<const K: EdgeKind>(&self, s: VM::VMSlot, o: ObjectReference) -> ! {
+        let kind = match K {
+            EDGE_KIND_ROOT => "root",
+            EDGE_KIND_NURSERY => "nursery",
+            _ => "mature (write barrier)",
+        };
+        let space_name = |o: ObjectReference| -> &'static str {
+            use crate::mmtk::SFT_MAP;
+            SFT_MAP.get_checked(o.to_raw_address()).name()
+        };
+        let a = s.to_address();
+        let layout = crate::util::heap::layout::vm_layout::vm_layout();
+        let in_heap = a >= layout.heap_start && a < layout.heap_end;
+        eprintln!(
+            "[lxr] gc#{} malformed increment (out_of_heap_slots so far: {})",
+            crate::plan::lxr::GC_COUNT.load(Ordering::SeqCst),
+            crate::plan::lxr::OUT_OF_HEAP_SLOTS.load(Ordering::Relaxed)
+        );
+        eprintln!("  kind      = {kind}");
+        eprintln!("  slot      = {a}  (in heap: {in_heap})");
+        eprintln!("  loaded    = {o:?}  space={}", space_name(o));
+        eprintln!("  loaded rc = {}", self.rc.count(o));
+        if self.lxr.immix_space.in_space(o) {
+            eprintln!("  loaded blk= {:?}", Block::containing(o).get_state());
+        }
+        if in_heap {
+            let slot_as_obj = ObjectReference::from_raw_address(a.align_down(8));
+            eprintln!("  slot space= {:?}", slot_as_obj.map(space_name));
+            if slot_as_obj.is_some_and(|x| self.lxr.immix_space.in_space(x)) {
+                eprintln!(
+                    "  slot blk  = {:?}",
+                    Block::from_unaligned_address(a).get_state()
+                );
+            }
+            // Walk back for the object this slot is a field of. Objects are at least a
+            // header apart, so stepping a word at a time cannot miss a start.
+            let mut owner = None;
+            let mut cursor = a.align_down(8);
+            for _ in 0..512 {
+                if let Some(c) = ObjectReference::from_raw_address(cursor) {
+                    if crate::plan::lxr::object_is_plausible(c)
+                        && c.to_raw_address() + c.get_size::<VM>() > a
+                    {
+                        owner = Some(c);
+                        break;
+                    }
+                }
+                if cursor <= layout.heap_start + 8usize {
+                    break;
+                }
+                cursor -= 8usize;
+            }
+            match owner {
+                Some(owner) => eprintln!(
+                    "  slot owner= {owner:?} +{} rc={} space={}",
+                    a - owner.to_raw_address(),
+                    self.rc.count(owner),
+                    space_name(owner)
+                ),
+                None => eprintln!("  slot owner= <no well-formed header within 512 words>"),
+            }
+            eprint!("  words     =");
+            let base = a.align_down(8) - 32usize;
+            for i in 0..9 {
+                let w = base + i * 8usize;
+                eprint!(
+                    "{}{:#x}",
+                    if w == a.align_down(8) { " >" } else { " " },
+                    unsafe { w.load::<usize>() }
+                );
+            }
+            eprintln!();
+        }
+        panic!("malformed increment from a {kind} slot at {a}");
+    }
+
     /// Return `None` if the increment of the slot should be delayed
     fn unlog_and_load_rc_object<const K: EdgeKind>(
         &mut self,
@@ -471,6 +576,9 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         depth: u32,
         add_root_to_remset: bool,
     ) -> Option<ObjectReference> {
+        if K == EDGE_KIND_MATURE {
+            probe!(mmtk, lxr_inc_processed, s.to_address().as_usize());
+        }
         let o = match self.unlog_and_load_rc_object::<K>(s) {
             Some(o) => o,
             _ => {
@@ -484,6 +592,20 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         if !self.lxr.is_rc_object(o) {
             return None;
         }
+        if check_incs() && !crate::plan::lxr::object_is_plausible(o) {
+            self.report_malformed_inc::<K>(s, o);
+        }
+        crate::plan::lxr::record_rc_event(
+            o,
+            match K {
+                EDGE_KIND_ROOT => "inc/root",
+                EDGE_KIND_NURSERY => "inc/nursery",
+                _ => "inc/mature",
+            },
+            None,
+            s.to_address(),
+        );
+        // println!(" - inc {:?}: {:?} rc={}", s, o, self.rc.count(o));
         let new = self.process_inc_and_evacuate(worker, o, depth);
         // Put this into remset if this is a mature slot, or a weak root
         if K != EDGE_KIND_ROOT || add_root_to_remset {
@@ -502,6 +624,9 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         depth: u32,
         add_root_to_remset: bool,
     ) -> Option<Vec<ObjectReference>> {
+        // One atomic per buffer, not per slot: this is the count the pause's cost gets divided by
+        // to give a cost per increment, so it must not itself cost per increment.
+        self.incs_count += incs.len();
         if K == EDGE_KIND_ROOT {
             // This used to reuse the increment buffer's allocation in place, writing the
             // resulting objects over the slots and handing the same pointer to
@@ -563,6 +688,16 @@ impl<S: Slot> DerefMut for AddressBuffer<'_, S> {
 impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         self.lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
+        if crate::plan::lxr::RELEASE_STARTED.load(Ordering::SeqCst)
+            && crate::plan::lxr::INCS_AFTER_RELEASE.fetch_add(1, Ordering::SeqCst) == 0
+        {
+            eprintln!(
+                "[lxr] gc#{} BUG: increments are still being processed after Release \
+                 began. Release decides what to reclaim from reference counts, so it has \
+                 already treated these objects as dead.",
+                crate::plan::lxr::GC_COUNT.load(Ordering::SeqCst)
+            );
+        }
         self.pause = self.lxr.current_pause().unwrap();
         self.in_cm = self.lxr.concurrent_work_in_progress();
         if NO_EVAC.load(Ordering::Relaxed) {
@@ -650,6 +785,12 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
                 self.lxr.curr_roots.read().unwrap().push(roots);
             }
         }
+        if crate::plan::lxr::stats() {
+            crate::plan::lxr::INCS_PROCESSED.fetch_add(self.incs_count, Ordering::Relaxed);
+            crate::plan::lxr::OBJS_PROMOTED.fetch_add(self.promoted_count, Ordering::Relaxed);
+            self.incs_count = 0;
+            self.promoted_count = 0;
+        }
         // Process recursively generated buffer
         let mut depth = self.depth;
         let mut incs = vec![];
@@ -703,6 +844,10 @@ pub struct ProcessDecs<VM: VMBinding> {
     mark_dead_objects: bool,
     mature_sweeping_in_progress: bool,
     rc: RefCountHelper<VM>,
+    /// Where these decrements came from, for diagnostics only. The two buffered sources --
+    /// the write barrier's overwritten field values and the previous pause's root set --
+    /// are indistinguishable in a backtrace, because both arrive as a plain packet.
+    pub origin: &'static str,
 }
 
 impl<VM: VMBinding> ProcessDecs<VM> {
@@ -716,6 +861,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             mark_dead_objects: false,
             mature_sweeping_in_progress: false,
             rc: RefCountHelper::NEW,
+            origin: "unknown",
         }
     }
 
@@ -729,6 +875,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             mark_dead_objects: false,
             mature_sweeping_in_progress: false,
             rc: RefCountHelper::NEW,
+            origin: "unknown",
         }
     }
 
@@ -747,7 +894,12 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         let mmtk = worker.mmtk;
         if !self.new_decs.is_empty() {
             let new_decs = self.new_decs.take();
-            let w = ProcessDecs::new(new_decs, self.counter.clone_with_decs());
+            let mut w = ProcessDecs::new(new_decs, self.counter.clone_with_decs());
+            w.origin = if self.origin == "unknown" {
+                "cascade"
+            } else {
+                self.origin
+            };
             self.new_work(worker, w);
         }
         if !self.mark_objects.is_empty() {
@@ -838,6 +990,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             } else {
                 *o
             };
+            crate::plan::lxr::record_rc_event(o, "dec/applied", None, crate::util::Address::ZERO);
             let mut dead = false;
             let mut is_los = false;
             let mut already_run = false;
@@ -849,6 +1002,9 @@ impl<VM: VMBinding> ProcessDecs<VM> {
                 }
                 if c == 1 && !dead {
                     dead = true;
+                    if crate::plan::lxr::is_known_live(o) {
+                        crate::plan::lxr::report_dec_of_live_object(o, self.origin);
+                    }
                     is_los = self.process_dead_object(worker, o, lxr);
                 }
                 debug_assert!(c <= MAX_REF_COUNT);

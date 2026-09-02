@@ -3,6 +3,7 @@ use std::sync::atomic::Ordering;
 
 use crate::plan::lxr::{LazySweepingJobsCounter, LXR};
 use crate::policy::immix::block::{Block, BlockState};
+use crate::policy::immix::line::Line;
 use crate::policy::immix::ImmixSpace;
 use crate::scheduler::{GCWork, GCWorker};
 use crate::util::heap::chunk_map::Chunk;
@@ -37,6 +38,10 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
                 o.to_raw_address().store(0xdeadusize);
             }
         }
+        if crate::plan::lxr::check_incs() && !crate::plan::lxr::object_is_plausible(o) {
+            self.report_bogus_dead_object(o);
+        }
+
         // Clear the VO bit.
         // Note that if the object is in the LOS,
         // the VO bit will be cleared in `LargeObjectSpace::release_object`.
@@ -45,6 +50,47 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
 
         self.rc.unmark_straddle_object(o);
         self.rc.set(o, 0);
+    }
+
+    /// Report a granule the linear scan took for a dead object although it does not hold one.
+    ///
+    /// The scan can only distinguish an object start from a synthetic line-occupancy mark by the
+    /// straddle bit, so anything that carries a count without either being an object or being
+    /// marked straddled lands here. What is needed is the *shape* of the stray count: where it
+    /// sits within its line, what its neighbours hold, and what the straddle bits say.
+    #[cold]
+    fn report_bogus_dead_object(&self, o: ObjectReference) {
+        let a = o.to_raw_address();
+        let line = Line::from_unaligned_address(a);
+        eprintln!("[lxr] sweep: granule at {a} is not an object");
+        eprintln!(
+            "  count={} line_aligned={} offset_in_line={} straddle(granule)={} straddle(line)={}",
+            self.rc.count(o),
+            Line::is_aligned(a),
+            a - line.start(),
+            self.rc.object_is_in_straddle_line_no_rc_check(o),
+            self.rc
+                .object_is_in_straddle_line_no_rc_check(unsafe {
+                    ObjectReference::from_raw_address_unchecked(line.start())
+                }),
+        );
+        eprint!("  neighbour counts =");
+        for i in -4i64..=4 {
+            let n = a.as_usize() as i64 + i * (rc::MIN_OBJECT_SIZE as i64);
+            let n = unsafe { crate::util::Address::from_usize(n as usize) };
+            let c = self.rc.count_by_address(n);
+            eprint!("{}{}", if i == 0 { " >" } else { " " }, c);
+        }
+        eprintln!();
+        eprint!("  words     =");
+        for i in -4i64..=4 {
+            let w = a.as_usize() as i64 + i * 8;
+            let w = unsafe { crate::util::Address::from_usize(w as usize) };
+            eprint!("{}{:#x}", if i == 0 { " >" } else { " " }, unsafe {
+                w.load::<usize>()
+            });
+        }
+        eprintln!();
     }
 
     fn process_block(&mut self, block: Block, lxr: &LXR<VM>, immix_space: &ImmixSpace<VM>) {
@@ -79,9 +125,11 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
                     if self.rc.count(o) == 0 {
                         continue;
                     }
+                    crate::plan::lxr::SWEEP_ZEROED.fetch_add(1, Ordering::Relaxed);
                     self.process_dead_object(o);
                     has_dead_object = true;
                 } else {
+                    crate::plan::lxr::SWEEP_KEPT_MARKED.fetch_add(1, Ordering::Relaxed);
                     has_live = true;
                 }
             }
