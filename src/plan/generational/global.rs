@@ -62,10 +62,16 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     /// Prepare Gen. This should be called by a single thread in GC prepare work.
     pub fn prepare(&mut self, tls: VMWorkerThread) {
         let full_heap = !self.is_current_gc_nursery();
+
+        // Only in case of full heap collection we prepare other spaces for collection that are not generational e.g NonMoving.
+        // LOS is generational space and is part of common plan so it is prepared in both cases.
         if full_heap {
             self.full_heap_gc_count.lock().unwrap().inc();
+            self.common.prepare(tls, full_heap);
+        } else {
+            self.common.los.prepare(full_heap);
         }
-        self.common.prepare(tls, full_heap);
+
         self.nursery.prepare(true);
         self.nursery
             .set_copy_for_sft_trace(Some(CopySemantics::PromoteToMature));
@@ -75,7 +81,13 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     pub fn release(&mut self, tls: VMWorkerThread) {
         let full_heap = !self.is_current_gc_nursery();
 
-        self.common.release(tls, full_heap);
+        // In case of full heap collection we will release all spaces, even non generational ones like NonMoving.
+        // Only LOS space from common plan is released on nursery.
+        if full_heap {
+            self.common.release(tls, full_heap);
+        } else {
+            self.common.los.release(full_heap);
+        }
         self.nursery.release();
     }
 

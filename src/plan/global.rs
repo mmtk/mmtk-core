@@ -877,49 +877,41 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     #[allow(clippy::needless_return)]
-    fn prepare_nonmoving_space(&mut self, full_heap: bool) {
+    fn prepare_nonmoving_space(&mut self, _full_heap: bool) {
         // LXR does not support spaces with no LXR support
         // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
         // This skip just works around for the nonmoving space (defaults to Immix space), for which we see a panic.
         if *self.base.options.plan == PlanSelector::LXR {
             return;
         }
-        if !full_heap {
-            // During a nursery GC, the nonmoving space is a mature space and is not traced.
-            // Do not prepare it, so that it is left untouched.
-            return;
-        }
+
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {
                 self.nonmoving.prepare();
             } else if #[cfg(feature = "marksweep_as_nonmoving")] {
-                self.nonmoving.prepare(full_heap);
+                self.nonmoving.prepare(_full_heap);
             } else {
-                self.nonmoving.prepare(full_heap, None, UnlogBitsOperation::NoOp);
+                self.nonmoving.prepare(_full_heap, None, UnlogBitsOperation::NoOp);
             }
         }
     }
 
     #[allow(clippy::needless_return)]
-    fn release_nonmoving_space(&mut self, full_heap: bool) {
+    fn release_nonmoving_space(&mut self, _full_heap: bool) {
         // LXR does not support spaces with no LXR support
         // FIXME: We want to properly deal with this. Essentially any space that is not supported by LXR should not be included when LXR is selected.
         // This skip just works around for the nonmoving space (defaults to Immix space), for which we see a panic.
         if *self.base.options.plan == PlanSelector::LXR {
             return;
         }
-        if !full_heap {
-            // During a nursery GC, the nonmoving space is a mature space and is not traced.
-            // Do not release (sweep) it, otherwise all its objects would be reclaimed.
-            return;
-        }
+
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {
                 self.nonmoving.release();
             } else if #[cfg(feature = "marksweep_as_nonmoving")] {
-                self.nonmoving.prepare(full_heap);
+                self.nonmoving.prepare(_full_heap);
             } else {
-                self.nonmoving.release(full_heap, UnlogBitsOperation::NoOp);
+                self.nonmoving.release(_full_heap, UnlogBitsOperation::NoOp);
             }
         }
     }
