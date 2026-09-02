@@ -52,7 +52,6 @@ pub struct ConcurrentImmix<VM: VMBinding> {
     previous_pause: Atomic<Option<Pause>>,
     should_do_full_gc: AtomicBool,
     concurrent_marking_active: AtomicBool,
-    unfinished_concurrent_marking: AtomicBool,
 }
 
 /// The plan constraints for the concurrent immix plan.
@@ -323,22 +322,6 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
             mmtk.gc_trigger.policy.on_gc_start(mmtk);
         }
 
-        // If we have unfinished concurrent marking work, do it here.
-        if self.unfinished_concurrent_marking.load(Ordering::SeqCst) {
-            info!(
-                "Concurrent marking was interrupted. Moving remaining work to STW closure bucket."
-            );
-            // We have unfinihsed concurrent marking work, so this pause has to be the final mark pause.
-            // If we want to allow full pause to interrupte concurrent marking, the unfinished work needs to be dropped.
-            assert!(pause == Pause::FinalMark);
-            let leftover_concurrent_work =
-                mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].drain_all_packets();
-            mmtk.scheduler.work_buckets[WorkBucketStage::FinishConcurrentWork]
-                .bulk_add(leftover_concurrent_work);
-            self.unfinished_concurrent_marking
-                .store(false, Ordering::SeqCst);
-        }
-
         info!("{:?} start", pause);
     }
 
@@ -389,7 +372,6 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
             previous_pause: Atomic::new(None),
             should_do_full_gc: AtomicBool::new(false),
             concurrent_marking_active: AtomicBool::new(false),
-            unfinished_concurrent_marking: AtomicBool::new(false),
         }
     }
 
@@ -515,16 +497,5 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentImmix<VM> {
 
     fn concurrent_work_in_progress(&self) -> bool {
         self.concurrent_marking_in_progress()
-    }
-
-    fn on_concurrent_work_interrupted(&self) {
-        assert!(!self.unfinished_concurrent_marking.load(Ordering::SeqCst));
-        // A pause is requested when we are doing concurrent marking.
-        // Set concurrent bucket as disabled now. Later (during collection scheduling),
-        // we will move all the remaining work to a STW bucket and continue.
-        // This preserves all marking progress already made; nothing is reset or re-traced.
-        self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(false);
-        self.unfinished_concurrent_marking
-            .store(true, Ordering::SeqCst);
     }
 }

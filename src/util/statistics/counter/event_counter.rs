@@ -10,9 +10,7 @@ pub struct EventCounter {
     name: String,
     pub implicitly_start: bool,
     merge_phases: bool,
-    /// The raw per-phase counts, in phase order (index 0 = phase 0, etc). Visible within the
-    /// `counter` module so [`super::LatencySampler`] can compute derived statistics.
-    pub(super) count: Vec<u64>,
+    count: Vec<u64>,
     current_count: u64,
     running: bool,
     stats: Arc<SharedStats>,
