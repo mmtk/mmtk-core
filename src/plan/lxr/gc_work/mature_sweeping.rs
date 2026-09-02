@@ -3,14 +3,12 @@ use std::sync::atomic::Ordering;
 
 use crate::plan::lxr::{LazySweepingJobsCounter, LXR};
 use crate::policy::immix::block::{Block, BlockState};
-use crate::policy::immix::line::Line;
 use crate::policy::immix::ImmixSpace;
 use crate::scheduler::{GCWork, GCWorker};
 use crate::util::heap::chunk_map::Chunk;
 use crate::util::linear_scan::Region;
 use crate::util::rc::{self, RefCountHelper};
 use crate::util::ObjectReference;
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::MMTK;
 
@@ -62,34 +60,25 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
                 // Safety: cur_cursor is either a valid object reference, or a straddle line
                 let o = unsafe { ObjectReference::from_raw_address_unchecked(cur_cursor) };
                 if !immix_space.is_marked(o) {
-                    // A synthetic straddle mark is always written as exactly 1 (see
-                    // `RefCountHelper::set_straddle_bit`), so `c == 1` cheaply rules out most
-                    // positions before touching straddle-line metadata, for either VM kind.
+                    // A straddle bit on this granule means the count is a synthetic line-occupancy
+                    // mark, not an object: `set_occupied_line_marks` writes one for every line an
+                    // object touches besides the one holding its own count, so the hole finder does
+                    // not read those lines as free. Sizing one reads a type tag from whatever
+                    // precedes it.
                     //
-                    // A mark for a UNIFIED_OBJECT_REFERENCE_ADDRESS VM only ever sits at a
-                    // line's own start, so a non-aligned `cur_cursor` can never be one, and the
-                    // more careful checks below can be skipped entirely. That is not true for a
-                    // VM whose reference address can trail the allocation start (e.g. Julia): a
-                    // mark can also sit in the last few bytes of a line (see
-                    // `RefCountHelper::straddle_bit`), so every position still needs the careful
-                    // check there -- this is exactly the case (`offset_in_line=248`, the header
-                    // mark for an object whose allocation start lands on a line boundary) that
-                    // crashed the sweep before the per-position check existed.
-                    let could_be_straddle_mark = !VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS
-                        || Line::is_aligned(o.to_raw_address());
-                    if could_be_straddle_mark {
-                        if c == 1 && self.rc.object_is_in_straddle_line_no_rc_check(o) {
-                            // this is a straddle line, skip
-                            continue;
-                        } else {
-                            // Now o is a valid object reference
-                            std::sync::atomic::fence(Ordering::SeqCst);
-                            if self.rc.count(o) == 0 {
-                                continue;
-                            }
-                        }
+                    // The bit is checked at the granule, not at the line. The mark for the line
+                    // holding an object's header sits at the header word; for Julia, whose reference
+                    // address is one word past the allocation start, that lands on the last word of
+                    // the preceding line whenever an object begins exactly on a line boundary. Those
+                    // granules (`offset_in_line=248`) are what crashed the sweep, and a per-line bit
+                    // could not describe them.
+                    if self.rc.object_is_in_straddle_line_no_rc_check(o) {
+                        continue;
                     }
-                    // o is still a valid object here.
+                    std::sync::atomic::fence(Ordering::SeqCst);
+                    if self.rc.count(o) == 0 {
+                        continue;
+                    }
                     self.process_dead_object(o);
                     has_dead_object = true;
                 } else {

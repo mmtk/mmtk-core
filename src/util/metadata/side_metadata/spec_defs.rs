@@ -81,20 +81,19 @@ define_side_metadata_specs!(
     IX_BLOCK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
     // Straddle line marks
     // One dedicated byte per line, matching upstream's footprint exactly (never packed with any
-    // other line's bits). For a VM with UNIFIED_OBJECT_REFERENCE_ADDRESS (reference address ==
-    // allocation start, true of most VMs), only bit 0 (a line's own start) is ever used, and the
-    // whole byte is read and written exactly as upstream does: a plain, non-atomic access, with
-    // "nonzero" meaning the line is fully consumed by one straddling object.
-    //
-    // For a VM where the reference address can trail the allocation start (Julia), the byte's
-    // remaining bits are needed too: a synthetic line-occupancy mark can also sit at one of the
-    // few granules trailing a line that OBJECT_REF_OFFSET_UPPER_BOUND makes reachable by a header
-    // (see `RefCountHelper::straddle_bit` and `mark_straddle_object_with_size`), and that header
-    // mark can share a line with a genuinely different, unrelated object's own reference address
-    // -- so each needs its own independently-addressable bit, set and cleared with atomic
-    // fetch_or/fetch_and rather than a plain store, and queries must check the exact position
-    // (see `RefCountHelper::object_is_in_straddle_line_no_rc_check`), not just "is this line
-    // marked at all".
+    // other line's bits). Within that byte, several independently-addressable bits rather than a
+    // single boolean: a synthetic line-occupancy mark can sit at a line's own start, or at one of
+    // the few granules trailing a line that OBJECT_REF_OFFSET_UPPER_BOUND makes reachable by a
+    // header (see `RefCountHelper::straddle_bit` and `mark_straddle_object_with_size`), and two of
+    // those positions can be independently occupied within the same line -- one by a real
+    // object's own reference address, another by an unrelated object's synthetic mark -- so they
+    // need separate bits, set and cleared with atomic fetch_or/fetch_and rather than a plain
+    // store. This applies even to a VM with UNIFIED_OBJECT_REFERENCE_ADDRESS, where only the
+    // line-start bit is ever used: an object's tail line is marked even when the object does not
+    // fill it (see `mark_straddle_object_with_size`'s doc), which leaves room in that same line
+    // for an unrelated, ordinary object to be placed -- so querying "is this line marked at all"
+    // is not sufficient, only "is this exact position marked" is (see
+    // `RefCountHelper::object_is_in_straddle_line_no_rc_check`'s unified fast path).
     RC_STRADDLE_LINES = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::line::Line::LOG_BYTES),
     // LXR Block logging bits
     IX_BLOCK_LOG   = (global: false, log_num_of_bits: 0, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
