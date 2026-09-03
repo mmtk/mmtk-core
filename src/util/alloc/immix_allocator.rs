@@ -11,6 +11,7 @@ use crate::util::alloc::allocator::get_maximum_aligned_size;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::VMThread;
+use crate::util::rc::ObjectEnvelope;
 use crate::util::rust_util::unlikely;
 use crate::util::Address;
 use crate::vm::*;
@@ -191,6 +192,16 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         self.space
     }
 
+    /// The first address in `block` an object may be allocated at.
+    fn block_usable_start(&self, block: Block) -> Address {
+        if self.space.rc_enabled {
+            // For LXR, we need to reserve the leading slack bytes of a block for the envelope reservation.
+            block.start() + ObjectEnvelope::slack::<VM>()
+        } else {
+            block.start()
+        }
+    }
+
     /// Large-object (larger than a line) bump allocation.
     fn overflow_alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
         trace!("{:?}: overflow_alloc", self.tls);
@@ -242,7 +253,9 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                 self.immix_space().get_next_available_lines(self.copy, line)
             {
                 // Find recyclable lines. Update the bump allocation cursor and limit.
-                self.bump_pointer.cursor = start_line.start();
+                self.bump_pointer.cursor = start_line
+                    .start()
+                    .max(self.block_usable_start(line.block()));
                 self.bump_pointer.limit = end_line.start();
                 trace!(
                     "{:?}: acquire_recyclable_lines -> {:?} [{:?}, {:?}) {:?}",
@@ -257,7 +270,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     self.bump_pointer.limit - self.bump_pointer.cursor,
                 );
                 debug_assert!(
-                    align_allocation_no_fill::<VM>(self.bump_pointer.cursor, align, offset) + size
+                    align_allocation_no_fill::<VM>(start_line.start(), align, offset) + size
                         <= self.bump_pointer.limit
                 );
                 let block = line.block();
@@ -334,10 +347,10 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     }
                 }
                 if self.request_for_large {
-                    self.large_bump_pointer.cursor = block.start();
+                    self.large_bump_pointer.cursor = self.block_usable_start(block);
                     self.large_bump_pointer.limit = block.end();
                 } else {
-                    self.bump_pointer.cursor = block.start();
+                    self.bump_pointer.cursor = self.block_usable_start(block);
                     self.bump_pointer.limit = block.end();
                 }
                 self.alloc(size, align, offset)

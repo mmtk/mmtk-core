@@ -772,6 +772,17 @@ impl<VM: VMBinding> LXR<VM> {
         self.immix_space.in_space(o) && Block::in_defrag_block(o)
     }
 
+    /// Whether LXR maintains a reference count for `o`.
+    ///
+    /// Only the Immix and large object spaces are reference counted. An object elsewhere -- the
+    /// immortal space, the VM space holding a boot image -- has no count, and its granule in
+    /// `RC_TABLE` is never written. Reading one is therefore not just uninformative but unsound:
+    /// counts are keyed on the object's envelope start, which can precede the object, and only a
+    /// reference-counted space reserves room for that. See [`crate::util::rc::ObjectEnvelope`].
+    pub fn is_rc_object(&self, o: ObjectReference) -> bool {
+        self.immix_space.in_space(o) || self.common.los.in_space(o)
+    }
+
     pub fn address_in_defrag(&self, a: Address) -> bool {
         self.immix_space.address_in_space(a) && Block::address_in_defrag_block(a)
     }

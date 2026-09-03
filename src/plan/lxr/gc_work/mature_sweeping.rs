@@ -60,9 +60,12 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
             let c = self.rc.count_by_address(cur_cursor);
             if c != 0 {
                 // Safety: cur_cursor is either a valid object reference, or a straddle line
-                let o = unsafe { ObjectReference::from_raw_address_unchecked(cur_cursor) };
+                // But we don't know o is valid now
+                let o = unsafe { rc::ObjectEnvelope::from_start(cur_cursor) }
+                    .to_object_reference::<VM>();
+                // TODO: This check is unsound. But if we only use side metadata, it is fine.
                 if !immix_space.is_marked(o) {
-                    if Line::is_aligned(o.to_raw_address()) {
+                    if Line::is_aligned(cur_cursor) {
                         if c == 1 && self.rc.object_is_in_straddle_line_no_rc_check(o) {
                             // this is a straddle line, skip
                             continue;

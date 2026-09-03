@@ -471,6 +471,33 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * object ref >= object_start + OBJECT_REF_OFFSET_LOWER_BOUND
     const OBJECT_REF_OFFSET_LOWER_BOUND: isize;
 
+    /// The counterpart to [`Self::OBJECT_REF_OFFSET_LOWER_BOUND`]: the *largest* possible offset
+    /// between an object's allocation result (object_start) and the raw address of its object
+    /// reference. As with the lower bound, the offset need not be the same for every object --
+    /// this is the largest value it can take for any of them, across every space.
+    ///
+    /// Together the two bounds let MMTk bracket where an object begins knowing only its reference
+    /// address, without inspecting the object (which for some bindings means loading a type tag).
+    /// LXR uses them to build an object's *envelope*, the address range that conservatively
+    /// covers the object wherever it actually starts -- see [`crate::util::rc::ObjectEnvelope`].
+    ///
+    /// Note that a loose bound is sound but not free: the gap between the two bounds is how much
+    /// conservatism every object pays for, so a binding whose offset varies widely across spaces
+    /// (a large object space that places the reference a whole cache line in, say) makes the
+    /// envelope correspondingly coarser.
+    ///
+    /// Defaults to [`Self::OBJECT_REF_OFFSET_LOWER_BOUND`], i.e. a fixed offset, which holds for
+    /// every binding that does not override this.
+    ///
+    /// We should have the invariant:
+    /// * object ref <= object_start + OBJECT_REF_OFFSET_UPPER_BOUND
+    // The doc comment above links to `crate::util::rc::ObjectEnvelope`. The `util::rc` module is
+    // private (not re-exported at the crate root), so that item is unreachable from outside the
+    // crate even though it is declared `pub`. `cargo doc --document-private-items` (used by GC
+    // implementers and by `ci-doc.sh`) documents it anyway, so the link does resolve there.
+    #[allow(rustdoc::private_intra_doc_links)]
+    const OBJECT_REF_OFFSET_UPPER_BOUND: isize = Self::OBJECT_REF_OFFSET_LOWER_BOUND;
+
     /// Return the lowest address of the storage associated with an object. This should be
     /// the address that a binding gets by an allocation call ([`crate::memory_manager::alloc`]).
     ///

@@ -4,6 +4,7 @@ use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::{allocator, Allocator};
 use crate::util::opaque_pointer::*;
+use crate::util::rc::ObjectEnvelope;
 use crate::util::Address;
 use crate::vm::VMBinding;
 
@@ -49,7 +50,8 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, _offset: usize) -> Address {
-        let maxbytes = allocator::get_maximum_aligned_size::<VM>(size, align);
+        let reserved = self.envelope_reservation();
+        let maxbytes = allocator::get_maximum_aligned_size::<VM>(size, align) + reserved;
         let pages = crate::util::conversions::bytes_to_pages_up(maxbytes);
 
         if self.handle_obvious_oom_request(
@@ -59,12 +61,29 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
             return Address::ZERO;
         }
 
-        self.space
-            .allocate_pages(self.tls, pages, self.get_context().get_alloc_options())
+        let cell =
+            self.space
+                .allocate_pages(self.tls, pages, self.get_context().get_alloc_options());
+        // A zero cell means the VM is out of memory; leave it zero so the caller still sees it.
+        if cell.is_zero() {
+            cell
+        } else {
+            cell + reserved
+        }
     }
 }
 
 impl<VM: VMBinding> LargeObjectAllocator<VM> {
+    /// Bytes left unused at the front of every cell, so that an object's *envelope* start can
+    /// never precede the cell it belongs to. See [`ObjectEnvelope`].
+    fn envelope_reservation(&self) -> usize {
+        if self.space.rc_enabled {
+            ObjectEnvelope::slack::<VM>()
+        } else {
+            0
+        }
+    }
+
     pub(crate) fn new(
         tls: VMThread,
         space: &'static LargeObjectSpace<VM>,
