@@ -4,7 +4,6 @@ use super::super::LXR;
 use super::super::{LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURSERY_EVACUATION};
 use super::tracing::LXRConcurrentTraceObjects;
 use super::tracing::LXRStopTheWorldProcessEdges;
-use super::tracing::LXRStopTheWorldProcessNodes;
 use super::tracing::ProcessModBufSATB;
 use super::ProcessEdgesBase;
 use crate::plan::VectorQueue;
@@ -98,8 +97,13 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             // A root node has no slot, so nothing could ever update it if `o` had already
             // moved by the time it got here. Catch that rather than silently register a
             // stale reference as this pause's root set.
+            //
+            // Only in the Immix space: it is the one space that both moves objects and
+            // registers forwarding metadata for its chunks. Asking a LOS or common-space
+            // object for its forwarding bits reads side metadata that was never mapped for
+            // that address.
             debug_assert!(
-                !object_forwarding::is_forwarded::<VM>(o),
+                !self.lxr.immix_space.in_space(o) || !object_forwarding::is_forwarded::<VM>(o),
                 "root node {:?} was already forwarded",
                 o
             );
@@ -122,6 +126,16 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
 
     /// Increment, promote and schedule tracing/decrementing for a set of root objects
     /// reported as nodes.
+    ///
+    /// A node root is traced with [`LXRConcurrentTraceObjects`], not with the slot-based
+    /// [`LXRStopTheWorldProcessEdges`]. That tracer dispatches per space -- Immix via
+    /// `trace_object_without_moving_rc`, LOS via the LOS policy's own `trace_object`, and
+    /// anything else via the common plan -- so it never moves an object, which is what a
+    /// node root needs: there is no slot to write a forwarding pointer back into. The
+    /// slot-based closure would instead reach for object sizes and forwarding bits, neither
+    /// of which a large object has -- `LargeObjectSpace` registers no forwarding metadata
+    /// for its chunks at all, and its objects' sizes are not recoverable through the VM's
+    /// object model.
     pub fn process_and_schedule_root_nodes(
         &mut self,
         worker: &mut GCWorker<VM>,
@@ -145,29 +159,15 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             );
         }
         let pause = lxr.current_pause().unwrap();
-        if pause == Pause::FinalMark {
+        if pause == Pause::Full || pause == Pause::FinalMark {
             // Nodes, unlike slots, are never re-scanned, so a stop-the-world pause has to
-            // trace them directly here or they're never marked. Uses
-            // `LXRStopTheWorldProcessNodes` in `PinningRootsTrace` -- which always runs
-            // (and drains) before `Closure` opens -- not `LXRConcurrentTraceObjects`,
-            // whose continuations resume in `ConcurrentResumable`, not guaranteed to drain
-            // before this pause ends.
+            // trace them directly here or they're never marked. `Closure` is where that
+            // belongs, and it is also where `LXRConcurrentTraceObjects::flush` sends its
+            // own continuations during these two pauses, so the closure this seeds drains
+            // before the pause ends rather than resuming in `ConcurrentResumable`.
             worker.add_work(
-                WorkBucketStage::PinningRootsTrace,
-                LXRStopTheWorldProcessNodes::<VM, false>::new(
-                    to_trace,
-                    mmtk,
-                    WorkBucketStage::PinningRootsTrace,
-                ),
-            );
-        } else if pause == Pause::Full {
-            worker.add_work(
-                WorkBucketStage::PinningRootsTrace,
-                LXRStopTheWorldProcessNodes::<VM, true>::new(
-                    to_trace,
-                    mmtk,
-                    WorkBucketStage::PinningRootsTrace,
-                ),
+                WorkBucketStage::Closure,
+                LXRConcurrentTraceObjects::new(to_trace, mmtk),
             );
         } else if lxr.cm_enabled() && pause == Pause::InitialMark {
             // Seed concurrent marking with these roots, like `ProcessIncs::do_work` does

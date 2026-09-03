@@ -144,16 +144,14 @@ impl<VM: VMBinding> LXRRootsWorkFactory<VM> {
     /// to fully drain before `RCProcessIncs` opens, so the counting has to happen there even
     /// when there's nothing to trace yet -- `RCProcessIncs` processes ordinary slots to the
     /// very same objects, and its nursery-eviction decision only skips an object once its rc
-    /// count is already nonzero. Scheduling this work into a later stage instead (e.g.
-    /// `PinningRootsTrace`, conditional on pause) would leave that window open for every
-    /// pause but `RefCount`.
+    /// count is already nonzero. Scheduling this work into a later stage instead, conditional
+    /// on pause, would leave that window open for every pause but `RefCount`.
     ///
     /// The *tracing* of these roots, in contrast, is deferred by
     /// [`rc::ProcessIncs::process_and_schedule_root_nodes`] to whichever stage suits the
-    /// current pause -- `PinningRootsTrace` for a pause with a `Closure` phase, since nodes,
-    /// unlike slots, are never re-scanned and so must be traced directly before `Closure`
-    /// opens; nothing for `RefCount`, which has no `Closure` phase at all. Only the counting
-    /// has to be this early.
+    /// current pause -- `Closure` for a stop-the-world tracing pause, `ConcurrentResumable`
+    /// to seed concurrent marking at `InitialMark`, and nothing at all for `RefCount`, which
+    /// has no marking phase. Only the counting has to be this early.
     fn create_node_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         if nodes.is_empty() {
             return;
