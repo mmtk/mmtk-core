@@ -837,7 +837,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         // This function should not be called during RC if mature evacuation is not enabled.
-        debug_assert!(!LXR_MATURE_EVACUATION || !self.rc_enabled);
+        if LXR_MATURE_EVACUATION {
+            debug_assert!(!self.rc_enabled);
+        }
 
         #[cfg(feature = "vo_bit")]
         if !self.rc_enabled {

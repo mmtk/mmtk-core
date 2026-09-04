@@ -111,14 +111,6 @@ builtin_env_logger = ["dep:env_logger"]
 # Enable this feature if you want to use nightly features and compiler
 nightly = []
 
-# LXR Features
-lxr_no_cm = []
-lxr_no_lazy = []
-lxr_stw = ["lxr_no_cm", "lxr_no_lazy"]
-lxr_no_nursery_evac = []
-lxr_no_mature_evac = []
-lxr_no_evac = ["lxr_no_nursery_evac", "lxr_no_mature_evac"]
-
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts
 perf_counter = ["dep:pfm"]
@@ -210,6 +202,14 @@ nogc_multi_space = []
 # slower for large objects and will be outright incorrect for bindings which allocate
 # non-moving objects; but compacting all objects will be more space-efficient.
 ovc_single_space = []
+
+# LXR Features
+lxr_no_cm = []
+lxr_no_lazy = []
+lxr_stw = ["lxr_no_cm", "lxr_no_lazy"]
+lxr_no_nursery_evac = []
+lxr_no_mature_evac = []
+lxr_no_evac = ["lxr_no_nursery_evac", "lxr_no_mature_evac"]
 
 # To collect statistics for each GC work packet. Enabling this may introduce a small overhead (several percentage slowdown on benchmark time).
 work_packet_stats = []
