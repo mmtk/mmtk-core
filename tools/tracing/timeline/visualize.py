@@ -245,6 +245,15 @@ class LogProcessor:
                         "pause": pause,
                     }
 
+                case "defrag_prepare":
+                    gc["args"] |= {
+                        "defrag_prepare": {
+                            "defrag_spill_threshold": int(args[0]),
+                            "available_clean_pages_for_defrag": int(args[1]),
+                            "new_available_clean_pages_for_defrag": int(args[2]),
+                        },
+                    }
+
                 case _:
                     processed_for_gc = False
         else:
@@ -377,15 +386,6 @@ class LogProcessor:
                         "num_refs": int(args[0]),
                         "num_live": int(args[1]),
                         "num_retained": int(args[2]),
-                    }
-
-                case "defrag_prepare":
-                    gc["args"] |= {
-                        "defrag_prepare": {
-                            "defrag_spill_threshold": int(args[0]),
-                            "available_clean_pages_for_defrag": int(args[1]),
-                            "new_available_clean_pages_for_defrag": int(args[2]),
-                        },
                     }
 
                 case "immix_prepare_block_state":
