@@ -462,6 +462,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
     /// Same as `promote`, but with the object's size supplied by the caller instead of being
     /// queried from the VM binding.
     pub fn promote_with_size(&self, o: ObjectReference, size: usize) {
+        #[cfg(debug_assertions)]
         debug_assert!(self.envelope_is_well_formed(o, size));
         if ObjectEnvelope::needs_straddle_marks::<VM>(size) {
             self.mark_straddle_object_with_size(o, size);
