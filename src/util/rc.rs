@@ -58,13 +58,13 @@ pub const RC_TABLE: SideMetadataSpec = crate::util::metadata::side_metadata::spe
 /// All the RC metadata is stored at the envelope start.
 ///
 /// To avoid the envelope start being outside of the block where the object is in, we reserve the leading 'slack'
-/// bytes of each block for the envelope reservation. See `ImmixAllocator::block_usable_start`.
+/// bytes of each block for the envelope reservation. See `ImmixAllocator::block_usable_start` and `LargeObjectAllcator::envelope_reservation`.
 ///
-/// TODO: Currently both LOS and Immix objects in LXR are using object envelope. But we don't reserve 'slack' for
-/// large objects space.
+/// Currently `ObjectEnvelope` is only used for the LXR plan for RC-related metadata. But it can be used for other purposes,
+/// and in other plans.
 #[repr(transparent)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ObjectEnvelope(Address);
+pub struct ObjectEnvelope(ObjectReference);
 
 impl ObjectEnvelope {
     /// The width of the bracket the envelope puts around an object, `UPPER - LOWER`: how far its
@@ -77,12 +77,6 @@ impl ObjectEnvelope {
     /// The constant distance between an object's reference address and its envelope start.
     const fn offset<VM: VMBinding>() -> usize {
         VM::VMObjectModel::OBJECT_REF_OFFSET_UPPER_BOUND as usize
-    }
-
-    /// The envelope's exclusive end for an object of `size` bytes: the latest address the object
-    /// could possibly end at, i.e. `ref - LOWER + size`.
-    pub fn end<VM: VMBinding>(self, size: usize) -> Address {
-        self.0 + size + Self::slack::<VM>()
     }
 
     /// Whether an object of `size` bytes needs straddle marks, i.e. whether its envelope can
@@ -101,55 +95,86 @@ impl ObjectEnvelope {
         size + Self::slack::<VM>() > Line::BYTES
     }
 
-    /// The envelope of object `o`: a plain constant subtraction.
-    pub fn of<VM: VMBinding>(o: ObjectReference) -> Self {
+    /// The envelope of object `o`.
+    ///
+    /// An envelope *is* an object, viewed through the bounds: it holds the object reference and
+    /// derives its addresses from that, so there is nothing to get wrong and no way to build one
+    /// that does not belong to an object.
+    pub fn of(o: ObjectReference) -> Self {
+        Self(o)
+    }
+
+    /// The envelope whose start is `a`. `a` must be an envelope start, i.e. an address that
+    /// [`Self::start`] produced; the reference-count table only ever holds counts at such
+    /// addresses.
+    ///
+    /// # Safety
+    ///
+    /// The caller must guarantee that `a` is an envelope start, because this reconstructs the
+    /// object reference `a` was derived from. A non-zero granule in `RC_TABLE` is either one of
+    /// these or a synthetic straddle mark written at a line start, so a caller scanning the table
+    /// has to rule the latter out first.
+    pub unsafe fn from_start<VM: VMBinding>(a: Address) -> Self {
+        Self(ObjectReference::from_raw_address_unchecked(
+            a + Self::offset::<VM>(),
+        ))
+    }
+
+    /// The object this envelope belongs to.
+    pub fn to_object_reference(self) -> ObjectReference {
+        self.0
+    }
+
+    /// The envelope's start address, i.e. the address the object's reference count is stored at.
+    /// A plain constant subtraction from the reference address.
+    pub fn start<VM: VMBinding>(self) -> Address {
         debug_assert!(
             VM::VMObjectModel::OBJECT_REF_OFFSET_UPPER_BOUND
                 >= VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
             "OBJECT_REF_OFFSET_UPPER_BOUND must not be below the lower bound"
         );
-        let a = o.to_raw_address();
+        let a = self.0.to_raw_address();
         let envelope = a - Self::offset::<VM>();
-        // The reservations above are what keep this true. If it ever fires, either an allocation
-        // path is handing out the leading `slack` bytes of a region, or a count is being read for
-        // an object in a space that reserves nothing because it is not reference counted.
+        // The reservations every reference-counted space makes at the front of a region are what
+        // keep this true. If it ever fires, either an allocation path is handing out the leading
+        // `slack` bytes of a region, or a count is being read for an object in a space that
+        // reserves nothing because it is not reference counted.
         debug_assert!(
             envelope >= Chunk::from_unaligned_address(a).start(),
             "envelope start {} for {} escaped its chunk; the region it was allocated in did not \
             reserve ObjectEnvelope::slack, or {} is not in a reference-counted space",
             envelope,
-            o,
-            o,
+            self.0,
+            self.0,
         );
-        Self(envelope)
+        envelope
     }
 
-    /// The envelope whose start is `a`. `a` must be an envelope start, i.e. an address that
-    /// [`Self::of`] produced; the reference-count table only ever holds counts at such addresses.
-    ///
-    /// # Safety
-    ///
-    /// The caller must guarantee that `a` is an envelope start, so that
-    /// [`Self::to_object_reference`] reproduces a real object reference.
-    pub unsafe fn from_start(a: Address) -> Self {
-        Self(a)
+    /// The envelope's exclusive end for an object of `size` bytes: the latest address the object
+    /// could possibly end at, i.e. `ref - LOWER + size`.
+    pub fn end<VM: VMBinding>(self) -> Address {
+        self.end_with_size::<VM>(VM::VMObjectModel::get_current_size(self.0))
     }
 
-    /// The object this envelope belongs to. Exactly inverts [`Self::of`].
-    pub fn to_object_reference<VM: VMBinding>(self) -> ObjectReference {
-        // Safety: an envelope start is derived from a non-zero, word-aligned object reference by
-        // subtracting a constant, so adding it back reproduces that reference.
-        unsafe { ObjectReference::from_raw_address_unchecked(self.0 + Self::offset::<VM>()) }
+    pub fn end_with_size<VM: VMBinding>(self, size: usize) -> Address {
+        self.start::<VM>() + size + Self::slack::<VM>()
     }
 
-    /// The envelope's start address, i.e. the address its reference count is stored at.
-    pub fn start(self) -> Address {
-        self.0
+    /// The first region of type `R` the envelope overlaps: the one holding its start.
+    pub fn first_overlapping_region<VM: VMBinding, R: Region>(self) -> R {
+        R::from_unaligned_address(self.start::<VM>())
     }
 
-    /// The line holding the envelope's start.
-    pub fn line(self) -> Line {
-        Line::from_unaligned_address(self.0)
+    pub fn last_overlapping_region<VM: VMBinding, R: Region>(self) -> R {
+        // `end_with_size` is exclusive, so the envelope's final byte is the one before it.
+        R::from_unaligned_address(self.end::<VM>() - 1usize)
+    }
+
+    /// The last region of type `R` the envelope overlaps: the one holding its final byte, for an
+    /// object of `size` bytes.
+    pub fn last_overlapping_region_with_size<VM: VMBinding, R: Region>(self, size: usize) -> R {
+        // `end_with_size` is exclusive, so the envelope's final byte is the one before it.
+        R::from_unaligned_address(self.end_with_size::<VM>(size) - 1usize)
     }
 }
 
@@ -206,7 +231,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
 
     /// The address object `o`'s reference count is stored at: its envelope start
     fn rc_slot(&self, o: ObjectReference) -> Address {
-        ObjectEnvelope::of::<VM>(o).start()
+        ObjectEnvelope::of(o).start::<VM>()
     }
 
     /// Atomically updates the reference count of object `o` by applying `f` to its current
@@ -351,16 +376,21 @@ impl<VM: VMBinding> RefCountHelper<VM> {
     /// Returns `true` if address `a` falls within a live object whose containing line is marked
     /// as a straddle line.
     pub fn object_is_in_straddle_line(&self, o: ObjectReference) -> bool {
-        let line = ObjectEnvelope::of::<VM>(o).line();
+        let line: Line = ObjectEnvelope::of(o).first_overlapping_region::<VM, Line>();
         self.count(o) != 0 && unsafe { RC_STRADDLE_LINES.load::<u8>(line.start()) != 0 }
     }
 
     /// The `[start, end)` range of lines that need a synthetic straddle mark for object `o`.
     fn straddle_line_range(&self, o: ObjectReference, size: usize) -> (Line, Line) {
-        let envelope = ObjectEnvelope::of::<VM>(o);
-        let start_line = envelope.line().next();
-        let end_line = Line::from_unaligned_address(envelope.end::<VM>(size));
-        let block_end_line = Block::from_unaligned_address(o.to_raw_address()).end_line();
+        use crate::util::linear_scan::UnstraddlableRegion;
+        let envelope = ObjectEnvelope::of(o);
+        // Mark every line the envelope overlaps except the first, whose count the object already
+        // carries, and except the last, which the hole finder's skip-the-first-line-of-a-hole
+        // margin covers. The range is end-exclusive, so naming the last overlapped line as the
+        // bound drops exactly that one.
+        let start_line = envelope.first_overlapping_region::<VM, Line>().next();
+        let end_line: Line = envelope.last_overlapping_region_with_size::<VM, Line>(size);
+        let block_end_line = Block::containing(o).end_line();
         let end_line = if end_line > block_end_line {
             block_end_line
         } else {
@@ -413,7 +443,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
     /// count of zero, used to verify that a reclaimed object has been fully cleared.
     pub fn assert_zero_ref_count(&self, o: ObjectReference) {
         let size = VM::VMObjectModel::get_current_size(o);
-        let start = ObjectEnvelope::of::<VM>(o).start();
+        let start = ObjectEnvelope::of(o).start::<VM>();
         for i in (0..size).step_by(MIN_OBJECT_SIZE) {
             let a = start + i;
             assert_eq!(0, self.count_by_address(a));
@@ -442,7 +472,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
     /// meaningful for an object in an Immix space, which is the only caller.
     #[cfg(debug_assertions)]
     fn envelope_is_well_formed(&self, o: ObjectReference, size: usize) -> bool {
-        let envelope = ObjectEnvelope::of::<VM>(o).start();
+        let envelope = ObjectEnvelope::of(o).start::<VM>();
         let start = o.to_object_start::<VM>();
         // 1. The envelope covers the object's head, and does not run out of the object's own
         //    block. Escaping the block would put the count in a neighbour's reference-count
@@ -457,7 +487,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         //    being the *union* of the object's possible positions buys: with a coarse offset
         //    bound the shortfall of a slid-down envelope would span whole lines, leaving two or
         //    more of them uncounted, which one margin cannot absorb.
-        let tail_ok = start + size <= ObjectEnvelope::of::<VM>(o).end::<VM>(size);
+        let tail_ok = start + size <= ObjectEnvelope::of(o).end_with_size::<VM>(size);
         head_ok && tail_ok
     }
 }

@@ -817,7 +817,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         if self.attempt_mark(object) {
-            let straddle = Line::is_aligned(ObjectEnvelope::of::<VM>(object).start())
+            let straddle = Line::is_aligned(ObjectEnvelope::of(object).start::<VM>())
                 && self.rc.object_is_in_straddle_line_no_rc_check(object);
             if !straddle {
                 queue.enqueue(object);
