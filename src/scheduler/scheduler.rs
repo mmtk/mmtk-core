@@ -22,7 +22,6 @@ use crossbeam::deque::Steal;
 use enum_map::{Enum, EnumMap};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
 
 pub struct GCWorkScheduler<VM: VMBinding> {
     /// Work buckets
@@ -521,12 +520,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     goals.on_current_goal_completed();
 
                     if concurrent_work_scheduled {
-                        // It was the initial mark pause and scheduled concurrent work.
-                        // Wake up all GC workers to do concurrent work.
+                        // We just scheduled concurrent work. Wake up all GC workers to do concurrent work.
                         LastParkedResult::WakeAll
                     } else {
-                        // It was an STW GC or the final mark pause of a concurrent GC.
-                        // Respond to another goal.
+                        // No scheduled concurrent work. Respond to another goal.
                         self.respond_to_requests(worker, goals)
                     }
                 }
@@ -548,7 +545,16 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     ) -> LastParkedResult {
         assert!(goals.current().is_none());
 
-        let Some(goal) = goals.poll_next_goal() else {
+        let mut next_goal = goals.poll_next_goal();
+        if next_goal.is_none() {
+            // No work now. Check if we would like to do a GC poll from GC workers.
+            if worker.mmtk.gc_trigger.poll_from_last_parked_worker() {
+                goals.set_request(WorkerGoal::Gc);
+                next_goal = goals.poll_next_goal();
+            }
+        }
+
+        let Some(goal) = next_goal else {
             // No requests.  Park this worker, too.
             return LastParkedResult::ParkSelf;
         };
@@ -560,12 +566,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 // We set the eBPF trace point here so that bpftrace scripts can start recording
                 // work packet events before the `ScheduleCollection` work packet starts.
                 probe!(mmtk, gc_start);
-
-                {
-                    let mut gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
-                    assert!(gc_start_time.is_none(), "GC already started?");
-                    *gc_start_time = Some(Instant::now());
-                }
 
                 self.add_schedule_collection_packet();
                 LastParkedResult::WakeSelf
@@ -632,15 +632,18 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         plan_mut.on_pause_end(mmtk, worker.tls);
         probe!(mmtk, plan_end_of_gc_end);
 
-        // Compute the elapsed time of the GC.
-        let start_time = {
-            let mut gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
-            gc_start_time.take().expect("GC not started yet?")
-        };
-        let elapsed = start_time.elapsed();
+        // Compute the elapsed time of the pause so far. `pause_start_time` is taken (and the
+        // "pause-time" stat recorded) further down, once the pause is truly about to end.
+        let elapsed = mmtk
+            .state
+            .pause_start_time
+            .borrow()
+            .as_ref()
+            .expect("Pause start time was not recorded")
+            .elapsed();
 
         info!(
-            "End of GC ({}/{} pages, took {:.2} ms)",
+            "End of Pause ({}/{} pages, took {:.2} ms)",
             mmtk.get_plan().get_reserved_pages(),
             mmtk.get_plan().get_total_pages(),
             elapsed.as_secs_f64() * 1000.0
@@ -695,6 +698,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         } else {
             mmtk.state.gc_status.set_not_in_gc();
         }
+        // The pause is about to end (mutators are about to resume)
+        mmtk.stats.record_pause_time(mmtk.state.take_pause_time());
         if mmtk.stats.get_gathering_stats() {
             mmtk.stats.end_gc();
         }

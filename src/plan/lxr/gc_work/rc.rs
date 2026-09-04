@@ -376,24 +376,46 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         add_root_to_remset: bool,
     ) -> Option<Vec<ObjectReference>> {
         if K == EDGE_KIND_ROOT {
-            let roots = incs.as_mut_ptr() as *mut ObjectReference;
-            let mut num_roots = 0usize;
+            // An optimization with Rust zero allocation. However, it only works if
+            // VMSlot has exactly the same size and alignment as ObjectReference, which
+            // is not guaranteed.
+            // TODO: Check performance of this optimization. If it is not significant, we can remove it to simplify the code.
+            if std::mem::size_of::<VM::VMSlot>() == std::mem::size_of::<ObjectReference>()
+                && std::mem::align_of::<VM::VMSlot>() == std::mem::align_of::<ObjectReference>()
+            {
+                let roots = incs.as_mut_ptr() as *mut ObjectReference;
+                let mut num_roots = 0usize;
+                for s in incs.iter() {
+                    if let Some(new) = self.process_slot::<K>(worker, *s, depth, add_root_to_remset)
+                    {
+                        unsafe {
+                            roots.add(num_roots).write(new);
+                        }
+                        num_roots += 1;
+                    }
+                }
+                return if num_roots != 0 {
+                    let cap = incs.capacity();
+                    std::mem::forget(incs); // roots references incs now. we dont need incs.
+                    let roots =
+                        unsafe { Vec::<ObjectReference>::from_raw_parts(roots, num_roots, cap) };
+                    Some(roots)
+                } else {
+                    None
+                };
+            }
+
+            // General case: we need to allocate a new vector and push into it.
+            let mut roots = Vec::with_capacity(incs.len());
             for s in incs.iter() {
                 if let Some(new) = self.process_slot::<K>(worker, *s, depth, add_root_to_remset) {
-                    unsafe {
-                        roots.add(num_roots).write(new);
-                    }
-                    num_roots += 1;
+                    roots.push(new);
                 }
             }
-            if num_roots != 0 {
-                let cap = incs.capacity();
-                std::mem::forget(incs); // roots references incs now. we dont need incs.
-                let roots =
-                    unsafe { Vec::<ObjectReference>::from_raw_parts(roots, num_roots, cap) };
-                Some(roots)
-            } else {
+            if roots.is_empty() {
                 None
+            } else {
+                Some(roots)
             }
         } else {
             for s in incs.iter() {
