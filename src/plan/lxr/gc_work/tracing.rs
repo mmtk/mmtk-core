@@ -1,7 +1,9 @@
 use super::super::LXR;
 use super::ProcessEdgesBase;
 use crate::plan::concurrent::Pause;
+use crate::plan::PlanTraceObject;
 use crate::plan::VectorQueue;
+use crate::policy::gc_work::DEFAULT_TRACE;
 use crate::policy::immix::block::Block;
 use crate::policy::space::Space;
 use crate::scheduler::RootKind;
@@ -72,15 +74,24 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if self.rc.count(object) == 0 {
-            return object;
-        }
         if self.plan.immix_space.in_space(object) {
+            if self.rc.count(object) == 0 {
+                return object;
+            }
             self.plan
                 .immix_space
                 .trace_object_without_moving_rc(self, object);
-        } else {
+        } else if self.plan.los().in_space(object) {
+            if self.rc.count(object) == 0 {
+                return object;
+            }
             self.plan.los().trace_object(self, object);
+        } else {
+            // Not reference counted. Forward to common plan.
+            let worker = unsafe { &mut *self.worker };
+            self.plan
+                .common
+                .trace_object::<Self, DEFAULT_TRACE>(self, object, worker);
         }
         object
     }
@@ -335,10 +346,11 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
         debug_assert!(object.is_in_any_space());
         debug_assert!(object.to_raw_address().is_aligned_to(8));
         // debug_assert!(object.class_is_valid::<VM>());
-        if WEAK_ROOT && !Block::containing(object).is_defrag_source() {
+        let in_immix_space = self.lxr.immix_space.in_space(object);
+        if WEAK_ROOT && !(in_immix_space && Block::containing(object).is_defrag_source()) {
             return object;
         }
-        let x = if self.lxr.immix_space.in_space(object) {
+        let x = if in_immix_space {
             let pause = self.pause;
             let worker = self.worker();
             self.lxr.immix_space.rc_trace_object(
@@ -349,8 +361,13 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
                 true,
                 worker,
             )
-        } else {
+        } else if self.lxr.los().in_space(object) {
             self.lxr.los().trace_object(self, object)
+        } else {
+            let worker = self.worker();
+            self.lxr
+                .common
+                .trace_object::<Self, DEFAULT_TRACE>(self, object, worker)
         };
         if self.should_record_forwarded_roots {
             self.forwarded_roots.push(x)
@@ -369,10 +386,14 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
         if REMSET && (!object.is_in_any_space() || !object.to_raw_address().is_aligned_to(8)) {
             return object;
         }
-        if self.lxr.rc.count(object) == 0 {
+        let in_immix_space = self.lxr.immix_space.in_space(object);
+        let in_common_space = !in_immix_space && !self.lxr.los().in_space(object);
+        // A zero reference count means the object is dead, but only for the spaces LXR
+        // reference counts.
+        if !in_common_space && self.lxr.rc.count(object) == 0 {
             return object;
         }
-        if WEAK_ROOT && !Block::containing(object).is_defrag_source() {
+        if WEAK_ROOT && !(in_immix_space && Block::containing(object).is_defrag_source()) {
             return object;
         }
         debug_assert!(object.is_in_any_space(), "Invalid {:?}", object);
@@ -397,8 +418,13 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
                 true,
                 worker,
             )
-        } else {
+        } else if self.lxr.los().in_space(object) {
             self.lxr.los().trace_object(self, object)
+        } else {
+            let worker = self.worker();
+            self.lxr
+                .common
+                .trace_object::<Self, DEFAULT_TRACE>(self, object, worker)
         };
         if self.should_record_forwarded_roots {
             self.forwarded_roots.push(new_object)

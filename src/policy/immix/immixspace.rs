@@ -1245,6 +1245,24 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
             cursor
         };
+        // For bindings without `UNIFIED_OBJECT_REFERENCE_ADDRESS`, the object start
+        // may land in the line immediately before its object reference address. Such a line
+        // can be considered as empty. We conservatively consider the last line in a hole
+        // may hold an object start. This is the only place in LXR we need to handle the object start vs object ref issue.
+        // TODO: This solution is conservative and not ideal, but is the simplest fix.
+        // An alternative is to shift RC_TABLE (and possibly the RC_STRADDLE_LINES) for the upper bound of (obj ref - obj start),
+        // when we search for holes. See https://github.com/mmtk/mmtk-core/pull/1576 as a half-done prototype.
+        let end = if !VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS && end < limit {
+            end - 1
+        } else {
+            end
+        };
+        if end <= start {
+            // The reservation consumed the entire hole (it was exactly one line). Retry from
+            // just past it instead of handing out an empty range.
+            let next_search_start = Line::from_aligned_address(block.start()).next_nth(start + 1);
+            return self.rc_get_next_available_lines(copy, next_search_start);
+        }
         let start = Line::from_aligned_address(block.start()).next_nth(start);
         let end = Line::from_aligned_address(block.start()).next_nth(end);
         if self.common.needs_log_bit {

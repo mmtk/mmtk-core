@@ -184,7 +184,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         &ALLOCATOR_MAPPING
     }
 
-    fn prepare(&mut self, tls: VMWorkerThread) {
+    fn prepare(&mut self, _tls: VMWorkerThread) {
         let pause = self.current_pause().unwrap();
         if pause == Pause::FinalMark || pause == Pause::Full {
             self.common.los.is_end_of_satb_or_full_gc = true;
@@ -192,8 +192,26 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             self.immix_space.scheduler().work_buckets[WorkBucketStage::Unconstrained]
                 .add(ReleaseLOSNursery);
         }
-        self.common
-            .prepare(tls, pause == Pause::Full || pause == Pause::InitialMark);
+
+        let starts_mark_cycle = pause == Pause::Full || pause == Pause::InitialMark;
+        // Only do prepare if we start a new mark cycle. Otherwise, let thoe spaces have sticky mark bits.
+        if starts_mark_cycle {
+            // We have tested that the following spaces -- they are used by Julia
+            self.common.immortal.prepare();
+            #[cfg(feature = "vm_space")]
+            self.common.base.vm_space.prepare();
+            // TODO: We haven't tested these spaces. But ideally they should be handled in the same way here.
+            self.common.prepare_nonmoving_space(starts_mark_cycle);
+            #[cfg(feature = "code_space")]
+            self.common.base.code_space.prepare();
+            #[cfg(feature = "code_space")]
+            self.common.base.code_lo_space.prepare();
+            #[cfg(feature = "ro_space")]
+            self.common.base.ro_space.prepare();
+        }
+        // LOS is aware of LXR. Call its prepare unconditionally.
+        self.common.los.prepare(starts_mark_cycle);
+
         if super::MATURE_EVACUATION && (pause == Pause::FinalMark || pause == Pause::Full) {
             self.process_mature_evacuation_remset();
         }
@@ -761,16 +779,26 @@ impl<VM: VMBinding> LXR<VM> {
     pub fn mark(&self, o: ObjectReference) -> bool {
         if self.immix_space.in_space(o) {
             self.immix_space.attempt_mark(o)
-        } else {
+        } else if self.common.los.in_space(o) {
             self.common.los.attempt_mark(o)
+        } else {
+            // TODO: We need to properly handle this case.
+            // This is a temporary solution for Julia -- the only other spaces it uses are immortal space and vm space, where objects won't die.
+            debug_assert!(o.is_live());
+            false
         }
     }
 
     pub fn is_marked(&self, o: ObjectReference) -> bool {
         if self.immix_space.in_space(o) {
             self.immix_space.is_marked(o)
-        } else {
+        } else if self.common.los.in_space(o) {
             self.common.los.is_marked(o)
+        } else {
+            // TODO: We need to properly handle this case.
+            // This is a temporary solution for Julia -- the only other spaces it uses are immortal space and vm space, where objects won't die.
+            debug_assert!(o.is_live());
+            true
         }
     }
 
