@@ -888,6 +888,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         if *self.base.options.plan == PlanSelector::LXR {
             return;
         }
+
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {
                 self.nonmoving.prepare();
@@ -906,6 +907,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         if *self.base.options.plan == PlanSelector::LXR {
             return;
         }
+
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {
                 self.nonmoving.release();
