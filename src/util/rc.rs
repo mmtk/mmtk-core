@@ -81,16 +81,6 @@ impl ObjectEnvelope {
 
     /// Whether an object of `size` bytes needs straddle marks, i.e. whether its envelope can
     /// touch a line other than the one holding its reference count and the one after it.
-    ///
-    /// The test is on the *envelope's* length, `size + slack`, not the object's: a range longer
-    /// than a line can touch three or more lines, and every line but the first and last needs a
-    /// mark. That is why the threshold is `Line::BYTES - slack` rather than `Line::BYTES` --
-    /// with a coarse bound this pulls a lot more objects into straddle marking, which is the
-    /// price of deriving the envelope from a single global offset.
-    ///
-    /// Every guard that decides whether to mark, unmark, or assert goes through here, so they
-    /// cannot disagree: a mark that unmark does not clear is a stray count that outlives its
-    /// object.
     pub fn needs_straddle_marks<VM: VMBinding>(size: usize) -> bool {
         size + Self::slack::<VM>() > Line::BYTES
     }
@@ -111,9 +101,7 @@ impl ObjectEnvelope {
     /// # Safety
     ///
     /// The caller must guarantee that `a` is an envelope start, because this reconstructs the
-    /// object reference `a` was derived from. A non-zero granule in `RC_TABLE` is either one of
-    /// these or a synthetic straddle mark written at a line start, so a caller scanning the table
-    /// has to rule the latter out first.
+    /// object reference `a` was derived from.
     pub unsafe fn from_start<VM: VMBinding>(a: Address) -> Self {
         Self(ObjectReference::from_raw_address_unchecked(
             a + Self::offset::<VM>(),
