@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["LXRConcurrentTraceObjects","LXRStopTheWorldProcessEdges","ProcessModBufSATB"]};
+window.SIDEBAR_ITEMS = {"struct":["LXRConcurrentTraceObjects","LXRStopTheWorldProcessEdges","LXRStopTheWorldProcessNodes","ProcessModBufSATB"]};

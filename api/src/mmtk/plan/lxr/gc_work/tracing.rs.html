@@ -465,7 +465,7 @@
 <a href=#465 id=465 data-nosnippet>465</a>            <span class="kw">let </span><span class="prelude-val">Some</span>(o) = s.load() <span class="kw">else </span>{
 <a href=#466 id=466 data-nosnippet>466</a>                <span class="kw">return</span>;
 <a href=#467 id=467 data-nosnippet>467</a>            };
-<a href=#468 id=468 data-nosnippet>468</a>            <span class="kw">if </span><span class="self">self</span>.lxr.is_marked(o) &amp;&amp; !<span class="self">self</span>.lxr.in_defrag(o) {
+<a href=#468 id=468 data-nosnippet>468</a>            <span class="kw">if </span><span class="self">self</span>.lxr.is_rc_object(o) &amp;&amp; <span class="self">self</span>.lxr.is_marked(o) &amp;&amp; !<span class="self">self</span>.lxr.in_defrag(o) {
 <a href=#469 id=469 data-nosnippet>469</a>                <span class="kw">return</span>;
 <a href=#470 id=470 data-nosnippet>470</a>            }
 <a href=#471 id=471 data-nosnippet>471</a>            <span class="self">self</span>.next_slots.push(s);
@@ -488,4 +488,120 @@
 <a href=#488 id=488 data-nosnippet>488</a>    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self</span>::Target {
 <a href=#489 id=489 data-nosnippet>489</a>        <span class="kw-2">&amp;mut </span><span class="self">self</span>.base
 <a href=#490 id=490 data-nosnippet>490</a>    }
-<a href=#491 id=491 data-nosnippet>491</a>}</code></pre></div></section></main></body></html>
+<a href=#491 id=491 data-nosnippet>491</a>}
+<a href=#492 id=492 data-nosnippet>492</a>
+<a href=#493 id=493 data-nosnippet>493</a><span class="doccomment">/// Stop-the-world tracing of roots reported as objects rather than as slots.
+<a href=#494 id=494 data-nosnippet>494</a></span><span class="kw">pub struct </span>LXRStopTheWorldProcessNodes&lt;VM: VMBinding, <span class="kw">const </span>FULL_GC: bool&gt; {
+<a href=#495 id=495 data-nosnippet>495</a>    lxr: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>LXR&lt;VM&gt;,
+<a href=#496 id=496 data-nosnippet>496</a>    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
+<a href=#497 id=497 data-nosnippet>497</a>    <span class="comment">// Use a raw pointer for the same reason `ProcessEdgesBase` does: this is dereferenced on
+<a href=#498 id=498 data-nosnippet>498</a>    // every traced object.
+<a href=#499 id=499 data-nosnippet>499</a>    </span>worker: <span class="kw-2">*mut </span>GCWorker&lt;VM&gt;,
+<a href=#500 id=500 data-nosnippet>500</a>    <span class="doccomment">/// The root objects to mark. These must not move.
+<a href=#501 id=501 data-nosnippet>501</a>    </span>nodes: Vec&lt;ObjectReference&gt;,
+<a href=#502 id=502 data-nosnippet>502</a>    <span class="doccomment">/// Fields of the marked roots, handed on to the slot-based closure.
+<a href=#503 id=503 data-nosnippet>503</a>    </span>next_slots: VectorQueue&lt;VM::VMSlot&gt;,
+<a href=#504 id=504 data-nosnippet>504</a>    next_slot_count: u32,
+<a href=#505 id=505 data-nosnippet>505</a>    <span class="doccomment">/// The bucket the slot closure over the roots' children runs in.
+<a href=#506 id=506 data-nosnippet>506</a>    </span>closure_bucket: WorkBucketStage,
+<a href=#507 id=507 data-nosnippet>507</a>}
+<a href=#508 id=508 data-nosnippet>508</a>
+<a href=#509 id=509 data-nosnippet>509</a><span class="kw">unsafe impl</span>&lt;VM: VMBinding, <span class="kw">const </span>FULL_GC: bool&gt; Send <span class="kw">for </span>LXRStopTheWorldProcessNodes&lt;VM, FULL_GC&gt; {}
+<a href=#510 id=510 data-nosnippet>510</a>
+<a href=#511 id=511 data-nosnippet>511</a><span class="kw">impl</span>&lt;VM: VMBinding, <span class="kw">const </span>FULL_GC: bool&gt; LXRStopTheWorldProcessNodes&lt;VM, FULL_GC&gt; {
+<a href=#512 id=512 data-nosnippet>512</a>    <span class="kw">pub fn </span>new(
+<a href=#513 id=513 data-nosnippet>513</a>        nodes: Vec&lt;ObjectReference&gt;,
+<a href=#514 id=514 data-nosnippet>514</a>        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
+<a href=#515 id=515 data-nosnippet>515</a>        closure_bucket: WorkBucketStage,
+<a href=#516 id=516 data-nosnippet>516</a>    ) -&gt; <span class="self">Self </span>{
+<a href=#517 id=517 data-nosnippet>517</a>        <span class="kw">let </span>lxr = mmtk.get_plan().downcast_ref::&lt;LXR&lt;VM&gt;&gt;().unwrap();
+<a href=#518 id=518 data-nosnippet>518</a>        <span class="self">Self </span>{
+<a href=#519 id=519 data-nosnippet>519</a>            lxr,
+<a href=#520 id=520 data-nosnippet>520</a>            mmtk,
+<a href=#521 id=521 data-nosnippet>521</a>            worker: std::ptr::null_mut(),
+<a href=#522 id=522 data-nosnippet>522</a>            nodes,
+<a href=#523 id=523 data-nosnippet>523</a>            next_slots: VectorQueue::new(),
+<a href=#524 id=524 data-nosnippet>524</a>            next_slot_count: <span class="number">0</span>,
+<a href=#525 id=525 data-nosnippet>525</a>            closure_bucket,
+<a href=#526 id=526 data-nosnippet>526</a>        }
+<a href=#527 id=527 data-nosnippet>527</a>    }
+<a href=#528 id=528 data-nosnippet>528</a>
+<a href=#529 id=529 data-nosnippet>529</a>    <span class="kw">fn </span>worker(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>GCWorker&lt;VM&gt; {
+<a href=#530 id=530 data-nosnippet>530</a>        <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span><span class="self">self</span>.worker }
+<a href=#531 id=531 data-nosnippet>531</a>    }
+<a href=#532 id=532 data-nosnippet>532</a>
+<a href=#533 id=533 data-nosnippet>533</a>    <span class="attr">#[cold]
+<a href=#534 id=534 data-nosnippet>534</a>    </span><span class="kw">fn </span>flush(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+<a href=#535 id=535 data-nosnippet>535</a>        <span class="kw">if </span>!<span class="self">self</span>.next_slots.is_empty() {
+<a href=#536 id=536 data-nosnippet>536</a>            <span class="kw">let </span>slots = <span class="self">self</span>.next_slots.take();
+<a href=#537 id=537 data-nosnippet>537</a>            <span class="kw">let </span>bucket = <span class="self">self</span>.closure_bucket;
+<a href=#538 id=538 data-nosnippet>538</a>            <span class="kw">let </span>w =
+<a href=#539 id=539 data-nosnippet>539</a>                LXRStopTheWorldProcessEdges::&lt;VM, FULL_GC&gt;::new(slots, <span class="bool-val">false</span>, <span class="self">self</span>.mmtk, bucket);
+<a href=#540 id=540 data-nosnippet>540</a>            <span class="self">self</span>.worker().add_work(bucket, w);
+<a href=#541 id=541 data-nosnippet>541</a>        }
+<a href=#542 id=542 data-nosnippet>542</a>        <span class="self">self</span>.next_slot_count = <span class="number">0</span>;
+<a href=#543 id=543 data-nosnippet>543</a>    }
+<a href=#544 id=544 data-nosnippet>544</a>
+<a href=#545 id=545 data-nosnippet>545</a>    <span class="doccomment">/// Mark `object` without moving it. This mirrors the per-space dispatch of
+<a href=#546 id=546 data-nosnippet>546</a>    /// [`LXRStopTheWorldProcessEdges::mature_evac_trace_object`] minus every path that could
+<a href=#547 id=547 data-nosnippet>547</a>    /// evacuate.
+<a href=#548 id=548 data-nosnippet>548</a>    </span><span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference {
+<a href=#549 id=549 data-nosnippet>549</a>        <span class="macro">debug_assert!</span>(object.is_in_any_space(), <span class="string">"Invalid {:?}"</span>, object);
+<a href=#550 id=550 data-nosnippet>550</a>        <span class="kw">let </span>in_immix_space = <span class="self">self</span>.lxr.immix_space.in_space(object);
+<a href=#551 id=551 data-nosnippet>551</a>        <span class="kw">let </span>in_common_space = !in_immix_space &amp;&amp; !<span class="self">self</span>.lxr.los().in_space(object);
+<a href=#552 id=552 data-nosnippet>552</a>        <span class="comment">// A zero reference count means the object is dead, but only for the spaces LXR
+<a href=#553 id=553 data-nosnippet>553</a>        // reference counts.
+<a href=#554 id=554 data-nosnippet>554</a>        </span><span class="kw">if </span>!in_common_space &amp;&amp; <span class="self">self</span>.lxr.rc.count(object) == <span class="number">0 </span>{
+<a href=#555 id=555 data-nosnippet>555</a>            <span class="kw">return </span>object;
+<a href=#556 id=556 data-nosnippet>556</a>        }
+<a href=#557 id=557 data-nosnippet>557</a>        <span class="kw">if </span>in_immix_space {
+<a href=#558 id=558 data-nosnippet>558</a>            <span class="self">self</span>.lxr
+<a href=#559 id=559 data-nosnippet>559</a>                .immix_space
+<a href=#560 id=560 data-nosnippet>560</a>                .trace_object_without_moving_rc(<span class="self">self</span>, object)
+<a href=#561 id=561 data-nosnippet>561</a>        } <span class="kw">else if </span>!in_common_space {
+<a href=#562 id=562 data-nosnippet>562</a>            <span class="self">self</span>.lxr.los().trace_object(<span class="self">self</span>, object)
+<a href=#563 id=563 data-nosnippet>563</a>        } <span class="kw">else </span>{
+<a href=#564 id=564 data-nosnippet>564</a>            <span class="comment">// Not reference counted. Forward to the common plan.
+<a href=#565 id=565 data-nosnippet>565</a>            </span><span class="kw">let </span>worker = <span class="self">self</span>.worker();
+<a href=#566 id=566 data-nosnippet>566</a>            <span class="self">self</span>.lxr
+<a href=#567 id=567 data-nosnippet>567</a>                .common
+<a href=#568 id=568 data-nosnippet>568</a>                .trace_object::&lt;<span class="self">Self</span>, DEFAULT_TRACE&gt;(<span class="self">self</span>, object, worker)
+<a href=#569 id=569 data-nosnippet>569</a>        }
+<a href=#570 id=570 data-nosnippet>570</a>    }
+<a href=#571 id=571 data-nosnippet>571</a>}
+<a href=#572 id=572 data-nosnippet>572</a>
+<a href=#573 id=573 data-nosnippet>573</a><span class="kw">impl</span>&lt;VM: VMBinding, <span class="kw">const </span>FULL_GC: bool&gt; ObjectQueue <span class="kw">for </span>LXRStopTheWorldProcessNodes&lt;VM, FULL_GC&gt; {
+<a href=#574 id=574 data-nosnippet>574</a>    <span class="kw">fn </span>enqueue(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) {
+<a href=#575 id=575 data-nosnippet>575</a>        <span class="kw">let </span>limit: usize = <span class="kw">if </span>FULL_GC { <span class="number">8192 </span>} <span class="kw">else </span>{ <span class="number">1024 </span>};
+<a href=#576 id=576 data-nosnippet>576</a>        <span class="comment">// TODO: Use actual TLS.
+<a href=#577 id=577 data-nosnippet>577</a>        </span>object.iterate_fields::&lt;VM, <span class="kw">_</span>&gt;(VMThread::UNINITIALIZED, |s| {
+<a href=#578 id=578 data-nosnippet>578</a>            <span class="kw">let </span><span class="prelude-val">Some</span>(o) = s.load() <span class="kw">else </span>{
+<a href=#579 id=579 data-nosnippet>579</a>                <span class="kw">return</span>;
+<a href=#580 id=580 data-nosnippet>580</a>            };
+<a href=#581 id=581 data-nosnippet>581</a>            <span class="kw">if </span><span class="self">self</span>.lxr.is_rc_object(o) &amp;&amp; <span class="self">self</span>.lxr.is_marked(o) &amp;&amp; !<span class="self">self</span>.lxr.in_defrag(o) {
+<a href=#582 id=582 data-nosnippet>582</a>                <span class="kw">return</span>;
+<a href=#583 id=583 data-nosnippet>583</a>            }
+<a href=#584 id=584 data-nosnippet>584</a>            <span class="self">self</span>.next_slots.push(s);
+<a href=#585 id=585 data-nosnippet>585</a>            <span class="self">self</span>.next_slot_count += <span class="number">1</span>;
+<a href=#586 id=586 data-nosnippet>586</a>            <span class="kw">if </span><span class="self">self</span>.next_slot_count <span class="kw">as </span>usize &gt;= limit {
+<a href=#587 id=587 data-nosnippet>587</a>                <span class="self">self</span>.flush();
+<a href=#588 id=588 data-nosnippet>588</a>            }
+<a href=#589 id=589 data-nosnippet>589</a>        });
+<a href=#590 id=590 data-nosnippet>590</a>    }
+<a href=#591 id=591 data-nosnippet>591</a>}
+<a href=#592 id=592 data-nosnippet>592</a>
+<a href=#593 id=593 data-nosnippet>593</a><span class="kw">impl</span>&lt;VM: VMBinding, <span class="kw">const </span>FULL_GC: bool&gt; GCWork&lt;VM&gt; <span class="kw">for </span>LXRStopTheWorldProcessNodes&lt;VM, FULL_GC&gt; {
+<a href=#594 id=594 data-nosnippet>594</a>    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+<a href=#595 id=595 data-nosnippet>595</a>        <span class="self">self</span>.worker = worker;
+<a href=#596 id=596 data-nosnippet>596</a>        <span class="kw">let </span>nodes = std::mem::take(<span class="kw-2">&amp;mut </span><span class="self">self</span>.nodes);
+<a href=#597 id=597 data-nosnippet>597</a>        <span class="kw">for </span>object <span class="kw">in </span>nodes {
+<a href=#598 id=598 data-nosnippet>598</a>            <span class="kw">let </span>new_object = <span class="self">self</span>.trace_object(object);
+<a href=#599 id=599 data-nosnippet>599</a>            <span class="macro">debug_assert_eq!</span>(
+<a href=#600 id=600 data-nosnippet>600</a>                object, new_object,
+<a href=#601 id=601 data-nosnippet>601</a>                <span class="string">"Root node {} moved to {}: a root reported as an object has no slot to update"</span>,
+<a href=#602 id=602 data-nosnippet>602</a>                object, new_object
+<a href=#603 id=603 data-nosnippet>603</a>            );
+<a href=#604 id=604 data-nosnippet>604</a>        }
+<a href=#605 id=605 data-nosnippet>605</a>        <span class="self">self</span>.flush();
+<a href=#606 id=606 data-nosnippet>606</a>    }
+<a href=#607 id=607 data-nosnippet>607</a>}</code></pre></div></section></main></body></html>
