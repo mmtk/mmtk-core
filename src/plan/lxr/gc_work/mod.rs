@@ -16,7 +16,7 @@ pub mod prepare;
 pub mod rc;
 pub mod tracing;
 
-use rc::{CollectNodeRoots, CollectRoots};
+use rc::{CollectNodeRoots, CollectSlotRoots};
 
 /// Common base fields shared by LXR's custom root/closure work packets.
 ///
@@ -101,9 +101,9 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for LXRGCWorkContext<VM> {
 
 /// The [`RootsWorkFactory`] used by LXR.
 ///
-/// Roots reported as slots are reference-counted through [`CollectRoots`] (which spawns
+/// Roots reported as slots are reference-counted through [`CollectSlotRoots`] (which spawns
 /// `ProcessIncs`) in `RCProcessIncs`; roots reported as objects go through
-/// [`CollectNodeRoots`] one stage earlier, in `RCProcessRootNodes`, so that nothing can move
+/// [`CollectNodeRoots`] one stage earlier, in `RCProcessIncsNonMoving`, so that nothing can move
 /// them. See the two methods below.
 pub struct LXRRootsWorkFactory<VM: VMBinding> {
     mmtk: &'static MMTK<VM>,
@@ -124,56 +124,27 @@ impl<VM: VMBinding> LXRRootsWorkFactory<VM> {
 impl<VM: VMBinding> RootsWorkFactory<VM::VMSlot> for LXRRootsWorkFactory<VM> {
     fn create_process_roots_work_with_root_kind(&mut self, slots: Vec<VM::VMSlot>, kind: RootKind) {
         // Slot roots may be evacuated, so they run in `RCProcessIncs`, one stage after the
-        // `root_scanning_stage` that discovered them. See `WorkBucketStage::RCProcessRootNodes`.
+        // `root_scanning_stage` that discovered them. See `WorkBucketStage::RCProcessIncsNonMoving`.
         let stage = WorkBucketStage::RCProcessIncs;
-        let mut w = CollectRoots::new(slots, true, self.mmtk, stage);
+        let mut w = CollectSlotRoots::new(slots, true, self.mmtk, stage);
         w.root_kind = Some(kind);
         crate::memory_manager::add_work_packet(self.mmtk, stage, w);
     }
 
-    /// Handle roots reported as objects rather than as slots.
-    ///
-    /// Bindings report these when they cannot hand out the location a reference lives in
-    /// (Julia does so for conservatively scanned stacks), and ask for the referents to be
-    /// pinned. Since there is no slot to write a forwarding pointer back into, nothing in
-    /// this pause may move them:
-    ///
-    /// * They are reference counted in `RCProcessRootNodes`, which drains before
-    ///   `RCProcessIncs` opens. That ordering is what keeps them in place: `RCProcessIncs`
-    ///   processes ordinary slots pointing at the very same objects, and its nursery
-    ///   eviction only spares an object whose reference count is already nonzero.
-    /// * A stop-the-world pause marks them in `PinningRootsTrace`, which drains before
-    ///   `Closure`, using the non-moving [`tracing::LXRStopTheWorldProcessNodes`].
-    ///
-    /// Their children are ordinary references and are handed to the evacuating slot closure
-    /// in `Closure`, which is what makes these non-transitive pinning roots.
-    ///
-    /// Note that `RootsWorkFactory` passes no [`RootKind`] for node roots, so they are always
-    /// treated as [`RootKind::Strong`].
     fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         if nodes.is_empty() {
             return;
         }
         crate::memory_manager::add_work_packet(
             self.mmtk,
-            WorkBucketStage::RCProcessRootNodes,
+            WorkBucketStage::RCProcessIncsNonMoving,
             CollectNodeRoots::<VM>::new(nodes),
         );
     }
 
-    /// Transitive pinning is not implemented.
-    ///
-    /// It requires the entire closure from these roots to stay in a non-moving bucket --
-    /// upstream feeds `TPinningClosure` back into itself for exactly that -- whereas
-    /// [`Self::create_process_pinning_roots_work`] hands the roots' children to the
-    /// evacuating slot closure in `Closure`.
-    ///
-    /// With both evacuation modes compiled out nothing in the pause moves anything, so the
-    /// transitive requirement is met for free and these can take the ordinary node-root path.
-    /// That is how Julia -- the only binding that reports transitive pinning roots, for its
-    /// conservatively scanned mutator stacks -- is built: moving objects makes its C interop
-    /// too difficult. A moving build must not silently drop the requirement.
     fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+        // Transitive pinning is not supported.
+        // Not sure if we can support it for LXR, as RC collections have no notion of transitive closure.
         if NURSERY_EVACUATION || MATURE_EVACUATION {
             unimplemented!(
                 "LXR does not support transitive pinning roots unless evacuation is compiled out"

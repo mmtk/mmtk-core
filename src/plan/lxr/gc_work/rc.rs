@@ -85,14 +85,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
     }
 
     /// Reference-count root objects reported as objects rather than as slots.
-    ///
-    /// Node counterpart of `process_incs::<EDGE_KIND_ROOT>`. Nothing here may move an object:
-    /// the caller has no slot to write a forwarding pointer back into, so a promotion is
-    /// always in place.
-    ///
-    /// Returns the roots this plan reference counts and, separately, the roots it does not.
-    /// Both still have to be traced, but only the former may be recorded as a root set --
-    /// a decrement against an object whose count was never raised would be unmatched.
+    /// Node counterpart of `process_incs::<EDGE_KIND_ROOT>`. Nothing here may move an object.
     fn process_root_nodes(
         &mut self,
         worker: &mut GCWorker<VM>,
@@ -101,19 +94,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         let mut roots = Vec::with_capacity(nodes.len());
         let mut uncounted = vec![];
         for o in nodes {
-            // A root node has no slot, so nothing could ever update it if `o` had already
-            // moved by the time it got here. Catch that rather than silently register a
-            // stale reference as this pause's root set.
-            //
-            // Only in the Immix space: it is the one space that both moves objects and
-            // registers forwarding metadata for its chunks. Asking a LOS or common-space
-            // object for its forwarding bits reads side metadata that was never mapped for
-            // that address.
-            debug_assert!(
-                !self.lxr.immix_space.in_space(o) || !object_forwarding::is_forwarded::<VM>(o),
-                "root node {:?} was already forwarded",
-                o
-            );
             if !self.lxr.is_rc_object(o) {
                 uncounted.push(o);
                 continue;
@@ -132,18 +112,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
     }
 
     /// Node-shaped counterpart of [`GCWork::do_work`] below for `KIND == EDGE_KIND_ROOT`.
-    ///
-    /// Both reference-count a root set and then decide, from the current pause, whether to
-    /// seed concurrent marking, trace immediately, or only record the set for later
-    /// decrementing. The two differences both follow from the roots being objects rather than
-    /// slots:
-    ///
-    /// * Nothing may move them. The stop-the-world closure is therefore
-    ///   [`LXRStopTheWorldProcessNodes`], not [`LXRStopTheWorldProcessEdges`], and it runs in
-    ///   `PinningRootsTrace` -- before `Closure`, where the slot closure could evacuate them.
-    /// * The root set is recorded in `curr_roots` here, in every pause. The slot path leaves
-    ///   that to `LXRStopTheWorldProcessEdges` during `FinalMark`/`Full` because it has to
-    ///   record the *forwarded* root; these roots never forward.
+    /// However, the major difference is that we cannot move any of these objects here, as
+    /// we don't know their slots.
     pub fn do_work_root_nodes(
         &mut self,
         nodes: Vec<ObjectReference>,
@@ -852,11 +822,11 @@ impl<VM: VMBinding> GCWork<VM> for ProcessDecs<VM> {
     }
 }
 
-pub struct CollectRoots<VM: VMBinding> {
+pub struct CollectSlotRoots<VM: VMBinding> {
     base: ProcessEdgesBase<VM>,
 }
 
-impl<VM: VMBinding> CollectRoots<VM> {
+impl<VM: VMBinding> CollectSlotRoots<VM> {
     pub fn new(
         slots: Vec<VM::VMSlot>,
         roots: bool,
@@ -869,7 +839,7 @@ impl<VM: VMBinding> CollectRoots<VM> {
     }
 }
 
-impl<VM: VMBinding> GCWork<VM> for CollectRoots<VM> {
+impl<VM: VMBinding> GCWork<VM> for CollectSlotRoots<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         self.set_worker(worker);
         if !self.slots.is_empty() {
@@ -882,25 +852,21 @@ impl<VM: VMBinding> GCWork<VM> for CollectRoots<VM> {
     }
 }
 
-impl<VM: VMBinding> Deref for CollectRoots<VM> {
+impl<VM: VMBinding> Deref for CollectSlotRoots<VM> {
     type Target = ProcessEdgesBase<VM>;
     fn deref(&self) -> &Self::Target {
         &self.base
     }
 }
 
-impl<VM: VMBinding> DerefMut for CollectRoots<VM> {
+impl<VM: VMBinding> DerefMut for CollectSlotRoots<VM> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }
 }
 
 /// Collects roots reported as objects rather than as slots. Node counterpart of
-/// [`CollectRoots`].
-///
-/// Scheduled into [`WorkBucketStage::RCProcessRootNodes`] by
-/// [`super::LXRRootsWorkFactory::create_process_pinning_roots_work`], which explains why that
-/// stage rather than `RCProcessIncs`.
+/// [`CollectSlotRoots`].
 pub struct CollectNodeRoots<VM: VMBinding> {
     nodes: Vec<ObjectReference>,
     _p: PhantomData<VM>,

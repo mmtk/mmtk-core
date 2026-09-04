@@ -391,13 +391,13 @@ pub enum WorkBucketStage {
     /// outstanding concurrent work, e.g. flushing SATB mod-buffer packets recorded by the LXR
     /// barrier, before the rest of the STW stages proceed.
     FinishConcurrentWork,
-    /// LXR scans roots here (see `root_scanning_stage`) and reference-counts the roots that are
-    /// reported as objects rather than as slots.  Counting them before `RCProcessIncs` opens is
-    /// what keeps them in place: `RCProcessIncs` evacuates nursery objects, and it only spares
-    /// an object whose reference count is already nonzero.
-    RCProcessRootNodes,
+    /// Process the reference-count increments that must not move their objects.  LXR also scans
+    /// roots here (see `root_scanning_stage`); the roots a binding reports as objects rather than
+    /// as slots are counted in this stage because there is no slot to write a forwarding pointer
+    /// back into.  Counting them before `RCProcessIncs` opens is what keeps them in place.
+    RCProcessIncsNonMoving,
     /// Process reference-count increments from the LXR barrier and from root slots.  May
-    /// evacuate nursery objects, so it must run after `RCProcessRootNodes`.
+    /// evacuate nursery objects, so it must run after `RCProcessIncsNonMoving`.
     RCProcessIncs,
     /// Preparation work.  Plans, spaces, GC workers, mutators, etc. should be prepared for GC at
     /// this stage.
