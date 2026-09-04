@@ -4,6 +4,7 @@ use super::super::LXR;
 use super::super::{LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURSERY_EVACUATION};
 use super::tracing::LXRConcurrentTraceObjects;
 use super::tracing::LXRStopTheWorldProcessEdges;
+use super::tracing::LXRStopTheWorldProcessNodes;
 use super::tracing::ProcessModBufSATB;
 use super::ProcessEdgesBase;
 use crate::plan::VectorQueue;
@@ -83,14 +84,20 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         }
     }
 
-    /// Increment root objects reported as objects rather than as slots.
-    pub fn process_root_nodes(
+    /// Reference-count root objects reported as objects rather than as slots.
+    ///
+    /// Node counterpart of `process_incs::<EDGE_KIND_ROOT>`. Nothing here may move an object:
+    /// the caller has no slot to write a forwarding pointer back into, so a promotion is
+    /// always in place.
+    ///
+    /// Returns the roots this plan reference counts and, separately, the roots it does not.
+    /// Both still have to be traced, but only the former may be recorded as a root set --
+    /// a decrement against an object whose count was never raised would be unmatched.
+    fn process_root_nodes(
         &mut self,
         worker: &mut GCWorker<VM>,
         nodes: Vec<ObjectReference>,
     ) -> (Vec<ObjectReference>, Vec<ObjectReference>) {
-        self.pause = self.lxr.current_pause().unwrap();
-        self.in_cm = self.lxr.concurrent_work_in_progress();
         let mut roots = Vec::with_capacity(nodes.len());
         let mut uncounted = vec![];
         for o in nodes {
@@ -113,7 +120,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
             let los = self.lxr.los().in_space(o);
             if self.inc(o) {
-                // Promote without moving
+                // Promote without moving.
                 self.promote(worker, o, false, los, 0);
             }
             roots.push(o);
@@ -124,26 +131,29 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         (roots, uncounted)
     }
 
-    /// Increment, promote and schedule tracing/decrementing for a set of root objects
-    /// reported as nodes.
+    /// Node-shaped counterpart of [`GCWork::do_work`] below for `KIND == EDGE_KIND_ROOT`.
     ///
-    /// A node root is traced with [`LXRConcurrentTraceObjects`], not with the slot-based
-    /// [`LXRStopTheWorldProcessEdges`]. That tracer dispatches per space -- Immix via
-    /// `trace_object_without_moving_rc`, LOS via the LOS policy's own `trace_object`, and
-    /// anything else via the common plan -- so it never moves an object, which is what a
-    /// node root needs: there is no slot to write a forwarding pointer back into. The
-    /// slot-based closure would instead reach for object sizes and forwarding bits, neither
-    /// of which a large object has -- `LargeObjectSpace` registers no forwarding metadata
-    /// for its chunks at all, and its objects' sizes are not recoverable through the VM's
-    /// object model.
-    pub fn process_and_schedule_root_nodes(
+    /// Both reference-count a root set and then decide, from the current pause, whether to
+    /// seed concurrent marking, trace immediately, or only record the set for later
+    /// decrementing. The two differences both follow from the roots being objects rather than
+    /// slots:
+    ///
+    /// * Nothing may move them. The stop-the-world closure is therefore
+    ///   [`LXRStopTheWorldProcessNodes`], not [`LXRStopTheWorldProcessEdges`], and it runs in
+    ///   `PinningRootsTrace` -- before `Closure`, where the slot closure could evacuate them.
+    /// * The root set is recorded in `curr_roots` here, in every pause. The slot path leaves
+    ///   that to `LXRStopTheWorldProcessEdges` during `FinalMark`/`Full` because it has to
+    ///   record the *forwarded* root; these roots never forward.
+    pub fn do_work_root_nodes(
         &mut self,
+        nodes: Vec<ObjectReference>,
         worker: &mut GCWorker<VM>,
         mmtk: &'static MMTK<VM>,
-        nodes: Vec<ObjectReference>,
     ) {
+        debug_assert_eq!(KIND, EDGE_KIND_ROOT);
         let lxr = self.lxr;
-        // `uncounted` must not reach `curr_roots`: no count was raised for it.
+        self.pause = lxr.current_pause().unwrap();
+        self.in_cm = lxr.concurrent_work_in_progress();
         let (roots, uncounted) = self.process_root_nodes(worker, nodes);
         let mut to_trace = roots.clone();
         to_trace.extend_from_slice(&uncounted);
@@ -152,28 +162,39 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         }
         // Roots arriving mid-cycle must also enter the SATB snapshot, or the cycle
         // collector can conclude their subgraphs are unreachable.
-        if lxr.cm_enabled() && lxr.concurrent_work_in_progress() {
+        if lxr.cm_enabled() && self.in_cm {
             worker.add_work(
                 WorkBucketStage::FinishConcurrentWork,
                 ProcessModBufSATB::new(to_trace.clone()),
             );
         }
-        let pause = lxr.current_pause().unwrap();
-        if pause == Pause::Full || pause == Pause::FinalMark {
-            // Nodes, unlike slots, are never re-scanned, so a stop-the-world pause has to
-            // trace them directly here or they're never marked. `Closure` is where that
-            // belongs, and it is also where `LXRConcurrentTraceObjects::flush` sends its
-            // own continuations during these two pauses, so the closure this seeds drains
-            // before the pause ends rather than resuming in `ConcurrentResumable`.
-            worker.add_work(
-                WorkBucketStage::Closure,
-                LXRConcurrentTraceObjects::new(to_trace, mmtk),
-            );
-        } else if lxr.cm_enabled() && pause == Pause::InitialMark {
-            // Seed concurrent marking with these roots, like `ProcessIncs::do_work` does
-            // for root slots -- otherwise node roots seed nothing until `FinalMark`.
-            worker.scheduler().work_buckets[WorkBucketStage::ConcurrentResumable]
-                .add(LXRConcurrentTraceObjects::new(to_trace, mmtk));
+        // Nodes, unlike slots, are never re-scanned, so a stop-the-world tracing pause has to
+        // mark from them here or they are never marked at all.
+        match self.pause {
+            Pause::Full => worker.add_work(
+                WorkBucketStage::PinningRootsTrace,
+                LXRStopTheWorldProcessNodes::<VM, true>::new(
+                    to_trace,
+                    mmtk,
+                    WorkBucketStage::Closure,
+                ),
+            ),
+            Pause::FinalMark => worker.add_work(
+                WorkBucketStage::PinningRootsTrace,
+                LXRStopTheWorldProcessNodes::<VM, false>::new(
+                    to_trace,
+                    mmtk,
+                    WorkBucketStage::Closure,
+                ),
+            ),
+            // Seed concurrent marking with these roots, exactly as the slot path does --
+            // otherwise node roots seed nothing until `FinalMark`.
+            Pause::InitialMark if lxr.cm_enabled() => {
+                worker.scheduler().work_buckets[WorkBucketStage::ConcurrentResumable]
+                    .add(LXRConcurrentTraceObjects::new(to_trace, mmtk));
+            }
+            // `RefCount` has no marking phase.
+            _ => {}
         }
         // Recorded so the matching decrements are applied in the next pause.
         if !roots.is_empty() {
@@ -874,8 +895,12 @@ impl<VM: VMBinding> DerefMut for CollectRoots<VM> {
     }
 }
 
-/// Reference-counts a set of root objects reported as nodes rather than as slots.
-/// Node counterpart of [`CollectRoots`].
+/// Collects roots reported as objects rather than as slots. Node counterpart of
+/// [`CollectRoots`].
+///
+/// Scheduled into [`WorkBucketStage::RCProcessRootNodes`] by
+/// [`super::LXRRootsWorkFactory::create_process_pinning_roots_work`], which explains why that
+/// stage rather than `RCProcessIncs`.
 pub struct CollectNodeRoots<VM: VMBinding> {
     nodes: Vec<ObjectReference>,
     _p: PhantomData<VM>,
@@ -892,9 +917,13 @@ impl<VM: VMBinding> CollectNodeRoots<VM> {
 
 impl<VM: VMBinding> GCWork<VM> for CollectNodeRoots<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
-        let nodes = std::mem::take(&mut self.nodes);
-        let mut incs = ProcessIncs::<VM, EDGE_KIND_ROOT>::new(vec![], lxr);
-        incs.process_and_schedule_root_nodes(worker, mmtk, nodes);
+        if !self.nodes.is_empty() {
+            let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
+            let roots = std::mem::take(&mut self.nodes);
+            let mut w = ProcessIncs::<_, EDGE_KIND_ROOT>::new(vec![], lxr);
+            // `RootsWorkFactory` passes no `RootKind` for node roots; they are strong roots.
+            w.root_kind = Some(RootKind::Strong);
+            w.do_work_root_nodes(roots, worker, mmtk);
+        }
     }
 }

@@ -460,12 +460,20 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
 impl<VM: VMBinding, const FULL_GC: bool> ObjectQueue for LXRStopTheWorldProcessEdges<VM, FULL_GC> {
     fn enqueue(&mut self, object: ObjectReference) {
         let limit: usize = if FULL_GC { 8192 } else { 1024 };
+        // A target that is already marked, and cannot move, has been visited: skip the slot.
+        //
+        // The `is_rc_object` test is what makes that reasoning valid. `LXR::is_marked` answers
+        // `true` for anything in a common-plan space, because LXR keeps no mark state for those
+        // -- so without it this would skip every reference *into* the immortal/VM space, and
+        // the closure would never scan those objects' own fields. Everything reachable only
+        // from there (for Julia, the whole loaded sysimage) would then go unmarked, and
+        // `SweepDeadCycles` reclaims a counted object it finds unmarked.
         // TODO: Use actual TLS.
         object.iterate_fields::<VM, _>(VMThread::UNINITIALIZED, |s| {
             let Some(o) = s.load() else {
                 return;
             };
-            if self.lxr.is_marked(o) && !self.lxr.in_defrag(o) {
+            if self.lxr.is_rc_object(o) && self.lxr.is_marked(o) && !self.lxr.in_defrag(o) {
                 return;
             }
             self.next_slots.push(s);
@@ -487,5 +495,145 @@ impl<VM: VMBinding, const FULL_GC: bool> Deref for LXRStopTheWorldProcessEdges<V
 impl<VM: VMBinding, const FULL_GC: bool> DerefMut for LXRStopTheWorldProcessEdges<VM, FULL_GC> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
+    }
+}
+
+/// Stop-the-world tracing of roots reported as objects rather than as slots.
+///
+/// Node counterpart of [`LXRStopTheWorldProcessEdges`]. A binding reports a root this way when
+/// it cannot hand out the location the reference lives in (Julia does so for conservatively
+/// scanned stacks). There is therefore no slot to write a forwarding pointer back into, and
+/// these objects must not move: every path below marks in place, and the trace of each root is
+/// asserted to return the object unchanged.
+///
+/// The roots' *children*, in contrast, are ordinary slots and may be evacuated, so they are
+/// handed to [`LXRStopTheWorldProcessEdges`] in `closure_bucket`. That is what makes these
+/// non-transitive pinning roots. Transitive pinning would instead have to keep the whole
+/// closure in a non-moving bucket, and is not supported (see
+/// [`crate::plan::lxr::gc_work::LXRRootsWorkFactory`]).
+///
+/// Note that only the roots themselves are kept in place. Nothing pins them against *mature*
+/// evacuation: a root that is already mature and sits in a defrag source block can still be
+/// forwarded by the slot closure in `Closure` if some ordinary slot also points at it.
+pub struct LXRStopTheWorldProcessNodes<VM: VMBinding, const FULL_GC: bool> {
+    lxr: &'static LXR<VM>,
+    mmtk: &'static MMTK<VM>,
+    // Use a raw pointer for the same reason `ProcessEdgesBase` does: this is dereferenced on
+    // every traced object.
+    worker: *mut GCWorker<VM>,
+    /// The root objects to mark. These must not move.
+    nodes: Vec<ObjectReference>,
+    /// Fields of the marked roots, handed on to the slot-based closure.
+    next_slots: VectorQueue<VM::VMSlot>,
+    next_slot_count: u32,
+    /// The bucket the slot closure over the roots' children runs in.
+    closure_bucket: WorkBucketStage,
+}
+
+unsafe impl<VM: VMBinding, const FULL_GC: bool> Send for LXRStopTheWorldProcessNodes<VM, FULL_GC> {}
+
+impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessNodes<VM, FULL_GC> {
+    pub fn new(
+        nodes: Vec<ObjectReference>,
+        mmtk: &'static MMTK<VM>,
+        closure_bucket: WorkBucketStage,
+    ) -> Self {
+        let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
+        Self {
+            lxr,
+            mmtk,
+            worker: std::ptr::null_mut(),
+            nodes,
+            next_slots: VectorQueue::new(),
+            next_slot_count: 0,
+            closure_bucket,
+        }
+    }
+
+    fn worker(&self) -> &'static mut GCWorker<VM> {
+        unsafe { &mut *self.worker }
+    }
+
+    /// Hand the fields collected so far to the slot-based closure. Unlike
+    /// [`LXRStopTheWorldProcessEdges::flush`], which continues its own closure in
+    /// `Unconstrained`, this has to go through `closure_bucket`: children may be evacuated,
+    /// and that must not happen until every node root has been marked in place.
+    #[cold]
+    fn flush(&mut self) {
+        if !self.next_slots.is_empty() {
+            let slots = self.next_slots.take();
+            let bucket = self.closure_bucket;
+            let w =
+                LXRStopTheWorldProcessEdges::<VM, FULL_GC>::new(slots, false, self.mmtk, bucket);
+            self.worker().add_work(bucket, w);
+        }
+        self.next_slot_count = 0;
+    }
+
+    /// Mark `object` without moving it.
+    ///
+    /// This mirrors the per-space dispatch of
+    /// [`LXRStopTheWorldProcessEdges::mature_evac_trace_object`] minus every path that could
+    /// evacuate. Dispatching on the space first also keeps this off metadata a space does not
+    /// have: the slot closure reads forwarding bits before it knows which space the object is
+    /// in, which is not something a large object has.
+    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        debug_assert!(object.is_in_any_space(), "Invalid {:?}", object);
+        let in_immix_space = self.lxr.immix_space.in_space(object);
+        let in_common_space = !in_immix_space && !self.lxr.los().in_space(object);
+        // A zero reference count means the object is dead, but only for the spaces LXR
+        // reference counts.
+        if !in_common_space && self.lxr.rc.count(object) == 0 {
+            return object;
+        }
+        if in_immix_space {
+            self.lxr
+                .immix_space
+                .trace_object_without_moving_rc(self, object)
+        } else if !in_common_space {
+            self.lxr.los().trace_object(self, object)
+        } else {
+            // Not reference counted. Forward to the common plan.
+            let worker = self.worker();
+            self.lxr
+                .common
+                .trace_object::<Self, DEFAULT_TRACE>(self, object, worker)
+        }
+    }
+}
+
+impl<VM: VMBinding, const FULL_GC: bool> ObjectQueue for LXRStopTheWorldProcessNodes<VM, FULL_GC> {
+    fn enqueue(&mut self, object: ObjectReference) {
+        let limit: usize = if FULL_GC { 8192 } else { 1024 };
+        // TODO: Use actual TLS.
+        object.iterate_fields::<VM, _>(VMThread::UNINITIALIZED, |s| {
+            let Some(o) = s.load() else {
+                return;
+            };
+            if self.lxr.is_rc_object(o) && self.lxr.is_marked(o) && !self.lxr.in_defrag(o) {
+                return;
+            }
+            self.next_slots.push(s);
+            self.next_slot_count += 1;
+            if self.next_slot_count as usize >= limit {
+                self.flush();
+            }
+        });
+    }
+}
+
+impl<VM: VMBinding, const FULL_GC: bool> GCWork<VM> for LXRStopTheWorldProcessNodes<VM, FULL_GC> {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        self.worker = worker;
+        let nodes = std::mem::take(&mut self.nodes);
+        for object in nodes {
+            let new_object = self.trace_object(object);
+            debug_assert_eq!(
+                object, new_object,
+                "Root node {} moved to {}: a root reported as an object has no slot to update",
+                object, new_object
+            );
+        }
+        self.flush();
     }
 }
