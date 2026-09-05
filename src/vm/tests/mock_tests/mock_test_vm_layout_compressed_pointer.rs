@@ -31,6 +31,7 @@ fn test_vm_layout_compressed_pointer() {
                 heap_end: chunk_align_up(unsafe { Address::from_usize(end) }),
                 log_space_extent: 31,
                 force_use_contiguous_spaces: false,
+                dynamic_heap_range: false,
             };
             test_with_vm_layout(Some(layout));
         },
