@@ -7,6 +7,14 @@ use crate::ObjectQueue;
 
 /// VM-specific methods for the current plan.
 pub trait ActivePlan<VM: VMBinding> {
+    /// Whether MMTk needs to zero memory before handing it out as new object space.
+    /// MMTk internally has a number of code paths that zero memory to guarantee freshly
+    /// allocated memory is zeroed (e.g. when reusing memory that was previously used, such as
+    /// recycled lines or freed cells). If the VM binding does not need this guarantee (e.g. the
+    /// VM zeroes memory itself, or does not rely on newly allocated memory being zeroed), it can
+    /// set this to `false` to skip that zeroing work.
+    const NEEDS_MEMORY_ZEROING: bool = true;
+
     /// Return whether there is a mutator created and associated with the thread.
     ///
     /// Arguments:
