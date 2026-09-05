@@ -376,7 +376,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             let is_nursery = self.rc.count(o) == 0;
             if is_nursery && !self.no_evac {
                 // Evacuate the object
-                let new = object_forwarding::try_forward_object::<VM>(
+                let new = object_forwarding::forward_object::<VM>(
                     o,
                     CopySemantics::DefaultCopy,
                     worker.get_copy_context_mut(),
