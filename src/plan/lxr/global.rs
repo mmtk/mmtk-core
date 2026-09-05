@@ -776,6 +776,12 @@ impl<VM: VMBinding> LXR<VM> {
         self.immix_space.in_space(o) && Block::in_defrag_block(o)
     }
 
+    /// Whether LXR maintains a reference count for `o`. Only the Immix and large object spaces are reference counted.
+    #[allow(dead_code)]
+    pub fn is_rc_object(&self, o: ObjectReference) -> bool {
+        self.immix_space.in_space(o) || self.common.los.in_space(o)
+    }
+
     pub fn address_in_defrag(&self, a: Address) -> bool {
         self.immix_space.address_in_space(a) && Block::address_in_defrag_block(a)
     }

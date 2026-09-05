@@ -24,7 +24,7 @@ use crate::util::metadata::vo_bit;
 use crate::util::metadata::{self, MetadataSpec};
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::object_forwarding;
-use crate::util::rc::RefCountHelper;
+use crate::util::rc::{ObjectEnvelope, RefCountHelper};
 use crate::util::{copy::*, epilogue, object_enum};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -817,12 +817,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         if self.attempt_mark(object) {
-            let addr = object.to_raw_address().as_usize();
-            let straddle = if (addr & 0b11110000) == 0 {
-                self.rc.object_is_in_straddle_line_no_rc_check(object)
-            } else {
-                false
-            };
+            let straddle = Line::is_aligned(ObjectEnvelope::of(object).start::<VM>())
+                && self.rc.object_is_in_straddle_line_no_rc_check(object);
             if !straddle {
                 queue.enqueue(object);
             }
@@ -1059,7 +1055,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             )
             .expect("to-space overflow");
             // Transfer RC count
-            if new.get_size::<VM>() > Line::BYTES {
+            if ObjectEnvelope::needs_straddle_marks::<VM>(new.get_size::<VM>()) {
                 self.rc.mark_straddle_object(new);
             }
             self.rc.set(new, self.rc.count(object));
