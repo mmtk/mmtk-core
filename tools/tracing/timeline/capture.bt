@@ -186,3 +186,9 @@ usdt:$MMTK:mmtk:reference_retained {
         printf("reference_retained,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
     }
 }
+
+usdt:$MMTK:mmtk:heap_stats {
+    // It is printed per GC and per pause, so the volume is low.
+    // We ignore @enable_print.
+    printf("heap_stats,C,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+}
