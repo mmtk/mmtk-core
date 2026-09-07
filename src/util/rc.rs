@@ -234,14 +234,19 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         debug_assert!(size > Line::BYTES);
         let start = o.to_object_start::<VM>();
         let end = start + size;
-        let start_line = Line::from_unaligned_address(start).next();
+        // Skip the line holding the object's reference address, not the one holding its start:
+        // the reference address is where the object's own count lives and what every straddle
+        // read keys on. See `object_is_in_straddle_line_no_rc_check`.
+        let start_line = Line::from_unaligned_address(o.to_raw_address()).next();
         let end_line = Line::from_unaligned_address(end);
         // Note that `end_line` may be the last line overlapping with `o`.
         // In that case, `end_line` will not be marked.
         // It is OK because when searching for available lines (`rc_get_next_available_lines`),
         // it always skips the first line in a hole.
         let mut line = start_line;
-        while line != end_line {
+        // `<`, not `!=`: the range is empty when the reference address is already in the last
+        // line the object overlaps, and `!=` would then never terminate.
+        while line < end_line {
             unsafe { RC_STRADDLE_LINES.store(line.start(), 1u8) };
             self.set_line_relaxed(line, 1);
             line = line.next();
@@ -263,14 +268,15 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         if size > Line::BYTES {
             let start = o.to_object_start::<VM>();
             let end = start + size;
-            let start_line = Line::from_unaligned_address(start).next();
+            // Must match `mark_straddle_object_with_size` exactly; see the comments there.
+            let start_line = Line::from_unaligned_address(o.to_raw_address()).next();
             let end_line = Line::from_unaligned_address(end);
             // Note that `end_line` may be the last line overlapping with `o`.
             // In that case, `end_line` will not be marked.
             // It is OK because when searching for available lines (`rc_get_next_available_lines`),
             // it always skips the first line in a hole.
             let mut line = start_line;
-            while line != end_line {
+            while line < end_line {
                 self.set_line_relaxed(line, 0);
                 unsafe { RC_STRADDLE_LINES.store(line.start(), 0u8) };
                 line = line.next();
