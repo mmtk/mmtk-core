@@ -441,11 +441,7 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessEdges<VM, FULL_GC
         // Immix space objects behind them and forwards those.
         let new_object = match self.lxr.space_of(object) {
             LXRSpace::Immix => {
-                if self
-                    .lxr
-                    .rc
-                    .address_is_in_straddle_line(object.to_raw_address())
-                {
+                if self.lxr.rc.object_is_in_straddle_line(object) {
                     return object;
                 }
                 let pause = self.pause;
