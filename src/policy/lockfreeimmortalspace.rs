@@ -22,7 +22,6 @@ use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
 use crate::util::os::*;
 use crate::util::ObjectReference;
-use crate::vm::ActivePlan;
 use crate::vm::VMBinding;
 
 /// This type implements a lock free version of the immortal collection
@@ -168,7 +167,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
                 return Address::ZERO;
             }
         }
-        if self.slow_path_zeroing && VM::VMActivePlan::NEEDS_MEMORY_ZEROING {
+        if self.slow_path_zeroing {
             crate::util::memory::zero(start, bytes);
         }
         start

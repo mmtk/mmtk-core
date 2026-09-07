@@ -196,7 +196,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         }
 
         // TODO: Concurrent zeroing
-        if self.common().zeroed && VM::VMActivePlan::NEEDS_MEMORY_ZEROING {
+        if self.common().zeroed {
             crate::util::memory::zero(res.start, bytes);
         }
 
