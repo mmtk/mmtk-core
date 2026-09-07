@@ -642,12 +642,17 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             .expect("Pause start time was not recorded")
             .elapsed();
 
+        let reserved_pages = mmtk.get_plan().get_reserved_pages();
+        let total_pages = mmtk.get_plan().get_total_pages();
+
         info!(
             "End of Pause ({}/{} pages, took {:.2} ms)",
-            mmtk.get_plan().get_reserved_pages(),
-            mmtk.get_plan().get_total_pages(),
+            reserved_pages,
+            total_pages,
             elapsed.as_secs_f64() * 1000.0
         );
+
+        probe!(mmtk, heap_stats, reserved_pages, total_pages);
 
         // USDT tracepoint for the end of GC.
         probe!(mmtk, gc_end);
