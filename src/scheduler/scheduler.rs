@@ -748,6 +748,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         } else {
             mmtk.state.gc_status.set_not_in_gc();
         }
+        // The pause is about to end (mutators are about to resume)
+        mmtk.stats.record_pause_time(mmtk.state.take_pause_time());
         if mmtk.stats.get_gathering_stats() {
             mmtk.stats.end_gc();
         }
