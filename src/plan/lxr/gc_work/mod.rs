@@ -1,5 +1,5 @@
 use super::global::LXR;
-use crate::plan::lxr::{MATURE_EVACUATION, NURSERY_EVACUATION};
+use super::{MATURE_EVACUATION, NURSERY_EVACUATION};
 use crate::plan::tracing::UnsupportedTrace;
 use crate::plan::VectorObjectQueue;
 use crate::scheduler::gc_work::RootKind;

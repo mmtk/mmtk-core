@@ -216,6 +216,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 ProcessModBufSATB::new(to_trace.clone()),
             );
         }
+        // Nodes, unlike slots, are never re-scanned, so a stop-the-world tracing pause has to
+        // mark from them here or they are never marked at all.
         match self.pause {
             Pause::Full => worker.add_work(
                 WorkBucketStage::PinningRootsTrace,
@@ -233,7 +235,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                     WorkBucketStage::Closure,
                 ),
             ),
-            // Seed concurrent marking with these roots, exactly as the slot path does.
+            // Seed concurrent marking with these roots, exactly as the slot path does --
+            // otherwise node roots seed nothing until `FinalMark`.
             Pause::InitialMark if lxr.cm_enabled() => {
                 worker.scheduler().work_buckets[WorkBucketStage::ConcurrentResumable]
                     .add(LXRConcurrentTraceObjects::new(to_trace, mmtk));
@@ -723,7 +726,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
     fn process_incs<const K: EdgeKind>(
         &mut self,
         worker: &mut GCWorker<VM>,
-        incs: AddressBuffer<'_, VM::VMSlot>,
+        mut incs: AddressBuffer<'_, VM::VMSlot>,
         depth: u32,
         add_root_to_remset: bool,
     ) -> Option<Vec<ObjectReference>> {
@@ -731,14 +734,36 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         // to give a cost per increment, so it must not itself cost per increment.
         self.incs_count += incs.len();
         if K == EDGE_KIND_ROOT {
-            // This used to reuse the increment buffer's allocation in place, writing the
-            // resulting objects over the slots and handing the same pointer to
-            // `Vec::from_raw_parts`. That is only sound when a slot and an
-            // `ObjectReference` have identical layout. A VM whose slot type is larger --
-            // Julia's `JuliaVMSlot` is an enum over a plain and an offset slot, three
-            // words wide -- would hand the resulting `Vec` a capacity counted in slots,
-            // and dropping it would free the allocation with a size three times too
-            // small, corrupting the allocator. Collect into its own buffer instead.
+            // An optimization with Rust zero allocation. However, it only works if
+            // VMSlot has exactly the same size and alignment as ObjectReference, which
+            // is not guaranteed.
+            // TODO: Check performance of this optimization. If it is not significant, we can remove it to simplify the code.
+            if std::mem::size_of::<VM::VMSlot>() == std::mem::size_of::<ObjectReference>()
+                && std::mem::align_of::<VM::VMSlot>() == std::mem::align_of::<ObjectReference>()
+            {
+                let roots = incs.as_mut_ptr() as *mut ObjectReference;
+                let mut num_roots = 0usize;
+                for s in incs.iter() {
+                    if let Some(new) = self.process_slot::<K>(worker, *s, depth, add_root_to_remset)
+                    {
+                        unsafe {
+                            roots.add(num_roots).write(new);
+                        }
+                        num_roots += 1;
+                    }
+                }
+                return if num_roots != 0 {
+                    let cap = incs.capacity();
+                    std::mem::forget(incs); // roots references incs now. we dont need incs.
+                    let roots =
+                        unsafe { Vec::<ObjectReference>::from_raw_parts(roots, num_roots, cap) };
+                    Some(roots)
+                } else {
+                    None
+                };
+            }
+
+            // General case: we need to allocate a new vector and push into it.
             let mut roots = Vec::with_capacity(incs.len());
             for s in incs.iter() {
                 if let Some(new) = self.process_slot::<K>(worker, *s, depth, add_root_to_remset) {
