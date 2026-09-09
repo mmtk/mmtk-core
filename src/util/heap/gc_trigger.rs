@@ -169,6 +169,51 @@ impl<VM: VMBinding> GCTrigger<VM> {
         false
     }
 
+    /// For [`crate::scheduler::GCWorkScheduler::on_last_parked`]'s use when the last parked GC
+    /// worker is about to go idle with no mutator-requested goal pending: check if we should poll
+    /// from a GC worker.
+    pub(crate) fn poll_from_last_parked_worker(&self) -> bool {
+        if !self.is_collection_enabled() {
+            return false;
+        }
+
+        // Currently only poll if a concurrent GC is in progress, and only if that work has actually drained.
+        let Some(concurrent_plan) = self.plan().concurrent() else {
+            return false;
+        };
+        if !concurrent_plan.concurrent_work_in_progress() {
+            return false;
+        }
+        if !self.scheduler.work_buckets[crate::scheduler::WorkBucketStage::Concurrent].is_drained()
+        {
+            return false;
+        }
+
+        let plan = self.plan();
+        if self.policy.is_gc_required(false, None, plan) {
+            match self.state.gc_status.try_request_pause() {
+                // This call won the race to request a GC. However, we cannot call request() now.
+                // The caller of this function is holding a mutex, and if we do request() here,
+                // we end up with deadlock. So we just return true to the caller, and let the caller do the request.
+                Ok(_) => {
+                    probe!(mmtk, gc_requested);
+                    self.state.record_pause_requested_time();
+                    info!(
+                        "[POLL] Requesting a concurrent GC's closing pause from the last parked GC worker"
+                    );
+                    true
+                }
+                Err(GcStatus::Disabled(_)) | Err(GcStatus::PauseRequested) => false,
+                Err(GcStatus::Uninitialized) => panic!(
+                    "GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."
+                ),
+                _ => unreachable!(),
+            }
+        } else {
+            false
+        }
+    }
+
     /// This method is called when the user manually requests a collection, such as `System.gc()` in Java.
     /// Returns true if a collection is actually requested.
     ///
