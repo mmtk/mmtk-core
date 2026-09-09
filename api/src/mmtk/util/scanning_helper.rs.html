@@ -32,7 +32,7 @@
 <a href=#32 id=32 data-nosnippet>32</a>        });
 <a href=#33 id=33 data-nosnippet>33</a>    } <span class="kw">else </span>{
 <a href=#34 id=34 data-nosnippet>34</a>        VM::VMScanning::scan_object_and_trace_edges(tls, object, <span class="kw-2">&amp;mut </span>|child| {
-<a href=#35 id=35 data-nosnippet>35</a>            <span class="kw">let </span>new_child = object_tracer.trace_object(object);
+<a href=#35 id=35 data-nosnippet>35</a>            <span class="kw">let </span>new_child = object_tracer.trace_object(child);
 <a href=#36 id=36 data-nosnippet>36</a>            <span class="kw">if </span>!MAY_MOVE_OBJECTS {
 <a href=#37 id=37 data-nosnippet>37</a>                <span class="macro">debug_assert_eq!</span>(new_child, child);
 <a href=#38 id=38 data-nosnippet>38</a>            }
