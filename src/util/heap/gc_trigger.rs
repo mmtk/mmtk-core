@@ -85,7 +85,10 @@ impl<VM: VMBinding> GCTrigger<VM> {
         // only returns `Ok` to the thread that actually wins the race to transition the status,
         // so only that thread calls it, instead of every thread that observes the old status.
         match self.state.gc_status.try_request_pause() {
-            Ok(_) => {
+            Ok(cur_status) => {
+                if cur_status == GcStatus::InConcurrentGC {
+                    self.plan().concurrent().unwrap().on_concurrent_work_interrupted();
+                }
                 probe!(mmtk, gc_requested);
                 self.state.record_pause_requested_time();
                 self.scheduler.request_schedule_collection();
