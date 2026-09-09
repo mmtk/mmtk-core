@@ -69,30 +69,35 @@ pub fn get_malloc_usable_size(address: Address, is_offset_malloc: bool) -> usize
 pub fn alloc<VM: VMBinding>(size: usize, align: usize, offset: usize) -> (Address, bool) {
     let address: Address;
     let mut is_offset_malloc = false;
-    // malloc returns 16 bytes aligned address.
-    // So if the alignment is smaller than 16 bytes, we do not need to align.
-    if align <= 16 && offset == 0 {
-        let raw = unsafe { calloc(1, size) };
-        address = Address::from_mut_ptr(raw);
-        debug_assert!(address.is_aligned_to(align));
-    } else if align > 16 && offset == 0 {
-        address = align_alloc(size, align);
-        debug_assert!(
-            address.is_aligned_to(align),
-            "Address: {:x} is not aligned to the given alignment: {}",
-            address,
-            align
-        );
-    } else {
-        address = align_offset_alloc::<VM>(size, align, offset);
-        is_offset_malloc = true;
-        debug_assert!(
-            (address + offset).is_aligned_to(align),
-            "Address: {:x} is not aligned to the given alignment: {} at offset: {}",
-            address,
-            align,
-            offset
-        );
+
+    match (align, offset) {
+        // malloc returns 16 bytes aligned address.
+        // So if the alignment is smaller than 16 bytes, we do not need to align.
+        (a, 0) if a <= 16 => {
+            let raw = unsafe { calloc(1, size) };
+            address = Address::from_mut_ptr(raw);
+            debug_assert!(address.is_aligned_to(align));
+        }
+        (a, 0) if a > 16 && SUPPORT_ALIGNED_MALLOC => {
+            address = align_alloc(size, align);
+            debug_assert!(
+                address.is_aligned_to(align),
+                "Address: {:x} is not aligned to the given alignment: {}",
+                address,
+                align
+            );
+        }
+        _ => {
+            address = align_offset_alloc::<VM>(size, align, offset);
+            is_offset_malloc = true;
+            debug_assert!(
+                (address + offset).is_aligned_to(align),
+                "Address: {:x} is not aligned to the given alignment: {} at offset: {}",
+                address,
+                align,
+                offset
+            );
+        }
     }
     (address, is_offset_malloc)
 }
