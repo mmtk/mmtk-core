@@ -275,7 +275,7 @@ impl<VM: VMBinding> CopySpace<VM> {
                     #[cfg(feature = "vo_bit")]
                     crate::util::metadata::vo_bit::set_vo_bit(_new_object);
                 },
-            );
+            ).expect("to-space exhausted");
 
             trace!("Forwarding pointer");
             queue.enqueue(new_object);

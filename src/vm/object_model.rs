@@ -363,9 +363,13 @@ pub trait ObjectModel<VM: VMBinding> {
         metadata_spec.fetch_update::<T, F>(object.to_header::<VM>(), set_order, fetch_order, f)
     }
 
-    /// Copy an object and return the address of the new object. Usually in the implementation of this method,
-    /// `alloc_copy()` and `post_copy()` from [`GCWorkerCopyContext`](util/copy/struct.GCWorkerCopyContext.html)
-    /// are used for copying.
+    /// Allocate a new copy of an object and copy the object to that location.  This is required for
+    /// evacuating collectors such as SemiSpace, generational plans with a CopySpace nursery, and
+    /// Immix-based plans.  The implementation of this method shall use `copy_context.alloc_copy()`
+    /// for copying and `copy_context.alloc_copy.post_copy()` after copying.
+    ///
+    /// When `copy_context.alloc_copy()` fails, this function should return `None`. Otherwise,
+    /// return `Some(new_objref)` where `new_objref` is the new object reference of the object.
     ///
     /// Arguments:
     /// * `from`: The address of the object to be copied.
@@ -375,28 +379,15 @@ pub trait ObjectModel<VM: VMBinding> {
         from: ObjectReference,
         semantics: CopySemantics,
         copy_context: &mut GCWorkerCopyContext<VM>,
-    ) -> ObjectReference;
-
-    /// Attempt to copy an object, allowing the copy to fail (e.g. under concurrent copying, where
-    /// another GC worker may already be copying the same object). Returns the address of the new
-    /// object on success, or `None` if the copy could not be performed.
-    ///
-    /// Arguments:
-    /// * `from`: The address of the object to be copied.
-    /// * `semantics`: The copy semantic to use.
-    /// * `copy_context`: The `GCWorkerCopyContext` for the GC thread.
-    fn try_copy(
-        from: ObjectReference,
-        semantics: CopySemantics,
-        copy_context: &mut GCWorkerCopyContext<VM>,
     ) -> Option<ObjectReference>;
 
-    /// Copy an object. This is required
-    /// for delayed-copy collectors such as compacting collectors. During the
-    /// collection, MMTk reserves a region in the heap for an object as per
-    /// requirements found from `ObjectModel` and then asks `ObjectModel` to
-    /// determine what the object's reference will be post-copy. Return the address
-    /// past the end of the copied object.
+    /// Copy an object to a given location. This is required for delayed-copy collectors such as
+    /// compacting collectors. During the collection, MMTk reserves a region in the heap for an
+    /// object as per requirements found from `ObjectModel` and then asks `ObjectModel` to determine
+    /// what the object's reference will be post-copy.
+    ///
+    /// Return the address past the end of the copied object.  Unlike [`ObjectModel::copy`], this
+    /// method should not fail because there is no allocation happening in this function.
     ///
     /// Arguments:
     /// * `from`: The address of the object to be copied.
