@@ -1,12 +1,14 @@
 use std::time::Instant;
 
 mod event_counter;
+mod latency_sampler;
 mod long_counter;
 #[cfg(feature = "perf_counter")]
 mod perf_event;
 mod size_counter;
 
 pub use self::event_counter::EventCounter;
+pub use self::latency_sampler::LatencySampler;
 pub use self::long_counter::{LongCounter, Timer};
 #[cfg(feature = "perf_counter")]
 pub use self::perf_event::PerfEventDiffable;

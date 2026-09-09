@@ -184,7 +184,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         &ALLOCATOR_MAPPING
     }
 
-    fn prepare(&mut self, tls: VMWorkerThread) {
+    fn prepare(&mut self, _tls: VMWorkerThread) {
         let pause = self.current_pause().unwrap();
         if pause == Pause::FinalMark || pause == Pause::Full {
             self.common.los.is_end_of_satb_or_full_gc = true;
@@ -192,8 +192,26 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             self.immix_space.scheduler().work_buckets[WorkBucketStage::Unconstrained]
                 .add(ReleaseLOSNursery);
         }
-        self.common
-            .prepare(tls, pause == Pause::Full || pause == Pause::InitialMark);
+
+        let starts_mark_cycle = pause == Pause::Full || pause == Pause::InitialMark;
+        // Only do prepare if we start a new mark cycle. Otherwise, let thoe spaces have sticky mark bits.
+        if starts_mark_cycle {
+            // We have tested that the following spaces -- they are used by Julia
+            self.common.immortal.prepare();
+            #[cfg(feature = "vm_space")]
+            self.common.base.vm_space.prepare();
+            // TODO: We haven't tested these spaces. But ideally they should be handled in the same way here.
+            self.common.prepare_nonmoving_space(starts_mark_cycle);
+            #[cfg(feature = "code_space")]
+            self.common.base.code_space.prepare();
+            #[cfg(feature = "code_space")]
+            self.common.base.code_lo_space.prepare();
+            #[cfg(feature = "ro_space")]
+            self.common.base.ro_space.prepare();
+        }
+        // LOS is aware of LXR. Call its prepare unconditionally.
+        self.common.los.prepare(starts_mark_cycle);
+
         if super::MATURE_EVACUATION && (pause == Pause::FinalMark || pause == Pause::Full) {
             self.process_mature_evacuation_remset();
         }
@@ -338,7 +356,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn root_scanning_stage(&self) -> WorkBucketStage {
-        WorkBucketStage::RCProcessIncs
+        WorkBucketStage::RCProcessIncsNonMoving
     }
 
     fn concurrent(&self) -> Option<&dyn ConcurrentPlan<VM = VM>> {
@@ -353,6 +371,10 @@ impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
 
     fn concurrent_work_in_progress(&self) -> bool {
         self.in_concurrent_marking.load(Ordering::Acquire)
+    }
+
+    fn on_concurrent_work_interrupted(&self) {
+        // Do nothing
     }
 }
 
@@ -634,9 +656,12 @@ impl<VM: VMBinding> LXR<VM> {
 
     fn disable_unnecessary_buckets(&'static self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
         // Set conditional buckets
+        scheduler.work_buckets[WorkBucketStage::RCProcessIncsNonMoving].set_enabled(true);
         scheduler.work_buckets[WorkBucketStage::RCProcessIncs].set_enabled(true);
         scheduler.work_buckets[WorkBucketStage::Prepare].set_enabled(pause != Pause::RefCount);
         let final_mark_or_full = pause == Pause::FinalMark || pause == Pause::Full;
+        // Marks roots reported as objects, before `Closure` can evacuate anything.
+        scheduler.work_buckets[WorkBucketStage::PinningRootsTrace].set_enabled(final_mark_or_full);
         scheduler.work_buckets[WorkBucketStage::Closure].set_enabled(final_mark_or_full);
         scheduler.work_buckets[WorkBucketStage::WeakRefClosure].set_enabled(final_mark_or_full);
         scheduler.work_buckets[WorkBucketStage::FinalRefClosure].set_enabled(final_mark_or_full);
@@ -647,8 +672,9 @@ impl<VM: VMBinding> LXR<VM> {
         scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(true);
         scheduler.work_buckets[WorkBucketStage::ConcurrentResumable].set_enabled(true);
         // Always disabled
+        // LXR never routes work here: it has no transitively pinning closure. Transitive
+        // pinning roots, where accepted at all, take the ordinary node-root path instead.
         scheduler.work_buckets[WorkBucketStage::TPinningClosure].set_enabled(false);
-        scheduler.work_buckets[WorkBucketStage::PinningRootsTrace].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::SoftRefClosure].set_enabled(false);
@@ -757,21 +783,37 @@ impl<VM: VMBinding> LXR<VM> {
     pub fn mark(&self, o: ObjectReference) -> bool {
         if self.immix_space.in_space(o) {
             self.immix_space.attempt_mark(o)
-        } else {
+        } else if self.common.los.in_space(o) {
             self.common.los.attempt_mark(o)
+        } else {
+            // TODO: We need to properly handle this case.
+            // This is a temporary solution for Julia -- the only other spaces it uses are immortal space and vm space, where objects won't die.
+            debug_assert!(o.is_live());
+            false
         }
     }
 
     pub fn is_marked(&self, o: ObjectReference) -> bool {
         if self.immix_space.in_space(o) {
             self.immix_space.is_marked(o)
-        } else {
+        } else if self.common.los.in_space(o) {
             self.common.los.is_marked(o)
+        } else {
+            // TODO: We need to properly handle this case.
+            // This is a temporary solution for Julia -- the only other spaces it uses are immortal space and vm space, where objects won't die.
+            debug_assert!(o.is_live());
+            true
         }
     }
 
     pub const fn los(&self) -> &LargeObjectSpace<VM> {
         &self.common.los
+    }
+
+    /// Whether `o` lives in a space LXR reference-counts (immix space or LOS). Objects
+    /// elsewhere (e.g. Julia's sysimage in the immortal/VM space) carry no reference count.
+    pub fn is_rc_object(&self, o: ObjectReference) -> bool {
+        self.immix_space.in_space(o) || self.common.los.in_space(o)
     }
 
     fn on_lazy_decs_finished(&self, c: LazySweepingJobsCounter) {

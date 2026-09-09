@@ -83,10 +83,17 @@ impl<VM: VMBinding> GCTrigger<VM> {
         // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
         // with GC workers, which is expensive for functions like `poll`. `try_request_pause`
         // only returns `Ok` to the thread that actually wins the race to transition the status,
-        // so only that thread calls it, instead of every thread that observes the old status.
+        // so only that thread calls it, instead of every thread that observes the old status:
+        // calling it unconditionally would re-queue a `WorkerGoal::Gc` request that a previous
+        // winner's request already delivered and that the workers may already be acting on,
+        // tripping the `debug_is_requested` assertion in `GCWorkScheduler::on_last_parked`.
         match self.state.gc_status.try_request_pause() {
-            Ok(_) => {
+            Ok(cur_status) => {
+                if cur_status == GcStatus::InConcurrentGC {
+                    self.plan().concurrent().unwrap().on_concurrent_work_interrupted();
+                }
                 probe!(mmtk, gc_requested);
+                self.state.record_pause_requested_time();
                 self.scheduler.request_schedule_collection();
                 true
             },
@@ -160,6 +167,51 @@ impl<VM: VMBinding> GCTrigger<VM> {
             return self.request();
         }
         false
+    }
+
+    /// For [`crate::scheduler::GCWorkScheduler::on_last_parked`]'s use when the last parked GC
+    /// worker is about to go idle with no mutator-requested goal pending: check if we should poll
+    /// from a GC worker.
+    pub(crate) fn poll_from_last_parked_worker(&self) -> bool {
+        if !self.is_collection_enabled() {
+            return false;
+        }
+
+        // Currently only poll if a concurrent GC is in progress, and only if that work has actually drained.
+        let Some(concurrent_plan) = self.plan().concurrent() else {
+            return false;
+        };
+        if !concurrent_plan.concurrent_work_in_progress() {
+            return false;
+        }
+        if !self.scheduler.work_buckets[crate::scheduler::WorkBucketStage::Concurrent].is_drained()
+        {
+            return false;
+        }
+
+        let plan = self.plan();
+        if self.policy.is_gc_required(false, None, plan) {
+            match self.state.gc_status.try_request_pause() {
+                // This call won the race to request a GC. However, we cannot call request() now.
+                // The caller of this function is holding a mutex, and if we do request() here,
+                // we end up with deadlock. So we just return true to the caller, and let the caller do the request.
+                Ok(_) => {
+                    probe!(mmtk, gc_requested);
+                    self.state.record_pause_requested_time();
+                    info!(
+                        "[POLL] Requesting a concurrent GC's closing pause from the last parked GC worker"
+                    );
+                    true
+                }
+                Err(GcStatus::Disabled(_)) | Err(GcStatus::PauseRequested) => false,
+                Err(GcStatus::Uninitialized) => panic!(
+                    "GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."
+                ),
+                _ => unreachable!(),
+            }
+        } else {
+            false
+        }
     }
 
     /// This method is called when the user manually requests a collection, such as `System.gc()` in Java.

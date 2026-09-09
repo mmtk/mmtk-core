@@ -170,6 +170,11 @@ like this:
 
 ![Perfetto UI timeline](./perfetto-example.png)
 
+Immediately to the left of each "GC" slice (on the same virtual thread), you should also see a
+"GC_REQUEST_WAIT" slice.  It spans from the `gc_requested` USDT trace point (when a mutator's
+request for a GC is accepted) to the `gc_start` trace point (when the GC actually begins), so it
+shows how long MMTk took to actually start a GC after one was requested.
+
 ## Extending the timeline tool
 
 VM binding developers can insert USDT trace points, too, and our scripts `capture.py` and

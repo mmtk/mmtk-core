@@ -25,6 +25,9 @@ Currently, the core provides the following tracepoints.
 -   `mmtk:harness_end()`: the timing iteration of a benchmark ends
 -   `mmtk:gcworker_run()`: a GC worker thread enters its work loop
 -   `mmtk:gcworker_exit()`: a GC worker thread exits its work loop
+-   `mmtk:gc_requested()`: a mutator's request for a GC has been accepted (i.e. it won the race to
+    transition MMTk into the "GC requested" state).  This precedes `gc_start()`, usually by a short
+    delay while GC workers park and the last one schedules the collection.
 -   `mmtk:gc_start()`: a collection epoch starts
 -   `mmtk:gc_end()`: a collection epoch ends
 -   `mmtk:gen_full_heap(is_full_heap: bool)`: the generational plan has determined whether the current

@@ -174,6 +174,18 @@ class LogProcessor:
             case "gc_requested":
                 result["tid"] = 1
 
+            case "GC_REQUEST_WAIT":
+                # Put the "GC requested but not yet started" span on the same virtual
+                # thread as "GC" so it renders as the slice immediately preceding each
+                # GC on the same timeline row.
+                result["tid"] = 0
+
+            case "heap_stats":
+                result["args"] |= {
+                    "reserved_pages": int(args[0]),
+                    "total_pages": int(args[1]),
+                }
+
             case _:
                 if self.enrich_event_extra is not None:
                     # Call ``enrich_event_extra`` in the extension script if defined.
@@ -198,9 +210,8 @@ class LogProcessor:
         parameters of this function, including `self` as the first argument.
         """
 
-        processed_for_gc = True
-        processed_for_wp = True
-
+        # The following meta events enrich the GC bar.
+        # Only process them when the current thread is in the middle of a GC.
         # bpftrace may drop events.  Be conservative.
         if gc is not None:
             match name:
@@ -233,30 +244,11 @@ class LogProcessor:
                         "pause": pause,
                     }
 
-                case _:
-                    processed_for_gc = False
-        else:
-            processed_for_gc = False
-
+        # The following meta events enrich the work packet.
+        # Only process them when the current thread is in the middle of a work packet.
         # bpftrace may drop events.  Be conservative.
         if wp is not None:
             match name:
-                case "roots":
-                    if "roots" not in wp["args"]:
-                        wp["args"]["roots"] = []
-                    roots_list = wp["args"]["roots"]
-                    kind_id = int(args[0])
-                    num = int(args[1])
-                    match kind_id:
-                        case RootsKind.NORMAL.value:
-                            root_dict = {"kind": "normal_roots", "num_slots": num}
-                        case RootsKind.PINNING.value:
-                            root_dict = {"kind": "pinning_roots", "num_nodes": num}
-                        case RootsKind.TPINNING.value:
-                            root_dict = {"kind": "tpinning_roots", "num_nodes": num}
-
-                    roots_list.append(root_dict)
-
                 case "process_root_nodes":
                     wp["args"] |= {
                         "num_roots": int(args[0]),
@@ -301,13 +293,6 @@ class LogProcessor:
                         "allocated_blocks": int(args[0]),
                     }
 
-                case "sweep_chunk_immix":
-                    wp["args"] |= {
-                        "swept_blocks": int(args[0]),
-                        "reused_blocks": int(args[1]),
-                        "unreused_blocks": int(args[2]),
-                    }
-
                 case "finalization":
                     wp["args"] |= {
                         "num_candidates": begin_end_diff_dict(int(args[0]), int(args[1])),
@@ -340,16 +325,91 @@ class LogProcessor:
                         "num_retained": int(args[2]),
                     }
 
-                case _:
-                    processed_for_wp = False
-        else:
-            processed_for_wp = False
+        # The following meta events may enrich both GC and the work packet.
+        # Let them decide which one to update.
+        #
+        # Because bpftrace can drop events, we always need to check if gc and wp are None or not.
+        #
+        # If we set the -e option of capture.py,
+        # it will not emit individual work packet bars during GCs when @enable_print is false.
+        # But we can still aggregate the statistic data to the GC bar.
+        match name:
+            case "roots":
+                kind_id = int(args[0])
+                num = int(args[1])
 
-        if not processed_for_gc and not processed_for_wp:
-            # If we haven't touched an event, we offload it to the extension.
-            if self.enrich_meta_extra is not None:
-                # Call ``enrich_meta_extra`` in the extension script if defined.
-                self.enrich_meta_extra(self, name, tid, ts, gc, wp, args)
+                if wp is not None:
+                    if "roots" not in wp["args"]:
+                        wp["args"]["roots"] = []
+                    roots_list = wp["args"]["roots"]
+                    match kind_id:
+                        case RootsKind.NORMAL.value:
+                            root_dict = {"kind": "normal_roots", "num_slots": num}
+                        case RootsKind.PINNING.value:
+                            root_dict = {"kind": "pinning_roots", "num_nodes": num}
+                        case RootsKind.TPINNING.value:
+                            root_dict = {"kind": "tpinning_roots", "num_nodes": num}
+                    roots_list.append(root_dict)
+
+                if gc is not None:
+                    if "roots" not in gc["args"]:
+                        gc["args"]["roots"] = {
+                            "normal_roots": 0,
+                            "pinning_roots": 0,
+                            "tpinning_roots": 0,
+                        }
+                    match kind_id:
+                        case RootsKind.NORMAL.value:
+                            gc["args"]["roots"]["normal_roots"] += num
+                        case RootsKind.PINNING.value:
+                            gc["args"]["roots"]["pinning_roots"] += num
+                        case RootsKind.TPINNING.value:
+                            gc["args"]["roots"]["tpinning_roots"] += num
+
+            case "immix_prepare_block_state":
+                num_blocks_prepared, num_defrag_source_blocks = [int(arg) for arg in args]
+
+                if wp is not None:
+                    wp["args"] |= {
+                        "num_blocks_prepared": num_blocks_prepared,
+                        "num_defrag_source_blocks": num_defrag_source_blocks,
+                    }
+
+                if gc is not None:
+                    if "immix_prepare_block_state" not in gc["args"]:
+                        gc["args"]["immix_prepare_block_state"] = {
+                            "num_blocks_prepared": 0,
+                            "num_defrag_source_blocks": 0,
+                        }
+                    gc["args"]["immix_prepare_block_state"]["num_blocks_prepared"] += num_blocks_prepared
+                    gc["args"]["immix_prepare_block_state"]["num_defrag_source_blocks"] += num_defrag_source_blocks
+
+            case "sweep_chunk_immix":
+                swept_blocks, reused_blocks, unreused_blocks = [int(arg) for arg in args]
+
+                if wp is not None:
+                    wp["args"] |= {
+                        "swept_blocks": swept_blocks,
+                        "reused_blocks": reused_blocks,
+                        "unreused_blocks": unreused_blocks,
+                    }
+
+                if gc is not None:
+                    if "sweep_chunk_immix" not in gc["args"]:
+                        gc["args"]["sweep_chunk_immix"] = {
+                            "swept_blocks": 0,
+                            "reused_blocks": 0,
+                            "unreused_blocks": 0,
+                        }
+                    gc["args"]["sweep_chunk_immix"]["swept_blocks"] += swept_blocks
+                    gc["args"]["sweep_chunk_immix"]["reused_blocks"] += reused_blocks
+                    gc["args"]["sweep_chunk_immix"]["unreused_blocks"] += unreused_blocks
+
+        # Regardless whether we have processed the GC or work packet blocks,
+        # we always give the extension script a chance to inspect them.
+        if self.enrich_meta_extra is not None:
+            # Call ``enrich_meta_extra`` in the extension script if defined.
+            self.enrich_meta_extra(self, name, tid, ts, gc, wp, args)
 
     def resolve_results(self):
         for result in self.results:

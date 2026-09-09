@@ -277,6 +277,15 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
             }
         });
         trace!("stop_all_mutators end");
+        // All mutators have just stopped: this is the end of the "time-to-yield" window
+        mmtk.stats
+            .record_time_to_yield(mmtk.state.take_time_to_yield());
+        mmtk.state.record_pause_start_time();
+
+        let reserved_pages = mmtk.get_plan().get_reserved_pages();
+        let total_pages = mmtk.get_plan().get_total_pages();
+        probe!(mmtk, heap_stats, reserved_pages, total_pages);
+
         // This also tells the GC trigger whether a new GC cycle has started (see `Plan::gc_pause_start`).
         mmtk.get_plan().on_pause_start(mmtk);
         mmtk.scheduler.notify_mutators_paused(mmtk);
