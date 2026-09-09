@@ -31,6 +31,10 @@ pub struct LXRFieldBarrierSemantics<VM: VMBinding> {
     decs: VectorQueue<ObjectReference>,
     refs: VectorQueue<ObjectReference>,
     lxr: &'static LXR<VM>,
+    /// Objects logged by [`Self::object_probable_write_slow`], to be re-armed at the end of
+    /// the epoch. See there.
+    #[cfg(feature = "lxr-object-log")]
+    logged_objs: VectorQueue<ObjectReference>,
 }
 
 impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
@@ -47,6 +51,18 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
             decs: VectorQueue::default(),
             refs: VectorQueue::default(),
             lxr: mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap(),
+            #[cfg(feature = "lxr-object-log")]
+            logged_objs: VectorQueue::default(),
+        }
+    }
+
+    /// Undo the object logging done by [`Self::object_probable_write_slow`], so the next
+    /// epoch's first store to each of these objects reaches the barrier again.
+    #[cfg(feature = "lxr-object-log")]
+    #[cold]
+    fn clear_and_reset_logged_objects(&mut self) {
+        for obj in self.logged_objs.take() {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
         }
     }
 
@@ -185,6 +201,10 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
         self.flush_weak_refs();
         self.flush_incs();
         self.flush_decs_and_satb();
+        // Ends the coalescing epoch for the objects this mutator logged: each is armed
+        // again, so the next store to it is recorded.
+        #[cfg(feature = "lxr-object-log")]
+        self.clear_and_reset_logged_objects();
     }
 
     fn object_reference_write_slow(
@@ -235,5 +255,23 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
         obj.iterate_fields::<VM, _>(self.tls.0, |s| {
             let _succ = self.enqueue_node(Some(obj), s, None);
         });
+        // Every field of `obj` is now logged. Also log the object log bit,
+        // so next time we don't hvae to scan the object again. This is a performance optimization.
+        #[cfg(feature = "lxr-object-log")]
+        {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
+                obj,
+                LOGGED_VALUE,
+                None,
+                Ordering::SeqCst,
+            );
+            self.logged_objs.push(obj);
+            // Try keep the logged objects queue small.
+            // We can remove this check, and only clear logged objects during flush.
+            // This would cause logged object queue to grow unboundedly.
+            if self.logged_objs.is_full() {
+                self.clear_and_reset_logged_objects();
+            }
+        }
     }
 }

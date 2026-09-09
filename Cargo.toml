@@ -210,6 +210,14 @@ lxr_stw = ["lxr_no_cm", "lxr_no_lazy"]
 lxr_no_nursery_evac = []
 lxr_no_mature_evac = []
 lxr_no_evac = ["lxr_no_nursery_evac", "lxr_no_mature_evac"]
+# Use the per-object log bit for LXR's barriers if no field is given.
+#
+# LXR uses a field write barrier. However, for APIs like `object_probable_write` where no
+# field is given, LXR's barrier would go through every field of the object every time the
+# barrier is called. In a runtime where this API is used often (such as Julia), we see
+# huge slowdown (10x) due to repetitively scan those objects in every barrier. In those cases,
+# this feature introduces per object log bit for LXR to address the pathological case.
+lxr-object-log = []
 
 # To collect statistics for each GC work packet. Enabling this may introduce a small overhead (several percentage slowdown on benchmark time).
 work_packet_stats = []
