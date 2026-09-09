@@ -95,9 +95,11 @@ usdt:$MMTK:mmtk:immix_defrag {
 }
 
 usdt:$MMTK:mmtk:roots {
-    if (@enable_print) {
-        printf("roots,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
-    }
+    // Roots are relatively few compared to the work packets for transitive closure.
+    // When @enable_print is false, we don't emit events for the root scanning work packets,
+    // but we can emit the statistics so that we can aggregate the number of roots to the GC bar on the timeline.
+    // So we ignore @enable_print here.
+    printf("roots,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
 }
 
 //////// BEGIN:PROCESS_ROOT_NODES
@@ -141,9 +143,11 @@ usdt:$MMTK:mmtk:sweep_chunk_ms {
 //////// END:SWEEP_CHUNK_MS
 
 usdt:$MMTK:mmtk:sweep_chunk_immix {
-    if (@enable_print) {
-        printf("sweep_chunk_immix,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
-    }
+    // Swept chunks are relatively few compared to the work packets for transitive closure.
+    // When @enable_print is false, we don't emit events for the sweep chunk work packets,
+    // but we can emit the statistics so that we can aggregate the number of chunks to the GC bar on the timeline.
+    // So we ignore @enable_print here.
+    printf("sweep_chunk_immix,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
 }
 
 usdt:$MMTK:mmtk:concurrent_trace_objects {
@@ -185,4 +189,16 @@ usdt:$MMTK:mmtk:reference_retained {
     if (@enable_print) {
         printf("reference_retained,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
     }
+}
+
+usdt:$MMTK:mmtk:heap_stats {
+    // It is printed per GC and per pause, so the volume is low.
+    // We ignore @enable_print.
+    printf("heap_stats,C,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+}
+
+usdt:$MMTK:mmtk:immix_prepare_block_state {
+    // It is printed per Immix defrag GC which rarely happens.
+    // We ignore @enable_print.
+    printf("immix_prepare_block_state,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
 }

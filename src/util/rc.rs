@@ -234,9 +234,11 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         debug_assert!(size > Line::BYTES);
         let start = o.to_object_start::<VM>();
         let end = start + size;
-        // Skip the line holding the object's reference address, not the one holding its start:
-        // the reference address is where the object's own count lives and what every straddle
-        // read keys on. See `object_is_in_straddle_line_no_rc_check`.
+        // Skip the line holding the object's reference address. As we currently conservatively skip
+        // the last line in a hole and do not use that line, we don't need to mark lines at object start here
+        // (as the line would be convervatively kept alive). See: https://github.com/mmtk/mmtk-core/pull/1576
+        // TODO: if we use a different solution to handle object start, we may need to mark lines
+        // at object start here.
         let start_line = Line::from_unaligned_address(o.to_raw_address()).next();
         let end_line = Line::from_unaligned_address(end);
         // Note that `end_line` may be the last line overlapping with `o`.
