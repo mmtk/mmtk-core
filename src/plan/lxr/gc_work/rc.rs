@@ -7,7 +7,6 @@ use super::tracing::LXRStopTheWorldProcessEdges;
 use super::tracing::LXRStopTheWorldProcessNodes;
 use super::tracing::ProcessModBufSATB;
 use super::ProcessEdgesBase;
-use crate::plan::lxr::global::LXRSpace;
 use crate::plan::VectorQueue;
 use crate::policy::immix::block::BlockState;
 use crate::scheduler::gc_work::RootKind;
@@ -28,6 +27,20 @@ use crate::{
 };
 use atomic::Ordering;
 use std::marker::PhantomData;
+
+/// Names the policy that owns `o`, for the malformed-increment diagnostics below.
+///
+/// Diagnostics only: the tracing and reference counting paths dispatch on
+/// `Space::in_space` directly rather than going through a space classification.
+fn space_name<VM: VMBinding>(lxr: &LXR<VM>, o: ObjectReference) -> &'static str {
+    if lxr.immix_space.in_space(o) {
+        "immix"
+    } else if lxr.los().in_space(o) {
+        "los"
+    } else {
+        "common"
+    }
+}
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
@@ -133,7 +146,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         let mut roots = Vec::with_capacity(nodes.len());
         let mut uncounted = vec![];
         for o in nodes {
-            let space = self.lxr.space_of(o);
+            let in_immix_space = self.lxr.immix_space.in_space(o);
+            let los = !in_immix_space && self.lxr.los().in_space(o);
             // A root node has no slot, so nothing could ever update it if `o` had already
             // moved by the time it got here. Catch that rather than silently register a
             // stale reference as this pause's root set.
@@ -143,15 +157,15 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             // object for its forwarding bits reads side metadata that was never mapped for
             // that address.
             debug_assert!(
-                space != LXRSpace::Immix || !object_forwarding::is_forwarded::<VM>(o),
+                !in_immix_space || !object_forwarding::is_forwarded::<VM>(o),
                 "root node {:?} was already forwarded",
                 o
             );
-            if space == LXRSpace::Common {
+            if !in_immix_space && !los {
+                // Not reference counted by LXR: hand it on untouched.
                 uncounted.push(o);
                 continue;
             }
-            let los = space == LXRSpace::Los;
             if self.inc(o) {
                 // Promote without moving.
                 self.promote(worker, o, false, los, 0);
@@ -589,7 +603,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         );
         eprintln!("  kind      = {kind}");
         eprintln!("  slot      = {a}  (in heap: {in_heap})");
-        eprintln!("  loaded    = {o:?}  space={:?}", self.lxr.space_of(o));
+        eprintln!("  loaded    = {o:?}  space={}", space_name(self.lxr, o));
         eprintln!("  loaded rc = {}", self.rc.count(o));
         if self.lxr.immix_space.in_space(o) {
             eprintln!("  loaded blk= {:?}", Block::containing(o).get_state());
@@ -598,7 +612,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             let slot_as_obj = ObjectReference::from_raw_address(a.align_down(8));
             eprintln!(
                 "  slot space= {:?}",
-                slot_as_obj.map(|x| self.lxr.space_of(x))
+                slot_as_obj.map(|x| space_name(self.lxr, x))
             );
             if slot_as_obj.is_some_and(|x| self.lxr.immix_space.in_space(x)) {
                 eprintln!(
@@ -626,10 +640,10 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
             match owner {
                 Some(owner) => eprintln!(
-                    "  slot owner= {owner:?} +{} rc={} space={:?}",
+                    "  slot owner= {owner:?} +{} rc={} space={}",
                     a - owner.to_raw_address(),
                     self.rc.count(owner),
-                    self.lxr.space_of(owner)
+                    space_name(self.lxr, owner)
                 ),
                 None => eprintln!("  slot owner= <no well-formed header within 512 words>"),
             }
@@ -1077,14 +1091,13 @@ impl<VM: VMBinding> ProcessDecs<VM> {
                 }
             }
         });
-        let space = lxr.space_of(o);
-        debug_assert_ne!(
-            space,
-            LXRSpace::Common,
+        let in_ix_space = lxr.immix_space.in_space(o);
+        let in_los = !in_ix_space && lxr.los().in_space(o);
+        debug_assert!(
+            in_ix_space || in_los,
             "{:?} is not reference counted, so its count can never reach zero",
             o
         );
-        let in_ix_space = space == LXRSpace::Immix;
         if in_ix_space {
             // Clear the VO bit if `o` is in the immix space.
             // Note that if the object is in the LOS,
@@ -1104,7 +1117,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         } else {
             // Only the large object space frees objects individually, and the caller
             // uses this to decide whether to ask it to.
-            space == LXRSpace::Los
+            in_los
         }
     }
 

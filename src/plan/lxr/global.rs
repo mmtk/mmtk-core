@@ -105,42 +105,18 @@ pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints
     ..PlanConstraints::default()
 });
 
-/// Identifies which policy owns an object, from the point of view of LXR's
-/// reference counting and tracing.
-///
-/// LXR only reference counts the objects it allocates itself, which live either in
-/// its Immix space or in the large object space. A plan also has an immortal space,
-/// a non-moving space, and (under the `vm_space` feature) a space describing a boot
-/// image supplied by the VM. Objects there have no reference count and no line
-/// marks, so none of the RC or Immix metadata may be consulted for them, but they
-/// still have to be traced because they can refer to reference counted objects.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum LXRSpace {
-    /// LXR's Immix space: reference counted, line marked, and possibly evacuated.
-    Immix,
-    /// The large object space: reference counted, never moved.
-    Los,
-    /// A space owned by the common plan: the immortal space, the non-moving space,
-    /// or the VM space. Not reference counted and never moved by LXR.
-    Common,
-}
-
 impl<VM: VMBinding> LXR<VM> {
-    /// Returns which policy owns `o`. See [`LXRSpace`].
-    pub fn space_of(&self, o: ObjectReference) -> LXRSpace {
-        if self.immix_space.in_space(o) {
-            LXRSpace::Immix
-        } else if self.common.los.in_space(o) {
-            LXRSpace::Los
-        } else {
-            LXRSpace::Common
-        }
-    }
-
     /// Returns whether `o` carries a reference count, i.e. whether it lives in the
     /// Immix space or the large object space.
+    ///
+    /// LXR only reference counts the objects it allocates itself. A plan also has an
+    /// immortal space, a non-moving space, and (under the `vm_space` feature) a space
+    /// describing a boot image supplied by the VM. Objects there have no reference count
+    /// and no line marks, so none of the RC or Immix metadata may be consulted for them,
+    /// but they still have to be traced because they can refer to reference counted
+    /// objects.
     pub fn is_rc_object(&self, o: ObjectReference) -> bool {
-        self.space_of(o) != LXRSpace::Common
+        self.immix_space.in_space(o) || self.common.los.in_space(o)
     }
 
     /// Whether any Immix line this object occupies currently reads as free.
@@ -152,7 +128,7 @@ impl<VM: VMBinding> LXR<VM> {
         use crate::policy::immix::line::{Line, RCArray};
         use crate::util::linear_scan::Region;
         use crate::util::linear_scan::UnstraddlableRegion;
-        if self.space_of(o) != LXRSpace::Immix {
+        if !self.immix_space.in_space(o) {
             return false;
         }
         let start = VM::VMObjectModel::ref_to_object_start(o);
@@ -311,7 +287,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         &ALLOCATOR_MAPPING
     }
 
-    fn prepare(&mut self, tls: VMWorkerThread) {
+    fn prepare(&mut self, _tls: VMWorkerThread) {
         let pause = self.current_pause().unwrap();
         if pause == Pause::FinalMark || pause == Pause::Full {
             self.common.los.is_end_of_satb_or_full_gc = true;
@@ -319,12 +295,31 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             self.immix_space.scheduler().work_buckets[WorkBucketStage::Unconstrained]
                 .add(ReleaseLOSNursery);
         }
-        // Only the pause that *begins* a mark cycle may clear the immortal/VM-space mark
-        // bits. `FinalMark` closes the cycle that `InitialMark` opened, so clearing there
-        // would throw away everything concurrent marking marked.
+        // Only the pause that *begins* a mark cycle may run these spaces' `prepare`, because
+        // `ImmortalSpace::prepare` and `VMSpace::prepare` bzero the mark bits of every region
+        // they own. `FinalMark` closes the cycle that `InitialMark` opened, so clearing there
+        // would throw away everything concurrent marking established and the pause would
+        // re-trace the whole graph. Julia's sysimage lives in the VM space, so that was
+        // ~1.77M objects re-marked in every `FinalMark`.
         let starts_mark_cycle = pause == Pause::Full || pause == Pause::InitialMark;
-        self.common
-            .prepare_ext(tls, starts_mark_cycle, starts_mark_cycle);
+        // Only do prepare if we start a new mark cycle. Otherwise, let those spaces keep their
+        // sticky mark bits.
+        if starts_mark_cycle {
+            // We have tested that the following spaces -- they are used by Julia
+            self.common.immortal.prepare();
+            #[cfg(feature = "vm_space")]
+            self.common.base.vm_space.prepare();
+            // TODO: We haven't tested these spaces. But ideally they should be handled in the same way here.
+            self.common.prepare_nonmoving_space(starts_mark_cycle);
+            #[cfg(feature = "code_space")]
+            self.common.base.code_space.prepare();
+            #[cfg(feature = "code_space")]
+            self.common.base.code_lo_space.prepare();
+            #[cfg(feature = "ro_space")]
+            self.common.base.ro_space.prepare();
+        }
+        // LOS is aware of LXR. Call its prepare unconditionally.
+        self.common.los.prepare(starts_mark_cycle);
         if super::MATURE_EVACUATION && (pause == Pause::FinalMark || pause == Pause::Full) {
             self.process_mature_evacuation_remset();
         }
@@ -1142,15 +1137,16 @@ impl<VM: VMBinding> LXR<VM> {
     /// Attempts to mark the object as live, in whichever space (Immix or large
     /// object space) it belongs to. Returns `true` if this call performed the
     /// marking (i.e. the object was previously unmarked).
-    ///
-    /// Objects owned by the common plan have no mark state that LXR maintains, and
-    /// are unconditionally live, so marking them is a no-op that reports no work
-    /// done.
     pub fn mark(&self, o: ObjectReference) -> bool {
-        match self.space_of(o) {
-            LXRSpace::Immix => self.immix_space.attempt_mark(o),
-            LXRSpace::Los => self.common.los.attempt_mark(o),
-            LXRSpace::Common => false,
+        if self.immix_space.in_space(o) {
+            self.immix_space.attempt_mark(o)
+        } else if self.common.los.in_space(o) {
+            self.common.los.attempt_mark(o)
+        } else {
+            // TODO: We need to properly handle this case.
+            // This is a temporary solution for Julia -- the only other spaces it uses are immortal space and vm space, where objects won't die.
+            debug_assert!(o.is_live());
+            false
         }
     }
 
@@ -1171,10 +1167,15 @@ impl<VM: VMBinding> LXR<VM> {
     /// reported as marked. Callers use this to decide whether an object still needs
     /// to be retained or revisited, and neither is ever true for them.
     pub fn is_marked(&self, o: ObjectReference) -> bool {
-        match self.space_of(o) {
-            LXRSpace::Immix => self.immix_space.is_marked(o),
-            LXRSpace::Los => self.common.los.is_marked(o),
-            LXRSpace::Common => true,
+        if self.immix_space.in_space(o) {
+            self.immix_space.is_marked(o)
+        } else if self.common.los.in_space(o) {
+            self.common.los.is_marked(o)
+        } else {
+            // TODO: We need to properly handle this case.
+            // This is a temporary solution for Julia -- the only other spaces it uses are immortal space and vm space, where objects won't die.
+            debug_assert!(o.is_live());
+            true
         }
     }
 
