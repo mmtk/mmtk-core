@@ -13,7 +13,6 @@ use crate::plan::lxr::gc_work::rc::ProcessDecs;
 use crate::plan::lxr::gc_work::rc::ProcessIncs;
 use crate::plan::lxr::gc_work::rc::EDGE_KIND_MATURE;
 use crate::plan::lxr::gc_work::tracing::ProcessModBufSATB;
-use crate::plan::lxr::SkipReason;
 use crate::plan::VectorQueue;
 use crate::scheduler::WorkBucketStage;
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
@@ -147,17 +146,6 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
             // it. NOT correct: the slot is re-read when its increment is processed, and
             // nothing keeps memory outside the heap alive until then. Observed to be
             // millions of stack addresses per GC cycle.
-            probe!(mmtk, lxr_slot_skipped, SkipReason::OutOfHeap);
-            // Short-circuits before the atomic unless the check is actually on.
-            if crate::plan::lxr::check_incs()
-                && crate::plan::lxr::OUT_OF_HEAP_SLOTS.fetch_add(1, Ordering::Relaxed) == 0
-            {
-                eprintln!(
-                    "[lxr] first out-of-heap barrier slot at {}; captured from:\n{}",
-                    slot.to_address(),
-                    std::backtrace::Backtrace::force_capture()
-                );
-            }
             return Ok(slot.load());
         }
         if self.get_slot_logging_state(slot) == LOGGED_VALUE {
@@ -179,7 +167,6 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
     ) {
         // Reference counting
         if let Some(old) = old {
-            crate::plan::lxr::record_rc_event(old, "dec/barrier", _src, slot.to_address());
             self.dec_origin = "barrier-field";
             self.decs.push(old);
             if self.decs.is_full() {
@@ -189,7 +176,6 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
         // A tracepoint rather than a counter: this runs on every reference store that
         // reaches the barrier slow path, and a global atomic here is one cache line
         // ping-ponging between every mutator thread in the program.
-        probe!(mmtk, lxr_inc_pushed, slot.to_address().as_usize());
         self.incs.push(slot);
         if self.incs.is_full() {
             self.flush_incs();
@@ -340,15 +326,8 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
         // read then are still the epoch-end values -- while making a realloc harmless,
         // since the object is asked for its fields again. The decrements of the old values
         // are pushed here either way, which is where they have to happen.
-        // Counted so that the cost of this path can be attributed: it is the whole-object fallback
-        // for a store whose field the caller could not name, and how many fields it walks per call
-        // is the amplification factor. One atomic per call, not per field -- accumulate locally.
-        let stats = crate::plan::lxr::stats();
-        let mut walked = 0usize;
         obj.iterate_fields::<VM, _>(self.tls.0, |s| {
-            walked += 1;
             if !self.slot_has_unlog_bit(s) {
-                probe!(mmtk, lxr_slot_skipped, SkipReason::OutOfHeap);
                 return;
             }
             // A derived slot cannot survive the trip to the pause: it is only interpretable
@@ -356,7 +335,6 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
             // change before then. It also names an object some other slot already names, so
             // skipping it costs no reachability. See `Slot::is_derived`.
             if s.is_derived() {
-                probe!(mmtk, lxr_slot_skipped, SkipReason::Derived);
                 return;
             }
             let _succ = self.enqueue_node(Some(obj), s, None);
@@ -383,10 +361,6 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
             None,
             Ordering::SeqCst,
         );
-        if stats {
-            super::OBJ_WRITE_CALLS.fetch_add(1, Ordering::Relaxed);
-            super::OBJ_WRITE_FIELDS.fetch_add(walked, Ordering::Relaxed);
-        }
         self.logged_objs.push(obj);
         if self.logged_objs.is_full() {
             // Re-arming early only costs another walk of an object whose fields are all

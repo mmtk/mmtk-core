@@ -83,7 +83,10 @@ impl<VM: VMBinding> GCTrigger<VM> {
         // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
         // with GC workers, which is expensive for functions like `poll`. `try_request_pause`
         // only returns `Ok` to the thread that actually wins the race to transition the status,
-        // so only that thread calls it, instead of every thread that observes the old status.
+        // so only that thread calls it, instead of every thread that observes the old status:
+        // calling it unconditionally would re-queue a `WorkerGoal::Gc` request that a previous
+        // winner's request already delivered and that the workers may already be acting on,
+        // tripping the `debug_is_requested` assertion in `GCWorkScheduler::on_last_parked`.
         match self.state.gc_status.try_request_pause() {
             Ok(cur_status) => {
                 if cur_status == GcStatus::InConcurrentGC {

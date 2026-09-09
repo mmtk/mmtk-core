@@ -1,7 +1,7 @@
 use super::super::LazySweepingJobsCounter;
 use super::super::SurvivalRatioPredictorLocal;
 use super::super::LXR;
-use super::super::{check_incs, LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURSERY_EVACUATION};
+use super::super::{LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURSERY_EVACUATION};
 use super::tracing::LXRConcurrentTraceObjects;
 use super::tracing::LXRStopTheWorldProcessEdges;
 use super::tracing::LXRStopTheWorldProcessNodes;
@@ -11,7 +11,6 @@ use crate::plan::VectorQueue;
 use crate::policy::immix::block::BlockState;
 use crate::scheduler::gc_work::RootKind;
 use crate::util::copy::CopySemantics;
-use crate::util::linear_scan::Region;
 use crate::util::linear_scan::UnstraddlableRegion;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::rc::*;
@@ -27,20 +26,6 @@ use crate::{
 };
 use atomic::Ordering;
 use std::marker::PhantomData;
-
-/// Names the policy that owns `o`, for the malformed-increment diagnostics below.
-///
-/// Diagnostics only: the tracing and reference counting paths dispatch on
-/// `Space::in_space` directly rather than going through a space classification.
-fn space_name<VM: VMBinding>(lxr: &LXR<VM>, o: ObjectReference) -> &'static str {
-    if lxr.immix_space.in_space(o) {
-        "immix"
-    } else if lxr.los().in_space(o) {
-        "los"
-    } else {
-        "common"
-    }
-}
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
@@ -61,11 +46,6 @@ pub struct ProcessIncs<VM: VMBinding, const KIND: EdgeKind> {
     /// A slice of one promoted object's fields to count, rather than a buffer of increments:
     /// `(object, chunks, obj_in_defrag)`. See [`ProcessIncs::scan_nursery_object`].
     promoted_chunks: Option<(ObjectReference, std::ops::Range<usize>, bool)>,
-    /// Diagnostic tallies for this packet, published once when it finishes. Kept local because a
-    /// global atomic per increment or per promotion is millions of contended updates inside the
-    /// pause -- enough to inflate the pause it is supposed to be measuring by 8x.
-    incs_count: usize,
-    promoted_count: usize,
 }
 
 unsafe impl<VM: VMBinding, const KIND: EdgeKind> Send for ProcessIncs<VM, KIND> {}
@@ -94,8 +74,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             root_kind: None,
             survival_ratio_predictor_local: SurvivalRatioPredictorLocal::default(),
             promoted_chunks: None,
-            incs_count: 0,
-            promoted_count: 0,
         }
     }
 
@@ -114,30 +92,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         }
     }
 
-    /// Increment root objects that were reported as objects rather than as slots.
-    ///
-    /// Node counterpart of `process_incs::<EDGE_KIND_ROOT>`. Nothing here may move an object:
-    /// the caller has no slot to write a forwarding pointer back into, so a promotion is
-    /// always in place.
-    ///
-    /// Incrementing is not enough on its own, because it is the zero-to-one transition that
-    /// promotes an object, and promotion is what arms its field unlog bits and increments the
-    /// objects it refers to. A bare increment leaves a nursery root's referents at zero, and
-    /// they are then swept even though the root keeps them reachable.
-    ///
-    /// Returns `(counted, uncounted)`. `counted` is the objects whose count was raised,
-    /// which is the set to record as the root set so the matching decrements are applied
-    /// later. `uncounted` is the roots the plan never reference counts -- objects in the
-    /// common plan's spaces, above all Julia's loaded sysimage -- which get no count and so
-    /// must not be recorded for decrementing.
-    ///
-    /// Both sets still have to be traced. An uncounted root used to be dropped here
-    /// outright, and then nothing ever scanned it: a tracing pause marks from the root sets
-    /// this returns, and the sysimage object was in neither. Anything in the heap held only
-    /// by a sysimage root was therefore never marked, and `SweepDeadCycles` -- which
-    /// reclaims any counted object it finds unmarked -- zeroed its count while it was still
-    /// reachable. Nothing in the bootstrap stage runs with a sysimage loaded, which is why
-    /// this only ever showed up when building `Base`.
+    /// Reference-count root objects reported as objects rather than as slots.
+    /// Node counterpart of `process_incs::<EDGE_KIND_ROOT>`. Nothing here may move an object.
     fn process_root_nodes(
         &mut self,
         worker: &mut GCWorker<VM>,
@@ -177,32 +133,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
     }
 
     /// Node-shaped counterpart of [`GCWork::do_work`] below for `KIND == EDGE_KIND_ROOT`.
-    ///
-    /// Both reference-count a root set and then decide, from the current pause, whether to
-    /// seed concurrent marking, trace immediately, or only record the set for later
-    /// decrementing. The two differences both follow from the roots being objects rather than
-    /// slots:
-    ///
-    /// * Nothing may move them. The stop-the-world closure is therefore
-    ///   [`LXRStopTheWorldProcessNodes`], not [`LXRStopTheWorldProcessEdges`], and it runs in
-    ///   `PinningRootsTrace` -- before `Closure`, where the slot closure could evacuate them.
-    ///   Like [`LXRConcurrentTraceObjects`], and unlike the slot closure, it dispatches on the
-    ///   space before touching any metadata, so it never asks a space for something it does
-    ///   not have: the slot closure reaches for forwarding bits before it knows the space, and
-    ///   `LargeObjectSpace` registers no forwarding metadata for its chunks at all.
-    /// * The root set is recorded in `curr_roots` here, in every pause. The slot path leaves
-    ///   that to `LXRStopTheWorldProcessEdges` during `FinalMark`/`Full` because it has to
-    ///   record the *forwarded* root; these roots never forward.
-    ///
-    /// A stop-the-world pause has to mark from these roots or nothing else will. With
-    /// concurrent marking off this path once traced nothing at all: the trace then reached
-    /// almost nothing, and `SweepDeadCycles` -- which reclaims any counted object it finds
-    /// unmarked -- took the live heap for cyclic garbage. Measured at the first `Full` pause
-    /// of the bootstrap: 189,960 objects zeroed, 0 kept as marked. Likewise, without seeding
-    /// `InitialMark` below, `concurrent_marking_packets_drained` is trivially true, the
-    /// trigger in `LXR::should_do_cycle_collection` fires immediately, and the entire
-    /// transitive closure lands in the `FinalMark` pause -- making LXR a stop-the-world marker
-    /// with a ~20ms pause regardless of heap size.
+    /// However, the major difference is that we cannot move any of these objects here, as
+    /// we don't know their slots.
     pub fn do_work_root_nodes(
         &mut self,
         nodes: Vec<ObjectReference>,
@@ -213,7 +145,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         let lxr = self.lxr;
         self.pause = lxr.current_pause().unwrap();
         self.in_cm = lxr.concurrent_work_in_progress();
-        // `uncounted` must not reach `curr_roots`: no count was raised for it.
         let (roots, uncounted) = self.process_root_nodes(worker, nodes);
         let mut to_trace = roots.clone();
         to_trace.extend_from_slice(&uncounted);
@@ -256,8 +187,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             // `RefCount` has no marking phase.
             _ => {}
         }
-        // Recorded so the matching decrements are applied in the next pause, which is what
-        // makes this a root set rather than a permanent increment.
+        // Recorded so the matching decrements are applied in the next pause.
         if !roots.is_empty() {
             lxr.curr_roots.read().unwrap().push(roots);
         }
@@ -271,8 +201,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         los: bool,
         depth: u32,
     ) {
-        self.promoted_count += 1;
-        probe!(mmtk, lxr_promote, o.to_raw_address().as_usize());
         let size = o.get_size::<VM>();
 
         if !los {
@@ -438,20 +366,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         );
         let rc = self.rc.count(target);
         if rc == 0 {
-            crate::plan::lxr::record_rc_event(
-                target,
-                "defer/promote-scan",
-                Some(o),
-                slot.to_address(),
-            );
             self.add_new_slot(worker, slot);
         } else {
-            crate::plan::lxr::record_rc_event(
-                target,
-                "inc/promote-scan",
-                Some(o),
-                slot.to_address(),
-            );
             if rc != crate::util::rc::MAX_REF_COUNT {
                 let _ = self.rc.inc(target);
             }
@@ -578,88 +494,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         }
     }
 
-    /// Report an increment whose slot holds something that is not an object, and abort.
-    ///
-    /// The interesting question is never the bad value itself but where the slot came
-    /// from, so this reconstructs as much of that as it can: the kind of increment, what
-    /// owns the slot's memory, and — by walking back from the slot to the nearest
-    /// well-formed header that covers it — which object the slot is a field of.
-    #[cold]
-    fn report_malformed_inc<const K: EdgeKind>(&self, s: VM::VMSlot, o: ObjectReference) -> ! {
-        let kind = match K {
-            EDGE_KIND_ROOT => "root",
-            EDGE_KIND_NURSERY => "nursery",
-            _ => "mature (write barrier)",
-        };
-        let a = s.to_address();
-        let layout = crate::util::heap::layout::vm_layout::vm_layout();
-        let in_heap = a >= layout.heap_start && a < layout.heap_end;
-        eprintln!(
-            "[lxr] gc#{} malformed increment (out_of_heap_slots so far: {})",
-            crate::plan::lxr::GC_COUNT.load(Ordering::SeqCst),
-            crate::plan::lxr::OUT_OF_HEAP_SLOTS.load(Ordering::Relaxed)
-        );
-        eprintln!("  kind      = {kind}");
-        eprintln!("  slot      = {a}  (in heap: {in_heap})");
-        eprintln!("  loaded    = {o:?}  space={}", space_name(self.lxr, o));
-        eprintln!("  loaded rc = {}", self.rc.count(o));
-        if self.lxr.immix_space.in_space(o) {
-            eprintln!("  loaded blk= {:?}", Block::containing(o).get_state());
-        }
-        if in_heap {
-            let slot_as_obj = ObjectReference::from_raw_address(a.align_down(8));
-            eprintln!(
-                "  slot space= {:?}",
-                slot_as_obj.map(|x| space_name(self.lxr, x))
-            );
-            if slot_as_obj.is_some_and(|x| self.lxr.immix_space.in_space(x)) {
-                eprintln!(
-                    "  slot blk  = {:?}",
-                    Block::from_unaligned_address(a).get_state()
-                );
-            }
-            // Walk back for the object this slot is a field of. Objects are at least a
-            // header apart, so stepping a word at a time cannot miss a start.
-            let mut owner = None;
-            let mut cursor = a.align_down(8);
-            for _ in 0..512 {
-                if let Some(c) = ObjectReference::from_raw_address(cursor) {
-                    if crate::plan::lxr::object_is_plausible(c)
-                        && c.to_raw_address() + c.get_size::<VM>() > a
-                    {
-                        owner = Some(c);
-                        break;
-                    }
-                }
-                if cursor <= layout.heap_start + 8usize {
-                    break;
-                }
-                cursor -= 8usize;
-            }
-            match owner {
-                Some(owner) => eprintln!(
-                    "  slot owner= {owner:?} +{} rc={} space={}",
-                    a - owner.to_raw_address(),
-                    self.rc.count(owner),
-                    space_name(self.lxr, owner)
-                ),
-                None => eprintln!("  slot owner= <no well-formed header within 512 words>"),
-            }
-            eprint!("  words     =");
-            let base = a.align_down(8) - 32usize;
-            for i in 0..9 {
-                let w = base + i * 8usize;
-                eprint!(
-                    "{}{:#x}",
-                    if w == a.align_down(8) { " >" } else { " " },
-                    unsafe { w.load::<usize>() }
-                );
-            }
-            eprintln!();
-        }
-        panic!("malformed increment from a {kind} slot at {a}");
-    }
-
     /// Return `None` if the increment of the slot should be delayed
     fn unlog_and_load_rc_object<const K: EdgeKind>(
         &mut self,
@@ -694,9 +528,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         depth: u32,
         add_root_to_remset: bool,
     ) -> Option<ObjectReference> {
-        if K == EDGE_KIND_MATURE {
-            probe!(mmtk, lxr_inc_processed, s.to_address().as_usize());
-        }
         let o = match self.unlog_and_load_rc_object::<K>(s) {
             Some(o) => o,
             _ => {
@@ -710,19 +541,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         if !self.lxr.is_rc_object(o) {
             return None;
         }
-        if check_incs() && !crate::plan::lxr::object_is_plausible(o) {
-            self.report_malformed_inc::<K>(s, o);
-        }
-        crate::plan::lxr::record_rc_event(
-            o,
-            match K {
-                EDGE_KIND_ROOT => "inc/root",
-                EDGE_KIND_NURSERY => "inc/nursery",
-                _ => "inc/mature",
-            },
-            None,
-            s.to_address(),
-        );
         // println!(" - inc {:?}: {:?} rc={}", s, o, self.rc.count(o));
         let new = self.process_inc_and_evacuate(worker, o, depth);
         // Put this into remset if this is a mature slot, or a weak root
@@ -742,9 +560,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         depth: u32,
         add_root_to_remset: bool,
     ) -> Option<Vec<ObjectReference>> {
-        // One atomic per buffer, not per slot: this is the count the pause's cost gets divided by
-        // to give a cost per increment, so it must not itself cost per increment.
-        self.incs_count += incs.len();
         if K == EDGE_KIND_ROOT {
             // An optimization with Rust zero allocation. However, it only works if
             // VMSlot has exactly the same size and alignment as ObjectReference, which
@@ -828,16 +643,6 @@ impl<S: Slot> DerefMut for AddressBuffer<'_, S> {
 impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         self.lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
-        if crate::plan::lxr::RELEASE_STARTED.load(Ordering::SeqCst)
-            && crate::plan::lxr::INCS_AFTER_RELEASE.fetch_add(1, Ordering::SeqCst) == 0
-        {
-            eprintln!(
-                "[lxr] gc#{} BUG: increments are still being processed after Release \
-                 began. Release decides what to reclaim from reference counts, so it has \
-                 already treated these objects as dead.",
-                crate::plan::lxr::GC_COUNT.load(Ordering::SeqCst)
-            );
-        }
         self.pause = self.lxr.current_pause().unwrap();
         self.in_cm = self.lxr.concurrent_work_in_progress();
         if NO_EVAC.load(Ordering::Relaxed) {
@@ -924,12 +729,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
             {
                 self.lxr.curr_roots.read().unwrap().push(roots);
             }
-        }
-        if crate::plan::lxr::stats() {
-            crate::plan::lxr::INCS_PROCESSED.fetch_add(self.incs_count, Ordering::Relaxed);
-            crate::plan::lxr::OBJS_PROMOTED.fetch_add(self.promoted_count, Ordering::Relaxed);
-            self.incs_count = 0;
-            self.promoted_count = 0;
         }
         // Process recursively generated buffer
         let mut depth = self.depth;
@@ -1131,7 +930,6 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             } else {
                 *o
             };
-            crate::plan::lxr::record_rc_event(o, "dec/applied", None, crate::util::Address::ZERO);
             let mut dead = false;
             let mut is_los = false;
             let mut already_run = false;
@@ -1143,9 +941,6 @@ impl<VM: VMBinding> ProcessDecs<VM> {
                 }
                 if c == 1 && !dead {
                     dead = true;
-                    if crate::plan::lxr::is_known_live(o) {
-                        crate::plan::lxr::report_dec_of_live_object(o, self.origin);
-                    }
                     is_los = self.process_dead_object(worker, o, lxr);
                 }
                 debug_assert!(c <= MAX_REF_COUNT);
@@ -1237,10 +1032,6 @@ impl<VM: VMBinding> DerefMut for CollectSlotRoots<VM> {
 
 /// Collects roots reported as objects rather than as slots. Node counterpart of
 /// [`CollectSlotRoots`].
-///
-/// Scheduled into [`WorkBucketStage::RCProcessIncsNonMoving`] by
-/// [`super::LXRRootsWorkFactory::create_process_pinning_roots_work`], which explains why that
-/// stage rather than `RCProcessIncs`.
 pub struct CollectNodeRoots<VM: VMBinding> {
     nodes: Vec<ObjectReference>,
     _p: PhantomData<VM>,
@@ -1260,9 +1051,6 @@ impl<VM: VMBinding> GCWork<VM> for CollectNodeRoots<VM> {
         if !self.nodes.is_empty() {
             let lxr = mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap();
             let roots = std::mem::take(&mut self.nodes);
-            // Route through `ProcessIncs` rather than incrementing here: the zero-to-one
-            // transition has to promote the object, which is what arms its field unlog bits
-            // and counts the objects it refers to.
             let mut w = ProcessIncs::<_, EDGE_KIND_ROOT>::new(vec![], lxr);
             // `RootsWorkFactory` passes no `RootKind` for node roots; they are strong roots.
             w.root_kind = Some(RootKind::Strong);

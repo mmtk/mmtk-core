@@ -505,14 +505,6 @@ impl Block {
     pub fn rc_sweep_nursery<VM: VMBinding>(&self, space: &ImmixSpace<VM>) -> bool {
         let is_in_place_promoted = self.is_in_place_promoted();
         self.clear_in_place_promoted();
-        if crate::plan::lxr::retain_nursery() {
-            // Bring-up diagnostic: keep every nursery block whole, so no line in it is
-            // ever handed back to the allocator. This makes an object that is live but
-            // uncounted survive anyway, which distinguishes "reachability/counting missed
-            // an object" from "something else corrupts the heap".
-            self.set_state(BlockState::Unmarked);
-            return false;
-        }
         if is_in_place_promoted {
             self.set_state(BlockState::Reusable {
                 unavailable_lines: 1 as _,
@@ -573,11 +565,6 @@ impl Block {
 
     pub fn rc_sweep_mature<VM: VMBinding>(&self, space: &ImmixSpace<VM>, defrag: bool) -> bool {
         if self.get_state() == BlockState::Unallocated || self.get_state() == BlockState::Nursery {
-            return false;
-        }
-        if crate::plan::lxr::retain_nursery() || crate::plan::lxr::retain_mature() {
-            // See `rc_sweep_nursery`: retaining the nursery is only meaningful if the
-            // mature sweep does not then reclaim the same blocks.
             return false;
         }
         if defrag || self.rc_dead() {

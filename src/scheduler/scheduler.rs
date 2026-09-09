@@ -338,15 +338,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             buckets_updated = buckets_updated || bucket_opened;
             if bucket_opened {
                 probe!(mmtk, bucket_opened, id);
-                // Guarded, not just passed to `mark`: the `format!` would otherwise allocate a
-                // String at every bucket boundary of every pause even with the timeline off.
-                if crate::scheduler::stage_timeline::enabled() {
-                    crate::scheduler::stage_timeline::mark(format!(
-                        "open {:?}({})",
-                        id,
-                        bucket.len()
-                    ));
-                }
                 if !bucket.is_drained() {
                     // Quit the loop. There are already new packets in the newly opened buckets.
                     new_packets = bucket.len();
@@ -444,18 +435,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 _ => {}
             }
         }
-        // Try steal some packets from any worker.
-        //
-        // This scan is O(workers) contended cache-line reads and every worker runs it at each
-        // work-bucket boundary, which looks like an obvious O(workers^2) waste. It is not worth
-        // bounding: probing only a few random victims left the minimum pause unchanged -- so the
-        // scan is not on an empty pause's critical path -- while median pause and wall time got
-        // much worse (on 32 workers, `strings` median 6.9ms -> 21.7ms, `tree_mutable` wall
-        // 23.0s -> 34.0s), improving monotonically as the probe count rose back to exhaustive.
-        //
-        // `WorkBucket::poll` is a *batch* steal, so an opening bucket's packets land in a few
-        // workers' local deques. That is where the work is, so a worker that fails to find it
-        // parks and the phase serialises. The scan is load-bearing for parallelism.
+        // Try steal some packets from any worker
         for (id, worker_shared) in self.worker_group.workers_shared.iter().enumerate() {
             if id == worker.ordinal {
                 continue;
@@ -539,10 +519,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 // During GC, if all workers parked, all open buckets must have been drained.
                 self.assert_all_open_buckets_are_empty();
 
-                // All workers are parked here, so the gap since the previous mark is the wall time
-                // that draining the previous stage took, handshake included.
-                crate::scheduler::stage_timeline::mark("all-parked");
-
                 // Find more work for workers to do.
                 let found_more_work = self.find_more_work_for_workers();
 
@@ -560,12 +536,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     goals.on_current_goal_completed();
 
                     if concurrent_work_scheduled {
-                        // It was the initial mark pause and scheduled concurrent work.
-                        // Wake up all GC workers to do concurrent work.
+                        // We just scheduled concurrent work. Wake up all GC workers to do concurrent work.
                         LastParkedResult::WakeAll
                     } else {
-                        // It was an STW GC or the final mark pause of a concurrent GC.
-                        // Respond to another goal.
+                        // No scheduled concurrent work. Respond to another goal.
                         self.respond_to_requests(worker, goals)
                     }
                 }

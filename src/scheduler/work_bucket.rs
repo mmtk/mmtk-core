@@ -407,9 +407,7 @@ pub enum WorkBucketStage {
     /// Process the reference-count increments that must not move their objects.  LXR also scans
     /// roots here (see `root_scanning_stage`); the roots a binding reports as objects rather than
     /// as slots are counted in this stage because there is no slot to write a forwarding pointer
-    /// back into.  Counting them before `RCProcessIncs` opens is what keeps them in place:
-    /// `RCProcessIncs` evacuates nursery objects, and it only spares an object whose reference
-    /// count is already nonzero.
+    /// back into.  Counting them before `RCProcessIncs` opens is what keeps them in place.
     RCProcessIncsNonMoving,
     /// Process reference-count increments from the LXR barrier and from root slots.  May
     /// evacuate nursery objects, so it must run after `RCProcessIncsNonMoving`.

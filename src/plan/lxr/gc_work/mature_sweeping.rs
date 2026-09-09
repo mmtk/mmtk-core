@@ -75,11 +75,9 @@ impl<VM: VMBinding> SweepDeadCycles<VM> {
                         }
                     }
                     // o is still a valid object here.
-                    crate::plan::lxr::SWEEP_ZEROED.fetch_add(1, Ordering::Relaxed);
                     self.process_dead_object(o);
                     has_dead_object = true;
                 } else {
-                    crate::plan::lxr::SWEEP_KEPT_MARKED.fetch_add(1, Ordering::Relaxed);
                     has_live = true;
                 }
             }

@@ -246,8 +246,6 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         // It is OK because when searching for available lines (`rc_get_next_available_lines`),
         // it always skips the first line in a hole.
         let mut line = start_line;
-        // `<`, not `!=`: the range is empty when the reference address is already in the last
-        // line the object overlaps, and `!=` would then never terminate.
         while line < end_line {
             unsafe { RC_STRADDLE_LINES.store(line.start(), 1u8) };
             self.set_line_relaxed(line, 1);

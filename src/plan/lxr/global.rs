@@ -105,57 +105,6 @@ pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints
     ..PlanConstraints::default()
 });
 
-impl<VM: VMBinding> LXR<VM> {
-    /// Whether any Immix line this object occupies currently reads as free.
-    ///
-    /// The hole finder decides a line is available from its reference counts, so a live
-    /// object sitting on a line that reads as free means the allocator will hand that
-    /// memory out and the mutator will overwrite the object in place. Bring-up check.
-    pub fn object_occupies_free_line(&self, o: ObjectReference) -> bool {
-        use crate::policy::immix::line::{Line, RCArray};
-        use crate::util::linear_scan::Region;
-        use crate::util::linear_scan::UnstraddlableRegion;
-        if !self.immix_space.in_space(o) {
-            return false;
-        }
-        let start = VM::VMObjectModel::ref_to_object_start(o);
-        let size = o.get_size::<VM>();
-        let block = Block::containing(o);
-        let rc_array = RCArray::of(block);
-        let mut line = Line::from_unaligned_address(start);
-        let end = Line::from_unaligned_address(start + (size - 1)).next();
-        while line != end {
-            if line.block() != block {
-                break;
-            }
-            if rc_array.is_dead(line.get_index_within_block()) {
-                return true;
-            }
-            line = line.next();
-        }
-        false
-    }
-
-    /// The root objects recorded so far in the current pause, without consuming them.
-    ///
-    /// Intended for bring-up verification: walking outwards from these reaches
-    /// everything the collector believes is live, so any object found with a zero
-    /// reference count is one that some store failed to count.
-    pub fn snapshot_curr_roots(&self) -> Vec<ObjectReference> {
-        let guard = self.curr_roots.read().unwrap();
-        let mut batches = vec![];
-        while let Some(b) = guard.pop() {
-            batches.push(b);
-        }
-        let mut all = vec![];
-        for b in batches {
-            all.extend_from_slice(&b);
-            guard.push(b);
-        }
-        all
-    }
-}
-
 impl<VM: VMBinding> Plan for LXR<VM> {
     fn current_gc_may_move_object(&self) -> bool {
         super::NURSERY_EVACUATION || super::MATURE_EVACUATION
@@ -229,10 +178,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        // Reset here, not in `prepare`: `RCProcessIncs` runs *before* `Prepare`, so a flag
-        // cleared there is still set from the previous GC while this GC's increments run.
         super::GC_COUNT.fetch_add(1, Ordering::SeqCst);
-        super::RELEASE_STARTED.store(false, Ordering::SeqCst);
         if !super::LazySweepingJobs::all_finished() {
             warn!("LXR Lazy Sweeping Not Finished");
         }
@@ -255,10 +201,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             Pause::InitialMark => self.schedule_concurrent_marking_initial_pause(scheduler),
             Pause::FinalMark => self.schedule_concurrent_marking_final_pause(scheduler),
         }
-        // NOTE: LXR does no VM weak-reference or finalizer processing. See the `VMRefClosure`
-        // comment in `disable_unnecessary_buckets`, and the "For whoever builds LXR's
-        // process_weak_refs" section of LXR_PROGRESS.md, which carries the `Trace` impl and
-        // the sentinel scheduling this would need.
         // Analysis routine that is ran. It is generally recommended to take advantage
         // of the scheduling system we have in place for more performance
         #[cfg(feature = "analysis")]
@@ -282,15 +224,9 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             self.immix_space.scheduler().work_buckets[WorkBucketStage::Unconstrained]
                 .add(ReleaseLOSNursery);
         }
-        // Only the pause that *begins* a mark cycle may run these spaces' `prepare`, because
-        // `ImmortalSpace::prepare` and `VMSpace::prepare` bzero the mark bits of every region
-        // they own. `FinalMark` closes the cycle that `InitialMark` opened, so clearing there
-        // would throw away everything concurrent marking established and the pause would
-        // re-trace the whole graph. Julia's sysimage lives in the VM space, so that was
-        // ~1.77M objects re-marked in every `FinalMark`.
+
         let starts_mark_cycle = pause == Pause::Full || pause == Pause::InitialMark;
-        // Only do prepare if we start a new mark cycle. Otherwise, let those spaces keep their
-        // sticky mark bits.
+        // Only do prepare if we start a new mark cycle. Otherwise, let thoe spaces have sticky mark bits.
         if starts_mark_cycle {
             // We have tested that the following spaces -- they are used by Julia
             self.common.immortal.prepare();
@@ -307,6 +243,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         }
         // LOS is aware of LXR. Call its prepare unconditionally.
         self.common.los.prepare(starts_mark_cycle);
+
         if super::MATURE_EVACUATION && (pause == Pause::FinalMark || pause == Pause::Full) {
             self.process_mature_evacuation_remset();
         }
@@ -324,7 +261,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        super::RELEASE_STARTED.store(true, Ordering::SeqCst);
         let _new_ratio = super::SURVIVAL_RATIO_PREDICTOR.update_ratio();
         let pause = self.current_pause().unwrap();
         // Every pause, not just tracing ones, and before anything is reclaimed: the binding
@@ -332,73 +268,14 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         // comment in `disable_unnecessary_buckets`). Reference counting frees objects in
         // `RefCount` pauses too, so skipping those would leave a window in which an entry
         // outlives the object it names -- which is the crash this avoids.
-        let stats = std::env::var_os("MMTK_LXR_STATS").is_some();
-        let t0 = std::time::Instant::now();
         VM::VMCollection::update_weak_processor(true);
-        let t_weak = t0.elapsed();
         <VM as VMBinding>::VMCollection::vm_release();
-        let t_vm = t0.elapsed() - t_weak;
         self.common.los.is_end_of_satb_or_full_gc = false;
         self.common
             .release(tls, pause == Pause::Full || pause == Pause::FinalMark);
-        let t_common = t0.elapsed() - t_weak - t_vm;
-        if stats {
-            eprintln!(
-                "[lxr] release phases: weak={}us vm_release={}us common={}us",
-                t_weak.as_micros(),
-                t_vm.as_micros(),
-                t_common.as_micros(),
-            );
-        }
-        if std::env::var_os("MMTK_LXR_STATS").is_some() {
-            // Per-object counts are USDT tracepoints rather than counters -- see
-            // `lxr_inc_pushed`, `lxr_promote`, `lxr_slot_skipped` and friends in
-            // `tools/tracing/README.md`. They used to be global atomics, but one of them sat
-            // on the barrier's fast path, so every mutator thread contended a single cache
-            // line on every reference store and no timing taken here meant anything.
-            eprintln!(
-                "[lxr] gc#{} release: pause={:?} reserved_pages={} cm_packets={}",
-                super::GC_COUNT.load(Ordering::SeqCst),
-                pause,
-                self.get_reserved_pages(),
-                // Concurrent tracing packets still outstanding. If this is 0 at the end of an
-                // InitialMark pause, no marking was handed to the concurrent workers and the
-                // whole closure will fall into the next FinalMark pause.
-                super::NUM_CONCURRENT_TRACING_PACKETS.load(Ordering::SeqCst),
-            );
-            eprintln!(
-                "[lxr] gc#{} incs: processed={} promoted={} young_mb={} survival_ratio={:.4} predicted_survival_mb={} (limit {})",
-                super::GC_COUNT.load(Ordering::SeqCst),
-                super::INCS_PROCESSED.swap(0, Ordering::Relaxed),
-                super::OBJS_PROMOTED.swap(0, Ordering::Relaxed),
-                self.block_allocation.total_young_allocation_in_bytes() >> LOG_BYTES_IN_MBYTE,
-                super::SURVIVAL_RATIO_PREDICTOR.promotion_ratio(),
-                (((self.block_allocation.total_young_allocation_in_bytes()
-                    >> LOG_BYTES_IN_MBYTE) as f64
-                    * super::SURVIVAL_RATIO_PREDICTOR.promotion_ratio()) as usize)
-                    << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER,
-                super::max_survival_mb(),
-            );
-            eprintln!(
-                "[lxr] gc#{} slotless barrier: calls={} fields={} inc_buffer={}",
-                super::GC_COUNT.load(Ordering::SeqCst),
-                super::OBJ_WRITE_CALLS.swap(0, Ordering::Relaxed),
-                super::OBJ_WRITE_FIELDS.swap(0, Ordering::Relaxed),
-                self.rc.inc_buffer_size(),
-            );
-            eprintln!(
-                "[lxr] gc#{} sweep dead cycles: zeroed={} kept_marked={}",
-                super::GC_COUNT.load(Ordering::SeqCst),
-                super::SWEEP_ZEROED.load(Ordering::Relaxed),
-                super::SWEEP_KEPT_MARKED.load(Ordering::Relaxed),
-            );
-        }
-        crate::scheduler::stage_timeline::mark("  release: weak+common");
         self.block_allocation
             .sweep_nursery_blocks(self.immix_space.scheduler(), pause);
-        crate::scheduler::stage_timeline::mark("  release: sweep_nursery_blocks");
         self.block_allocation.sweep_mutator_reused_blocks(pause);
-        crate::scheduler::stage_timeline::mark("  release: sweep_mutator_reused_blocks");
         // Check if we want to do all decs and sweeping in the pause
         if super::disable_lasy_dec_for_current_gc() {
             self.immix_space
@@ -407,39 +284,8 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         } else {
             debug_assert_ne!(pause, Pause::Full);
         }
-        crate::scheduler::stage_timeline::mark("  release: concurrent_packets_in_pause");
         self.immix_space.release_rc();
-        crate::scheduler::stage_timeline::mark("  release: release_rc");
         self.schedule_mature_sweeping(pause);
-        crate::scheduler::stage_timeline::mark("  release: schedule_mature_sweeping");
-        // Re-arm every object's log bit for the epoch that starts when mutators resume.
-        //
-        // The per-object log bit says "this object has not been snapshotted this epoch".
-        // A binding whose inlined barrier fast path cannot name the field gates on it
-        // (Julia does, in `mmtk_gc_wb_fast`), and the barrier clears it on the first write
-        // so later writes in the same epoch are free. Nothing used to set it again:
-        // promotion armed it once and that was all, so from the second epoch onwards the
-        // barrier never fired for an object again. Every store after that went unrecorded,
-        // which loses the increment for the newly stored value while the field's earlier
-        // value still gets its decrement -- reclaiming objects that are still reachable.
-        //
-        // The per-field bits do not need this; `ProcessIncs::unlog_and_load_rc_object`
-        // re-arms each field lazily as its increment is processed.
-        //
-        // Done here, at the end of the pause, because the bits must be set before mutators
-        // resume and nothing in the pause itself consults them.
-        // The whole-heap re-arm that used to happen here is gone. `ImmixSpace::set_side_log_bits`
-        // walks every chunk in the heap single-threaded (and mmtk-core's own `warn!` there says
-        // so), and `CommonPlan::set_side_log_bits` enumerates every LOS object one atomic store at
-        // a time. That made the cost of a pause O(heap) rather than O(work done in the pause): it
-        // measured 1.3ms of the 4.4ms median `RefCount` pause on `tree_mutable`, serially, in a
-        // single `Release` packet, and it grows with the heap.
-        //
-        // It is also unnecessary. Only bits the barrier actually cleared need re-arming, and the
-        // barrier now records what it cleared and re-arms exactly that on flush, in
-        // `LXRFieldBarrierSemantics::rearm_logged_objects`. Mutators are flushed during every
-        // pause, so the re-arm happens before mutators resume, which is the property this
-        // location was chosen for.
         // swap roots
         let mut prev_roots = self.prev_roots.write().unwrap();
         let mut curr_roots = self.curr_roots.write().unwrap();
@@ -603,19 +449,6 @@ impl<VM: VMBinding> LXR<VM> {
             "LXR does not support placing forwarding bits on the side."
         );
         let num_workers = args.scheduler.num_workers();
-        if std::env::var_os("MMTK_LXR_STATS").is_some() {
-            // The cargo feature chain reaching these is long enough that it is worth
-            // having the plan state what it actually compiled to, rather than deriving it
-            // from the feature graph each time a question about evacuation comes up.
-            eprintln!(
-                "[lxr] config: nursery_evac={} mature_evac={} lazy_decs={} cm={} workers={}",
-                super::NURSERY_EVACUATION,
-                super::MATURE_EVACUATION,
-                super::LAZY_DECREMENTS,
-                !cfg!(feature = "lxr_no_cm"),
-                num_workers,
-            );
-        }
         // Note: `Block::DEFRAG_STATE_TABLE` doesn't need to be listed here; it's already
         // registered unconditionally by `SideMetadataContext::new_global_specs` since every
         // Immix-family plan (not just LXR) requires it.
@@ -626,12 +459,6 @@ impl<VM: VMBinding> LXR<VM> {
                     .as_spec()
                     .extract_side_spec(),
             ),
-            // The per-object log bit has to be registered too, not just the per-field
-            // one. LXR's own barrier only consults the field bits, but the plan declares
-            // `needs_log_bit`, and bindings set the object bit directly (Julia does it
-            // from its immortal post-alloc fast path). Leaving it out means its side
-            // metadata is never mapped and the first such write faults.
-            *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.as_spec(),
         ]);
         let global_side_metadata_specs = SideMetadataContext::new_global_specs(&immix_specs);
         let mut plan_args = CreateSpecificPlanArgs {
@@ -836,17 +663,6 @@ impl<VM: VMBinding> LXR<VM> {
         let hint_cycle_gc = self.next_gc_is_cycle_gc(mature_space_pages, pause);
         let hint_emergency_gc =
             self.next_gc_is_emergency_gc(total_pages, mature_space_pages, emergency_threshold);
-        if super::stats() {
-            eprintln!(
-                "[lxr] decide: total_pages={} mature_pages={} heap_after_gc={} lazy_freed_blocks={} hint_cycle={} hint_emergency={}",
-                total_pages,
-                mature_space_pages,
-                HEAP_AFTER_GC.load(Ordering::SeqCst),
-                self.num_clean_blocks_released_lazy.load(Ordering::SeqCst),
-                hint_cycle_gc,
-                hint_emergency_gc,
-            );
-        }
         // Update states
         self.hint_cycle_gc.store(hint_cycle_gc, Ordering::SeqCst);
         self.hint_emergency_gc
@@ -888,14 +704,6 @@ impl<VM: VMBinding> LXR<VM> {
     fn select_collection_kind(&self) -> Pause {
         self.wait_for_decide_cycle_collection();
 
-        // Bring-up aid: never trace. With concurrent marking off, `Full` is the only pause
-        // that marks and sweeps mature blocks, so forcing `RefCount` isolates the
-        // reference-counting path from the tracing path. Cycles are then never collected,
-        // so the heap only grows -- diagnostic only. Set `MMTK_LXR_NO_FULL=1`.
-        if super::no_full_pauses() {
-            return Pause::RefCount;
-        }
-
         let emergency = self.base().global_state.is_emergency_collection();
         let user_triggered = self.base().global_state.is_user_triggered_collection();
         let cm_in_progress = self.concurrent_work_in_progress();
@@ -905,13 +713,6 @@ impl<VM: VMBinding> LXR<VM> {
         // If CM is finished, do a final mark pause
         if cm_in_progress && cm_packets_drained {
             return Pause::FinalMark;
-        }
-
-        if crate::plan::lxr::stats() && (emergency || user_triggered || hint_emergency_gc) {
-            eprintln!(
-                "[lxr] emergency: emergency={} user_triggered={} hint_emergency={} cm_in_progress={}",
-                emergency, user_triggered, hint_emergency_gc, cm_in_progress
-            );
         }
 
         // A real emergency: mmtk-core could not satisfy an allocation even after a collection, or
@@ -1110,9 +911,6 @@ impl<VM: VMBinding> LXR<VM> {
         self.previous_pause.load(Ordering::SeqCst)
     }
 
-    /// Returns whether the given object is in a block that was selected for
-    /// defragmentation (evacuation) in the current collection. Only Immix space
-    /// objects live in blocks, so this is false for everything else.
     pub fn in_defrag(&self, o: ObjectReference) -> bool {
         self.immix_space.in_space(o) && Block::in_defrag_block(o)
     }
@@ -1121,9 +919,6 @@ impl<VM: VMBinding> LXR<VM> {
         self.immix_space.address_in_space(a) && Block::address_in_defrag_block(a)
     }
 
-    /// Attempts to mark the object as live, in whichever space (Immix or large
-    /// object space) it belongs to. Returns `true` if this call performed the
-    /// marking (i.e. the object was previously unmarked).
     pub fn mark(&self, o: ObjectReference) -> bool {
         if self.immix_space.in_space(o) {
             self.immix_space.attempt_mark(o)
