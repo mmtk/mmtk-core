@@ -459,6 +459,7 @@ impl<VM: VMBinding> LXR<VM> {
                     .as_spec()
                     .extract_side_spec(),
             ),
+            *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.as_spec(),
         ]);
         let global_side_metadata_specs = SideMetadataContext::new_global_specs(&immix_specs);
         let mut plan_args = CreateSpecificPlanArgs {
