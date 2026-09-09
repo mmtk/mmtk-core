@@ -146,8 +146,6 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         let mut roots = Vec::with_capacity(nodes.len());
         let mut uncounted = vec![];
         for o in nodes {
-            let in_immix_space = self.lxr.immix_space.in_space(o);
-            let los = !in_immix_space && self.lxr.los().in_space(o);
             // A root node has no slot, so nothing could ever update it if `o` had already
             // moved by the time it got here. Catch that rather than silently register a
             // stale reference as this pause's root set.
@@ -157,15 +155,15 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             // object for its forwarding bits reads side metadata that was never mapped for
             // that address.
             debug_assert!(
-                !in_immix_space || !object_forwarding::is_forwarded::<VM>(o),
+                !self.lxr.immix_space.in_space(o) || !object_forwarding::is_forwarded::<VM>(o),
                 "root node {:?} was already forwarded",
                 o
             );
-            if !in_immix_space && !los {
-                // Not reference counted by LXR: hand it on untouched.
+            if !self.lxr.is_rc_object(o) {
                 uncounted.push(o);
                 continue;
             }
+            let los = self.lxr.los().in_space(o);
             if self.inc(o) {
                 // Promote without moving.
                 self.promote(worker, o, false, los, 0);

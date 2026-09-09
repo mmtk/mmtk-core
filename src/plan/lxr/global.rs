@@ -106,19 +106,6 @@ pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints
 });
 
 impl<VM: VMBinding> LXR<VM> {
-    /// Returns whether `o` carries a reference count, i.e. whether it lives in the
-    /// Immix space or the large object space.
-    ///
-    /// LXR only reference counts the objects it allocates itself. A plan also has an
-    /// immortal space, a non-moving space, and (under the `vm_space` feature) a space
-    /// describing a boot image supplied by the VM. Objects there have no reference count
-    /// and no line marks, so none of the RC or Immix metadata may be consulted for them,
-    /// but they still have to be traced because they can refer to reference counted
-    /// objects.
-    pub fn is_rc_object(&self, o: ObjectReference) -> bool {
-        self.immix_space.in_space(o) || self.common.los.in_space(o)
-    }
-
     /// Whether any Immix line this object occupies currently reads as free.
     ///
     /// The hole finder decides a line is available from its reference counts, so a live
@@ -1181,6 +1168,12 @@ impl<VM: VMBinding> LXR<VM> {
 
     pub const fn los(&self) -> &LargeObjectSpace<VM> {
         &self.common.los
+    }
+
+    /// Whether `o` lives in a space LXR reference-counts (immix space or LOS). Objects
+    /// elsewhere (e.g. Julia's sysimage in the immortal/VM space) carry no reference count.
+    pub fn is_rc_object(&self, o: ObjectReference) -> bool {
+        self.immix_space.in_space(o) || self.common.los.in_space(o)
     }
 
     fn on_lazy_decs_finished(&self, c: LazySweepingJobsCounter) {
