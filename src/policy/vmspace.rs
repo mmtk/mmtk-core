@@ -297,18 +297,12 @@ impl<VM: VMBinding> VMSpace<VM> {
         }
         #[cfg(feature = "set_unlog_bits_vm_space")]
         if self.common.needs_field_log_bit {
-            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC {
-                side.bset_metadata(raw_start, raw_size);
-            }
-        }
-        #[cfg(feature = "set_unlog_bits_vm_space")]
-        if self.common.needs_field_log_bit {
             // Plans with a field-granularity barrier (LXR) consult a per-field bit rather
             // than the per-object one set above, so that table needs the same treatment:
             // without it, writes into the bootimage take the barrier fast path and the
             // plan never learns about references the bootimage stores into its heap.
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC {
-                side.bset_metadata(_raw_start, _raw_size);
+                side.bset_metadata(raw_start, raw_size);
             }
         }
     }
