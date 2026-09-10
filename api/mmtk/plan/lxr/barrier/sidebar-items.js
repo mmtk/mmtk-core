@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["LXRFieldBarrierSemantics"]};
+window.SIDEBAR_ITEMS = {"struct":["LXRFieldBarrierSemantics","RearmLoggedObjects"]};
