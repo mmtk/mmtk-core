@@ -53,7 +53,7 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize) {
+    fn initialize_object_metadata(&self, object: ObjectReference, bytes: usize) {
         self.mark_state
             .on_object_metadata_initialization::<VM>(object);
         if self.common.unlog_allocated_object {
@@ -65,7 +65,7 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
                 VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
                     .as_spec()
                     .extract_side_spec()
-                    .bset_metadata(object.to_raw_address(), _bytes);
+                    .bset_metadata(object.to_object_start::<VM>(), bytes);
             }
         }
         #[cfg(feature = "vo_bit")]

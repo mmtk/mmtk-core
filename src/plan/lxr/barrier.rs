@@ -25,6 +25,33 @@ use crate::vm::slot::Slot;
 use crate::vm::*;
 use crate::MMTK;
 
+/// Re-arm the per-object log bits that one mutator's barrier cleared, so the next epoch's first
+/// store to each of those objects reaches the barrier again.
+#[cfg(feature = "lxr-object-log")]
+pub struct RearmLoggedObjects<VM: VMBinding> {
+    objects: Vec<ObjectReference>,
+    _p: std::marker::PhantomData<VM>,
+}
+
+#[cfg(feature = "lxr-object-log")]
+impl<VM: VMBinding> RearmLoggedObjects<VM> {
+    pub fn new(objects: Vec<ObjectReference>) -> Self {
+        Self {
+            objects,
+            _p: std::marker::PhantomData,
+        }
+    }
+}
+
+#[cfg(feature = "lxr-object-log")]
+impl<VM: VMBinding> crate::scheduler::GCWork<VM> for RearmLoggedObjects<VM> {
+    fn do_work(&mut self, _worker: &mut crate::scheduler::GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        for obj in &self.objects {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(*obj, Ordering::SeqCst);
+        }
+    }
+}
+
 pub struct LXRFieldBarrierSemantics<VM: VMBinding> {
     mmtk: &'static MMTK<VM>,
     tls: VMMutatorThread,
@@ -38,6 +65,7 @@ pub struct LXRFieldBarrierSemantics<VM: VMBinding> {
     mapped_chunk: std::cell::Cell<Address>,
     /// Objects logged by [`Self::object_probable_write_slow`], to be re-armed at the end of
     /// the epoch. See there.
+    #[cfg(feature = "lxr-object-log")]
     logged_objs: VectorQueue<ObjectReference>,
 }
 
@@ -57,17 +85,20 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
             lxr: mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap(),
             dec_origin: "barrier-unknown",
             mapped_chunk: std::cell::Cell::new(Address::ZERO),
+            #[cfg(feature = "lxr-object-log")]
             logged_objs: VectorQueue::default(),
         }
     }
 
-    /// Undo the object logging done by [`Self::object_probable_write_slow`], so the next
-    /// epoch's first store to each of these objects reaches the barrier again.
+    #[cfg(feature = "lxr-object-log")]
     #[cold]
-    fn rearm_logged_objects(&mut self) {
-        for obj in self.logged_objs.take() {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
+    fn flush_logged_objects(&mut self) {
+        let objects = self.logged_objs.take();
+        if objects.is_empty() {
+            return;
         }
+        self.mmtk.scheduler.work_buckets[WorkBucketStage::FIRST_STW_STAGE]
+            .add(RearmLoggedObjects::<VM>::new(objects));
     }
 
     fn get_slot_logging_state(&self, slot: VM::VMSlot) -> u8 {
@@ -267,7 +298,8 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
         self.flush_decs_and_satb();
         // Ends the coalescing epoch for the objects this mutator logged: each is armed
         // again, so the next store to it is recorded.
-        self.rearm_logged_objects();
+        #[cfg(feature = "lxr-object-log")]
+        self.flush_logged_objects();
     }
 
     fn object_reference_write_slow(
@@ -340,32 +372,31 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
             let _succ = self.enqueue_node(Some(obj), s, None);
         });
         // Every field of `obj` is now logged, so a further store to any of them would be
-        // coalesced away by the field bit anyway. Log the object too, so a binding whose
-        // inlined fast path can only test the per-object bit (Julia's `mmtk_gc_wb_fast`,
-        // for stores whose field it cannot name) stops calling this for the rest of the
-        // epoch. Without it the walk above runs on *every* such store.
+        // coalesced away by the field bit anyway -- but only after this walk has visited it
+        // again, which is the cost. Log the object too, so a caller whose fast path can only
+        // test the per-object bit stops reaching this for the rest of the epoch.
         //
-        // This is only sound because the bit is re-armed at the end of the epoch, by
-        // `flush`. The field bits re-arm lazily, as each increment is processed
+        // Sound only because the bit is re-armed at the end of the epoch. The field bits
+        // re-arm lazily, as each increment is processed
         // (`ProcessIncs::unlog_and_load_rc_object`); there is no per-object equivalent,
         // because the increment buffer holds slots and a slot does not identify its owner.
-        // Remembering the objects here is that equivalent, and costs a re-arm per object
-        // logged rather than a pass over the whole heap's metadata. Leaving an object
-        // logged past the end of its epoch loses every later store to it.
+        // Remembering the objects here is that equivalent. Leaving an object logged past the
+        // end of its epoch loses every later store to it.
         //
         // Racing snapshots of the same object are harmless: `attempt_to_log_field` decides
         // per field who records it, so the duplicate walk records nothing twice.
-        VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
-            obj,
-            LOGGED_VALUE,
-            None,
-            Ordering::SeqCst,
-        );
-        self.logged_objs.push(obj);
-        if self.logged_objs.is_full() {
-            // Re-arming early only costs another walk of an object whose fields are all
-            // logged already, which records nothing. It is never wrong, just wasted.
-            self.rearm_logged_objects();
+        #[cfg(feature = "lxr-object-log")]
+        {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
+                obj,
+                LOGGED_VALUE,
+                None,
+                Ordering::SeqCst,
+            );
+            self.logged_objs.push(obj);
+            if self.logged_objs.is_full() {
+                self.flush_logged_objects();
+            }
         }
     }
 }

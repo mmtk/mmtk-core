@@ -32,7 +32,7 @@ pub fn visit_children<VM, const MAY_MOVE_OBJECTS: bool>(
         });
     } else {
         VM::VMScanning::scan_object_and_trace_edges(tls, object, &mut |child| {
-            let new_child = object_tracer.trace_object(object);
+            let new_child = object_tracer.trace_object(child);
             if !MAY_MOVE_OBJECTS {
                 debug_assert_eq!(new_child, child);
             }

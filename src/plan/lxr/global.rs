@@ -452,15 +452,24 @@ impl<VM: VMBinding> LXR<VM> {
         // Note: `Block::DEFRAG_STATE_TABLE` doesn't need to be listed here; it's already
         // registered unconditionally by `SideMetadataContext::new_global_specs` since every
         // Immix-family plan (not just LXR) requires it.
-        let immix_specs = metadata::extract_side_metadata(&[
+        #[allow(unused_mut)]
+        let mut specs = vec![
             MetadataSpec::OnSide(RC_TABLE),
             MetadataSpec::OnSide(
                 *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
                     .as_spec()
                     .extract_side_spec(),
             ),
-            *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.as_spec(),
-        ]);
+        ];
+        // The per-object log bit has to be registered too, not just the per-field one. LXR's
+        // own barrier only consults the field bits, this can be an issue for the probable write API (no field given).
+        // With `lxr-object-log`, the probable write API also logs the object bit.
+        // TODO: We should examine if we can steal a bit from the field log its as the 'logical' object log bit.
+        // We potentially could use the field log bit at the object start, or (object ref - lower bound) -- there should
+        // be no field at those addresses.
+        #[cfg(feature = "lxr-object-log")]
+        specs.push(*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.as_spec());
+        let immix_specs = metadata::extract_side_metadata(&specs);
         let global_side_metadata_specs = SideMetadataContext::new_global_specs(&immix_specs);
         let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
