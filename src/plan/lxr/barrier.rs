@@ -83,11 +83,9 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
         }
     }
 
-    /// Undo the object logging done by [`Self::object_probable_write_slow`], so the next
-    /// epoch's first store to each of these objects reaches the barrier again.
     #[cfg(feature = "lxr-object-log")]
     #[cold]
-    fn clear_and_reset_logged_objects(&mut self) {
+    fn flush_logged_objects(&mut self) {
         let objects = self.logged_objs.take();
         if objects.is_empty() {
             return;
@@ -234,7 +232,7 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
         // Ends the coalescing epoch for the objects this mutator logged: each is armed
         // again, so the next store to it is recorded.
         #[cfg(feature = "lxr-object-log")]
-        self.clear_and_reset_logged_objects();
+        self.flush_logged_objects();
     }
 
     fn object_reference_write_slow(
@@ -297,7 +295,7 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
             );
             self.logged_objs.push(obj);
             if self.logged_objs.is_full() {
-                self.clear_and_reset_logged_objects();
+                self.flush_logged_objects();
             }
         }
     }
