@@ -195,7 +195,8 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     fn create_and_schedule_root_nodes_work(&mut self, nodes: Vec<ObjectReference>) {
         let mmtk = self.mmtk;
         let work_packet = ConcurrentTraceObjects::<VM, P, KIND>::new(nodes, false);
-        mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].add_no_notify(work_packet);
+        mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent]
+            .add_deferred(Box::new(work_packet));
     }
 }
 

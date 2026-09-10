@@ -78,12 +78,23 @@ pub struct LXR<VM: VMBinding> {
     block_allocation: BlockAllocation<VM>,
     pub(super) evac_set: MatureEvacuationSet,
     pub(super) mature_evac_remset: MatureEvecRemSet<VM>,
+    /// Monotonic total of clean blocks released by deferred sweeping, ever.
     pub(super) num_clean_blocks_released_lazy: AtomicUsize,
+    /// Value of the two totals above/in the LOS as of the end of the last pause, so that the
+    /// reclamation attributable to that pause can be read off as a difference. See `gc_pause_end`.
+    lazy_freed_blocks_at_pause_end: AtomicUsize,
+    lazy_freed_los_pages_at_pause_end: AtomicUsize,
+    /// The last cycle for which `on_lazy_sweeping_finished` took a decision, so that a cycle whose
+    /// deferred work drains in more than one wave is only decided once.
+    decided_epoch: AtomicUsize,
     pub(super) possibly_dead_mature_blocks: SegQueue<(Block, bool)>,
 }
 
+/// The static plan constraints for LXR: it uses a field-level write barrier with
+/// log bits, enables reference counting, and moves objects unless both nursery and
+/// mature evacuation have been disabled at build time.
 pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints {
-    moves_objects: true,
+    moves_objects: super::NURSERY_EVACUATION || super::MATURE_EVACUATION,
     // Max immix object size is half of a block.
     max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
     barrier: BarrierSelector::FieldBarrier,
@@ -96,7 +107,7 @@ pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints
 
 impl<VM: VMBinding> Plan for LXR<VM> {
     fn current_gc_may_move_object(&self) -> bool {
-        true
+        super::NURSERY_EVACUATION || super::MATURE_EVACUATION
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
@@ -108,13 +119,33 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         if self.concurrent_work_in_progress() && super::concurrent_marking_packets_drained() {
             return true;
         }
+        // Bound the pause by bounding the work it has to do.
+        //
+        // Every pause drains the increment buffer the barrier has been filling, in
+        // `RCProcessIncs`, and that is what a pause is made of: 12.9ms of a 14.2ms `RefCount`
+        // pause and 5.5ms of a 7.9ms `FinalMark` on `tree_mutable`, with everything else in the
+        // pause under a millisecond. Its size is set by how much the mutator has written since the
+        // last pause, which the heap-occupancy trigger does not bound at all -- a mutation-heavy
+        // program reaches the heap target having queued an unbounded number of increments.
+        //
+        // So collect on the buffer as well as on occupancy. This is `INC_BUFFER_LIMIT` from
+        // upstream LXR, which has always been declared here (`rc::inc_buffer_size` is maintained
+        // on the barrier's flush path and reset in `ImmixSpace::release_rc`) but never read.
+        if let Some(limit) = super::inc_buffer_limit() {
+            if self.rc.inc_buffer_size() >= limit {
+                return true;
+            }
+        }
         // Survival limits
         let total_young_alloc_pages =
             self.block_allocation.total_young_allocation_in_bytes() >> LOG_BYTES_IN_MBYTE;
-        let predicted_survival_mb: usize =
-            ((total_young_alloc_pages as f64 * super::SURVIVAL_RATIO_PREDICTOR.ratio()) as usize)
-                << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER;
-        if predicted_survival_mb >= super::MAX_SURVIVAL_MB {
+        // `promotion_ratio`, not `ratio`: this bound exists to cap the promotion work the next
+        // pause will do, and every promotion costs that work whether or not the object moved.
+        let predicted_survival_mb: usize = ((total_young_alloc_pages as f64
+            * super::SURVIVAL_RATIO_PREDICTOR.promotion_ratio())
+            as usize)
+            << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER;
+        if predicted_survival_mb >= super::max_survival_mb() {
             return true;
         }
         if !self.immix_space.common().contiguous {
@@ -147,6 +178,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        super::GC_COUNT.fetch_add(1, Ordering::SeqCst);
         if !super::LazySweepingJobs::all_finished() {
             warn!("LXR Lazy Sweeping Not Finished");
         }
@@ -219,8 +251,10 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             // Select mature evacuation set
             self.schedule_defrag_selection_packets();
         }
-        self.num_clean_blocks_released_lazy
-            .store(0, Ordering::SeqCst);
+        // `num_clean_blocks_released_lazy` is deliberately *not* reset here. It is a monotonic
+        // total; a consumer takes the difference against the snapshot `gc_pause_end` records.
+        // Zeroing it at the start of a pause used to discard the previous cycle's reclamation
+        // before the decision that needed it had been taken. See `gc_pause_end`.
         self.immix_space.prepare_rc(pause);
         self.block_allocation
             .reset_block_mark_for_mutator_reused_blocks(pause);
@@ -229,9 +263,12 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     fn release(&mut self, tls: VMWorkerThread) {
         let _new_ratio = super::SURVIVAL_RATIO_PREDICTOR.update_ratio();
         let pause = self.current_pause().unwrap();
-        if pause == Pause::FinalMark || pause == Pause::Full {
-            VM::VMCollection::update_weak_processor(false);
-        }
+        // Every pause, not just tracing ones, and before anything is reclaimed: the binding
+        // uses this to drop registered finalizers, which LXR cannot run (see the `VMRefClosure`
+        // comment in `disable_unnecessary_buckets`). Reference counting frees objects in
+        // `RefCount` pauses too, so skipping those would leave a window in which an entry
+        // outlives the object it names -- which is the crash this avoids.
+        VM::VMCollection::update_weak_processor(true);
         <VM as VMBinding>::VMCollection::vm_release();
         self.common.los.is_end_of_satb_or_full_gc = false;
         self.common
@@ -329,7 +366,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         }
         self.previous_pause.store(Some(pause), Ordering::SeqCst);
         self.current_pause.store(None, Ordering::SeqCst);
-        LAZY_SWEEPING_JOBS.write().swap();
         if super::LAZY_DECREMENTS {
             let perform_cycle_collection =
                 self.get_available_pages() < super::CYCLE_TRIGGER_THRESHOLD;
@@ -341,6 +377,31 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         self.avail_pages_at_end_of_last_gc
             .store(self.get_available_pages(), Ordering::SeqCst);
         HEAP_AFTER_GC.store(self.get_reserved_pages(), Ordering::SeqCst);
+        // Snapshot the lazy-reclaim totals in the same breath as `HEAP_AFTER_GC`. Everything the
+        // concurrent phase frees from here on is what this cycle reclaimed, so the two always
+        // describe the same instant. They used to be reconstructed from a counter that
+        // `LXR::prepare` zeroed at the start of every pause, which meant a decision taken just
+        // after a pause read this cycle's reserved size against a counter that had just been
+        // cleared -- "the heap is full and the collection freed nothing" -- and hinted an emergency
+        // full trace. That accounted for every emergency pause on `tree_mutable`.
+        self.lazy_freed_blocks_at_pause_end.store(
+            self.num_clean_blocks_released_lazy.load(Ordering::SeqCst),
+            Ordering::SeqCst,
+        );
+        self.lazy_freed_los_pages_at_pause_end.store(
+            self.los().num_pages_released_lazy.load(Ordering::SeqCst),
+            Ordering::SeqCst,
+        );
+        // Close this cycle's wave of deferred jobs and attribute it to this cycle, so that draining
+        // it -- and only that -- reports the cycle's reclamation as complete.
+        let epoch = super::GC_COUNT.load(Ordering::SeqCst);
+        let outstanding = LAZY_SWEEPING_JOBS.write().swap(epoch);
+        if outstanding == 0 {
+            // Nothing was deferred, so no wave will report completion. Everything this cycle freed
+            // is already visible, so decide now; otherwise `select_collection_kind` would block on
+            // `wait_for_decide_cycle_collection` with nobody left to wake it.
+            self.on_lazy_sweeping_finished(epoch);
+        }
 
         self.common_mut().on_pause_end(tls);
 
@@ -380,11 +441,17 @@ impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
 
 impl<VM: VMBinding> LXR<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Box<Self> {
+        // Only evacuation forwards objects, so a binding that never evacuates (e.g. a
+        // non-moving build) is free to keep its forwarding bits on the side.
         assert!(
-            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_in_header(),
+            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_in_header()
+                || !(super::NURSERY_EVACUATION || super::MATURE_EVACUATION),
             "LXR does not support placing forwarding bits on the side."
         );
         let num_workers = args.scheduler.num_workers();
+        // Note: `Block::DEFRAG_STATE_TABLE` doesn't need to be listed here; it's already
+        // registered unconditionally by `SideMetadataContext::new_global_specs` since every
+        // Immix-family plan (not just LXR) requires it.
         #[allow(unused_mut)]
         let mut specs = vec![
             MetadataSpec::OnSide(RC_TABLE),
@@ -436,6 +503,9 @@ impl<VM: VMBinding> LXR<VM> {
             mature_evac_remset: MatureEvecRemSet::new(num_workers),
             possibly_dead_mature_blocks: Default::default(),
             num_clean_blocks_released_lazy: Default::default(),
+            lazy_freed_blocks_at_pause_end: Default::default(),
+            lazy_freed_los_pages_at_pause_end: Default::default(),
+            decided_epoch: AtomicUsize::new(usize::MAX),
         });
 
         lxr.gc_init();
@@ -578,14 +648,26 @@ impl<VM: VMBinding> LXR<VM> {
         let emergency_threshold = super::RC_STOP_PERCENT;
         // Calculate mature space size
         let total_pages = self.get_total_pages();
+        // Reserved pages as of the end of the last pause, less everything the concurrent phase has
+        // freed since. Both terms are deltas from the same instant -- see the snapshot in
+        // `gc_pause_end`.
         let mature_space_pages = {
-            let released_los_pages = self.los().num_pages_released_lazy.load(Ordering::SeqCst);
-            HEAP_AFTER_GC
+            let freed_blocks = self
+                .num_clean_blocks_released_lazy
+                .load(Ordering::SeqCst)
+                .saturating_sub(self.lazy_freed_blocks_at_pause_end.load(Ordering::SeqCst));
+            let freed_los_pages = self
+                .los()
+                .num_pages_released_lazy
                 .load(Ordering::SeqCst)
                 .saturating_sub(
-                    self.num_clean_blocks_released_lazy.load(Ordering::SeqCst) << Block::LOG_PAGES,
-                )
-                .saturating_sub(released_los_pages)
+                    self.lazy_freed_los_pages_at_pause_end
+                        .load(Ordering::SeqCst),
+                );
+            HEAP_AFTER_GC
+                .load(Ordering::SeqCst)
+                .saturating_sub(freed_blocks << Block::LOG_PAGES)
+                .saturating_sub(freed_los_pages)
         };
         // Decide next GC kind
         let hint_cycle_gc = self.next_gc_is_cycle_gc(mature_space_pages, pause);
@@ -643,10 +725,35 @@ impl<VM: VMBinding> LXR<VM> {
             return Pause::FinalMark;
         }
 
-        // Either final mark pause or full pause for emergency GC
-        if emergency || user_triggered || hint_emergency_gc {
+        // A real emergency: mmtk-core could not satisfy an allocation even after a collection, or
+        // the user asked for a full collection. Stopping the world for the whole trace is the
+        // correct response -- there is no budget left to trace concurrently in.
+        if emergency || user_triggered {
             return if cm_in_progress {
                 Pause::FinalMark
+            } else {
+                Pause::Full
+            };
+        }
+
+        // Free headroom is below `RC_STOP_PERCENT`, so reference counting alone is not keeping up
+        // and the heap needs a trace to find its cycles. That is a reason to *trace*, not a reason
+        // to stop the world: tracing concurrently is what this plan exists for. An `InitialMark`
+        // pause plus the `FinalMark` that closes it measured ~2.4ms + ~17ms on `tree_mutable`
+        // against ~300ms for the full stop-the-world trace this used to choose, and those full
+        // traces were 70% of all pause time.
+        //
+        // The hint fires readily because the headroom test compares the heap budget against
+        // `HEAP_AFTER_GC` less the whole blocks deferred sweeping returned, and LXR reclaims mostly
+        // by recycling lines inside blocks that stay reserved. Reserved pages therefore sit near the
+        // budget whether or not memory is actually short, so this hint cannot carry the weight of a
+        // whole-heap stop -- and does not need to, since a genuine exhaustion still arrives as
+        // `emergency` above.
+        if hint_emergency_gc {
+            return if cm_in_progress {
+                Pause::FinalMark
+            } else if self.cm_enabled() {
+                Pause::InitialMark
             } else {
                 Pause::Full
             };
@@ -676,6 +783,40 @@ impl<VM: VMBinding> LXR<VM> {
         scheduler.work_buckets[WorkBucketStage::WeakRefClosure].set_enabled(final_mark_or_full);
         scheduler.work_buckets[WorkBucketStage::FinalRefClosure].set_enabled(final_mark_or_full);
         scheduler.work_buckets[WorkBucketStage::PhantomRefClosure].set_enabled(final_mark_or_full);
+        // The VM's own reference processing, which for Julia is where finalizers are swept.
+        //
+        // This was disabled outright, and with the bucket disabled MMTk never calls
+        // `Scanning::process_weak_refs` at all. Two things then never ran. Finalizer lists
+        // were never swept, so nothing was ever finalized while the program ran; and
+        // `mark_finlist`, which traces the objects still on those lists, never ran either --
+        // and that trace is what keeps a registered object alive until its finalizer has been
+        // scheduled. Registered objects were therefore reclaimed with live entries still
+        // naming them, and `jl_gc_run_all_finalizers` at exit ran every one of those entries
+        // against recycled memory: an invalid `free` on the C finalizer path
+        // (`gc-common.c:174`), a segfault reading the argument's type on the Julia path
+        // (`gc-common.c:180`).
+        //
+        // The same call also schedules `SweepVMSpecific`, so `jl_gc_sweep_weak_processing`,
+        // `jl_gc_mmtk_sweep_malloced_memory` and `jl_gc_sweep_stack_pools_and_mtarraylist_buffers`
+        // were all being skipped as well.
+        //
+        // Still disabled, because enabling it is necessary but not sufficient and the rest is
+        // not yet working. Two further things are needed, both attempted and reverted:
+        //
+        //  1. A packet in the bucket. Plans that use `GCWorkScheduler::schedule_common_work`
+        //     get a `VMProcessWeakRefs` sentinel from there; LXR schedules its own collection,
+        //     and that sentinel is commented out on the upstream LXR branch regardless.
+        //     ConcurrentImmix sets it explicitly with `PlanTrace<_, TRACE_KIND_FAST>`; LXR is
+        //     not a `PlanTraceObject`, so `gc_work::tracing::LXRRefTrace` exists for this.
+        //  2. A liveness predicate that is safe here. `sweep_finalizer_list` asks
+        //     `is_live_object`, and `ImmixSpace::is_live`'s `rc_enabled` branch sends every
+        //     *unmarked* object -- i.e. every dead entry, which is what the sweep is looking
+        //     for -- into `object_forwarding::is_forwarded`. Under `lxr_no_evac` nothing moves,
+        //     that state is never established, and reading it faults. `object_is_live` in
+        //     `mmtk_julia/src/julia_finalizer.rs` answers in LXR's own terms instead.
+        //
+        // With both in place the first tracing pause still segfaults, so this stays off.
+        scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::STWRCDecsAndSweep]
             .set_enabled(!(super::LAZY_DECREMENTS && pause != Pause::Full));
         // Always enabled
@@ -685,7 +826,6 @@ impl<VM: VMBinding> LXR<VM> {
         // LXR never routes work here: it has no transitively pinning closure. Transitive
         // pinning roots, where accepted at all, take the ordinary node-root path instead.
         scheduler.work_buckets[WorkBucketStage::TPinningClosure].set_enabled(false);
-        scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::SoftRefClosure].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding].set_enabled(false);
@@ -756,10 +896,9 @@ impl<VM: VMBinding> LXR<VM> {
         let prev_roots = self.prev_roots.read().unwrap();
         let mut work_packets: Vec<Box<dyn GCWork<VM>>> = Vec::with_capacity(prev_roots.len());
         while let Some(decs) = prev_roots.pop() {
-            work_packets.push(Box::new(ProcessDecs::new(
-                decs,
-                LazySweepingJobsCounter::new_decs(),
-            )))
+            let mut w = ProcessDecs::new(decs, LazySweepingJobsCounter::new_decs());
+            w.origin = "prev_roots";
+            work_packets.push(Box::new(w))
         }
         if work_packets.is_empty() {
             work_packets.push(Box::new(ProcessDecs::new(
@@ -803,6 +942,22 @@ impl<VM: VMBinding> LXR<VM> {
         }
     }
 
+    /// Like [`Self::mark`], but takes an explicit `los` flag indicating whether
+    /// the object is in the large object space, avoiding a space lookup.
+    pub fn mark2(&self, o: ObjectReference, los: bool) -> bool {
+        if !los {
+            self.immix_space.attempt_mark(o)
+        } else {
+            self.common.los.attempt_mark(o)
+        }
+    }
+
+    /// Returns whether the object has already been marked as live in whichever
+    /// space (Immix or large object space) it belongs to.
+    ///
+    /// Objects owned by the common plan are never reclaimed, so they are always
+    /// reported as marked. Callers use this to decide whether an object still needs
+    /// to be retained or revisited, and neither is ever true for them.
     pub fn is_marked(&self, o: ObjectReference) -> bool {
         if self.immix_space.in_space(o) {
             self.immix_space.is_marked(o)
@@ -830,17 +985,33 @@ impl<VM: VMBinding> LXR<VM> {
         self.schedule_rc_block_sweeping_tasks(c);
     }
 
-    fn on_lazy_sweeping_finished(&self) {
+    fn on_lazy_sweeping_finished(&self, epoch: super::WaveEpoch) {
+        // Always worth doing: it makes whatever was just freed visible, whichever wave this was.
         self.immix_space.flush_page_resource();
         // Update counters
         if !super::LAZY_DECREMENTS {
             HEAP_AFTER_GC.store(self.get_used_pages(), Ordering::SeqCst);
+        }
+        // Only the wave belonging to the most recent pause means "that cycle's reclamation is
+        // done". A still-open wave draining transiently, or a wave for an older cycle arriving
+        // late, would otherwise pair the latest `HEAP_AFTER_GC` with reclamation that has not
+        // happened yet -- which is what hinted an emergency and forced a full trace.
+        if epoch != super::GC_COUNT.load(Ordering::SeqCst) {
+            return;
+        }
+        // And only once per cycle: two waves can both belong to it.
+        if self.decided_epoch.swap(epoch, Ordering::SeqCst) == epoch {
+            return;
         }
         let pause = match self.current_pause() {
             Some(p) => p,
             None => self.previous_pause().unwrap(),
         };
         self.decide_next_gc_may_perform_cycle_collection(pause);
+        // The flush above is the first moment this cycle's reclamation is visible through
+        // `get_reserved_pages`, so it is the first moment a trigger policy can size the next
+        // heap target from what the collection actually freed.
+        self.base().gc_trigger.policy.on_lazy_reclaim_finished(self);
     }
 
     fn gc_init(&mut self) {
@@ -852,15 +1023,16 @@ impl<VM: VMBinding> LXR<VM> {
             me.immix_space.install_hooks(&me.block_allocation);
         }
         let mut lazy_sweeping_jobs = LAZY_SWEEPING_JOBS.write();
-        lazy_sweeping_jobs.swap();
+        // Prime the counters. There is no cycle yet, so the wave this closes belongs to none.
+        lazy_sweeping_jobs.swap(super::WAVE_STILL_OPEN);
         let lxr_ptr = self as *const Self as usize;
         lazy_sweeping_jobs.end_of_decs = Some(Box::new(move |c| {
             let lxr = unsafe { &*(lxr_ptr as *const Self) };
             lxr.on_lazy_decs_finished(c);
         }));
-        lazy_sweeping_jobs.end_of_lazy = Some(Box::new(move || {
+        lazy_sweeping_jobs.end_of_lazy = Some(Box::new(move |epoch| {
             let lxr = unsafe { &*(lxr_ptr as *const Self) };
-            lxr.on_lazy_sweeping_finished();
+            lxr.on_lazy_sweeping_finished(epoch);
         }));
     }
 

@@ -20,7 +20,20 @@ pub(crate) enum LastParkedResult {
     ParkSelf,
     /// The last parked worker should unpark and find work packet to do.
     WakeSelf,
-    /// Wake up all parked GC workers.
+    /// Unpark the last parked worker and up to `n - 1` others, i.e. just enough workers to cover
+    /// `n` available work packets.
+    ///
+    /// Every work-bucket boundary in a pause runs through here, and several of the buckets an LXR
+    /// pause opens hold exactly one packet (`ScheduleCollection`, `StopMutators`,
+    /// `ScanMutatorRoots`, `FastRCPrepare`, `Release`). Waking every worker for those meant all
+    /// but one immediately found nothing and re-parked, paying for the monitor lock twice more
+    /// each. Waking `n` costs one `notify_one` per worker that actually has something to do.
+    ///
+    /// Under-waking cannot strand work: a worker that adds to an already-open bucket notifies
+    /// through [`WorkBucket::add`], so any packet appearing later gets its own wake-up.
+    Wake(usize),
+    /// Wake up all parked GC workers.  For cases where which worker runs matters (designated
+    /// work) or where every worker must observe a new goal (shutdown, fork).
     WakeAll,
 }
 
@@ -37,6 +50,12 @@ pub(crate) struct WorkerMonitor {
     sync: Mutex<WorkerMonitorSync>,
     /// The number of workers that are allowed to execute work after being notified.
     active_workers: AtomicUsize,
+    /// Number of workers currently blocked on either condition variable.
+    ///
+    /// Maintained under `sync`, but readable without it so that `notify_work_available` can skip
+    /// acquiring the lock entirely when nobody is waiting -- the common case while a GC is
+    /// running and every worker is busy. See the safety argument on that function.
+    sleeping: AtomicUsize,
     /// Active workers wait on this when idle.  A parked *active* worker is notified if workers
     /// have things to do.  That includes:
     /// -   any work packets available, and
@@ -53,6 +72,24 @@ struct WorkerMonitorSync {
     parker: WorkerParker,
     /// Current and requested goals.
     goals: WorkerGoals,
+    /// Number of workers blocked on `active_worker_number_changed` specifically.
+    ///
+    /// Only inactive workers wait on that condition variable, which normally means none of them.
+    /// Broadcasting to it at every bucket boundary was a wasted syscall per boundary, so the
+    /// notify is gated on this being non-zero. It must be a count of actual waiters rather than a
+    /// test of `active_workers < worker_count`: raising the active count back up has to wake the
+    /// workers waiting to be reactivated, and by then the test would already be false.
+    inactive_waiters: usize,
+}
+
+/// Whether to keep the old behaviour of waking every worker at every bucket boundary, for
+/// measuring what the targeted wake-ups are worth.  Set `MMTK_WAKE_ALL=1`.
+///
+/// Read once: this sits on the path the targeted wake-ups exist to make cheap, and `var_os`
+/// allocates.
+fn wake_all_override() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("MMTK_WAKE_ALL").is_some())
 }
 
 /// This struct counts the number of workers parked and identifies the last parked worker.
@@ -100,8 +137,10 @@ impl WorkerMonitor {
             sync: Mutex::new(WorkerMonitorSync {
                 parker: WorkerParker::new(worker_count),
                 goals: Default::default(),
+                inactive_waiters: 0,
             }),
             active_workers: AtomicUsize::new(worker_count),
+            sleeping: AtomicUsize::new(0),
             workers_have_anything_to_do: Default::default(),
             active_worker_number_changed: Default::default(),
         }
@@ -142,30 +181,80 @@ impl WorkerMonitor {
         let mut guard = self.sync.lock().unwrap();
         let newly_requested = guard.goals.set_request(goal);
         if newly_requested {
-            self.notify_work_available_while_locked(true);
+            self.notify_work_available_while_locked(&guard, true);
         }
     }
 
     /// Wake up workers when more work packets are made available for workers,
     /// or a mutator has requested the GC workers to schedule a GC.
     pub fn notify_work_available(&self, all: bool) {
+        // Fast path: nobody is blocked, so there is nothing to notify and no reason to serialise
+        // on the monitor lock.  Every `WorkBucket::add` during a GC comes through here, so this
+        // is the difference between one relaxed load and a global lock acquisition per packet.
+        //
+        // The caller has already made the work visible (pushed it onto the bucket queue) before
+        // calling us, and this load is `SeqCst`, so it cannot be reordered before that push.  A
+        // worker about to block increments `sleeping` while holding `sync`.  So if we observe
+        // zero, any worker that blocks after this point had not yet incremented -- meaning it is
+        // still going to acquire `sync`, and it is therefore not yet parked.
+        //
+        // That worker can only lose this notification if it is the *last* worker to park, and it
+        // cannot be: the caller is a running GC worker (it just added a packet), so at least one
+        // worker is not parked.  Every non-last parked worker may lose a wake-up harmlessly --
+        // the last one to park re-checks for work under the lock and wakes the others.  This is
+        // the same invariant the blocking-path comment in `park_and_wait` relies on.
+        //
+        // Mutators reach this only via generational barriers adding `ProcessModBuf` outside a GC,
+        // which that same comment already documents as benign.  Mutators requesting a *goal* go
+        // through `make_request`, which still takes the lock.
+        if self.sleeping.load(Ordering::SeqCst) == 0 {
+            return;
+        }
         // We must hold the lock while notifying.  Otherwise a worker that is between checking
         // its wake-up condition and actually blocking on the CondVar (both of which happen while
         // holding this lock) could have the notification delivered too early and lost, causing
         // it to block forever despite the condition it was waiting for having become true.
-        let _guard = self.sync.lock().unwrap();
-        self.notify_work_available_while_locked(all);
+        let guard = self.sync.lock().unwrap();
+        self.notify_work_available_while_locked(&guard, all);
     }
 
     /// Like `notify_work_available`, but for use by callers that already hold the monitor's
     /// internal lock (such as `park_and_wait` below), to avoid trying to lock it again.
-    fn notify_work_available_while_locked(&self, all: bool) {
+    fn notify_work_available_while_locked(&self, sync: &WorkerMonitorSync, all: bool) {
         if all {
             self.workers_have_anything_to_do.notify_all();
-            self.active_worker_number_changed.notify_all();
+            self.notify_inactive_while_locked(sync);
         } else {
             self.workers_have_anything_to_do.notify_one();
         }
+    }
+
+    /// Wake workers waiting to be reactivated, but only if any exist.  See
+    /// `WorkerMonitorSync::inactive_waiters`.
+    fn notify_inactive_while_locked(&self, sync: &WorkerMonitorSync) {
+        if sync.inactive_waiters != 0 {
+            self.active_worker_number_changed.notify_all();
+        }
+    }
+
+    /// Wake `n` workers in total, counting the caller.  See [`LastParkedResult::Wake`].
+    ///
+    /// Called by the last parked worker while holding `sync`, at which point every other worker is
+    /// provably blocked on `workers_have_anything_to_do`: parking requires `sync`, so each of them
+    /// has already released it inside `Condvar::wait`.  `notify_one` therefore reliably wakes one
+    /// real waiter per call rather than being dropped.
+    fn wake_n_while_locked(&self, sync: &WorkerMonitorSync, n: usize) {
+        // The caller does not wait, so it covers one of the `n` packets itself.
+        let others = n.saturating_sub(1).min(self.worker_count.saturating_sub(1));
+        if others >= self.worker_count.saturating_sub(1) {
+            // Waking everyone anyway; one broadcast beats N wake-ups.
+            self.workers_have_anything_to_do.notify_all();
+        } else {
+            for _ in 0..others {
+                self.workers_have_anything_to_do.notify_one();
+            }
+        }
+        self.notify_inactive_while_locked(sync);
     }
 
     /// Park a worker and wait on the CondVar `workers_have_anything_to_do`.
@@ -209,10 +298,19 @@ impl WorkerMonitor {
                 LastParkedResult::WakeSelf => {
                     // Continue without waiting.
                 }
+                LastParkedResult::Wake(n) => {
+                    // We are still holding `sync`, so we must not call `notify_work_available`
+                    // (which would try to lock it again and deadlock).
+                    if wake_all_override() {
+                        self.notify_work_available_while_locked(&sync, true);
+                    } else {
+                        self.wake_n_while_locked(&sync, n);
+                    }
+                }
                 LastParkedResult::WakeAll => {
                     // We are still holding `sync`, so we must not call `notify_work_available`
                     // (which would try to lock it again and deadlock).
-                    self.notify_work_available_while_locked(true);
+                    self.notify_work_available_while_locked(&sync, true);
                 }
             }
         } else {
@@ -290,8 +388,12 @@ impl WorkerMonitor {
         // deactivated by `set_active_workers` before it got here.  Such a worker must not wait on
         // `workers_have_anything_to_do` (it must not consume work packets while inactive), so it
         // skips straight to the `while` loop below instead.
+        // `sleeping` is incremented while `sync` is still held, before `wait` releases it. That is
+        // what lets `notify_work_available` treat a zero reading as "no worker is parked yet".
         if should_wait && self.is_worker_active(ordinal) {
+            self.sleeping.fetch_add(1, Ordering::SeqCst);
             sync = self.workers_have_anything_to_do.wait(sync).unwrap();
+            self.sleeping.fetch_sub(1, Ordering::SeqCst);
         }
 
         // The worker may be inactive already (see above), or it may become inactive while
@@ -299,7 +401,11 @@ impl WorkerMonitor {
         // not held.  Keep waiting on `active_worker_number_changed` -- which is notified whenever
         // the active worker count changes -- until this worker is (re)activated.
         while !self.is_worker_active(ordinal) {
+            sync.inactive_waiters += 1;
+            self.sleeping.fetch_add(1, Ordering::SeqCst);
             sync = self.active_worker_number_changed.wait(sync).unwrap();
+            self.sleeping.fetch_sub(1, Ordering::SeqCst);
+            sync.inactive_waiters -= 1;
         }
 
         // Unpark this worker.

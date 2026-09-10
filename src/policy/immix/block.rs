@@ -526,8 +526,19 @@ impl Block {
 
             space.reusable_blocks.push(*self);
             false
+        } else if !self.rc_dead() {
+            // The in-place-promotion flag is set by `promote`, but reaching a non-zero
+            // reference count is what actually makes an object live. Trusting the flag
+            // alone frees the whole block whenever the two disagree, taking live objects
+            // with it. Checking the counts is authoritative, so do that rather than
+            // assert it: the assertion was compiled out of release builds, which is
+            // where the block was being freed out from under live data.
+            self.set_state(BlockState::Reusable {
+                unavailable_lines: 1 as _,
+            });
+            space.reusable_blocks.push(*self);
+            false
         } else {
-            debug_assert!(self.rc_dead(), "{:?} has non-zero rc value", self);
             debug_assert_ne!(self.get_state(), super::block::BlockState::Unallocated);
 
             // Bulk clear the VO bits of the entire block.

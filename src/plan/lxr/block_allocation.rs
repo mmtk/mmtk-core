@@ -128,7 +128,7 @@ impl<VM: VMBinding> BlockAllocation<VM> {
     /// Reset allocated_block_buffer and free nursery blocks.
     pub fn sweep_nursery_blocks(&self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
         const PARALLEL_STW_SWEEPING: bool = false;
-        let max_stw_sweep_blocks: usize = usize::MAX;
+        let max_stw_sweep_blocks: usize = crate::plan::lxr::max_stw_sweep_nursery_blocks();
         let space = self.space();
         self.nursery_blocks.visit_slice(|blocks| {
             if PARALLEL_STW_SWEEPING {

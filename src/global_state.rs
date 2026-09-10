@@ -15,6 +15,8 @@ use std::time::{Duration, Instant};
 pub struct GlobalState {
     /// The current GC status.
     pub(crate) gc_status: GcStatusWord,
+    /// When did the last GC start? Only accessed by the last parked worker.
+    pub(crate) gc_start_time: AtomicRefCell<Option<Instant>>,
     /// The time when a GC pause is requested. Used to calculate the time-to-yield metric.
     pub(crate) pause_requested_time: AtomicRefCell<Option<Instant>>,
     /// When did the current GC pause begin, i.e. when did all mutators finish stopping (see
@@ -245,6 +247,7 @@ impl Default for GlobalState {
     fn default() -> Self {
         Self {
             gc_status: GcStatusWord::new(GcStatus::Uninitialized),
+            gc_start_time: AtomicRefCell::new(None),
             pause_requested_time: AtomicRefCell::new(None),
             pause_start_time: AtomicRefCell::new(None),
             stacks_prepared: AtomicBool::new(false),
@@ -479,6 +482,23 @@ impl GcStatusWord {
             );
             GcStatus::InConcurrentGC
         });
+    }
+
+    /// `InConcurrentGC` -> `NotInGC`: the concurrent phase's work has drained and no pause
+    /// follows it. A concurrent plan whose background phase always ends in a pause (such as
+    /// ConcurrentImmix, which finishes concurrent marking with a `FinalMark` pause) never needs
+    /// this; a plan whose background work simply runs out (LXR's concurrent decrements and
+    /// sweeping) does, or the collector would look permanently mid-GC to everything that waits
+    /// for it to be quiescent -- `set_disabled` in particular.
+    ///
+    /// Returns `true` if this call performed the transition, `false` if the status had already
+    /// moved on (a mutator may have requested a pause in the meantime).
+    pub(crate) fn set_concurrent_gc_finished(&self) -> bool {
+        self.try_transition(|status| match status {
+            GcStatus::InConcurrentGC => Some(GcStatus::NotInGC),
+            _ => None,
+        })
+        .is_ok()
     }
 
     /// `InPause` -> `NotInGC`, e.g. once a GC pause has finished and no concurrent work remains.
