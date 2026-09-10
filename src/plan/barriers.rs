@@ -300,14 +300,6 @@ impl<S: BarrierSemantics> Barrier<S::VM> for FieldBarrier<S> {
     }
 
     fn object_probable_write(&mut self, obj: ObjectReference) {
-        // The slow path snapshots every field of `obj`, so a second call in the same epoch
-        // records nothing: the field bits stop it enqueueing a field twice, but not the walk
-        // itself, and the walk is the cost. With `lxr-object-log` the slow path logs the
-        // per-object bit once it has walked, so test that bit and skip.
-        //
-        // A binding that gates on the same bit in its own inlined fast path never reaches
-        // here twice; one that calls this through the API does. Without the feature there is
-        // no bit to test, so the call stays unconditional.
         #[cfg(feature = "lxr-object-log")]
         if !self.object_is_unlogged(obj) {
             return;

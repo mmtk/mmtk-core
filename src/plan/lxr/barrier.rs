@@ -24,6 +24,33 @@ use crate::vm::slot::Slot;
 use crate::vm::*;
 use crate::MMTK;
 
+/// Re-arm the per-object log bits that one mutator's barrier cleared, so the next epoch's first
+/// store to each of those objects reaches the barrier again.
+#[cfg(feature = "lxr-object-log")]
+pub struct RearmLoggedObjects<VM: VMBinding> {
+    objects: Vec<ObjectReference>,
+    _p: std::marker::PhantomData<VM>,
+}
+
+#[cfg(feature = "lxr-object-log")]
+impl<VM: VMBinding> RearmLoggedObjects<VM> {
+    pub fn new(objects: Vec<ObjectReference>) -> Self {
+        Self {
+            objects,
+            _p: std::marker::PhantomData,
+        }
+    }
+}
+
+#[cfg(feature = "lxr-object-log")]
+impl<VM: VMBinding> crate::scheduler::GCWork<VM> for RearmLoggedObjects<VM> {
+    fn do_work(&mut self, _worker: &mut crate::scheduler::GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        for obj in &self.objects {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(*obj, Ordering::SeqCst);
+        }
+    }
+}
+
 pub struct LXRFieldBarrierSemantics<VM: VMBinding> {
     mmtk: &'static MMTK<VM>,
     tls: VMMutatorThread,
@@ -61,9 +88,12 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
     #[cfg(feature = "lxr-object-log")]
     #[cold]
     fn clear_and_reset_logged_objects(&mut self) {
-        for obj in self.logged_objs.take() {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
+        let objects = self.logged_objs.take();
+        if objects.is_empty() {
+            return;
         }
+        self.mmtk.scheduler.work_buckets[WorkBucketStage::FIRST_STW_STAGE]
+            .add(RearmLoggedObjects::<VM>::new(objects));
     }
 
     fn get_slot_logging_state(&self, slot: VM::VMSlot) -> u8 {
@@ -266,9 +296,6 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
                 Ordering::SeqCst,
             );
             self.logged_objs.push(obj);
-            // Try keep the logged objects queue small.
-            // We can remove this check, and only clear logged objects during flush.
-            // This would cause logged object queue to grow unboundedly.
             if self.logged_objs.is_full() {
                 self.clear_and_reset_logged_objects();
             }

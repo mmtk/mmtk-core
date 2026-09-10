@@ -270,12 +270,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 cursor += step;
             }
         };
-        // Promotion above arms the per-field unlog bits, which is what LXR's own barrier
-        // consults. Bindings whose inlined write-barrier fast path cannot name the field
-        // instead gate on the per-object log bit, and nothing else sets it for an object
-        // promoted through the reference-counting path rather than through tracing. Leaving
-        // it clear makes such a binding skip the barrier for every mature object, losing the
-        // decrements and increments that keep reachable objects alive.
+        // Promotion above arms the per-field unlog bits. Do the same for object log bits.
         #[cfg(feature = "lxr-object-log")]
         VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(o, Ordering::SeqCst);
         let obj_in_defrag = !los && Block::in_defrag_block(o);
