@@ -271,7 +271,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
         };
         // Promotion above arms the per-field unlog bits. Do the same for object log bits.
-        #[cfg(feature = "lxr-object-log")]
+        #[cfg(feature = "lxr_object_log")]
         VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(o, Ordering::SeqCst);
         let obj_in_defrag = !los && Block::in_defrag_block(o);
         let tls = worker.tls.0;

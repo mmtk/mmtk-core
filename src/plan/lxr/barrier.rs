@@ -26,13 +26,13 @@ use crate::MMTK;
 
 /// Re-arm the per-object log bits that one mutator's barrier cleared, so the next epoch's first
 /// store to each of those objects reaches the barrier again.
-#[cfg(feature = "lxr-object-log")]
+#[cfg(feature = "lxr_object_log")]
 pub struct RearmLoggedObjects<VM: VMBinding> {
     objects: Vec<ObjectReference>,
     _p: std::marker::PhantomData<VM>,
 }
 
-#[cfg(feature = "lxr-object-log")]
+#[cfg(feature = "lxr_object_log")]
 impl<VM: VMBinding> RearmLoggedObjects<VM> {
     pub fn new(objects: Vec<ObjectReference>) -> Self {
         Self {
@@ -42,7 +42,7 @@ impl<VM: VMBinding> RearmLoggedObjects<VM> {
     }
 }
 
-#[cfg(feature = "lxr-object-log")]
+#[cfg(feature = "lxr_object_log")]
 impl<VM: VMBinding> crate::scheduler::GCWork<VM> for RearmLoggedObjects<VM> {
     fn do_work(&mut self, _worker: &mut crate::scheduler::GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         for obj in &self.objects {
@@ -60,7 +60,7 @@ pub struct LXRFieldBarrierSemantics<VM: VMBinding> {
     lxr: &'static LXR<VM>,
     /// Objects logged by [`Self::object_probable_write_slow`], to be re-armed at the end of
     /// the epoch. See there.
-    #[cfg(feature = "lxr-object-log")]
+    #[cfg(feature = "lxr_object_log")]
     logged_objs: VectorQueue<ObjectReference>,
 }
 
@@ -78,12 +78,12 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
             decs: VectorQueue::default(),
             refs: VectorQueue::default(),
             lxr: mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap(),
-            #[cfg(feature = "lxr-object-log")]
+            #[cfg(feature = "lxr_object_log")]
             logged_objs: VectorQueue::default(),
         }
     }
 
-    #[cfg(feature = "lxr-object-log")]
+    #[cfg(feature = "lxr_object_log")]
     #[cold]
     fn flush_logged_objects(&mut self) {
         let objects = self.logged_objs.take();
@@ -231,7 +231,7 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
         self.flush_decs_and_satb();
         // Ends the coalescing epoch for the objects this mutator logged: each is armed
         // again, so the next store to it is recorded.
-        #[cfg(feature = "lxr-object-log")]
+        #[cfg(feature = "lxr_object_log")]
         self.flush_logged_objects();
     }
 
@@ -285,7 +285,7 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
         });
         // Every field of `obj` is now logged. Also log the object log bit,
         // so next time we don't hvae to scan the object again. This is a performance optimization.
-        #[cfg(feature = "lxr-object-log")]
+        #[cfg(feature = "lxr_object_log")]
         {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
                 obj,
