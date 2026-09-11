@@ -405,11 +405,11 @@
 <a href=#405 id=405 data-nosnippet>405</a>        ];
 <a href=#406 id=406 data-nosnippet>406</a>        <span class="comment">// The per-object log bit has to be registered too, not just the per-field one. LXR's
 <a href=#407 id=407 data-nosnippet>407</a>        // own barrier only consults the field bits, this can be an issue for the probable write API (no field given).
-<a href=#408 id=408 data-nosnippet>408</a>        // With `lxr-object-log`, the probable write API also logs the object bit.
+<a href=#408 id=408 data-nosnippet>408</a>        // With `lxr_object_log`, the probable write API also logs the object bit.
 <a href=#409 id=409 data-nosnippet>409</a>        // TODO: We should examine if we can steal a bit from the field log its as the 'logical' object log bit.
 <a href=#410 id=410 data-nosnippet>410</a>        // We potentially could use the field log bit at the object start, or (object ref - lower bound) -- there should
 <a href=#411 id=411 data-nosnippet>411</a>        // be no field at those addresses.
-<a href=#412 id=412 data-nosnippet>412</a>        </span><span class="attr">#[cfg(feature = <span class="string">"lxr-object-log"</span>)]
+<a href=#412 id=412 data-nosnippet>412</a>        </span><span class="attr">#[cfg(feature = <span class="string">"lxr_object_log"</span>)]
 <a href=#413 id=413 data-nosnippet>413</a>        </span>specs.push(<span class="kw-2">*</span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.as_spec());
 <a href=#414 id=414 data-nosnippet>414</a>        <span class="kw">let </span>immix_specs = metadata::extract_side_metadata(<span class="kw-2">&amp;</span>specs);
 <a href=#415 id=415 data-nosnippet>415</a>        <span class="kw">let </span>global_side_metadata_specs = SideMetadataContext::new_global_specs(<span class="kw-2">&amp;</span>immix_specs);
