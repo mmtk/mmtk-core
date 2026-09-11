@@ -1014,8 +1014,8 @@ options! {
     /// Trigger an LXR pause once this many reference-count increments are pending, bounding the
     /// `RCProcessIncs` work a single pause has to do. Each pending increment is one slot the write
     /// barrier recorded, so the limit is roughly "words of reference stores between pauses".
-    /// Zero, the default, means unlimited, leaving the pause bounded only by heap occupancy.
-    lxr_inc_buffer_limit: usize                     [always_valid] = 0,
+    /// `usize::MAX`, the default, leaves the pause bounded only by heap occupancy.
+    lxr_inc_buffer_limit: usize                     [always_valid] = usize::MAX,
     /// Trigger an LXR pause when the predicted surviving young data exceeds this many megabytes.
     /// This is the bound that limits pause time, since a pause is dominated by promoting the young
     /// objects that survived.

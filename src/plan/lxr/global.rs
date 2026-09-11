@@ -108,9 +108,8 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         if self.concurrent_work_in_progress() && super::concurrent_marking_packets_drained() {
             return true;
         }
-        // Bound the pause by bounding the work it has to do (default to 0 - disabled)
-        let inc_buffer_limit = *self.base().options.lxr_inc_buffer_limit;
-        if inc_buffer_limit != 0 && self.rc.inc_buffer_size() >= inc_buffer_limit {
+        // Bound the pause by bounding the work it has to do (default to usize::MAX - disabled)
+        if self.rc.inc_buffer_size() >= *self.base().options.lxr_inc_buffer_limit {
             return true;
         }
         // Survival limits
