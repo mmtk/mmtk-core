@@ -217,7 +217,7 @@ lxr_no_evac = ["lxr_no_nursery_evac", "lxr_no_mature_evac"]
 # barrier is called. In a runtime where this API is used often (such as Julia), we see
 # huge slowdown (10x) due to repetitively scan those objects in every barrier. In those cases,
 # this feature introduces per object log bit for LXR to address the pathological case.
-lxr-object-log = []
+lxr_object_log = []
 
 # To collect statistics for each GC work packet. Enabling this may introduce a small overhead (several percentage slowdown on benchmark time).
 work_packet_stats = []

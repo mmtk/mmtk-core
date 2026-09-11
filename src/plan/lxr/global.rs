@@ -405,11 +405,11 @@ impl<VM: VMBinding> LXR<VM> {
         ];
         // The per-object log bit has to be registered too, not just the per-field one. LXR's
         // own barrier only consults the field bits, this can be an issue for the probable write API (no field given).
-        // With `lxr-object-log`, the probable write API also logs the object bit.
+        // With `lxr_object_log`, the probable write API also logs the object bit.
         // TODO: We should examine if we can steal a bit from the field log its as the 'logical' object log bit.
         // We potentially could use the field log bit at the object start, or (object ref - lower bound) -- there should
         // be no field at those addresses.
-        #[cfg(feature = "lxr-object-log")]
+        #[cfg(feature = "lxr_object_log")]
         specs.push(*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.as_spec());
         let immix_specs = metadata::extract_side_metadata(&specs);
         let global_side_metadata_specs = SideMetadataContext::new_global_specs(&immix_specs);
