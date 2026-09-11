@@ -83,7 +83,7 @@ pub struct LXR<VM: VMBinding> {
 }
 
 pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints {
-    moves_objects: true,
+    moves_objects: super::NURSERY_EVACUATION || super::MATURE_EVACUATION,
     // Max immix object size is half of a block.
     max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
     barrier: BarrierSelector::FieldBarrier,
@@ -108,13 +108,22 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         if self.concurrent_work_in_progress() && super::concurrent_marking_packets_drained() {
             return true;
         }
+        // Bound the pause by bounding the work it has to do (default to usize::MAX - disabled)
+        if self.rc.inc_buffer_size() >= *self.base().options.lxr_inc_buffer_limit {
+            return true;
+        }
         // Survival limits
         let total_young_alloc_pages =
             self.block_allocation.total_young_allocation_in_bytes() >> LOG_BYTES_IN_MBYTE;
-        let predicted_survival_mb: usize =
-            ((total_young_alloc_pages as f64 * super::SURVIVAL_RATIO_PREDICTOR.ratio()) as usize)
-                << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER;
-        if predicted_survival_mb >= super::MAX_SURVIVAL_MB {
+        // Use copy promotion ratio, or just total promotion ratio.
+        let ratio = if LXR_CONSTRAINTS.moves_objects {
+            super::SURVIVAL_RATIO_PREDICTOR.copy_promote_ratio()
+        } else {
+            super::SURVIVAL_RATIO_PREDICTOR.promote_ratio()
+        };
+        let predicted_survival_mb: usize = ((total_young_alloc_pages as f64 * ratio) as usize)
+            << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER;
+        if predicted_survival_mb >= *self.base().options.lxr_max_survival_mb {
             return true;
         }
         if !self.immix_space.common().contiguous {
@@ -227,7 +236,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        let _new_ratio = super::SURVIVAL_RATIO_PREDICTOR.update_ratio();
+        super::SURVIVAL_RATIO_PREDICTOR.update_ratios();
         let pause = self.current_pause().unwrap();
         if pause == Pause::FinalMark || pause == Pause::Full {
             VM::VMCollection::update_weak_processor(false);
@@ -259,7 +268,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     fn get_collection_reserved_pages(&self) -> usize {
         let survival = {
             let predicted_survival = (self.block_allocation.clean_nursery_mb() as f64
-                * super::SURVIVAL_RATIO_PREDICTOR.ratio())
+                * super::SURVIVAL_RATIO_PREDICTOR.copy_promote_ratio())
                 as usize;
             predicted_survival << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER
         };
