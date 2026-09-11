@@ -1010,7 +1010,29 @@ options! {
     /// headroom between 1% to 3% of the heap size.
     immix_defrag_headroom_percent: usize            [|v: &usize| *v <= 50] = 5,
     /// Disable concurrent marking in ConcurrentImmix. Setting this to true will make ConcurrentImmix behave exactly like full heap Immix. This option is only intended for debugging.
-    concurrent_immix_disable_concurrent_marking: bool              [always_valid] = false
+    concurrent_immix_disable_concurrent_marking: bool              [always_valid] = false,
+    /// Trigger an LXR pause once this many reference-count increments are pending, bounding the
+    /// `RCProcessIncs` work a single pause has to do. Each pending increment is one slot the write
+    /// barrier recorded, so the limit is roughly "words of reference stores between pauses".
+    /// Zero, the default, means unlimited, leaving the pause bounded only by heap occupancy.
+    lxr_inc_buffer_limit: usize                     [always_valid] = 0,
+    /// Trigger an LXR pause when the predicted surviving young data exceeds this many megabytes.
+    /// This is the bound that limits pause time, since a pause is dominated by promoting the young
+    /// objects that survived.
+    lxr_max_survival_mb: usize                      [|v: &usize| *v > 0] = 128,
+    /// How many nursery blocks a non-`Full` LXR pause may sweep before handing the rest to the
+    /// concurrent phase. `usize::MAX`, the default, sweeps the whole nursery inside the pause;
+    /// zero defers all of it.
+    lxr_max_stw_sweep_nursery_blocks: usize         [always_valid] = usize::MAX,
+    /// The smallest generation of recursively-discovered reference-count increments that LXR will
+    /// split with another worker instead of processing entirely.
+    /// `usize::MAX`, the default, disables splitting.
+    lxr_min_packet_split_size: usize                [always_valid] = usize::MAX,
+    /// The earliest generation of recursively-discovered reference-count increments that LXR will
+    /// consider splitting. Early generations are small and near the roots, where splitting costs a
+    /// work packet and buys little; the chain only gets long enough to matter further down. Zero
+    /// considers every generation.
+    lxr_min_packet_split_depth: usize               [always_valid] = 16
 }
 
 #[cfg(test)]
