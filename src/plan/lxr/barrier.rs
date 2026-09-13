@@ -27,13 +27,13 @@ use crate::MMTK;
 
 /// Re-arm the per-object log bits that one mutator's barrier cleared, so the next epoch's first
 /// store to each of those objects reaches the barrier again.
-#[cfg(feature = "lxr-object-log")]
+#[cfg(feature = "lxr_object_log")]
 pub struct RearmLoggedObjects<VM: VMBinding> {
     objects: Vec<ObjectReference>,
     _p: std::marker::PhantomData<VM>,
 }
 
-#[cfg(feature = "lxr-object-log")]
+#[cfg(feature = "lxr_object_log")]
 impl<VM: VMBinding> RearmLoggedObjects<VM> {
     pub fn new(objects: Vec<ObjectReference>) -> Self {
         Self {
@@ -43,7 +43,7 @@ impl<VM: VMBinding> RearmLoggedObjects<VM> {
     }
 }
 
-#[cfg(feature = "lxr-object-log")]
+#[cfg(feature = "lxr_object_log")]
 impl<VM: VMBinding> crate::scheduler::GCWork<VM> for RearmLoggedObjects<VM> {
     fn do_work(&mut self, _worker: &mut crate::scheduler::GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         for obj in &self.objects {
@@ -65,7 +65,7 @@ pub struct LXRFieldBarrierSemantics<VM: VMBinding> {
     mapped_chunk: std::cell::Cell<Address>,
     /// Objects logged by [`Self::object_probable_write_slow`], to be re-armed at the end of
     /// the epoch. See there.
-    #[cfg(feature = "lxr-object-log")]
+    #[cfg(feature = "lxr_object_log")]
     logged_objs: VectorQueue<ObjectReference>,
 }
 
@@ -85,12 +85,12 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
             lxr: mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap(),
             dec_origin: "barrier-unknown",
             mapped_chunk: std::cell::Cell::new(Address::ZERO),
-            #[cfg(feature = "lxr-object-log")]
+            #[cfg(feature = "lxr_object_log")]
             logged_objs: VectorQueue::default(),
         }
     }
 
-    #[cfg(feature = "lxr-object-log")]
+    #[cfg(feature = "lxr_object_log")]
     #[cold]
     fn flush_logged_objects(&mut self) {
         let objects = self.logged_objs.take();
@@ -298,7 +298,7 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
         self.flush_decs_and_satb();
         // Ends the coalescing epoch for the objects this mutator logged: each is armed
         // again, so the next store to it is recorded.
-        #[cfg(feature = "lxr-object-log")]
+        #[cfg(feature = "lxr_object_log")]
         self.flush_logged_objects();
     }
 
@@ -371,21 +371,9 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
             }
             let _succ = self.enqueue_node(Some(obj), s, None);
         });
-        // Every field of `obj` is now logged, so a further store to any of them would be
-        // coalesced away by the field bit anyway -- but only after this walk has visited it
-        // again, which is the cost. Log the object too, so a caller whose fast path can only
-        // test the per-object bit stops reaching this for the rest of the epoch.
-        //
-        // Sound only because the bit is re-armed at the end of the epoch. The field bits
-        // re-arm lazily, as each increment is processed
-        // (`ProcessIncs::unlog_and_load_rc_object`); there is no per-object equivalent,
-        // because the increment buffer holds slots and a slot does not identify its owner.
-        // Remembering the objects here is that equivalent. Leaving an object logged past the
-        // end of its epoch loses every later store to it.
-        //
-        // Racing snapshots of the same object are harmless: `attempt_to_log_field` decides
-        // per field who records it, so the duplicate walk records nothing twice.
-        #[cfg(feature = "lxr-object-log")]
+        // Every field of `obj` is now logged. Also log the object log bit,
+        // so next time we don't hvae to scan the object again. This is a performance optimization.
+        #[cfg(feature = "lxr_object_log")]
         {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
                 obj,

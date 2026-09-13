@@ -119,33 +119,22 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         if self.concurrent_work_in_progress() && super::concurrent_marking_packets_drained() {
             return true;
         }
-        // Bound the pause by bounding the work it has to do.
-        //
-        // Every pause drains the increment buffer the barrier has been filling, in
-        // `RCProcessIncs`, and that is what a pause is made of: 12.9ms of a 14.2ms `RefCount`
-        // pause and 5.5ms of a 7.9ms `FinalMark` on `tree_mutable`, with everything else in the
-        // pause under a millisecond. Its size is set by how much the mutator has written since the
-        // last pause, which the heap-occupancy trigger does not bound at all -- a mutation-heavy
-        // program reaches the heap target having queued an unbounded number of increments.
-        //
-        // So collect on the buffer as well as on occupancy. This is `INC_BUFFER_LIMIT` from
-        // upstream LXR, which has always been declared here (`rc::inc_buffer_size` is maintained
-        // on the barrier's flush path and reset in `ImmixSpace::release_rc`) but never read.
-        if let Some(limit) = super::inc_buffer_limit() {
-            if self.rc.inc_buffer_size() >= limit {
-                return true;
-            }
+        // Bound the pause by bounding the work it has to do (default to usize::MAX - disabled)
+        if self.rc.inc_buffer_size() >= *self.base().options.lxr_inc_buffer_limit {
+            return true;
         }
         // Survival limits
         let total_young_alloc_pages =
             self.block_allocation.total_young_allocation_in_bytes() >> LOG_BYTES_IN_MBYTE;
-        // `promotion_ratio`, not `ratio`: this bound exists to cap the promotion work the next
-        // pause will do, and every promotion costs that work whether or not the object moved.
-        let predicted_survival_mb: usize = ((total_young_alloc_pages as f64
-            * super::SURVIVAL_RATIO_PREDICTOR.promotion_ratio())
-            as usize)
+        // Use copy promotion ratio, or just total promotion ratio.
+        let ratio = if LXR_CONSTRAINTS.moves_objects {
+            super::SURVIVAL_RATIO_PREDICTOR.copy_promote_ratio()
+        } else {
+            super::SURVIVAL_RATIO_PREDICTOR.promote_ratio()
+        };
+        let predicted_survival_mb: usize = ((total_young_alloc_pages as f64 * ratio) as usize)
             << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER;
-        if predicted_survival_mb >= super::max_survival_mb() {
+        if predicted_survival_mb >= *self.base().options.lxr_max_survival_mb {
             return true;
         }
         if !self.immix_space.common().contiguous {
@@ -261,7 +250,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        let _new_ratio = super::SURVIVAL_RATIO_PREDICTOR.update_ratio();
+        super::SURVIVAL_RATIO_PREDICTOR.update_ratios();
         let pause = self.current_pause().unwrap();
         // Every pause, not just tracing ones, and before anything is reclaimed: the binding
         // uses this to drop registered finalizers, which LXR cannot run (see the `VMRefClosure`
@@ -296,7 +285,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     fn get_collection_reserved_pages(&self) -> usize {
         let survival = {
             let predicted_survival = (self.block_allocation.clean_nursery_mb() as f64
-                * super::SURVIVAL_RATIO_PREDICTOR.ratio())
+                * super::SURVIVAL_RATIO_PREDICTOR.copy_promote_ratio())
                 as usize;
             predicted_survival << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER
         };
@@ -463,11 +452,11 @@ impl<VM: VMBinding> LXR<VM> {
         ];
         // The per-object log bit has to be registered too, not just the per-field one. LXR's
         // own barrier only consults the field bits, this can be an issue for the probable write API (no field given).
-        // With `lxr-object-log`, the probable write API also logs the object bit.
+        // With `lxr_object_log`, the probable write API also logs the object bit.
         // TODO: We should examine if we can steal a bit from the field log its as the 'logical' object log bit.
         // We potentially could use the field log bit at the object start, or (object ref - lower bound) -- there should
         // be no field at those addresses.
-        #[cfg(feature = "lxr-object-log")]
+        #[cfg(feature = "lxr_object_log")]
         specs.push(*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.as_spec());
         let immix_specs = metadata::extract_side_metadata(&specs);
         let global_side_metadata_specs = SideMetadataContext::new_global_specs(&immix_specs);

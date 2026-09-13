@@ -284,7 +284,7 @@ impl<S: BarrierSemantics> FieldBarrier<S> {
     }
 
     /// Returns true if the object is not logged.
-    #[cfg(feature = "lxr-object-log")]
+    #[cfg(feature = "lxr_object_log")]
     fn object_is_unlogged(&self, object: ObjectReference) -> bool {
         S::UNLOG_BIT_SPEC.load_atomic::<S::VM, u8>(object, None, Ordering::SeqCst) != 0
     }
@@ -300,7 +300,7 @@ impl<S: BarrierSemantics> Barrier<S::VM> for FieldBarrier<S> {
     }
 
     fn object_probable_write(&mut self, obj: ObjectReference) {
-        #[cfg(feature = "lxr-object-log")]
+        #[cfg(feature = "lxr_object_log")]
         if !self.object_is_unlogged(obj) {
             return;
         }

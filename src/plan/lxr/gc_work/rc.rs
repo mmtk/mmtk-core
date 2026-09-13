@@ -18,6 +18,7 @@ use crate::vm::slot::Slot;
 use crate::{
     plan::concurrent::global::ConcurrentPlan,
     plan::concurrent::Pause,
+    plan::global::Plan,
     policy::{immix::block::Block, space::Space},
     scheduler::{GCWork, GCWorker, WorkBucketStage},
     util::{metadata::side_metadata, object_forwarding, ObjectReference},
@@ -210,11 +211,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 block.set_as_in_place_promoted();
             }
             self.rc.promote_with_size(o, size);
-            self.survival_ratio_predictor_local.record_promotion(size);
-            if copied {
-                self.survival_ratio_predictor_local
-                    .record_copied_promotion(size);
-            }
+            self.survival_ratio_predictor_local
+                .record_promotion(size, copied);
         } else {
             // println!("promote los {:?} {}", o, self.immix().is_marked(o));
         }
@@ -301,13 +299,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 cursor += step;
             }
         };
-        // Promotion above arms the per-field unlog bits, which is what LXR's own barrier
-        // consults. A caller whose inlined fast path cannot name the field gates on the
-        // per-object log bit instead, and nothing else sets it for an object promoted through
-        // the reference-counting path rather than through tracing. Leaving it clear makes such
-        // a caller skip the barrier for every mature object, losing the decrements and
-        // increments that keep reachable objects alive.
-        #[cfg(feature = "lxr-object-log")]
+        // Promotion above arms the per-field unlog bits. Do the same for object log bits.
+        #[cfg(feature = "lxr_object_log")]
         VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(o, Ordering::SeqCst);
         let obj_in_defrag = !los && Block::in_defrag_block(o);
         // One worker walks one object, and the walk is order-independent, so an object big
@@ -733,26 +726,17 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
         // Process recursively generated buffer
         let mut depth = self.depth;
         let mut incs = vec![];
-        // Hand half of each generation to another worker.
-        //
-        // Without this the promotion trace is a chain, not a tree. `add_new_slot` spills a packet
-        // every `CAPACITY` (1024) slots, and a packet consuming 1024 slots promotes ~512 objects
-        // whose fields are ~1024 new slots -- so each packet produces almost exactly one successor.
-        // Measured on `tree_mutable`: 2.08M increments in 1984 packets, i.e. 1048 slots each, formed
-        // as 13 chains (one per root packet) about 152 packets long. Parallelism was therefore
-        // capped at 13 no matter how many workers existed, and measured ~3x because the root buffers
-        // are uneven -- `ProcessIncs` CPU over pause wall stayed at ~3x whether 4, 16 or 64 workers
-        // were available.
-        //
-        // Splitting each generation converts the chain into a binary tree, whose depth is
-        // logarithmic in the generation size rather than linear in it.
-        let split = crate::plan::lxr::active_packet_split();
+        // Incs are processed by the worker that discovered them, unless we split.
+        // Split size defaults to `usize::MAX` (never split).
+        let split_size = *self.lxr.base().options.lxr_min_packet_split_size;
+        // Split depth defaults to 16 (split after 16 recursions).
+        let split_depth = *self.lxr.base().options.lxr_min_packet_split_depth;
         while !self.new_incs.is_empty() {
             self.new_incs_count = 0;
             depth += 1;
             incs.clear();
             self.new_incs.swap(&mut incs);
-            if incs.len() > split {
+            if depth as usize >= split_depth && incs.len() > split_size {
                 let (a, b) = incs.split_at(incs.len() / 2);
                 let mut w = ProcessIncs::<VM, EDGE_KIND_NURSERY>::new(b.to_vec(), self.lxr);
                 w.depth = depth;

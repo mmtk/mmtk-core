@@ -29,67 +29,6 @@ static NO_EVAC: AtomicBool = AtomicBool::new(false);
 /// `LXR::on_lazy_sweeping_finished`.
 pub(crate) static GC_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-/// How many pending reference-count increments force a collection, bounding the `RCProcessIncs`
-/// work a single pause has to do. `None` (spelled `0`) leaves the pause bounded only by heap
-/// occupancy, which does not bound mutation at all.
-///
-/// Override with `MMTK_LXR_INC_BUFFER_LIMIT`, in entries. Each entry is one slot the barrier
-/// recorded, so the limit is roughly "words of reference stores between pauses".
-pub fn inc_buffer_limit() -> Option<usize> {
-    static N: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
-    *N.get_or_init(|| {
-        let v = match std::env::var("MMTK_LXR_INC_BUFFER_LIMIT") {
-            Ok(v) => v.trim().parse().expect(
-                "MMTK_LXR_INC_BUFFER_LIMIT must be a whole number of entries, or 0 for none",
-            ),
-            Err(_) => 0usize,
-        };
-        (v != 0).then_some(v)
-    })
-}
-
-/// Smallest generation of recursively-discovered increments that `ProcessIncs` will split with
-/// another worker instead of processing entirely itself. `usize::MAX` disables splitting, restoring
-/// the chain. Override with `MMTK_LXR_SPLIT_MIN`.
-pub fn active_packet_split() -> usize {
-    static N: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
-    *N.get_or_init(|| match std::env::var("MMTK_LXR_SPLIT_MIN") {
-        Ok(v) => v
-            .trim()
-            .parse()
-            .expect("MMTK_LXR_SPLIT_MIN must be a whole number of slots"),
-        Err(_) => 64,
-    })
-}
-
-/// How many nursery blocks a non-`Full` pause may sweep before handing the rest to the
-/// concurrent phase. Override with `MMTK_LXR_STW_SWEEP_BLOCKS`; `usize::MAX` restores sweeping
-/// the whole nursery inside the pause.
-///
-/// Sweeping a nursery block means `Block::rc_sweep_nursery`, which reads the block's reference
-/// count table to decide whether the block is dead, reusable, or promoted in place. That is
-/// O(nursery bytes) of work, it ran single-threaded in the `Release` packet, and it measured
-/// 7-8ms of a 27ms `RefCount` pause on `tree_mutable` -- second only to `RCProcessIncs`.
-///
-/// None of it has to happen while the mutator is stopped. A block being swept is not yet on any
-/// free list, so no mutator can allocate into it either way, and the concurrent phase that runs
-/// it (`RCLazySweepNurseryBlocks`) already reports what it frees through
-/// `num_clean_blocks_released_lazy`, which is what the next pause's sizing decision reads. The
-/// only cost of deferring is that the pages come back a mutator window later.
-///
-/// A `Full` pause still sweeps everything itself: it is already a whole-heap stop, and it must
-/// leave the heap in a state where nothing is owed to a concurrent phase.
-pub fn max_stw_sweep_nursery_blocks() -> usize {
-    static N: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
-    *N.get_or_init(|| match std::env::var("MMTK_LXR_STW_SWEEP_BLOCKS") {
-        Ok(v) => v
-            .trim()
-            .parse()
-            .expect("MMTK_LXR_STW_SWEEP_BLOCKS must be a whole number of blocks"),
-        Err(_) => 0,
-    })
-}
-
 /// Enable Lazy Decrements
 const LAZY_DECREMENTS: bool = !cfg!(feature = "lxr_no_lazy");
 
@@ -101,27 +40,6 @@ pub(crate) const MATURE_EVACUATION: bool = !cfg!(feature = "lxr_no_mature_evac")
 
 /// Stop triggering CM or RC pauses, and trigger Full GCs instead if the available heap after a RC pause is still small.
 const RC_STOP_PERCENT: usize = 15;
-
-/// Trigger an RC pause when the predicted max survival size is larger than this threshold, in MB.
-///
-/// This is the bound that actually limits pause time. A pause's cost is dominated by
-/// `RCProcessIncs` promoting the young objects that survived -- the bucket opens with a dozen
-/// packets and fans out to thousands as the promotion trace walks their fields -- so the pause is
-/// proportional to *surviving* young data, not to how much was allocated or how many references
-/// were written. `inc_buffer_size` counts only the slots the barrier recorded and so does not bound
-/// it; this does.
-///
-/// Override with `MMTK_LXR_MAX_SURVIVAL_MB`.
-pub fn max_survival_mb() -> usize {
-    static N: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
-    *N.get_or_init(|| match std::env::var("MMTK_LXR_MAX_SURVIVAL_MB") {
-        Ok(v) => v
-            .trim()
-            .parse()
-            .expect("MMTK_LXR_MAX_SURVIVAL_MB must be a whole number of megabytes"),
-        Err(_) => 128,
-    })
-}
 
 /// Trigger a concurrent marking cycle when the predicted mature size is larger than this threshold.
 const TRACE_THRESHOLD: usize = 20;
@@ -274,21 +192,25 @@ static LAZY_SWEEPING_JOBS: Lazy<RwLock<LazySweepingJobs>> =
     Lazy::new(|| RwLock::new(LazySweepingJobs::new()));
 
 static SURVIVAL_RATIO_PREDICTOR: SurvivalRatioPredictor = SurvivalRatioPredictor {
-    prev_ratio: Atomic::new(0.01),
-    prev_promote_ratio: Atomic::new(0.01),
     alloc_vol: AtomicUsize::new(0),
     copy_promote_vol: AtomicUsize::new(0),
+    prev_copy_promote_ratio: Atomic::new(0.01),
     promote_vol: AtomicUsize::new(0),
+    prev_promote_ratio: Atomic::new(0.01),
 };
 
+/// Predicts how much of the young allocation in the coming cycle will survive.
 struct SurvivalRatioPredictor {
-    prev_ratio: Atomic<f64>,
-    /// As `prev_ratio`, but counting every promotion rather than only the copied ones. See
-    /// [`SurvivalRatioPredictor::promotion_ratio`].
-    prev_promote_ratio: Atomic<f64>,
+    /// Young allocation over the current cycle: the denominator of both ratios.
     alloc_vol: AtomicUsize,
+    /// Volume promoted by copying during the current cycle.
     copy_promote_vol: AtomicUsize,
+    /// Smoothed `copy_promote_vol / alloc_vol` over previous cycles.
+    prev_copy_promote_ratio: Atomic<f64>,
+    /// Volume promoted by any means during the current cycle.
     promote_vol: AtomicUsize,
+    /// Smoothed `promote_vol / alloc_vol` over previous cycles.
+    prev_promote_ratio: Atomic<f64>,
 }
 
 impl SurvivalRatioPredictor {
@@ -297,52 +219,30 @@ impl SurvivalRatioPredictor {
         self.alloc_vol.store(size, Ordering::SeqCst);
     }
 
-    /// Fraction of young allocation that survived *by being copied*. This is what sizing a
-    /// to-space wants, and it is legitimately zero when evacuation is off.
-    pub fn ratio(&self) -> f64 {
-        self.prev_ratio.load(Ordering::Relaxed)
+    /// Fraction of young allocation that survived *by being copied*.
+    pub fn copy_promote_ratio(&self) -> f64 {
+        self.prev_copy_promote_ratio.load(Ordering::Relaxed)
     }
 
     /// Fraction of young allocation that survived at all, copied or promoted in place.
-    ///
-    /// This is the one to use to predict how much work the next pause will do, because a pause pays
-    /// for every promotion: `ProcessIncs` scans each promoted object's fields and generates further
-    /// increments from them, whether or not the object moved. [`Self::ratio`] cannot serve that
-    /// purpose -- it counts only copied promotions, so with evacuation disabled (which is permanent
-    /// for the Julia binding) it is pinned at zero. Anything predicting survival from it therefore
-    /// predicted zero, which is how `MAX_SURVIVAL_MB` came to be unreachable: measured on
-    /// `tree_mutable`, ~887k objects and ~27MB were promoted per pause while the prediction stayed
-    /// at 0MB against a 128MB limit, so the bound that exists to cap pause time never once fired.
-    pub fn promotion_ratio(&self) -> f64 {
+    pub fn promote_ratio(&self) -> f64 {
         self.prev_promote_ratio.load(Ordering::Relaxed)
     }
 
-    pub fn update_ratio(&self) -> f64 {
-        if self.alloc_vol.load(Ordering::SeqCst) == 0 {
-            self.copy_promote_vol.store(0, Ordering::SeqCst);
-            self.promote_vol.store(0, Ordering::SeqCst);
-            return self.ratio();
+    pub fn update_ratios(&self) {
+        let alloc_vol = self.alloc_vol.swap(0, Ordering::SeqCst);
+        let copy_promote_vol = self.copy_promote_vol.swap(0, Ordering::SeqCst);
+        let promote_vol = self.promote_vol.swap(0, Ordering::SeqCst);
+        if alloc_vol == 0 {
+            return;
         }
-        let alloc = self.alloc_vol.load(Ordering::SeqCst) as f64;
-        let smooth = |prev: f64, curr: f64| {
-            let curr = f64::min(curr, 1.0);
-            f64::min((curr * 3f64 + prev) / 4f64, 1.0)
+        let smooth = |prev_ratio: &Atomic<f64>, vol: usize| {
+            let curr = f64::min(vol as f64 / alloc_vol as f64, 1.0);
+            let prev = prev_ratio.load(Ordering::SeqCst);
+            prev_ratio.store(f64::min((curr * 3f64 + prev) / 4f64, 1.0), Ordering::SeqCst);
         };
-        let ratio = smooth(
-            self.prev_ratio.load(Ordering::SeqCst),
-            self.copy_promote_vol.load(Ordering::SeqCst) as f64 / alloc,
-        );
-        let promote_ratio = smooth(
-            self.prev_promote_ratio.load(Ordering::SeqCst),
-            self.promote_vol.load(Ordering::SeqCst) as f64 / alloc,
-        );
-        self.prev_ratio.store(ratio, Ordering::SeqCst);
-        self.prev_promote_ratio
-            .store(promote_ratio, Ordering::SeqCst);
-        self.alloc_vol.store(0, Ordering::SeqCst);
-        self.copy_promote_vol.store(0, Ordering::SeqCst);
-        self.promote_vol.store(0, Ordering::SeqCst);
-        ratio
+        smooth(&self.prev_copy_promote_ratio, copy_promote_vol);
+        smooth(&self.prev_promote_ratio, promote_vol);
     }
 }
 
@@ -361,21 +261,11 @@ impl Default for SurvivalRatioPredictorLocal {
 }
 
 impl SurvivalRatioPredictorLocal {
-    pub fn record_copied_promotion(&self, size: usize) {
-        self.copy_promote_vol.store(
-            self.copy_promote_vol.load(Ordering::Relaxed) + size,
-            Ordering::Relaxed,
-        );
-    }
-
-    /// Record a promotion of any kind. Per-worker and non-atomic like the above, published by
-    /// [`Self::sync`], so it stays off the shared cache line that a global counter would put on the
-    /// path of every promoted object.
-    pub fn record_promotion(&self, size: usize) {
-        self.promote_vol.store(
-            self.promote_vol.load(Ordering::Relaxed) + size,
-            Ordering::Relaxed,
-        );
+    pub fn record_promotion(&self, size: usize, copied: bool) {
+        self.promote_vol.fetch_add(size, Ordering::Relaxed);
+        if copied {
+            self.copy_promote_vol.fetch_add(size, Ordering::Relaxed);
+        }
     }
 
     pub fn sync(&self) {
