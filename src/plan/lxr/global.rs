@@ -83,7 +83,7 @@ pub struct LXR<VM: VMBinding> {
 }
 
 pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints {
-    moves_objects: true,
+    moves_objects: super::NURSERY_EVACUATION || super::MATURE_EVACUATION,
     // Max immix object size is half of a block.
     max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
     barrier: BarrierSelector::FieldBarrier,
@@ -108,13 +108,22 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         if self.concurrent_work_in_progress() && super::concurrent_marking_packets_drained() {
             return true;
         }
+        // Bound the pause by bounding the work it has to do (default to usize::MAX - disabled)
+        if self.rc.inc_buffer_size() >= *self.base().options.lxr_inc_buffer_limit {
+            return true;
+        }
         // Survival limits
         let total_young_alloc_pages =
             self.block_allocation.total_young_allocation_in_bytes() >> LOG_BYTES_IN_MBYTE;
-        let predicted_survival_mb: usize =
-            ((total_young_alloc_pages as f64 * super::SURVIVAL_RATIO_PREDICTOR.ratio()) as usize)
-                << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER;
-        if predicted_survival_mb >= super::MAX_SURVIVAL_MB {
+        // Use copy promotion ratio, or just total promotion ratio.
+        let ratio = if LXR_CONSTRAINTS.moves_objects {
+            super::SURVIVAL_RATIO_PREDICTOR.copy_promote_ratio()
+        } else {
+            super::SURVIVAL_RATIO_PREDICTOR.promote_ratio()
+        };
+        let predicted_survival_mb: usize = ((total_young_alloc_pages as f64 * ratio) as usize)
+            << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER;
+        if predicted_survival_mb >= *self.base().options.lxr_max_survival_mb {
             return true;
         }
         if !self.immix_space.common().contiguous {
@@ -227,7 +236,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        let _new_ratio = super::SURVIVAL_RATIO_PREDICTOR.update_ratio();
+        super::SURVIVAL_RATIO_PREDICTOR.update_ratios();
         let pause = self.current_pause().unwrap();
         if pause == Pause::FinalMark || pause == Pause::Full {
             VM::VMCollection::update_weak_processor(false);
@@ -259,7 +268,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     fn get_collection_reserved_pages(&self) -> usize {
         let survival = {
             let predicted_survival = (self.block_allocation.clean_nursery_mb() as f64
-                * super::SURVIVAL_RATIO_PREDICTOR.ratio())
+                * super::SURVIVAL_RATIO_PREDICTOR.copy_promote_ratio())
                 as usize;
             predicted_survival << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER
         };
@@ -356,7 +365,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn root_scanning_stage(&self) -> WorkBucketStage {
-        WorkBucketStage::RCProcessIncs
+        WorkBucketStage::RCProcessIncsNonMoving
     }
 
     fn concurrent(&self) -> Option<&dyn ConcurrentPlan<VM = VM>> {
@@ -385,14 +394,24 @@ impl<VM: VMBinding> LXR<VM> {
             "LXR does not support placing forwarding bits on the side."
         );
         let num_workers = args.scheduler.num_workers();
-        let immix_specs = metadata::extract_side_metadata(&[
+        #[allow(unused_mut)]
+        let mut specs = vec![
             MetadataSpec::OnSide(RC_TABLE),
             MetadataSpec::OnSide(
                 *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
                     .as_spec()
                     .extract_side_spec(),
             ),
-        ]);
+        ];
+        // The per-object log bit has to be registered too, not just the per-field one. LXR's
+        // own barrier only consults the field bits, this can be an issue for the probable write API (no field given).
+        // With `lxr_object_log`, the probable write API also logs the object bit.
+        // TODO: We should examine if we can steal a bit from the field log its as the 'logical' object log bit.
+        // We potentially could use the field log bit at the object start, or (object ref - lower bound) -- there should
+        // be no field at those addresses.
+        #[cfg(feature = "lxr_object_log")]
+        specs.push(*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.as_spec());
+        let immix_specs = metadata::extract_side_metadata(&specs);
         let global_side_metadata_specs = SideMetadataContext::new_global_specs(&immix_specs);
         let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
@@ -656,9 +675,12 @@ impl<VM: VMBinding> LXR<VM> {
 
     fn disable_unnecessary_buckets(&'static self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
         // Set conditional buckets
+        scheduler.work_buckets[WorkBucketStage::RCProcessIncsNonMoving].set_enabled(true);
         scheduler.work_buckets[WorkBucketStage::RCProcessIncs].set_enabled(true);
         scheduler.work_buckets[WorkBucketStage::Prepare].set_enabled(pause != Pause::RefCount);
         let final_mark_or_full = pause == Pause::FinalMark || pause == Pause::Full;
+        // Marks roots reported as objects, before `Closure` can evacuate anything.
+        scheduler.work_buckets[WorkBucketStage::PinningRootsTrace].set_enabled(final_mark_or_full);
         scheduler.work_buckets[WorkBucketStage::Closure].set_enabled(final_mark_or_full);
         scheduler.work_buckets[WorkBucketStage::WeakRefClosure].set_enabled(final_mark_or_full);
         scheduler.work_buckets[WorkBucketStage::FinalRefClosure].set_enabled(final_mark_or_full);
@@ -669,8 +691,9 @@ impl<VM: VMBinding> LXR<VM> {
         scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(true);
         scheduler.work_buckets[WorkBucketStage::ConcurrentResumable].set_enabled(true);
         // Always disabled
+        // LXR never routes work here: it has no transitively pinning closure. Transitive
+        // pinning roots, where accepted at all, take the ordinary node-root path instead.
         scheduler.work_buckets[WorkBucketStage::TPinningClosure].set_enabled(false);
-        scheduler.work_buckets[WorkBucketStage::PinningRootsTrace].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::SoftRefClosure].set_enabled(false);
@@ -804,6 +827,12 @@ impl<VM: VMBinding> LXR<VM> {
 
     pub const fn los(&self) -> &LargeObjectSpace<VM> {
         &self.common.los
+    }
+
+    /// Whether `o` lives in a space LXR reference-counts (immix space or LOS). Objects
+    /// elsewhere (e.g. Julia's sysimage in the immortal/VM space) carry no reference count.
+    pub fn is_rc_object(&self, o: ObjectReference) -> bool {
+        self.immix_space.in_space(o) || self.common.los.in_space(o)
     }
 
     fn on_lazy_decs_finished(&self, c: LazySweepingJobsCounter) {

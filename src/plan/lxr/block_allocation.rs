@@ -2,6 +2,7 @@ use super::gc_work::nursery_sweeping::{RCLazySweepNurseryBlocks, RCSTWSweepNurse
 use super::LXR;
 use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::Pause;
+use crate::plan::global::Plan;
 use crate::policy::immix::block::{Block, BlockState};
 use crate::policy::immix::{ImmixHooks, ImmixSpace};
 use crate::scheduler::{GCWork, GCWorkScheduler, WorkBucketStage};
@@ -128,7 +129,8 @@ impl<VM: VMBinding> BlockAllocation<VM> {
     /// Reset allocated_block_buffer and free nursery blocks.
     pub fn sweep_nursery_blocks(&self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
         const PARALLEL_STW_SWEEPING: bool = false;
-        let max_stw_sweep_blocks: usize = usize::MAX;
+        let max_stw_sweep_blocks: usize =
+            *self.lxr().base().options.lxr_max_stw_sweep_nursery_blocks;
         let space = self.space();
         self.nursery_blocks.visit_slice(|blocks| {
             if PARALLEL_STW_SWEEPING {

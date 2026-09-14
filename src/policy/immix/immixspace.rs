@@ -837,7 +837,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         // This function should not be called during RC if mature evacuation is not enabled.
-        debug_assert!(!LXR_MATURE_EVACUATION || !self.rc_enabled);
+        if LXR_MATURE_EVACUATION {
+            debug_assert!(!self.rc_enabled);
+        }
 
         #[cfg(feature = "vo_bit")]
         if !self.rc_enabled {
@@ -1245,6 +1247,24 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
             cursor
         };
+        // For bindings without `UNIFIED_OBJECT_REFERENCE_ADDRESS`, the object start
+        // may land in the line immediately before its object reference address. Such a line
+        // can be considered as empty. We conservatively consider the last line in a hole
+        // may hold an object start. This is the only place in LXR we need to handle the object start vs object ref issue.
+        // TODO: This solution is conservative and not ideal, but is the simplest fix.
+        // An alternative is to shift RC_TABLE (and possibly the RC_STRADDLE_LINES) for the upper bound of (obj ref - obj start),
+        // when we search for holes. See https://github.com/mmtk/mmtk-core/pull/1576 as a half-done prototype.
+        let end = if !VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS && end < limit {
+            end - 1
+        } else {
+            end
+        };
+        if end <= start {
+            // The reservation consumed the entire hole (it was exactly one line). Retry from
+            // just past it instead of handing out an empty range.
+            let next_search_start = Line::from_aligned_address(block.start()).next_nth(start + 1);
+            return self.rc_get_next_available_lines(copy, next_search_start);
+        }
         let start = Line::from_aligned_address(block.start()).next_nth(start);
         let end = Line::from_aligned_address(block.start()).next_nth(end);
         if self.common.needs_log_bit {
@@ -1384,6 +1404,9 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         // Clear object mark table for this chunk
         self.reset_object_mark();
+        // The number of defrag source blocks.  For debugging.
+        let mut num_defrag_source_blocks = 0;
+        let mut num_blocks_prepared = 0;
         // Iterate over all blocks in this chunk
         for block in self.chunk.iter_region::<Block>() {
             let state = block.get_state();
@@ -1391,6 +1414,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             if state == BlockState::Unallocated {
                 continue;
             }
+            num_blocks_prepared += 1;
             // Check if this block needs to be defragmented.
             let is_defrag_source = if !self.space.is_defrag_enabled() {
                 // Do not set any block as defrag source if defrag is disabled.
@@ -1405,12 +1429,22 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
                 // Not a defrag GC.
                 false
             };
+            if is_defrag_source {
+                num_defrag_source_blocks += 1;
+            }
             block.set_as_defrag_source(is_defrag_source);
             // Clear block mark data.
             block.set_state(BlockState::Unmarked);
             debug_assert!(!block.get_state().is_reusable());
             debug_assert_ne!(block.get_state(), BlockState::Marked);
         }
+
+        probe!(
+            mmtk,
+            immix_prepare_block_state,
+            num_blocks_prepared,
+            num_defrag_source_blocks
+        );
 
         self.unlog_bits_op
             .execute::<VM>(self.chunk.start(), Chunk::BYTES);

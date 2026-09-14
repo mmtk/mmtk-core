@@ -35,9 +35,6 @@ pub(crate) const MATURE_EVACUATION: bool = !cfg!(feature = "lxr_no_mature_evac")
 /// Stop triggering CM or RC pauses, and trigger Full GCs instead if the available heap after a RC pause is still small.
 const RC_STOP_PERCENT: usize = 15;
 
-/// Trigger an RC pause when the predicted max survival size is larger than this threshold.
-const MAX_SURVIVAL_MB: usize = 128;
-
 /// Trigger a concurrent marking cycle when the predicted mature size is larger than this threshold.
 const TRACE_THRESHOLD: usize = 20;
 
@@ -153,15 +150,25 @@ static LAZY_SWEEPING_JOBS: Lazy<RwLock<LazySweepingJobs>> =
     Lazy::new(|| RwLock::new(LazySweepingJobs::new()));
 
 static SURVIVAL_RATIO_PREDICTOR: SurvivalRatioPredictor = SurvivalRatioPredictor {
-    prev_ratio: Atomic::new(0.01),
     alloc_vol: AtomicUsize::new(0),
     copy_promote_vol: AtomicUsize::new(0),
+    prev_copy_promote_ratio: Atomic::new(0.01),
+    promote_vol: AtomicUsize::new(0),
+    prev_promote_ratio: Atomic::new(0.01),
 };
 
+/// Predicts how much of the young allocation in the coming cycle will survive.
 struct SurvivalRatioPredictor {
-    prev_ratio: Atomic<f64>,
+    /// Young allocation over the current cycle: the denominator of both ratios.
     alloc_vol: AtomicUsize,
+    /// Volume promoted by copying during the current cycle.
     copy_promote_vol: AtomicUsize,
+    /// Smoothed `copy_promote_vol / alloc_vol` over previous cycles.
+    prev_copy_promote_ratio: Atomic<f64>,
+    /// Volume promoted by any means during the current cycle.
+    promote_vol: AtomicUsize,
+    /// Smoothed `promote_vol / alloc_vol` over previous cycles.
+    prev_promote_ratio: Atomic<f64>,
 }
 
 impl SurvivalRatioPredictor {
@@ -170,46 +177,53 @@ impl SurvivalRatioPredictor {
         self.alloc_vol.store(size, Ordering::SeqCst);
     }
 
-    pub fn ratio(&self) -> f64 {
-        self.prev_ratio.load(Ordering::Relaxed)
+    /// Fraction of young allocation that survived *by being copied*.
+    pub fn copy_promote_ratio(&self) -> f64 {
+        self.prev_copy_promote_ratio.load(Ordering::Relaxed)
     }
 
-    pub fn update_ratio(&self) -> f64 {
-        if self.alloc_vol.load(Ordering::SeqCst) == 0 {
-            self.copy_promote_vol.store(0, Ordering::SeqCst);
-            return self.ratio();
+    /// Fraction of young allocation that survived at all, copied or promoted in place.
+    pub fn promote_ratio(&self) -> f64 {
+        self.prev_promote_ratio.load(Ordering::Relaxed)
+    }
+
+    pub fn update_ratios(&self) {
+        let alloc_vol = self.alloc_vol.swap(0, Ordering::SeqCst);
+        let copy_promote_vol = self.copy_promote_vol.swap(0, Ordering::SeqCst);
+        let promote_vol = self.promote_vol.swap(0, Ordering::SeqCst);
+        if alloc_vol == 0 {
+            return;
         }
-        let prev = self.prev_ratio.load(Ordering::SeqCst);
-        let curr = self.copy_promote_vol.load(Ordering::SeqCst) as f64
-            / self.alloc_vol.load(Ordering::SeqCst) as f64;
-        let curr = f64::min(curr, 1.0);
-        let ratio = (curr * 3f64 + prev) / 4f64;
-        let ratio = f64::min(ratio, 1.0);
-        self.prev_ratio.store(ratio, Ordering::SeqCst);
-        self.alloc_vol.store(0, Ordering::SeqCst);
-        self.copy_promote_vol.store(0, Ordering::SeqCst);
-        ratio
+        let smooth = |prev_ratio: &Atomic<f64>, vol: usize| {
+            let curr = f64::min(vol as f64 / alloc_vol as f64, 1.0);
+            let prev = prev_ratio.load(Ordering::SeqCst);
+            prev_ratio.store(f64::min((curr * 3f64 + prev) / 4f64, 1.0), Ordering::SeqCst);
+        };
+        smooth(&self.prev_copy_promote_ratio, copy_promote_vol);
+        smooth(&self.prev_promote_ratio, promote_vol);
     }
 }
 
 struct SurvivalRatioPredictorLocal {
     copy_promote_vol: AtomicUsize,
+    promote_vol: AtomicUsize,
 }
 
 impl Default for SurvivalRatioPredictorLocal {
     fn default() -> Self {
         Self {
             copy_promote_vol: AtomicUsize::new(0),
+            promote_vol: AtomicUsize::new(0),
         }
     }
 }
 
 impl SurvivalRatioPredictorLocal {
-    pub fn record_copied_promotion(&self, size: usize) {
-        self.copy_promote_vol.store(
-            self.copy_promote_vol.load(Ordering::Relaxed) + size,
-            Ordering::Relaxed,
-        );
+    pub fn record_promotion(&self, size: usize, copied: bool) {
+        self.promote_vol.fetch_add(size, Ordering::Relaxed);
+        if copied {
+            self.copy_promote_vol.fetch_add(size, Ordering::Relaxed);
+        }
     }
 
     pub fn sync(&self) {
@@ -217,6 +231,9 @@ impl SurvivalRatioPredictorLocal {
             self.copy_promote_vol.load(Ordering::Relaxed),
             Ordering::Relaxed,
         );
+        SURVIVAL_RATIO_PREDICTOR
+            .promote_vol
+            .fetch_add(self.promote_vol.load(Ordering::Relaxed), Ordering::Relaxed);
     }
 }
 

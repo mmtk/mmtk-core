@@ -1,4 +1,5 @@
 use super::global::LXR;
+use super::{MATURE_EVACUATION, NURSERY_EVACUATION};
 use crate::plan::tracing::UnsupportedTrace;
 use crate::plan::VectorObjectQueue;
 use crate::scheduler::gc_work::RootKind;
@@ -15,7 +16,7 @@ pub mod prepare;
 pub mod rc;
 pub mod tracing;
 
-use rc::CollectRoots;
+use rc::{CollectNodeRoots, CollectSlotRoots};
 
 /// Common base fields shared by LXR's custom root/closure work packets.
 ///
@@ -98,8 +99,12 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for LXRGCWorkContext<VM> {
     }
 }
 
-/// The [`RootsWorkFactory`] used by LXR. Roots are processed by reference-counting them through
-/// [`CollectRoots`] (which spawns `ProcessIncs`).
+/// The [`RootsWorkFactory`] used by LXR.
+///
+/// Roots reported as slots are reference-counted through [`CollectSlotRoots`] (which spawns
+/// `ProcessIncs`) in `RCProcessIncs`; roots reported as objects go through
+/// [`CollectNodeRoots`] one stage earlier, in `RCProcessIncsNonMoving`, so that nothing can move
+/// them. See the two methods below.
 pub struct LXRRootsWorkFactory<VM: VMBinding> {
     mmtk: &'static MMTK<VM>,
 }
@@ -118,17 +123,33 @@ impl<VM: VMBinding> LXRRootsWorkFactory<VM> {
 
 impl<VM: VMBinding> RootsWorkFactory<VM::VMSlot> for LXRRootsWorkFactory<VM> {
     fn create_process_roots_work_with_root_kind(&mut self, slots: Vec<VM::VMSlot>, kind: RootKind) {
-        let stage = self.mmtk.get_plan().root_scanning_stage();
-        let mut w = CollectRoots::new(slots, true, self.mmtk, stage);
+        // Slot roots may be evacuated, so they run in `RCProcessIncs`, one stage after the
+        // `root_scanning_stage` that discovered them. See `WorkBucketStage::RCProcessIncsNonMoving`.
+        let stage = WorkBucketStage::RCProcessIncs;
+        let mut w = CollectSlotRoots::new(slots, true, self.mmtk, stage);
         w.root_kind = Some(kind);
         crate::memory_manager::add_work_packet(self.mmtk, stage, w);
     }
 
-    fn create_process_pinning_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
-        unreachable!("LXR does not support pinning roots");
+    fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+        if nodes.is_empty() {
+            return;
+        }
+        crate::memory_manager::add_work_packet(
+            self.mmtk,
+            WorkBucketStage::RCProcessIncsNonMoving,
+            CollectNodeRoots::<VM>::new(nodes),
+        );
     }
 
-    fn create_process_tpinning_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
-        unreachable!("LXR does not support transitive pinning roots");
+    fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+        // Transitive pinning is not supported.
+        // Not sure if we can support it for LXR, as RC collections have no notion of transitive closure.
+        if NURSERY_EVACUATION || MATURE_EVACUATION {
+            unimplemented!(
+                "LXR does not support transitive pinning roots unless evacuation is compiled out"
+            );
+        }
+        self.create_process_pinning_roots_work(nodes);
     }
 }
