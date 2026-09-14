@@ -317,7 +317,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// This function should only be called after all the workers are parked.
     /// No workers will be waked up by this function. The caller is responsible for that.
     ///
-    /// Return true if there're any non-empty buckets updated.
+    /// Returns the number of packets made available by the buckets that were opened, so the
+    /// caller can wake just that many workers.  Returns 0 if no bucket was opened, or if the
+    /// opened buckets were all empty.
     pub(crate) fn update_buckets(&self) -> usize {
         debug!("update_buckets");
         let mut buckets_updated = false;

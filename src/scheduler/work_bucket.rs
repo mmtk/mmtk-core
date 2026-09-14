@@ -221,11 +221,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.queue.is_empty()
     }
 
-    /// Number of packets currently queued.
-    ///
-    /// Used to decide how many workers to wake when this bucket opens, so that a bucket holding a
-    /// single packet does not wake every worker.  Only meaningful when no worker can be stealing
-    /// concurrently, i.e. when called by the last parked worker.
     pub fn len(&self) -> usize {
         self.queue.len()
     }
