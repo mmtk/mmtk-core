@@ -20,7 +20,11 @@ pub(crate) enum LastParkedResult {
     ParkSelf,
     /// The last parked worker should unpark and find work packet to do.
     WakeSelf,
-    /// Wake up all parked GC workers.
+    /// Unpark the last parked worker and up to `n - 1` others, i.e. just enough workers to cover
+    /// `n` available work packets.
+    Wake(usize),
+    /// Wake up all parked GC workers.  For cases where which worker runs matters (designated
+    /// work) or where every worker must observe a new goal (shutdown, fork).
     WakeAll,
 }
 
@@ -180,6 +184,25 @@ impl WorkerMonitor {
         }
     }
 
+    /// Wake `n` workers in total, counting the caller.  See [`LastParkedResult::Wake`].
+    ///
+    /// Called by the last parked worker while holding `sync`, at which point every other worker is
+    /// provably blocked on `workers_have_anything_to_do`: parking requires `sync`, so each of them
+    /// has already released it inside `Condvar::wait`.  `notify_one` therefore reliably wakes one
+    /// real waiter per call rather than being dropped.
+    fn wake_n_while_locked(&self, n: usize) {
+        // The caller does not wait, so it covers one of the `n` packets itself.
+        let others = n.saturating_sub(1).min(self.worker_count.saturating_sub(1));
+        if others >= self.worker_count.saturating_sub(1) {
+            // Waking everyone anyway; one broadcast beats N wake-ups.
+            self.workers_have_anything_to_do.notify_all();
+        } else {
+            for _ in 0..others {
+                self.workers_have_anything_to_do.notify_one();
+            }
+        }
+    }
+
     /// Park a worker and wait on the CondVar `workers_have_anything_to_do`.
     ///
     /// If it is the last worker parked, `on_last_parked` will be called.
@@ -220,6 +243,11 @@ impl WorkerMonitor {
                 }
                 LastParkedResult::WakeSelf => {
                     // Continue without waiting.
+                }
+                LastParkedResult::Wake(n) => {
+                    // We are still holding `sync`, so we must not call `notify_work_available`
+                    // (which would try to lock it again and deadlock).
+                    self.wake_n_while_locked(n);
                 }
                 LastParkedResult::WakeAll => {
                     // We are still holding `sync`, so we must not call `notify_work_available`
