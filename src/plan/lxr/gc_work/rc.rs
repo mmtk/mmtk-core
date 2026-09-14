@@ -767,10 +767,6 @@ pub struct ProcessDecs<VM: VMBinding> {
     mark_dead_objects: bool,
     mature_sweeping_in_progress: bool,
     rc: RefCountHelper<VM>,
-    /// Where these decrements came from, for diagnostics only. The two buffered sources --
-    /// the write barrier's overwritten field values and the previous pause's root set --
-    /// are indistinguishable in a backtrace, because both arrive as a plain packet.
-    pub origin: &'static str,
 }
 
 impl<VM: VMBinding> ProcessDecs<VM> {
@@ -784,7 +780,6 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             mark_dead_objects: false,
             mature_sweeping_in_progress: false,
             rc: RefCountHelper::NEW,
-            origin: "unknown",
         }
     }
 
@@ -798,7 +793,6 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             mark_dead_objects: false,
             mature_sweeping_in_progress: false,
             rc: RefCountHelper::NEW,
-            origin: "unknown",
         }
     }
 
@@ -817,12 +811,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
         let mmtk = worker.mmtk;
         if !self.new_decs.is_empty() {
             let new_decs = self.new_decs.take();
-            let mut w = ProcessDecs::new(new_decs, self.counter.clone_with_decs());
-            w.origin = if self.origin == "unknown" {
-                "cascade"
-            } else {
-                self.origin
-            };
+            let w = ProcessDecs::new(new_decs, self.counter.clone_with_decs());
             self.new_work(worker, w);
         }
         if !self.mark_objects.is_empty() {

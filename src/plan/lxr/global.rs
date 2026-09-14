@@ -885,8 +885,7 @@ impl<VM: VMBinding> LXR<VM> {
         let prev_roots = self.prev_roots.read().unwrap();
         let mut work_packets: Vec<Box<dyn GCWork<VM>>> = Vec::with_capacity(prev_roots.len());
         while let Some(decs) = prev_roots.pop() {
-            let mut w = ProcessDecs::new(decs, LazySweepingJobsCounter::new_decs());
-            w.origin = "prev_roots";
+            let w = ProcessDecs::new(decs, LazySweepingJobsCounter::new_decs());
             work_packets.push(Box::new(w))
         }
         if work_packets.is_empty() {

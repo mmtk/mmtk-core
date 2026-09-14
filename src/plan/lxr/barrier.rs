@@ -59,8 +59,6 @@ pub struct LXRFieldBarrierSemantics<VM: VMBinding> {
     decs: VectorQueue<ObjectReference>,
     refs: VectorQueue<ObjectReference>,
     lxr: &'static LXR<VM>,
-    /// Which barrier path pushed into `decs`, for diagnostics.
-    dec_origin: &'static str,
     /// The last chunk [`Self::slot_has_unlog_bit`] found metadata mapped for. See there.
     mapped_chunk: std::cell::Cell<Address>,
     /// Objects logged by [`Self::object_probable_write_slow`], to be re-armed at the end of
@@ -83,7 +81,6 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
             decs: VectorQueue::default(),
             refs: VectorQueue::default(),
             lxr: mmtk.get_plan().downcast_ref::<LXR<VM>>().unwrap(),
-            dec_origin: "barrier-unknown",
             mapped_chunk: std::cell::Cell::new(Address::ZERO),
             #[cfg(feature = "lxr_object_log")]
             logged_objs: VectorQueue::default(),
@@ -198,7 +195,6 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
     ) {
         // Reference counting
         if let Some(old) = old {
-            self.dec_origin = "barrier-field";
             self.decs.push(old);
             if self.decs.is_full() {
                 self.flush_decs_and_satb();
@@ -250,23 +246,13 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
     #[cold]
     fn flush_decs_and_satb(&mut self) {
         if !self.decs.is_empty() {
-            let origin = self.dec_origin;
             let w = if self.should_create_satb_packets() {
                 let decs = Arc::new(self.decs.take());
                 self.mmtk.scheduler.work_buckets[WorkBucketStage::FinishConcurrentWork]
                     .add(ProcessModBufSATB::new_arc(decs.clone()));
-                {
-                    let mut w = ProcessDecs::new_arc(decs, LazySweepingJobsCounter::new_decs());
-                    w.origin = origin;
-                    w
-                }
+                ProcessDecs::new_arc(decs, LazySweepingJobsCounter::new_decs())
             } else {
-                let decs = self.decs.take();
-                {
-                    let mut w = ProcessDecs::new(decs, LazySweepingJobsCounter::new_decs());
-                    w.origin = origin;
-                    w
-                }
+                ProcessDecs::new(self.decs.take(), LazySweepingJobsCounter::new_decs())
             };
             if super::LAZY_DECREMENTS {
                 self.mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent]
