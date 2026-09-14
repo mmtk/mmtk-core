@@ -22,7 +22,6 @@ use crossbeam::deque::Steal;
 use enum_map::{Enum, EnumMap};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
 
 pub struct GCWorkScheduler<VM: VMBinding> {
     /// Work buckets
@@ -591,12 +590,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 // work packet events before the `ScheduleCollection` work packet starts.
                 probe!(mmtk, gc_start);
 
-                {
-                    let mut gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
-                    assert!(gc_start_time.is_none(), "GC already started?");
-                    *gc_start_time = Some(Instant::now());
-                }
-
                 self.add_schedule_collection_packet();
                 LastParkedResult::WakeSelf
             }
@@ -669,18 +662,21 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         plan_mut.on_pause_end(mmtk, worker.tls);
         probe!(mmtk, plan_end_of_gc_end);
 
-        // Compute the elapsed time of the GC.
-        let start_time = {
-            let mut gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
-            gc_start_time.take().expect("GC not started yet?")
-        };
-        let elapsed = start_time.elapsed();
+        // Compute the elapsed time of the pause so far. `pause_start_time` is taken (and the
+        // "pause-time" stat recorded) further down, once the pause is truly about to end.
+        let elapsed = mmtk
+            .state
+            .pause_start_time
+            .borrow()
+            .as_ref()
+            .expect("Pause start time was not recorded")
+            .elapsed();
 
         let reserved_pages = mmtk.get_plan().get_reserved_pages();
         let total_pages = mmtk.get_plan().get_total_pages();
 
         info!(
-            "End of GC ({}/{} pages, took {:.2} ms)",
+            "End of Pause ({}/{} pages, took {:.2} ms)",
             reserved_pages,
             total_pages,
             elapsed.as_secs_f64() * 1000.0
