@@ -67,9 +67,20 @@ impl<VM: VMBinding> LXRConcurrentTraceObjects<VM> {
         if !self.next_objects.is_empty() {
             let objects = self.next_objects.take();
             let worker = unsafe { &mut *self.worker };
-            debug_assert!(self.plan.cm_enabled());
             let w = Self::new(objects, worker.mmtk);
-            worker.add_work(WorkBucketStage::ConcurrentResumable, w);
+            // A stop-the-world tracing pause has to finish its closure before the pause ends, so
+            // the continuation belongs in `Closure`. `ConcurrentResumable` does not run inside a
+            // pause, so routing there unconditionally meant a `Full` pause marked the objects it
+            // was handed and then stopped: 566 objects marked against 188,228 that
+            // `SweepDeadCycles` went on to reclaim as unmarked.
+            let stage = match self.plan.current_pause() {
+                Some(Pause::Full) | Some(Pause::FinalMark) => WorkBucketStage::Closure,
+                _ => {
+                    debug_assert!(self.plan.cm_enabled());
+                    WorkBucketStage::ConcurrentResumable
+                }
+            };
+            worker.add_work(stage, w);
         }
     }
 
@@ -229,10 +240,12 @@ impl<VM: VMBinding> GCWork<VM> for ProcessModBufSATB {
             .downcast_ref::<LXR<VM>>()
             .unwrap()
             .current_pause();
-        if current_pause != Some(Pause::FinalMark) {
-            worker.scheduler().work_buckets[WorkBucketStage::ConcurrentResumable].add(w);
-        } else {
+        // In a tracing pause the closure has to complete before the pause ends; running it here
+        // keeps it inside the pause, and its own `flush` continues into `Closure`.
+        if current_pause == Some(Pause::FinalMark) || current_pause == Some(Pause::Full) {
             GCWork::do_work(&mut w, worker, mmtk);
+        } else {
+            worker.scheduler().work_buckets[WorkBucketStage::ConcurrentResumable].add(w);
         }
     }
 }

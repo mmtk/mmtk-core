@@ -240,6 +240,52 @@ pub trait Scanning<VM: VMBinding> {
         unreachable!("scan_object_and_trace_edges() will not be called when support_slot_enqueuing() is always true.")
     }
 
+    /// The number of independently scannable chunks `object` is made of, or `None` if it can
+    /// only be scanned as a whole.
+    ///
+    /// A chunk is whatever unit the VM can start and stop scanning at -- an array element, say
+    /// -- and is meaningful only for this object. MMTk uses this to hand one object's fields to
+    /// several workers, which matters for an object large enough that scanning it serially
+    /// dominates a pause: one 100M-element array of references takes hundreds of milliseconds
+    /// to walk, however many workers are idle.
+    ///
+    /// Returning `None` (the default) is always correct and keeps the whole object in one
+    /// scan. Return `Some` only if [`Scanning::scan_object_chunks`] is also implemented.
+    ///
+    /// Called on the object-scanning path, so it must be cheap -- for an array, the length.
+    ///
+    /// Arguments:
+    /// * `tls`: The VM-specific thread-local storage for the current worker.
+    /// * `object`: The object about to be scanned.
+    fn scan_chunk_count(_tls: VMWorkerThread, _object: ObjectReference) -> Option<usize> {
+        None
+    }
+
+    /// As [`Scanning::scan_object`], but visiting only the fields in chunks `chunks` of
+    /// `object`, where a chunk is the unit [`Scanning::scan_chunk_count`] counts.
+    ///
+    /// MMTk calls this only after `scan_chunk_count` returned `Some(n)` for this object, and
+    /// only with `chunks.end <= n`. Scanning `0..n` must visit exactly the slots
+    /// [`Scanning::scan_object`] visits, no more and no fewer: MMTk splits `0..n` into
+    /// adjacent ranges and covers each exactly once, so a slot reported by both the whole-object
+    /// scan and no chunk is lost, and one reported by two chunks is counted twice.
+    ///
+    /// Arguments:
+    /// * `tls`: The VM-specific thread-local storage for the current worker.
+    /// * `object`: The object to be scanned.
+    /// * `chunks`: The half-open range of chunk indices to scan.
+    /// * `slot_visitor`: Called back for each field in those chunks.
+    fn scan_object_chunks(
+        _tls: VMWorkerThread,
+        _object: ObjectReference,
+        _chunks: std::ops::Range<usize>,
+        _slot_visitor: &mut impl SlotVisitor<VM::VMSlot>,
+    ) {
+        unreachable!(
+            "scan_object_chunks() must be implemented when scan_chunk_count() returns Some"
+        )
+    }
+
     /// MMTk calls this method at the first time during a collection that thread's stacks
     /// have been scanned. This can be used (for example) to clean up
     /// obsolete compiled methods that are no longer being executed.

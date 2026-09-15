@@ -527,7 +527,12 @@ impl Block {
             space.reusable_blocks.push(*self);
             false
         } else {
-            debug_assert!(self.rc_dead(), "{:?} has non-zero rc value", self);
+            // A nursery block with no in-place promotion must have no live object: any
+            // object that reaches a non-zero count without being copied out sets the
+            // block's in-place-promotion flag. Checked unconditionally, because a
+            // violation means releasing a block with live objects in it, which corrupts
+            // the heap far away from the cause.
+            assert!(self.rc_dead(), "{:?} has non-zero rc value", self);
             debug_assert_ne!(self.get_state(), super::block::BlockState::Unallocated);
 
             // Bulk clear the VO bits of the entire block.
