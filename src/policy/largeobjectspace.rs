@@ -23,8 +23,19 @@ use std::sync::atomic::AtomicUsize;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
+
+// LOS objects can be in one of the three states at any time:
+//
+// -   Nursery: NURSERY_BIT is 1 (regardless of mark bit)
+// -   MatureUnmarked: NURSERY_BIT is 0, and MARK_BIT is not equal to mark_state
+// -   MatureMarked: NURSERY_BIT is 0, and MARK_BIT is equal to mark_state
+//
+// When flipping the meaning of the mark bit,
+// MatureUnmarked becomes MatureMarked, and MatureMarked becomes MatureUnmarked.
+// However, the Nursery state remains the Nursery state because the mark bit is ignored.
 const MARK_BIT: u8 = 0b01;
 const NURSERY_BIT: u8 = 0b10;
+#[allow(unused)]
 const LOS_BIT_MASK: u8 = 0b11;
 
 /// This type implements a policy for large objects. Each instance corresponds
@@ -58,7 +69,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             }
             return self.rc.count(object) > 0;
         }
-        self.test_mark_bit(object, self.mark_state)
+        self.is_marked(object)
     }
     fn is_reachable(&self, object: ObjectReference) -> bool {
         if self.rc_enabled {
@@ -122,11 +133,13 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         let allocate_as_live = self.should_allocate_as_live();
         let into_nursery = !allocate_as_live;
 
-        // mark/nursery bits: Set mark state plus optionally nursery bit.
         {
             let mark_nursery_state = if into_nursery {
-                self.mark_state | NURSERY_BIT
+                // It is Nursery state as long as the NURSERY_BIT is set,
+                // regardless of the mark state.
+                NURSERY_BIT
             } else {
+                // Marked objects don't have NURSERY_BIT.
                 self.mark_state
             };
 
@@ -229,8 +242,15 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     }
 
     fn debug_print_object_info(&self, object: ObjectReference) {
-        println!("marked = {}", self.test_mark_bit(object, self.mark_state));
+        let mark_nursery_state = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
+            .load_atomic::<VM, u8>(object, None, Ordering::SeqCst);
+        let mark_state = self.mark_state;
+        println!(
+            "mark_nursery_state = {} (current mark state is {})",
+            mark_nursery_state, mark_state
+        );
         println!("nursery = {}", self.is_in_nursery(object));
+        println!("marked = {}", self.is_marked(object));
         self.common.debug_print_object_global_info(object);
     }
 }
@@ -525,44 +545,18 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
     }
 
-    /// Test if the object's mark bit is the same as the given value. If it is not the same,
-    /// the method will attemp to mark the object and clear its nursery bit. If the attempt
-    /// succeeds, the method will return true, meaning the object is marked by this invocation.
-    /// Otherwise, it returns false.
+    /// Test if the nursery-mark state is in the marked state.  If not, it will atomically change
+    /// the state to marked (`MatureMarked`, which implies clearing the nursery bit) and return
+    /// true.  Otherwise, it returns false.
     fn test_and_mark(&self, object: ObjectReference, value: u8) -> bool {
-        loop {
-            let mask = if self.rc_enabled {
-                MARK_BIT
-            } else if self.in_nursery_gc {
-                LOS_BIT_MASK
-            } else {
-                MARK_BIT
-            };
-            let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
+        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
+            .fetch_update_metadata::<VM, u8, _>(
                 object,
-                None,
                 Ordering::SeqCst,
-            );
-            let mark_bit = old_value & mask;
-            if mark_bit == value {
-                return false;
-            }
-            // using LOS_BIT_MASK have side effects of clearing nursery bit
-            if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
-                .compare_exchange_metadata::<VM, u8>(
-                    object,
-                    old_value,
-                    old_value & !LOS_BIT_MASK | value,
-                    None,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                break;
-            }
-        }
-        true
+                Ordering::SeqCst,
+                |old_value| (!Self::is_marked_state(old_value, value)).then_some(value),
+            )
+            .is_ok()
     }
 
     fn test_mark_bit(&self, object: ObjectReference, value: u8) -> bool {
@@ -576,12 +570,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     /// Check if a given object is in nursery
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
-        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
-            object,
-            None,
-            Ordering::Relaxed,
-        ) & NURSERY_BIT
-            == NURSERY_BIT
+        let mark_nursery_state = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
+            .load_atomic::<VM, u8>(object, None, Ordering::Relaxed);
+
+        Self::is_nursery_state(mark_nursery_state)
     }
 
     pub fn sweep_rc_mature_objects_after_satb(&self, is_live: &impl Fn(ObjectReference) -> bool) {
@@ -599,7 +591,23 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     pub fn is_marked(&self, object: ObjectReference) -> bool {
-        self.test_mark_bit(object, self.mark_state)
+        let mark_nursery_state = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
+            .load_atomic::<VM, u8>(object, None, Ordering::SeqCst);
+
+        Self::is_marked_state(mark_nursery_state, self.mark_state)
+    }
+
+    /// Return true if the mark-nursery state represents the `Nursery` state.
+    fn is_nursery_state(mark_nursery_state: u8) -> bool {
+        mark_nursery_state & NURSERY_BIT == NURSERY_BIT
+    }
+
+    /// Return true if the mark-nursery state represents a marked state (i.e. the `MatureMarked` state).
+    /// Any other states are considered unmarked.
+    ///
+    /// Nursery objects are promoted when first marked, so there can't be marked nursery objects.
+    fn is_marked_state(mark_nursery_state: u8, mark_state: u8) -> bool {
+        mark_nursery_state == mark_state
     }
 }
 
