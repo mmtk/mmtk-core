@@ -30,9 +30,28 @@ const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
 // -   MatureUnmarked: NURSERY_BIT is 0, and MARK_BIT is not equal to mark_state
 // -   MatureMarked: NURSERY_BIT is 0, and MARK_BIT is equal to mark_state
 //
+// Note that there is no "nursery marked" state.  Nursery objects are promoted when marked.
+//
 // When flipping the meaning of the mark bit,
 // MatureUnmarked becomes MatureMarked, and MatureMarked becomes MatureUnmarked.
 // However, the Nursery state remains the Nursery state because the mark bit is ignored.
+//
+// Possible state transitions are:
+//
+//  alloocate
+//  │
+//  │   ┌──┐flip mark state
+//  │   │  │
+// ┌▼───▼──┴─┐         ┌──────────────┐ flip mark state ┌────────────────┐
+// │         │ mark    │              ├────────────────►│                │
+// │ Nursery │────────►│ MatureMarked │                 │ MatureUnmarked │
+// │         │         │              │◄────────────────┤                │
+// └─────────┘         └──────────────┘ mark            └────────────────┘
+//
+// Note that right before flipping mark state (at the beginning of a full-heap GC),
+// all objects are either (unmarked) nursery objects or marked mature objects.
+// There is no unmarked mature objects, otherwise it is an error.
+// After flipping, all objects become unmarked (Nursery or MatureUnmarked).
 const MARK_BIT: u8 = 0b01;
 const NURSERY_BIT: u8 = 0b10;
 #[allow(unused)]
@@ -590,6 +609,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         });
     }
 
+    /// Check if a given object is marked
     pub fn is_marked(&self, object: ObjectReference) -> bool {
         let mark_nursery_state = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
             .load_atomic::<VM, u8>(object, None, Ordering::SeqCst);
