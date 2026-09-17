@@ -5,10 +5,8 @@
 //! -   letting the last parked worker take action, and
 //! -   letting workers and mutators notify workers when workers are given things to do.
 
-use atomic::Atomic;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Condvar, Mutex};
-use std::sync::{atomic::Ordering, Condvar, Mutex};
 
 use super::{
     worker::WorkerShouldExit,
@@ -51,9 +49,6 @@ pub(crate) struct WorkerMonitor {
     /// -   any work packets available, and
     /// -   any field in `sync.goals.requests` set to true.
     workers_have_anything_to_do: Condvar,
-    /// A sloppy public counter for querying the number of workers parked.
-    /// This is read by work packets to split the work smartly.
-    parked_workers_sloppy: Atomic<usize>,
     /// Inactive workers wait on this instead.  They are notified whenever the number of active
     /// workers changes, which may turn them into active workers.
     active_worker_number_changed: Condvar,
@@ -118,7 +113,6 @@ impl WorkerMonitor {
             parker: WorkerParker::new(worker_count),
             active_workers: AtomicUsize::new(worker_count),
             workers_have_anything_to_do: Default::default(),
-            parked_workers_sloppy: Atomic::new(0),
             active_worker_number_changed: Default::default(),
         }
     }
@@ -237,9 +231,6 @@ impl WorkerMonitor {
             self.parker.worker_count,
             all_parked
         );
-
-        self.parked_workers_sloppy
-            .store(sync.parker.parked_workers, Ordering::SeqCst);
 
         let mut should_wait = false;
 
@@ -360,9 +351,6 @@ impl WorkerMonitor {
             self.parker.worker_count,
         );
 
-        self.parked_workers_sloppy
-            .store(sync.parker.parked_workers, Ordering::SeqCst);
-
         // If the current goal is an exit goal, the worker thread should exit.
         if matches!(
             sync.goals.current(),
@@ -380,12 +368,13 @@ impl WorkerMonitor {
         sync.goals.on_current_goal_completed();
     }
 
-    /// Load the sloppy parked worker counter.
+    /// Load the parked worker counter.
     ///
-    /// The result is inaccurate, but is enough to be used as a heuristics for load-balancing when
-    /// creating/splitting work packets
+    /// This function is allowed to be called at any time, therefore the result is sloppy because GC
+    /// workers may park and unpark while the current thread calls this function.  However, it is
+    /// enough to be used as a heuristics for load-balancing when creating/splitting work packets
     pub fn parked_workers_sloppy(&self) -> usize {
-        self.parked_workers_sloppy.load(Ordering::SeqCst)
+        self.parker.parked_workers()
     }
 }
 
