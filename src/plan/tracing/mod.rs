@@ -6,8 +6,8 @@ use std::marker::PhantomData;
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::{GCWorker, EDGES_WORK_BUFFER_SIZE};
-use crate::util::{ObjectReference, VMThread, VMWorkerThread};
-use crate::vm::{Scanning, VMBinding};
+use crate::util::ObjectReference;
+use crate::vm::VMBinding;
 use crate::{Plan, MMTK};
 
 pub(crate) mod gc_work;
@@ -65,7 +65,7 @@ pub trait Trace: 'static + Send + Clone {
     /// ## The enqueued value and the return value
     ///
     /// The return value may be different from the enqueued value.  For example, during the
-    /// forwarding stage of MarkCompact, it returns the new object reference, but enqueues the old
+    /// forwarding stage of Lisp2, it returns the new object reference, but enqueues the old
     /// `object` because the object has not been moved, yet.
     ///
     /// ## The `queue` can be a callback instead of a collection
@@ -90,8 +90,8 @@ pub trait Trace: 'static + Send + Clone {
 
     /// The post-scan hook to be call after scanning `object`.
     ///
-    /// Each object is scanned by [`Scanning::scan_object`] or
-    /// [`Scanning::scan_object_and_trace_edges`], and this function will be called after scanning
+    /// Each object is scanned by [`crate::vm::Scanning::scan_object`] or
+    /// [`crate::vm::Scanning::scan_object_and_trace_edges`], and this function will be called after scanning
     /// an object as a hook to invoke possible policy-specific post-scan methods.  If `object` is in
     /// a space that needs such a hook, this method should call such hook of the space.  Otherwise,
     /// this method may do nothing.
@@ -342,6 +342,11 @@ impl<T> VectorQueue<T> {
     pub fn clear(&mut self) {
         self.buffer.clear()
     }
+
+    /// Swap the underlying buffer with the given vector.
+    pub fn swap(&mut self, new_buffer: &mut Vec<T>) {
+        std::mem::swap(&mut self.buffer, new_buffer)
+    }
 }
 
 impl<T> Default for VectorQueue<T> {
@@ -353,26 +358,5 @@ impl<T> Default for VectorQueue<T> {
 impl ObjectQueue for VectorQueue<ObjectReference> {
     fn enqueue(&mut self, v: ObjectReference) {
         self.push(v);
-    }
-}
-
-/// For iterating over the slots of an object.
-// FIXME: This type iterates slots, but all of its current use cases only care about the values in the slots.
-// And it currently only works if the object supports slot enqueuing (i.e. `Scanning::scan_object` is implemented).
-// We may refactor the interface according to <https://github.com/mmtk/mmtk-core/issues/1375>
-pub(crate) struct SlotIterator<VM: VMBinding> {
-    _p: PhantomData<VM>,
-}
-
-impl<VM: VMBinding> SlotIterator<VM> {
-    /// Iterate over the slots of an object by applying a function to each slot.
-    pub fn iterate_fields<F: FnMut(VM::VMSlot)>(object: ObjectReference, _tls: VMThread, mut f: F) {
-        // FIXME: We should use tls from the arguments.
-        // See https://github.com/mmtk/mmtk-core/issues/1375
-        let fake_tls = VMWorkerThread(VMThread::UNINITIALIZED);
-        if !<VM::VMScanning as Scanning<VM>>::support_slot_enqueuing(fake_tls, object) {
-            panic!("SlotIterator::iterate_fields cannot be used on objects that don't support slot-enqueuing");
-        }
-        <VM::VMScanning as Scanning<VM>>::scan_object(fake_tls, object, &mut f);
     }
 }

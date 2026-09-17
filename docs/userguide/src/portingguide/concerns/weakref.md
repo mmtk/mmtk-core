@@ -432,7 +432,7 @@ entries and another for young entries.
 ### Copying versus non-copying GC
 
 MMTk provides both copying and non-copying GC plans.  `MarkSweep` never moves any objects.
-`MarkCompact`, `SemiSpace` always moves all objects (except objects in the large object space,
+`Lisp2`, `OVC`, `SemiSpace` always moves all objects (except objects in the large object space,
 immortal space, VM space, etc.).  Immix-based plans sometimes do non-copying GC, and sometimes do
 copying GC.  Regardless of the plan, the VM binding can query if the current GC is a copying GC by
 calling

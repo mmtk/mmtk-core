@@ -11,11 +11,11 @@ use crate::vm::VMBinding;
 /// A thin wrapper(specific implementation) of bump allocator
 /// reserve extra bytes when allocating
 #[repr(C)]
-pub struct MarkCompactAllocator<VM: VMBinding> {
+pub struct Lisp2Allocator<VM: VMBinding> {
     pub(in crate::util::alloc) bump_allocator: BumpAllocator<VM>,
 }
 
-impl<VM: VMBinding> MarkCompactAllocator<VM> {
+impl<VM: VMBinding> Lisp2Allocator<VM> {
     pub(crate) fn set_limit(&mut self, cursor: Address, limit: Address) {
         self.bump_allocator.set_limit(cursor, limit);
     }
@@ -29,7 +29,7 @@ impl<VM: VMBinding> MarkCompactAllocator<VM> {
     }
 }
 
-impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
+impl<VM: VMBinding> Allocator<VM> for Lisp2Allocator<VM> {
     fn get_space(&self) -> &'static dyn Space<VM> {
         self.bump_allocator.get_space()
     }
@@ -88,16 +88,16 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
     }
 }
 
-impl<VM: VMBinding> MarkCompactAllocator<VM> {
+impl<VM: VMBinding> Lisp2Allocator<VM> {
     /// The number of bytes that the allocator reserves for its own header.
     pub const HEADER_RESERVED_IN_BYTES: usize =
-        crate::policy::markcompactspace::MarkCompactSpace::<VM>::HEADER_RESERVED_IN_BYTES;
+        crate::policy::lisp2space::Lisp2Space::<VM>::HEADER_RESERVED_IN_BYTES;
     pub(crate) fn new(
         tls: VMThread,
         space: &'static dyn Space<VM>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
-        MarkCompactAllocator {
+        Lisp2Allocator {
             bump_allocator: BumpAllocator::new(tls, space, context),
         }
     }

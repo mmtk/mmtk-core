@@ -29,6 +29,7 @@ mod mock_test_allocate_no_gc_oom_on_acquire_no_oom_call;
 mod mock_test_allocate_no_gc_simple;
 mod mock_test_allocate_no_infinite_loop_if_throw_oom_returns;
 mod mock_test_allocate_nonmoving;
+mod mock_test_allocate_oom_unwind_inconsistent_state;
 mod mock_test_allocate_overcommit;
 mod mock_test_allocate_with_disable_collection;
 mod mock_test_allocate_with_initialize_collection;
@@ -39,6 +40,7 @@ mod mock_test_barrier_slow_path_assertion;
 #[cfg(feature = "vo_bit")]
 mod mock_test_conservatism;
 mod mock_test_debug_get_object_info;
+mod mock_test_enable_collection_without_disable;
 #[cfg(target_os = "linux")]
 mod mock_test_handle_mmap_conflict;
 mod mock_test_handle_mmap_oom;
@@ -65,12 +67,14 @@ mod mock_test_malloc_ms;
 mod mock_test_mmtk_julia_pr_143;
 #[cfg(feature = "nogc_lock_free")]
 mod mock_test_nogc_lock_free;
+mod mock_test_shutdown;
 mod mock_test_slots;
 #[cfg(target_pointer_width = "64")]
 mod mock_test_vm_layout_compressed_pointer;
 mod mock_test_vm_layout_default;
 mod mock_test_vm_layout_heap_start;
 mod mock_test_vm_layout_log_address_space;
+mod mock_test_wait_for_no_collection_in_progress;
 
 mod mock_test_doc_avoid_resolving_allocator;
 mod mock_test_doc_mutator_storage;

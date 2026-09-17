@@ -99,7 +99,9 @@ impl MMTKBuilder {
 
     /// Build an MMTk instance from the builder.
     pub fn build<VM: VMBinding>(&self) -> MMTK<VM> {
-        MMTK::new(Arc::new(self.options.clone()))
+        let mut options = self.options.clone();
+        options.resolve_connected_options();
+        MMTK::new(Arc::new(options))
     }
 }
 
@@ -164,14 +166,11 @@ impl<VM: VMBinding> MMTK<VM> {
 
         let stats = Arc::new(Stats::new(&options));
 
-        // Initialize side metadata runtime state and reserve its address range before creating
-        // spaces. Plan/space initialization may map side metadata during setup.
-        crate::util::metadata::side_metadata::initialize_side_metadata::<VM>(&options);
-
         // We need this during creating spaces, but we do not use this once the MMTk instance is created.
         // So we do not save it in MMTK. This may change in the future.
         let mut heap = HeapMeta::new();
 
+        // Create plan and spaces. Note that side metadata is not initialized yet. Plan creation should avoid using it.
         let mut plan = crate::plan::create_plan(
             *options.plan,
             CreateGeneralPlanArgs {
@@ -185,6 +184,9 @@ impl<VM: VMBinding> MMTK<VM> {
                 heap: &mut heap,
             },
         );
+
+        // Initialize side metadata runtime state and reserve its address range after creating spaces.
+        crate::util::metadata::side_metadata::initialize_side_metadata::<VM>(&options);
 
         // We haven't finished creating MMTk. No one is using the GC trigger. We cast the arc into a mutable reference.
         {
@@ -214,6 +216,7 @@ impl<VM: VMBinding> MMTK<VM> {
         );
 
         // The order here is important:
+        plan.initialize_side_metadata();
         // Initialize side metadat sanity first
         plan.verify_side_metadata_sanity();
         // Then intiialize SFT because it may use side metadata
@@ -260,8 +263,16 @@ impl<VM: VMBinding> MMTK<VM> {
             "MMTk collection has been initialized (was initialize_collection() already called before?)"
         );
         self.scheduler.spawn_gc_threads(self, tls);
-        self.state.initialized.store(true, Ordering::SeqCst);
+        self.state.gc_status.set_initialized();
         probe!(mmtk, collection_initialized);
+    }
+
+    /// Shut down all GC worker threads.
+    pub fn shutdown(&'static self) {
+        if self.state.is_initialized() {
+            self.scheduler.shutdown_gc_threads();
+            self.state.gc_status.set_uninitialized();
+        }
     }
 
     /// Prepare an MMTk instance for calling the `fork()` system call.
@@ -333,7 +344,20 @@ impl<VM: VMBinding> MMTK<VM> {
     /// This is usually called by the benchmark harness as its last step before the actual benchmark.
     pub fn harness_begin(&self, tls: VMMutatorThread) {
         probe!(mmtk, harness_begin);
-        self.handle_user_collection_request(tls, true, true);
+        let gc_triggered = self.handle_user_collection_request(tls, true, true);
+        // Since handle_user_collection_request may not trigger GC if tls is null, we add a
+        // block_for_gc to compensate for this because we force a GC in harness begin.
+        //
+        // Only do this if a GC was actually triggered. A plan that does not collect garbage
+        // (NoGC) ignores the request and never schedules a GC, so blocking here would wait
+        // forever and deadlock the VM.
+        //
+        // FIXME: Fix the API of handle_user_collection_request so that we won't need this
+        // workaround.
+        if gc_triggered && tls.0 .0.is_null() {
+            use crate::vm::Collection;
+            VM::VMCollection::block_for_gc(tls);
+        }
         self.state.inside_harness.store(true, Ordering::SeqCst);
         self.stats.start_all();
         self.scheduler.enable_stat();
@@ -364,30 +388,36 @@ impl<VM: VMBinding> MMTK<VM> {
         self.inside_sanity.load(Ordering::Relaxed)
     }
 
-    pub(crate) fn set_gc_status(&self, s: GcStatus) {
-        let mut gc_status = self.state.gc_status.lock().unwrap();
-        if *gc_status == GcStatus::NotInGC {
-            self.state.stacks_prepared.store(false, Ordering::SeqCst);
-            // FIXME stats
-            self.stats.start_gc();
-        }
-        *gc_status = s;
-        if *gc_status == GcStatus::NotInGC {
-            // FIXME stats
-            if self.stats.get_gathering_stats() {
-                self.stats.end_gc();
-            }
-        }
+    /// Get the current GC status for MMTk.
+    pub fn get_gc_status(&self) -> GcStatus {
+        self.state.gc_status.load()
     }
 
-    /// Return true if a collection is in progress.
-    pub fn gc_in_progress(&self) -> bool {
-        *self.state.gc_status.lock().unwrap() != GcStatus::NotInGC
+    /// Disable collection. On success, returns `Ok(true)` if this call actually switched
+    /// collection from enabled to disabled, `Ok(false)` if it only increased the nesting depth of
+    /// an already-disabled status. If MMTk is unable to disable GC right now (possibly a GC is in
+    /// progress, or a GC has been requested), returns `Err` with the status that prevented it;
+    /// users should invoke runtime safepoints or other mechanisms to prepare for a GC pause, and
+    /// then call this function again.
+    ///
+    /// This call is nestable. Each call must be paired with a matching call to
+    /// [`MMTK::enable_collection`].
+    pub fn disable_collection(&self) -> Result<bool, GcStatus> {
+        self.gc_trigger.disable_collection()
     }
 
-    /// Return true if a collection is in progress and past the preparatory stage.
-    pub fn gc_in_progress_proper(&self) -> bool {
-        *self.state.gc_status.lock().unwrap() == GcStatus::GcProper
+    /// Enable collection. If collection is not currently disabled (e.g. there was no prior
+    /// matching call to [`MMTK::disable_collection`]), this is a no-op.
+    /// Returns `true` if this call actually re-enabled collection (i.e. it was the outermost
+    /// matching call), `false` if it only decremented the nesting depth, or if collection was
+    /// already enabled.
+    pub fn enable_collection(&self) -> bool {
+        self.gc_trigger.enable_collection()
+    }
+
+    /// Return whether collection is currently enabled.
+    pub fn is_collection_enabled(&self) -> bool {
+        self.gc_trigger.is_collection_enabled()
     }
 
     /// Return true if the current GC is an emergency GC.
@@ -435,7 +465,14 @@ impl<VM: VMBinding> MMTK<VM> {
             .handle_user_collection_request(force, exhaustive)
         {
             use crate::vm::Collection;
-            VM::VMCollection::block_for_gc(tls);
+            // Do not block for GC if the `tls` does not represent a valid mutator thread. This
+            // allows non-mutator threads to trigger GC but not block for GC.
+            //
+            // FIXME: Make a proper API that allows `handle_user_collection_request` to be called by
+            // non-mutators and/or not trigger GC.
+            if !tls.0 .0.is_null() {
+                VM::VMCollection::block_for_gc(tls);
+            }
             true
         } else {
             false

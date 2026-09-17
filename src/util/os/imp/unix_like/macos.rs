@@ -29,9 +29,23 @@ impl OSMemory for MacOS {
         size: usize,
         align: usize,
         strategy: MmapStrategy,
-        _annotation: &MmapAnnotation<'_>,
-    ) -> Result<Address> {
-        unix_common::mmap_anywhere(size, align, strategy)
+        annotation: &MmapAnnotation<'_>,
+    ) -> MmapResult<Address> {
+        unix_common::mmap_anywhere(size, align, strategy, annotation)
+    }
+
+    fn dzmmap_preferred(
+        start: Address,
+        size: usize,
+        align: usize,
+        strategy: MmapStrategy,
+        annotation: &MmapAnnotation<'_>,
+    ) -> MmapResult<Address> {
+        let addr = unix_common::mmap_preferred(start, size, align, strategy, annotation)?;
+        if strategy.reserve {
+            crate::util::memory::zero(addr, size);
+        }
+        Ok(addr)
     }
 
     fn munmap(start: Address, size: usize) -> Result<()> {

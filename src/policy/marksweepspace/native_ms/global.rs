@@ -10,6 +10,7 @@ use crate::{
         copy::CopySemantics,
         epilogue,
         heap::{BlockPageResource, PageResource},
+        linear_scan::UnstraddlableRegion,
         metadata::{self, side_metadata::SideMetadataSpec, MetadataSpec},
         object_enum::{self, ObjectEnumerator},
         ObjectReference,
@@ -178,7 +179,7 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
 
     #[cfg(feature = "object_pinning")]
     fn is_object_pinned(&self, _object: ObjectReference) -> bool {
-        false
+        true
     }
 
     fn is_movable(&self) -> bool {

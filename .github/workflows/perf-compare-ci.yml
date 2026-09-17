@@ -145,12 +145,6 @@ jobs:
               name: jikesrvm-compare-build
               path: ${{ env.CI_PERF_KIT_BUILD }}
               if-no-files-found: error
-          - name: Upload logs as artifacts
-            uses: actions/upload-artifact@v4
-            with:
-              name: jikesrvm-compare-logs
-              path: ${{ env.CI_PERF_KIT_LOG }}
-              if-no-files-found: error
           - uses: actions/upload-artifact@v4
             with:
               name: jikesrvm-compare-report.md
@@ -255,12 +249,6 @@ jobs:
               with:
                 name: openjdk-compare-build
                 path: ${{ env.CI_PERF_KIT_BUILD }}
-                if-no-files-found: error
-            - name: Upload logs as artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                name: openjdk-compare-logs
-                path: ${{ env.CI_PERF_KIT_LOG }}
                 if-no-files-found: error
             - uses: actions/upload-artifact@v4
               with:

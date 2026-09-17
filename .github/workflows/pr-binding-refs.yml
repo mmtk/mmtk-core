@@ -10,7 +10,8 @@
 #
 # In the cases that we need to update bindings, we expect the core PR to have a comment like the following
 # to specify the binding pull requests. Note if any of the following values are omitted, the default values
-# will be used (run with the master in mmtk's binding repos).
+# will be used. For most bindings, the default is the master branch in mmtk's binding repos.
+# For Julia, the default is JuliaLang/julia master because the MMTk binding is in the Julia repo.
 # Repo is in the format of user/repo. Ref could be sha or branch name.
 #
 # Note that OpenJDK 11 and OpenJDK 21 are considered two bindings, and their repo and ref names are
@@ -26,10 +27,8 @@
 # JIKESRVM_BINDING_REF=xxxxxx
 # V8_BINDING_REPO=xx/xx
 # V8_BINDING_REF=xxxxxx
-# JULIA_BINDING_REPO=xx/xx
-# JULIA_BINDING_REF=xxxxxx
-# JULIA_VM_REPO=xx/xx
-# JULIA_VM_REF=xxxxxx
+# JULIA_REPO=xx/xx
+# JULIA_REF=xxxxxx
 # RUBY_BINDING_REPO=xx/xx
 # RUBY_BINDING_REF=xxxxxx
 # ```
@@ -95,33 +94,18 @@ on:
         description: "The default git ref of V8 binding, such as sha and branch name"
         value: ${{ jobs.binding-refs.outputs.v8_binding_ref_default }}
 
-      julia_binding_repo:
-        description: "The repository of Julia binding, such as {user}/{repo}"
-        value: ${{ jobs.binding-refs.outputs.julia_binding_repo}}
-      julia_binding_repo_default:
-        description: "The default repository of Julia binding, such as {user}/{repo}"
-        value: ${{ jobs.binding-refs.outputs.julia_binding_repo_default }}
-      julia_binding_ref:
-        description: "The git ref of Julia binding, such as sha and branch name"
-        value: ${{ jobs.binding-refs.outputs.julia_binding_ref}}
-      julia_binding_ref_default:
-        description: "The default git ref of Julia binding, such as sha and branch name"
-        value: ${{ jobs.binding-refs.outputs.julia_binding_ref_default }}
-      # We further define the Julia version to run with, as we no longer record the Julia
-      # version with each binding commit. Instead, we record the binding version with
-      # each Julia commit.
-      julia_vm_repo:
+      julia_repo:
         description: "The repository of Julia, such as {user}/{repo}"
-        value: ${{ jobs.binding-refs.outputs.julia_vm_repo }}
-      julia_vm_repo_default:
+        value: ${{ jobs.binding-refs.outputs.julia_repo }}
+      julia_repo_default:
         description: "The default repository of Julia, such as {user}/{repo}"
-        value: ${{ jobs.binding-refs.outputs.julia_vm_repo_default }}
-      julia_vm_ref:
+        value: ${{ jobs.binding-refs.outputs.julia_repo_default }}
+      julia_ref:
         description: "The git ref of Julia, such as sha and branch name"
-        value: ${{ jobs.binding-refs.outputs.julia_vm_ref }}
-      julia_vm_ref_default:
+        value: ${{ jobs.binding-refs.outputs.julia_ref }}
+      julia_ref_default:
         description: "The default git ref of Julia, such as sha and branch name"
-        value: ${{ jobs.binding-refs.outputs.julia_vm_ref_default }}
+        value: ${{ jobs.binding-refs.outputs.julia_ref_default }}
 
       ruby_binding_repo:
         description: "The repository of Ruby binding, such as {user}/{repo}"
@@ -148,10 +132,8 @@ jobs:
       JIKESRVM_BINDING_REF_DEFAULT: master
       V8_BINDING_REPO_DEFAULT: mmtk/mmtk-v8
       V8_BINDING_REF_DEFAULT: master
-      JULIA_BINDING_REPO_DEFAULT: mmtk/mmtk-julia
-      JULIA_BINDING_REF_DEFAULT: master
-      JULIA_VM_REPO_DEFAULT: JuliaLang/julia
-      JULIA_VM_REF_DEFAULT: master
+      JULIA_REPO_DEFAULT: JuliaLang/julia
+      JULIA_REF_DEFAULT: master
       RUBY_BINDING_REPO_DEFAULT: mmtk/mmtk-ruby
       RUBY_BINDING_REF_DEFAULT: master
     outputs:
@@ -171,14 +153,10 @@ jobs:
         v8_binding_repo_default: ${{ env.V8_BINDING_REPO_DEFAULT }}
         v8_binding_ref: ${{ steps.print.outputs.v8_binding_ref }}
         v8_binding_ref_default: ${{ env.V8_BINDING_REF_DEFAULT }}
-        julia_binding_repo: ${{ steps.print.outputs.julia_binding_repo }}
-        julia_binding_repo_default: ${{ env.JULIA_BINDING_REPO_DEFAULT }}
-        julia_binding_ref: ${{ steps.print.outputs.julia_binding_ref }}
-        julia_binding_ref_default: ${{ env.JULIA_BINDING_REF_DEFAULT }}
-        julia_vm_repo: ${{ steps.print.outputs.julia_vm_repo }}
-        julia_vm_repo_default: ${{ env.JULIA_VM_REPO_DEFAULT }}
-        julia_vm_ref: ${{ steps.print.outputs.julia_vm_ref }}
-        julia_vm_ref_default: ${{ env.JULIA_VM_REF_DEFAULT }}
+        julia_repo: ${{ steps.print.outputs.julia_repo }}
+        julia_repo_default: ${{ env.JULIA_REPO_DEFAULT }}
+        julia_ref: ${{ steps.print.outputs.julia_ref }}
+        julia_ref_default: ${{ env.JULIA_REF_DEFAULT }}
         ruby_binding_repo: ${{ steps.print.outputs.ruby_binding_repo }}
         ruby_binding_repo_default: ${{ env.RUBY_BINDING_REPO_DEFAULT }}
         ruby_binding_ref: ${{ steps.print.outputs.ruby_binding_ref }}
@@ -204,10 +182,8 @@ jobs:
               JIKESRVM_BINDING_REF=${{ env.JIKESRVM_BINDING_REF_DEFAULT }}
               V8_BINDING_REPO=${{ env.V8_BINDING_REPO_DEFAULT }}
               V8_BINDING_REF=${{ env.V8_BINDING_REF_DEFAULT }}
-              JULIA_BINDING_REPO=${{ env.JULIA_BINDING_REPO_DEFAULT }}
-              JULIA_BINDING_REF=${{ env.JULIA_BINDING_REF_DEFAULT }}
-              JULIA_VM_REPO=${{ env.JULIA_VM_REPO_DEFAULT }}
-              JULIA_VM_REF=${{ env.JULIA_VM_REF_DEFAULT }}
+              JULIA_REPO=${{ env.JULIA_REPO_DEFAULT }}
+              JULIA_REF=${{ env.JULIA_REF_DEFAULT }}
               RUBY_BINDING_REPO=${{ env.RUBY_BINDING_REPO_DEFAULT }}
               RUBY_BINDING_REF=${{ env.RUBY_BINDING_REF_DEFAULT }}
         - id: print
@@ -220,9 +196,7 @@ jobs:
             echo "jikesrvm_binding_ref=${{ env.JIKESRVM_BINDING_REF }}" >> $GITHUB_OUTPUT
             echo "v8_binding_repo=${{ env.V8_BINDING_REPO }}" >> $GITHUB_OUTPUT
             echo "v8_binding_ref=${{ env.V8_BINDING_REF }}" >> $GITHUB_OUTPUT
-            echo "julia_binding_repo=${{ env.JULIA_BINDING_REPO }}" >> $GITHUB_OUTPUT
-            echo "julia_binding_ref=${{ env.JULIA_BINDING_REF }}" >> $GITHUB_OUTPUT
-            echo "julia_vm_repo=${{ env.JULIA_VM_REPO }}" >> $GITHUB_OUTPUT
-            echo "julia_vm_ref=${{ env.JULIA_VM_REF }}" >> $GITHUB_OUTPUT
+            echo "julia_repo=${{ env.JULIA_REPO }}" >> $GITHUB_OUTPUT
+            echo "julia_ref=${{ env.JULIA_REF }}" >> $GITHUB_OUTPUT
             echo "ruby_binding_repo=${{ env.RUBY_BINDING_REPO }}" >> $GITHUB_OUTPUT
             echo "ruby_binding_ref=${{ env.RUBY_BINDING_REF }}" >> $GITHUB_OUTPUT

@@ -1,3 +1,81 @@
+0.33.0 (2026-08-05)
+===
+
+## What's Changed
+
+### Plan
+* Support pinning/tpinning roots for concurrent Immix by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1454
+* Add an option to disable concurrent marking for concurrent immix by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1460
+* Do not scan any root in FinalMark by @wks in https://github.com/mmtk/mmtk-core/pull/1470
+* If concurrent marking is disabled, force full GC in schedule_collection by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1472
+* Concurrent Immix should do a full collection on user requests by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1493
+
+### Policy
+* Add bytes parameter to initialize_object_metadata by @wenyuzhao in https://github.com/mmtk/mmtk-core/pull/1487
+* Mmap side metadata after space creation by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1515
+* Quarantine address ranges for spaces by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1491
+
+### Allocator
+* Move a few misplaced functions about obvious OOM handling by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1476
+* Fix infinite loop if we return from `Collection::out_of_memory` by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1473
+* Set allocation_success before oom call by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1532
+
+### Scheduler
+* Replace ProcessEdgesWork with Trace by @wks in https://github.com/mmtk/mmtk-core/pull/1468
+* Reorganize scheduler/gc_work.rs by @wks in https://github.com/mmtk/mmtk-core/pull/1503
+
+### API
+* Remove the "is_mmtk_object" Cargo feature by @wks in https://github.com/mmtk/mmtk-core/pull/1446
+* Add mmtk_shutdown API by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1513
+* Require `Slot` to implement `Sync`. by @wks in https://github.com/mmtk/mmtk-core/pull/1531
+* Reintroduce GC disable/enable API by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1457
+* Concurrent worker threads by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1504
+
+### Documentation
+* Document requirements about mutator-related API by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1466
+* Add a warning about unwinding. by @wks in https://github.com/mmtk/mmtk-core/pull/1480
+* Update object graph traverse doc by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1514
+* Add missing prefix pages in MMTk tutorial by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1533
+* Document pinning API publicly by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1535
+* Add a doc about code review process by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1530
+* Update doc comments in `AllocationSemantics` by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1538
+
+### CI
+* Add CI script to check line ends by @wks in https://github.com/mmtk/mmtk-core/pull/1452
+* Use ci-perf-kit 0.8.7. Mutator perf runs with jdk-11 by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1467
+* Update ci-perf-kit to 0.8.8. New epoch. by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1499
+* Update CI scripts for Julia binding tests by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1519
+* Bump tj-actions/changed-files from 44 to 46 in /.github/workflows by @dependabot[bot] in https://github.com/mmtk/mmtk-core/pull/1525
+* Fix links that disallow robot access by @wks in https://github.com/mmtk/mmtk-core/pull/1527
+* Add a workflow to run cargo fmt by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1524
+* Remove mod mygc before ci-doc.sh quits by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1537
+
+### Misc
+* OS interface by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1439
+* Introduce MmapResult by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1451
+* Remove Java-specific constants. by @wks in https://github.com/mmtk/mmtk-core/pull/1456
+* Set rust-version and resolver in dummyvm by @wks in https://github.com/mmtk/mmtk-core/pull/1471
+* Dynamic side metadata base address by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1449
+* Create a slice from raw backing memory for RawMemoryFreeList by @caizixian in https://github.com/mmtk/mmtk-core/pull/1484
+* `ObjectBarrier::object_is_unlogged` should be atomic by @ThePuzzlemaker in https://github.com/mmtk/mmtk-core/pull/1497
+* Make the visualize script compatible with Python 3.10 by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1498
+* Add support to find next non-zero bit in side-metadata by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1502
+* fix(linux): support musl builds by @playX18 in https://github.com/mmtk/mmtk-core/pull/1517
+* Remove dependency on `memoffset` by @syberant in https://github.com/mmtk/mmtk-core/pull/1520
+* Fix style check for Rust stable 1.97 by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1529
+* Refactor GcStatus by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1534
+* Rename on_gc_start/end to on_pause_start/end. Call on_pause_start after all threads stop by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1539
+* GC status transition logging by @wks in https://github.com/mmtk/mmtk-core/pull/1542
+* Log pause time with fractional milliseconds by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1501
+* Add `on_gc_start/end` to `GCTriggerPolicy` by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1544
+
+## New Contributors
+* @ThePuzzlemaker made their first contribution in https://github.com/mmtk/mmtk-core/pull/1497
+* @dependabot[bot] made their first contribution in https://github.com/mmtk/mmtk-core/pull/1525
+* @syberant made their first contribution in https://github.com/mmtk/mmtk-core/pull/1520
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.32.0...v0.33.0
+
 0.32.0 (2026-02-04)
 ===
 

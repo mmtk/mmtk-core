@@ -1,33 +1,30 @@
-use super::global::Compressor;
+use super::global::OVC;
 use crate::plan::tracing::{PlanTrace, UnsupportedTrace};
-use crate::policy::compressor::{CompressorSpace, TRACE_KIND_FORWARD_ROOT, TRACE_KIND_MARK};
 use crate::policy::largeobjectspace::LargeObjectSpace;
+use crate::policy::ovc::{OVCSpace, TRACE_KIND_FORWARD_ROOT, TRACE_KIND_MARK};
 use crate::scheduler::gc_work::*;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
 use crate::vm::{ActivePlan, Scanning, VMBinding};
 use crate::MMTK;
 use std::marker::{PhantomData, Send};
 
-/// Generate more packets by calling a method on [`CompressorSpace`].
-pub struct GenerateWork<VM: VMBinding, F: Fn(&'static CompressorSpace<VM>) + Send + 'static> {
-    compressor_space: &'static CompressorSpace<VM>,
+/// Generate more packets by calling a method on [`OVCSpace`].
+pub struct GenerateWork<VM: VMBinding, F: Fn(&'static OVCSpace<VM>) + Send + 'static> {
+    ovc_space: &'static OVCSpace<VM>,
     f: F,
 }
 
-impl<VM: VMBinding, F: Fn(&'static CompressorSpace<VM>) + Send + 'static> GCWork<VM>
+impl<VM: VMBinding, F: Fn(&'static OVCSpace<VM>) + Send + 'static> GCWork<VM>
     for GenerateWork<VM, F>
 {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        (self.f)(self.compressor_space);
+        (self.f)(self.ovc_space);
     }
 }
 
-impl<VM: VMBinding, F: Fn(&'static CompressorSpace<VM>) + Send + 'static> GenerateWork<VM, F> {
-    pub fn new(compressor_space: &'static CompressorSpace<VM>, f: F) -> Self {
-        Self {
-            compressor_space,
-            f,
-        }
+impl<VM: VMBinding, F: Fn(&'static OVCSpace<VM>) + Send + 'static> GenerateWork<VM, F> {
+    pub fn new(ovc_space: &'static OVCSpace<VM>, f: F) -> Self {
+        Self { ovc_space, f }
     }
 }
 
@@ -48,13 +45,12 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
         mmtk.slot_logger.reset();
 
         for mutator in VM::VMActivePlan::mutators() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots].add(ScanMutatorRoots::<
-                CompressorForwardingWorkContext<VM>,
-            >(mutator));
+            mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]
+                .add(ScanMutatorRoots::<OVCForwardingWorkContext<VM>>(mutator));
         }
 
         mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]
-            .add(ScanVMSpecificRoots::<CompressorForwardingWorkContext<VM>>::new());
+            .add(ScanVMSpecificRoots::<OVCForwardingWorkContext<VM>>::new());
     }
 }
 
@@ -66,45 +62,39 @@ impl<VM: VMBinding> UpdateReferences<VM> {
 
 /// Reset the allocator and update references in large object space.
 pub struct AfterCompact<VM: VMBinding> {
-    compressor_space: &'static CompressorSpace<VM>,
+    ovc_space: &'static OVCSpace<VM>,
     los: &'static LargeObjectSpace<VM>,
 }
 
 impl<VM: VMBinding> GCWork<VM> for AfterCompact<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.compressor_space.after_compact(worker, self.los);
+        self.ovc_space.after_compact(worker, self.los);
     }
 }
 
 impl<VM: VMBinding> AfterCompact<VM> {
-    pub fn new(
-        compressor_space: &'static CompressorSpace<VM>,
-        los: &'static LargeObjectSpace<VM>,
-    ) -> Self {
-        Self {
-            compressor_space,
-            los,
-        }
+    pub fn new(ovc_space: &'static OVCSpace<VM>, los: &'static LargeObjectSpace<VM>) -> Self {
+        Self { ovc_space, los }
     }
 }
 
 /// Marking trace
-pub type MarkingTrace<VM> = PlanTrace<Compressor<VM>, TRACE_KIND_MARK>;
+pub type MarkingTrace<VM> = PlanTrace<OVC<VM>, TRACE_KIND_MARK>;
 /// Forwarding trace
-pub type ForwardingTrace<VM> = PlanTrace<Compressor<VM>, TRACE_KIND_FORWARD_ROOT>;
+pub type ForwardingTrace<VM> = PlanTrace<OVC<VM>, TRACE_KIND_FORWARD_ROOT>;
 
-pub struct CompressorWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
-impl<VM: VMBinding> crate::scheduler::GCWorkContext for CompressorWorkContext<VM> {
+pub struct OVCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for OVCWorkContext<VM> {
     type VM = VM;
-    type PlanType = Compressor<VM>;
+    type PlanType = OVC<VM>;
     type DefaultTrace = MarkingTrace<VM>;
     type PinningTrace = UnsupportedTrace<VM>;
 }
 
-pub struct CompressorForwardingWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
-impl<VM: VMBinding> crate::scheduler::GCWorkContext for CompressorForwardingWorkContext<VM> {
+pub struct OVCForwardingWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for OVCForwardingWorkContext<VM> {
     type VM = VM;
-    type PlanType = Compressor<VM>;
+    type PlanType = OVC<VM>;
     type DefaultTrace = ForwardingTrace<VM>;
     type PinningTrace = UnsupportedTrace<VM>;
 }

@@ -128,12 +128,6 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     }
     // ANCHOR_END: release
 
-    // ANCHOR: end_of_gc
-    fn end_of_gc(&mut self, tls: VMWorkerThread) {
-        self.common.end_of_gc(tls);
-    }
-    // ANCHOR_END: end_of_gc
-
     // Modify
     // ANCHOR: plan_get_collection_reserve
     fn get_collection_reserved_pages(&self) -> usize {
@@ -163,6 +157,10 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     // ANCHOR: plan_common
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
+    }
+
+    fn common_mut(&mut self) -> &mut CommonPlan<VM> {
+        &mut self.common
     }
     // ANCHOR_END: plan_common
 }

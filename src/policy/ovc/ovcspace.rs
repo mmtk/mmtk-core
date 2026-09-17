@@ -1,7 +1,7 @@
 use crate::plan::tracing::OptionObjectQueue;
-use crate::policy::compressor::forwarding;
 use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::largeobjectspace::LargeObjectSpace;
+use crate::policy::ovc::forwarding;
 use crate::policy::sft::{GCWorkerMutRef, SFT};
 use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::{GCWork, GCWorkScheduler, GCWorker, WorkBucketStage};
@@ -24,13 +24,13 @@ use std::sync::Arc;
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
 pub(crate) const TRACE_KIND_FORWARD_ROOT: TraceKind = 1;
 
-/// [`CompressorSpace`] is a stop-the-world implementation of
+/// [`OVCSpace`] is a stop-the-world implementation of
 /// the Compressor, as described in Kermany and Petrank,
 /// [The Compressor: concurrent, incremental, and parallel compaction](https://dl.acm.org/doi/10.1145/1133255.1134023).
 ///
-/// [`CompressorSpace`] makes two main diversions from the paper
-/// (aside from [`CompressorSpace`] being stop-the-world):
-/// - The heap is structured into regions ([`forwarding::CompressorRegion`])
+/// [`OVCSpace`] makes two main diversions from the paper
+/// (aside from [`OVCSpace`] being stop-the-world):
+/// - The heap is structured into regions ([`forwarding::OVCRegion`])
 ///   which the collector compacts separately.
 /// - The collector compacts each region in-place, instead of using two virtual
 ///   spaces as in Kermany and Petrank. The virtual spaces side-step a race which
@@ -40,15 +40,15 @@ pub(crate) const TRACE_KIND_FORWARD_ROOT: TraceKind = 1;
 ///   preventing the old objects from being overwritten. (They reclaim memory by unmapping
 ///   pages of the from-virtual space after moving all objects out of said pages.)
 ///   We instead side-step this race by assigning only a single thread to each region, and
-///   running multiple single-threaded Compressors at once.
-pub struct CompressorSpace<VM: VMBinding> {
+///   running multiple single-threaded OVCs at once.
+pub struct OVCSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
-    pr: RegionPageResource<VM, forwarding::CompressorRegion>,
+    pr: RegionPageResource<VM, forwarding::OVCRegion>,
     forwarding: forwarding::ForwardingMetadata<VM>,
     scheduler: Arc<GCWorkScheduler<VM>>,
 }
 
-impl<VM: VMBinding> SFT for CompressorSpace<VM> {
+impl<VM: VMBinding> SFT for OVCSpace<VM> {
     fn name(&self) -> &'static str {
         self.get_name()
     }
@@ -69,12 +69,12 @@ impl<VM: VMBinding> SFT for CompressorSpace<VM> {
 
     #[cfg(feature = "object_pinning")]
     fn pin_object(&self, _object: ObjectReference) -> bool {
-        panic!("Cannot pin/unpin objects of CompressorSpace.")
+        panic!("Cannot pin/unpin objects of OVCSpace.")
     }
 
     #[cfg(feature = "object_pinning")]
     fn unpin_object(&self, _object: ObjectReference) -> bool {
-        panic!("Cannot pin/unpin objects of CompressorSpace.")
+        panic!("Cannot pin/unpin objects of OVCSpace.")
     }
 
     #[cfg(feature = "object_pinning")]
@@ -119,19 +119,19 @@ impl<VM: VMBinding> SFT for CompressorSpace<VM> {
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
-        // We should not use trace_object for compressor space.
+        // We should not use trace_object for OVC space.
         // Depending on which trace it is, we should manually call either trace_mark or trace_forward.
-        panic!("sft_trace_object() cannot be used with CompressorSpace")
+        panic!("sft_trace_object() cannot be used with OVCSpace")
     }
 
     fn debug_print_object_info(&self, object: ObjectReference) {
-        println!("marked = {}", CompressorSpace::<VM>::is_marked(object));
+        println!("marked = {}", OVCSpace::<VM>::is_marked(object));
         println!("forwarding = {:?}", self.get_forwarded_object(object));
         self.common.debug_print_object_global_info(object);
     }
 }
 
-impl<VM: VMBinding> Space<VM> for CompressorSpace<VM> {
+impl<VM: VMBinding> Space<VM> for OVCSpace<VM> {
     fn as_space(&self) -> &dyn Space<VM> {
         self
     }
@@ -157,7 +157,7 @@ impl<VM: VMBinding> Space<VM> for CompressorSpace<VM> {
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
-        panic!("compressorspace only releases pages enmasse")
+        panic!("ovc space only releases pages enmasse")
     }
 
     fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
@@ -173,7 +173,7 @@ impl<VM: VMBinding> Space<VM> for CompressorSpace<VM> {
     }
 }
 
-impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CompressorSpace<VM> {
+impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for OVCSpace<VM> {
     fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         queue: &mut Q,
@@ -183,7 +183,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for Compressor
     ) -> ObjectReference {
         debug_assert!(
             KIND != TRACE_KIND_TRANSITIVE_PIN,
-            "Compressor does not support transitive pin trace."
+            "OVC does not support transitive pin trace."
         );
         if KIND == TRACE_KIND_MARK {
             self.trace_mark_object(queue, object)
@@ -204,12 +204,12 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for Compressor
     }
 }
 
-impl<VM: VMBinding> CompressorSpace<VM> {
+impl<VM: VMBinding> OVCSpace<VM> {
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
         let vm_map = args.vm_map;
         assert!(
             VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS,
-            "The Compressor requires a unified object reference address model"
+            "OVC requires a unified object reference address model"
         );
         let local_specs = extract_side_metadata(&[
             MetadataSpec::OnSide(forwarding::MARK_SPEC),
@@ -218,7 +218,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
         let is_discontiguous = args.vmrequest.is_discontiguous();
         let scheduler = args.scheduler.clone();
         let common = CommonSpace::new(args.into_policy_args(true, false, local_specs));
-        CompressorSpace {
+        OVCSpace {
             pr: if is_discontiguous {
                 RegionPageResource::new_discontiguous(vm_map)
             } else {
@@ -232,7 +232,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
 
     pub fn prepare(&self) {
         self.pr
-            .enumerate_regions(&mut |r: &AllocatedRegion<forwarding::CompressorRegion>| {
+            .enumerate_regions(&mut |r: &AllocatedRegion<forwarding::OVCRegion>| {
                 forwarding::MARK_SPEC
                     .bzero_metadata(r.region.start(), r.region.end() - r.region.start());
             });
@@ -253,7 +253,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
             "{:x}: VO bit not set",
             object
         );
-        if CompressorSpace::<VM>::test_and_mark(object) {
+        if OVCSpace::<VM>::test_and_mark(object) {
             queue.enqueue(object);
             self.forwarding.mark_last_word_of_object(object);
         }
@@ -293,7 +293,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
 
     fn generate_tasks(
         &self,
-        f: &mut impl FnMut(&AllocatedRegion<forwarding::CompressorRegion>, usize) -> Box<dyn GCWork<VM>>,
+        f: &mut impl FnMut(&AllocatedRegion<forwarding::OVCRegion>, usize) -> Box<dyn GCWork<VM>>,
     ) -> Vec<Box<dyn GCWork<VM>>> {
         let mut packets = vec![];
         let mut index = 0;
@@ -314,7 +314,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
 
     pub fn calculate_offset_vector_for_region(
         &self,
-        region: forwarding::CompressorRegion,
+        region: forwarding::OVCRegion,
         cursor: Address,
     ) {
         self.forwarding.calculate_offset_vector(region, cursor);
@@ -409,7 +409,7 @@ impl<VM: VMBinding> CompressorSpace<VM> {
 
     pub fn after_compact(&self, worker: &mut GCWorker<VM>, los: &LargeObjectSpace<VM>) {
         self.pr.reset_allocator();
-        // Update references from the LOS to Compressor too.
+        // Update references from the LOS to OVC too.
         los.enumerate_to_space_objects(&mut object_enum::ClosureObjectEnumerator::<_, VM>::new(
             &mut |o: ObjectReference| {
                 self.update_references(worker, o);
@@ -420,26 +420,26 @@ impl<VM: VMBinding> CompressorSpace<VM> {
 
 /// Calculate the offset vector for a region.
 pub struct CalculateOffsetVector<VM: VMBinding> {
-    compressor_space: &'static CompressorSpace<VM>,
-    region: forwarding::CompressorRegion,
+    ovc_space: &'static OVCSpace<VM>,
+    region: forwarding::OVCRegion,
     cursor: Address,
 }
 
 impl<VM: VMBinding> GCWork<VM> for CalculateOffsetVector<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.compressor_space
+        self.ovc_space
             .calculate_offset_vector_for_region(self.region, self.cursor);
     }
 }
 
 impl<VM: VMBinding> CalculateOffsetVector<VM> {
     pub fn new(
-        compressor_space: &'static CompressorSpace<VM>,
-        region: forwarding::CompressorRegion,
+        ovc_space: &'static OVCSpace<VM>,
+        region: forwarding::OVCRegion,
         cursor: Address,
     ) -> Self {
         Self {
-            compressor_space,
+            ovc_space,
             region,
             cursor,
         }
@@ -448,21 +448,18 @@ impl<VM: VMBinding> CalculateOffsetVector<VM> {
 
 /// Compact live objects in a region.
 pub struct Compact<VM: VMBinding> {
-    compressor_space: &'static CompressorSpace<VM>,
+    ovc_space: &'static OVCSpace<VM>,
     index: usize,
 }
 
 impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.compressor_space.compact_region(worker, self.index);
+        self.ovc_space.compact_region(worker, self.index);
     }
 }
 
 impl<VM: VMBinding> Compact<VM> {
-    pub fn new(compressor_space: &'static CompressorSpace<VM>, index: usize) -> Self {
-        Self {
-            compressor_space,
-            index,
-        }
+    pub fn new(ovc_space: &'static OVCSpace<VM>, index: usize) -> Self {
+        Self { ovc_space, index }
     }
 }

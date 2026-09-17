@@ -1,17 +1,16 @@
 use atomic::Ordering;
 
-use crate::global_state::GlobalState;
+use crate::global_state::{GcStatus, GlobalState};
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions;
 use crate::util::options::{GCTriggerSelector, Options, DEFAULT_MAX_NURSERY, DEFAULT_MIN_NURSERY};
-use crate::vm::Collection;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::mem::MaybeUninit;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
 /// GCTrigger is responsible for triggering GCs based on the given policy.
@@ -24,9 +23,6 @@ pub struct GCTrigger<VM: VMBinding> {
     plan: MaybeUninit<&'static dyn Plan<VM = VM>>,
     /// The triggering policy.
     pub policy: Box<dyn GCTriggerPolicy<VM>>,
-    /// Set by mutators to trigger GC.  It is atomic so that mutators can check if GC has already
-    /// been requested efficiently in `poll` without acquiring any mutex.
-    request_flag: AtomicBool,
     scheduler: Arc<GCWorkScheduler<VM>>,
     options: Arc<Options>,
     state: Arc<GlobalState>,
@@ -62,7 +58,6 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 }
             },
             options,
-            request_flag: AtomicBool::new(false),
             scheduler,
             state,
         }
@@ -79,24 +74,66 @@ impl<VM: VMBinding> GCTrigger<VM> {
 
     /// Request a GC.  Called by mutators when polling (during allocation) and when handling user
     /// GC requests (e.g. `System.gc();` in Java).
-    fn request(&self) {
-        if self.request_flag.load(Ordering::Relaxed) {
-            return;
-        }
-
-        if !self.request_flag.swap(true, Ordering::Relaxed) {
-            // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
-            // with GC workers, which is expensive for functions like `poll`.  We use the atomic
-            // flag `request_flag` to elide the need to acquire the mutex in subsequent calls.
-            probe!(mmtk, gc_requested);
-            self.scheduler.request_schedule_collection();
+    /// Atomically check that collection is enabled, and if so, request a GC. This makes the
+    /// enabled-check and the request atomic with respect to [`GCTrigger::disable_collection`]
+    /// and [`GCTrigger::enable_collection`], so a GC is never requested after collection has
+    /// been disabled.
+    /// Returns whether a GC was actually requested.
+    fn request(&self) -> bool {
+        // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
+        // with GC workers, which is expensive for functions like `poll`. `try_request_pause`
+        // only returns `Ok` to the thread that actually wins the race to transition the status,
+        // so only that thread calls it, instead of every thread that observes the old status:
+        // calling it unconditionally would re-queue a `WorkerGoal::Gc` request that a previous
+        // winner's request already delivered and that the workers may already be acting on,
+        // tripping the `debug_is_requested` assertion in `GCWorkScheduler::on_last_parked`.
+        match self.state.gc_status.try_request_pause() {
+            Ok(cur_status) => {
+                if cur_status == GcStatus::InConcurrentGC {
+                    self.plan().concurrent().unwrap().on_concurrent_work_interrupted();
+                }
+                probe!(mmtk, gc_requested);
+                self.state.record_pause_requested_time();
+                self.scheduler.request_schedule_collection();
+                true
+            },
+            Err(GcStatus::Disabled(_)) => false,
+            // A GC is genuinely required (the heap policy has been exceeded), but MMTk has no GC
+            // worker threads to service it. Silently returning `false` here would let allocation
+            // grow the heap without bound instead of respecting the configured limit.
+            Err(GcStatus::Uninitialized) => panic!(
+                "GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."
+            ),
+            Err(GcStatus::PauseRequested) => true,
+            _ => unreachable!(),
         }
     }
 
-    /// Clear the "GC requested" flag so that mutators can trigger the next GC.
-    /// Called by a GC worker when all mutators have come to a stop.
-    pub fn clear_request(&self) {
-        self.request_flag.store(false, Ordering::Relaxed);
+    /// Disable collection. On success, returns `Ok(true)` if this call actually switched
+    /// collection from enabled to disabled, `Ok(false)` if it only increased the nesting depth of
+    /// an already-disabled status. If MMTk is unable to disable GC right now (possibly a GC is in
+    /// progress, or a GC has been requested), returns `Err` with the status that prevented it;
+    /// users should invoke runtime safepoints or other mechanisms to prepare for a GC pause, and
+    /// then call this function again.
+    ///
+    /// This call is nestable. Each call must be paired with a matching call to
+    /// [`GCTrigger::enable_collection`].
+    pub fn disable_collection(&self) -> Result<bool, GcStatus> {
+        self.state.gc_status.set_disabled()
+    }
+
+    /// Re-enable collection. If collection is not currently disabled (e.g. there was no prior
+    /// matching call to [`GCTrigger::disable_collection`]), this is a no-op.
+    /// Returns `true` if this call actually re-enabled collection (i.e. it was the outermost
+    /// matching call), `false` if it only decremented the nesting depth, or if collection was
+    /// already enabled.
+    pub fn enable_collection(&self) -> bool {
+        self.state.gc_status.set_enabled()
+    }
+
+    /// Return whether collection is currently enabled.
+    pub fn is_collection_enabled(&self) -> bool {
+        !self.state.gc_status.is_disabled()
     }
 
     /// This method is called periodically by the allocation subsystem
@@ -107,7 +144,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// * `space_full`: Space request failed, must recover pages within 'space'.
     /// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.
     pub fn poll(&self, space_full: bool, space: Option<&dyn Space<VM>>) -> bool {
-        if !VM::VMCollection::is_collection_enabled() {
+        if !self.is_collection_enabled() {
             return false;
         }
 
@@ -127,10 +164,54 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 plan.get_reserved_pages(),
                 plan.get_total_pages(),
             );
-            self.request();
-            return true;
+            return self.request();
         }
         false
+    }
+
+    /// For [`crate::scheduler::GCWorkScheduler::on_last_parked`]'s use when the last parked GC
+    /// worker is about to go idle with no mutator-requested goal pending: check if we should poll
+    /// from a GC worker.
+    pub(crate) fn poll_from_last_parked_worker(&self) -> bool {
+        if !self.is_collection_enabled() {
+            return false;
+        }
+
+        // Currently only poll if a concurrent GC is in progress, and only if that work has actually drained.
+        let Some(concurrent_plan) = self.plan().concurrent() else {
+            return false;
+        };
+        if !concurrent_plan.concurrent_work_in_progress() {
+            return false;
+        }
+        if !self.scheduler.work_buckets[crate::scheduler::WorkBucketStage::Concurrent].is_drained()
+        {
+            return false;
+        }
+
+        let plan = self.plan();
+        if self.policy.is_gc_required(false, None, plan) {
+            match self.state.gc_status.try_request_pause() {
+                // This call won the race to request a GC. However, we cannot call request() now.
+                // The caller of this function is holding a mutex, and if we do request() here,
+                // we end up with deadlock. So we just return true to the caller, and let the caller do the request.
+                Ok(_) => {
+                    probe!(mmtk, gc_requested);
+                    self.state.record_pause_requested_time();
+                    info!(
+                        "[POLL] Requesting a concurrent GC's closing pause from the last parked GC worker"
+                    );
+                    true
+                }
+                Err(GcStatus::Disabled(_)) | Err(GcStatus::PauseRequested) => false,
+                Err(GcStatus::Uninitialized) => panic!(
+                    "GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."
+                ),
+                _ => unreachable!(),
+            }
+        } else {
+            false
+        }
     }
 
     /// This method is called when the user manually requests a collection, such as `System.gc()` in Java.
@@ -145,7 +226,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
             return false;
         }
 
-        if force || !*self.options.ignore_system_gc && VM::VMCollection::is_collection_enabled() {
+        if force || !*self.options.ignore_system_gc && self.is_collection_enabled() {
             info!("User triggering collection");
             // TODO: this may not work reliably. If a GC has been triggered, this will not force it to be a full heap GC.
             if exhaustive {
@@ -157,8 +238,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
             self.state
                 .user_triggered_collection
                 .store(true, Ordering::Relaxed);
-            self.request();
-            return true;
+            return self.request();
         }
 
         false
@@ -305,15 +385,29 @@ pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
     /// Failing to do so may result in unnecessay GCs, or result in an infinite loop if the new heap size
     /// can never accomodate the pending allocation.
     fn on_pending_allocation(&self, _pages: usize) {}
-    /// Inform the triggering policy that a GC starts.
+    /// Inform the triggering policy that a GC cycle starts. A GC cycle consists of one or more
+    /// GC pauses (see [`Self::on_pause_start`]) plus any concurrent work in between the pauses.
+    /// For a stop-the-world GC, a GC cycle is just a single pause, and this is called at the same
+    /// time as [`Self::on_pause_start`]. For a concurrent GC that splits a cycle into multiple
+    /// pauses (e.g. an initial mark pause and a final mark pause with concurrent marking in
+    /// between), this is only called once per cycle, for the first pause in the cycle.
     fn on_gc_start(&self, _mmtk: &'static MMTK<VM>) {}
+    /// Inform the triggering policy that a GC cycle ends. See [`Self::on_gc_start`] for what
+    /// a GC cycle is. This is only called once per GC cycle, for the last pause in the cycle.
+    fn on_gc_end(&self, _mmtk: &'static MMTK<VM>) {}
+    /// Inform the triggering policy that a pause starts. For a concurrent GC, this is called once
+    /// for every STW pause in a GC cycle, not just once per cycle. See
+    /// [`Self::on_gc_start`] for the hook that is only called once per GC cycle.
+    fn on_pause_start(&self, _mmtk: &'static MMTK<VM>) {}
+    /// Inform the triggering policy that a pause ends. For a concurrent GC, this is called once
+    /// for every STW pause in a GC cycle, not just once per cycle. See [`Self::on_gc_end`]
+    /// for the hook that is only called once per GC cycle.
+    fn on_pause_end(&self, _mmtk: &'static MMTK<VM>) {}
     /// Inform the triggering policy that a GC is about to start the release work. This is called
     /// in the global Release work packet. This means we assume a plan
     /// do not schedule any work that reclaims memory before the global `Release` work. The current plans
     /// satisfy this assumption: they schedule other release work in `plan.release()`.
     fn on_gc_release(&self, _mmtk: &'static MMTK<VM>) {}
-    /// Inform the triggering policy that a GC ends.
-    fn on_gc_end(&self, _mmtk: &'static MMTK<VM>) {}
     /// Is a GC required now? The GC trigger may implement its own heuristics to decide when
     /// a GC should be performed. However, we recommend the implementation to do its own checks
     /// first, and always call `plan.collection_required(space_full, space)` at the end as a fallback to see if the plan needs

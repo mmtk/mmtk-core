@@ -326,6 +326,13 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         self.common.release_discontiguous_chunks(chunk);
     }
 
+    pub fn get_pages(&self, start: Address) -> usize {
+        debug_assert!(conversions::is_page_aligned(start));
+        let sync = self.sync.lock().unwrap();
+        let page_offset = conversions::bytes_to_pages_up(start - sync.start);
+        sync.free_list.size(page_offset as _) as _
+    }
+
     /// Release pages previously allocated by `alloc_pages`.
     ///
     /// Warning: This method acquires the mutex `self.sync`.  If multiple threads release pages
@@ -334,7 +341,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     /// large object space are recommended to use [`BlockPageResource`] whenever possible.
     ///
     /// [`BlockPageResource`]: crate::util::heap::blockpageresource::BlockPageResource
-    pub fn release_pages(&self, first: Address) {
+    pub fn release_pages(&self, first: Address) -> usize {
         debug_assert!(conversions::is_page_aligned(first));
         let mut sync = self.sync.lock().unwrap();
         let page_offset = conversions::bytes_to_pages_up(first - sync.start);
@@ -354,6 +361,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             // only discontiguous spaces use chunks
             self.release_free_chunks(first, freed as _, &mut sync);
         }
+        pages as _
     }
 
     fn release_free_chunks(

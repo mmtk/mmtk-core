@@ -7,6 +7,7 @@ use crate::util::constants::*;
 /// Most of the constraints are constants. Each plan should declare a constant of this struct,
 /// and use the constant wherever possible. However, for plan-neutral implementations,
 /// these constraints are not constant.
+#[derive(Clone, Debug)]
 pub struct PlanConstraints {
     /// Does the plan collect garbage? Obviously most plans do, but NoGC does not collect.
     pub collects_garbage: bool,
@@ -21,6 +22,9 @@ pub struct PlanConstraints {
     pub max_non_los_copy_bytes: usize,
     /// Does this plan use the log bit? See vm::ObjectModel::GLOBAL_LOG_BIT_SPEC.
     pub needs_log_bit: bool,
+    /// Does this plan use the field-level (rather than object-level) unlogged bit for its write barrier?
+    /// See vm::ObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.
+    pub needs_field_log_bit: bool,
     /// Some plans may allow benign race for testing mark bit, and this will lead to trace the same
     /// edge multiple times. If a plan allows tracing duplicated edges, we will not run duplicate
     /// edge check in extreme_assertions.
@@ -41,6 +45,8 @@ pub struct PlanConstraints {
     /// Some policies do object forwarding after the first liveness transitive closure, such as mark compact.
     /// For plans that use those policies, they should set this as true.
     pub needs_forward_after_liveness: bool,
+    /// True if this plan is reference-counting based (e.g. LXR), rather than tracing-only.
+    pub rc_enabled: bool,
     /// Some (in fact, most) plans do nothing when preparing mutators before tracing (i.e. in
     /// `MutatorConfig::prepare_func`).  Those plans can set this to `false` so that the
     /// `PrepareMutator` work packets will not be created at all.
@@ -68,7 +74,9 @@ impl PlanConstraints {
             may_trace_duplicate_edges: cfg!(feature = "marksweep_as_nonmoving"),
             needs_forward_after_liveness: false,
             needs_log_bit: false,
+            needs_field_log_bit: false,
             barrier: BarrierSelector::NoBarrier,
+            rc_enabled: false,
             // If we use mark sweep as non moving space, we need to prepare mutator. See [`common_prepare_func`].
             needs_prepare_mutator: cfg!(feature = "marksweep_as_nonmoving"),
             generational: false,

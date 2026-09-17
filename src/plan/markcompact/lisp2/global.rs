@@ -1,58 +1,55 @@
-use super::gc_work::CompressorWorkContext;
-use super::gc_work::{AfterCompact, ForwardingTrace, GenerateWork, MarkingTrace, UpdateReferences};
-use crate::plan::compressor::mutator::ALLOCATOR_MAPPING;
-use crate::plan::global::CreateGeneralPlanArgs;
-use crate::plan::global::CreateSpecificPlanArgs;
-use crate::plan::global::{BasePlan, CommonPlan};
-use crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN;
+use super::gc_work::Lisp2GCWorkContext;
+use super::gc_work::{
+    CalculateForwardingAddress, Compact, ForwardingTrace, MarkingTrace, UpdateReferences,
+};
+use crate::plan::global::CommonPlan;
+use crate::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
+use crate::plan::markcompact::lisp2::mutator::ALLOCATOR_MAPPING;
 use crate::plan::tracing::gc_work::weakref::{
     VMForwardWeakRefs, VMPostForwarding, VMProcessWeakRefs,
 };
-use crate::plan::{AllocationSemantics, Plan, PlanConstraints};
-use crate::policy::compressor::CompressorSpace;
+use crate::plan::AllocationSemantics;
+use crate::plan::Plan;
+use crate::plan::PlanConstraints;
+use crate::policy::lisp2space::Lisp2Space;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::{GCWorkScheduler, WorkBucketStage};
+use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::copy::CopySemantics;
 use crate::util::heap::gc_trigger::SpaceStats;
-#[allow(unused_imports)]
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
+#[cfg(not(feature = "vo_bit"))]
+use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
+
 use enum_map::EnumMap;
+
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
-/// [`Compressor`] implements a stop-the-world and parallel implementation of
-/// the Compressor, as described in Kermany and Petrank,
-/// [The Compressor: concurrent, incremental, and parallel compaction](https://dl.acm.org/doi/10.1145/1133255.1134023).
 #[derive(HasSpaces, PlanTraceObject)]
-pub struct Compressor<VM: VMBinding> {
+pub struct Lisp2<VM: VMBinding> {
+    #[space]
+    #[copy_semantics(CopySemantics::DefaultCopy)]
+    pub lisp2_space: Lisp2Space<VM>,
     #[parent]
     pub common: CommonPlan<VM>,
-    #[space]
-    pub compressor_space: CompressorSpace<VM>,
 }
 
-/// The plan constraints for the Compressor plan.
-pub const COMPRESSOR_CONSTRAINTS: PlanConstraints = PlanConstraints {
-    max_non_los_default_alloc_bytes: MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
+/// The plan constraints for the Lisp2 plan.
+pub const LISP2_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     needs_forward_after_liveness: true,
+    max_non_los_default_alloc_bytes:
+        crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
     ..PlanConstraints::default()
 };
 
-impl<VM: VMBinding> Plan for Compressor<VM> {
+impl<VM: VMBinding> Plan for Lisp2<VM> {
     fn constraints(&self) -> &'static PlanConstraints {
-        &COMPRESSOR_CONSTRAINTS
-    }
-
-    fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
-        self.base().collection_required(self, space_full)
-    }
-
-    fn common(&self) -> &CommonPlan<VM> {
-        &self.common
+        &LISP2_CONSTRAINTS
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -63,18 +60,22 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
         &mut self.common.base
     }
 
-    fn prepare(&mut self, tls: VMWorkerThread) {
-        self.common.prepare(tls, true);
-        self.compressor_space.prepare();
+    fn common(&self) -> &CommonPlan<VM> {
+        &self.common
     }
 
-    fn release(&mut self, tls: VMWorkerThread) {
-        self.common.release(tls, true);
-        self.compressor_space.release();
+    fn common_mut(&mut self) -> &mut CommonPlan<VM> {
+        &mut self.common
     }
 
-    fn end_of_gc(&mut self, tls: VMWorkerThread) {
-        self.common.end_of_gc(tls);
+    fn prepare(&mut self, _tls: VMWorkerThread) {
+        self.common.prepare(_tls, true);
+        self.lisp2_space.prepare();
+    }
+
+    fn release(&mut self, _tls: VMWorkerThread) {
+        self.common.release(_tls, true);
+        self.lisp2_space.release();
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -87,32 +88,21 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
 
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<CompressorWorkContext<VM>>::new());
+            .add(StopMutators::<Lisp2GCWorkContext<VM>>::new());
 
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<CompressorWorkContext<VM>>::new(self));
+            .add(Prepare::<Lisp2GCWorkContext<VM>>::new(self));
 
-        scheduler.work_buckets[WorkBucketStage::CalculateForwarding].add(GenerateWork::new(
-            &self.compressor_space,
-            CompressorSpace::<VM>::add_offset_vector_tasks,
-        ));
-
-        // scan roots to update their references
-        scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new());
-
-        scheduler.work_buckets[WorkBucketStage::Compact].add(GenerateWork::new(
-            &self.compressor_space,
-            CompressorSpace::<VM>::add_compact_tasks,
-        ));
-
-        scheduler.work_buckets[WorkBucketStage::Compact].set_sentinel(Box::new(
-            AfterCompact::<VM>::new(&self.compressor_space, &self.common.los),
-        ));
+        scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
+            .add(CalculateForwardingAddress::<VM>::new(&self.lisp2_space));
+        // do another trace to update references
+        scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new(self));
+        scheduler.work_buckets[WorkBucketStage::Compact].add(Compact::<VM>::new(&self.lisp2_space));
 
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<CompressorWorkContext<VM>>::new(self));
+            .add(Release::<Lisp2GCWorkContext<VM>>::new(self));
 
         // Reference processing
         if !*self.base().options.no_reference_types {
@@ -170,31 +160,57 @@ impl<VM: VMBinding> Plan for Compressor<VM> {
             .add(crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self>::new(self));
     }
 
-    fn current_gc_may_move_object(&self) -> bool {
-        true
+    fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
+        self.base().collection_required(self, space_full)
     }
 
     fn get_used_pages(&self) -> usize {
-        self.compressor_space.reserved_pages() + self.common.get_used_pages()
+        self.lisp2_space.reserved_pages() + self.common.get_used_pages()
+    }
+
+    fn get_collection_reserved_pages(&self) -> usize {
+        0
+    }
+
+    fn current_gc_may_move_object(&self) -> bool {
+        true
     }
 }
 
-impl<VM: VMBinding> Compressor<VM> {
+impl<VM: VMBinding> Lisp2<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        // if vo_bit is enabled, VO_BIT_SIDE_METADATA_SPEC will be added to
+        // SideMetadataContext by default, so we don't need to add it here.
+        #[cfg(feature = "vo_bit")]
+        let global_side_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        // if vo_bit is NOT enabled,
+        // we need to add VO_BIT_SIDE_METADATA_SPEC to SideMetadataContext here.
+        #[cfg(not(feature = "vo_bit"))]
+        let global_side_metadata_specs =
+            SideMetadataContext::new_global_specs(&[VO_BIT_SIDE_METADATA_SPEC]);
+
         let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
-            constraints: &COMPRESSOR_CONSTRAINTS,
-            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
+            constraints: &LISP2_CONSTRAINTS,
+            global_side_metadata_specs,
         };
 
-        Compressor {
-            compressor_space: CompressorSpace::new(plan_args.get_normal_space_args(
-                "compressor_space",
-                true,
-                false,
-                VMRequest::discontiguous(),
-            )),
+        let lisp2_space = Lisp2Space::new(plan_args.get_normal_space_args(
+            "lisp2",
+            true,
+            false,
+            VMRequest::discontiguous(),
+        ));
+
+        Lisp2 {
+            lisp2_space,
             common: CommonPlan::new(plan_args),
         }
+    }
+}
+
+impl<VM: VMBinding> Lisp2<VM> {
+    pub fn lisp2_space(&self) -> &Lisp2Space<VM> {
+        &self.lisp2_space
     }
 }

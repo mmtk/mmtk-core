@@ -119,48 +119,36 @@ jobs:
     runs-on: ubuntu-22.04
     needs: binding-refs
     if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
+    env:
+      MMTK_CORE_PATH: ${{ github.workspace }}/mmtk-core
+      JULIA_PATH: ${{ github.workspace }}/julia
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v4
         with:
           path: mmtk-core
-      - name: Checkout Julia Binding
+      - name: Checkout Julia
         uses: actions/checkout@v4
         with:
-          repository: ${{ needs.binding-refs.outputs.julia_binding_repo }}
-          path: mmtk-julia
-          ref: ${{ needs.binding-refs.outputs.julia_binding_ref }}
-      - name: Use mmtk-core Rust toolchain for bindings
-        run: |
-          cp mmtk-core/rust-toolchain mmtk-julia/mmtk
+          repository: ${{ needs.binding-refs.outputs.julia_repo }}
+          path: julia
+          ref: ${{ needs.binding-refs.outputs.julia_ref }}
       - name: Setup
         run: |
-          cd mmtk-julia
-          ./.github/scripts/ci-checkout.sh ${{ needs.binding-refs.outputs.julia_vm_repo }} ${{ needs.binding-refs.outputs.julia_vm_ref }}
-          ./.github/scripts/ci-setup.sh
-          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
-          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+          mmtk-core/.github/scripts/julia/ci-setup.sh
       # removing these two LLVM installations as they cause a conflict within bindgen
       - name: Hack to make bindgen work for Github images
         run: |
           sudo rm -rf /usr/lib/llvm-14
           sudo rm -rf /usr/lib/llvm-13
-      - name: Overwrite MMTk core in Julia binding
+      - name: Debug
         run: |
-          mkdir -p mmtk-julia/repos/mmtk-core
-          cp -r mmtk-core/* mmtk-julia/repos/mmtk-core
-      - name: debug
-        run: |
-          ls mmtk-julia
-          ls mmtk-julia/repos
-          ls mmtk-julia/repos/mmtk-core
-          cat mmtk-julia/mmtk/Cargo.toml
+          ls julia/src/gc-mmtk
+          cat julia/src/gc-mmtk/mmtk_julia/Cargo.toml
       - name: Test
         run: |
-          cd mmtk-julia
           export RUST_BACKTRACE=1
-          ./.github/scripts/ci-test.sh
-          ./.github/scripts/ci-style.sh
+          mmtk-core/.github/scripts/julia/ci-test.sh
 
   extended-tests-ruby:
     # Note: CRuby requires an existing installation of CRuby 3.1.0 or newer to build itself.

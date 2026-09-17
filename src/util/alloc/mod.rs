@@ -32,9 +32,9 @@ pub use self::immix_allocator::ImmixAllocator;
 pub mod free_list_allocator;
 pub use free_list_allocator::FreeListAllocator;
 
-/// Mark compact allocator (actually a bump pointer allocator with an extra heade word)
-mod markcompact_allocator;
-pub use markcompact_allocator::MarkCompactAllocator;
+/// Lisp2 allocator (actually a bump pointer allocator with an extra heade word)
+mod lisp2_allocator;
+pub use lisp2_allocator::Lisp2Allocator;
 
 /// Embedded metadata pages
 pub(crate) mod embedded_meta_data;

@@ -105,7 +105,7 @@ use crate::util::{Address, ObjectReference};
 /// This trait only concerns the representation (i.e. the shape) of the slot, not its semantics,
 /// such as whether it holds strong or weak references.  Therefore, one `Slot` implementation can be
 /// used for both slots that hold strong references and slots that hold weak references.
-pub trait Slot: Copy + Send + Debug + PartialEq + Eq + Hash {
+pub trait Slot: Copy + Send + Sync + Debug + PartialEq + Eq + Hash {
     /// Load object reference from the slot.
     ///
     /// If the slot is not holding an object reference (For example, if it is holding NULL or a
@@ -117,6 +117,18 @@ pub trait Slot: Copy + Send + Debug + PartialEq + Eq + Hash {
     fn load(&self) -> Option<ObjectReference>;
 
     /// Store the object reference `object` into the slot.
+    ///
+    /// This method is used during a GC to update a slot so that it holds the updated
+    /// `ObjectReference` which points to the new address of the target object during a moving GC.
+    /// MMTk core may conservatively call this method even if the target object is not moved.
+    ///
+    /// Note that if [`crate::plan::PlanConstraints::may_trace_duplicate_edges`] is true, multiple
+    /// GC worker threads may visit the same slot during tracing, and update it concurrently.  In
+    /// this case, the implementation of [`Slot::store`] must be benign with respect to such a race,
+    /// but doesn't need to be an atomic read-modify-write operation.  Because the new address of a
+    /// moved object is unique during a GC, if such a race occurs, all invocations of `store` will
+    /// receive the same `object` argument.  Storing the same value to the same address is usually
+    /// idempotent.
     ///
     /// If the slot holds an object reference with tag bits, this method must preserve the tag
     /// bits while updating the object reference so that it points to the forwarded object given by
@@ -141,6 +153,14 @@ pub trait Slot: Copy + Send + Debug + PartialEq + Eq + Hash {
     /// Prefetch the slot so that a subsequent `store` will be faster.
     fn prefetch_store(&self) {
         // no-op by default
+    }
+
+    /// Return the raw memory address of this slot. This is used, for example, by LXR's field
+    /// barrier and remembered-set code to access per-field side metadata (such as the field unlog
+    /// bit) that is indexed by the slot's address. The default implementation is unimplemented;
+    /// slot types that are used with such features must override this method.
+    fn to_address(&self) -> Address {
+        unimplemented!()
     }
 }
 
@@ -174,6 +194,7 @@ impl SimpleSlot {
 }
 
 unsafe impl Send for SimpleSlot {}
+unsafe impl Sync for SimpleSlot {}
 
 impl Slot for SimpleSlot {
     fn load(&self) -> Option<ObjectReference> {
@@ -204,6 +225,10 @@ impl Slot for Address {
 
     fn store(&self, object: ObjectReference) {
         unsafe { Address::store(*self, object) }
+    }
+
+    fn to_address(&self) -> Address {
+        *self
     }
 }
 

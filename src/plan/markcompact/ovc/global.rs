@@ -1,55 +1,62 @@
-use super::gc_work::MarkCompactGCWorkContext;
-use super::gc_work::{
-    CalculateForwardingAddress, Compact, ForwardingTrace, MarkingTrace, UpdateReferences,
-};
-use crate::plan::global::CommonPlan;
-use crate::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
-use crate::plan::markcompact::mutator::ALLOCATOR_MAPPING;
+use super::gc_work::OVCWorkContext;
+use super::gc_work::{AfterCompact, ForwardingTrace, GenerateWork, MarkingTrace, UpdateReferences};
+use crate::plan::global::CreateGeneralPlanArgs;
+use crate::plan::global::CreateSpecificPlanArgs;
+use crate::plan::global::{BasePlan, CommonPlan};
+use crate::plan::markcompact::ovc::mutator::ALLOCATOR_MAPPING;
+use crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN;
 use crate::plan::tracing::gc_work::weakref::{
     VMForwardWeakRefs, VMPostForwarding, VMProcessWeakRefs,
 };
-use crate::plan::AllocationSemantics;
-use crate::plan::Plan;
-use crate::plan::PlanConstraints;
-use crate::policy::markcompactspace::MarkCompactSpace;
+use crate::plan::{AllocationSemantics, Plan, PlanConstraints};
+use crate::policy::ovc::OVCSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::*;
+use crate::scheduler::{GCWorkScheduler, WorkBucketStage};
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::copy::CopySemantics;
 use crate::util::heap::gc_trigger::SpaceStats;
+#[allow(unused_imports)]
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
-#[cfg(not(feature = "vo_bit"))]
-use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
-
 use enum_map::EnumMap;
-
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
+/// [`OVC`] implements a stop-the-world and parallel implementation of
+/// the Compressor, as described in Kermany and Petrank,
+/// [The Compressor: concurrent, incremental, and parallel compaction](https://dl.acm.org/doi/10.1145/1133255.1134023).
 #[derive(HasSpaces, PlanTraceObject)]
-pub struct MarkCompact<VM: VMBinding> {
-    #[space]
-    #[copy_semantics(CopySemantics::DefaultCopy)]
-    pub mc_space: MarkCompactSpace<VM>,
+pub struct OVC<VM: VMBinding> {
     #[parent]
     pub common: CommonPlan<VM>,
+    #[space]
+    pub ovc_space: OVCSpace<VM>,
 }
 
-/// The plan constraints for the mark compact plan.
-pub const MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
+/// The plan constraints for the OVC plan.
+pub const OVC_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    max_non_los_default_alloc_bytes: MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
     moves_objects: true,
     needs_forward_after_liveness: true,
-    max_non_los_default_alloc_bytes:
-        crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
     ..PlanConstraints::default()
 };
 
-impl<VM: VMBinding> Plan for MarkCompact<VM> {
+impl<VM: VMBinding> Plan for OVC<VM> {
     fn constraints(&self) -> &'static PlanConstraints {
-        &MARKCOMPACT_CONSTRAINTS
+        &OVC_CONSTRAINTS
+    }
+
+    fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
+        self.base().collection_required(self, space_full)
+    }
+
+    fn common(&self) -> &CommonPlan<VM> {
+        &self.common
+    }
+
+    fn common_mut(&mut self) -> &mut CommonPlan<VM> {
+        &mut self.common
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -60,22 +67,14 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         &mut self.common.base
     }
 
-    fn common(&self) -> &CommonPlan<VM> {
-        &self.common
+    fn prepare(&mut self, tls: VMWorkerThread) {
+        self.common.prepare(tls, true);
+        self.ovc_space.prepare();
     }
 
-    fn prepare(&mut self, _tls: VMWorkerThread) {
-        self.common.prepare(_tls, true);
-        self.mc_space.prepare();
-    }
-
-    fn release(&mut self, _tls: VMWorkerThread) {
-        self.common.release(_tls, true);
-        self.mc_space.release();
-    }
-
-    fn end_of_gc(&mut self, tls: VMWorkerThread) {
-        self.common.end_of_gc(tls);
+    fn release(&mut self, tls: VMWorkerThread) {
+        self.common.release(tls, true);
+        self.ovc_space.release();
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -88,21 +87,32 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
 
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<MarkCompactGCWorkContext<VM>>::new());
+            .add(StopMutators::<OVCWorkContext<VM>>::new());
 
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<MarkCompactGCWorkContext<VM>>::new(self));
+            .add(Prepare::<OVCWorkContext<VM>>::new(self));
 
-        scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
-            .add(CalculateForwardingAddress::<VM>::new(&self.mc_space));
-        // do another trace to update references
-        scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new(self));
-        scheduler.work_buckets[WorkBucketStage::Compact].add(Compact::<VM>::new(&self.mc_space));
+        scheduler.work_buckets[WorkBucketStage::CalculateForwarding].add(GenerateWork::new(
+            &self.ovc_space,
+            OVCSpace::<VM>::add_offset_vector_tasks,
+        ));
+
+        // scan roots to update their references
+        scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new());
+
+        scheduler.work_buckets[WorkBucketStage::Compact].add(GenerateWork::new(
+            &self.ovc_space,
+            OVCSpace::<VM>::add_compact_tasks,
+        ));
+
+        scheduler.work_buckets[WorkBucketStage::Compact].set_sentinel(Box::new(
+            AfterCompact::<VM>::new(&self.ovc_space, &self.common.los),
+        ));
 
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<MarkCompactGCWorkContext<VM>>::new(self));
+            .add(Release::<OVCWorkContext<VM>>::new(self));
 
         // Reference processing
         if !*self.base().options.no_reference_types {
@@ -160,57 +170,31 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             .add(crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self>::new(self));
     }
 
-    fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
-        self.base().collection_required(self, space_full)
-    }
-
-    fn get_used_pages(&self) -> usize {
-        self.mc_space.reserved_pages() + self.common.get_used_pages()
-    }
-
-    fn get_collection_reserved_pages(&self) -> usize {
-        0
-    }
-
     fn current_gc_may_move_object(&self) -> bool {
         true
     }
-}
 
-impl<VM: VMBinding> MarkCompact<VM> {
-    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
-        // if vo_bit is enabled, VO_BIT_SIDE_METADATA_SPEC will be added to
-        // SideMetadataContext by default, so we don't need to add it here.
-        #[cfg(feature = "vo_bit")]
-        let global_side_metadata_specs = SideMetadataContext::new_global_specs(&[]);
-        // if vo_bit is NOT enabled,
-        // we need to add VO_BIT_SIDE_METADATA_SPEC to SideMetadataContext here.
-        #[cfg(not(feature = "vo_bit"))]
-        let global_side_metadata_specs =
-            SideMetadataContext::new_global_specs(&[VO_BIT_SIDE_METADATA_SPEC]);
-
-        let mut plan_args = CreateSpecificPlanArgs {
-            global_args: args,
-            constraints: &MARKCOMPACT_CONSTRAINTS,
-            global_side_metadata_specs,
-        };
-
-        let mc_space = MarkCompactSpace::new(plan_args.get_normal_space_args(
-            "mc",
-            true,
-            false,
-            VMRequest::discontiguous(),
-        ));
-
-        MarkCompact {
-            mc_space,
-            common: CommonPlan::new(plan_args),
-        }
+    fn get_used_pages(&self) -> usize {
+        self.ovc_space.reserved_pages() + self.common.get_used_pages()
     }
 }
 
-impl<VM: VMBinding> MarkCompact<VM> {
-    pub fn mc_space(&self) -> &MarkCompactSpace<VM> {
-        &self.mc_space
+impl<VM: VMBinding> OVC<VM> {
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        let mut plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &OVC_CONSTRAINTS,
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
+        };
+
+        OVC {
+            ovc_space: OVCSpace::new(plan_args.get_normal_space_args(
+                "ovc_space",
+                true,
+                false,
+                VMRequest::discontiguous(),
+            )),
+            common: CommonPlan::new(plan_args),
+        }
     }
 }

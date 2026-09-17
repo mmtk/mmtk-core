@@ -1,0 +1,51 @@
+name: Performance Regression CI (OpenJDK, per-commit)
+
+# Triggerred when a new commit is pushed to master
+on:
+  push:
+    branches:
+      - master
+  # To test in a branch: uncomment this trigger, and see
+  # openjdk-perf-config.yml for the RESULT_REPO_BRANCH/DEPLOY env to set.
+  # pull_request:
+  #   branches:
+  #     - master
+
+jobs:
+  # Single source of truth for RESULT_REPO_BRANCH/DEPLOY/CI_PERF_KIT_VERSION,
+  # shared with the weekly batch workflows. See openjdk-perf-config.yml.
+  config:
+    uses: ./.github/workflows/openjdk-perf-config.yml
+
+  # Build OpenJDK+MMTk fresh for this push, and cache it for openjdk-run-plan
+  # below to restore within this same workflow run.
+  openjdk-build:
+    needs: [config]
+    uses: ./.github/workflows/openjdk-build-reusable.yml
+    with:
+      ci_perf_kit_version: ${{ needs.config.outputs.ci_perf_kit_version }}
+      openjdk_rev: ${{ needs.config.outputs.openjdk_rev }}
+
+  # Plans we track on every commit: one job per plan, each calling the reusable workflow.
+  openjdk-run-plan:
+    needs: [config, openjdk-build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - plan_name: stickyimmix
+            config: running-openjdk-stickyimmix-complete.yml
+            heap_modifier: ${{ needs.config.outputs.normal_heap_factor }}
+          - plan_name: lxr
+            config: running-openjdk-lxr-complete.yml
+            heap_modifier: ${{ needs.config.outputs.normal_heap_factor }}
+    uses: ./.github/workflows/openjdk-run-plan-reusable.yml
+    with:
+      plan_name: ${{ matrix.plan_name }}
+      config: ${{ matrix.config }}
+      heap_modifier: ${{ matrix.heap_modifier }}
+      result_repo_branch: ${{ needs.config.outputs.result_repo_branch }}
+      deploy: ${{ needs.config.outputs.deploy == 'true' }}
+      ci_perf_kit_version: ${{ needs.config.outputs.ci_perf_kit_version }}
+      openjdk_rev: ${{ needs.config.outputs.openjdk_rev }}
+    secrets: inherit

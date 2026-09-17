@@ -122,6 +122,14 @@ pub trait Collection<VM: VMBinding> {
     /// * `tls`: The thread pointer for the current GC thread.
     fn schedule_finalization(_tls: VMWorkerThread) {}
 
+    /// A hook for the VM to update the state of its weak reference processor at the end of the
+    /// release phase of a GC. This is currently called by the LXR plan after a full or final-mark
+    /// pause, before the reachability of weak references has changed further.
+    ///
+    /// Arguments:
+    /// * `_lxr`: Whether the current GC is being driven by the LXR plan.
+    fn update_weak_processor(_lxr: bool) {}
+
     /// A hook for the VM to do work after forwarding objects.
     ///
     /// This function is called after all of the following have finished:
@@ -144,6 +152,9 @@ pub trait Collection<VM: VMBinding> {
     /// Arguments:
     /// * `tls_worker`: The thread pointer for the worker thread performing this call.
     fn post_forwarding(_tls: VMWorkerThread) {}
+
+    /// Inform the VM to do its VM-specific release work at the end of a GC.
+    fn vm_release() {}
 
     /// Return the amount of memory (in bytes) which the VM allocated outside the MMTk heap but
     /// wants to include into the current MMTk heap size.  MMTk core will consider the reported
@@ -177,25 +188,6 @@ pub trait Collection<VM: VMBinding> {
     fn vm_live_bytes() -> usize {
         // By default, MMTk assumes the amount of memory the VM allocates off-heap is negligible.
         0
-    }
-
-    /// Callback function to ask the VM whether GC is enabled or disabled, allowing or disallowing MMTk
-    /// to trigger garbage collection. When collection is disabled, you can still allocate through MMTk,
-    /// but MMTk will not trigger a GC even if the heap is full. In such a case, the allocation will
-    /// exceed MMTk's heap size (the soft heap limit). However, there is no guarantee that the physical
-    /// allocation will succeed, and if it succeeds, there is no guarantee that further allocation will
-    /// keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration
-    /// to make sure that the physical memory allows the amount of allocation. We highly recommend
-    /// to have GC always enabled (i.e. that this method always returns true). However, we support
-    /// this to accomodate some VMs that require this behavior. Note that
-    /// `handle_user_collection_request()` calls this function, too.  If this function returns
-    /// false, `handle_user_collection_request()` will not trigger GC, either. Note also that any synchronization
-    /// involving enabling and disabling collections by mutator threads should be implemented by the VM.
-    fn is_collection_enabled() -> bool {
-        // By default, MMTk assumes that collections are always enabled, and the binding should define
-        // this method if the VM supports disabling GC, or if the VM cannot safely trigger GC until some
-        // initialization is done, such as initializing class metadata for scanning objects.
-        true
     }
 
     /// Ask the binding to create a [`GCTriggerPolicy`] if the option `gc_trigger` is set to

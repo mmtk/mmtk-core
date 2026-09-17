@@ -27,10 +27,11 @@ pub fn test_allocator_info() {
                 | PlanSelector::SemiSpace
                 | PlanSelector::GenCopy
                 | PlanSelector::GenImmix
-                | PlanSelector::MarkCompact
-                | PlanSelector::Compressor
+                | PlanSelector::Lisp2
+                | PlanSelector::OVC
                 | PlanSelector::ConcurrentImmix
-                | PlanSelector::StickyImmix => {
+                | PlanSelector::StickyImmix
+                | PlanSelector::LXR => {
                     // These plans all use bump pointer allocator.
                     let AllocatorInfo::BumpPointer {
                         bump_pointer_offset,

@@ -7,14 +7,14 @@
 # For GC Developers
 
 - [Tutorial: Add a new GC plan to MMTk](tutorial/prefix.md)
-    - [Introduction]()
+    - [Introduction](tutorial/intro/prefix.md)
         - [What is MMTk?](tutorial/intro/what_is_mmtk.md)
         - [What will this tutorial cover?](tutorial/intro/what_will_this_tutorial_cover.md)
         - [Glossary](tutorial/intro/glossary.md)
-    - [Preliminaries]()
+    - [Preliminaries](tutorial/preliminaries/prefix.md)
         - [Set up MMTk and OpenJDK](tutorial/preliminaries/set_up.md)
         - [Test the build](tutorial/preliminaries/test.md)
-    - [MyGC]()
+    - [MyGC](tutorial/mygc/prefix.md)
         - [Create MyGC](tutorial/mygc/create.md)
         - [Building a semispace GC](tutorial/mygc/ss/prefix.md)
             - [Allocation](tutorial/mygc/ss/alloc.md)

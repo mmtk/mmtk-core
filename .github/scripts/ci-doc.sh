@@ -19,6 +19,9 @@ cp -r $tutorial_code_dir $project_root/src/plan/mygc
 # If we havent appended the mod line, append it
 if ! cat $project_root/src/plan/mod.rs | grep -q "pub mod mygc;"; then
     echo "pub mod mygc;" >> $project_root/src/plan/mod.rs
+    # Undo this on exit (success, failure, or early abort) so the working tree is always left clean
+    # Use -i.bak (portable across GNU and BSD/macOS sed) and remove the backup file it leaves behind
+    trap 'sed -i.bak "/^pub mod mygc;\$/d" $project_root/src/plan/mod.rs && rm -f $project_root/src/plan/mod.rs.bak' EXIT
 fi
 cargo build
 

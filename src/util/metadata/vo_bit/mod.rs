@@ -41,7 +41,7 @@
 //! [`crate::plan::PlanConstraints::may_trace_duplicate_edges`])*
 
 // FIXME: The entire vo_bit module should only be available if the "vo_bit" feature is enabled.
-// However, the malloc-based MarkSweepSpace and MarkCompactSpace depends on the VO bits regardless
+// However, the malloc-based MarkSweepSpace and Lisp2Space depends on the VO bits regardless
 // of the "vo_bit" feature.
 #[cfg(feature = "vo_bit")]
 pub(crate) mod helper;
