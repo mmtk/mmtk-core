@@ -1502,20 +1502,20 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             // Note, `block.sweep()` overwrites `DEFRAG_STATE_TABLE` with the number of holes,
             // but we need it to know if a block is a defrag source.
             // We clear forwarding bits before `block.sweep()`.
-            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
-                if is_moving_gc {
-                    let objects_may_move = if is_defrag_gc {
-                        // If it is a defrag GC, we only clear forwarding bits for defrag sources.
-                        block.is_defrag_source()
-                    } else {
-                        // Otherwise, it must be a nursery GC of StickyImmix with copying nursery.
-                        // We don't have information about which block contains moved objects,
-                        // so we have to clear forwarding bits for all blocks.
-                        true
-                    };
-                    if objects_may_move {
-                        side.bzero_metadata(block.start(), Block::BYTES);
-                    }
+            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC
+                && is_moving_gc
+            {
+                let objects_may_move = if is_defrag_gc {
+                    // If it is a defrag GC, we only clear forwarding bits for defrag sources.
+                    block.is_defrag_source()
+                } else {
+                    // Otherwise, it must be a nursery GC of StickyImmix with copying nursery.
+                    // We don't have information about which block contains moved objects,
+                    // so we have to clear forwarding bits for all blocks.
+                    true
+                };
+                if objects_may_move {
+                    side.bzero_metadata(block.start(), Block::BYTES);
                 }
             }
 

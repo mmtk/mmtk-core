@@ -1501,10 +1501,10 @@ impl SideMetadataContext {
         #[cfg(feature = "vo_bit")]
         ret.push(VO_BIT_SIDE_METADATA_SPEC);
 
-        if let Some(spec) = crate::mmtk::SFT_MAP.get_side_metadata() {
-            if spec.is_global {
-                ret.push(*spec);
-            }
+        if let Some(spec) = crate::mmtk::SFT_MAP.get_side_metadata()
+            && spec.is_global
+        {
+            ret.push(*spec);
         }
 
         // Any plan that uses the chunk map needs to reserve the chunk map table.
@@ -1595,7 +1595,7 @@ impl SideMetadataContext {
         );
         // Page aligned
         debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
-        debug_assert!(size % BYTES_IN_PAGE == 0);
+        debug_assert!(size.is_multiple_of(BYTES_IN_PAGE));
         self.map_metadata_internal(start, size, false, space_name)
     }
 
@@ -1618,7 +1618,7 @@ impl SideMetadataContext {
         );
         // Chunk aligned
         debug_assert!(start.is_aligned_to(BYTES_IN_CHUNK));
-        debug_assert!(size % BYTES_IN_CHUNK == 0);
+        debug_assert!(size.is_multiple_of(BYTES_IN_CHUNK));
         self.map_metadata_internal(start, size, true, name)
     }
 

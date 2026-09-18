@@ -373,7 +373,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         let page_offset = conversions::bytes_to_pages_up(freed_page - sync.start);
 
         // may be multiple chunks
-        if pages_freed % PAGES_IN_CHUNK == 0 {
+        if pages_freed.is_multiple_of(PAGES_IN_CHUNK) {
             // necessary, but not sufficient condition
             /* grow a region of chunks, starting with the chunk containing the freed page */
             let mut region_start = page_offset & !(PAGES_IN_CHUNK - 1);

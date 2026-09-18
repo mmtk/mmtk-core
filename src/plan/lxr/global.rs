@@ -517,7 +517,7 @@ impl<VM: VMBinding> LXR<VM> {
         // This may happen either within a pause, or in concurrent.
         let size = self.possibly_dead_mature_blocks.len();
         let num_bins = self.immix_space.scheduler().num_workers();
-        let bin_cap = size / num_bins + if size % num_bins == 0 { 0 } else { 1 };
+        let bin_cap = size / num_bins + if size.is_multiple_of(num_bins) { 0 } else { 1 };
         let mut bins = (0..num_bins)
             .map(|_| Vec::with_capacity(bin_cap))
             .collect::<Vec<Vec<(Block, bool)>>>();

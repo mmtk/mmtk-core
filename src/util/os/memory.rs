@@ -122,10 +122,10 @@ pub trait OSMemory {
             // TODO: We may be able to remove this now.
             ErrorKind::Other => {
                 // further check the error
-                if let Some(os_errno) = mmap_error.error.raw_os_error() {
-                    if OS::is_mmap_oom(os_errno) {
-                        call_binding_oom();
-                    }
+                if let Some(os_errno) = mmap_error.error.raw_os_error()
+                    && OS::is_mmap_oom(os_errno)
+                {
+                    call_binding_oom();
                 }
             }
             ErrorKind::AlreadyExists => {
@@ -134,10 +134,10 @@ pub trait OSMemory {
                 );
             }
             _ => {
-                if let Some(os_errno) = mmap_error.error.raw_os_error() {
-                    if OS::is_mmap_oom(os_errno) {
-                        call_binding_oom();
-                    }
+                if let Some(os_errno) = mmap_error.error.raw_os_error()
+                    && OS::is_mmap_oom(os_errno)
+                {
+                    call_binding_oom();
                 }
             }
         }

@@ -195,8 +195,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         });
         let start = address_to_meta_address(&super::rc::RC_TABLE, b.start()).to_ptr::<UInt>();
         let limit = address_to_meta_address(&super::rc::RC_TABLE, b.end()).to_ptr::<UInt>();
-        let rc_table = unsafe { std::slice::from_raw_parts(start, limit.offset_from(start) as _) };
-        rc_table
+        unsafe { std::slice::from_raw_parts(start, limit.offset_from(start) as _) }
     }
 
     /// Returns `true` if object `o`'s reference count is zero.

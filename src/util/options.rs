@@ -454,37 +454,33 @@ impl AffinityKind {
 
         // Split on ',' first and then split on '-' if there is a range
         for split in cpulist.split(',') {
-            if !split.contains('-') {
-                if !split.is_empty() {
-                    if let Ok(core) = split.parse::<u16>() {
-                        cpuset.push(core);
-                        cpuset.sort_unstable();
-                        cpuset.dedup();
-                        continue;
-                    }
+            if !split.contains('-') && !split.is_empty() {
+                if let Ok(core) = split.parse::<u16>() {
+                    cpuset.push(core);
+                    cpuset.sort_unstable();
+                    cpuset.dedup();
+                    continue;
                 }
             } else {
                 // Contains a range
                 let range: Vec<&str> = split.split('-').collect();
-                if range.len() == 2 {
-                    if let Ok(start) = range[0].parse::<u16>() {
-                        if let Ok(end) = range[1].parse::<u16>() {
-                            if start >= end {
-                                return Err(
-                                    "Starting core id in range should be less than the end"
-                                        .to_string(),
-                                );
-                            }
-
-                            for cpu in start..=end {
-                                cpuset.push(cpu);
-                                cpuset.sort_unstable();
-                                cpuset.dedup();
-                            }
-
-                            continue;
-                        }
+                if range.len() == 2
+                    && let Ok(start) = range[0].parse::<u16>()
+                    && let Ok(end) = range[1].parse::<u16>()
+                {
+                    if start >= end {
+                        return Err(
+                            "Starting core id in range should be less than the end".to_string()
+                        );
                     }
+
+                    for cpu in start..=end {
+                        cpuset.push(cpu);
+                        cpuset.sort_unstable();
+                        cpuset.dedup();
+                    }
+
+                    continue;
                 }
             }
 
