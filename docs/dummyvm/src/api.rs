@@ -1,17 +1,17 @@
 // All functions here are extern function. There is no point for marking them as unsafe.
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
-use crate::mmtk;
 use crate::DummyVM;
 use crate::SINGLETON;
+use crate::mmtk;
 use libc::c_char;
+use mmtk::AllocationSemantics;
+use mmtk::MMTKBuilder;
+use mmtk::Mutator;
 use mmtk::memory_manager;
 use mmtk::scheduler::GCWorker;
 use mmtk::util::opaque_pointer::*;
 use mmtk::util::{Address, ObjectReference};
-use mmtk::AllocationSemantics;
-use mmtk::MMTKBuilder;
-use mmtk::Mutator;
 use std::ffi::CStr;
 
 // This file exposes MMTk Rust API to the native code. This is not an exhaustive list of all the APIs.
