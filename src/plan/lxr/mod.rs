@@ -5,8 +5,8 @@ pub(super) mod global;
 mod mature_evac;
 pub(super) mod mutator;
 
-use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 
 pub use self::global::LXR;
 

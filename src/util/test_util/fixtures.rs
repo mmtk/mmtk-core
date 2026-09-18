@@ -5,12 +5,12 @@ use atomic_refcell::AtomicRefCell;
 use std::sync::Mutex;
 use std::sync::Once;
 
+use crate::AllocationSemantics;
+use crate::MMTK;
+use crate::MMTKBuilder;
 use crate::memory_manager;
 use crate::util::test_util::mock_vm::MockVM;
 use crate::util::{ObjectReference, VMMutatorThread, VMThread};
-use crate::AllocationSemantics;
-use crate::MMTKBuilder;
-use crate::MMTK;
 
 pub trait FixtureContent {
     fn create() -> Self;

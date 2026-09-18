@@ -1,12 +1,12 @@
+use super::super::LXR;
 use super::super::LazySweepingJobsCounter;
 use super::super::SurvivalRatioPredictorLocal;
-use super::super::LXR;
 use super::super::{LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURSERY_EVACUATION};
+use super::ProcessEdgesBase;
 use super::tracing::LXRConcurrentTraceObjects;
 use super::tracing::LXRStopTheWorldProcessEdges;
 use super::tracing::LXRStopTheWorldProcessNodes;
 use super::tracing::ProcessModBufSATB;
-use super::ProcessEdgesBase;
 use crate::plan::VectorQueue;
 use crate::policy::immix::block::BlockState;
 use crate::scheduler::gc_work::RootKind;
@@ -16,14 +16,14 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::rc::*;
 use crate::vm::slot::Slot;
 use crate::{
-    plan::concurrent::global::ConcurrentPlan,
+    MMTK,
     plan::concurrent::Pause,
+    plan::concurrent::global::ConcurrentPlan,
     plan::global::Plan,
     policy::{immix::block::Block, space::Space},
     scheduler::{GCWork, GCWorker, WorkBucketStage},
-    util::{metadata::side_metadata, object_forwarding, ObjectReference},
+    util::{ObjectReference, metadata::side_metadata, object_forwarding},
     vm::*,
-    MMTK,
 };
 use atomic::Ordering;
 use std::marker::PhantomData;
@@ -505,11 +505,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                     roots.push(new);
                 }
             }
-            if roots.is_empty() {
-                None
-            } else {
-                Some(roots)
-            }
+            if roots.is_empty() { None } else { Some(roots) }
         } else {
             for s in incs.iter() {
                 self.process_slot::<K>(worker, *s, depth, false);

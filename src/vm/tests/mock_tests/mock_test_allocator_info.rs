@@ -1,11 +1,11 @@
 // GITHUB-CI: MMTK_PLAN=all
 
+use crate::AllocationSemantics;
 use crate::memory_manager;
 use crate::util::alloc::AllocatorInfo;
 use crate::util::options::PlanSelector;
 use crate::util::test_util::fixtures::*;
 use crate::util::test_util::mock_vm::*;
-use crate::AllocationSemantics;
 
 #[test]
 pub fn test_allocator_info() {

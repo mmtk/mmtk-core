@@ -1,8 +1,8 @@
+use crate::AllocationSemantics;
 use crate::memory_manager;
 use crate::util::test_util::fixtures::*;
 use crate::util::test_util::mock_method::*;
 use crate::util::test_util::mock_vm::*;
-use crate::AllocationSemantics;
 
 /// This test allocates after calling `initialize_collection()`. When we exceed the heap limit for the first time, MMTk will not trigger GC since GC has been disabled
 /// However, the second 1MB allocation will trigger a GC since GC is enabled again. And `block_for_gc` will be called.

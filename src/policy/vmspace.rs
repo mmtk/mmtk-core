@@ -1,21 +1,21 @@
 use crate::mmtk::SFT_MAP;
-use crate::plan::tracing::OptionObjectQueue;
 use crate::plan::ObjectQueue;
+use crate::plan::tracing::OptionObjectQueue;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
+use crate::util::ObjectReference;
 use crate::util::address::Address;
 use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::constants::BYTES_IN_PAGE;
+use crate::util::heap::PageResource;
 use crate::util::heap::externalpageresource::{ExternalPageResource, ExternalPages};
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
-use crate::util::heap::PageResource;
-use crate::util::metadata::mark_bit::MarkState;
 #[cfg(feature = "set_unlog_bits_vm_space")]
 use crate::util::metadata::MetadataSpec;
+use crate::util::metadata::mark_bit::MarkState;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
-use crate::util::ObjectReference;
 use crate::vm::{ObjectModel, VMBinding};
 
 use std::sync::atomic::Ordering;
@@ -239,11 +239,13 @@ impl<VM: VMBinding> VMSpace<VM> {
 
         // For simplicity, VMSpace has to be outside our available heap range.
         // TODO: Allow VMSpace in our available heap range.
-        assert!(Address::range_intersection(
-            &(chunk_start..chunk_end),
-            &crate::util::heap::layout::available_range()
-        )
-        .is_empty());
+        assert!(
+            Address::range_intersection(
+                &(chunk_start..chunk_end),
+                &crate::util::heap::layout::available_range()
+            )
+            .is_empty()
+        );
 
         debug!(
             "Align VM space ({}, {}) to chunk ({}, {})",
@@ -270,7 +272,11 @@ impl<VM: VMBinding> VMSpace<VM> {
     }
 
     fn set_sft(&self, chunk_start: Address, chunk_size: usize) {
-        assert!(SFT_MAP.has_sft_entry(chunk_start), "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.", chunk_start);
+        assert!(
+            SFT_MAP.has_sft_entry(chunk_start),
+            "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.",
+            chunk_start
+        );
         unsafe {
             SFT_MAP.update(self.as_sft(), chunk_start, chunk_size);
         }

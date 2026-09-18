@@ -2,7 +2,7 @@
 name = "mmtk"
 version = "0.33.0"
 authors = ["The MMTk Developers <>"]
-edition = "2021" # TODO: Switch to 2024 after bumping MSRV to 1.85
+edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "MMTk is a framework for the design and implementation of high-performance and portable memory managers."
 homepage = "https://www.mmtk.io"
@@ -10,19 +10,8 @@ repository = "https://github.com/mmtk/mmtk-core"
 readme = "README.md"
 categories = ["memory-management"]
 keywords = ["gc", "garbage", "collection", "garbage-collection", "allocation"]
-rust-version = "1.84"
+rust-version = "1.97.1"
 build = "build.rs"
-# Use the MSRV-aware resolver which has been available since Rust 1.84.
-#
-# NOTE: The MSRV-aware resolver will only find compatible versions within the allowed version range.
-# For example, if we specify a dependency version as "0.7.2" or equivalently ">=0.7.2,<0.8.0",
-# and the version 0.7.4 is MSRV-compatible but 0.7.5 is not, then it will resolve to 0.7.4.
-# However, if 0.7.2 is not compatible with our MSRV,
-# the resolver will refuse to go below 0.7.2, and the resolution will fail.
-# For this reason, we still need to keep some dependency versions below the latest versions.
-#
-# TODO: Remove `resolver = "3"` after bumping Rust edition to 2024 (Rust 1.85+) because it will be the default.
-resolver = "3"
 
 [lib]
 name = "mmtk"

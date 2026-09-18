@@ -10,6 +10,7 @@ use crate::util::linear_scan::Region;
 use crate::util::metadata::side_metadata::spec_defs::{IX_LINE_REUSE_COUNT, LOS_PAGE_REUSE_COUNT};
 use crate::vm::slot::Slot;
 use crate::{
+    MMTK,
     plan::concurrent::Pause,
     policy::{
         immix::block::{Block, BlockState},
@@ -17,11 +18,10 @@ use crate::{
     },
     scheduler::{GCWork, GCWorker, WorkBucketStage},
     vm::VMBinding,
-    MMTK,
 };
 
-use super::super::mature_evac::RemSetEntry;
 use super::super::LXR;
+use super::super::mature_evac::RemSetEntry;
 
 pub static SELECT_DEFRAG_BLOCK_JOB_COUNTER: AtomicUsize = AtomicUsize::new(0);
 

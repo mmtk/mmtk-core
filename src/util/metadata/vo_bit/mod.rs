@@ -48,11 +48,11 @@ pub(crate) mod helper;
 
 use atomic::Ordering;
 
-use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::vm::object_model::ObjectModel;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::vm::VMBinding;
+use crate::vm::object_model::ObjectModel;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "vo_bit_access")] {
@@ -99,7 +99,7 @@ pub(crate) fn unset_vo_bit_nocheck(object: ObjectReference) {
 /// This is unsafe: check the comment on `side_metadata::store`
 pub(crate) unsafe fn unset_vo_bit_unsafe(object: ObjectReference) {
     debug_assert!(is_vo_bit_set(object), "{:x}: VO bit not set", object);
-    VO_BIT_SIDE_METADATA_SPEC.store::<u8>(object.to_raw_address(), 0);
+    unsafe { VO_BIT_SIDE_METADATA_SPEC.store::<u8>(object.to_raw_address(), 0) };
 }
 
 /// Check if the VO bit is set for an object.
@@ -234,5 +234,5 @@ pub(crate) fn is_internal_ptr_from_vo_bit<VM: VMBinding>(
 /// # Safety
 /// The caller needs to make sure that no one is modifying VO bit.
 pub(crate) unsafe fn is_vo_addr(addr: Address) -> bool {
-    VO_BIT_SIDE_METADATA_SPEC.load::<u8>(addr) != 0
+    (unsafe { VO_BIT_SIDE_METADATA_SPEC.load::<u8>(addr) }) != 0
 }

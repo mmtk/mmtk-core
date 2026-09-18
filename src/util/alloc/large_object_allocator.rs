@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
-use crate::util::alloc::{allocator, Allocator};
-use crate::util::opaque_pointer::*;
 use crate::util::Address;
+use crate::util::alloc::{Allocator, allocator};
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 
 use super::allocator::AllocatorContext;

@@ -7,7 +7,7 @@ use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::mark_bit::MarkState;
 
 use crate::util::object_enum::{self, ObjectEnumerator};
-use crate::util::{metadata, ObjectReference};
+use crate::util::{ObjectReference, metadata};
 
 use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 

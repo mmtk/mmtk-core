@@ -1,7 +1,7 @@
-use crate::util::heap::layout::vm_layout::vm_layout;
-use crate::util::heap::layout::Mmapper;
-use crate::util::os::{HugePageSupport, MmapAnnotation, MmapResult};
 use crate::util::Address;
+use crate::util::heap::layout::Mmapper;
+use crate::util::heap::layout::vm_layout::vm_layout;
+use crate::util::os::{HugePageSupport, MmapAnnotation, MmapResult};
 
 pub struct HeapMeta {
     pub heap_cursor: Address,

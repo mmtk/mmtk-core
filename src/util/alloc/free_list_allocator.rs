@@ -4,11 +4,11 @@ use std::sync::Arc;
 
 use super::allocator::AllocatorContext;
 use crate::policy::marksweepspace::native_ms::*;
-use crate::util::alloc::allocator;
-use crate::util::alloc::Allocator;
-use crate::util::linear_scan::Region;
 use crate::util::Address;
 use crate::util::VMThread;
+use crate::util::alloc::Allocator;
+use crate::util::alloc::allocator;
+use crate::util::linear_scan::Region;
 use crate::vm::VMBinding;
 
 /// A MiMalloc free list allocator
@@ -72,7 +72,13 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
                     debug_assert!(
                         res + size <= cell + cell_size,
                         "Allocating (size = {}, align = {}, offset = {}) to the cell {} of size {}, but the end of the allocation region {} is beyond the cell end {}",
-                        size, align, offset, cell, cell_size, res + size, cell + cell_size
+                        size,
+                        align,
+                        offset,
+                        cell,
+                        cell_size,
+                        res + size,
+                        cell + cell_size
                     );
                 }
                 return res;

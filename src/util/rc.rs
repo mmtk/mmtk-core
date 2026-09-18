@@ -2,10 +2,10 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU32, AtomicUsize};
 
 use crate::util::linear_scan::Region;
-use crate::util::{metadata::side_metadata::address_to_meta_address, Address};
+use crate::util::{Address, metadata::side_metadata::address_to_meta_address};
 use crate::{
     policy::immix::{block::Block, line::Line},
-    util::{metadata::side_metadata::SideMetadataSpec, ObjectReference},
+    util::{ObjectReference, metadata::side_metadata::SideMetadataSpec},
     vm::*,
 };
 use atomic::Ordering;

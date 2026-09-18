@@ -5,7 +5,7 @@ use mmtk::memory_manager;
 #[cfg(feature = "vo_bit")]
 use mmtk::util::test_util::fixtures::*;
 use mmtk::util::test_util::mock_method::*;
-use mmtk::util::test_util::mock_vm::{write_mockvm, MockVM};
+use mmtk::util::test_util::mock_vm::{MockVM, write_mockvm};
 
 pub fn bench(c: &mut Criterion) {
     // Setting a larger heap, although the GC should be disabled below
@@ -27,8 +27,8 @@ pub fn bench(c: &mut Criterion) {
     c.bench_function("internal pointer - normal objects", |_b| {
         #[cfg(feature = "vo_bit")]
         {
-            use mmtk::memory_manager;
             use mmtk::AllocationSemantics;
+            use mmtk::memory_manager;
             let addr = memory_manager::alloc(
                 &mut fixture.mutator,
                 NORMAL_OBJECT_SIZE,
@@ -64,8 +64,8 @@ pub fn bench(c: &mut Criterion) {
     c.bench_function("internal pointer - large objects", |_b| {
         #[cfg(feature = "vo_bit")]
         {
-            use mmtk::memory_manager;
             use mmtk::AllocationSemantics;
+            use mmtk::memory_manager;
             let addr = memory_manager::alloc(
                 &mut fixture.mutator,
                 LARGE_OBJECT_SIZE,

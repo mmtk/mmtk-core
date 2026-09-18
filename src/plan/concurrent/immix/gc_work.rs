@@ -1,7 +1,7 @@
 use crate::plan::concurrent::concurrent_marking_work::ConcurrentMarkingRootsWorkFactory;
 use crate::plan::concurrent::immix::global::ConcurrentImmix;
 use crate::plan::tracing::PlanTrace;
-use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
+use crate::policy::gc_work::{TRACE_KIND_TRANSITIVE_PIN, TraceKind};
 use crate::policy::immix::TRACE_KIND_FAST;
 use crate::vm::VMBinding;
 

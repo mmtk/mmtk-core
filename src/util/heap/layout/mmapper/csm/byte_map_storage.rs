@@ -1,13 +1,13 @@
 use super::MapState;
+use crate::util::Address;
 use crate::util::heap::layout::mmapper::csm::ChunkRange;
 use crate::util::heap::layout::mmapper::csm::MapStateStorage;
 use crate::util::rust_util::rev_group::RevisitableGroupByForIterator;
-use crate::util::Address;
 
 use crate::util::heap::layout::vm_layout::*;
 use std::fmt;
-use std::sync::atomic::Ordering;
 use std::sync::Mutex;
+use std::sync::atomic::Ordering;
 
 use crate::util::os::MmapResult;
 use atomic::Atomic;

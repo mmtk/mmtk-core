@@ -4,13 +4,13 @@
 //! this module is only available on 64-bit machines.
 
 use super::MapState;
+use crate::util::Address;
 use crate::util::heap::layout::mmapper::csm::{ChunkRange, MapStateStorage};
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::os::MmapResult;
 use crate::util::rust_util::atomic_box::OnceOptionBox;
 use crate::util::rust_util::rev_group::RevisitableGroupByForIterator;
 use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
-use crate::util::Address;
 use atomic::{Atomic, Ordering};
 use std::fmt;
 

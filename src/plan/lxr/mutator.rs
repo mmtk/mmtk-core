@@ -1,17 +1,17 @@
-use super::barrier::LXRFieldBarrierSemantics;
 use super::LXR;
+use super::barrier::LXRFieldBarrierSemantics;
+use crate::MMTK;
+use crate::plan::AllocationSemantics;
 use crate::plan::barriers::FieldBarrier;
-use crate::plan::mutator_context::create_allocator_mapping;
-use crate::plan::mutator_context::create_space_mapping;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::ReservedAllocators;
-use crate::plan::AllocationSemantics;
-use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::plan::mutator_context::create_allocator_mapping;
+use crate::plan::mutator_context::create_space_mapping;
 use crate::util::alloc::ImmixAllocator;
+use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::opaque_pointer::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
-use crate::MMTK;
 use enum_map::EnumMap;
 
 pub fn lxr_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {

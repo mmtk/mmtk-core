@@ -3,7 +3,7 @@
 use std::os::raw::c_void;
 
 use criterion::Criterion;
-use mmtk::util::{constants::LOG_BITS_IN_WORD, test_private, Address};
+use mmtk::util::{Address, constants::LOG_BITS_IN_WORD, test_private};
 
 fn allocate_aligned(size: usize) -> Address {
     let ptr = unsafe {

@@ -2,10 +2,10 @@ use std::hint::black_box;
 
 use criterion::Criterion;
 
+use mmtk::AllocationSemantics;
 use mmtk::memory_manager;
 use mmtk::util::test_util::fixtures::*;
 use mmtk::util::test_util::mock_vm::*;
-use mmtk::AllocationSemantics;
 
 pub fn bench(c: &mut Criterion) {
     let mut fixture = MutatorFixture::create();

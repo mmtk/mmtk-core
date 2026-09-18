@@ -1,7 +1,7 @@
+use crate::MMTK;
 use crate::util::analysis::RtAnalysis;
 use crate::util::statistics::counter::EventCounter;
 use crate::vm::VMBinding;
-use crate::MMTK;
 use std::sync::{Arc, Mutex};
 
 /**

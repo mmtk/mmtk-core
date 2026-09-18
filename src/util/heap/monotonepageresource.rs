@@ -11,9 +11,9 @@ use crate::util::heap::layout::vm_layout::LOG_BYTES_IN_CHUNK;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::opaque_pointer::*;
 
+use super::PageResource;
 use super::layout::VMMap;
 use super::pageresource::{PRAllocFail, PRAllocResult};
-use super::PageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
@@ -218,7 +218,7 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
     pub unsafe fn reset(&self) {
         let mut guard = self.sync.lock().unwrap();
         self.common().accounting.reset();
-        self.release_pages(&mut guard);
+        unsafe { self.release_pages(&mut guard) };
         drop(guard);
     }
 
@@ -325,9 +325,9 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
                 self.release_pages_extent(guard.current_chunk, bytes);
             }
 
-            guard.current_chunk = Address::zero();
-            guard.sentinel = Address::zero();
-            guard.cursor = Address::zero();
+            guard.current_chunk = unsafe { Address::zero() };
+            guard.sentinel = unsafe { Address::zero() };
+            guard.cursor = unsafe { Address::zero() };
             self.common.release_all_chunks();
         }
     }

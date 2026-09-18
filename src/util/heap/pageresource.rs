@@ -5,8 +5,8 @@ use crate::util::opaque_pointer::*;
 use std::sync::Mutex;
 
 use super::layout::VMMap;
-use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::PageAccounting;
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::vm::VMBinding;
 
 pub trait PageResource<VM: VMBinding>: 'static {

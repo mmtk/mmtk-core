@@ -1,5 +1,7 @@
-use super::ranges::BitOffset;
 use super::SideMetadataSpec;
+use super::ranges::BitOffset;
+use crate::MMAPPER;
+use crate::util::Address;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 use crate::util::conversions::rshift_align_up;
@@ -7,8 +9,6 @@ use crate::util::heap::layout::vm_layout::VMLayout;
 #[cfg(target_pointer_width = "32")]
 use crate::util::metadata::side_metadata::address_to_chunked_meta_address;
 use crate::util::os::*;
-use crate::util::Address;
-use crate::MMAPPER;
 
 /// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)
 pub(super) fn address_to_contiguous_meta_address(
@@ -177,9 +177,7 @@ pub(crate) fn address_to_meta_address(
 
     trace!(
         "address_to_meta_address({:?}, addr: {}) -> 0x{:x}",
-        metadata_spec,
-        data_addr,
-        res
+        metadata_spec, data_addr, res
     );
 
     res

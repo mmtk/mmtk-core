@@ -1,4 +1,6 @@
 use super::*;
+use crate::MMAPPER;
+use crate::util::Address;
 use crate::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
 use crate::util::conversions::raw_align_up;
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
@@ -7,8 +9,6 @@ use crate::util::metadata::side_metadata::layout::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::os::*;
-use crate::util::Address;
-use crate::MMAPPER;
 use num_traits::FromPrimitive;
 use ranges::BitByteRange;
 use std::fmt;
@@ -103,8 +103,7 @@ impl SideMetadataSpec {
 
         trace!(
             "ensure_metadata_is_mapped({}).meta_start({})",
-            data_addr,
-            meta_start
+            data_addr, meta_start
         );
 
         OS::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
@@ -490,11 +489,11 @@ impl SideMetadataSpec {
                 if bits_num_log < 3 {
                     let lshift = meta_byte_lshift(self, data_addr);
                     let mask = meta_byte_mask(self) << lshift;
-                    let byte_val = meta_addr.load::<u8>();
+                    let byte_val = unsafe { meta_addr.load::<u8>() };
 
                     FromPrimitive::from_u8((byte_val & mask) >> lshift).unwrap()
                 } else {
-                    meta_addr.load::<T>()
+                    unsafe { meta_addr.load::<T>() }
                 }
             },
             |_v| {
@@ -522,12 +521,12 @@ impl SideMetadataSpec {
                 if bits_num_log < 3 {
                     let lshift = meta_byte_lshift(self, data_addr);
                     let mask = meta_byte_mask(self) << lshift;
-                    let old_val = meta_addr.load::<u8>();
+                    let old_val = unsafe { meta_addr.load::<u8>() };
                     let new_val = (old_val & !mask) | (metadata.to_u8().unwrap() << lshift);
 
-                    meta_addr.store::<u8>(new_val);
+                    unsafe { meta_addr.store::<u8>(new_val) };
                 } else {
-                    meta_addr.store::<T>(metadata);
+                    unsafe { meta_addr.store::<T>(metadata) };
                 }
             },
             |_| {
@@ -555,7 +554,7 @@ impl SideMetadataSpec {
     /// 2. Interleaving non-atomic and atomic operations is undefined behaviour.
     pub unsafe fn store_byte_relaxed(&self, data_addr: Address, byte: u8) {
         let meta_addr = address_to_meta_address(self, data_addr);
-        meta_addr.store::<u8>(byte);
+        unsafe { meta_addr.store::<u8>(byte) };
     }
 
     /// Loads a value from the side metadata for the given address.
@@ -626,10 +625,10 @@ impl SideMetadataSpec {
     pub unsafe fn set_zero(&self, data_addr: Address) {
         use num_traits::Zero;
         match self.log_num_of_bits {
-            0..=3 => self.store(data_addr, u8::zero()),
-            4 => self.store(data_addr, u16::zero()),
-            5 => self.store(data_addr, u32::zero()),
-            6 => self.store(data_addr, u64::zero()),
+            0..=3 => unsafe { self.store(data_addr, u8::zero()) },
+            4 => unsafe { self.store(data_addr, u16::zero()) },
+            5 => unsafe { self.store(data_addr, u32::zero()) },
+            6 => unsafe { self.store(data_addr, u64::zero()) },
             _ => unreachable!(),
         }
     }
@@ -669,7 +668,7 @@ impl SideMetadataSpec {
                     Some(1u8),
                     || {
                         let meta_addr = address_to_meta_address(self, data_addr);
-                        u8::store_atomic(meta_addr, 0xffu8, order);
+                        unsafe { u8::store_atomic(meta_addr, 0xffu8, order) };
                     },
                     |_| {}
                 )
@@ -691,7 +690,7 @@ impl SideMetadataSpec {
             None,
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
-                meta_addr.load::<u8>()
+                unsafe { meta_addr.load::<u8>() }
             },
             |_| {},
         )
@@ -713,7 +712,7 @@ impl SideMetadataSpec {
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 let aligned_meta_addr = meta_addr.align_down(BYTES_IN_ADDRESS);
-                aligned_meta_addr.load::<usize>()
+                unsafe { aligned_meta_addr.load::<usize>() }
             },
             |_| {},
         )
@@ -1045,14 +1044,19 @@ impl SideMetadataSpec {
                 // Double check if the implementation is correct
                 let result2 =
                     self.find_prev_non_zero_value_simple::<T>(data_addr, search_limit_bytes);
-                assert_eq!(result, result2, "find_prev_non_zero_value_fast returned a diffrent result from the naive implementation.");
+                assert_eq!(
+                    result, result2,
+                    "find_prev_non_zero_value_fast returned a diffrent result from the naive implementation."
+                );
             }
             result
         } else {
             // TODO: We should be able to optimize further for this case. However, we need to be careful that the side metadata
             // is not contiguous, and we need to skip to the next chunk's side metadata when we search to a different chunk.
             // This won't be used for VO bit, as VO bit is global and is always contiguous. So for now, I am not bothered to do it.
-            warn!("We are trying to search non zero bits in an discontiguous side metadata. The performance is slow, as MMTk does not optimize for this case.");
+            warn!(
+                "We are trying to search non zero bits in an discontiguous side metadata. The performance is slow, as MMTk does not optimize for this case."
+            );
             self.find_prev_non_zero_value_simple::<T>(data_addr, search_limit_bytes)
         }
     }
@@ -1207,8 +1211,7 @@ impl SideMetadataSpec {
                 let result2 =
                     self.find_next_non_zero_value_simple::<T>(data_addr, search_limit_bytes);
                 assert_eq!(
-                    result,
-                    result2,
+                    result, result2,
                     "find_next_non_zero_value_fast returned a different result from the naive implementation. data_addr {}, search_limit_bytes {}",
                     data_addr, search_limit_bytes,
                 );
@@ -1218,7 +1221,9 @@ impl SideMetadataSpec {
             // TODO: We should be able to optimize further for this case. However, we need to be careful that the side metadata
             // is not contiguous, and we need to skip to the next chunk's side metadata when we search to a different chunk.
             // This won't be used for VO bit, as VO bit is global and is always contiguous. So for now, I am not bothered to do it.
-            warn!("We are trying to search non zero bits in an discontiguous side metadata. The performance is slow, as MMTk does not optimize for this case.");
+            warn!(
+                "We are trying to search non zero bits in an discontiguous side metadata. The performance is slow, as MMTk does not optimize for this case."
+            );
             self.find_next_non_zero_value_simple::<T>(data_addr, search_limit_bytes)
         }
     }

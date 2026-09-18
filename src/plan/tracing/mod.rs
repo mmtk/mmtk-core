@@ -5,10 +5,10 @@ use std::marker::PhantomData;
 
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
-use crate::scheduler::{GCWorker, EDGES_WORK_BUFFER_SIZE};
+use crate::scheduler::{EDGES_WORK_BUFFER_SIZE, GCWorker};
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
-use crate::{Plan, MMTK};
+use crate::{MMTK, Plan};
 
 pub(crate) mod gc_work;
 

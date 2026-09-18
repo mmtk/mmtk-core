@@ -1,27 +1,27 @@
 use atomic::Atomic;
 
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
+use crate::util::ObjectReference;
 use crate::util::address::Address;
 use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::conversions;
 use crate::util::copy::CopySemantics;
-use crate::util::heap::gc_trigger::GCTrigger;
-use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
+use crate::util::heap::gc_trigger::GCTrigger;
+use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
 use crate::util::os::*;
-use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 
 /// This type implements a lock free version of the immortal collection

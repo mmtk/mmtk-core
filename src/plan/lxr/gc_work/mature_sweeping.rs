@@ -1,17 +1,17 @@
 use std::ops::Range;
 use std::sync::atomic::Ordering;
 
-use crate::plan::lxr::{LazySweepingJobsCounter, LXR};
+use crate::MMTK;
+use crate::plan::lxr::{LXR, LazySweepingJobsCounter};
+use crate::policy::immix::ImmixSpace;
 use crate::policy::immix::block::{Block, BlockState};
 use crate::policy::immix::line::Line;
-use crate::policy::immix::ImmixSpace;
 use crate::scheduler::{GCWork, GCWorker};
+use crate::util::ObjectReference;
 use crate::util::heap::chunk_map::Chunk;
 use crate::util::linear_scan::Region;
 use crate::util::rc::{self, RefCountHelper};
-use crate::util::ObjectReference;
 use crate::vm::VMBinding;
-use crate::MMTK;
 
 /// Chunk sweeping work packet.
 pub struct SweepDeadCycles<VM: VMBinding> {

@@ -1,17 +1,17 @@
 use std::sync::{Mutex, MutexGuard};
 
-use super::layout::vm_layout::PAGES_IN_CHUNK;
-use super::layout::VMMap;
-use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::PageResource;
+use super::layout::VMMap;
+use super::layout::vm_layout::PAGES_IN_CHUNK;
+use super::pageresource::{PRAllocFail, PRAllocResult};
 use crate::mmtk::MMAPPER;
 use crate::util::address::Address;
 use crate::util::alloc::embedded_meta_data::*;
 use crate::util::conversions;
 use crate::util::freelist;
 use crate::util::freelist::FreeList;
-use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::layout::CreateFreeListResult;
+use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::opaque_pointer::*;

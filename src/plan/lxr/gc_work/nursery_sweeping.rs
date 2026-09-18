@@ -1,11 +1,11 @@
 use atomic::Ordering;
 
-use crate::plan::lxr::{LazySweepingJobsCounter, LXR};
+use crate::MMTK;
+use crate::plan::lxr::{LXR, LazySweepingJobsCounter};
 use crate::policy::immix::block::Block;
 use crate::scheduler::WorkBucketStage;
 use crate::scheduler::{GCWork, GCWorker};
 use crate::vm::VMBinding;
-use crate::MMTK;
 
 pub struct RCLazySweepNurseryBlocks {
     blocks: Vec<Block>,

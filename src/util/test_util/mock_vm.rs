@@ -1,24 +1,24 @@
 // Some mock methods may get really complex
 #![allow(clippy::type_complexity)]
 
-use crate::plan::tracing::gc_work::root::DefaultRootsWorkFactory;
-use crate::plan::tracing::gc_work::DefaultObjectTracerContext;
-use crate::plan::tracing::UnsupportedTrace;
+use crate::Mutator;
 use crate::plan::ObjectQueue;
+use crate::plan::tracing::UnsupportedTrace;
+use crate::plan::tracing::gc_work::DefaultObjectTracerContext;
+use crate::plan::tracing::gc_work::root::DefaultRootsWorkFactory;
 use crate::scheduler::*;
 use crate::util::alloc::AllocationError;
 use crate::util::copy::*;
 use crate::util::heap::gc_trigger::GCTriggerPolicy;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
-use crate::vm::object_model::specs::*;
 use crate::vm::GCThreadContext;
 use crate::vm::ObjectTracer;
 use crate::vm::ObjectTracerContext;
 use crate::vm::RootsWorkFactory;
 use crate::vm::SlotVisitor;
 use crate::vm::VMBinding;
-use crate::Mutator;
+use crate::vm::object_model::specs::*;
 
 use super::mock_method::*;
 
@@ -284,7 +284,10 @@ impl Default for MockVM {
             mutator: MockMethod::new_unimplemented(),
             mutators: MockMethod::new_unimplemented(),
             vm_trace_object: MockMethod::new_fixed(Box::new(|(_, object, _)| {
-                panic!("MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.", object)
+                panic!(
+                    "MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.",
+                    object
+                )
             })),
 
             stop_all_mutators: MockMethod::new_unimplemented(),

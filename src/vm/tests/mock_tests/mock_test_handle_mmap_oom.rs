@@ -1,8 +1,8 @@
 use super::mock_test_prelude::*;
 
+use crate::util::Address;
 use crate::util::opaque_pointer::*;
 use crate::util::os::*;
-use crate::util::Address;
 
 #[cfg(target_pointer_width = "32")]
 const LARGE_SIZE: usize = 4_294_967_295;

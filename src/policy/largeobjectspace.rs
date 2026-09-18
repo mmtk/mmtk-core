@@ -8,8 +8,8 @@ use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::{FreeListPageResource, PageResource};
 use crate::util::metadata;
-use crate::util::metadata::side_metadata::spec_defs::LOS_PAGE_REUSE_COUNT;
 use crate::util::metadata::MetadataSpec;
+use crate::util::metadata::side_metadata::spec_defs::LOS_PAGE_REUSE_COUNT;
 use crate::util::object_enum::ClosureObjectEnumerator;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
@@ -175,7 +175,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         ptr: Address,
         max_search_bytes: usize,
     ) -> Option<ObjectReference> {
-        use crate::{util::metadata::vo_bit, MMAPPER};
+        use crate::{MMAPPER, util::metadata::vo_bit};
 
         let mmap_granularity = MMAPPER.granularity();
 

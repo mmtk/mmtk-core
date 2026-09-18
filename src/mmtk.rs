@@ -2,7 +2,7 @@
 use crate::global_state::{GcStatus, GlobalState};
 use crate::plan::CreateGeneralPlanArgs;
 use crate::plan::Plan;
-use crate::policy::sft_map::{create_sft_map, SFTMap};
+use crate::policy::sft_map::{SFTMap, create_sft_map};
 use crate::scheduler::GCWorkScheduler;
 
 #[cfg(feature = "vo_bit")]
@@ -10,11 +10,11 @@ use crate::util::address::ObjectReference;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::finalizable_processor::FinalizableProcessor;
+use crate::util::heap::HeapMeta;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::heap_parameters::MAX_SPACES;
-use crate::util::heap::layout::vm_layout::{vm_layout, VMLayout};
+use crate::util::heap::layout::vm_layout::{VMLayout, vm_layout};
 use crate::util::heap::layout::{self, Mmapper, VMMap};
-use crate::util::heap::HeapMeta;
 use crate::util::opaque_pointer::*;
 use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
@@ -23,18 +23,18 @@ use crate::util::sanity::sanity_checker::SanityChecker;
 #[cfg(feature = "extreme_assertions")]
 use crate::util::slot_logger::SlotLogger;
 use crate::util::statistics::stats::Stats;
-#[cfg(feature = "vm_space")]
-use crate::vm::object_model::ObjectModel;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
+#[cfg(feature = "vm_space")]
+use crate::vm::object_model::ObjectModel;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::default::Default;
+use std::sync::Arc;
+use std::sync::Mutex;
 #[cfg(feature = "sanity")]
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
-use std::sync::Mutex;
 
 lazy_static! {
     // I am not sure if we should include these mmappers as part of MMTk struct.
@@ -354,7 +354,7 @@ impl<VM: VMBinding> MMTK<VM> {
         //
         // FIXME: Fix the API of handle_user_collection_request so that we won't need this
         // workaround.
-        if gc_triggered && tls.0 .0.is_null() {
+        if gc_triggered && tls.0.0.is_null() {
             use crate::vm::Collection;
             VM::VMCollection::block_for_gc(tls);
         }
@@ -470,7 +470,7 @@ impl<VM: VMBinding> MMTK<VM> {
             //
             // FIXME: Make a proper API that allows `handle_user_collection_request` to be called by
             // non-mutators and/or not trigger GC.
-            if !tls.0 .0.is_null() {
+            if !tls.0.0.is_null() {
                 VM::VMCollection::block_for_gc(tls);
             }
             true
@@ -490,14 +490,9 @@ impl<VM: VMBinding> MMTK<VM> {
         unsafe { &**(self.plan.get()) }
     }
 
-    /// Get the plan as mutable reference.
-    ///
-    /// # Safety
-    ///
-    /// This is unsafe because the caller must ensure that the plan is not used by other threads.
-    #[allow(clippy::mut_from_ref)]
-    pub unsafe fn get_plan_mut(&self) -> &mut dyn Plan<VM = VM> {
-        &mut **(self.plan.get())
+    /// Get the plan as a mutable reference.
+    pub unsafe fn get_plan_mut(&self) -> &mut Box<dyn Plan<VM = VM>> {
+        unsafe { &mut *self.plan.get() }
     }
 
     /// Get the run time options.
@@ -627,7 +622,7 @@ impl<VM: VMBinding> MMTK<VM> {
 
 /// A non-mangled function to print object information for debugging purposes. This function can be directly
 /// called from a debugger.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn mmtk_debug_print_object(object: crate::util::ObjectReference) {
     // If the address is unmapped, we cannot access its metadata. Just quit.
     if !object.to_raw_address().is_mapped() {
