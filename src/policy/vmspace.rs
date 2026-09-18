@@ -294,18 +294,18 @@ impl<VM: VMBinding> VMSpace<VM> {
             .try_map_metadata_space(chunk_start, chunk_size, self.get_name())
             .unwrap();
         #[cfg(feature = "set_unlog_bits_vm_space")]
-        if self.common.needs_log_bit {
+        if self.common.needs_log_bit
+            && let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+        {
             // Bulk set unlog bits for all addresses in the VM space. This ensures that any
             // modification to the bootimage is logged
-            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                side.bset_metadata(raw_start, raw_size);
-            }
+            side.bset_metadata(raw_start, raw_size);
         }
         #[cfg(feature = "set_unlog_bits_vm_space")]
-        if self.common.needs_field_log_bit {
-            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC {
-                side.bset_metadata(raw_start, raw_size);
-            }
+        if self.common.needs_field_log_bit
+            && let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+        {
+            side.bset_metadata(raw_start, raw_size);
         }
     }
 

@@ -1705,7 +1705,7 @@ impl SideMetadataContext {
     pub fn ensure_unmap_metadata_space(&self, start: Address, size: usize) {
         trace!("ensure_unmap_metadata_space({}, 0x{:x})", start, size);
         debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
-        debug_assert!(size % BYTES_IN_PAGE == 0);
+        debug_assert!(size.is_multiple_of(BYTES_IN_PAGE));
 
         for spec in self.global.iter() {
             ensure_munmap_contiguous_metadata_space(start, size, spec);
