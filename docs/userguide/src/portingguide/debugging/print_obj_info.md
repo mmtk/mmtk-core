@@ -1,7 +1,7 @@
 # Print MMTk Object Information
 
 MMTk provides a utility function to print object information for debugging, `crate::mmtk::mmtk_debug_print_object`.
-The function is marked as `#[no_mangle]`, making it suitable to be used in a debugger.
+The function is marked as `#[unsafe(no_mangle)]`, making it suitable to be used in a debugger.
 
 The following example shows how to use the function to print MMTk's object metadata before and after a single GC in `rr`.
 
