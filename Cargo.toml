@@ -34,7 +34,8 @@ cfg-if = "1.0"
 crossbeam = "0.8.1"
 delegate = "0.13.2"
 downcast-rs = "2.0.1"
-enum-map = "3.1.0"
+# enum-map 3.1.0 requires MSRV 1.95.  Versions 3.0.0 was yanked.
+enum-map = "2.7.3"
 env_logger = { version = "0.11.3", optional = true }
 is-terminal = "0.4.7"
 itertools = "0.15.0"

@@ -19,7 +19,7 @@ use crate::util::options::PlanSelector;
 use crate::vm::Collection;
 use crate::vm::VMBinding;
 use crossbeam::deque::Steal;
-use enum_map::{Array, Enum, EnumMap};
+use enum_map::{Enum, EnumMap};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -53,8 +53,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // Set the open condition of each bucket.
         {
             let mut open_stages: Vec<WorkBucketStage> = vec![WorkBucketStage::FIRST_STW_STAGE];
-            let stages = (0..<WorkBucketStage as Enum>::Array::<()>::LENGTH)
-                .map(WorkBucketStage::from_usize);
+            let stages = (0..WorkBucketStage::LENGTH).map(WorkBucketStage::from_usize);
             for stage in stages {
                 if stage.is_sequentially_opened() {
                     let cur_stages = open_stages.clone();
@@ -326,10 +325,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         debug!("update_buckets");
         let mut buckets_updated = false;
         let mut new_packets = 0;
-        for (id, bucket) in self.work_buckets.iter() {
+        for i in 0..WorkBucketStage::LENGTH {
+            let id = WorkBucketStage::from_usize(i);
             if id.is_always_open() {
                 continue;
             }
+            let bucket = &self.work_buckets[id];
             if !bucket.is_enabled() {
                 debug!("Work bucket {:?} is disabled. Skip.", id);
                 continue;
