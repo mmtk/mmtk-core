@@ -37,7 +37,7 @@ downcast-rs = "2.0.1"
 enum-map = "3.1.0"
 env_logger = { version = "0.11.3", optional = true }
 is-terminal = "0.4.7"
-itertools = "0.14.0"
+itertools = "0.15.0"
 jemalloc-sys = { version = "0.5.3", features = [
     "disable_initial_exec_tls",
 ], optional = true }
@@ -54,10 +54,9 @@ regex = "1.7.0"
 rustversion = "1.0"
 spin = "0.12.3"
 static_assertions = "1.1.0"
-strum = "0.27.1"
-strum_macros = "0.27.1"
-# sysinfo >=0.37.0 requires MSRV 1.88.0 and Rust edition 2024.
-sysinfo = "0.36.1"
+strum = "0.28.0"
+strum_macros = "0.28.0"
+sysinfo = "0.39.6"
 
 [dev-dependencies]
 paste = "1.0.8"
