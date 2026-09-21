@@ -27,10 +27,7 @@ const MAPPABLE_ADDRESS_LIMIT: Address = unsafe { Address::from_usize(MAPPABLE_BY
 /// mean of [`LOG_MAPPABLE_BYTES`] and [`LOG_BYTES_IN_CHUNK`] in order to make [`MMAP_SLAB_BYTES`]
 /// the geometric mean of [`MAPPABLE_BYTES`] and [`BYTES_IN_CHUNK`].  This will balance the array
 /// size of [`TwoLevelStateStorage::slabs`] and [`Slab`].
-///
-/// TODO: Use `usize::midpoint` after bumping MSRV to 1.85
-const LOG_MMAP_SLAB_BYTES: usize =
-    LOG_BYTES_IN_CHUNK + (LOG_MAPPABLE_BYTES - LOG_BYTES_IN_CHUNK) / 2;
+const LOG_MMAP_SLAB_BYTES: usize = usize::midpoint(LOG_BYTES_IN_CHUNK, LOG_MAPPABLE_BYTES);
 /// Number of bytes per slab.
 const MMAP_SLAB_BYTES: usize = 1 << LOG_MMAP_SLAB_BYTES;
 
