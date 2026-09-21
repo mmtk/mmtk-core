@@ -12,7 +12,7 @@ pub use self::global::LXR;
 
 use atomic::Atomic;
 use atomic::Ordering;
-use spin::Lazy;
+use spin::LazyLock;
 type RwLock<T> = spin::rwlock::RwLock<T>;
 
 // --- LXR-specific global state ---
@@ -146,8 +146,8 @@ impl LazySweepingJobs {
     }
 }
 
-static LAZY_SWEEPING_JOBS: Lazy<RwLock<LazySweepingJobs>> =
-    Lazy::new(|| RwLock::new(LazySweepingJobs::new()));
+static LAZY_SWEEPING_JOBS: LazyLock<RwLock<LazySweepingJobs>> =
+    LazyLock::new(|| RwLock::new(LazySweepingJobs::new()));
 
 static SURVIVAL_RATIO_PREDICTOR: SurvivalRatioPredictor = SurvivalRatioPredictor {
     alloc_vol: AtomicUsize::new(0),

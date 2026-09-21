@@ -43,7 +43,7 @@ use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use atomic::{Atomic, Ordering};
 use crossbeam::queue::SegQueue;
 use enum_map::EnumMap;
-use spin::Lazy;
+use spin::LazyLock;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Condvar, Mutex, RwLock};
 
@@ -82,7 +82,7 @@ pub struct LXR<VM: VMBinding> {
     pub(super) possibly_dead_mature_blocks: SegQueue<(Block, bool)>,
 }
 
-pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints {
+pub static LXR_CONSTRAINTS: LazyLock<PlanConstraints> = LazyLock::new(|| PlanConstraints {
     moves_objects: super::NURSERY_EVACUATION || super::MATURE_EVACUATION,
     // Max immix object size is half of a block.
     max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
