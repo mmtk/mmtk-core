@@ -45,7 +45,7 @@ fn make_standard_bitmap() -> PreparedBitmap {
     let mut rng = get_rng();
 
     let mut set_bits = (0..(BLOCK_BYTES >> LOG_BITS_IN_WORD))
-        .choose_multiple(&mut rng, NUM_OBJECTS)
+        .sample(&mut rng, NUM_OBJECTS)
         .iter()
         .map(|total_bit_offset| {
             let word_offset = total_bit_offset >> LOG_BITS_IN_WORD;
