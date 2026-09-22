@@ -538,39 +538,39 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             "{:x}: VO bit not set",
             object
         );
+
         if self.rc_enabled {
-            if self.test_and_mark(object) {
+            if self.test_and_mark(object).is_ok() {
                 queue.enqueue(object);
             }
             return object;
         }
-        let nursery_object = self.is_in_nursery(object);
-        trace!(
-            "LOS object {} {} a nursery object",
-            object,
-            if nursery_object { "is" } else { "is not" }
-        );
-        if !self.in_nursery_gc || nursery_object {
-            // Note that test_and_mark() has side effects of
-            // clearing nursery bit/moving objects out of logical nursery
-            if self.test_and_mark(object) {
-                trace!("LOS object {} is being marked now", object);
-                self.treadmill.copy(object, nursery_object);
-                // We just moved the object out of the logical nursery, mark it as unlogged.
-                // We also unlog mature objects as their unlog bit may have been unset before the
-                // full-heap GC
-                if self.common.unlog_traced_object {
-                    VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                        .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
-                }
-                queue.enqueue(object);
-            } else {
-                trace!(
-                    "LOS object {} is not being marked now, it was marked before",
-                    object
-                );
+
+        // We don't check if the current GC is a nursery GC,
+        // and we don't check if `object` is in nursery.
+        // test_and_mark will always transition the state to MatureMarked.
+        // If the object is already in the MatureMarked state, test_and_mark will not do anything.
+        if let Ok(old_state) = self.test_and_mark(object) {
+            let was_nursery_object = mark_nursery_bits_states::is_nursery(old_state);
+            trace!(
+                "Marked LOS object {}.  It {} a nursery object",
+                object,
+                if was_nursery_object { "was" } else { "was not" }
+            );
+            // If the object was a nursery object, we move it to `to_space` in the treadmill.
+            self.treadmill.copy(object, was_nursery_object);
+            // We just moved the object out of the logical nursery, mark it as unlogged.
+            // We also unlog mature objects as their unlog bit may have been unset before the
+            // full-heap GC
+            if self.common.unlog_traced_object {
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                    .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
             }
+            queue.enqueue(object);
+        } else {
+            trace!("LOS object {} is already marked", object);
         }
+
         object
     }
 
@@ -616,8 +616,9 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         self.acquire(tls, pages, alloc_options)
     }
 
+    /// Attempt to mark `object`.  Return `true` if this invocation marked the object.
     pub fn attempt_mark(&self, object: ObjectReference) -> bool {
-        self.test_and_mark(object)
+        self.test_and_mark(object).is_ok()
     }
 
     pub fn rc_free(&self, o: ObjectReference) {
@@ -629,21 +630,20 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     /// Test if the nursery-mark state is in the marked state.  If not, it will atomically change
-    /// the state to marked (`MatureMarked`, which implies clearing the nursery bit) and return
-    /// true.  Otherwise, it returns false.
-    fn test_and_mark(&self, object: ObjectReference) -> bool {
+    /// the state to marked (`MatureMarked`, which implies clearing the nursery bit).  Returns
+    /// `Ok(old_state)` if this invocation marked the object, or `Err(old_state)` if the object is
+    /// already in the marked state.  In either case, `old_state` is the old state before the atomic
+    /// operation.
+    fn test_and_mark(&self, object: ObjectReference) -> Result<u8, u8> {
         let mark_state = self.mark_state;
-        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
-            .fetch_update_metadata::<VM, u8, _>(
-                object,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-                |old_value| {
-                    (!mark_nursery_bits_states::is_marked(old_value, mark_state))
-                        .then_some(mark_state)
-                },
-            )
-            .is_ok()
+        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.fetch_update_metadata::<VM, u8, _>(
+            object,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+            |old_value| {
+                (!mark_nursery_bits_states::is_marked(old_value, mark_state)).then_some(mark_state)
+            },
+        )
     }
 
     /// Test if the mark bit of `LOCAL_LOS_MARK_NURSERY_SPEC` is equal to `value`.
