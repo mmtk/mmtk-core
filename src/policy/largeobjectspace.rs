@@ -24,38 +24,97 @@ use std::sync::atomic::AtomicUsize;
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
 
-// LOS objects can be in one of the three states at any time:
-//
-// -   Nursery: NURSERY_BIT is 1 (regardless of mark bit)
-// -   MatureUnmarked: NURSERY_BIT is 0, and MARK_BIT is not equal to mark_state
-// -   MatureMarked: NURSERY_BIT is 0, and MARK_BIT is equal to mark_state
-//
-// Note that there is no "nursery marked" state.  Nursery objects are promoted when marked.
-//
-// When flipping the meaning of the mark bit,
-// MatureUnmarked becomes MatureMarked, and MatureMarked becomes MatureUnmarked.
-// However, the Nursery state remains the Nursery state because the mark bit is ignored.
-//
-// Possible state transitions are:
-//
-//  alloocate
-//  │
-//  │   ┌──┐flip mark state
-//  │   │  │
-// ┌▼───▼──┴─┐         ┌──────────────┐ flip mark state ┌────────────────┐
-// │         │ mark    │              ├────────────────►│                │
-// │ Nursery │────────►│ MatureMarked │                 │ MatureUnmarked │
-// │         │         │              │◄────────────────┤                │
-// └─────────┘         └──────────────┘ mark            └────────────────┘
-//
-// Note that right before flipping mark state (at the beginning of a full-heap GC),
-// all objects are either (unmarked) nursery objects or marked mature objects.
-// There is no unmarked mature objects, otherwise it is an error.
-// After flipping, all objects become unmarked (Nursery or MatureUnmarked).
 const MARK_BIT: u8 = 0b01;
 const NURSERY_BIT: u8 = 0b10;
 #[allow(unused)]
 const LOS_BIT_MASK: u8 = 0b11;
+
+/// The states of the [`ObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC`] metadata in tracing-based GC.
+///
+/// # The states
+///
+/// LOS objects can be in one of the three states at any time:
+///
+/// | State               | `NURSERY_BIT` | `MARK_BIT`         |
+/// |---------------------|---------------|--------------------|
+/// | Nursery             | 1             | disregarded        |
+/// | MatureUnmarked      | 0             | `!= mark_state`    |
+/// | MatureMarked        | 0             | `== mark_state`    |
+///
+/// Note that there is no "nursery marked" state.  Nursery objects are promoted when marked.
+///
+/// When encoded as the two-bit metadata, both `0b10` and `0b11` represents the Nursery state.  When
+/// the [`NURSERY_BIT`] is 0, it is mature, and the [`MARK_BIT`] represents "marked" if it is equal
+/// to [`LargeObjectSpace::mark_state`].
+///
+/// When flipping the meaning of the mark bit, MatureUnmarked becomes MatureMarked, and MatureMarked
+/// becomes MatureUnmarked. However, the Nursery state remains the Nursery state because the mark
+/// bit is ignored.
+///
+/// # In tracing collectors
+///
+/// In tracing collectors, allowed state transitions are:
+///
+/// ```text
+///  allocate (normal)          allocate (as live)
+///  │                          |
+///  │   ┌──┐flip mark state    |
+///  │   │  │                   |
+/// ┌▼───▼──┴─┐         ┌───────▼──────┐ flip mark state ┌────────────────┐
+/// │         │ mark    │              ├────────────────►│                │
+/// │ Nursery │────────►│ MatureMarked │                 │ MatureUnmarked │
+/// │         │         │              │◄────────────────┤                │
+/// └─────────┘         └──────────────┘ mark            └────────────────┘
+/// ```
+///
+/// Newly allocated objects can be either in the `Nursery` state (for normal allocations) or the
+/// `MatureMarked` state (when allocating as live for concurrent GC).  Note that right before
+/// flipping mark state (at the beginning of a full-heap GC), all objects must be either in the
+/// `Nursery` state or the `MatureMarked` state.  There must not be unmarked mature objects,
+/// otherwise it is an error.  After flipping, all objects become unmarked (Nursery remains Nursery,
+/// and MatureMarked becomes MatureUnmarked).
+///
+/// # In RC collectors
+///
+/// In RC collectors (currently just LXR), the `NURSERY_BIT` is unused, and the `Nursery` state is
+/// unused.
+///
+/// ```text
+///         allocate
+///         |
+/// ┌───────▼──────┐ flip mark state ┌────────────────┐
+/// │              ├────────────────►│                │
+/// │ MatureMarked │                 │ MatureUnmarked │
+/// │              │◄────────────────┤                │
+/// └──────────────┘ mark            └────────────────┘
+/// ```
+///
+/// Newly allocated objects are always in the `MatureMarked` state.  There are two reasons:
+///
+/// 1.  When backup tracing is *not* in progress, all (surviving) objects are in the `MatureMarked`
+///     state.  Allocating new objects in the `MatureMarked` state just makes them look like any
+///     other objects.  During RC collections, only the reference counts are used, and the
+///     `MatureMarked` state is disregared.
+/// 2.  When backup tracing starts (the InitialMark pause or the Full pause), the meaning of the
+///     mark bit is flipped, and all `MatureMarked` objects become `MatureUnmarked`.  Objects
+///     allocated during concurrent marking are in the `MatureMarked` state, too.  They will be
+///     conservatively considered as "marked", just like SATB-based concurrent tracing collectors.
+///     At the end of tracing, objects that are in the `MatureUnmarked` state have been dead since
+///     tracing started, i.e. they have been dead in the snapshot in the beginning (SATB).
+mod mark_nursery_bits_states {
+    use super::NURSERY_BIT;
+
+    /// Return true if the mark-nursery state represents the `Nursery` state.
+    pub fn is_nursery(state: u8) -> bool {
+        state & NURSERY_BIT == NURSERY_BIT
+    }
+
+    /// Return true if the mark-nursery state represents a marked state (i.e. the `MatureMarked`
+    /// state). All other states are considered unmarked.
+    pub fn is_marked(state: u8, mark_state: u8) -> bool {
+        state == mark_state
+    }
+}
 
 /// This type implements a policy for large objects. Each instance corresponds
 /// to one Treadmill space.
@@ -480,7 +539,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             object
         );
         if self.rc_enabled {
-            if self.test_and_mark(object, self.mark_state) {
+            if self.test_and_mark(object) {
                 queue.enqueue(object);
             }
             return object;
@@ -494,7 +553,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if !self.in_nursery_gc || nursery_object {
             // Note that test_and_mark() has side effects of
             // clearing nursery bit/moving objects out of logical nursery
-            if self.test_and_mark(object, self.mark_state) {
+            if self.test_and_mark(object) {
                 trace!("LOS object {} is being marked now", object);
                 self.treadmill.copy(object, nursery_object);
                 // We just moved the object out of the logical nursery, mark it as unlogged.
@@ -558,7 +617,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     pub fn attempt_mark(&self, object: ObjectReference) -> bool {
-        self.test_and_mark(object, self.mark_state)
+        self.test_and_mark(object)
     }
 
     pub fn rc_free(&self, o: ObjectReference) {
@@ -572,17 +631,22 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     /// Test if the nursery-mark state is in the marked state.  If not, it will atomically change
     /// the state to marked (`MatureMarked`, which implies clearing the nursery bit) and return
     /// true.  Otherwise, it returns false.
-    fn test_and_mark(&self, object: ObjectReference, value: u8) -> bool {
+    fn test_and_mark(&self, object: ObjectReference) -> bool {
+        let mark_state = self.mark_state;
         VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
             .fetch_update_metadata::<VM, u8, _>(
                 object,
                 Ordering::SeqCst,
                 Ordering::SeqCst,
-                |old_value| (!Self::is_marked_state(old_value, value)).then_some(value),
+                |old_value| {
+                    (!mark_nursery_bits_states::is_marked(old_value, mark_state))
+                        .then_some(mark_state)
+                },
             )
             .is_ok()
     }
 
+    /// Test if the mark bit of `LOCAL_LOS_MARK_NURSERY_SPEC` is equal to `value`.
     fn test_mark_bit(&self, object: ObjectReference, value: u8) -> bool {
         VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
             object,
@@ -597,7 +661,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         let mark_nursery_state = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
             .load_atomic::<VM, u8>(object, None, Ordering::Relaxed);
 
-        Self::is_nursery_state(mark_nursery_state)
+        mark_nursery_bits_states::is_nursery(mark_nursery_state)
     }
 
     pub fn sweep_rc_mature_objects_after_satb(&self, is_live: &impl Fn(ObjectReference) -> bool) {
@@ -619,20 +683,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         let mark_nursery_state = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
             .load_atomic::<VM, u8>(object, None, Ordering::SeqCst);
 
-        Self::is_marked_state(mark_nursery_state, self.mark_state)
-    }
-
-    /// Return true if the mark-nursery state represents the `Nursery` state.
-    fn is_nursery_state(mark_nursery_state: u8) -> bool {
-        mark_nursery_state & NURSERY_BIT == NURSERY_BIT
-    }
-
-    /// Return true if the mark-nursery state represents a marked state (i.e. the `MatureMarked` state).
-    /// Any other states are considered unmarked.
-    ///
-    /// Nursery objects are promoted when first marked, so there can't be marked nursery objects.
-    fn is_marked_state(mark_nursery_state: u8, mark_state: u8) -> bool {
-        mark_nursery_state == mark_state
+        mark_nursery_bits_states::is_marked(mark_nursery_state, self.mark_state)
     }
 }
 
