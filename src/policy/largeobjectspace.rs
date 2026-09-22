@@ -136,7 +136,12 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             // Add to treadmill nursery
             self.treadmill.add_to_treadmill(object, true);
             // Initialize mark bit
-            self.test_and_mark(object, self.mark_state);
+            VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::<VM, u8>(
+                object,
+                self.mark_state,
+                None,
+                Ordering::SeqCst,
+            );
             // Initialize metadata
             if self.bump_page_reuse_count.load(Ordering::Acquire) {
                 for off in (0..bytes).step_by(BYTES_IN_PAGE) {
