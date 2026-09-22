@@ -194,7 +194,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         if self.rc_enabled {
             // Add to treadmill nursery
             self.treadmill.add_to_treadmill(object, true);
-            // Initialize mark bit
+            // Initialize the object to the MatureMarked state.
             VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::<VM, u8>(
                 object,
                 self.mark_state,
@@ -218,11 +218,16 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
 
         {
             let mark_nursery_state = if into_nursery {
-                // It is Nursery state as long as the NURSERY_BIT is set,
+                // If we allocate the object into nursery,
+                // the initial state will be Nursery.
+                // It is considered the Nursery state as long as the NURSERY_BIT is set,
                 // regardless of the mark state.
                 NURSERY_BIT
             } else {
-                // Marked objects don't have NURSERY_BIT.
+                // If we allocate an object as live,
+                // the initial state will be MatureMarked.
+                // The NURSERY_BIT bit is not set,
+                // and the mark bit is equal to `self.mark_state`.
                 self.mark_state
             };
 
@@ -328,12 +333,16 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         let mark_nursery_state = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
             .load_atomic::<VM, u8>(object, None, Ordering::SeqCst);
         let mark_state = self.mark_state;
-        println!(
-            "mark_nursery_state = {} (current mark state is {})",
-            mark_nursery_state, mark_state
-        );
-        println!("nursery = {}", self.is_in_nursery(object));
+        println!("mark_nursery_state = 0b{:02b}", mark_nursery_state);
+        println!("LOS mark state = {}", mark_state);
         println!("marked = {}", self.is_marked(object));
+        if self.rc_enabled {
+            let rc = self.rc.count(object);
+            println!("RC = {}", rc);
+        } else {
+            let is_in_nursery = mark_nursery_bits_states::is_nursery(mark_nursery_state);
+            println!("is in nursery = {}", is_in_nursery);
+        }
         self.common.debug_print_object_global_info(object);
     }
 }
@@ -654,14 +663,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             Ordering::SeqCst,
         ) & MARK_BIT
             == value
-    }
-
-    /// Check if a given object is in nursery
-    fn is_in_nursery(&self, object: ObjectReference) -> bool {
-        let mark_nursery_state = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
-            .load_atomic::<VM, u8>(object, None, Ordering::Relaxed);
-
-        mark_nursery_bits_states::is_nursery(mark_nursery_state)
     }
 
     pub fn sweep_rc_mature_objects_after_satb(&self, is_live: &impl Fn(ObjectReference) -> bool) {
