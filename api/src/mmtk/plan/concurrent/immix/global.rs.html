@@ -523,4 +523,9 @@
 <a href=#523 id=523 data-nosnippet>523</a>        <span class="self">self</span>.unfinished_concurrent_marking
 <a href=#524 id=524 data-nosnippet>524</a>            .store(<span class="bool-val">true</span>, Ordering::SeqCst);
 <a href=#525 id=525 data-nosnippet>525</a>    }
-<a href=#526 id=526 data-nosnippet>526</a>}</code></pre></div></section></main></body></html>
+<a href=#526 id=526 data-nosnippet>526</a>
+<a href=#527 id=527 data-nosnippet>527</a>    <span class="kw">fn </span>on_concurrent_work_drained(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+<a href=#528 id=528 data-nosnippet>528</a>        <span class="comment">// Concurrent marking is the only concurrent work this plan schedules, and it always ends
+<a href=#529 id=529 data-nosnippet>529</a>        // in a `FinalMark` pause. Nothing to do here.
+<a href=#530 id=530 data-nosnippet>530</a>    </span>}
+<a href=#531 id=531 data-nosnippet>531</a>}</code></pre></div></section></main></body></html>
