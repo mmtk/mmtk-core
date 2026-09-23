@@ -88,8 +88,13 @@ pub struct Block(Address);
 impl Region for Block {
     #[cfg(not(feature = "immix_smaller_block"))]
     const LOG_BYTES: usize = 15;
+    // 8K, or one page if the page is larger. A block cannot be smaller than a page.
     #[cfg(feature = "immix_smaller_block")]
-    const LOG_BYTES: usize = 13;
+    const LOG_BYTES: usize = if 13 > LOG_BYTES_IN_PAGE as usize {
+        13
+    } else {
+        LOG_BYTES_IN_PAGE as usize
+    };
 
     fn from_aligned_address(address: Address) -> Self {
         debug_assert!(address.is_aligned_to(Self::BYTES));

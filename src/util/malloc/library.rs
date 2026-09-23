@@ -18,7 +18,7 @@ pub const BYTES_IN_MALLOC_PAGE: usize = 1 << LOG_BYTES_IN_MALLOC_PAGE;
 
 #[cfg(feature = "malloc_jemalloc")]
 mod jemalloc {
-    // Normal 4K page
+    // OS page
     pub const LOG_BYTES_IN_MALLOC_PAGE: u8 = crate::util::constants::LOG_BYTES_IN_PAGE;
     // ANSI C
     pub use jemalloc_sys::{calloc, free, malloc, realloc};
@@ -30,7 +30,7 @@ mod jemalloc {
 
 #[cfg(feature = "malloc_mimalloc")]
 mod mimalloc {
-    // Normal 4K page accounting
+    // OS page accounting
     pub const LOG_BYTES_IN_MALLOC_PAGE: u8 = crate::util::constants::LOG_BYTES_IN_PAGE;
     // ANSI C
     pub use libmimalloc_sys::{
@@ -45,7 +45,7 @@ mod mimalloc {
 /// If no malloc lib is specified, use the libc implementation
 #[cfg(not(any(feature = "malloc_jemalloc", feature = "malloc_mimalloc",)))]
 mod libc_malloc {
-    // Normal 4K page
+    // OS page
     pub const LOG_BYTES_IN_MALLOC_PAGE: u8 = crate::util::constants::LOG_BYTES_IN_PAGE;
     // ANSI C
     pub use libc::{calloc, free, malloc, realloc};

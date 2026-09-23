@@ -75,8 +75,9 @@ pub const LOG_BITS_IN_WORD: usize = LOG_BITS_IN_BYTE as usize + LOG_BYTES_IN_WOR
 /// The number of bits in a word
 pub const BITS_IN_WORD: usize = 1 << LOG_BITS_IN_WORD;
 
-/// log2 of the number of bytes in a page
-pub const LOG_BYTES_IN_PAGE: u8 = 12;
+/// log2 of the number of bytes in a page. This is the page size of the OS.
+pub const LOG_BYTES_IN_PAGE: u8 =
+    <crate::util::os::OS as crate::util::os::OSMemory>::LOG_BYTES_IN_PAGE;
 /// The number of bytes in a page
 pub const BYTES_IN_PAGE: usize = 1 << LOG_BYTES_IN_PAGE;
 /// log2 of the number of bits in a page

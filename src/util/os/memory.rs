@@ -62,7 +62,7 @@ pub type MmapResult<T> = std::result::Result<T, MmapError>;
 /// Abstraction for OS memory operations.
 pub trait OSMemory {
     /// log2 of the page size of the OS. This is the granularity of OS memory operations such as `mprotect`.
-    /// It may be larger than MMTk's page size ([`crate::util::constants::LOG_BYTES_IN_PAGE`]).
+    /// MMTk uses the same page size ([`crate::util::constants::LOG_BYTES_IN_PAGE`]).
     const LOG_BYTES_IN_PAGE: u8;
     /// The page size of the OS in bytes.
     const BYTES_IN_PAGE: usize = 1 << Self::LOG_BYTES_IN_PAGE;
@@ -405,6 +405,5 @@ mod tests {
     fn os_page_size_matches_system() {
         let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
         assert_eq!(OS::BYTES_IN_PAGE, page_size as usize);
-        const { assert!(OS::LOG_BYTES_IN_PAGE >= crate::util::constants::LOG_BYTES_IN_PAGE) };
     }
 }

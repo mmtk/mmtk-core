@@ -174,7 +174,7 @@ immix_non_moving = []
 # if `immix_non_moving` is in use.
 sticky_immix_non_moving_nursery = []
 
-# Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
+# Reduce block size for ImmixSpace (8K, or one page if the page is larger).  This mitigates fragmentation when defrag is disabled.
 immix_smaller_block = []
 # Zero the unmarked lines after a GC cycle in immix. This helps debug untraced objects.
 immix_zero_on_release = []

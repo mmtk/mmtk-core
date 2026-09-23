@@ -510,15 +510,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         pages: usize,
         alloc_options: AllocationOptions,
     ) -> Address {
-        let pages = if self.pr.protect_memory_on_release.is_some() {
-            // We protect memory at the granularity of allocations, and the OS can only protect whole OS pages.
-            // If every allocation is a multiple of OS pages, all the allocations are aligned to OS pages as well.
-            use crate::util::constants::LOG_BYTES_IN_PAGE;
-            use crate::util::os::{OSMemory, OS};
-            pages.next_multiple_of(OS::BYTES_IN_PAGE >> LOG_BYTES_IN_PAGE)
-        } else {
-            pages
-        };
         self.acquire(tls, pages, alloc_options)
     }
 
