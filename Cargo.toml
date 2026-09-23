@@ -2,7 +2,7 @@
 name = "mmtk"
 version = "0.33.0"
 authors = ["The MMTk Developers <>"]
-edition = "2021" # TODO: Switch to 2024 after bumping MSRV to 1.85
+edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "MMTk is a framework for the design and implementation of high-performance and portable memory managers."
 homepage = "https://www.mmtk.io"
@@ -10,19 +10,8 @@ repository = "https://github.com/mmtk/mmtk-core"
 readme = "README.md"
 categories = ["memory-management"]
 keywords = ["gc", "garbage", "collection", "garbage-collection", "allocation"]
-rust-version = "1.84"
+rust-version = "1.92.0"
 build = "build.rs"
-# Use the MSRV-aware resolver which has been available since Rust 1.84.
-#
-# NOTE: The MSRV-aware resolver will only find compatible versions within the allowed version range.
-# For example, if we specify a dependency version as "0.7.2" or equivalently ">=0.7.2,<0.8.0",
-# and the version 0.7.4 is MSRV-compatible but 0.7.5 is not, then it will resolve to 0.7.4.
-# However, if 0.7.2 is not compatible with our MSRV,
-# the resolver will refuse to go below 0.7.2, and the resolution will fail.
-# For this reason, we still need to keep some dependency versions below the latest versions.
-#
-# TODO: Remove `resolver = "3"` after bumping Rust edition to 2024 (Rust 1.85+) because it will be the default.
-resolver = "3"
 
 [lib]
 name = "mmtk"
@@ -45,10 +34,11 @@ cfg-if = "1.0"
 crossbeam = "0.8.1"
 delegate = "0.13.2"
 downcast-rs = "2.0.1"
+# enum-map 3.1.0 requires MSRV 1.95.  Versions 3.0.0 was yanked.
 enum-map = "2.7.3"
 env_logger = { version = "0.11.3", optional = true }
 is-terminal = "0.4.7"
-itertools = "0.14.0"
+itertools = "0.15.0"
 jemalloc-sys = { version = "0.5.3", features = [
     "disable_initial_exec_tls",
 ], optional = true }
@@ -63,19 +53,18 @@ portable-atomic = "1.4.3"
 probe = "0.5"
 regex = "1.7.0"
 rustversion = "1.0"
-spin = "0.10.0"
+spin = "0.12.3"
 static_assertions = "1.1.0"
-strum = "0.27.1"
-strum_macros = "0.27.1"
-# sysinfo >=0.37.0 requires MSRV 1.88.0 and Rust edition 2024.
-sysinfo = "0.36.1"
+strum = "0.28.0"
+strum_macros = "0.28.0"
+# sysinfo 0.39.0 requires MSRV 1.95.
+sysinfo = "0.38.4"
 
 [dev-dependencies]
 paste = "1.0.8"
-rand = "0.9.0"
-rand_chacha = "0.9.0"
-# criterion >=0.8.0 requires MSRV 1.86.0.
-criterion = "0.7.0"
+rand = "0.10.2"
+rand_chacha = "0.10.0"
+criterion = "0.8.2"
 
 [build-dependencies]
 built = { version = "0.8.0", features = ["git2"] }

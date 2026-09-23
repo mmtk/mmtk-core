@@ -3,7 +3,7 @@ use crate::policy::immix::block::{Block, BlockState};
 use crate::scheduler::{GCWork, GCWorker};
 use crate::util::heap::chunk_map::Chunk;
 use crate::util::linear_scan::Region;
-use crate::{vm::*, Plan, MMTK};
+use crate::{MMTK, Plan, vm::*};
 use std::ops::Range;
 
 pub struct FastRCPrepare;

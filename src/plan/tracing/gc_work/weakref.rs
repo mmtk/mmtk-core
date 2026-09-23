@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
 use crate::{
-    plan::tracing::{gc_work::DefaultObjectTracerContext, Trace},
+    MMTK,
+    plan::tracing::{Trace, gc_work::DefaultObjectTracerContext},
     scheduler::{GCWork, GCWorker, WorkBucketStage},
     vm::{Collection, Scanning, VMBinding},
-    MMTK,
 };
 
 /// Delegate to the VM binding for weak reference processing.

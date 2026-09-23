@@ -12,8 +12,8 @@
 //! pointer. Either way, the VM binding code needs to guarantee the safety.
 
 use crate::global_state::GcStatus;
-use crate::mmtk::MMTKBuilder;
 use crate::mmtk::MMTK;
+use crate::mmtk::MMTKBuilder;
 use crate::plan::AllocationSemantics;
 use crate::plan::{Mutator, MutatorContext};
 use crate::scheduler::WorkBucketStage;
@@ -24,9 +24,9 @@ use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
-use crate::vm::slot::MemorySlice;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
+use crate::vm::slot::MemorySlice;
 
 /// Notify MMTk that a GC has started, so that MMTk can update its internal statistics (e.g. GC counts
 /// and timers) to reflect this. A binding does not normally need to call this directly, as MMTk calls it
@@ -82,7 +82,10 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
             if split[0] == "Threads:" {
                 let threads = split[1].parse::<i32>().unwrap();
                 if threads != 1 {
-                    warn!("Current process has {} threads, process-wide perf event measurement will only include child threads spawned from this thread", threads);
+                    warn!(
+                        "Current process has {} threads, process-wide perf event measurement will only include child threads spawned from this thread",
+                        threads
+                    );
                 }
             }
         }
@@ -94,7 +97,9 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
         *mmtk.options.plan, *mmtk.options.gc_trigger
     );
     #[cfg(feature = "extreme_assertions")]
-    warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
+    warn!(
+        "The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected."
+    );
     Box::new(mmtk)
 }
 
@@ -569,7 +574,9 @@ pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
     if mmtk.gc_trigger.poll(false, None) {
         debug!("Collection required");
         if !mmtk.state.is_initialized() {
-            panic!("GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
+            panic!(
+                "GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."
+            );
         }
         VM::VMCollection::block_for_gc(tls);
     }

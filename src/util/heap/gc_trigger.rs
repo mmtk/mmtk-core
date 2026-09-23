@@ -1,17 +1,17 @@
 use atomic::Ordering;
 
+use crate::MMTK;
 use crate::global_state::{GcStatus, GlobalState};
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions;
-use crate::util::options::{GCTriggerSelector, Options, DEFAULT_MAX_NURSERY, DEFAULT_MIN_NURSERY};
+use crate::util::options::{DEFAULT_MAX_NURSERY, DEFAULT_MIN_NURSERY, GCTriggerSelector, Options};
 use crate::vm::VMBinding;
-use crate::MMTK;
 use std::mem::MaybeUninit;
-use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 
 /// GCTrigger is responsible for triggering GCs based on the given policy.
 /// All the decisions about heap limit and GC triggering should be resolved here.
@@ -45,7 +45,9 @@ impl<VM: VMBinding> GCTrigger<VM> {
                     let max_pages = conversions::bytes_to_pages_up(max);
 
                     if *options.plan == crate::util::options::PlanSelector::NoGC {
-                        warn!("Cannot use dynamic heap size with NoGC.  Using fixed heap size trigger instead.");
+                        warn!(
+                            "Cannot use dynamic heap size with NoGC.  Using fixed heap size trigger instead."
+                        );
                         break 'dynamic_heap_size Box::new(FixedHeapSizeTrigger {
                             total_pages: max_pages,
                         });
@@ -90,13 +92,16 @@ impl<VM: VMBinding> GCTrigger<VM> {
         match self.state.gc_status.try_request_pause() {
             Ok(cur_status) => {
                 if cur_status == GcStatus::InConcurrentGC {
-                    self.plan().concurrent().unwrap().on_concurrent_work_interrupted();
+                    self.plan()
+                        .concurrent()
+                        .unwrap()
+                        .on_concurrent_work_interrupted();
                 }
                 probe!(mmtk, gc_requested);
                 self.state.record_pause_requested_time();
                 self.scheduler.request_schedule_collection();
                 true
-            },
+            }
             Err(GcStatus::Disabled(_)) => false,
             // A GC is genuinely required (the heap policy has been exceeded), but MMTk has no GC
             // worker threads to service it. Silently returning `false` here would let allocation
@@ -222,17 +227,17 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// * `exhaustive`: If true, we try to make the collection exhaustive (e.g. full heap collection). If false, the collection kind is determined internally.
     pub fn handle_user_collection_request(&self, force: bool, exhaustive: bool) -> bool {
         if !self.plan().constraints().collects_garbage {
-            warn!("User attempted a collection request, but the plan can not do GC. The request is ignored.");
+            warn!(
+                "User attempted a collection request, but the plan can not do GC. The request is ignored."
+            );
             return false;
         }
 
         if force || !*self.options.ignore_system_gc && self.is_collection_enabled() {
             info!("User triggering collection");
             // TODO: this may not work reliably. If a GC has been triggered, this will not force it to be a full heap GC.
-            if exhaustive {
-                if let Some(gen) = self.plan().generational() {
-                    gen.force_full_heap_collection();
-                }
+            if exhaustive && let Some(r#gen) = self.plan().generational() {
+                r#gen.force_full_heap_collection();
             }
 
             self.state
@@ -291,7 +296,10 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 let max_bytes = heap_size_bytes as f64 * max;
                 let max_bytes = conversions::raw_align_up(max_bytes as usize, BYTES_IN_PAGE);
                 if max_bytes > DEFAULT_MAX_NURSERY {
-                    warn!("Proportional nursery with max size {} ({}) is larger than DEFAULT_MAX_NURSERY ({}). Use DEFAULT_MAX_NURSERY instead.", max, max_bytes, DEFAULT_MAX_NURSERY);
+                    warn!(
+                        "Proportional nursery with max size {} ({}) is larger than DEFAULT_MAX_NURSERY ({}). Use DEFAULT_MAX_NURSERY instead.",
+                        max, max_bytes, DEFAULT_MAX_NURSERY
+                    );
                     DEFAULT_MAX_NURSERY
                 } else {
                     max_bytes
@@ -314,7 +322,10 @@ impl<VM: VMBinding> GCTrigger<VM> {
                         * min;
                 let min_bytes = conversions::raw_align_up(min_bytes as usize, BYTES_IN_PAGE);
                 if min_bytes < DEFAULT_MIN_NURSERY {
-                    warn!("Proportional nursery with min size {} ({}) is smaller than DEFAULT_MIN_NURSERY ({}). Use DEFAULT_MIN_NURSERY instead.", min, min_bytes, DEFAULT_MIN_NURSERY);
+                    warn!(
+                        "Proportional nursery with min size {} ({}) is smaller than DEFAULT_MIN_NURSERY ({}). Use DEFAULT_MIN_NURSERY instead.",
+                        min, min_bytes, DEFAULT_MIN_NURSERY
+                    );
                     DEFAULT_MIN_NURSERY
                 } else {
                     min_bytes
@@ -569,9 +580,7 @@ impl MemBalancerStats {
             self.allocation_pages = promoted as f64;
             trace!(
                 "promoted = mature live before release {} - mature live at prev gc end {} = {}",
-                self.gc_release_live_pages,
-                self.gc_end_live_pages,
-                promoted
+                self.gc_release_live_pages, self.gc_end_live_pages, promoted
             );
             trace!(
                 "allocated pages (accumulated to) = {}",
@@ -590,9 +599,7 @@ impl MemBalancerStats {
             self.collection_pages = self.gc_end_live_pages as f64;
             trace!(
                 "collected pages = mature live at gc end {} - mature live at gc release {} = {}",
-                self.gc_release_live_pages,
-                self.gc_end_live_pages,
-                self.collection_pages
+                self.gc_release_live_pages, self.gc_end_live_pages, self.collection_pages
             );
             true
         } else {
@@ -627,9 +634,7 @@ impl MemBalancerStats {
         self.collection_pages = self.gc_end_live_pages as f64;
         trace!(
             "collected pages = live at gc end {} - live at gc release {} = {}",
-            self.gc_release_live_pages,
-            self.gc_end_live_pages,
-            self.collection_pages
+            self.gc_release_live_pages, self.gc_end_live_pages, self.collection_pages
         );
     }
 }
@@ -656,8 +661,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
             stats.allocation_time += (stats.gc_start_time - stats.gc_end_time).as_secs_f64();
             trace!(
                 "gc_start = {:?}, allocation_time = {}",
-                stats.gc_start_time,
-                stats.allocation_time
+                stats.gc_start_time, stats.allocation_time
             );
 
             if let Some(plan) = mmtk.get_plan().generational() {
@@ -686,8 +690,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
             stats.collection_time += (stats.gc_end_time - stats.gc_start_time).as_secs_f64();
             trace!(
                 "gc_end = {:?}, collection_time = {}",
-                stats.gc_end_time,
-                stats.collection_time
+                stats.gc_end_time, stats.collection_time
             );
 
             if let Some(plan) = mmtk.get_plan().generational() {
@@ -791,13 +794,11 @@ impl MemBalancerTrigger {
         );
         trace!(
             "after smoothing, alloc mem = {}, alloc_time = {}",
-            alloc_mem,
-            alloc_time
+            alloc_mem, alloc_time
         );
         trace!(
             "after smoothing, gc mem    = {}, gc_time    = {}",
-            gc_mem,
-            gc_time
+            gc_mem, gc_time
         );
 
         // We got the smoothed stats. Now save the current stats as previous stats
@@ -830,9 +831,7 @@ impl MemBalancerTrigger {
         let optimal_heap = live + e as usize + extra_reserve + pending_pages;
         trace!(
             "optimal = live {} + sqrt(live) {} + extra {}",
-            live,
-            e,
-            extra_reserve
+            live, e, extra_reserve
         );
 
         // The new heap size must be within min/max.

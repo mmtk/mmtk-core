@@ -7,17 +7,17 @@ use super::worker::{GCWorker, ThreadId, WorkerGroup};
 use super::worker_goals::{WorkerGoal, WorkerGoals};
 use super::worker_monitor::{LastParkedResult, WorkerMonitor};
 use super::*;
+use crate::Plan;
 use crate::mmtk::MMTK;
+use crate::plan::Pause;
 use crate::plan::tracing::gc_work::weakref::{
     VMForwardWeakRefs, VMPostForwarding, VMProcessWeakRefs,
 };
-use crate::plan::Pause;
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
 use crate::util::options::PlanSelector;
 use crate::vm::Collection;
 use crate::vm::VMBinding;
-use crate::Plan;
 use crossbeam::deque::Steal;
 use enum_map::{Enum, EnumMap};
 use std::collections::HashMap;
@@ -279,22 +279,23 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     pub fn debug_assert_all_stw_buckets_empty(&self) {
-        debug_assert!(self
-            .work_buckets
-            .values()
-            .filter(|bucket| bucket.get_stage().is_stw())
-            .all(|bucket| {
-                if !bucket.is_empty() {
-                    warn!(
-                        "Work bucket {:?} is not empty but it is expected to be empty!",
-                        bucket.get_stage()
-                    );
-                    warn!("Queue: {:?}", bucket.get_queue().debug_dump_packets());
-                    false
-                } else {
-                    true
-                }
-            }))
+        debug_assert!(
+            self.work_buckets
+                .values()
+                .filter(|bucket| bucket.get_stage().is_stw())
+                .all(|bucket| {
+                    if !bucket.is_empty() {
+                        warn!(
+                            "Work bucket {:?} is not empty but it is expected to be empty!",
+                            bucket.get_stage()
+                        );
+                        warn!("Queue: {:?}", bucket.get_queue().debug_dump_packets());
+                        false
+                    } else {
+                        true
+                    }
+                })
+        )
     }
 
     /// Schedule "sentinel" work packets for all open buckets.
@@ -344,8 +345,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     new_packets = bucket.len();
                     trace!(
                         "Found {} new packets at stage {:?}.  Break.",
-                        new_packets,
-                        id
+                        new_packets, id
                     );
                     break;
                 }
@@ -357,11 +357,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 }
             }
         }
-        if buckets_updated {
-            new_packets
-        } else {
-            0
-        }
+        if buckets_updated { new_packets } else { 0 }
     }
 
     pub fn close_all_stw_buckets(&self) {
@@ -651,7 +647,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
         // All other workers are parked, so it is safe to access the Plan instance mutably.
         probe!(mmtk, plan_end_of_gc_begin);
-        let plan_mut: &mut dyn Plan<VM = VM> = unsafe { mmtk.get_plan_mut() };
+        let plan_mut = unsafe { mmtk.get_plan_mut() };
         // This also tells the GC trigger whether the GC cycle has ended (see `Plan::on_pause_end`).
         plan_mut.on_pause_end(mmtk, worker.tls);
         probe!(mmtk, plan_end_of_gc_end);

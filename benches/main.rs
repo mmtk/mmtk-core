@@ -1,6 +1,6 @@
+use criterion::Criterion;
 use criterion::criterion_group;
 use criterion::criterion_main;
-use criterion::Criterion;
 
 #[cfg(all(feature = "mock_test", feature = "test_private"))]
 pub mod mock_bench;

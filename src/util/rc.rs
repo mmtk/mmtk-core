@@ -2,10 +2,10 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU32, AtomicUsize};
 
 use crate::util::linear_scan::Region;
-use crate::util::{metadata::side_metadata::address_to_meta_address, Address};
+use crate::util::{Address, metadata::side_metadata::address_to_meta_address};
 use crate::{
     policy::immix::{block::Block, line::Line},
-    util::{metadata::side_metadata::SideMetadataSpec, ObjectReference},
+    util::{ObjectReference, metadata::side_metadata::SideMetadataSpec},
     vm::*,
 };
 use atomic::Ordering;
@@ -195,8 +195,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
         });
         let start = address_to_meta_address(&super::rc::RC_TABLE, b.start()).to_ptr::<UInt>();
         let limit = address_to_meta_address(&super::rc::RC_TABLE, b.end()).to_ptr::<UInt>();
-        let rc_table = unsafe { std::slice::from_raw_parts(start, limit.offset_from(start) as _) };
-        rc_table
+        unsafe { std::slice::from_raw_parts(start, limit.offset_from(start) as _) }
     }
 
     /// Returns `true` if object `o`'s reference count is zero.

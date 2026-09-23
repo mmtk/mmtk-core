@@ -3,20 +3,20 @@ use std::{cell::UnsafeCell, marker::PhantomData};
 
 use crate::plan::concurrent::Pause;
 use crate::plan::global::Plan;
-use crate::plan::lxr::gc_work::mature_evac::SelectDefragBlocks;
 use crate::plan::lxr::gc_work::mature_evac::SELECT_DEFRAG_BLOCK_JOB_COUNTER;
+use crate::plan::lxr::gc_work::mature_evac::SelectDefragBlocks;
+use crate::policy::immix::ImmixSpace;
 use crate::policy::immix::block::{Block, BlockState};
 use crate::policy::immix::line::Line;
-use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
 use crate::scheduler::WorkBucketStage;
+use crate::util::ObjectReference;
 use crate::util::linear_scan::Region;
 use crate::util::metadata::side_metadata::spec_defs::{IX_LINE_REUSE_COUNT, LOS_PAGE_REUSE_COUNT};
-use crate::util::ObjectReference;
 use crate::{
     plan::lxr::LXR,
     scheduler::GCWork,
-    vm::{slot::Slot, VMBinding},
+    vm::{VMBinding, slot::Slot},
 };
 
 use super::gc_work::mature_evac::EvacuateMatureObjects;

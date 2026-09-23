@@ -1,4 +1,4 @@
-use downcast_rs::{impl_downcast, Downcast};
+use downcast_rs::{Downcast, impl_downcast};
 
 pub const FAILURE: i32 = -1;
 
@@ -183,11 +183,7 @@ pub trait FreeList: Sync + Downcast {
 
     fn get_next(&self, unit: i32) -> i32 {
         let next = self.get_hi_entry(unit) & NEXT_MASK;
-        if next <= MAX_UNITS {
-            next
-        } else {
-            self.head()
-        }
+        if next <= MAX_UNITS { next } else { self.head() }
     }
 
     fn set_next(&mut self, unit: i32, next: i32) {
@@ -200,11 +196,7 @@ pub trait FreeList: Sync + Downcast {
     // Return the previous link. If no previous link, return head
     fn get_prev(&self, unit: i32) -> i32 {
         let prev = self.get_lo_entry(unit) & PREV_MASK;
-        if prev <= MAX_UNITS {
-            prev
-        } else {
-            self.head()
-        }
+        if prev <= MAX_UNITS { prev } else { self.head() }
     }
 
     fn set_prev(&mut self, unit: i32, prev: i32) {

@@ -8,11 +8,7 @@ pub mod zeroed_alloc;
 
 /// Const function for min value of two usize numbers.
 pub const fn min_of_usize(a: usize, b: usize) -> usize {
-    if a > b {
-        b
-    } else {
-        a
-    }
+    if a > b { b } else { a }
 }
 
 #[cfg(feature = "nightly")]

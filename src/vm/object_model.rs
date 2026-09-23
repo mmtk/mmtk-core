@@ -2,8 +2,8 @@ use atomic::Ordering;
 
 use self::specs::*;
 use crate::util::copy::*;
-use crate::util::metadata::header_metadata::HeaderMetadataSpec;
 use crate::util::metadata::MetadataValue;
+use crate::util::metadata::header_metadata::HeaderMetadataSpec;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 
@@ -168,7 +168,7 @@ pub trait ObjectModel<VM: VMBinding> {
         object: ObjectReference,
         mask: Option<T>,
     ) -> T {
-        metadata_spec.load::<T>(object.to_header::<VM>(), mask)
+        unsafe { metadata_spec.load::<T>(object.to_header::<VM>(), mask) }
     }
 
     /// A function to atomically load the specified per-object metadata's content.
@@ -208,7 +208,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         mask: Option<T>,
     ) {
-        metadata_spec.store::<T>(object.to_header::<VM>(), val, mask)
+        unsafe { metadata_spec.store::<T>(object.to_header::<VM>(), val, mask) }
     }
 
     /// A function to atomically store a value to the specified per-object metadata.
@@ -510,9 +510,9 @@ pub mod specs {
     use crate::util::constants::LOG_MIN_OBJECT_SIZE;
     use crate::util::metadata::side_metadata::*;
     use crate::util::metadata::{
-        header_metadata::HeaderMetadataSpec,
-        side_metadata::{side_metadata_offset_after, SideMetadataSpec},
         MetadataSpec,
+        header_metadata::HeaderMetadataSpec,
+        side_metadata::{SideMetadataSpec, side_metadata_offset_after},
     };
 
     // This macro is invoked in define_vm_metadata_global_spec or define_vm_metadata_local_spec.

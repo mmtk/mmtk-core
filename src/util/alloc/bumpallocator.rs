@@ -111,10 +111,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
             self.bump_pointer.cursor = new_cursor;
             trace!(
                 "Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}",
-                size,
-                result,
-                self.bump_pointer.cursor,
-                self.bump_pointer.limit
+                size, result, self.bump_pointer.cursor, self.bump_pointer.limit
             );
             result
         }
@@ -159,10 +156,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
             self.bump_pointer.cursor = new_cursor;
             trace!(
                 "alloc_slow: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}",
-                size,
-                result,
-                self.bump_pointer.cursor,
-                self.bump_pointer.limit
+                size, result, self.bump_pointer.cursor, self.bump_pointer.limit
             );
             result
         }
@@ -210,8 +204,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         } else {
             trace!(
                 "Acquired a new block of size {} with start address {}",
-                block_size,
-                acquired_start
+                block_size, acquired_start
             );
             if !stress_test {
                 self.set_limit(acquired_start, acquired_start + block_size);

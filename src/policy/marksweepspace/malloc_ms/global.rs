@@ -4,23 +4,23 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::CommonSpace;
 use crate::scheduler::GCWorkScheduler;
+use crate::util::Address;
+use crate::util::ObjectReference;
+use crate::util::heap::PageResource;
 use crate::util::heap::chunk_map::Chunk;
 use crate::util::heap::chunk_map::ChunkMap;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
-use crate::util::heap::PageResource;
 use crate::util::linear_scan::Region;
 use crate::util::malloc::library::{BYTES_IN_MALLOC_PAGE, LOG_BYTES_IN_MALLOC_PAGE};
 use crate::util::malloc::malloc_ms_util::*;
+use crate::util::metadata::MetadataSpec;
 use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
-use crate::util::metadata::MetadataSpec;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
-use crate::util::Address;
-use crate::util::ObjectReference;
 use crate::util::{conversions, metadata};
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
@@ -28,11 +28,11 @@ use crate::{policy::space::Space, util::heap::layout::vm_layout::BYTES_IN_CHUNK}
 #[cfg(debug_assertions)]
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::sync::Arc;
+use std::sync::Mutex;
 #[cfg(debug_assertions)]
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::sync::Mutex;
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it
 // to make sure our allocation is correct.
 #[cfg(debug_assertions)]
@@ -210,7 +210,9 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     }
 
     fn address_in_space(&self, _start: Address) -> bool {
-        unreachable!("We do not know if an address is in malloc space. Use in_space() to check if an object is in malloc space.")
+        unreachable!(
+            "We do not know if an address is in malloc space. Use in_space() to check if an object is in malloc space."
+        )
     }
 
     fn get_name(&self) -> &'static str {
@@ -362,9 +364,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
         let mut page = start;
         let mut cleared_pages = 0;
         while page < start + size {
-            if is_page_marked_unsafe(page) {
+            if unsafe { is_page_marked_unsafe(page) } {
                 cleared_pages += 1;
-                unset_page_mark_unsafe(page);
+                unsafe { unset_page_mark_unsafe(page) };
             }
             page += BYTES_IN_MALLOC_PAGE;
         }
@@ -887,8 +889,8 @@ impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MallocObj
     }
 }
 
-use crate::scheduler::GCWork;
 use crate::MMTK;
+use crate::scheduler::GCWork;
 
 /// Simple work packet that just sweeps a single chunk
 pub struct MSSweepChunk<VM: VMBinding> {

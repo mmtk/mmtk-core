@@ -4,7 +4,7 @@ use std::io::Result;
 use crate::util::os::*;
 use crate::vm::*;
 use crate::{
-    util::{address::Address, VMThread},
+    util::{VMThread, address::Address},
     vm::VMBinding,
 };
 
@@ -122,20 +122,22 @@ pub trait OSMemory {
             // TODO: We may be able to remove this now.
             ErrorKind::Other => {
                 // further check the error
-                if let Some(os_errno) = mmap_error.error.raw_os_error() {
-                    if OS::is_mmap_oom(os_errno) {
-                        call_binding_oom();
-                    }
+                if let Some(os_errno) = mmap_error.error.raw_os_error()
+                    && OS::is_mmap_oom(os_errno)
+                {
+                    call_binding_oom();
                 }
             }
             ErrorKind::AlreadyExists => {
-                panic!("Failed to mmap, the address is already mapped. Should MMTk quarantine the address range first?");
+                panic!(
+                    "Failed to mmap, the address is already mapped. Should MMTk quarantine the address range first?"
+                );
             }
             _ => {
-                if let Some(os_errno) = mmap_error.error.raw_os_error() {
-                    if OS::is_mmap_oom(os_errno) {
-                        call_binding_oom();
-                    }
+                if let Some(os_errno) = mmap_error.error.raw_os_error()
+                    && OS::is_mmap_oom(os_errno)
+                {
+                    call_binding_oom();
                 }
             }
         }

@@ -1,19 +1,19 @@
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 
 use crate::{
     policy::{marksweepspace::native_ms::*, sft::GCWorkerMutRef},
     scheduler::{GCWorkScheduler, GCWorker, WorkBucketStage},
     util::{
+        ObjectReference,
         copy::CopySemantics,
         epilogue,
         heap::{BlockPageResource, PageResource},
         linear_scan::UnstraddlableRegion,
-        metadata::{self, side_metadata::SideMetadataSpec, MetadataSpec},
+        metadata::{self, MetadataSpec, side_metadata::SideMetadataSpec},
         object_enum::{self, ObjectEnumerator},
-        ObjectReference,
     },
     vm::{ActivePlan, VMBinding},
 };
@@ -24,11 +24,11 @@ use crate::util::Address;
 use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
+use crate::util::VMThread;
 use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
-use crate::util::VMThread;
 use crate::vm::ObjectModel;
 use crate::vm::Scanning;
 use std::sync::Mutex;
@@ -570,8 +570,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 }
 
-use crate::scheduler::GCWork;
 use crate::MMTK;
+use crate::scheduler::GCWork;
 
 struct PrepareChunkMap<VM: VMBinding> {
     space: &'static MarkSweepSpace<VM>,

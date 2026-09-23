@@ -1,9 +1,9 @@
+use crate::ObjectQueue;
 use crate::plan::Mutator;
 use crate::scheduler::GCWorker;
-use crate::util::opaque_pointer::*;
 use crate::util::ObjectReference;
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
-use crate::ObjectQueue;
 
 /// VM-specific methods for the current plan.
 pub trait ActivePlan<VM: VMBinding> {
@@ -59,6 +59,9 @@ pub trait ActivePlan<VM: VMBinding> {
         object: ObjectReference,
         _worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        panic!("MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.", object)
+        panic!(
+            "MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.",
+            object
+        )
     }
 }

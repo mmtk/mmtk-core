@@ -1,8 +1,8 @@
 use crate::scheduler::GCWork;
+use crate::util::Address;
 use crate::util::linear_scan::Region;
 use crate::util::linear_scan::RegionIterator;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::Address;
 use crate::vm::VMBinding;
 use spin::Mutex;
 use std::ops::Range;

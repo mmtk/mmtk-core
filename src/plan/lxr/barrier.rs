@@ -4,25 +4,25 @@ use std::sync::Arc;
 
 use atomic::Ordering;
 
-use super::LazySweepingJobsCounter;
 use super::LXR;
+use super::LazySweepingJobsCounter;
+use crate::MMTK;
+use crate::plan::VectorQueue;
 use crate::plan::barriers::BarrierSemantics;
-use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::Pause;
+use crate::plan::concurrent::global::ConcurrentPlan;
+use crate::plan::lxr::gc_work::rc::EDGE_KIND_MATURE;
 use crate::plan::lxr::gc_work::rc::ProcessDecs;
 use crate::plan::lxr::gc_work::rc::ProcessIncs;
-use crate::plan::lxr::gc_work::rc::EDGE_KIND_MATURE;
 use crate::plan::lxr::gc_work::tracing::ProcessModBufSATB;
-use crate::plan::VectorQueue;
 use crate::scheduler::WorkBucketStage;
 use crate::util::metadata::log_bit::{LOGGED_VALUE, UNLOGGED_VALUE};
-use crate::util::metadata::side_metadata::address_to_meta_address;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::metadata::side_metadata::address_to_meta_address;
 use crate::util::*;
 use crate::vm::slot::MemorySlice;
 use crate::vm::slot::Slot;
 use crate::vm::*;
-use crate::MMTK;
 
 /// Re-arm the per-object log bits that one mutator's barrier cleared, so the next epoch's first
 /// store to each of those objects reaches the barrier again.

@@ -3,7 +3,7 @@ pub use criterion::Criterion;
 use mmtk::{
     memory_manager, mmap_anno_test,
     util::{
-        constants::BYTES_IN_PAGE, os::*, test_private::MMAPPER, test_util::fixtures::*, Address,
+        Address, constants::BYTES_IN_PAGE, os::*, test_private::MMAPPER, test_util::fixtures::*,
     },
 };
 

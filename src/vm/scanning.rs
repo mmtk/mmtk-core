@@ -1,10 +1,10 @@
 use crate::plan::Mutator;
-use crate::scheduler::gc_work::RootKind;
 use crate::scheduler::GCWorker;
+use crate::scheduler::gc_work::RootKind;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
-use crate::vm::slot::Slot;
 use crate::vm::VMBinding;
+use crate::vm::slot::Slot;
 
 /// Callback trait of scanning functions that report slots.
 pub trait SlotVisitor<SL: Slot> {
@@ -237,7 +237,9 @@ pub trait Scanning<VM: VMBinding> {
         _object: ObjectReference,
         _object_tracer: &mut OT,
     ) {
-        unreachable!("scan_object_and_trace_edges() will not be called when support_slot_enqueuing() is always true.")
+        unreachable!(
+            "scan_object_and_trace_edges() will not be called when support_slot_enqueuing() is always true."
+        )
     }
 
     /// MMTk calls this method at the first time during a collection that thread's stacks

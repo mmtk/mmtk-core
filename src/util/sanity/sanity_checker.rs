@@ -1,12 +1,12 @@
+use crate::MMTK;
 use crate::plan::Plan;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
 use crate::scheduler::WorkBucketStage;
-use crate::util::scanning_helper;
 use crate::util::ObjectReference;
+use crate::util::scanning_helper;
 use crate::vm::slot::Slot;
 use crate::vm::{ObjectModel, VMBinding};
-use crate::MMTK;
 use std::collections::HashSet;
 
 #[allow(dead_code)]

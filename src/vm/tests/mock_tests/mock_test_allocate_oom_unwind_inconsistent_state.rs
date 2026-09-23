@@ -2,8 +2,8 @@
 
 use super::mock_test_prelude::*;
 
-use crate::util::alloc::allocator::AllocationOptions;
 use crate::AllocationSemantics;
+use crate::util::alloc::allocator::AllocationOptions;
 use std::panic::AssertUnwindSafe;
 use std::sync::atomic::Ordering;
 

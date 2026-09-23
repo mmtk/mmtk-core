@@ -1,7 +1,7 @@
 use super::mock_test_prelude::*;
 
-use crate::util::opaque_pointer::*;
 use crate::AllocationSemantics;
+use crate::util::opaque_pointer::*;
 
 /// This test allocates without calling initialize_collection(). When we exceed the heap limit, a GC should be triggered by MMTk.
 /// But as we haven't enabled collection, GC is not initialized, so MMTk will panic.

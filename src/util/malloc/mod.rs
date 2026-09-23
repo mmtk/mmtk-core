@@ -13,11 +13,11 @@ pub(crate) mod library;
 /// Using malloc as mark sweep free-list allocator.
 pub(crate) mod malloc_ms_util;
 
+#[cfg(feature = "malloc_counted_size")]
+use crate::MMTK;
 use crate::util::Address;
 #[cfg(feature = "malloc_counted_size")]
 use crate::vm::VMBinding;
-#[cfg(feature = "malloc_counted_size")]
-use crate::MMTK;
 
 /// Manually allocate memory. Similar to libc's malloc.
 pub fn malloc(size: usize) -> Address {

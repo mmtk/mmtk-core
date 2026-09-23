@@ -1,7 +1,7 @@
+use crate::AllocationSemantics;
 use crate::memory_manager;
 use crate::util::test_util::fixtures::*;
 use crate::util::test_util::mock_vm::*;
-use crate::AllocationSemantics;
 
 /// This test allocates after calling disable_collection(). When we exceed the heap limit, MMTk will NOT trigger a GC.
 /// And the allocation will succeed.

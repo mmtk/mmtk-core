@@ -1,6 +1,6 @@
-use crate::util::metadata::vo_bit;
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::util::metadata::vo_bit;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;

@@ -352,10 +352,10 @@ mod tagged_slot {
 mod mixed {
     #[cfg(target_pointer_width = "64")]
     use super::compressed_oop::CompressedOopSlot;
-    use super::offset_slot::OffsetSlot;
     use super::offset_slot::OFFSET;
-    use super::tagged_slot::TaggedSlot;
+    use super::offset_slot::OffsetSlot;
     use super::tagged_slot::TAG1;
+    use super::tagged_slot::TaggedSlot;
     use super::*;
     use crate::vm::slot::SimpleSlot;
 

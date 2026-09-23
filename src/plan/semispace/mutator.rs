@@ -1,18 +1,18 @@
 use super::SemiSpace;
-use crate::plan::mutator_context::common_prepare_func;
-use crate::plan::mutator_context::common_release_func;
+use crate::MMTK;
+use crate::plan::AllocationSemantics;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
+use crate::plan::mutator_context::common_prepare_func;
+use crate::plan::mutator_context::common_release_func;
 use crate::plan::mutator_context::{
-    create_allocator_mapping, create_space_mapping, ReservedAllocators,
+    ReservedAllocators, create_allocator_mapping, create_space_mapping,
 };
-use crate::plan::AllocationSemantics;
-use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::alloc::BumpAllocator;
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
-use crate::MMTK;
 use enum_map::EnumMap;
 
 pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {

@@ -7,11 +7,11 @@ use super::layout::{
     LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO, LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };
 use super::{SideMetadataContext, SideMetadataSpec};
-#[cfg(target_pointer_width = "64")]
-use crate::util::heap::layout::vm_layout::vm_layout;
-use crate::util::heap::layout::vm_layout::VMLayout;
 #[cfg(target_pointer_width = "32")]
 use crate::util::heap::layout::vm_layout::LOG_BYTES_IN_CHUNK;
+use crate::util::heap::layout::vm_layout::VMLayout;
+#[cfg(target_pointer_width = "64")]
+use crate::util::heap::layout::vm_layout::vm_layout;
 
 /// An internal enum to enhance code style for add/sub
 #[cfg(feature = "extreme_assertions")]
@@ -294,11 +294,11 @@ impl SideMetadataSanity {
             // make sure the global metadata in the current context has the same length as before
             let g_specs = self.specs_sanity_map.get(&GLOBAL_META_NAME).unwrap();
             assert!(
-            g_specs.len() == metadata_context.global.len(),
-            "Global metadata must not change between policies! NEW SPECS: {:#?} OLD SPECS: {:#?}",
-            metadata_context.global,
-            g_specs
-        );
+                g_specs.len() == metadata_context.global.len(),
+                "Global metadata must not change between policies! NEW SPECS: {:#?} OLD SPECS: {:#?}",
+                metadata_context.global,
+                g_specs
+            );
         }
 
         for spec in &metadata_context.global {
@@ -319,7 +319,11 @@ impl SideMetadataSanity {
                 .unwrap()
                 .contains(spec)
             {
-                panic!("Global metadata must not change between policies! NEW SPEC: {:#?} OLD SPECS: {:#?}", spec, self.get_all_specs(true));
+                panic!(
+                    "Global metadata must not change between policies! NEW SPEC: {:#?} OLD SPECS: {:#?}",
+                    spec,
+                    self.get_all_specs(true)
+                );
             }
         }
 
@@ -375,7 +379,11 @@ impl SideMetadataSanity {
 /// 2. Check if metadata address is out of bounds. If this fails, we will panic.
 fn verify_metadata_address_bound(spec: &SideMetadataSpec, data_addr: Address) {
     #[cfg(target_pointer_width = "32")]
-    assert_eq!(VMLayout::LOG_ARCH_ADDRESS_SPACE, 32, "We assume we use all address space in 32 bits. This seems not true any more, we need a proper check here.");
+    assert_eq!(
+        VMLayout::LOG_ARCH_ADDRESS_SPACE,
+        32,
+        "We assume we use all address space in 32 bits. This seems not true any more, we need a proper check here."
+    );
     #[cfg(target_pointer_width = "32")]
     let data_addr_in_address_space = true;
     #[cfg(target_pointer_width = "64")]
