@@ -79,6 +79,10 @@ criterion = "0.7.0"
 
 [build-dependencies]
 built = { version = "0.8.0", features = ["git2"] }
+# yoke-derive (pulled in via built -> git2 -> url -> idna -> yoke) 0.8.3 uses the inherent `str::from_utf8`
+# which requires Rust 1.87, but it does not declare `rust-version`, so the MSRV-aware resolver cannot skip it.
+# We can remove this dependency when we use MSRV 1.87+.
+yoke-derive = "=0.8.2"
 
 [lints.clippy]
 # Allow this. Clippy suggests we should use Sft, Mmtk, rather than SFT and MMTK.
