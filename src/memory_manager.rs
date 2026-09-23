@@ -11,6 +11,7 @@
 //! it can turn the `Box` pointer to a native pointer (`*mut Mutator`), and forge a mut reference from the native
 //! pointer. Either way, the VM binding code needs to guarantee the safety.
 
+use crate::global_state::GcStatus;
 use crate::mmtk::MMTKBuilder;
 use crate::mmtk::MMTK;
 use crate::plan::AllocationSemantics;
@@ -26,6 +27,17 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::slot::MemorySlice;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
+
+/// Notify MMTk that a GC has started, so that MMTk can update its internal statistics (e.g. GC counts
+/// and timers) to reflect this. A binding does not normally need to call this directly, as MMTk calls it
+/// itself when it triggers a GC; it is only needed if the binding drives GC start/stop outside of MMTk's
+/// own scheduling.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+pub fn report_gc_start<VM: VMBinding>(mmtk: &MMTK<VM>) {
+    mmtk.stats.start_gc();
+}
 
 use std::collections::HashMap;
 
@@ -57,6 +69,7 @@ use std::collections::HashMap;
 /// * `builder`: The reference to a MMTk builder.
 pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     crate::util::logger::try_init();
+
     #[cfg(all(feature = "perf_counter", target_os = "linux"))]
     {
         use std::fs::File;
@@ -74,8 +87,8 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
             }
         }
     }
-    let mmtk = builder.build();
 
+    let mmtk = builder.build();
     info!(
         "Initialized MMTk with {:?} ({:?})",
         *mmtk.options.plan, *mmtk.options.gc_trigger
@@ -83,6 +96,12 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     #[cfg(feature = "extreme_assertions")]
     warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
     Box::new(mmtk)
+}
+
+/// Shut down an MMTk instance.
+/// This would asynchronously request GC workers to stop. Bindings need to check if all GC workers have quit in binding-specific ways.
+pub fn mmtk_shutdown<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
+    mmtk.shutdown();
 }
 
 /// Add an externally mmapped region to the VM space. A VM space can be set through MMTk options (`vm_space_start` and `vm_space_size`),
@@ -104,6 +123,8 @@ pub fn set_vm_space<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, start: Address, 
 /// structure, and use that as a reference to the mutator (it is okay to drop the box once the content is copied --
 /// Note that `Mutator` may contain pointers so a binding may drop the box only if they perform a deep copy).
 ///
+/// MMTk generally does not expect the runtime to create or destroy mutators during a pause. See also [`crate::vm::ActivePlan::mutators`].
+///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that will be associated with the mutator.
@@ -124,6 +145,8 @@ pub fn bind_mutator<VM: VMBinding>(
 /// destroyed. A binding should not attempt to use the mutator after this call. MMTk will not
 /// attempt to reclaim the memory for the mutator, so a binding should properly reclaim the memory
 /// for the mutator after this call.
+///
+/// MMTk generally does not expect the runtime to create or destroy mutators during a pause. See also [`crate::vm::ActivePlan::mutators`].
 ///
 /// Arguments:
 /// * `mutator`: A reference to the mutator to be destroyed.
@@ -543,7 +566,7 @@ pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
         "gc_poll() can only be called by a mutator thread."
     );
 
-    if VM::VMCollection::is_collection_enabled() && mmtk.gc_trigger.poll(false, None) {
+    if mmtk.gc_trigger.poll(false, None) {
         debug!("Collection required");
         if !mmtk.state.is_initialized() {
             panic!("GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
@@ -564,6 +587,21 @@ pub fn start_worker<VM: VMBinding>(
 /// Wrapper for [`crate::mmtk::MMTK::initialize_collection`].
 pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
     mmtk.initialize_collection(tls);
+}
+
+/// Wrapper for [`crate::mmtk::MMTK::disable_collection`].
+pub fn disable_collection<VM: VMBinding>(mmtk: &MMTK<VM>) -> Result<bool, GcStatus> {
+    mmtk.disable_collection()
+}
+
+/// Wrapper for [`crate::mmtk::MMTK::enable_collection`].
+pub fn enable_collection<VM: VMBinding>(mmtk: &MMTK<VM>) -> bool {
+    mmtk.enable_collection()
+}
+
+/// Wrapper for [`crate::mmtk::MMTK::is_collection_enabled`].
+pub fn is_collection_enabled<VM: VMBinding>(mmtk: &MMTK<VM>) -> bool {
+    mmtk.is_collection_enabled()
 }
 
 /// Process MMTk run-time options. Returns true if the option is processed successfully.
@@ -650,8 +688,9 @@ pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 pub fn handle_user_collection_request<VM: VMBinding>(
     mmtk: &MMTK<VM>,
     tls: VMMutatorThread,
+    force: bool,
 ) -> bool {
-    mmtk.handle_user_collection_request(tls, false, false)
+    mmtk.handle_user_collection_request(tls, force, false)
 }
 
 /// Is the object alive?
@@ -686,7 +725,7 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// * `addr`: A non-zero word-aligned address.  Because the raw address of an `ObjectReference`
 ///   cannot be zero and must be word-aligned, the caller must filter out zero and misaligned
 ///   addresses before calling this function.  Otherwise the behavior is undefined.
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 pub fn is_mmtk_object(addr: Address) -> Option<ObjectReference> {
     crate::util::is_mmtk_object::check_object_reference(addr)
 }
@@ -715,7 +754,7 @@ pub fn is_mmtk_object(addr: Address) -> Option<ObjectReference> {
 /// Argument:
 /// * `internal_ptr`: The address to start searching. We search backwards from this address (including this address) to find the base reference.
 /// * `max_search_bytes`: The maximum number of bytes we may search for an object with VO bit set. `internal_ptr - max_search_bytes` is not included.
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 pub fn find_object_from_internal_pointer(
     internal_ptr: Address,
     max_search_bytes: usize,

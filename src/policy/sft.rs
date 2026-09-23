@@ -1,4 +1,4 @@
-use crate::plan::VectorObjectQueue;
+use crate::plan::tracing::OptionObjectQueue;
 use crate::scheduler::GCWorker;
 use crate::util::*;
 use crate::vm::VMBinding;
@@ -22,7 +22,7 @@ use std::marker::PhantomData;
 ///
 /// We use the SFT trait to simplify typing for Rust, so our table is a
 /// table of SFT rather than Space.
-pub trait SFT {
+pub trait SFT: Sync + 'static {
     /// The space name
     fn name(&self) -> &'static str;
 
@@ -40,17 +40,30 @@ pub trait SFT {
         self.is_live(object)
     }
 
-    // Functions for pinning/unpining and checking if an object is pinned
-    // For non moving policies, all the objects are considered as forever pinned,
-    // thus attempting to pin or unpin them will not succeed and will always return false.
-    // For policies where moving is compusory, pin/unpin is impossible and will panic (is_object_pinned will return false).
-    // For policies that support pinning (eg. Immix), pin/unpin will return a boolean indicating that the
-    // pinning/unpinning action has been performed by the function, and is_object_pinned will return whether the object
-    // is currently pinned.
+    /// Pin a given object. Return if this call pinned the given object.
+    ///
+    /// Note that this may be a no-op (i.e. always return `false`) for some
+    /// policies (such as immortal or non-moving) and may panic for policies
+    /// where pinning is unsupported (such as fully copying spaces like
+    /// `CopySpace`).
     #[cfg(feature = "object_pinning")]
     fn pin_object(&self, object: ObjectReference) -> bool;
+
+    /// Unpin a given object. Return if this call unpinned the given object.
+    ///
+    /// Note that this may be a no-op (i.e. always return `false`) for some
+    /// policies (such as immortal or non-moving) and may panic for policies
+    /// where pinning is unsupported (such as fully copying spaces like
+    /// `CopySpace`).
     #[cfg(feature = "object_pinning")]
     fn unpin_object(&self, object: ObjectReference) -> bool;
+
+    /// Return if the given object is pinned.
+    ///
+    /// Note that this may be a no-op (i.e. always return `true`) for some
+    /// policies (such as immortal or non-moving) and may always return `false`
+    /// for policies where pinnning is unsupported (such as fully copying spaces
+    /// like `CopySpace`).
     #[cfg(feature = "object_pinning")]
     fn is_object_pinned(&self, object: ObjectReference) -> bool;
 
@@ -75,10 +88,10 @@ pub trait SFT {
     /// This default implementation works for all spaces that use MMTk's mapper to allocate memory.
     /// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.
     /// Such spaces needs to override this method.
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference>;
 
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn find_object_from_internal_pointer(
         &self,
         ptr: Address,
@@ -92,18 +105,20 @@ pub trait SFT {
     ///     to set the metadata for the VM space.
     /// -   Objects in other spaces are allocated by mutators using an MMTk allocator.
     ///     `Mutator::post_alloc` will call this method after allocation.
-    fn initialize_object_metadata(&self, object: ObjectReference);
+    fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize);
 
-    /// Trace objects through SFT. This along with [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges)
+    /// Trace objects through SFT. This along with [`crate::plan::tracing::SFTTrace`]
     /// provides an easy way for most plans to trace objects without the need to implement any plan-specific
     /// code. However, tracing objects for some policies are more complicated, and they do not provide an
     /// implementation of this method. For example, mark compact space requires trace twice in each GC.
     /// Immix has defrag trace and fast trace.
     fn sft_trace_object(
         &self,
-        // We use concrete type for `queue` because SFT doesn't support generic parameters,
-        // and SFTProcessEdges uses `VectorObjectQueue`.
-        queue: &mut VectorObjectQueue,
+        // We use `OptionObjectQueue`, the simplest `ObjectQueue` implementation, for `queue`
+        // because SFT doesn't support generic parameters.  The generic `SFTTrace::trace_object`
+        // method wraps `SFT::sft_trace_object` and forwards the enqueued object to the actual
+        // queue.
+        queue: &mut OptionObjectQueue,
         object: ObjectReference,
         worker: GCWorkerMutRef,
     ) -> ObjectReference;
@@ -135,11 +150,8 @@ impl SFT for EmptySpaceSFT {
     fn name(&self) -> &'static str {
         EMPTY_SFT_NAME
     }
-    fn is_live(&self, object: ObjectReference) -> bool {
-        panic!(
-            "Called is_live() on {:x}, which maps to an empty space",
-            object
-        )
+    fn is_live(&self, _object: ObjectReference) -> bool {
+        false
     }
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
@@ -172,11 +184,11 @@ impl SFT for EmptySpaceSFT {
     fn is_in_space(&self, _object: ObjectReference) -> bool {
         false
     }
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn is_mmtk_object(&self, _addr: Address) -> Option<ObjectReference> {
         None
     }
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn find_object_from_internal_pointer(
         &self,
         _ptr: Address,
@@ -185,7 +197,7 @@ impl SFT for EmptySpaceSFT {
         None
     }
 
-    fn initialize_object_metadata(&self, object: ObjectReference) {
+    fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize) {
         panic!(
             "Called initialize_object_metadata() on {:x}, which maps to an empty space",
             object
@@ -194,13 +206,13 @@ impl SFT for EmptySpaceSFT {
 
     fn sft_trace_object(
         &self,
-        _queue: &mut VectorObjectQueue,
+        _queue: &mut OptionObjectQueue,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
         // We do not have the `VM` type parameter here, so we cannot forward the call to the VM.
         panic!(
-            "Call trace_object() on {}, which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().",
+            "Call trace_object() on {}, which maps to an empty space. SFTTrace does not support the fallback to vm_trace_object().",
             object,
         )
     }

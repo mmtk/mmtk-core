@@ -18,6 +18,7 @@ use crate::util::heap::VMRequest;
 use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::vm::VMBinding;
+use crate::MMTK;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
 
@@ -92,10 +93,11 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         self.release_inner(tls, UnlogBitsOperation::NoOp);
     }
 
-    fn end_of_gc(&mut self, tls: VMWorkerThread) {
+    fn on_pause_end(&mut self, mmtk: &'static MMTK<VM>, tls: VMWorkerThread) {
         self.last_gc_was_defrag
             .store(self.immix_space.end_of_gc(), Ordering::Relaxed);
-        self.common.end_of_gc(tls);
+        self.common.on_pause_end(tls);
+        mmtk.gc_trigger.policy.on_gc_end(mmtk);
     }
 
     fn current_gc_may_move_object(&self) -> bool {
@@ -143,7 +145,7 @@ impl<VM: VMBinding> Immix<VM> {
         mut plan_args: CreateSpecificPlanArgs<VM>,
         space_args: ImmixSpaceArgs,
     ) -> Self {
-        let immix = Immix {
+        Immix {
             immix_space: ImmixSpace::new(
                 if space_args.mixed_age {
                     plan_args.get_mixed_age_space_args(
@@ -164,11 +166,7 @@ impl<VM: VMBinding> Immix<VM> {
             ),
             common: CommonPlan::new(plan_args),
             last_gc_was_defrag: AtomicBool::new(false),
-        };
-
-        immix.verify_side_metadata_sanity();
-
-        immix
+        }
     }
 
     /// Schedule a full heap immix collection. This method is used by immix/genimmix/stickyimmix

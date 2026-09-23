@@ -13,9 +13,9 @@ fi
 
 ALL_PLANS=$(sed -n '/enum PlanSelector/,/}/p' src/util/options.rs | sed -e 's;//.*;;g' -e '/^$/d' -e 's/,//g' | xargs | grep -o '{.*}' | grep -o '\w\+')
 
-# At the moment, the Compressor does not work with the mock VM tests.
-# So we skip testing the Compressor entirely.
-ALL_PLANS=$(echo -n "$ALL_PLANS" | sed '/Compressor/d')
+# At the moment, OVC does not work with the mock VM tests.
+# So we skip testing OVC entirely.
+ALL_PLANS=$(echo -n "$ALL_PLANS" | sed '/OVC/d')
 
 # Test with mock VM:
 # - Find all the files that start with mock_test_
@@ -38,8 +38,13 @@ find ./src ./tests -type f -name "mock_test_*" | while read -r file; do
 
     # Run the test with each plan it needs.
     for MMTK_PLAN in $PLANS; do
-        # Currently run all tests with side metadata
-        env MMTK_PLAN=$MMTK_PLAN cargo test --features mock_test,mock_test_side_metadata,"$FEATURES" -- $t;
+        # Currently run all tests with side metadata, except LXR which requires in-header forwarding bits.
+        if [[ $MMTK_PLAN == 'LXR' ]]; then
+            METADATA=mock_test_header_metadata
+        else
+            METADATA=mock_test_side_metadata
+        fi
+        env MMTK_PLAN=$MMTK_PLAN cargo test --features mock_test,$METADATA,"$FEATURES" -- $t;
     done
 done
 

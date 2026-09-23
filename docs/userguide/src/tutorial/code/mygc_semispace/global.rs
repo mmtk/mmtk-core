@@ -128,12 +128,6 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     }
     // ANCHOR_END: release
 
-    // ANCHOR: end_of_gc
-    fn end_of_gc(&mut self, tls: VMWorkerThread) {
-        self.common.end_of_gc(tls);
-    }
-    // ANCHOR_END: end_of_gc
-
     // Modify
     // ANCHOR: plan_get_collection_reserve
     fn get_collection_reserved_pages(&self) -> usize {
@@ -164,6 +158,10 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
+
+    fn common_mut(&mut self) -> &mut CommonPlan<VM> {
+        &mut self.common
+    }
     // ANCHOR_END: plan_common
 }
 
@@ -178,18 +176,14 @@ impl<VM: VMBinding> MyGC<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
-        let res = MyGC {
+        MyGC {
             hi: AtomicBool::new(false),
             // ANCHOR: copyspace_new
             copyspace0: CopySpace::new(plan_args.get_normal_space_args("copyspace0", true, false, VMRequest::discontiguous()), false),
             // ANCHOR_END: copyspace_new
             copyspace1: CopySpace::new(plan_args.get_normal_space_args("copyspace1", true, false, VMRequest::discontiguous()), true),
             common: CommonPlan::new(plan_args),
-        };
-
-        res.verify_side_metadata_sanity();
-
-        res
+        }
     }
     // ANCHOR_END: plan_new
 

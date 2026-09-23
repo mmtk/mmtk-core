@@ -3,6 +3,8 @@ name = "mmtk_dummyvm"
 version = "0.0.1"
 authors = [" <>"]
 edition = "2021"
+rust-version = "1.84"
+resolver = "3"
 
 [lib]
 name = "mmtk_dummyvm"
@@ -24,5 +26,5 @@ atomic = "0.6"
 
 [features]
 default = []
-is_mmtk_object = ["mmtk/is_mmtk_object"]
+vo_bit = ["mmtk/vo_bit"]
 malloc_counted_size = ["mmtk/malloc_counted_size"]

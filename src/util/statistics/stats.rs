@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::time::Duration;
 
 /// The default number of phases for statistics.
 pub const DEFAULT_NUM_PHASES: usize = 1 << 12;
@@ -52,6 +53,8 @@ pub struct Stats {
     perfmon: Perfmon,
     pub shared: Arc<SharedStats>,
     counters: Mutex<Vec<Arc<Mutex<dyn Counter + Send>>>>,
+    time_to_yield: Arc<Mutex<LatencySampler>>,
+    pause_time: Arc<Mutex<LatencySampler>>,
 }
 
 impl Stats {
@@ -79,6 +82,20 @@ impl Stats {
             MonotoneNanoTime {},
         )));
         counters.push(t.clone());
+        // We always have a time-to-yield counter enabled
+        let time_to_yield = Arc::new(Mutex::new(LatencySampler::new(
+            "time-to-yield",
+            shared.clone(),
+            true,
+        )));
+        counters.push(time_to_yield.clone());
+        // We always have a pause-time counter enabled
+        let pause_time = Arc::new(Mutex::new(LatencySampler::new(
+            "pause-time",
+            shared.clone(),
+            true,
+        )));
+        counters.push(pause_time.clone());
         // Read from the MMTK option for a list of perf events we want to
         // measure, and create corresponding counters
         #[cfg(feature = "perf_counter")]
@@ -98,7 +115,27 @@ impl Stats {
             perfmon,
             shared,
             counters: Mutex::new(counters),
+            time_to_yield,
+            pause_time,
         }
+    }
+
+    /// Record a "time-to-yield" sample: the time elapsed between MMTk successfully requesting a
+    /// GC pause and the point all mutators have stopped for that pause.
+    pub fn record_time_to_yield(&self, duration: Duration) {
+        self.time_to_yield
+            .lock()
+            .unwrap()
+            .record(duration.as_nanos() as u64);
+    }
+
+    /// Record a "pause time" sample: the duration mutators spent stopped for a GC pause, from
+    /// the point all mutators stopped to the point they are resumed.
+    pub fn record_pause_time(&self, duration: Duration) {
+        self.pause_time
+            .lock()
+            .unwrap()
+            .record(duration.as_nanos() as u64);
     }
 
     pub fn new_event_counter(

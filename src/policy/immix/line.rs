@@ -1,12 +1,16 @@
 use std::ops::Range;
 
 use super::block::Block;
+use crate::util::constants::{LOG_BITS_IN_BYTE, LOG_BYTES_IN_WORD};
 use crate::util::linear_scan::{Region, RegionIterator};
-use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::metadata::side_metadata::spec_defs::IX_LINE_REUSE_COUNT;
+use crate::util::metadata::side_metadata::*;
+use crate::util::rc;
 use crate::{
     util::{Address, ObjectReference},
     vm::*,
 };
+use atomic::Ordering;
 
 /// Data structure to reference a line within an immix block.
 #[repr(transparent)]
@@ -91,10 +95,23 @@ impl Line {
     /// doesn't need to explicitly mark bump-allocated objects in the fast path.
     pub fn initialize_mark_table_as_marked<VM: VMBinding>(lines: Range<Line>) {
         let meta = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec();
-        let start = lines.start.start();
-        let limit = lines.end.start();
-        let size = limit - start;
-        meta.bset_metadata(start, size);
+        let start: *mut u8 = address_to_meta_address(meta, lines.start.start()).to_mut_ptr();
+        let limit: *mut u8 = address_to_meta_address(meta, lines.end.start()).to_mut_ptr();
+        unsafe {
+            let bytes = limit.offset_from(start) as usize;
+            std::ptr::write_bytes(start, 0xffu8, bytes);
+        }
+    }
+
+    pub fn inc_reuse_counts(lines: Range<Line>) {
+        let mut l = lines.start;
+        while l < lines.end {
+            let addr = l.start();
+            let count = IX_LINE_REUSE_COUNT.load_atomic::<u8>(addr, Ordering::SeqCst);
+            let new_count = if count == u8::MAX { 0 } else { count + 1 };
+            IX_LINE_REUSE_COUNT.store_atomic::<u8>(addr, new_count, Ordering::SeqCst);
+            l = l.next();
+        }
     }
 
     /// Bulk set line mark states.
@@ -110,5 +127,157 @@ impl Line {
     pub fn eager_mark_lines<VM: VMBinding>(line_mark_state: u8, lines: Range<Line>) {
         Self::bulk_set_line_mark_states(line_mark_state, lines.clone());
         Self::initialize_mark_table_as_marked::<VM>(lines);
+    }
+
+    pub fn clear_field_unlog_table<VM: VMBinding>(lines: Range<Line>) {
+        let unlog_bit = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+            .as_spec()
+            .extract_side_spec();
+        let log_meta_bits_per_line = Line::LOG_BYTES - LOG_BYTES_IN_WORD as usize
+            + if !VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
+                0
+            } else {
+                1
+            };
+        debug_assert!((1 << log_meta_bits_per_line) >= 8);
+        let log_meta_bytes_per_line = log_meta_bits_per_line - LOG_BITS_IN_BYTE as usize;
+        // FIXME: Performance
+        let start = lines.start.start();
+        let meta_start = address_to_meta_address(&unlog_bit, start);
+        let meta_bytes =
+            Line::steps_between(&lines.start, &lines.end).unwrap() << log_meta_bytes_per_line;
+        crate::util::memory::zero(meta_start, meta_bytes)
+    }
+
+    pub fn initialize_field_unlog_table_as_unlogged<VM: VMBinding>(lines: Range<Line>) {
+        let unlog_bit = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+            .as_spec()
+            .extract_side_spec();
+        let log_meta_bits_per_line = Line::LOG_BYTES - LOG_BYTES_IN_WORD as usize
+            + if !VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
+                0
+            } else {
+                1
+            };
+        debug_assert!((1 << log_meta_bits_per_line) >= 8);
+        let log_meta_bytes_per_line = log_meta_bits_per_line - LOG_BITS_IN_BYTE as usize;
+        // FIXME: Performance
+        let start = lines.start.start();
+        let meta_start = address_to_meta_address(&unlog_bit, start);
+        let meta_bytes =
+            Line::steps_between(&lines.start, &lines.end).unwrap() << log_meta_bytes_per_line;
+        unsafe {
+            std::ptr::write_bytes::<u8>(meta_start.to_mut_ptr(), 0xffu8, meta_bytes);
+        }
+    }
+}
+
+// type UInt<const BITS: usize> =
+
+pub trait UintType: 'static + Sized {
+    type Type: 'static + Sized + Copy + Eq + PartialEq;
+    fn is_zero(v: Self::Type) -> bool;
+}
+
+pub struct Uint<const BITS: usize> {}
+
+impl UintType for Uint<8> {
+    type Type = u8;
+    fn is_zero(v: Self::Type) -> bool {
+        v == 0
+    }
+}
+
+impl UintType for Uint<16> {
+    type Type = u16;
+    fn is_zero(v: Self::Type) -> bool {
+        v == 0
+    }
+}
+
+impl UintType for Uint<32> {
+    type Type = u32;
+    fn is_zero(v: Self::Type) -> bool {
+        v == 0
+    }
+}
+
+impl UintType for Uint<64> {
+    type Type = u64;
+    fn is_zero(v: Self::Type) -> bool {
+        v == 0
+    }
+}
+
+impl UintType for Uint<128> {
+    type Type = u128;
+    fn is_zero(v: Self::Type) -> bool {
+        v == 0
+    }
+}
+
+#[repr(transparent)]
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct UInt256([u8; 256 / 8]);
+
+impl UintType for Uint<256> {
+    type Type = UInt256;
+    fn is_zero(v: Self::Type) -> bool {
+        v == UInt256([0; 256 / 8])
+    }
+}
+
+#[repr(transparent)]
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct UInt512([u8; 512 / 8]);
+
+impl UintType for Uint<512> {
+    type Type = UInt512;
+    fn is_zero(v: Self::Type) -> bool {
+        v == UInt512([0; 512 / 8])
+    }
+}
+
+#[repr(transparent)]
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct UInt1024([u8; 1024 / 8]);
+
+impl UintType for Uint<1024> {
+    type Type = UInt1024;
+    fn is_zero(v: Self::Type) -> bool {
+        v == UInt1024([0; 1024 / 8])
+    }
+}
+
+#[repr(transparent)]
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct UInt2048([u8; 2048 / 8]);
+
+impl UintType for Uint<2048> {
+    type Type = UInt2048;
+    fn is_zero(v: Self::Type) -> bool {
+        v == UInt2048([0; 2048 / 8])
+    }
+}
+
+const LOG_BITS_PER_LINE: usize = Line::LOG_BYTES - rc::LOG_MIN_OBJECT_SIZE + rc::LOG_REF_COUNT_BITS;
+const BITS_PER_LINE: usize = 1 << LOG_BITS_PER_LINE;
+const LOG_BITS_PER_BLOCK: usize =
+    Block::LOG_BYTES - rc::LOG_MIN_OBJECT_SIZE + rc::LOG_REF_COUNT_BITS;
+const BITS_PER_BLOCK: usize = 1 << LOG_BITS_PER_BLOCK;
+
+pub struct RCArray {
+    table: &'static [<Uint<{ BITS_PER_LINE }> as UintType>::Type; BITS_PER_BLOCK / BITS_PER_LINE],
+}
+
+impl RCArray {
+    pub fn of(block: Block) -> Self {
+        Self {
+            table: unsafe { &*block.rc_table_start().to_ptr() },
+        }
+    }
+
+    pub fn is_dead(&self, i: usize) -> bool {
+        <Uint<{ BITS_PER_LINE }> as UintType>::is_zero(self.table[i])
     }
 }

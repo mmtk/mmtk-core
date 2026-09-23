@@ -24,6 +24,7 @@ use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 use crate::ObjectQueue;
+use crate::MMTK;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -117,9 +118,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         }
     }
 
-    fn end_of_gc(&mut self, tls: VMWorkerThread) {
+    fn on_pause_end(&mut self, mmtk: &'static MMTK<VM>, tls: VMWorkerThread) {
         let next_gc_full_heap = CommonGenPlan::should_next_gc_be_full_heap(self);
-        self.gen.end_of_gc(tls, next_gc_full_heap);
+        self.gen.on_pause_end(tls, next_gc_full_heap);
+        mmtk.gc_trigger.policy.on_gc_end(mmtk);
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
@@ -220,16 +222,12 @@ impl<VM: VMBinding> GenCopy<VM> {
             true,
         );
 
-        let res = GenCopy {
+        GenCopy {
             gen: CommonGenPlan::new(plan_args),
             hi: AtomicBool::new(false),
             copyspace0,
             copyspace1,
-        };
-
-        res.verify_side_metadata_sanity();
-
-        res
+        }
     }
 
     fn requires_full_heap_collection(&self) -> bool {

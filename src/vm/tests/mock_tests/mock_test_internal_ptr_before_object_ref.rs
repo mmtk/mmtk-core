@@ -1,5 +1,5 @@
 // GITHUB-CI: MMTK_PLAN=all
-// GITHUB-CI: FEATURES=is_mmtk_object
+// GITHUB-CI: FEATURES=vo_bit
 
 use super::mock_test_prelude::*;
 

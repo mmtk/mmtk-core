@@ -253,18 +253,13 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
     }
 
     // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
-    fn post_alloc(
-        &mut self,
-        refer: ObjectReference,
-        _bytes: usize,
-        allocator: AllocationSemantics,
-    ) {
+    fn post_alloc(&mut self, refer: ObjectReference, bytes: usize, allocator: AllocationSemantics) {
         unsafe {
             self.allocators
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
         }
         .get_space()
-        .initialize_object_metadata(refer)
+        .initialize_object_metadata(refer, bytes)
     }
 
     fn get_tls(&self) -> VMMutatorThread {
@@ -361,8 +356,7 @@ impl<VM: VMBinding> Mutator<VM> {
     /// Return the base offset from a mutator pointer to the allocator specified by the selector.
     pub fn get_allocator_base_offset(selector: AllocatorSelector) -> usize {
         use crate::util::alloc::*;
-        use memoffset::offset_of;
-        use std::mem::size_of;
+        use std::mem::{offset_of, size_of};
         offset_of!(Mutator<VM>, allocators)
             + match selector {
                 AllocatorSelector::BumpPointer(index) => {
@@ -385,9 +379,9 @@ impl<VM: VMBinding> Mutator<VM> {
                     offset_of!(Allocators<VM>, malloc)
                         + size_of::<MallocAllocator<VM>>() * index as usize
                 }
-                AllocatorSelector::MarkCompact(index) => {
-                    offset_of!(Allocators<VM>, markcompact)
-                        + size_of::<MarkCompactAllocator<VM>>() * index as usize
+                AllocatorSelector::Lisp2(index) => {
+                    offset_of!(Allocators<VM>, lisp2)
+                        + size_of::<Lisp2Allocator<VM>>() * index as usize
                 }
                 AllocatorSelector::None => panic!("Expect a valid AllocatorSelector, found None"),
             }
@@ -494,7 +488,7 @@ pub(crate) struct ReservedAllocators {
     pub n_large_object: u8,
     pub n_malloc: u8,
     pub n_immix: u8,
-    pub n_mark_compact: u8,
+    pub n_lisp2: u8,
     pub n_free_list: u8,
 }
 
@@ -504,7 +498,7 @@ impl ReservedAllocators {
         n_large_object: 0,
         n_malloc: 0,
         n_immix: 0,
-        n_mark_compact: 0,
+        n_lisp2: 0,
         n_free_list: 0,
     };
     /// check if the number of each allocator is okay. Panics if any allocator exceeds the max number.
@@ -527,7 +521,7 @@ impl ReservedAllocators {
             "Allocator mapping declared more immix allocators than the max allowed."
         );
         assert!(
-            self.n_mark_compact as usize <= MAX_MARK_COMPACT_ALLOCATORS,
+            self.n_lisp2 as usize <= MAX_LISP2_ALLOCATORS,
             "Allocator mapping declared more mark compact allocators than the max allowed."
         );
         assert!(
@@ -561,9 +555,9 @@ impl ReservedAllocators {
         selector
     }
     #[allow(dead_code)]
-    fn add_mark_compact_allocator(&mut self) -> AllocatorSelector {
-        let selector = AllocatorSelector::MarkCompact(self.n_mark_compact);
-        self.n_mark_compact += 1;
+    fn add_lisp2_allocator(&mut self) -> AllocatorSelector {
+        let selector = AllocatorSelector::Lisp2(self.n_lisp2);
+        self.n_lisp2 += 1;
         selector
     }
     #[allow(dead_code)]

@@ -1,11 +1,11 @@
 //! A general scheduler implementation. MMTk uses it to schedule GC-related work.
 
-/// Buffer size for [`ProcessEdgesWork`] work packets. This constant is exposed to binding
-/// developers so that they can use this value for places in their binding that interface with the
-/// work packet system, specifically the transitive closure via `ProcessEdgesWork` work packets
-/// such as roots gathering code or weak reference processing. In order to have better load
-/// balancing, it is recommended that binding developers use this constant to split work up into
-/// different work packets.
+/// This constant used to be the default capacity of work packets that process slots, such as
+/// `ProcessSlots`.  But now it is an empirical value used by many work packets.
+///
+/// We expose this constant to the VM binding developers.  During root scanning, the VM binding
+/// should call methods of [`crate::vm::RootsWorkFactory`] and pass lists of root slots or root nodes.  This
+/// constant shall be used as the max lengths of those lists.
 pub const EDGES_WORK_BUFFER_SIZE: usize = 4096;
 
 pub(crate) mod affinity;
@@ -24,11 +24,14 @@ pub(crate) use work::GCWorkContext;
 mod work_bucket;
 pub use work_bucket::WorkBucketStage;
 
+/// GC worker threads: the [`worker::GCWorker`] struct representing a single worker, the
+/// (crate-private) `WorkerGroup` that manages all workers, and per-worker shared state.
 mod worker;
 mod worker_goals;
 mod worker_monitor;
 pub(crate) use worker::current_worker_ordinal;
 pub use worker::GCWorker;
+pub(crate) use worker::GCWorkerShared;
 
 pub(crate) mod gc_work;
-pub use gc_work::ProcessEdgesWork;
+pub use gc_work::RootKind;

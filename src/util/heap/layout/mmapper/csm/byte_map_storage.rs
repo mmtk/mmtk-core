@@ -9,8 +9,8 @@ use std::fmt;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
+use crate::util::os::MmapResult;
 use atomic::Atomic;
-use std::io::Result;
 
 /// Logarithm of the address space size that [`ByteMapStateStorage`] is able to handle.
 /// This is enough for 32-bit architectures.
@@ -60,9 +60,9 @@ impl MapStateStorage for ByteMapStateStorage {
         }
     }
 
-    fn bulk_transition_state<F>(&self, range: ChunkRange, mut update_fn: F) -> Result<()>
+    fn bulk_transition_state<F>(&self, range: ChunkRange, mut update_fn: F) -> MmapResult<()>
     where
-        F: FnMut(ChunkRange, MapState) -> Result<Option<MapState>>,
+        F: FnMut(ChunkRange, MapState) -> MmapResult<Option<MapState>>,
     {
         if range.is_empty() {
             return Ok(());
@@ -107,22 +107,9 @@ impl MapStateStorage for ByteMapStateStorage {
 
 impl ByteMapStateStorage {
     pub fn new() -> Self {
-        // Because AtomicU8 does not implement Copy, it is a compilation error to usen the
-        // expression `[Atomic::new(MapState::Unmapped); MMAP_NUM_CHUNKS]` because that involves
-        // copying.  We must define a constant for it.
-        //
-        // TODO: Use the inline const expression `const { Atomic::new(MapState::Unmapped) }` after
-        // we bump MSRV to 1.79.
-
-        // If we declare a const Atomic, Clippy will warn about const items being interior mutable.
-        // Using inline const expression will eliminate this warning, but that is experimental until
-        // 1.79.  Fix it after we bump MSRV.
-        #[allow(clippy::declare_interior_mutable_const)]
-        const INITIAL_ENTRY: Atomic<MapState> = Atomic::new(MapState::Unmapped);
-
         ByteMapStateStorage {
             lock: Mutex::new(()),
-            mapped: [INITIAL_ENTRY; MMAP_NUM_CHUNKS],
+            mapped: [const { Atomic::new(MapState::Unmapped) }; MMAP_NUM_CHUNKS],
         }
     }
 }

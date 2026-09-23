@@ -1,3 +1,175 @@
+0.33.0 (2026-08-05)
+===
+
+## What's Changed
+
+### Plan
+* Support pinning/tpinning roots for concurrent Immix by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1454
+* Add an option to disable concurrent marking for concurrent immix by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1460
+* Do not scan any root in FinalMark by @wks in https://github.com/mmtk/mmtk-core/pull/1470
+* If concurrent marking is disabled, force full GC in schedule_collection by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1472
+* Concurrent Immix should do a full collection on user requests by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1493
+
+### Policy
+* Add bytes parameter to initialize_object_metadata by @wenyuzhao in https://github.com/mmtk/mmtk-core/pull/1487
+* Mmap side metadata after space creation by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1515
+* Quarantine address ranges for spaces by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1491
+
+### Allocator
+* Move a few misplaced functions about obvious OOM handling by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1476
+* Fix infinite loop if we return from `Collection::out_of_memory` by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1473
+* Set allocation_success before oom call by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1532
+
+### Scheduler
+* Replace ProcessEdgesWork with Trace by @wks in https://github.com/mmtk/mmtk-core/pull/1468
+* Reorganize scheduler/gc_work.rs by @wks in https://github.com/mmtk/mmtk-core/pull/1503
+
+### API
+* Remove the "is_mmtk_object" Cargo feature by @wks in https://github.com/mmtk/mmtk-core/pull/1446
+* Add mmtk_shutdown API by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1513
+* Require `Slot` to implement `Sync`. by @wks in https://github.com/mmtk/mmtk-core/pull/1531
+* Reintroduce GC disable/enable API by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1457
+* Concurrent worker threads by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1504
+
+### Documentation
+* Document requirements about mutator-related API by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1466
+* Add a warning about unwinding. by @wks in https://github.com/mmtk/mmtk-core/pull/1480
+* Update object graph traverse doc by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1514
+* Add missing prefix pages in MMTk tutorial by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1533
+* Document pinning API publicly by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1535
+* Add a doc about code review process by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1530
+* Update doc comments in `AllocationSemantics` by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1538
+
+### CI
+* Add CI script to check line ends by @wks in https://github.com/mmtk/mmtk-core/pull/1452
+* Use ci-perf-kit 0.8.7. Mutator perf runs with jdk-11 by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1467
+* Update ci-perf-kit to 0.8.8. New epoch. by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1499
+* Update CI scripts for Julia binding tests by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1519
+* Bump tj-actions/changed-files from 44 to 46 in /.github/workflows by @dependabot[bot] in https://github.com/mmtk/mmtk-core/pull/1525
+* Fix links that disallow robot access by @wks in https://github.com/mmtk/mmtk-core/pull/1527
+* Add a workflow to run cargo fmt by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1524
+* Remove mod mygc before ci-doc.sh quits by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1537
+
+### Misc
+* OS interface by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1439
+* Introduce MmapResult by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1451
+* Remove Java-specific constants. by @wks in https://github.com/mmtk/mmtk-core/pull/1456
+* Set rust-version and resolver in dummyvm by @wks in https://github.com/mmtk/mmtk-core/pull/1471
+* Dynamic side metadata base address by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1449
+* Create a slice from raw backing memory for RawMemoryFreeList by @caizixian in https://github.com/mmtk/mmtk-core/pull/1484
+* `ObjectBarrier::object_is_unlogged` should be atomic by @ThePuzzlemaker in https://github.com/mmtk/mmtk-core/pull/1497
+* Make the visualize script compatible with Python 3.10 by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1498
+* Add support to find next non-zero bit in side-metadata by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1502
+* fix(linux): support musl builds by @playX18 in https://github.com/mmtk/mmtk-core/pull/1517
+* Remove dependency on `memoffset` by @syberant in https://github.com/mmtk/mmtk-core/pull/1520
+* Fix style check for Rust stable 1.97 by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1529
+* Refactor GcStatus by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1534
+* Rename on_gc_start/end to on_pause_start/end. Call on_pause_start after all threads stop by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1539
+* GC status transition logging by @wks in https://github.com/mmtk/mmtk-core/pull/1542
+* Log pause time with fractional milliseconds by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1501
+* Add `on_gc_start/end` to `GCTriggerPolicy` by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1544
+
+## New Contributors
+* @ThePuzzlemaker made their first contribution in https://github.com/mmtk/mmtk-core/pull/1497
+* @dependabot[bot] made their first contribution in https://github.com/mmtk/mmtk-core/pull/1525
+* @syberant made their first contribution in https://github.com/mmtk/mmtk-core/pull/1520
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.32.0...v0.33.0
+
+0.32.0 (2026-02-04)
+===
+
+## What's Changed
+
+### Plan
+* Compressor
+  * Add a stop-the-world, serial Compressor by @no-defun-allowed in https://github.com/mmtk/mmtk-core/pull/1340
+  * Add a parallel/regional Compressor by @no-defun-allowed in https://github.com/mmtk/mmtk-core/pull/1372
+  * Fetch before trying to atomically mark in Compressor by @no-defun-allowed in https://github.com/mmtk/mmtk-core/pull/1438
+* Concurrent Immix
+  * Concurrent Immix by @tianleq in https://github.com/mmtk/mmtk-core/pull/1355
+  * Schedule VMProcessWeakRefs in ConcurrentImmix. by @wks in https://github.com/mmtk/mmtk-core/pull/1403
+
+### Policy
+* Make chunk map as global side metadata, and each space only lists its own chunks using chunk map by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1304
+* Allow configuring each Immix space to be non moving by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1305
+* Use ChunkMap in MallocSpace by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1312
+* LOS: Reduce is_mapped calls during VO bit scan by @wks in https://github.com/mmtk/mmtk-core/pull/1341
+* Remove dead code about vm space in immortal space by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1363
+* Fix LargeObjectSpace::initialize_object_metadata by @wks in https://github.com/mmtk/mmtk-core/pull/1393
+* Refactor Space::acquire by @wks in https://github.com/mmtk/mmtk-core/pull/1401
+* Fix LOS object enumeration by @wks in https://github.com/mmtk/mmtk-core/pull/1412
+* Implement debug_print_object_info for ImmortalSpace by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1423
+
+### Allocator
+* Minor refactor to remove duplicate code using ReservedAllocators by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1309
+* Add alloc_with_options by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1218
+
+### Scheduler
+* Minor changes to the ProcessRootNode work packet by @wks in https://github.com/mmtk/mmtk-core/pull/1327
+* Rename Workbucket's active flag to open, add enable flag by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1373
+* Remove GCRequester, move related code to GCTrigger by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1405
+
+### Documentation
+* Fix typos and vague statements in weakref doc by @wks in https://github.com/mmtk/mmtk-core/pull/1329
+* Wrong example in print_obj_info.md by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1358
+* Fix doc comments in options module by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1389
+* Add a debugging tip on traversing object graph by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1396
+* Update doc comment for Slot by @wks in https://github.com/mmtk/mmtk-core/pull/1409
+* Document supported platforms by @wks in https://github.com/mmtk/mmtk-core/pull/1431
+
+### CI
+* Remove V8 tests from extended tests by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1313
+* Bump Ruby binding test image to 24.04 by @wks in https://github.com/mmtk/mmtk-core/pull/1326
+* Use canary binary by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1384
+* Let CI use both OpenJDK 11 and OpenJDK 21 by @wks in https://github.com/mmtk/mmtk-core/pull/1419
+* Print more info for debugging in get-merged-pr by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1428
+* Allow retry in get-merged-pr by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1427
+* Use ci-perf-kit 0.8.6 (new epoch for CI runner package update on 5th Jan) by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1444
+
+### Misc
+* Choose Non-moving Policy based on features by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1308
+* Add a function to print object info from the space for debugging by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1269
+* Remove dead field in `VMMap` by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1320
+* Move `inside_harness` to `GlobalState` by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1321
+* Remove env_var and command_line from options by @wks in https://github.com/mmtk/mmtk-core/pull/1240
+* Use EnumMap::from_fn by @wks in https://github.com/mmtk/mmtk-core/pull/1323
+* Remove the immix_stress_copying feature. Replace with separate options. by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1324
+* Make scan_non_zero_values_fast scan entirely forwards by @no-defun-allowed in https://github.com/mmtk/mmtk-core/pull/1332
+* Move lint config to Cargo.toml. Adapt to Rust 1.88 by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1335
+* SFTSpaceMap should do range check in get_checked by @wks in https://github.com/mmtk/mmtk-core/pull/1339
+* Replace FragmentedMapper with TwoLevelMmapper by @wks in https://github.com/mmtk/mmtk-core/pull/1337
+* Deduplicate specs in `SideMetadataSanity::get_all_specs` by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1342
+* Workaround eBPF errors by @wks in https://github.com/mmtk/mmtk-core/pull/1350
+* Enable reference processing in the core by default by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1360
+* Fix Clippy 1.89 warnings by @wks in https://github.com/mmtk/mmtk-core/pull/1367
+* Fix rayon-core version for MSRV by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1368
+* Use `bytemuck::Zeroable` for zeroable types. by @wks in https://github.com/mmtk/mmtk-core/pull/1371
+* Refactor log bits by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1364
+* eBPF probes for finalization and reference processing by @wks in https://github.com/mmtk/mmtk-core/pull/1374
+* Refactor both Mmapper impls into ChunkStateMmapper by @wks in https://github.com/mmtk/mmtk-core/pull/1369
+* Remove unused methods and types related to memory mapping by @wks in https://github.com/mmtk/mmtk-core/pull/1383
+* Add `AllInSet` affinity kind for pinning threads to all cores in a set by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1386
+* Fix Clippy 1.90 warning by @wks in https://github.com/mmtk/mmtk-core/pull/1394
+* Warn the user about aliasing effect by @wks in https://github.com/mmtk/mmtk-core/pull/1392
+* Remove vim modeline, move current_pause_determined to gc by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1395
+* Use u8 for alignment value by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1399
+* Use boolean allocation options by @wks in https://github.com/mmtk/mmtk-core/pull/1400
+* Fix typo by @wks in https://github.com/mmtk/mmtk-core/pull/1404
+* Pin the dep home to 0.5.5 by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1411
+* Fix Clippy 1.91 warnings. by @wks in https://github.com/mmtk/mmtk-core/pull/1413
+* Pin mdbook/mdbook-admonish version by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1416
+* fix: do not force turn off log in release mode by @playX18 in https://github.com/mmtk/mmtk-core/pull/1415
+* Fix Clippy warnings for Rust 1.92 by @wks in https://github.com/mmtk/mmtk-core/pull/1435
+* Move to Rust 1.92. Bump MSRV to 1.84. by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1440
+* Cleaning up after bumping Rust MSRV by @wks in https://github.com/mmtk/mmtk-core/pull/1442
+
+## New Contributors
+* @no-defun-allowed made their first contribution in https://github.com/mmtk/mmtk-core/pull/1332
+* @playX18 made their first contribution in https://github.com/mmtk/mmtk-core/pull/1415
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.31.0...v0.32.0
+
 0.31.0 (2025-04-17)
 ===
 

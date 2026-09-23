@@ -14,11 +14,6 @@ pub fn allocate_with_re_enable_collection() {
         || -> MockVM {
             MockVM {
                 block_for_gc: MockMethod::new_fixed(Box::new(|_| panic!("block_for_gc is called"))),
-                is_collection_enabled: MockMethod::new_sequence(vec![
-                    Box::new(|()| -> bool { true }), // gc is enabled but it shouldn't matter here
-                    Box::new(|()| -> bool { false }), // gc is disabled
-                    Box::new(|()| -> bool { true }), // gc is enabled again
-                ]),
                 ..MockVM::default()
             }
         },
@@ -33,9 +28,6 @@ pub fn allocate_with_re_enable_collection() {
                 write_mockvm(|mock| {
                     use crate::util::VMMutatorThread;
                     use crate::util::VMThread;
-                    mock.is_collection_enabled.call(());
-                    mock.is_collection_enabled.call(());
-                    mock.is_collection_enabled.call(());
                     mock.block_for_gc
                         .call(VMMutatorThread(VMThread::UNINITIALIZED));
                 });
@@ -52,9 +44,11 @@ pub fn allocate_with_re_enable_collection() {
             assert!(!addr.is_zero());
 
             // In the next allocation GC is disabled. So we can keep allocate without triggering a GC.
+            assert_eq!(memory_manager::disable_collection(fixture.mmtk()), Ok(true));
             // Fill up the heap
             let _ =
                 memory_manager::alloc(fixture.mutator(), MB, 8, 0, AllocationSemantics::Default);
+            assert!(memory_manager::enable_collection(fixture.mmtk()));
 
             // Attempt another allocation. This will trigger GC since GC is enabled again.
             let addr =
@@ -62,11 +56,9 @@ pub fn allocate_with_re_enable_collection() {
             assert!(!addr.is_zero());
         },
         || {
-            // This ensures that block_for_gc is called for this test, and that the second allocation
-            // does not trigger GC since we expect is_collection_enabled to be called three times.
+            // This ensures block_for_gc is called for this test.
             read_mockvm(|mock| {
                 assert!(mock.block_for_gc.is_called());
-                assert!(mock.is_collection_enabled.call_count() == 3);
             });
         },
     )

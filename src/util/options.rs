@@ -1,5 +1,5 @@
-use crate::scheduler::affinity::{get_total_num_cpus, CoreId};
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
+use crate::util::os::*;
 use crate::util::Address;
 use std::default::Default;
 use std::fmt::Debug;
@@ -45,11 +45,13 @@ pub enum PlanSelector {
     /// A mark-region collector that allows an opportunistic defragmentation mechanism.
     Immix,
     /// A mark-compact collector that implements the Lisp-2 compaction algorithm.
-    MarkCompact,
-    /// A mark-compact collector that uses Compressor-style bitmaps.
-    Compressor,
+    Lisp2,
+    /// A mark-compact collector that uses offset-vector bitmaps.
+    OVC,
     /// An Immix collector that uses a sticky mark bit to allow generational behaviors without a copying nursery.
     StickyImmix,
+    /// LXR GC
+    LXR,
     /// Concurrent non-moving immix using SATB
     ConcurrentImmix,
 }
@@ -147,6 +149,8 @@ pub struct MMTKOption<T: Debug + Clone + FromStr> {
     value: T,
     /// The validator to ensure the value is valid.
     validator: fn(&T) -> bool,
+    /// Whether this option has been explicitly set by the user, as opposed to using its built-in default.
+    was_set: bool,
 }
 
 impl<T: Debug + Clone + FromStr> MMTKOption<T> {
@@ -164,16 +168,26 @@ impl<T: Debug + Clone + FromStr> MMTKOption<T> {
         //     "Unable to create MMTKOption: initial value {:?} is invalid",
         //     value
         // );
-        MMTKOption { value, validator }
+        MMTKOption {
+            value,
+            validator,
+            was_set: false,
+        }
     }
 
     /// Set the option to the given value. Returns true if the value is valid, and we set the option to the value.
     pub fn set(&mut self, value: T) -> bool {
         if (self.validator)(&value) {
             self.value = value;
+            self.was_set = true;
             return true;
         }
         false
+    }
+
+    /// Return true if this option has been explicitly set by the user (rather than left at its built-in default).
+    pub fn was_set(&self) -> bool {
+        self.was_set
     }
 }
 
@@ -341,6 +355,27 @@ impl Options {
         *self.stress_factor != DEFAULT_STRESS_FACTOR
             || *self.analysis_factor != DEFAULT_STRESS_FACTOR
     }
+
+    /// Turning transparent huge pages into HugePageSupport.
+    pub fn transparent_hugepages_as_huge_page_support(&self) -> HugePageSupport {
+        if *self.transparent_hugepages {
+            HugePageSupport::TransparentHugePages
+        } else {
+            HugePageSupport::No
+        }
+    }
+
+    /// The number of concurrent threads is set to 1/4 of the total GC threads with a minimal of 1 concurrent threads.
+    fn compute_default_concurrent_threads(gc_threads: usize) -> usize {
+        usize::max(gc_threads / 4, 1)
+    }
+
+    /// Some options may change based on other options. This function resolves those options based on the current values of other options.
+    pub(crate) fn resolve_connected_options(&mut self) {
+        if !self.concurrent_threads.was_set() {
+            self.concurrent_threads.value = Self::compute_default_concurrent_threads(*self.threads);
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -455,7 +490,7 @@ impl AffinityKind {
     /// maximum number of cores allocated to the program. Assumes core ids on the system are
     /// 0-indexed.
     pub fn validate(&self) -> bool {
-        let num_cpu = get_total_num_cpus();
+        let num_cpu = OS::get_total_num_cpus();
 
         if let AffinityKind::RoundRobin(cpuset) = self {
             for cpu in cpuset {
@@ -869,6 +904,9 @@ options! {
     plan:                   PlanSelector            [always_valid] = PlanSelector::GenImmix,
     /// Number of GC worker threads.
     threads:                usize                   [|v: &usize| *v > 0] = num_cpus::get(),
+    /// Maximum number of GC worker threads that may run concurrent GC work.
+    /// If this exceeds the total number of GC worker threads, all workers may participate.
+    concurrent_threads:     usize                   [|v: &usize| *v > 0] = Options::compute_default_concurrent_threads(num_cpus::get()),
     /// Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans:  bool                    [always_valid] = false,
     /// Enable a return barrier (not supported)
@@ -909,6 +947,10 @@ options! {
     vm_space_start:         Address                 [always_valid] = Address::ZERO,
     /// The size of vmspace.
     vm_space_size:          usize                   [|v: &usize| *v > 0] = 0xdc0_0000,
+    /// The base address to reserve side metadata at startup.
+    /// If this is zero, MMTk will reserve side metadata at any available address.
+    /// If non-zero, MMTk will quarantine side metadata at this fixed address.
+    side_metadata_base_address: Address             [always_valid] = Address::ZERO,
     /// Perf events to measure
     /// Semicolons are used to separate events
     /// Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
@@ -948,9 +990,11 @@ options! {
     /// there is no core with (perceived) ID 12.
     // XXX: This option is currently only supported on Linux.
     thread_affinity:        AffinityKind            [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
+    /// Verbosity level for GC statistics and logging output, from 0 (quiet) to 10 (most verbose).
+    verbose:                       usize            [|v: &usize| *v <= 10]  = 0,
     /// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
     /// Default to a fixed heap size of 0.5x physical memory.
-    gc_trigger:             GCTriggerSelector       [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize),
+    gc_trigger:             GCTriggerSelector       [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((OS::get_system_total_memory().unwrap_or(4 * 1024 * 1024 * 1024) as f64 * 0.5f64) as usize),
     /// Enable transparent hugepage support for MMTk spaces via madvise (only Linux is supported)
     /// This only affects the memory for MMTk spaces.
     transparent_hugepages:  bool                    [|v: &bool| !v || cfg!(target_os = "linux")] = false,
@@ -964,7 +1008,31 @@ options! {
     /// Percentage of heap size reserved for defragmentation.
     /// According to [this paper](https://doi.org/10.1145/1375581.1375586), Immix works well with
     /// headroom between 1% to 3% of the heap size.
-    immix_defrag_headroom_percent: usize            [|v: &usize| *v <= 50] = 2
+    immix_defrag_headroom_percent: usize            [|v: &usize| *v <= 50] = 5,
+    /// Disable concurrent marking in ConcurrentImmix. Setting this to true will make ConcurrentImmix behave exactly like full heap Immix. This option is only intended for debugging.
+    concurrent_immix_disable_concurrent_marking: bool              [always_valid] = false,
+    /// Trigger an LXR pause once this many reference-count increments are pending, bounding the
+    /// `RCProcessIncs` work a single pause has to do. Each pending increment is one slot the write
+    /// barrier recorded, so the limit is roughly "words of reference stores between pauses".
+    /// `usize::MAX`, the default, leaves the pause bounded only by heap occupancy.
+    lxr_inc_buffer_limit: usize                     [always_valid] = usize::MAX,
+    /// Trigger an LXR pause when the predicted surviving young data exceeds this many megabytes.
+    /// This is the bound that limits pause time, since a pause is dominated by promoting the young
+    /// objects that survived.
+    lxr_max_survival_mb: usize                      [|v: &usize| *v > 0] = 128,
+    /// How many nursery blocks a non-`Full` LXR pause may sweep before handing the rest to the
+    /// concurrent phase. `usize::MAX`, the default, sweeps the whole nursery inside the pause;
+    /// zero defers all of it.
+    lxr_max_stw_sweep_nursery_blocks: usize         [always_valid] = usize::MAX,
+    /// The smallest generation of recursively-discovered reference-count increments that LXR will
+    /// split with another worker instead of processing entirely.
+    /// `usize::MAX`, the default, disables splitting.
+    lxr_min_packet_split_size: usize                [always_valid] = usize::MAX,
+    /// The earliest generation of recursively-discovered reference-count increments that LXR will
+    /// consider splitting. Early generations are small and near the roots, where splitting costs a
+    /// work packet and buys little; the chain only gets long enough to matter further down. Zero
+    /// considers every generation.
+    lxr_min_packet_split_depth: usize               [always_valid] = 16
 }
 
 #[cfg(test)]
@@ -1090,6 +1158,83 @@ mod tests {
     }
 
     #[test]
+    fn test_concurrent_threads_validation() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let concurrent_threads = *options.concurrent_threads;
+            let success = options.concurrent_threads.set(0);
+            assert!(!success);
+            assert_eq!(*options.concurrent_threads, concurrent_threads);
+        })
+    }
+
+    #[test]
+    fn test_compute_default_concurrent_threads() {
+        assert_eq!(Options::compute_default_concurrent_threads(1), 1);
+        assert_eq!(Options::compute_default_concurrent_threads(3), 1);
+        assert_eq!(Options::compute_default_concurrent_threads(4), 1);
+        assert_eq!(Options::compute_default_concurrent_threads(8), 2);
+        assert_eq!(Options::compute_default_concurrent_threads(100), 25);
+    }
+
+    #[test]
+    fn test_concurrent_threads_default_tracks_threads_default() {
+        serial_test(|| {
+            // Rule 1: if `threads` is left at its default, `concurrent_threads` defaults to 1/4 of it.
+            let options = Options::default();
+            assert_eq!(
+                *options.concurrent_threads,
+                Options::compute_default_concurrent_threads(*options.threads)
+            );
+        })
+    }
+
+    #[test]
+    fn test_concurrent_threads_resolves_from_explicit_threads() {
+        serial_test(|| {
+            // Rule 2: if `threads` is explicitly set (and `concurrent_threads` is not),
+            // resolving should derive `concurrent_threads` as 1/4 of the new `threads` value.
+            let mut options = Options::default();
+            assert!(options.threads.set(16));
+            options.resolve_connected_options();
+            assert_eq!(*options.concurrent_threads, 4);
+        })
+    }
+
+    #[test]
+    fn test_concurrent_threads_resolves_from_threads_set_via_string() {
+        serial_test(|| {
+            let mut options = Options::default();
+            assert!(options.set_from_string("threads", "12"));
+            options.resolve_connected_options();
+            assert_eq!(*options.concurrent_threads, 3);
+        })
+    }
+
+    #[test]
+    fn test_concurrent_threads_explicit_value_is_not_overridden() {
+        serial_test(|| {
+            // Rule 3: if `concurrent_threads` is explicitly set, it is kept as-is even if
+            // `threads` is changed afterwards.
+            let mut options = Options::default();
+            assert!(options.concurrent_threads.set(3));
+            assert!(options.threads.set(16));
+            options.resolve_connected_options();
+            assert_eq!(*options.concurrent_threads, 3);
+        })
+    }
+
+    #[test]
+    fn test_concurrent_threads_resolve_without_explicit_set_is_a_noop() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let concurrent_threads = *options.concurrent_threads;
+            options.resolve_connected_options();
+            assert_eq!(*options.concurrent_threads, concurrent_threads);
+        })
+    }
+
+    #[test]
     #[cfg(all(feature = "perf_counter", feature = "work_packet_stats"))]
     fn test_work_perf_events_option_from_env_var() {
         serial_test(|| {
@@ -1210,7 +1355,7 @@ mod tests {
                 || {
                     let mut vec = vec![0_u16];
                     let mut cpu_list = String::new();
-                    let num_cpus = get_total_num_cpus();
+                    let num_cpus = OS::get_total_num_cpus();
 
                     cpu_list.push('0');
                     for cpu in 1..num_cpus {
@@ -1316,6 +1461,16 @@ mod tests {
             let success = options.set_from_string("no_finalizer", "true");
             assert!(success);
             assert!(*options.no_finalizer);
+        })
+    }
+
+    #[test]
+    fn test_process_concurrent_threads_valid() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let success = options.set_from_string("concurrent_threads", "2");
+            assert!(success);
+            assert_eq!(*options.concurrent_threads, 2);
         })
     }
 

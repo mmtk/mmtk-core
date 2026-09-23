@@ -110,6 +110,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
+          # TODO: If we plan to resurrect stress-ci, we need to get the trunk name from a unique .yml
+          # file so that all GitHub Actions scripts agree upon which branch is the trunk (e.g.
+          # jdk-11, jdk-21, ...).
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           path: mmtk-openjdk
           submodules: true

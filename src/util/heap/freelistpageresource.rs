@@ -14,8 +14,8 @@ use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::layout::CreateFreeListResult;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
-use crate::util::memory;
 use crate::util::opaque_pointer::*;
+use crate::util::os::*;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::vm::*;
 use std::marker::PhantomData;
@@ -27,7 +27,7 @@ pub struct FreeListPageResource<VM: VMBinding> {
     sync: Mutex<FreeListPageResourceSync>,
     _p: PhantomData<VM>,
     /// Protect memory on release, and unprotect on re-allocate.
-    pub(crate) protect_memory_on_release: Option<memory::MmapProtection>,
+    pub(crate) protect_memory_on_release: Option<MmapProtection>,
 }
 
 unsafe impl<VM: VMBinding> Send for FreeListPageResource<VM> {}
@@ -219,7 +219,11 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         // > (e.g., read versus read/write protection) exceeding the
         // > allowed maximum.
         assert!(self.protect_memory_on_release.is_some());
-        if let Err(e) = memory::mprotect(start, conversions::pages_to_bytes(pages)) {
+        if let Err(e) = OS::set_memory_access(
+            start,
+            conversions::pages_to_bytes(pages),
+            MmapProtection::NoAccess,
+        ) {
             panic!(
                 "Failed at protecting memory (starting at {}): {:?}",
                 start, e
@@ -230,7 +234,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     /// Unprotect the memory
     fn munprotect(&self, start: Address, pages: usize) {
         assert!(self.protect_memory_on_release.is_some());
-        if let Err(e) = memory::munprotect(
+        if let Err(e) = OS::set_memory_access(
             start,
             conversions::pages_to_bytes(pages),
             self.protect_memory_on_release.unwrap(),
@@ -322,6 +326,13 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         self.common.release_discontiguous_chunks(chunk);
     }
 
+    pub fn get_pages(&self, start: Address) -> usize {
+        debug_assert!(conversions::is_page_aligned(start));
+        let sync = self.sync.lock().unwrap();
+        let page_offset = conversions::bytes_to_pages_up(start - sync.start);
+        sync.free_list.size(page_offset as _) as _
+    }
+
     /// Release pages previously allocated by `alloc_pages`.
     ///
     /// Warning: This method acquires the mutex `self.sync`.  If multiple threads release pages
@@ -330,7 +341,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     /// large object space are recommended to use [`BlockPageResource`] whenever possible.
     ///
     /// [`BlockPageResource`]: crate::util::heap::blockpageresource::BlockPageResource
-    pub fn release_pages(&self, first: Address) {
+    pub fn release_pages(&self, first: Address) -> usize {
         debug_assert!(conversions::is_page_aligned(first));
         let mut sync = self.sync.lock().unwrap();
         let page_offset = conversions::bytes_to_pages_up(first - sync.start);
@@ -350,6 +361,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             // only discontiguous spaces use chunks
             self.release_free_chunks(first, freed as _, &mut sync);
         }
+        pages as _
     }
 
     fn release_free_chunks(

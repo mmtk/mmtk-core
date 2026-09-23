@@ -1,4 +1,5 @@
 use crate::plan::Mutator;
+use crate::scheduler::gc_work::RootKind;
 use crate::scheduler::GCWorker;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
@@ -43,31 +44,29 @@ impl<F: FnMut(ObjectReference) -> ObjectReference> ObjectTracer for F {
     }
 }
 
-/// An `ObjectTracerContext` gives a GC worker temporary access to an `ObjectTracer`, allowing
-/// the GC worker to trace objects.  This trait is intended to abstract out the implementation
-/// details of tracing objects, enqueuing objects, and creating work packets that expand the
-/// transitive closure, allowing the VM binding to focus on VM-specific parts.
+/// An `ObjectTracerContext` gives a GC worker temporary access to an [`ObjectTracer`], allowing the
+/// GC worker to trace objects.  This trait is intended to abstract out the implementation details
+/// of tracing objects, enqueuing objects, and creating work packets that expand the transitive
+/// closure, allowing the VM binding to focus on VM-specific parts.
 ///
 /// This trait is used during root scanning and binding-side weak reference processing.
 pub trait ObjectTracerContext<VM: VMBinding>: Clone + Send + 'static {
-    /// The concrete `ObjectTracer` type.
+    /// The concrete [`ObjectTracer`] type.
     ///
-    /// FIXME: The current code works because of the unsafe method `ProcessEdgesWork::set_worker`.
-    /// The tracer should borrow the worker passed to `with_queuing_tracer` during its lifetime.
-    /// For this reason, `TracerType` should have a `<'w>` lifetime parameter.
-    /// Generic Associated Types (GAT) is already stablized in Rust 1.65.
-    /// We should update our toolchain version, too.
-    type TracerType: ObjectTracer;
+    /// The lifetime parameter `'w` is the lifetime of the `&'w mut GCWorker<VM>` passed to the
+    /// [`Self::with_tracer`] method.  It is borrowed by the [`ObjectTracer`] passed to the `func`
+    /// callback of [`Self::with_tracer`].
+    type TracerType<'w>: ObjectTracer;
 
-    /// Create a temporary `ObjectTracer` and provide access in the scope of `func`.
+    /// Create a temporary [`ObjectTracer`] and provide access in the scope of `func`.
     ///
-    /// When the `ObjectTracer::trace_object` is called, if the traced object is first visited
-    /// in this transitive closure, it will be enqueued.  After `func` returns, the implememtation
-    /// will create work packets to continue computing the transitive closure from the newly
-    /// enqueued objects.
+    /// When [`ObjectTracer::trace_object`] is called, if the traced object is first visited in this
+    /// transitive closure, it will be enqueued.  After `func` returns, the implememtation will
+    /// create work packets to continue computing the transitive closure from the newly enqueued
+    /// objects.
     ///
-    /// API functions that provide `QueuingTracerFactory` should document
-    /// 1.  on which fields the user is supposed to call `ObjectTracer::trace_object`, and
+    /// API functions that provide [`ObjectTracerContext`] should document
+    /// 1.  on which fields the user is supposed to call [`ObjectTracer::trace_object`], and
     /// 2.  which work bucket the generated work packet will be added to.  Sometimes the user needs
     ///     to know when the computing of transitive closure finishes.
     ///
@@ -76,9 +75,9 @@ pub trait ObjectTracerContext<VM: VMBinding>: Clone + Send + 'static {
     /// -   `func`: A caller-supplied closure in which the created `ObjectTracer` can be used.
     ///
     /// Returns: The return value of `func`.
-    fn with_tracer<R, F>(&self, worker: &mut GCWorker<VM>, func: F) -> R
+    fn with_tracer<'w, R, F>(&self, worker: &'w mut GCWorker<VM>, func: F) -> R
     where
-        F: FnOnce(&mut Self::TracerType) -> R;
+        F: FnOnce(&mut Self::TracerType<'w>) -> R;
 }
 
 /// Root-scanning methods use this trait to create work packets for processing roots.
@@ -111,9 +110,18 @@ pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
     ///
     /// The work packet may update the slots.
     ///
+    /// Equivalent to `self.create_process_roots_work_experimental(slots, RootKind::Strong)`.
+    ///
     /// Arguments:
     /// * `slots`: A vector of slots.
-    fn create_process_roots_work(&mut self, slots: Vec<SL>);
+    fn create_process_roots_work(&mut self, slots: Vec<SL>) {
+        self.create_process_roots_work_with_root_kind(slots, RootKind::Strong);
+    }
+
+    /// An experimental API to support weak and young code cache roots.
+    ///
+    /// Currently only used by the LXR plan and the OpenJDK binding.
+    fn create_process_roots_work_with_root_kind(&mut self, slots: Vec<SL>, kind: RootKind);
 
     /// Create work packets to handle non-transitively pinning roots.
     ///
@@ -136,6 +144,15 @@ pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
     /// Arguments:
     /// * `nodes`: A vector of references to objects pointed by edges from roots.
     fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>);
+}
+
+/// For USDT tracepoints for roots.
+/// Keep in sync with `tools/tracing/timeline/visualize.py`.
+#[repr(usize)]
+pub(crate) enum RootsKind {
+    NORMAL = 0,
+    PINNING = 1,
+    TPINNING = 2,
 }
 
 /// VM-specific methods for scanning roots/objects.
@@ -183,17 +200,17 @@ pub trait Scanning<VM: VMBinding> {
     /// object reference.
     ///
     /// The `memory_manager::is_mmtk_object` function can be used in this function if
-    /// -   the "is_mmtk_object" feature is enabled, and
+    /// -   the "vo_bit" feature is enabled, and
     /// -   `VM::VMObjectModel::NEED_VO_BITS_DURING_TRACING` is true.
     ///
     /// Arguments:
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
     /// * `slot_visitor`: Called back for each field.
-    fn scan_object<SV: SlotVisitor<VM::VMSlot>>(
+    fn scan_object(
         tls: VMWorkerThread,
         object: ObjectReference,
-        slot_visitor: &mut SV,
+        slot_visitor: &mut impl SlotVisitor<VM::VMSlot>,
     );
 
     /// Delegated scanning of a object, visiting each reference field encountered, and tracing the
@@ -208,7 +225,7 @@ pub trait Scanning<VM: VMBinding> {
     /// field is holding a null reference, or a tagged non-reference value such as small integer).
     ///
     /// The `memory_manager::is_mmtk_object` function can be used in this function if
-    /// -   the "is_mmtk_object" feature is enabled, and
+    /// -   the "vo_bit" feature is enabled, and
     /// -   `VM::VMObjectModel::NEED_VO_BITS_DURING_TRACING` is true.
     ///
     /// Arguments:
@@ -244,7 +261,7 @@ pub trait Scanning<VM: VMBinding> {
     /// optimization for the stack roots.
     ///
     /// The `memory_manager::is_mmtk_object` function can be used in this function if
-    /// -   the "is_mmtk_object" feature is enabled.
+    /// -   the "vo_bit" feature is enabled.
     ///
     /// Arguments:
     /// * `tls`: The GC thread that is performing this scanning.
@@ -260,7 +277,7 @@ pub trait Scanning<VM: VMBinding> {
     /// goes here.
     ///
     /// The `memory_manager::is_mmtk_object` function can be used in this function if
-    /// -   the "is_mmtk_object" feature is enabled.
+    /// -   the "vo_bit" feature is enabled.
     ///
     /// Arguments:
     /// * `tls`: The GC thread that is performing this scanning.
@@ -328,7 +345,7 @@ pub trait Scanning<VM: VMBinding> {
     /// the objects retained in the closure.
     ///
     /// The `memory_manager::is_mmtk_object` function can be used in this function if
-    /// -   the "is_mmtk_object" feature is enabled, and
+    /// -   the "vo_bit" feature is enabled, and
     /// -   `VM::VMObjectModel::NEED_VO_BITS_DURING_TRACING` is true.
     ///
     /// Arguments:

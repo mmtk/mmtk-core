@@ -1,0 +1,117 @@
+name: OpenJDK Run Plan (reusable)
+
+# Runs OpenJDK benchmarks for a single plan against the OpenJDK+MMTk build
+# cached by the openjdk-build job (see openjdk-build-reusable.yml) in this
+# same workflow run, then pushes the result and (re)renders the report.
+on:
+  workflow_call:
+    inputs:
+      plan_name:
+        description: Result dir name under result_repo/openjdk (e.g. nogc, semispace, canary)
+        required: true
+        type: string
+      config:
+        description: running-ng config filename under ci-perf-kit/configs (e.g. running-openjdk-nogc-complete.yml)
+        required: true
+        type: string
+      heap_modifier:
+        description: Passed straight to run_benchmarks (0 for NoGC-style fixed heaps)
+        required: true
+        type: string
+      canary:
+        description: Whether this plan is the canary run, which needs a prebuilt canary JDK downloaded and put in place first
+        required: false
+        type: boolean
+        default: false
+      result_repo_branch:
+        description: The branch to save run data and plot graph from. Use 'self-hosted-chopin' for master, 'test' or anything else for testing in a branch.
+        required: true
+        type: string
+      deploy:
+        description: Whether to deploy the rendered report to the GitHub Page.
+        required: true
+        type: boolean
+      ci_perf_kit_version:
+        required: true
+        type: string
+      openjdk_rev:
+        description: mmtk-openjdk (jdk-21) revision, used only to label the result-repo commit message. Computed once by openjdk-perf-config.yml.
+        required: true
+        type: string
+    secrets:
+      CI_ACCESS_TOKEN:
+        required: true
+
+env:
+  # Kept in sync with the same env var in openjdk-build-reusable.yml.
+  OPENJDK_BUILD_CACHE_PREFIX: openjdk-mmtk-build-
+  CANARY_VERSION: "v0.32.0-jdk-21"
+  CANARY_RELEASE_BINARY_NAME: "jdk-21.0.9-internal_linux-x64_bin.tar.gz"
+  CANARY_JDK_NAME: "jdk-21.0.9"
+  CANARY_DIR: "canary"
+
+jobs:
+  run-plan:
+    runs-on: [self-hosted, Linux, freq-scaling-off]
+    timeout-minutes: 1440
+    steps:
+      - name: Checkout Perf Kit
+        uses: actions/checkout@v4
+        with:
+          repository: mmtk/ci-perf-kit
+          ref: ${{ inputs.ci_perf_kit_version }}
+          path: ci-perf-kit
+          submodules: true
+      - name: Restore OpenJDK+MMTk build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ci-perf-kit/build
+            ci-perf-kit/probes/out
+            ci-perf-kit/openjdk-probe
+          key: ${{ env.OPENJDK_BUILD_CACHE_PREFIX }}${{ github.sha }}-${{ inputs.openjdk_rev }}
+          fail-on-cache-miss: true
+      - name: Download canary build
+        if: ${{ inputs.canary }}
+        env:
+          GH_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
+        run: |
+          rm -rf ${{ env.CANARY_DIR }}
+          mkdir -p ${{ env.CANARY_DIR }}
+          gh release download ${{ env.CANARY_VERSION }} --repo mmtk/mmtk-openjdk --pattern "${{ env.CANARY_RELEASE_BINARY_NAME }}" --dir ${{ env.CANARY_DIR }}/images
+          cd ${{ env.CANARY_DIR }}/images
+          tar -xvzf ${{ env.CANARY_RELEASE_BINARY_NAME }}
+          mv ${{ env.CANARY_JDK_NAME }} jdk
+          rm ${{ env.CANARY_RELEASE_BINARY_NAME }}
+      - name: Put canary build in place
+        if: ${{ inputs.canary }}
+        run: cp -r ${{ env.CANARY_DIR }} ci-perf-kit/build/jdk-mmtk-canary
+      - id: branch
+        # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
+        run: echo "branch_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_OUTPUT
+      # run + push
+      - name: Performance Run (${{ inputs.plan_name }})
+        run: |
+          export RESULT_REPO=mmtk/ci-perf-result
+          export RESULT_REPO_BRANCH=${{ inputs.result_repo_branch }}
+          export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
+          # Uncomment for 1 invocation instead of 20 (faster, less accurate
+          # results) when testing workflow changes. Keep commented out in production.
+          # export OPENJDK_HISTORY_RUN_TEST_FAST=1
+          ./ci-perf-kit/scripts/openjdk-run-plan.sh ${{ inputs.plan_name }} ${{ inputs.config }} ${{ inputs.heap_modifier }} ${{ inputs.openjdk_rev }}
+      # render
+      - name: Regenerate report
+        run: |
+          export RESULT_REPO=mmtk/ci-perf-result
+          export RESULT_REPO_BRANCH=${{ inputs.result_repo_branch }}
+          export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
+          ./ci-perf-kit/scripts/openjdk-report.sh ./reports/${{ steps.branch.outputs.branch_name }} ${{ inputs.plan_name }}
+      - name: Deploy to Github Page
+        if: ${{ inputs.deploy }}
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
+          external_repository: mmtk/ci-perf-result
+          publish_dir: ./reports
+          publish_branch: gh-pages
+          keep_files: true

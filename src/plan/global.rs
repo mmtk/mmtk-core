@@ -54,26 +54,32 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::PageProtect => {
             crate::plan::pageprotect::mutator::create_pp_mutator(tls, mmtk)
         }
-        PlanSelector::MarkCompact => {
-            crate::plan::markcompact::mutator::create_markcompact_mutator(tls, mmtk)
+        PlanSelector::Lisp2 => {
+            crate::plan::markcompact::lisp2::mutator::create_lisp2_mutator(tls, mmtk)
         }
         PlanSelector::StickyImmix => {
             crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
         }
+        PlanSelector::LXR => crate::plan::lxr::mutator::create_lxr_mutator(tls, mmtk),
         PlanSelector::ConcurrentImmix => {
             crate::plan::concurrent::immix::mutator::create_concurrent_immix_mutator(tls, mmtk)
         }
-        PlanSelector::Compressor => {
-            crate::plan::compressor::mutator::create_compressor_mutator(tls, mmtk)
-        }
+        PlanSelector::OVC => crate::plan::markcompact::ovc::mutator::create_ovc_mutator(tls, mmtk),
     })
 }
 
+/// Create a plan and the spaces for the plan.
+///
+/// It is very important that in the constructor of each plan (including the constructor of each space),
+/// sft and side metadata is not available for access. If a plan or a space needs to initialize sft or side metadata
+/// in its constructor, it needs to postpone the initialization to [`Plan::initialize_sft`], [`Plan::initialize_side_metadata`],
+/// [`Space::initialize_sft`] or [`Space::initialize_side_metadata`].
+/// If a plan or a space tries to access sft or side metadata in its constructor, it may cause undefined behavior.
 pub fn create_plan<VM: VMBinding>(
     plan: PlanSelector,
     args: CreateGeneralPlanArgs<VM>,
 ) -> Box<dyn Plan<VM = VM>> {
-    let plan = match plan {
+    match plan {
         PlanSelector::NoGC => {
             Box::new(crate::plan::nogc::NoGC::new(args)) as Box<dyn Plan<VM = VM>>
         }
@@ -93,31 +99,21 @@ pub fn create_plan<VM: VMBinding>(
         PlanSelector::PageProtect => {
             Box::new(crate::plan::pageprotect::PageProtect::new(args)) as Box<dyn Plan<VM = VM>>
         }
-        PlanSelector::MarkCompact => {
-            Box::new(crate::plan::markcompact::MarkCompact::new(args)) as Box<dyn Plan<VM = VM>>
+        PlanSelector::Lisp2 => {
+            Box::new(crate::plan::markcompact::lisp2::Lisp2::new(args)) as Box<dyn Plan<VM = VM>>
         }
         PlanSelector::StickyImmix => {
             Box::new(crate::plan::sticky::immix::StickyImmix::new(args)) as Box<dyn Plan<VM = VM>>
         }
+        PlanSelector::LXR => crate::plan::lxr::LXR::new(args) as Box<dyn Plan<VM = VM>>,
         PlanSelector::ConcurrentImmix => {
             Box::new(crate::plan::concurrent::immix::ConcurrentImmix::new(args))
                 as Box<dyn Plan<VM = VM>>
         }
-        PlanSelector::Compressor => {
-            Box::new(crate::plan::compressor::Compressor::new(args)) as Box<dyn Plan<VM = VM>>
+        PlanSelector::OVC => {
+            Box::new(crate::plan::markcompact::ovc::OVC::new(args)) as Box<dyn Plan<VM = VM>>
         }
-    };
-
-    // We have created Plan in the heap, and we won't explicitly move it.
-    // Each space now has a fixed address for its lifetime. It is safe now to initialize SFT.
-    let sft_map: &mut dyn crate::policy::sft_map::SFTMap =
-        unsafe { crate::mmtk::SFT_MAP.get_mut() }.as_mut();
-    plan.for_each_space(&mut |s| {
-        sft_map.notify_space_creation(s.as_sft());
-        s.initialize_sft(sft_map);
-    });
-
-    plan
+    }
 }
 
 /// Create thread local GC worker.
@@ -180,6 +176,11 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         panic!("Common Plan not handled!")
     }
 
+    /// Get a mutable reference to the common plan. See [`Self::common`].
+    fn common_mut(&mut self) -> &mut CommonPlan<Self::VM> {
+        panic!("Common Plan not handled!")
+    }
+
     /// Return a reference to `GenerationalPlan` to allow
     /// access methods specific to generational plans if the plan is a generational plan.
     fn generational(
@@ -205,8 +206,21 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// This defines what space this plan will allocate objects into for different semantics.
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
 
-    /// Called when all mutators are paused. This is called before prepare.
-    fn notify_mutators_paused(&self, _scheduler: &GCWorkScheduler<Self::VM>) {}
+    /// Called once all mutators have been stopped.  This is called before `Prepare`, which is right
+    /// before root scanning starts, at the beginning of a GC pause.
+    ///
+    /// Plans that need to do per-pause setup (e.g. resetting mark tables, flushing mutator state)
+    /// can override this.
+    ///
+    /// A plan that overrides this function need to manage the invocation of
+    /// `GCTriggerPolicy::on_gc_start` at the proper timing for the plan.
+    fn on_pause_start(&self, mmtk: &'static MMTK<Self::VM>) {
+        assert!(
+            self.concurrent().is_none(),
+            "ConcurrentPlan must override on_pause_start"
+        );
+        mmtk.gc_trigger.policy.on_gc_start(mmtk);
+    }
 
     /// Prepare the plan before a GC. This is invoked in an initial step in the GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
@@ -221,10 +235,24 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
     fn release(&mut self, tls: VMWorkerThread);
 
-    /// Inform the plan about the end of a GC. It is guaranteed that there is no further work for this GC.
-    /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
-    // TODO: This is actually called at the end of a pause/STW, rather than the end of a GC. It should be renamed.
-    fn end_of_gc(&mut self, _tls: VMWorkerThread);
+    /// Called at the end of a GC pause.  It is guaranteed that there is no further work for this
+    /// pause.  This is invoked once per pause by one worker thread.  `tls` is the worker thread
+    /// that executes this method.
+    ///
+    /// Plans that need to do per-pause teardown (e.g. recording pause-end statistics) can override
+    /// this.
+    ///
+    /// A plan that overrides this function need to do whatever the default implementation does at
+    /// the proper timing for the plan, such as calling `CommonPlan::on_pause_end`, and selectively
+    /// call `GCTriggerPolicy::on_gc_end` if the pause is the end of a GC.
+    fn on_pause_end(&mut self, mmtk: &'static MMTK<Self::VM>, tls: VMWorkerThread) {
+        self.common_mut().on_pause_end(tls);
+        assert!(
+            self.concurrent().is_none(),
+            "ConcurrentPlan must override on_pause_end"
+        );
+        mmtk.gc_trigger.policy.on_gc_end(mmtk);
+    }
 
     /// Notify the plan that an emergency collection will happen. The plan should try to free as much memory as possible.
     /// The default implementation will force a full heap collection for generational plans.
@@ -332,6 +360,14 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         true
     }
 
+    /// Return the work bucket stage in which mutator (and VM) roots should be scanned for this
+    /// plan. By default, roots are scanned in the `Prepare` stage, but concurrent/incremental
+    /// plans may schedule root scanning into a different stage (e.g. alongside reference
+    /// counting increments).
+    fn root_scanning_stage(&self) -> WorkBucketStage {
+        WorkBucketStage::Prepare
+    }
+
     /// Return whether the current GC may move any object.  The VM binding can make use of this
     /// information and choose to or not to update some data structures that record the addresses
     /// of objects.
@@ -357,6 +393,25 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         self.for_each_space(&mut |space| {
             space.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         })
+    }
+
+    /// Call `space.initialize_sft` for all spaces in this plan, and notify the SFT map about the creation of each space.
+    /// This method should only be called after 1. side metadata is initialized (as some SFT maps may use side metadata), 2. the plan is created in the heap and won't be moved,
+    /// and 3. the side metadata sanity is initialized (otherwise we may try access side metadata and trigger sanity check before side metadata sanity is initialized)
+    fn initialize_sft(&self) {
+        let sft_map: &mut dyn crate::policy::sft_map::SFTMap =
+            unsafe { crate::mmtk::SFT_MAP.get_mut() }.as_mut();
+        self.for_each_space(&mut |s| {
+            sft_map.notify_space_creation(s.as_sft());
+            s.initialize_sft(sft_map);
+        });
+    }
+
+    /// Call `space.initialize_side_metadata` for all spaces in this plan.
+    /// This is called after the plan is created in the heap and won't be moved, and after side metadata is initialized.
+    /// If a plan needs to access side metadata during space construction, it can override this method for its own initialization.
+    fn initialize_side_metadata(&self) {
+        self.for_each_space(&mut |s| s.initialize_side_metadata());
     }
 }
 
@@ -648,8 +703,8 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.vm_space.set_side_log_bits();
     }
 
-    pub fn end_of_gc(&mut self, _tls: VMWorkerThread) {
-        // Do nothing here. None of the spaces needs end_of_gc.
+    pub fn on_pause_end(&mut self, _tls: VMWorkerThread) {
+        // Do nothing here. None of the spaces needs on_pause_end.
     }
 
     pub(crate) fn collection_required<P: Plan>(&self, plan: &P, space_full: bool) -> bool {
@@ -786,9 +841,9 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.set_side_log_bits();
     }
 
-    pub fn end_of_gc(&mut self, tls: VMWorkerThread) {
+    pub fn on_pause_end(&mut self, tls: VMWorkerThread) {
         self.end_of_gc_nonmoving_space();
-        self.base.end_of_gc(tls);
+        self.base.on_pause_end(tls);
     }
 
     pub fn get_immortal(&self) -> &ImmortalSpace<VM> {
@@ -821,7 +876,19 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
-    fn prepare_nonmoving_space(&mut self, _full_heap: bool) {
+    #[allow(clippy::needless_return)]
+    pub(crate) fn prepare_nonmoving_space(&mut self, _full_heap: bool) {
+        // FIXME: We need to handle nonmoving space properly.
+        // Nonmoving space is a bit special for LXR, as it could be a second ImmixSpace (as opposed to the default ImmixSpace).
+        // It is arguable whether we should use an LXR ImmixSpace here, or use a normal Immix space.
+        // If we use an LXR ImmixSpace, we don't have a test case right now to know its correctness.
+        // If we use a normal ImmixSpace, our side metadata sanity does not allow this right, as both LXR ImmixSpace and normal
+        // ImmixSpace are ImmixSpace, and our sanity expects them to use a same set of side metadata.
+        // This might be another reason why LXR ImmixSpace should be a separate policy.
+        if *self.base.options.plan == PlanSelector::LXR {
+            return;
+        }
+
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {
                 self.nonmoving.prepare();
@@ -833,7 +900,14 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
-    fn release_nonmoving_space(&mut self, _full_heap: bool) {
+    #[allow(clippy::needless_return)]
+    pub(crate) fn release_nonmoving_space(&mut self, _full_heap: bool) {
+        // FIXME: We need to handle nonmoving space properly.
+        // See comments in prepare_non_moving_space
+        if *self.base.options.plan == PlanSelector::LXR {
+            return;
+        }
+
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {
                 self.nonmoving.release();
@@ -845,7 +919,13 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
-    fn end_of_gc_nonmoving_space(&mut self) {
+    #[allow(clippy::needless_return)]
+    pub(crate) fn end_of_gc_nonmoving_space(&mut self) {
+        // FIXME: We need to handle nonmoving space properly.
+        // See comments in prepare_non_moving_space
+        if *self.base.options.plan == PlanSelector::LXR {
+            return;
+        }
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {
                 // Nothing we need to do for immortal space.
@@ -892,21 +972,18 @@ pub trait HasSpaces {
     fn for_each_space_mut(&mut self, func: &mut dyn FnMut(&mut dyn Space<Self::VM>));
 }
 
-/// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.
+/// A plan that uses [`PlanTrace`] needs to provide an implementation for this trait.
 /// Generally a plan does not need to manually implement this trait. Instead, we provide
 /// a procedural macro that helps generate an implementation. Please check `macros/trace_object`.
 ///
 /// A plan could also manually implement this trait. For the sake of performance, the implementation
 /// of this trait should mark methods as `[inline(always)]`.
+///
+/// [`PlanTrace`]: crate::plan::tracing::PlanTrace
 pub trait PlanTraceObject<VM: VMBinding> {
-    /// Trace objects in the plan. Generally one needs to figure out
-    /// which space an object resides in, and invokes the corresponding policy
-    /// trace object method.
+    /// Trace objects in the plan.
     ///
-    /// Arguments:
-    /// * `trace`: the current transitive closure
-    /// * `object`: the object to trace.
-    /// * `worker`: the GC worker that is tracing this object.
+    /// See [`crate::plan::tracing::Trace::trace_object`].
     fn trace_object<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
         queue: &mut Q,
@@ -914,15 +991,14 @@ pub trait PlanTraceObject<VM: VMBinding> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference;
 
-    /// Post-scan objects in the plan. Each object is scanned by `VM::VMScanning::scan_object()`, and this function
-    /// will be called after the `VM::VMScanning::scan_object()` as a hook to invoke possible policy post scan method.
-    /// If a plan does not have any policy that needs post scan, this method can be implemented as empty.
-    /// If a plan has a policy that has some policy specific behaviors for scanning (e.g. mark lines in Immix),
-    /// this method should also invoke those policy specific methods for objects in that space.
+    /// Post-scan objects in the plan.
+    ///
+    /// See [`crate::plan::tracing::Trace::post_scan_object`].
     fn post_scan_object(&self, object: ObjectReference);
 
-    /// Whether objects in this plan may move. If any of the spaces used by the plan may move objects, this should
-    /// return true.
+    /// Whether objects in this plan may move.
+    ///
+    /// See [`crate::plan::tracing::Trace::post_scan_object`].
     fn may_move_objects<const KIND: TraceKind>() -> bool;
 }
 
@@ -946,12 +1022,13 @@ pub enum AllocationSemantics {
     /// This semantic may get removed and MMTk will transparently allocate into large object space for large objects.
     Los = 2,
     /// Code objects have execution permission.
-    /// Note that this is a place holder for now. Currently all the memory MMTk allocates has execution permission.
+    /// Note that we do not currently support this semantic.
     Code = 3,
     /// Read-only objects cannot be mutated once it is initialized.
-    /// Note that this is a place holder for now. It does not provide read only semantic.
+    /// Note that we do not currently support this semantic.
     ReadOnly = 4,
     /// Los + Code.
+    /// Note that we do not currently support this semantic.
     LargeCode = 5,
     /// Non moving objects will not be moved by GC.
     NonMoving = 6,

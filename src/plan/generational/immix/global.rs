@@ -27,6 +27,7 @@ use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 use crate::ObjectQueue;
+use crate::MMTK;
 
 use enum_map::EnumMap;
 use std::sync::atomic::AtomicBool;
@@ -101,11 +102,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         self.gen.collection_required(self, space_full, space)
     }
 
-    // GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }> and GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>
-    // are different types. However, it seems clippy does not recognize the constant type parameter and thinks we have identical blocks
-    // in different if branches.
-    #[allow(clippy::if_same_then_else)]
-    #[allow(clippy::branches_sharing_code)]
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<Self::VM>) {
         let is_full_heap = self.requires_full_heap_collection();
         probe!(mmtk, gen_full_heap, is_full_heap);
@@ -161,12 +157,14 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             .store(full_heap, Ordering::Relaxed);
     }
 
-    fn end_of_gc(&mut self, tls: VMWorkerThread) {
+    fn on_pause_end(&mut self, mmtk: &'static MMTK<VM>, tls: VMWorkerThread) {
         let next_gc_full_heap = CommonGenPlan::should_next_gc_be_full_heap(self);
-        self.gen.end_of_gc(tls, next_gc_full_heap);
+        self.gen.on_pause_end(tls, next_gc_full_heap);
 
         let did_defrag = self.immix_space.end_of_gc();
         self.last_gc_was_defrag.store(did_defrag, Ordering::Relaxed);
+
+        mmtk.gc_trigger.policy.on_gc_end(mmtk);
     }
 
     fn current_gc_may_move_object(&self) -> bool {
@@ -275,16 +273,12 @@ impl<VM: VMBinding> GenImmix<VM> {
             },
         );
 
-        let genimmix = GenImmix {
+        GenImmix {
             gen: CommonGenPlan::new(plan_args),
             immix_space,
             last_gc_was_defrag: AtomicBool::new(false),
             last_gc_was_full_heap: AtomicBool::new(false),
-        };
-
-        genimmix.verify_side_metadata_sanity();
-
-        genimmix
+        }
     }
 
     fn requires_full_heap_collection(&self) -> bool {

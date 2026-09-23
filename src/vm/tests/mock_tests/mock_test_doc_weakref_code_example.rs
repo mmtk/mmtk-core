@@ -65,10 +65,10 @@ impl Scanning<MyVM> for VMScanning {
 
     // Methods after this are placeholders.  We only ensure they compile.
 
-    fn scan_object<SV: crate::vm::SlotVisitor<<MockVM as VMBinding>::VMSlot>>(
+    fn scan_object(
         _tls: crate::util::VMWorkerThread,
         _object: ObjectReference,
-        _slot_visitor: &mut SV,
+        _slot_visitor: &mut impl crate::vm::SlotVisitor<<MockVM as VMBinding>::VMSlot>,
     ) {
         unimplemented!()
     }

@@ -7,4 +7,6 @@ pub trait ConcurrentPlan: Plan {
     fn concurrent_work_in_progress(&self) -> bool;
     /// Return the current pause kind.  `None` if not in a pause.
     fn current_pause(&self) -> Option<Pause>;
+    /// Called when concurrent work is interrupted.
+    fn on_concurrent_work_interrupted(&self);
 }

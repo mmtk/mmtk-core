@@ -62,7 +62,7 @@ extern bool mmtk_is_live_object(void* object);
 extern bool mmtk_will_never_move(void* object);
 
 // Return if the address is an object in MMTk heap.
-// Only available when the feature is_mmtk_object is enabled.
+// Only available when the feature vo_bit is enabled.
 extern bool mmtk_is_mmtk_object(void* addr);
 
 // Return if the object is in any MMTk space.
@@ -71,8 +71,8 @@ extern bool mmtk_is_in_mmtk_spaces(void* object);
 // Return if the address pointed to by `addr` is in memory that is mapped by MMTk
 extern bool mmtk_is_mapped_address(void* addr);
 
-// Request MMTk to trigger a GC. Note that this may not actually trigger a GC
-extern void mmtk_handle_user_collection_request(void* tls);
+// Request MMTk to trigger a GC. Note that this may not actually trigger a GC unless `force` is true
+extern void mmtk_handle_user_collection_request(void* tls, bool force);
 
 // Add a reference to the list of weak references
 extern void mmtk_add_weak_candidate(void* ref);

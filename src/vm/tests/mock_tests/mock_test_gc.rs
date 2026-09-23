@@ -18,7 +18,11 @@ pub fn simple_gc() {
             assert!(!addr.is_zero());
             info!("Allocated default at: {:#x}", addr);
 
-            memory_manager::handle_user_collection_request(fixture.mmtk(), fixture.mutator_tls());
+            memory_manager::handle_user_collection_request(
+                fixture.mmtk(),
+                fixture.mutator_tls(),
+                false,
+            );
         },
         no_cleanup,
     )

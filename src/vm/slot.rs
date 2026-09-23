@@ -11,45 +11,101 @@ use atomic::Atomic;
 use crate::util::constants::{BYTES_IN_ADDRESS, LOG_BYTES_IN_ADDRESS};
 use crate::util::{Address, ObjectReference};
 
-/// A `Slot` represents a slot in an object (a.k.a. a field), on the stack (i.e. a local variable)
-/// or any other places (such as global variables).  A slot may hold an object reference. We can
-/// load the object reference from it, and we can update the object reference in it after the GC
-/// moves the object.
+/// `Slot` is an abstraction for MMTk to load and update object references in memory.
 ///
-/// For some VMs, a slot may sometimes not hold an object reference.  For example, it can hold a
-/// special `NULL` pointer which does not point to any object, or it can hold a tagged
-/// non-reference value, such as small integers and special values such as `true`, `false`, `null`
-/// (a.k.a. "none", "nil", etc. for other VMs), `undefined`, etc.
+/// # Slots and the `Slot` trait
 ///
-/// This intends to abstract out the differences of reference field representation among different
-/// VMs.  If the VM represent a reference field as a word that holds the pointer to the object, it
-/// can use the default `SimpleSlot` we provide.  In some cases, the VM need to implement its own
-/// `Slot` instances.
+/// In a VM, a slot can contain an object reference or a non-reference value.  It can be in an
+/// object (a.k.a. a field), on the stack (i.e. a local variable) or in any other places (such as
+/// global variables).  It may have different representations in different VMs.  Some VMs put a
+/// direct pointer to an object into a slot, while others may use compressed pointers, tagged
+/// pointers, offsetted pointers, etc.  Some VMs (such as JVM) have null references, and others
+/// (such as CRuby and JavaScript engines) can also use tagged bits to represent non-reference
+/// values such as small integers, `true`, `false`, `null` (a.k.a. "none", "nil", etc.),
+/// `undefined`, etc.
+///
+/// In MMTk, the `Slot` trait is intended to abstract out such different representations of
+/// reference fields (compressed, tagged, offsetted, etc.) among different VMs.  From MMTk's point
+/// of view, **MMTk only cares about the object reference held inside the slot, but not
+/// non-reference values**, such as `null`, `true`, etc.  When the slot is holding an object
+/// reference, we can load the object reference from it, and we can update the object reference in
+/// it after the GC moves the object.
+///
+/// # The `Slot` trait has pointer semantics
+///
+/// A `Slot` value *points to* a slot, and is not the slot itself.  In fact, the simplest
+/// implementation of the `Slot` trait ([`SimpleSlot`], see below) can simply contain the address of
+/// the slot.
+///
+/// A `Slot` can be [copied](std::marker::Copy), and the copied `Slot` instance points to the same
+/// slot.
+///
+/// # How to implement `Slot`?
+///
+/// If a reference field of a VM is word-sized and holds the raw pointer to an object, and uses the
+/// 0 word as the null pointer, it can use the default [`SimpleSlot`] we provide.  It simply
+/// contains a pointer to a memory location that holds an address.
+///
+/// ```rust
+/// pub struct SimpleSlot {
+///     slot_addr: *mut Atomic<Address>,
+/// }
+/// ```
+///
+/// In other cases, the VM need to implement its own `Slot` instances.
 ///
 /// For example:
-/// -   The VM uses compressed pointer (Compressed OOP in OpenJDK's terminology), where the heap
-///     size is limited, and a 64-bit pointer is stored in a 32-bit slot.
-/// -   The VM uses tagged pointer, where some bits of a word are used as metadata while the rest
-///     are used as pointer.
-/// -   A field holds a pointer to the middle of an object (an object field, or an array element,
-///     or some arbitrary offset) for some reasons.
+/// -   The VM uses **compressed pointers** (Compressed OOPs in OpenJDK's terminology), where the
+///     heap size is limited, and a 64-bit pointer is stored in a 32-bit slot.
+/// -   The VM uses **tagged pointers**, where some bits of a word are used as metadata while the
+///     rest are used as pointer.
+/// -   The VM uses **offsetted pointers**, i.e. the value of the field is an address at an offset
+///     from the [`ObjectReference`] of the target object.  Such offsetted pointers are usually used
+///     to represent **interior pointers**, i.e. pointers to an object field, an array element, etc.
 ///
-/// When loading, `Slot::load` shall decode its internal representation to a "regular"
-/// `ObjectReference`.  The implementation can do this with any appropriate operations, usually
-/// shifting and masking bits or subtracting offset from the address.  By doing this conversion,
-/// MMTk can implement GC algorithms in a VM-neutral way, knowing only `ObjectReference`.
+/// If needed, the implementation of `Slot` can contain not only the pointer, but also additional
+/// information. The `OffsetSlot` example below also contains an offset which can be used when
+/// decoding the pointer. See `src/vm/tests/mock_tests/mock_test_slots.rs` for more concrete
+/// examples, such as `CompressedOopSlot` and `TaggedSlot`.
+///
+/// ```rust
+/// pub struct OffsetSlot {
+///     slot_addr: *mut Atomic<Address>,
+///     offset: usize,
+/// }
+/// ```
+///
+/// When loading, `Slot::load` shall load the value from the slot and decode the value into a
+/// regular `ObjectReference` (note that MMTk has specific requirements for `ObjectReference`, such
+/// as being aligned, pointing inside an object, and cannot be null.  Please read the doc comments
+/// of [`ObjectReference`] for details).  The decoding is VM-specific, but usually involves removing
+/// tag bits and/or adding an offset to the word, and (in the case of compressed pointers) extending
+/// the word size.  By doing this conversion, MMTk can implement GC algorithms in a VM-neutral way,
+/// knowing only `ObjectReference`.
 ///
 /// When GC moves object, `Slot::store` shall convert the updated `ObjectReference` back to the
 /// slot-specific representation.  Compressed pointers remain compressed; tagged pointers preserve
 /// their tag bits; and offsetted pointers keep their offsets.
 ///
-/// The methods of this trait are called on hot paths.  Please ensure they have high performance.
-/// Use inlining when appropriate.
+/// # Performance notes
 ///
-/// Note: this trait only concerns the representation (i.e. the shape) of the slot, not its
-/// semantics, such as whether it holds strong or weak references.  If a VM holds a weak reference
-/// in a word as a pointer, it can also use `SimpleSlot` for weak reference fields.
-pub trait Slot: Copy + Send + Debug + PartialEq + Eq + Hash {
+/// The methods of this trait are called on hot paths.  Please ensure they have high performance.
+///
+/// The size of the data structure of the `Slot` implementation may affect the performance as well.
+/// During GC, MMTk enqueues `Slot` instances, and its size affects the overhead of copying.  If
+/// your `Slot` implementation has multiple fields or uses `enum` for multiple kinds of slots, it
+/// may have extra cost when copying or decoding.  You should measure it.  If the cost is too much,
+/// you can implement `Slot` with a tagged word.  For example, the [mmtk-openjdk] binding uses the
+/// low order bit to encode whether the slot is compressed or not.
+///
+/// [mmtk-openjdk]: https://github.com/mmtk/mmtk-openjdk/blob/master/mmtk/src/slots.rs
+///
+/// # About weak references
+///
+/// This trait only concerns the representation (i.e. the shape) of the slot, not its semantics,
+/// such as whether it holds strong or weak references.  Therefore, one `Slot` implementation can be
+/// used for both slots that hold strong references and slots that hold weak references.
+pub trait Slot: Copy + Send + Sync + Debug + PartialEq + Eq + Hash {
     /// Load object reference from the slot.
     ///
     /// If the slot is not holding an object reference (For example, if it is holding NULL or a
@@ -61,6 +117,18 @@ pub trait Slot: Copy + Send + Debug + PartialEq + Eq + Hash {
     fn load(&self) -> Option<ObjectReference>;
 
     /// Store the object reference `object` into the slot.
+    ///
+    /// This method is used during a GC to update a slot so that it holds the updated
+    /// `ObjectReference` which points to the new address of the target object during a moving GC.
+    /// MMTk core may conservatively call this method even if the target object is not moved.
+    ///
+    /// Note that if [`crate::plan::PlanConstraints::may_trace_duplicate_edges`] is true, multiple
+    /// GC worker threads may visit the same slot during tracing, and update it concurrently.  In
+    /// this case, the implementation of [`Slot::store`] must be benign with respect to such a race,
+    /// but doesn't need to be an atomic read-modify-write operation.  Because the new address of a
+    /// moved object is unique during a GC, if such a race occurs, all invocations of `store` will
+    /// receive the same `object` argument.  Storing the same value to the same address is usually
+    /// idempotent.
     ///
     /// If the slot holds an object reference with tag bits, this method must preserve the tag
     /// bits while updating the object reference so that it points to the forwarded object given by
@@ -85,6 +153,14 @@ pub trait Slot: Copy + Send + Debug + PartialEq + Eq + Hash {
     /// Prefetch the slot so that a subsequent `store` will be faster.
     fn prefetch_store(&self) {
         // no-op by default
+    }
+
+    /// Return the raw memory address of this slot. This is used, for example, by LXR's field
+    /// barrier and remembered-set code to access per-field side metadata (such as the field unlog
+    /// bit) that is indexed by the slot's address. The default implementation is unimplemented;
+    /// slot types that are used with such features must override this method.
+    fn to_address(&self) -> Address {
+        unimplemented!()
     }
 }
 
@@ -118,6 +194,7 @@ impl SimpleSlot {
 }
 
 unsafe impl Send for SimpleSlot {}
+unsafe impl Sync for SimpleSlot {}
 
 impl Slot for SimpleSlot {
     fn load(&self) -> Option<ObjectReference> {
@@ -148,6 +225,10 @@ impl Slot for Address {
 
     fn store(&self, object: ObjectReference) {
         unsafe { Address::store(*self, object) }
+    }
+
+    fn to_address(&self) -> Address {
+        *self
     }
 }
 

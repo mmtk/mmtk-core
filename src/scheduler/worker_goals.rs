@@ -31,6 +31,8 @@ pub(crate) struct WorkerGoals {
 pub(crate) enum WorkerGoal {
     /// Do a garbage collection.
     Gc,
+    /// Stop all GC threads permanently.
+    Shutdown,
     /// Stop all GC threads so that the VM can call `fork()`.
     StopForFork,
 }

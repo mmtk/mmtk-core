@@ -16,8 +16,6 @@
 mod barriers;
 pub use barriers::BarrierSelector;
 
-pub(crate) mod gc_requester;
-
 mod gc_work;
 
 mod global;
@@ -38,17 +36,18 @@ mod plan_constraints;
 pub use plan_constraints::PlanConstraints;
 pub(crate) use plan_constraints::DEFAULT_PLAN_CONSTRAINTS;
 
-mod tracing;
-pub use tracing::{ObjectQueue, ObjectsClosure, VectorObjectQueue, VectorQueue};
+pub(crate) mod tracing;
+pub use tracing::{ObjectQueue, VectorObjectQueue, VectorQueue};
 
 /// Generational plans (with a copying nursery)
 mod generational;
 /// Sticky plans (using sticky marks for generational behaviors without a copying nursery)
 mod sticky;
 
-mod compressor;
 mod concurrent;
+pub use concurrent::{ConcurrentPlan, Pause};
 mod immix;
+mod lxr;
 mod markcompact;
 mod marksweep;
 mod nogc;
@@ -64,7 +63,7 @@ pub(crate) use generational::global::GenerationalPlan;
 pub use generational::copying::GENCOPY_CONSTRAINTS;
 pub use generational::immix::GENIMMIX_CONSTRAINTS;
 pub use immix::IMMIX_CONSTRAINTS;
-pub use markcompact::MARKCOMPACT_CONSTRAINTS;
+pub use markcompact::LISP2_CONSTRAINTS;
 pub use marksweep::MS_CONSTRAINTS;
 pub use nogc::NOGC_CONSTRAINTS;
 pub use pageprotect::PP_CONSTRAINTS;

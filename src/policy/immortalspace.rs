@@ -9,7 +9,7 @@ use crate::util::metadata::mark_bit::MarkState;
 use crate::util::object_enum::{self, ObjectEnumerator};
 use crate::util::{metadata, ObjectReference};
 
-use crate::plan::{ObjectQueue, VectorObjectQueue};
+use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 
 use crate::policy::sft::GCWorkerMutRef;
 use crate::vm::{ObjectModel, VMBinding};
@@ -53,20 +53,26 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_object_metadata(&self, object: ObjectReference) {
+    fn initialize_object_metadata(&self, object: ObjectReference, bytes: usize) {
         self.mark_state
             .on_object_metadata_initialization::<VM>(object);
         if self.common.unlog_allocated_object {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+            if self.common.needs_field_log_bit {
+                VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
+                    .as_spec()
+                    .extract_side_spec()
+                    .bset_metadata(object.to_object_start::<VM>(), bytes);
+            }
         }
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(object);
     }
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
         crate::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
     }
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     fn find_object_from_internal_pointer(
         &self,
         ptr: Address,
@@ -79,11 +85,15 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     }
     fn sft_trace_object(
         &self,
-        queue: &mut VectorObjectQueue,
+        queue: &mut OptionObjectQueue,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
         self.trace_object(queue, object)
+    }
+    fn debug_print_object_info(&self, object: ObjectReference) {
+        println!("marked = {}", self.mark_state.is_marked::<VM>(object));
+        self.common.debug_print_object_global_info(object);
     }
 }
 

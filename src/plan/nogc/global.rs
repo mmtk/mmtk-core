@@ -15,6 +15,7 @@ use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
+use crate::MMTK;
 use enum_map::EnumMap;
 use mmtk_macros::HasSpaces;
 
@@ -66,7 +67,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         unreachable!()
     }
 
-    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
+    fn on_pause_end(&mut self, _mmtk: &'static MMTK<VM>, _tls: VMWorkerThread) {
         unreachable!()
     }
 
@@ -98,7 +99,7 @@ impl<VM: VMBinding> NoGC<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
-        let res = NoGC {
+        NoGC {
             nogc_space: NoGCImmortalSpace::new(plan_args.get_normal_space_args(
                 "nogc_space",
                 cfg!(not(feature = "nogc_no_zeroing")),
@@ -118,10 +119,6 @@ impl<VM: VMBinding> NoGC<VM> {
                 VMRequest::discontiguous(),
             )),
             base: BasePlan::new(plan_args),
-        };
-
-        res.verify_side_metadata_sanity();
-
-        res
+        }
     }
 }

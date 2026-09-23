@@ -30,6 +30,203 @@ Notes for the mmtk-core developers:
 
 <!-- Insert new versions here -->
 
+## 0.34.0
+
+### Rename "Compressor" to "OVC", and "MarkCompact" to "Lisp2"
+
+```admonish tldr
+The `Compressor` plan is renamed to `OVC`, and the `MarkCompact` plan is renamed to `Lisp2`.
+Both plans now live under the shared `plan::markcompact` module, as
+`plan::markcompact::ovc::OVC` and `plan::markcompact::lisp2::Lisp2` respectively. VM bindings that
+select a plan by name (e.g. via `MMTK_PLAN`), or refer to the renamed types/modules directly, need to
+be updated.
+```
+
+API changes:
+
+*   enum `util::options::PlanSelector`
+    -   `Compressor` -> `OVC`
+    -   `MarkCompact` -> `Lisp2`
+        +   This also changes the string accepted for the `plan` option (e.g. via the `MMTK_PLAN`
+            environment variable used by some bindings): use `"OVC"`/`"Lisp2"` instead of
+            `"Compressor"`/`"MarkCompact"`.
+*   Cargo feature `compressor_single_space` -> `ovc_single_space`
+
+Not API change, but worth noting:
+
+*   Any string that names these plans (e.g. the `MMTK_PLAN` environment variable used by some
+    bindings, or benchmark/CI configuration keyed by plan name) must be updated from
+    `"MarkCompact"`/`"Compressor"` to `"Lisp2"`/`"OVC"`.
+
+## 0.33.0
+
+### `GCTriggerPolicy::on_gc_start/on_gc_end` repurposed for GC cycles
+
+```admonish tldr
+The old `on_gc_start` and `on_gc_end` (called once per STW pause) are renamed to `on_pause_start`
+and `on_pause_end`. `on_pause_start` is now also called after all mutators have stopped, instead of
+at the very start of GC scheduling before mutators are asked to stop. The names `on_gc_start` and
+`on_gc_end` are reused for a new pair of hooks with different semantics: they are called once per
+*GC cycle* rather than once per pause. For stop-the-world GCs, no changes are needed for the delegated
+GC trigger; however, for concurrent GCs, the GC trigger needs to differentiate pauses and GC cycles,
+and use the correct hooks correspondingly.
+```
+
+API changes:
+
+-   trait `util::heap::GCTriggerPolicy`
+    +   `on_gc_start`: Renamed to `on_pause_start`.
+        *   Previously called once for every STW pause, when GC was scheduled and before mutators
+            were told to stop.
+        *   Now called after all mutators have stopped (i.e. once the world is actually stopped for
+            the pause). Implementations that only use this hook to record a timestamp or the
+            reserved-page count for computing GC time/space overhead should still work correctly,
+            but the recorded time will now reflect the start of the actual pause rather than the
+            start of GC scheduling (which also includes time spent waiting for mutators to reach a
+            safepoint).
+    +   `on_gc_end`: Renamed to `on_pause_end`.
+        *   No change to timing, only the name.
+    +   `on_gc_start`/`on_gc_end`: New methods that reuse the old names, but with different meaning.
+        *   A GC cycle consists of one or more STW pauses plus any concurrent work in between them.
+            These new hooks are called once per GC cycle, rather than once per pause.
+        *   For a stop-the-world plan, a GC cycle is exactly one pause, so `on_gc_start`/`on_gc_end`
+            fire at the same time as `on_pause_start`/`on_pause_end`.
+        *   For a concurrent plan whose cycle spans multiple pauses (e.g. an initial mark pause and
+            a final mark pause with concurrent marking in between), `on_gc_start` is only called for
+            the first pause of the cycle, and `on_gc_end` only for the last.
+
+This only affects VM bindings that provide a custom `GCTriggerPolicy` (via
+`Collection::create_gc_trigger`).
+
+### Collection enabling/disabling is now managed by MMTk instead of the VM binding
+
+```admonish tldr
+`Collection::is_collection_enabled()` is removed.  MMTk now tracks whether collection is enabled
+itself, via the new, nestable `disable_collection()`/`enable_collection()` API on `MMTK` (and
+`memory_manager`).
+```
+
+API changes:
+
+-   trait `vm::Collection`
+    +   `is_collection_enabled()`: Removed.
+        *   Previously, the VM binding implemented this method to tell MMTk whether GC is
+            currently allowed. MMTk now manages this state itself, so the binding no longer needs
+            to (and no longer can) answer this question.
+        *   If the binding previously disabled collection at certain times (e.g. before some
+            initialization completed), it should instead call the new `memory_manager::disable_collection()`
+            at the point where it used to start returning `false`, and `memory_manager::enable_collection()`
+            at the point where it used to start returning `true` again.
+-   module `memory_manager`
+    +   `disable_collection()`: now returns `Result<bool, GcStatus>`. `Ok(true)`
+        means this call actually switched collection from enabled to disabled; `Ok(false)` means
+        it only increased the nesting depth of an already-disabled status. `Err(status)` means
+        collection could not be disabled right now, with `status` naming why (e.g. a GC is in
+        progress or has been requested); the VM binding should check safepoints, expect a pause,
+        or wait for the concurrent GC to finish, then call this function again.
+    *   `enable_collection()`: return true if the GC is enabled after the call. Otherwise, the function
+        returns false.
+    +   `is_collection_enabled()`: New. Returns whether collection is currently enabled.
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/pull/1457>
+
+### `Slot` is required to implement `Sync`
+
+```admonish tldr
+`vm::slot::Slot` now needs to implement `Sync`.
+```
+
+API changes:
+-   module `vm::slot`
+    +   `Slot`: Now required to implement `Sync`
+        *   The provided `SimpleSlot` in mmtk-core already implements `Sync`.  If the VM binding
+            uses it, no change is needed.
+        *   If the VM binding's `Slot` implementation does not include raw pointers (`*const T` and
+            `*mut T`), chance is high that it automatically implements `Sync`.  If this is the case,
+            no change is needed.
+        *   Otherwise, the VM binding should declare `unsafe impl Sync for ...` for the slot type.
+
+### Thread IDs require `Debug` instead of `Display`
+
+```admonish tldr
+`mmtk::util::os::OS::ThreadIDType` now needs to implement `Debug` instead of `Display`.
+```
+
+API changes:
+
+-   module `util::os`
+    +   `OS::ThreadIDType`: This associated type now requires `Debug` instead of `Display`.
+        *   This allows platforms where the native thread ID type does not implement `Display`,
+            such as `libc::pthread_t` on musl.
+        *   Bindings that provide an OS implementation should derive or implement `Debug` for
+            their thread ID type.
+
+### The `<'w>` lifetime in `ObjectTracerContext`
+
+```admonish tldr
+Your existing source code probably still works.
+```
+
+API changes:
+
+-   module `vm::scanning`
+    +   `ObjectTracerContext::TracerType`: Now has a `<'w>` lifetime parameter
+    +   `ObjectTracerContext::with_tracer`: Now has a `<'w>` lifetime parameter
+        *   `'w` is the lifetime of the `worker` argument, and is passed to the
+            `Self::TracerType<'w>` argument of the `func` callback.  It basically means the
+            `ObjectTracer` provided to the `func` callback borrows the `worker` during the callback.
+            This has always been true, but we now made it explicit through the lifetime parameter.
+
+### Type argument changes in `Finalizable::keep_alive` module
+
+```admonish tldr
+`Finalizable::keep_alive` now has the `<OT: ObjectTracer>` type parameter.
+```
+
+API changes:
+
+-   module `vm::reference_glue`
+    +   `Finalizable::keep_alive`: Now has the `<OT: ObjectTracer>` type parameter instead of
+        `<E: ProcessEdgesWork>`.  The `trace` parameter is now `&mut OT`.  It still has the
+        `trace_object` method like the old `ProcessEdgesWork` trait, and is supposed to be used the
+        same way.
+
+### The Cargo feature "is_mmtk_object" is removed
+
+```admonish tldr
+The "is_mmtk_object" cargo feature is removed.  Anything previously enabled by the "is_mmtk_object"
+feature are now enabled by the "vo_bit" feature.
+```
+
+API changes: None.  If a VM binding uses the "is_mmtk_object" feature, it should now use the
+"vo_bit" feature if not already using, and existing code should still compile.
+
+### Side metadata base addresses are no longer constants
+
+```admonish tldr
+Side metadata addresses are now chosen at runtime.  The old address constants are removed and
+replaced with accessor functions that must only be called after MMTk is initialized.
+```
+
+API changes:
+
+-   module `util::metadata::side_metadata`
+    +   `GLOBAL_SIDE_METADATA_BASE_ADDRESS`: Removed.
+        *   Use `global_side_metadata_base_address()` instead.
+    +   `GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS`: Removed.
+        *   Use `global_side_metadata_vm_base_address()` instead.
+    +   `VO_BIT_SIDE_METADATA_ADDR`: Removed.
+        *   Use `vo_bit_side_metadata_addr()` instead.
+-   module `util::metadata::vo_bit`
+    +   `VO_BIT_SIDE_METADATA_ADDR`: Removed.
+        *   Use `vo_bit_side_metadata_addr()` instead.
+
+These addresses are no longer constants because MMTk now chooses the side metadata base address at
+boot time. Bindings should fetch them from the accessor functions after MMTk initialization has
+completed. Bindings can assume the addresses will not change once they are initialized.
+
 ## 0.32.0
 
 ### Allocation options changed

@@ -1,10 +1,10 @@
 // Some mock methods may get really complex
 #![allow(clippy::type_complexity)]
 
+use crate::plan::tracing::gc_work::root::DefaultRootsWorkFactory;
+use crate::plan::tracing::gc_work::DefaultObjectTracerContext;
+use crate::plan::tracing::UnsupportedTrace;
 use crate::plan::ObjectQueue;
-use crate::scheduler::gc_work::ProcessEdgesWorkRootsWorkFactory;
-use crate::scheduler::gc_work::ProcessEdgesWorkTracerContext;
-use crate::scheduler::gc_work::SFTProcessEdges;
 use crate::scheduler::*;
 use crate::util::alloc::AllocationError;
 use crate::util::copy::*;
@@ -54,14 +54,20 @@ macro_rules! lifetime {
 /// Call `MockMethod`.
 macro_rules! mock {
     ($fn: ident($($arg:expr),*)) => {
-        write_mockvm(|mock| mock.$fn.call(($($arg),*)))
+        {
+            let arg_tuple = ($($arg),*);
+            write_mockvm(|mock| mock.$fn.call(arg_tuple))
+        }
     };
 }
 /// Call `MockAny`.
 #[allow(unused_macros)] // This macro is unused for now.
 macro_rules! mock_any {
     ($fn: ident($($arg:expr),*)) => {
-        *write_mockvm(|mock| mock.$fn.call_any(Box::new(($($arg),*)))).downcast().unwrap()
+        {
+            let arg_tuple = ($($arg),*);
+            *write_mockvm(|mock| mock.$fn.call_any(Box::new(arg_tuple))).downcast().unwrap()
+        }
     };
 }
 
@@ -196,7 +202,7 @@ pub fn no_cleanup() {}
 /// has a signature of `fn(&mut GCWorker<VM>, impl ObjectTracerContext<VM>`.
 /// `ObjectTracerContext` is not object safe. So we just use `Box<MockAny>`
 /// in `MockVM`, and initiate it with a concrete type of `ObjectTracerContext`, such as
-/// `Box::new((MockMethod::<(&'static mut GCWorker<Self>,ProcessEdgesWorkTracerContext<SFTProcessEdges<Self>>,),bool>::new_unimplemented())`.
+/// `Box::new((MockMethod::<(&'static mut GCWorker<Self>,DefaultObjectTracerContext<UnsupportedTrace<Self>>,),bool>::new_unimplemented())`.
 ///
 /// Note that when `MockAny` is used, one needs to make sure that the types of the actual arguments match the argument types used for creating the `MockMethod`.
 /// We provide a default implementation for those `MockAny` methods, and it is very possible that the types in the default implementation do not
@@ -235,7 +241,6 @@ pub struct MockVM {
     pub schedule_finalization: MockMethod<VMWorkerThread, ()>,
     pub post_forwarding: MockMethod<VMWorkerThread, ()>,
     pub vm_live_bytes: MockMethod<(), usize>,
-    pub is_collection_enabled: MockMethod<(), bool>,
     pub create_gc_trigger: MockMethod<(), Box<dyn GCTriggerPolicy<MockVM>>>,
     // object model
     pub copy_object: MockMethod<
@@ -245,6 +250,14 @@ pub struct MockVM {
             &'static GCWorkerCopyContext<MockVM>,
         ),
         ObjectReference,
+    >,
+    pub try_copy_object: MockMethod<
+        (
+            ObjectReference,
+            CopySemantics,
+            &'static GCWorkerCopyContext<MockVM>,
+        ),
+        Option<ObjectReference>,
     >,
     pub copy_object_to: MockMethod<(ObjectReference, ObjectReference, Address), Address>,
     pub get_object_size: MockMethod<ObjectReference, usize>,
@@ -411,10 +424,10 @@ impl Default for MockVM {
             schedule_finalization: MockMethod::new_default(),
             post_forwarding: MockMethod::new_default(),
             vm_live_bytes: MockMethod::new_default(),
-            is_collection_enabled: MockMethod::new_fixed(Box::new(|_| true)),
             create_gc_trigger: MockMethod::new_unimplemented(),
 
             copy_object: MockMethod::new_unimplemented(),
+            try_copy_object: MockMethod::new_unimplemented(),
             copy_object_to: MockMethod::new_unimplemented(),
             get_object_size: MockMethod::new_unimplemented(),
             get_object_size_when_copied: MockMethod::new_unimplemented(),
@@ -438,7 +451,7 @@ impl Default for MockVM {
             support_slot_enqueuing: MockMethod::new_fixed(Box::new(|_| true)),
             scan_object: MockMethod::new_unimplemented(),
             scan_object_and_trace_edges: MockMethod::new_unimplemented(),
-            // We instantiate a `MockMethod` with the arguments as ProcessEdgesWorkRootsWorkFactory<..., SFTProcessEdges<MockVM>, ...>,
+            // We instantiate a `MockMethod` with the arguments as `DefaultRootsWorkFactory<..., UnsupportedTrace<MockVM>, ...>`,
             // thus the mock method expects the actual call arguments to match the type.
             // In most cases, this won't work and this `MockMethod` is just a place holder. It is
             // fine as long as the method is not actually called.
@@ -450,10 +463,10 @@ impl Default for MockVM {
                 (
                     VMWorkerThread,
                     &'static mut Mutator<MockVM>,
-                    ProcessEdgesWorkRootsWorkFactory<
+                    DefaultRootsWorkFactory<
                         MockVM,
-                        SFTProcessEdges<MockVM>,
-                        SFTProcessEdges<MockVM>,
+                        UnsupportedTrace<MockVM>,
+                        UnsupportedTrace<MockVM>,
                     >,
                 ),
                 (),
@@ -462,10 +475,10 @@ impl Default for MockVM {
             scan_vm_specific_roots: Box::new(MockMethod::<
                 (
                     VMWorkerThread,
-                    ProcessEdgesWorkRootsWorkFactory<
+                    DefaultRootsWorkFactory<
                         MockVM,
-                        SFTProcessEdges<MockVM>,
-                        SFTProcessEdges<MockVM>,
+                        UnsupportedTrace<MockVM>,
+                        UnsupportedTrace<MockVM>,
                     >,
                 ),
                 (),
@@ -479,7 +492,7 @@ impl Default for MockVM {
             process_weak_refs: Box::new(MockMethod::<
                 (
                     &'static mut GCWorker<Self>,
-                    ProcessEdgesWorkTracerContext<SFTProcessEdges<MockVM>>,
+                    DefaultObjectTracerContext<UnsupportedTrace<MockVM>>,
                 ),
                 bool,
             >::new_unimplemented()),
@@ -487,7 +500,7 @@ impl Default for MockVM {
             forward_weak_refs: Box::new(MockMethod::<
                 (
                     &'static mut GCWorker<Self>,
-                    ProcessEdgesWorkTracerContext<SFTProcessEdges<MockVM>>,
+                    DefaultObjectTracerContext<UnsupportedTrace<MockVM>>,
                 ),
                 (),
             >::new_default()),
@@ -578,10 +591,6 @@ impl crate::vm::Collection<MockVM> for MockVM {
         mock!(post_forwarding(tls))
     }
 
-    fn is_collection_enabled() -> bool {
-        mock!(is_collection_enabled())
-    }
-
     fn vm_live_bytes() -> usize {
         mock!(vm_live_bytes())
     }
@@ -591,23 +600,36 @@ impl crate::vm::Collection<MockVM> for MockVM {
     }
 }
 
-#[cfg(feature = "mock_test_header_metadata")]
+// Header metadata is the default, unless `mock_test_side_metadata` is enabled.
+#[cfg(not(feature = "mock_test_side_metadata"))]
 mod header_metadata {
     use super::*;
     pub const MOCK_VM_GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::in_header(0);
+    pub const MOCK_VM_GLOBAL_FIELD_UNLOG_BIT_SPEC: VMGlobalFieldUnlogBitSpec =
+        VMGlobalFieldUnlogBitSpec::side_first();
     pub const MOCK_VM_LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec =
         VMLocalForwardingBitsSpec::in_header(0);
-    pub const MOCK_VM_LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec = VMLocalMarkBitSpec::in_header(0);
+    // LXR clears mark bits in bulk over side metadata, so this must be a side spec (unlike most
+    // of the other local specs here, which can stay in the header).
+    pub const MOCK_VM_LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec = VMLocalMarkBitSpec::side_first();
     pub const MOCK_VM_LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec =
         VMLocalLOSMarkNurserySpec::in_header(0);
 }
-#[cfg(feature = "mock_test_header_metadata")]
+#[cfg(not(feature = "mock_test_side_metadata"))]
 use header_metadata::*;
+
+#[cfg(all(
+    feature = "mock_test_header_metadata",
+    feature = "mock_test_side_metadata"
+))]
+compile_error!("mock_test_header_metadata and mock_test_side_metadata are mutually exclusive");
 
 #[cfg(feature = "mock_test_side_metadata")]
 mod side_metadata {
     use super::*;
     pub const MOCK_VM_GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::side_first();
+    pub const MOCK_VM_GLOBAL_FIELD_UNLOG_BIT_SPEC: VMGlobalFieldUnlogBitSpec =
+        VMGlobalFieldUnlogBitSpec::side_after(MOCK_VM_GLOBAL_LOG_BIT_SPEC.as_spec());
     pub const MOCK_VM_LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec =
         VMLocalForwardingBitsSpec::side_first();
     pub const MOCK_VM_LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec =
@@ -620,6 +642,8 @@ use side_metadata::*;
 
 impl crate::vm::ObjectModel<MockVM> for MockVM {
     const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = MOCK_VM_GLOBAL_LOG_BIT_SPEC;
+    const GLOBAL_FIELD_UNLOG_BIT_SPEC: VMGlobalFieldUnlogBitSpec =
+        MOCK_VM_GLOBAL_FIELD_UNLOG_BIT_SPEC;
     const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec =
         VMLocalForwardingPointerSpec::in_header(0);
     const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec =
@@ -639,6 +663,14 @@ impl crate::vm::ObjectModel<MockVM> for MockVM {
         copy_context: &mut GCWorkerCopyContext<MockVM>,
     ) -> ObjectReference {
         mock!(copy_object(from, semantics, lifetime!(copy_context)))
+    }
+
+    fn try_copy(
+        from: ObjectReference,
+        semantics: CopySemantics,
+        copy_context: &mut GCWorkerCopyContext<MockVM>,
+    ) -> Option<ObjectReference> {
+        mock!(try_copy_object(from, semantics, lifetime!(copy_context)))
     }
 
     fn copy_to(from: ObjectReference, to: ObjectReference, region: Address) -> Address {
@@ -705,10 +737,10 @@ impl crate::vm::Scanning<MockVM> for MockVM {
     fn support_slot_enqueuing(tls: VMWorkerThread, object: ObjectReference) -> bool {
         mock!(support_slot_enqueuing(tls, object))
     }
-    fn scan_object<SV: SlotVisitor<<MockVM as VMBinding>::VMSlot>>(
+    fn scan_object(
         tls: VMWorkerThread,
         object: ObjectReference,
-        slot_visitor: &mut SV,
+        slot_visitor: &mut impl SlotVisitor<<MockVM as VMBinding>::VMSlot>,
     ) {
         mock!(scan_object(
             tls,

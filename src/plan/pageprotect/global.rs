@@ -57,10 +57,6 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         self.space.release(true);
     }
 
-    fn end_of_gc(&mut self, tls: VMWorkerThread) {
-        self.common.end_of_gc(tls);
-    }
-
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
         self.base().collection_required(self, space_full)
     }
@@ -84,6 +80,10 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
+
+    fn common_mut(&mut self) -> &mut CommonPlan<VM> {
+        &mut self.common
+    }
 }
 
 impl<VM: VMBinding> PageProtect<VM> {
@@ -106,7 +106,7 @@ impl<VM: VMBinding> PageProtect<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
-        let ret = PageProtect {
+        PageProtect {
             space: LargeObjectSpace::new(
                 plan_args.get_normal_space_args(
                     "pageprotect",
@@ -118,10 +118,6 @@ impl<VM: VMBinding> PageProtect<VM> {
                 false, // PageProtect does not use log bit
             ),
             common: CommonPlan::new(plan_args),
-        };
-
-        ret.verify_side_metadata_sanity();
-
-        ret
+        }
     }
 }

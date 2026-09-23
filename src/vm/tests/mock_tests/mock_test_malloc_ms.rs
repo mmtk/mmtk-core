@@ -19,6 +19,7 @@ fn test_malloc() {
 
             assert!(!bool1);
             assert!(!bool2);
+
             assert!(bool3);
             assert!(bool4);
 

@@ -22,13 +22,13 @@ pub mod copy;
 /// Heap implementation, including page resource, mmapper, etc.
 pub mod heap;
 /// Checking if an address is an valid MMTk object.
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 pub mod is_mmtk_object;
 /// Linear scan through a heap range
 pub mod linear_scan;
 /// Various malloc implementations (conditionally compiled by features)
 pub mod malloc;
-/// Wrapper functions for memory syscalls such as mmap, mprotect, etc.
+/// Memory utilities (non-OS dependent). OS dependent memory utilities can be found in [`crate::util::os::OSMemory`].
 pub mod memory;
 /// Metadata (OnSide or InHeader) implementation.
 pub mod metadata;
@@ -36,6 +36,8 @@ pub mod metadata;
 pub mod opaque_pointer;
 /// MMTk command line options.
 pub mod options;
+/// Operating system abstractions.
+pub mod os;
 #[cfg(feature = "test_private")]
 pub mod test_private;
 /// Test utilities. We need this module for `MockVM` in criterion benches, which does not include code with `cfg(test)`.
@@ -56,6 +58,8 @@ pub(crate) mod logger;
 pub(crate) mod object_enum;
 /// Forwarding word in object copying.
 pub(crate) mod object_forwarding;
+/// Reference counting support.
+pub(crate) mod rc;
 /// Reference processing implementation.
 pub(crate) mod reference_processor;
 /// Utilities funcitons for Rust
@@ -63,6 +67,7 @@ pub(crate) mod rust_util;
 /// Sanity checker for GC.
 #[cfg(feature = "sanity")]
 pub(crate) mod sanity;
+pub(crate) mod scanning_helper;
 /// Logging slots to check duplicated edges in GC.
 #[cfg(feature = "extreme_assertions")]
 pub(crate) mod slot_logger;

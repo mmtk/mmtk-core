@@ -13,8 +13,8 @@ pub enum GCThreadContext<VM: VMBinding> {
 
 /// VM-specific methods for garbage collection.
 pub trait Collection<VM: VMBinding> {
-    /// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a GC.
-    /// This method should not return until all the threads are yielded.
+    /// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a pause.
+    /// This method should not return until all the threads are yielded. When the method returns, MMTk assumes the pause starts.
     /// The actual thread synchronization mechanism is up to the VM, and MMTk does not make assumptions on that.
     /// MMTk provides a callback function and expects the binding to use the callback for each mutator when it
     /// is ready for stack scanning. Usually a stack can be scanned as soon as the thread stops in the yieldpoint.
@@ -26,7 +26,7 @@ pub trait Collection<VM: VMBinding> {
     where
         F: FnMut(&'static mut Mutator<VM>);
 
-    /// Resume all the mutator threads, the opposite of the above. When a GC is finished, MMTk calls this method.
+    /// Resume all the mutator threads, the opposite of the above. When a pause is finished, MMTk calls this method.
     ///
     /// This method may not be called by the same GC thread that called `stop_all_mutators`.
     ///
@@ -71,6 +71,47 @@ pub trait Collection<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The thread pointer for the mutator which failed the allocation and triggered the OOM.
     /// * `err_kind`: The type of OOM error that was encountered.
+    ///
+    /// # Warnings about stack unwinding
+    ///
+    /// Some programming languages throw exceptions when the heap is out of memory.  We recommend
+    /// letting `Collection::out_of_memory` return so that [`crate::memory_manager::alloc`] or
+    /// [`crate::memory_manager::alloc_with_options`] will return `Address::ZERO`.  The VM binding
+    /// then throws exceptions when it detects such a return value.  In the case of
+    /// `alloc_with_option` where it may also return `Address::ZERO` if not at safepoint, the VM
+    /// binding can set some thread-local flags in `Collection::out_of_memory` to distinguish
+    /// between the two different cases that return zero.
+    ///
+    /// It may be tempting to implement throwing exceptions by unwinding the stack from within
+    /// `Collection::out_of_memory`.  But the VM binding developers must be aware that the behavior
+    /// of
+    ///
+    /// 1.  whether any stack frame can be unwound, and
+    /// 2.  whether local variables that implement the [`Drop`] trait will be dropped
+    ///
+    /// depends on many factors, including but not limited to:
+    ///
+    /// -   the unwinding mechanism, such as `panic!()` (Rust), `throw` (C++), `longjmp` (C), etc.
+    /// -   the ABI of the function of each stack frame, such as "Rust", "C-unwind", "C", etc.
+    /// -   inlining decisions made by the compiler
+    /// -   the Rust [panic handler]
+    /// -   the [`panic` codegen option]
+    /// -   whether any native (C/C++/etc.) functions are compiled with `-fno-exceptions`
+    /// -   whether C++ functions have the `noexcept` specifier
+    /// -   the implementation-specified behaviour in C++ where `throw` is executed but no exception
+    ///     handler is found on the stack (the implementation may choose to terminate immediately
+    ///     without unwinding at all)
+    ///
+    /// [panic handler]: https://doc.rust-lang.org/reference/panic.html#r-panic.panic_handler
+    /// [`panic` codegen option]: https://doc.rust-lang.org/rustc/codegen-options/index.html#panic
+    ///
+    /// The Rust Documentation [specifies][rust-unw] that when unwinding across certain ABI
+    /// boundaries, it will result in aborting or [undefined behavior][rust-ub].  The VM binding
+    /// developers need to be extremely careful about those details, but the obvious alternative is
+    /// simply returning from `Collection::out_of_memory`.
+    ///
+    /// [rust-unw]: https://doc.rust-lang.org/reference/items/functions.html#unwinding
+    /// [rust-ub]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     fn out_of_memory(_tls: VMThread, err_kind: AllocationError) {
         panic!("Out of memory with {:?}!", err_kind);
     }
@@ -80,6 +121,14 @@ pub trait Collection<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The thread pointer for the current GC thread.
     fn schedule_finalization(_tls: VMWorkerThread) {}
+
+    /// A hook for the VM to update the state of its weak reference processor at the end of the
+    /// release phase of a GC. This is currently called by the LXR plan after a full or final-mark
+    /// pause, before the reachability of weak references has changed further.
+    ///
+    /// Arguments:
+    /// * `_lxr`: Whether the current GC is being driven by the LXR plan.
+    fn update_weak_processor(_lxr: bool) {}
 
     /// A hook for the VM to do work after forwarding objects.
     ///
@@ -103,6 +152,9 @@ pub trait Collection<VM: VMBinding> {
     /// Arguments:
     /// * `tls_worker`: The thread pointer for the worker thread performing this call.
     fn post_forwarding(_tls: VMWorkerThread) {}
+
+    /// Inform the VM to do its VM-specific release work at the end of a GC.
+    fn vm_release() {}
 
     /// Return the amount of memory (in bytes) which the VM allocated outside the MMTk heap but
     /// wants to include into the current MMTk heap size.  MMTk core will consider the reported
@@ -136,25 +188,6 @@ pub trait Collection<VM: VMBinding> {
     fn vm_live_bytes() -> usize {
         // By default, MMTk assumes the amount of memory the VM allocates off-heap is negligible.
         0
-    }
-
-    /// Callback function to ask the VM whether GC is enabled or disabled, allowing or disallowing MMTk
-    /// to trigger garbage collection. When collection is disabled, you can still allocate through MMTk,
-    /// but MMTk will not trigger a GC even if the heap is full. In such a case, the allocation will
-    /// exceed MMTk's heap size (the soft heap limit). However, there is no guarantee that the physical
-    /// allocation will succeed, and if it succeeds, there is no guarantee that further allocation will
-    /// keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration
-    /// to make sure that the physical memory allows the amount of allocation. We highly recommend
-    /// to have GC always enabled (i.e. that this method always returns true). However, we support
-    /// this to accomodate some VMs that require this behavior. Note that
-    /// `handle_user_collection_request()` calls this function, too.  If this function returns
-    /// false, `handle_user_collection_request()` will not trigger GC, either. Note also that any synchronization
-    /// involving enabling and disabling collections by mutator threads should be implemented by the VM.
-    fn is_collection_enabled() -> bool {
-        // By default, MMTk assumes that collections are always enabled, and the binding should define
-        // this method if the VM supports disabling GC, or if the VM cannot safely trigger GC until some
-        // initialization is done, such as initializing class metadata for scanning objects.
-        true
     }
 
     /// Ask the binding to create a [`GCTriggerPolicy`] if the option `gc_trigger` is set to

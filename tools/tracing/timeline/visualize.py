@@ -6,26 +6,36 @@ import json
 import re
 import sys
 from collections import defaultdict
-from enum import Enum
+import enum
 from importlib.machinery import SourceFileLoader
 
 RE_TYPE_ID = re.compile(r"\d+")
 UNKNOWN_TYPE = "(unknown)"
 
-class RootsKind(Enum):
+class RootsKind(enum.Enum):
     NORMAL = 0
     PINNING = 1
     TPINNING = 2
 
-class Semantics(Enum):
+class Semantics(enum.Enum):
     SOFT = 0
     WEAK = 1
     PHANTOM = 2
 
-class Pause(Enum):
+class Pause(enum.Enum):
     FULL = 1
     INITIAL_MARK = 2
     FINAL_MARK = 3
+
+class DefragDecisionWord(enum.Flag):
+    # Note: Keep in sync with ``Defrag::decide_whether_to_defrag``
+    defrag_enabled              = enum.auto()
+    emergency_collection        = enum.auto()
+    collect_whole_heap          = enum.auto()
+    user_triggered              = enum.auto()
+    exhausted_reusable_space    = enum.auto()
+    full_heap_system_gc         = enum.auto()
+    stress_defrag               = enum.auto()
 
 def get_args():
     parser = argparse.ArgumentParser(
@@ -87,12 +97,12 @@ class LogProcessor:
         parts = line.split(",") # Split by comma.
         try:
             name, ph, tid, ts = parts[:4] # Extract the first four columns.
+            tid = int(tid)
+            ts = int(ts)
+            args = parts[4:] # `args` will hold other columns.
         except:
             print("Abnormal line: {}".format(line))
             raise
-        tid = int(tid)
-        ts = int(ts)
-        args = parts[4:] # `args` will hold other columns.
 
         if not self.start_time:
             self.start_time = ts
@@ -161,8 +171,20 @@ class LogProcessor:
                     "stage": int(args[0]),
                 }
 
-            case "gcrequester_request":
+            case "gc_requested":
                 result["tid"] = 1
+
+            case "GC_REQUEST_WAIT":
+                # Put the "GC requested but not yet started" span on the same virtual
+                # thread as "GC" so it renders as the slice immediately preceding each
+                # GC on the same timeline row.
+                result["tid"] = 0
+
+            case "heap_stats":
+                result["args"] |= {
+                    "reserved_pages": int(args[0]),
+                    "total_pages": int(args[1]),
+                }
 
             case _:
                 if self.enrich_event_extra is not None:
@@ -188,9 +210,8 @@ class LogProcessor:
         parameters of this function, including `self` as the first argument.
         """
 
-        processed_for_gc = True
-        processed_for_wp = True
-
+        # The following meta events enrich the GC bar.
+        # Only process them when the current thread is in the middle of a GC.
         # bpftrace may drop events.  Be conservative.
         if gc is not None:
             match name:
@@ -202,8 +223,14 @@ class LogProcessor:
                     }
 
                 case "immix_defrag":
+                    decision_word = int(args[2])
+                    decision_flags = DefragDecisionWord(decision_word)
+                    desicion_details = {f.name : (f in decision_flags) for f in DefragDecisionWord}
                     gc["args"] |= {
                         "immix_is_defrag_gc": bool(int(args[0])),
+                        "collection_attempts": int(args[1]),
+                        "decision_word": decision_word,
+                        "desicion_details": desicion_details,
                     }
 
                 case "concurrent_pause_determined":
@@ -217,30 +244,11 @@ class LogProcessor:
                         "pause": pause,
                     }
 
-                case _:
-                    processed_for_gc = False
-        else:
-            processed_for_gc = False
-
+        # The following meta events enrich the work packet.
+        # Only process them when the current thread is in the middle of a work packet.
         # bpftrace may drop events.  Be conservative.
         if wp is not None:
             match name:
-                case "roots":
-                    if "roots" not in wp["args"]:
-                        wp["args"]["roots"] = []
-                    roots_list = wp["args"]["roots"]
-                    kind_id = int(args[0])
-                    num = int(args[1])
-                    match kind_id:
-                        case RootsKind.NORMAL.value:
-                            root_dict = {"kind": "normal_roots", "num_slots": num}
-                        case RootsKind.PINNING.value:
-                            root_dict = {"kind": "pinning_roots", "num_nodes": num}
-                        case RootsKind.TPINNING.value:
-                            root_dict = {"kind": "tpinning_roots", "num_nodes": num}
-
-                    roots_list.append(root_dict)
-
                 case "process_root_nodes":
                     wp["args"] |= {
                         "num_roots": int(args[0]),
@@ -249,21 +257,20 @@ class LogProcessor:
 
                 case "process_slots":
                     wp["args"] |= {
-                        # Group args by "process_slots" and "scan_objects" because a ProcessEdgesWork
+                        # Group args by "process_slots" and "process_nodes" because a ProcessSlots
                         # work packet may do both if SCAN_OBJECTS_IMMEDIATELY is true.
                         "process_slots": {
                             "num_slots": int(args[0]),
-                            "is_roots": int(args[1]),
                         },
                     }
 
-                case "scan_objects":
+                case "process_nodes":
                     total_scanned = int(args[0])
                     scan_and_trace = int(args[1])
                     scan_for_slots = total_scanned - scan_and_trace
                     wp["args"] |= {
                         # Put args in a group.  See comments in "process_slots".
-                        "scan_objects": {
+                        "process_nodes": {
                             "total_scanned": total_scanned,
                             "scan_for_slots": scan_for_slots,
                             "scan_and_trace": scan_and_trace,
@@ -271,21 +278,17 @@ class LogProcessor:
                     }
 
                 case "concurrent_trace_objects":
-                    objects = int(args[0])
-                    next_objects = int(args[1])
-                    iterations = int(args[2])
-                    total_objects = objects + next_objects
+                    initial = int(args[0])
+                    queued = int(args[1])
                     wp["args"] |= {
                         # Put args in a group.  See comments in "process_slots".
-                        "scan_objects": {
-                            "objects": objects,
-                            "next_objects": next_objects,
-                            "total_objects": total_objects,
-                            "iterations": iterations,
+                        "concurrent_trace_objects": {
+                            "initial": initial,
+                            "queued": queued,
                         }
                     }
 
-                case "sweep_chunk":
+                case "sweep_chunk_ms":
                     wp["args"] |= {
                         "allocated_blocks": int(args[0]),
                     }
@@ -298,9 +301,13 @@ class LogProcessor:
 
                 case "reference_scanned":
                     semantics_int = int(args[0])
-                    if semantics_int in Semantics:
+                    try:
                         semantics_str = Semantics(semantics_int).name
-                    else:
+                    except ValueError:
+                        print(
+                            f"Unexpected reference_scanned semantics value: {semantics_int}",
+                            file=sys.stderr,
+                        )
                         semantics_str = "(Unknown)"
                     if "reference_scanned" not in wp["args"]:
                         wp["args"]["reference_scanned"] = []
@@ -318,16 +325,91 @@ class LogProcessor:
                         "num_retained": int(args[2]),
                     }
 
-                case _:
-                    processed_for_wp = False
-        else:
-            processed_for_wp = False
+        # The following meta events may enrich both GC and the work packet.
+        # Let them decide which one to update.
+        #
+        # Because bpftrace can drop events, we always need to check if gc and wp are None or not.
+        #
+        # If we set the -e option of capture.py,
+        # it will not emit individual work packet bars during GCs when @enable_print is false.
+        # But we can still aggregate the statistic data to the GC bar.
+        match name:
+            case "roots":
+                kind_id = int(args[0])
+                num = int(args[1])
 
-        if not processed_for_gc and not processed_for_wp:
-            # If we haven't touched an event, we offload it to the extension.
-            if self.enrich_meta_extra is not None:
-                # Call ``enrich_meta_extra`` in the extension script if defined.
-                self.enrich_meta_extra(self, name, tid, ts, gc, wp, args)
+                if wp is not None:
+                    if "roots" not in wp["args"]:
+                        wp["args"]["roots"] = []
+                    roots_list = wp["args"]["roots"]
+                    match kind_id:
+                        case RootsKind.NORMAL.value:
+                            root_dict = {"kind": "normal_roots", "num_slots": num}
+                        case RootsKind.PINNING.value:
+                            root_dict = {"kind": "pinning_roots", "num_nodes": num}
+                        case RootsKind.TPINNING.value:
+                            root_dict = {"kind": "tpinning_roots", "num_nodes": num}
+                    roots_list.append(root_dict)
+
+                if gc is not None:
+                    if "roots" not in gc["args"]:
+                        gc["args"]["roots"] = {
+                            "normal_roots": 0,
+                            "pinning_roots": 0,
+                            "tpinning_roots": 0,
+                        }
+                    match kind_id:
+                        case RootsKind.NORMAL.value:
+                            gc["args"]["roots"]["normal_roots"] += num
+                        case RootsKind.PINNING.value:
+                            gc["args"]["roots"]["pinning_roots"] += num
+                        case RootsKind.TPINNING.value:
+                            gc["args"]["roots"]["tpinning_roots"] += num
+
+            case "immix_prepare_block_state":
+                num_blocks_prepared, num_defrag_source_blocks = [int(arg) for arg in args]
+
+                if wp is not None:
+                    wp["args"] |= {
+                        "num_blocks_prepared": num_blocks_prepared,
+                        "num_defrag_source_blocks": num_defrag_source_blocks,
+                    }
+
+                if gc is not None:
+                    if "immix_prepare_block_state" not in gc["args"]:
+                        gc["args"]["immix_prepare_block_state"] = {
+                            "num_blocks_prepared": 0,
+                            "num_defrag_source_blocks": 0,
+                        }
+                    gc["args"]["immix_prepare_block_state"]["num_blocks_prepared"] += num_blocks_prepared
+                    gc["args"]["immix_prepare_block_state"]["num_defrag_source_blocks"] += num_defrag_source_blocks
+
+            case "sweep_chunk_immix":
+                swept_blocks, reused_blocks, unreused_blocks = [int(arg) for arg in args]
+
+                if wp is not None:
+                    wp["args"] |= {
+                        "swept_blocks": swept_blocks,
+                        "reused_blocks": reused_blocks,
+                        "unreused_blocks": unreused_blocks,
+                    }
+
+                if gc is not None:
+                    if "sweep_chunk_immix" not in gc["args"]:
+                        gc["args"]["sweep_chunk_immix"] = {
+                            "swept_blocks": 0,
+                            "reused_blocks": 0,
+                            "unreused_blocks": 0,
+                        }
+                    gc["args"]["sweep_chunk_immix"]["swept_blocks"] += swept_blocks
+                    gc["args"]["sweep_chunk_immix"]["reused_blocks"] += reused_blocks
+                    gc["args"]["sweep_chunk_immix"]["unreused_blocks"] += unreused_blocks
+
+        # Regardless whether we have processed the GC or work packet blocks,
+        # we always give the extension script a chance to inspect them.
+        if self.enrich_meta_extra is not None:
+            # Call ``enrich_meta_extra`` in the extension script if defined.
+            self.enrich_meta_extra(self, name, tid, ts, gc, wp, args)
 
     def resolve_results(self):
         for result in self.results:
@@ -346,12 +428,18 @@ class LogProcessor:
     def run(self, input_file):
         print("Parsing lines...")
         with open(input_file) as f:
+            started = False
             start_time = None
 
             for line in f.readlines():
                 line = line.strip()
 
-                self.process_line(line)
+                if started:
+                    self.process_line(line)
+                elif line == "====MMTK:CUT_HERE====":
+                    # Some recent versions of bpftrace print warning messages in the beginning of stdout.
+                    # We skip lines until we see the marker.
+                    started = True
 
         output_name = input_file + ".json.gz"
 
