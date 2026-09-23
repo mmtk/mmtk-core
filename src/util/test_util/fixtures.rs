@@ -2,12 +2,14 @@
 #![allow(dead_code)]
 
 use atomic_refcell::AtomicRefCell;
+use std::marker::PhantomData;
 use std::sync::Mutex;
 use std::sync::Once;
 
 use crate::memory_manager;
-use crate::util::test_util::mock_vm::MockVM;
+use crate::util::test_util::mock_vm::{MockVM, MutatorHandle};
 use crate::util::{ObjectReference, VMMutatorThread, VMThread};
+use crate::vm::VMBinding;
 use crate::AllocationSemantics;
 use crate::MMTKBuilder;
 use crate::MMTK;
@@ -116,9 +118,15 @@ impl<T: FixtureContent> Default for SerialFixture<T> {
     }
 }
 
-pub struct MMTKFixture;
+/// A fixture that creates the MMTk singleton for the default [`MockVM`].
+pub type MMTKFixture = GenericMMTKFixture<MockVM>;
 
-impl FixtureContent for MMTKFixture {
+/// A fixture that creates the MMTk singleton for a mock VM type `VM`.
+pub struct GenericMMTKFixture<VM: VMBinding> {
+    _vm: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> FixtureContent for GenericMMTKFixture<VM> {
     fn create() -> Self {
         Self::create_with_builder(
             |builder| {
@@ -133,7 +141,7 @@ impl FixtureContent for MMTKFixture {
     }
 }
 
-impl MMTKFixture {
+impl<VM: VMBinding> GenericMMTKFixture<VM> {
     pub fn create_with_builder<F>(with_builder: F, initialize_collection: bool) -> Self
     where
         F: FnOnce(&mut MMTKBuilder),
@@ -141,44 +149,48 @@ impl MMTKFixture {
         let mut builder = MMTKBuilder::new();
         with_builder(&mut builder);
 
-        let mmtk = memory_manager::mmtk_init(&builder);
+        let mmtk = memory_manager::mmtk_init::<VM>(&builder);
         let mmtk_ptr = Box::into_raw(mmtk);
         mock_api::set_singleton(mmtk_ptr);
 
         if initialize_collection {
-            let mmtk_static: &'static MMTK<MockVM> = unsafe { &*mmtk_ptr };
+            let mmtk_static: &'static MMTK<VM> = unsafe { &*mmtk_ptr };
             memory_manager::initialize_collection(mmtk_static, VMThread::UNINITIALIZED);
         }
 
-        MMTKFixture
+        Self { _vm: PhantomData }
     }
 
-    pub fn get_mmtk(&self) -> &'static MMTK<MockVM> {
+    pub fn get_mmtk(&self) -> &'static MMTK<VM> {
         mock_api::singleton()
     }
 
-    pub fn get_mmtk_mut(&mut self) -> &'static mut MMTK<MockVM> {
+    pub fn get_mmtk_mut(&mut self) -> &'static mut MMTK<VM> {
         mock_api::singleton_mut()
     }
 }
 
 use crate::plan::Mutator;
 
-pub struct MutatorFixture {
-    mmtk: MMTKFixture,
+/// A fixture that creates the MMTk singleton and binds a mutator for the default [`MockVM`].
+pub type MutatorFixture = GenericMutatorFixture<MockVM>;
+
+/// A fixture that creates the MMTk singleton and binds a mutator for a mock VM type `VM`.
+pub struct GenericMutatorFixture<VM: VMBinding> {
+    mmtk: GenericMMTKFixture<VM>,
     mutator: VMMutatorThread,
 }
 
-impl FixtureContent for MutatorFixture {
+impl<VM: VMBinding> FixtureContent for GenericMutatorFixture<VM> {
     fn create() -> Self {
         const MB: usize = 1024 * 1024;
         Self::create_with_heapsize(MB)
     }
 }
 
-impl MutatorFixture {
+impl<VM: VMBinding> GenericMutatorFixture<VM> {
     pub fn create_with_heapsize(size: usize) -> Self {
-        let mmtk = MMTKFixture::create_with_builder(
+        let mmtk = GenericMMTKFixture::create_with_builder(
             |builder| {
                 builder
                     .options
@@ -187,7 +199,7 @@ impl MutatorFixture {
             },
             true,
         );
-        let mutator = mock_api::bind_mutator();
+        let mutator = MutatorHandle::bind::<VM>();
         Self { mmtk, mutator }
     }
 
@@ -195,17 +207,17 @@ impl MutatorFixture {
     where
         F: FnOnce(&mut MMTKBuilder),
     {
-        let mmtk = MMTKFixture::create_with_builder(with_builder, true);
-        let mutator = mock_api::bind_mutator();
+        let mmtk = GenericMMTKFixture::create_with_builder(with_builder, true);
+        let mutator = MutatorHandle::bind::<VM>();
         Self { mmtk, mutator }
     }
 
-    pub fn mmtk(&self) -> &'static MMTK<MockVM> {
+    pub fn mmtk(&self) -> &'static MMTK<VM> {
         self.mmtk.get_mmtk()
     }
 
-    pub fn mutator(&self) -> &'static mut Mutator<MockVM> {
-        self.mutator.as_mock_mutator()
+    pub fn mutator(&self) -> &'static mut Mutator<VM> {
+        self.mutator.as_generic_mock_mutator()
     }
 
     pub fn mutator_tls(&self) -> VMMutatorThread {
@@ -213,7 +225,7 @@ impl MutatorFixture {
     }
 }
 
-unsafe impl Send for MutatorFixture {}
+unsafe impl<VM: VMBinding> Send for GenericMutatorFixture<VM> {}
 
 pub struct SingleObject {
     pub objref: ObjectReference,

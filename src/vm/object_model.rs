@@ -7,6 +7,16 @@ use crate::util::metadata::MetadataValue;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 
+/// Default for [`ObjectModel::COMPRESSED_PTR_ENABLED`]
+pub(crate) const DEFAULT_COMPRESSED_PTR_ENABLED: bool = false;
+/// Default for [`ObjectModel::NEED_VO_BITS_DURING_TRACING`]
+#[cfg(feature = "vo_bit")]
+pub(crate) const DEFAULT_NEED_VO_BITS_DURING_TRACING: bool = false;
+/// Default for [`ObjectModel::VM_WORST_CASE_COPY_EXPANSION`]
+pub(crate) const DEFAULT_VM_WORST_CASE_COPY_EXPANSION: f64 = 1.5;
+/// Default for [`ObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS`]
+pub(crate) const DEFAULT_UNIFIED_OBJECT_REFERENCE_ADDRESS: bool = false;
+
 /// VM-specific methods for object model.
 ///
 /// This trait includes 3 parts:
@@ -132,7 +142,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// Set this to true if the VM binding uses compressed (narrow) object pointers, e.g. compressed
     /// oops on a 64-bit heap. When enabled, MMTk adjusts the size of certain per-object and per-field
     /// side metadata (such as the field unlog bits) to match the narrower pointer/field width.
-    const COMPRESSED_PTR_ENABLED: bool = false;
+    const COMPRESSED_PTR_ENABLED: bool = DEFAULT_COMPRESSED_PTR_ENABLED;
 
     /// Set this to true if the VM binding requires the valid object (VO) bits to be available
     /// during tracing. If this constant is set to `false`, it is undefined behavior if the binding
@@ -149,7 +159,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// according to the configuration of the VM binding, including this flag.  Currently, setting
     /// this flag to true does not impose any additional overhead.
     #[cfg(feature = "vo_bit")]
-    const NEED_VO_BITS_DURING_TRACING: bool = false;
+    const NEED_VO_BITS_DURING_TRACING: bool = DEFAULT_NEED_VO_BITS_DURING_TRACING;
 
     /// A function to non-atomically load the specified per-object metadata's content.
     /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.
@@ -448,7 +458,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// This is the worst case expansion that can occur due to object size increasing while
     /// copying. This constant is used to calculate whether a nursery has grown larger than the
     /// mature space for generational plans.
-    const VM_WORST_CASE_COPY_EXPANSION: f64 = 1.5;
+    const VM_WORST_CASE_COPY_EXPANSION: f64 = DEFAULT_VM_WORST_CASE_COPY_EXPANSION;
 
     /// If this is true, the binding guarantees that the object reference's raw address and the
     /// object start are always the same address.  In other words, an object reference's raw
@@ -458,7 +468,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// make some assumptions and optimize for this case.
     /// If a binding sets this to true, and the related methods return inconsistent results, this is an undefined behavior. MMTk may panic
     /// if any assertion catches this error, but may also fail silently.
-    const UNIFIED_OBJECT_REFERENCE_ADDRESS: bool = false;
+    const UNIFIED_OBJECT_REFERENCE_ADDRESS: bool = DEFAULT_UNIFIED_OBJECT_REFERENCE_ADDRESS;
 
     /// For our allocation result (object_start), the binding may have an offset between the allocation result
     /// and the raw address of their object reference, i.e. object ref's raw address = object_start + offset.

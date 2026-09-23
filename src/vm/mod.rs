@@ -35,13 +35,23 @@ pub use self::scanning::RootsWorkFactory;
 pub use self::scanning::Scanning;
 pub use self::scanning::SlotVisitor;
 
+// MockVM uses this as the default in its config.
+#[cfg(feature = "mock_test")]
+pub(crate) use self::scanning::DEFAULT_UNIQUE_OBJECT_ENQUEUING;
+
 #[cfg(test)]
 mod tests;
 
 /// Default min alignment 4 bytes
-const DEFAULT_LOG_MIN_ALIGNMENT: usize = 2;
+pub(crate) const DEFAULT_LOG_MIN_ALIGNMENT: usize = 2;
 /// Default max alignment 8 bytes
 const DEFAULT_LOG_MAX_ALIGNMENT: usize = 3;
+/// Default for [`VMBinding::ALIGNMENT_VALUE`]
+pub(crate) const DEFAULT_ALIGNMENT_VALUE: u8 = 0xab;
+/// Default for [`VMBinding::USE_ALLOCATION_OFFSET`]
+pub(crate) const DEFAULT_USE_ALLOCATION_OFFSET: bool = true;
+/// Default for [`VMBinding::ALLOC_END_ALIGNMENT`]
+pub(crate) const DEFAULT_ALLOC_END_ALIGNMENT: usize = 1;
 
 /// The `VMBinding` trait associates with each trait, and provides VM-specific constants.
 pub trait VMBinding
@@ -65,7 +75,7 @@ where
     type VMMemorySlice: slot::MemorySlice<SlotType = Self::VMSlot>;
 
     /// A value to fill in alignment gaps. This value can be used for debugging. Set this value to 0 to skip filling alignment gaps.
-    const ALIGNMENT_VALUE: u8 = 0xab;
+    const ALIGNMENT_VALUE: u8 = DEFAULT_ALIGNMENT_VALUE;
     /// Allowed minimal alignment in bytes.
     const MIN_ALIGNMENT: usize = 1 << DEFAULT_LOG_MIN_ALIGNMENT;
     /// Allowed maximum alignment in bytes.
@@ -73,11 +83,11 @@ where
     /// Does the binding use a non-zero allocation offset? If this is false, we expect the binding
     /// to always use offset === 0 for allocation, and we are able to do some optimization if we know
     /// offset === 0.
-    const USE_ALLOCATION_OFFSET: bool = true;
+    const USE_ALLOCATION_OFFSET: bool = DEFAULT_USE_ALLOCATION_OFFSET;
 
     /// This value is used to assert if the cursor is reasonable after allocations.
     /// At the end of an allocation, the allocation cursor should be aligned to this value.
     /// Note that MMTk does not attempt to do anything to align the cursor to this value, but
     /// it merely asserts with this constant.
-    const ALLOC_END_ALIGNMENT: usize = 1;
+    const ALLOC_END_ALIGNMENT: usize = DEFAULT_ALLOC_END_ALIGNMENT;
 }

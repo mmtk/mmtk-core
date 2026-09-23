@@ -69,6 +69,7 @@ mod mock_test_mmtk_julia_pr_143;
 #[cfg(feature = "nogc_lock_free")]
 mod mock_test_nogc_lock_free;
 mod mock_test_shutdown;
+mod mock_test_side_metadata_gc;
 mod mock_test_slots;
 #[cfg(target_pointer_width = "64")]
 mod mock_test_vm_layout_compressed_pointer;
