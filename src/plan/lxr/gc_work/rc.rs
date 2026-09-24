@@ -4,7 +4,9 @@ use super::super::LXR;
 use super::super::{LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURSERY_EVACUATION};
 use super::tracing::LXRConcurrentTraceObjects;
 use super::tracing::LXRStopTheWorldProcessEdges;
+#[cfg(feature = "non_moving_root")]
 use super::tracing::LXRStopTheWorldProcessNodes;
+#[cfg(feature = "non_moving_root")]
 use super::tracing::ProcessModBufSATB;
 use super::ProcessEdgesBase;
 use crate::plan::VectorQueue;
@@ -26,6 +28,7 @@ use crate::{
     MMTK,
 };
 use atomic::Ordering;
+#[cfg(feature = "non_moving_root")]
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
@@ -85,6 +88,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         }
     }
 
+    #[cfg(feature = "non_moving_root")]
     /// Reference-count root objects reported as objects rather than as slots.
     /// Node counterpart of `process_incs::<EDGE_KIND_ROOT>`. Nothing here may move an object.
     fn process_root_nodes(
@@ -112,6 +116,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         (roots, uncounted)
     }
 
+    #[cfg(feature = "non_moving_root")]
     /// Node-shaped counterpart of [`GCWork::do_work`] below for `KIND == EDGE_KIND_ROOT`.
     /// However, the major difference is that we cannot move any of these objects here, as
     /// we don't know their slots.
@@ -893,6 +898,7 @@ impl<VM: VMBinding> DerefMut for CollectSlotRoots<VM> {
     }
 }
 
+#[cfg(feature = "non_moving_root")]
 /// Collects roots reported as objects rather than as slots. Node counterpart of
 /// [`CollectSlotRoots`].
 pub struct CollectNodeRoots<VM: VMBinding> {
@@ -900,6 +906,7 @@ pub struct CollectNodeRoots<VM: VMBinding> {
     _p: PhantomData<VM>,
 }
 
+#[cfg(feature = "non_moving_root")]
 impl<VM: VMBinding> CollectNodeRoots<VM> {
     pub fn new(nodes: Vec<ObjectReference>) -> Self {
         Self {
@@ -909,6 +916,7 @@ impl<VM: VMBinding> CollectNodeRoots<VM> {
     }
 }
 
+#[cfg(feature = "non_moving_root")]
 impl<VM: VMBinding> GCWork<VM> for CollectNodeRoots<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         if !self.nodes.is_empty() {

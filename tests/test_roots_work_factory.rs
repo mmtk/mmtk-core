@@ -5,11 +5,9 @@
 
 use std::sync::{Arc, Mutex};
 
-use mmtk::{
-    scheduler::RootKind,
-    util::{Address, ObjectReference},
-    vm::RootsWorkFactory,
-};
+#[cfg(feature = "non_moving_root")]
+use mmtk::util::ObjectReference;
+use mmtk::{scheduler::RootKind, util::Address, vm::RootsWorkFactory};
 
 #[derive(Default)]
 struct MockScanning {
@@ -67,10 +65,12 @@ impl RootsWorkFactory<Address> for MockFactory {
         }
     }
 
+    #[cfg(feature = "non_moving_root")]
     fn create_process_pinning_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
         unimplemented!();
     }
 
+    #[cfg(feature = "non_moving_root")]
     fn create_process_tpinning_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
         unimplemented!();
     }

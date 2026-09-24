@@ -232,6 +232,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         self.create_and_schedule_root_nodes_work(nodes);
     }
 
+    #[cfg(feature = "non_moving_root")]
     fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         probe!(mmtk, roots, RootsKind::PINNING, nodes.len());
 
@@ -247,6 +248,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         self.create_and_schedule_root_nodes_work(nodes);
     }
 
+    #[cfg(feature = "non_moving_root")]
     fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         probe!(mmtk, roots, RootsKind::TPINNING, nodes.len());
 

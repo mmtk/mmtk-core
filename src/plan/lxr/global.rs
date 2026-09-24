@@ -365,7 +365,16 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn root_scanning_stage(&self) -> WorkBucketStage {
-        WorkBucketStage::RCProcessIncsNonMoving
+        // With `non_moving_root`, roots reported as objects have to be counted before
+        // `RCProcessIncs` -- which may evacuate -- can move anything, so scanning happens one
+        // stage earlier.  That costs parallelism: it stops root scanning from overlapping with
+        // the increments the barrier already recorded, and root scanning is bounded by the
+        // mutator count.  Without the feature no root is reported as an object, so scan in
+        // `RCProcessIncs` itself and keep the overlap.
+        #[cfg(feature = "non_moving_root")]
+        return WorkBucketStage::RCProcessIncsNonMoving;
+        #[cfg(not(feature = "non_moving_root"))]
+        return WorkBucketStage::RCProcessIncs;
     }
 
     fn concurrent(&self) -> Option<&dyn ConcurrentPlan<VM = VM>> {
@@ -697,11 +706,13 @@ impl<VM: VMBinding> LXR<VM> {
 
     fn disable_unnecessary_buckets(&'static self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
         // Set conditional buckets
+        #[cfg(feature = "non_moving_root")]
         scheduler.work_buckets[WorkBucketStage::RCProcessIncsNonMoving].set_enabled(true);
         scheduler.work_buckets[WorkBucketStage::RCProcessIncs].set_enabled(true);
         scheduler.work_buckets[WorkBucketStage::Prepare].set_enabled(pause != Pause::RefCount);
         let final_mark_or_full = pause == Pause::FinalMark || pause == Pause::Full;
         // Marks roots reported as objects, before `Closure` can evacuate anything.
+        #[cfg(feature = "non_moving_root")]
         scheduler.work_buckets[WorkBucketStage::PinningRootsTrace].set_enabled(final_mark_or_full);
         scheduler.work_buckets[WorkBucketStage::Closure].set_enabled(final_mark_or_full);
         scheduler.work_buckets[WorkBucketStage::WeakRefClosure].set_enabled(final_mark_or_full);
@@ -715,6 +726,7 @@ impl<VM: VMBinding> LXR<VM> {
         // Always disabled
         // LXR never routes work here: it has no transitively pinning closure. Transitive
         // pinning roots, where accepted at all, take the ordinary node-root path instead.
+        #[cfg(feature = "non_moving_root")]
         scheduler.work_buckets[WorkBucketStage::TPinningClosure].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_enabled(false);
