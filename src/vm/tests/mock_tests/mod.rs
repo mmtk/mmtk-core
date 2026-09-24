@@ -18,7 +18,7 @@
 pub(crate) mod mock_test_prelude {
     pub use crate::memory_manager;
     pub use crate::util::test_util::fixtures::*;
-    pub use crate::util::test_util::mock_method::*;
+    pub use crate::util::test_util::mock_vm::mock_api;
     pub use crate::util::test_util::mock_vm::*;
     pub use crate::vm::*;
 }
@@ -41,6 +41,7 @@ mod mock_test_barrier_slow_path_assertion;
 mod mock_test_conservatism;
 mod mock_test_debug_get_object_info;
 mod mock_test_enable_collection_without_disable;
+mod mock_test_gc;
 #[cfg(target_os = "linux")]
 mod mock_test_handle_mmap_conflict;
 mod mock_test_handle_mmap_oom;
@@ -68,6 +69,7 @@ mod mock_test_mmtk_julia_pr_143;
 #[cfg(feature = "nogc_lock_free")]
 mod mock_test_nogc_lock_free;
 mod mock_test_shutdown;
+mod mock_test_side_metadata_gc;
 mod mock_test_slots;
 #[cfg(target_pointer_width = "64")]
 mod mock_test_vm_layout_compressed_pointer;

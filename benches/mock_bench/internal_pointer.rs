@@ -4,13 +4,12 @@ use criterion::Criterion;
 use mmtk::memory_manager;
 #[cfg(feature = "vo_bit")]
 use mmtk::util::test_util::fixtures::*;
-use mmtk::util::test_util::mock_method::*;
-use mmtk::util::test_util::mock_vm::{write_mockvm, MockVM};
+use mmtk::util::test_util::mock_vm::*;
 
 pub fn bench(c: &mut Criterion) {
     // Setting a larger heap, although the GC should be disabled below
     #[cfg(feature = "vo_bit")]
-    let mut fixture = MutatorFixture::create_with_heapsize(1 << 30);
+    let fixture = MutatorFixture::create_with_heapsize(1 << 30);
     #[cfg(feature = "vo_bit")]
     memory_manager::disable_collection(fixture.mmtk()).unwrap();
 
@@ -30,7 +29,7 @@ pub fn bench(c: &mut Criterion) {
             use mmtk::memory_manager;
             use mmtk::AllocationSemantics;
             let addr = memory_manager::alloc(
-                &mut fixture.mutator,
+                fixture.mutator(),
                 NORMAL_OBJECT_SIZE,
                 8,
                 0,
@@ -38,7 +37,7 @@ pub fn bench(c: &mut Criterion) {
             );
             let obj_ref = MockVM::object_start_to_ref(addr);
             memory_manager::post_alloc(
-                &mut fixture.mutator,
+                fixture.mutator(),
                 obj_ref,
                 NORMAL_OBJECT_SIZE,
                 AllocationSemantics::Default,
@@ -67,7 +66,7 @@ pub fn bench(c: &mut Criterion) {
             use mmtk::memory_manager;
             use mmtk::AllocationSemantics;
             let addr = memory_manager::alloc(
-                &mut fixture.mutator,
+                fixture.mutator(),
                 LARGE_OBJECT_SIZE,
                 8,
                 0,
@@ -75,7 +74,7 @@ pub fn bench(c: &mut Criterion) {
             );
             let obj_ref = MockVM::object_start_to_ref(addr);
             memory_manager::post_alloc(
-                &mut fixture.mutator,
+                fixture.mutator(),
                 obj_ref,
                 LARGE_OBJECT_SIZE,
                 AllocationSemantics::Los,

@@ -261,15 +261,19 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
      }
      }*/
 
-    pub fn reset_cursor(&self, top: Address) {
+    // top might be Address::ZERO
+    pub fn reset_cursor(&self, mut top: Address) {
         if self.common.contiguous {
             let mut guard = self.sync.lock().unwrap();
-            let cursor = top.align_up(crate::util::constants::BYTES_IN_PAGE);
-            let chunk = chunk_align_down(top);
             let space_start = match guard.conditional {
                 MonotonePageResourceConditional::Contiguous { start, .. } => start,
                 _ => unreachable!(),
             };
+            if top.is_zero() {
+                top = space_start;
+            }
+            let cursor = top.align_up(crate::util::constants::BYTES_IN_PAGE);
+            let chunk = chunk_align_down(top);
             let pages = bytes_to_pages_up(top - space_start);
             self.common.accounting.reset();
             self.common.accounting.reserve_and_commit(pages);
@@ -284,6 +288,9 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
                     + (self.common.vm_map.get_contiguous_region_chunks(chunk_start)
                         << LOG_BYTES_IN_CHUNK);
                 let next_chunk_start = self.common.vm_map.get_next_contiguous_region(chunk_start);
+                if top.is_zero() {
+                    top = chunk_start;
+                }
                 if top >= chunk_start && top < chunk_end {
                     // This is the last live chunk
                     debug_assert!(!release_regions);

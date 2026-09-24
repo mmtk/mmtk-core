@@ -2,15 +2,19 @@
 #![allow(dead_code)]
 
 use atomic_refcell::AtomicRefCell;
+use std::marker::PhantomData;
 use std::sync::Mutex;
 use std::sync::Once;
 
 use crate::memory_manager;
-use crate::util::test_util::mock_vm::MockVM;
+use crate::util::test_util::mock_vm::{MockVM, MutatorHandle};
 use crate::util::{ObjectReference, VMMutatorThread, VMThread};
+use crate::vm::VMBinding;
 use crate::AllocationSemantics;
 use crate::MMTKBuilder;
 use crate::MMTK;
+
+use crate::util::test_util::mock_vm::mock_api;
 
 pub trait FixtureContent {
     fn create() -> Self;
@@ -114,11 +118,15 @@ impl<T: FixtureContent> Default for SerialFixture<T> {
     }
 }
 
-pub struct MMTKFixture {
-    mmtk: *mut MMTK<MockVM>,
+/// A fixture that creates the MMTk singleton for the default [`MockVM`].
+pub type MMTKFixture = GenericMMTKFixture<MockVM>;
+
+/// A fixture that creates the MMTk singleton for a mock VM type `VM`.
+pub struct GenericMMTKFixture<VM: VMBinding> {
+    _vm: PhantomData<VM>,
 }
 
-impl FixtureContent for MMTKFixture {
+impl<VM: VMBinding> FixtureContent for GenericMMTKFixture<VM> {
     fn create() -> Self {
         Self::create_with_builder(
             |builder| {
@@ -133,7 +141,7 @@ impl FixtureContent for MMTKFixture {
     }
 }
 
-impl MMTKFixture {
+impl<VM: VMBinding> GenericMMTKFixture<VM> {
     pub fn create_with_builder<F>(with_builder: F, initialize_collection: bool) -> Self
     where
         F: FnOnce(&mut MMTKBuilder),
@@ -141,50 +149,48 @@ impl MMTKFixture {
         let mut builder = MMTKBuilder::new();
         with_builder(&mut builder);
 
-        let mmtk = memory_manager::mmtk_init(&builder);
+        let mmtk = memory_manager::mmtk_init::<VM>(&builder);
         let mmtk_ptr = Box::into_raw(mmtk);
+        mock_api::set_singleton(mmtk_ptr);
 
         if initialize_collection {
-            let mmtk_static: &'static MMTK<MockVM> = unsafe { &*mmtk_ptr };
+            let mmtk_static: &'static MMTK<VM> = unsafe { &*mmtk_ptr };
             memory_manager::initialize_collection(mmtk_static, VMThread::UNINITIALIZED);
         }
 
-        MMTKFixture { mmtk: mmtk_ptr }
+        Self { _vm: PhantomData }
     }
 
-    pub fn get_mmtk(&self) -> &'static MMTK<MockVM> {
-        unsafe { &*self.mmtk }
+    pub fn get_mmtk(&self) -> &'static MMTK<VM> {
+        mock_api::singleton()
     }
 
-    pub fn get_mmtk_mut(&mut self) -> &'static mut MMTK<MockVM> {
-        unsafe { &mut *self.mmtk }
-    }
-}
-
-impl Drop for MMTKFixture {
-    fn drop(&mut self) {
-        let mmtk_ptr: *const MMTK<MockVM> = self.mmtk as _;
-        let _ = unsafe { Box::from_raw(mmtk_ptr as *mut MMTK<MockVM>) };
+    pub fn get_mmtk_mut(&mut self) -> &'static mut MMTK<VM> {
+        mock_api::singleton_mut()
     }
 }
 
 use crate::plan::Mutator;
 
-pub struct MutatorFixture {
-    mmtk: MMTKFixture,
-    pub mutator: Box<Mutator<MockVM>>,
+/// A fixture that creates the MMTk singleton and binds a mutator for the default [`MockVM`].
+pub type MutatorFixture = GenericMutatorFixture<MockVM>;
+
+/// A fixture that creates the MMTk singleton and binds a mutator for a mock VM type `VM`.
+pub struct GenericMutatorFixture<VM: VMBinding> {
+    mmtk: GenericMMTKFixture<VM>,
+    mutator: VMMutatorThread,
 }
 
-impl FixtureContent for MutatorFixture {
+impl<VM: VMBinding> FixtureContent for GenericMutatorFixture<VM> {
     fn create() -> Self {
         const MB: usize = 1024 * 1024;
         Self::create_with_heapsize(MB)
     }
 }
 
-impl MutatorFixture {
+impl<VM: VMBinding> GenericMutatorFixture<VM> {
     pub fn create_with_heapsize(size: usize) -> Self {
-        let mmtk = MMTKFixture::create_with_builder(
+        let mmtk = GenericMMTKFixture::create_with_builder(
             |builder| {
                 builder
                     .options
@@ -193,8 +199,7 @@ impl MutatorFixture {
             },
             true,
         );
-        let mutator =
-            memory_manager::bind_mutator(mmtk.get_mmtk(), VMMutatorThread(VMThread::UNINITIALIZED));
+        let mutator = MutatorHandle::bind::<VM>();
         Self { mmtk, mutator }
     }
 
@@ -202,18 +207,25 @@ impl MutatorFixture {
     where
         F: FnOnce(&mut MMTKBuilder),
     {
-        let mmtk = MMTKFixture::create_with_builder(with_builder, true);
-        let mutator =
-            memory_manager::bind_mutator(mmtk.get_mmtk(), VMMutatorThread(VMThread::UNINITIALIZED));
+        let mmtk = GenericMMTKFixture::create_with_builder(with_builder, true);
+        let mutator = MutatorHandle::bind::<VM>();
         Self { mmtk, mutator }
     }
 
-    pub fn mmtk(&self) -> &'static MMTK<MockVM> {
+    pub fn mmtk(&self) -> &'static MMTK<VM> {
         self.mmtk.get_mmtk()
+    }
+
+    pub fn mutator(&self) -> &'static mut Mutator<VM> {
+        self.mutator.as_generic_mock_mutator()
+    }
+
+    pub fn mutator_tls(&self) -> VMMutatorThread {
+        self.mutator
     }
 }
 
-unsafe impl Send for MutatorFixture {}
+unsafe impl<VM: VMBinding> Send for GenericMutatorFixture<VM> {}
 
 pub struct SingleObject {
     pub objref: ObjectReference,
@@ -222,17 +234,17 @@ pub struct SingleObject {
 
 impl FixtureContent for SingleObject {
     fn create() -> Self {
-        let mut mutator = MutatorFixture::create();
+        let mutator = MutatorFixture::create();
 
         // A relatively small object, typical for Ruby.
         let size = 40;
         let semantics = AllocationSemantics::Default;
 
-        let addr = memory_manager::alloc(&mut mutator.mutator, size, 8, 0, semantics);
+        let addr = memory_manager::alloc(mutator.mutator(), size, 8, 0, semantics);
         assert!(!addr.is_zero());
 
         let objref = MockVM::object_start_to_ref(addr);
-        memory_manager::post_alloc(&mut mutator.mutator, objref, size, semantics);
+        memory_manager::post_alloc(mutator.mutator(), objref, size, semantics);
 
         SingleObject { objref, mutator }
     }
@@ -240,11 +252,11 @@ impl FixtureContent for SingleObject {
 
 impl SingleObject {
     pub fn mutator(&self) -> &Mutator<MockVM> {
-        &self.mutator.mutator
+        self.mutator.mutator()
     }
 
     pub fn mutator_mut(&mut self) -> &mut Mutator<MockVM> {
-        &mut self.mutator.mutator
+        self.mutator.mutator()
     }
 }
 
@@ -256,22 +268,22 @@ pub struct TwoObjects {
 
 impl FixtureContent for TwoObjects {
     fn create() -> Self {
-        let mut mutator = MutatorFixture::create();
+        let mutator = MutatorFixture::create();
 
         let size = 128;
         let semantics = AllocationSemantics::Default;
 
-        let addr1 = memory_manager::alloc(&mut mutator.mutator, size, 8, 0, semantics);
+        let addr1 = memory_manager::alloc(mutator.mutator(), size, 8, 0, semantics);
         assert!(!addr1.is_zero());
 
         let objref1 = MockVM::object_start_to_ref(addr1);
-        memory_manager::post_alloc(&mut mutator.mutator, objref1, size, semantics);
+        memory_manager::post_alloc(mutator.mutator(), objref1, size, semantics);
 
-        let addr2 = memory_manager::alloc(&mut mutator.mutator, size, 8, 0, semantics);
+        let addr2 = memory_manager::alloc(mutator.mutator(), size, 8, 0, semantics);
         assert!(!addr2.is_zero());
 
         let objref2 = MockVM::object_start_to_ref(addr2);
-        memory_manager::post_alloc(&mut mutator.mutator, objref2, size, semantics);
+        memory_manager::post_alloc(mutator.mutator(), objref2, size, semantics);
 
         TwoObjects {
             objref1,
