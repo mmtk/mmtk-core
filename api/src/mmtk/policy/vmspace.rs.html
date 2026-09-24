@@ -280,8 +280,8 @@
 <a href=#280 id=280 data-nosnippet>280</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
 <a href=#281 id=281 data-nosnippet>281</a>        chunk_start: Address,
 <a href=#282 id=282 data-nosnippet>282</a>        chunk_size: usize,
-<a href=#283 id=283 data-nosnippet>283</a>        raw_start: Address,
-<a href=#284 id=284 data-nosnippet>284</a>        raw_size: usize,
+<a href=#283 id=283 data-nosnippet>283</a>        _raw_start: Address,
+<a href=#284 id=284 data-nosnippet>284</a>        _raw_size: usize,
 <a href=#285 id=285 data-nosnippet>285</a>    ) {
 <a href=#286 id=286 data-nosnippet>286</a>        <span class="self">self</span>.common
 <a href=#287 id=287 data-nosnippet>287</a>            .metadata
@@ -292,13 +292,13 @@
 <a href=#292 id=292 data-nosnippet>292</a>            <span class="comment">// Bulk set unlog bits for all addresses in the VM space. This ensures that any
 <a href=#293 id=293 data-nosnippet>293</a>            // modification to the bootimage is logged
 <a href=#294 id=294 data-nosnippet>294</a>            </span><span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-<a href=#295 id=295 data-nosnippet>295</a>                side.bset_metadata(raw_start, raw_size);
+<a href=#295 id=295 data-nosnippet>295</a>                side.bset_metadata(_raw_start, _raw_size);
 <a href=#296 id=296 data-nosnippet>296</a>            }
 <a href=#297 id=297 data-nosnippet>297</a>        }
 <a href=#298 id=298 data-nosnippet>298</a>        <span class="attr">#[cfg(feature = <span class="string">"set_unlog_bits_vm_space"</span>)]
 <a href=#299 id=299 data-nosnippet>299</a>        </span><span class="kw">if </span><span class="self">self</span>.common.needs_field_log_bit {
 <a href=#300 id=300 data-nosnippet>300</a>            <span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC {
-<a href=#301 id=301 data-nosnippet>301</a>                side.bset_metadata(raw_start, raw_size);
+<a href=#301 id=301 data-nosnippet>301</a>                side.bset_metadata(_raw_start, _raw_size);
 <a href=#302 id=302 data-nosnippet>302</a>            }
 <a href=#303 id=303 data-nosnippet>303</a>        }
 <a href=#304 id=304 data-nosnippet>304</a>    }
