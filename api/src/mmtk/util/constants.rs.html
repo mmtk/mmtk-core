@@ -75,20 +75,21 @@
 <a href=#75 id=75 data-nosnippet>75</a><span class="doccomment">/// The number of bits in a word
 <a href=#76 id=76 data-nosnippet>76</a></span><span class="kw">pub const </span>BITS_IN_WORD: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_WORD;
 <a href=#77 id=77 data-nosnippet>77</a>
-<a href=#78 id=78 data-nosnippet>78</a><span class="doccomment">/// log2 of the number of bytes in a page
-<a href=#79 id=79 data-nosnippet>79</a></span><span class="kw">pub const </span>LOG_BYTES_IN_PAGE: u8 = <span class="number">12</span>;
-<a href=#80 id=80 data-nosnippet>80</a><span class="doccomment">/// The number of bytes in a page
-<a href=#81 id=81 data-nosnippet>81</a></span><span class="kw">pub const </span>BYTES_IN_PAGE: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_PAGE;
-<a href=#82 id=82 data-nosnippet>82</a><span class="doccomment">/// log2 of the number of bits in a page
-<a href=#83 id=83 data-nosnippet>83</a></span><span class="kw">pub const </span>LOG_BITS_IN_PAGE: usize = LOG_BITS_IN_BYTE <span class="kw">as </span>usize + LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
-<a href=#84 id=84 data-nosnippet>84</a><span class="doccomment">/// The number of bits in a page
-<a href=#85 id=85 data-nosnippet>85</a></span><span class="kw">pub const </span>BITS_IN_PAGE: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_PAGE;
-<a href=#86 id=86 data-nosnippet>86</a>
-<a href=#87 id=87 data-nosnippet>87</a><span class="doccomment">/// log2 of the number of bytes in the address space
-<a href=#88 id=88 data-nosnippet>88</a></span><span class="kw">pub const </span>LOG_BYTES_IN_ADDRESS_SPACE: u8 = BITS_IN_ADDRESS <span class="kw">as </span>u8;
-<a href=#89 id=89 data-nosnippet>89</a>
-<a href=#90 id=90 data-nosnippet>90</a><span class="doccomment">/// log2 of the minimal object size in bytes.
-<a href=#91 id=91 data-nosnippet>91</a></span><span class="comment">// TODO: this should be VM specific.
-<a href=#92 id=92 data-nosnippet>92</a></span><span class="kw">pub const </span>LOG_MIN_OBJECT_SIZE: u8 = LOG_BYTES_IN_WORD;
-<a href=#93 id=93 data-nosnippet>93</a><span class="doccomment">/// The minimal object size in bytes
-<a href=#94 id=94 data-nosnippet>94</a></span><span class="kw">pub const </span>MIN_OBJECT_SIZE: usize = <span class="number">1 </span>&lt;&lt; LOG_MIN_OBJECT_SIZE;</code></pre></div></section></main></body></html>
+<a href=#78 id=78 data-nosnippet>78</a><span class="doccomment">/// log2 of the number of bytes in a page. This is the page size of the OS.
+<a href=#79 id=79 data-nosnippet>79</a></span><span class="kw">pub const </span>LOG_BYTES_IN_PAGE: u8 =
+<a href=#80 id=80 data-nosnippet>80</a>    &lt;<span class="kw">crate</span>::util::os::OS <span class="kw">as </span><span class="kw">crate</span>::util::os::OSMemory&gt;::LOG_BYTES_IN_PAGE;
+<a href=#81 id=81 data-nosnippet>81</a><span class="doccomment">/// The number of bytes in a page
+<a href=#82 id=82 data-nosnippet>82</a></span><span class="kw">pub const </span>BYTES_IN_PAGE: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_PAGE;
+<a href=#83 id=83 data-nosnippet>83</a><span class="doccomment">/// log2 of the number of bits in a page
+<a href=#84 id=84 data-nosnippet>84</a></span><span class="kw">pub const </span>LOG_BITS_IN_PAGE: usize = LOG_BITS_IN_BYTE <span class="kw">as </span>usize + LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
+<a href=#85 id=85 data-nosnippet>85</a><span class="doccomment">/// The number of bits in a page
+<a href=#86 id=86 data-nosnippet>86</a></span><span class="kw">pub const </span>BITS_IN_PAGE: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_PAGE;
+<a href=#87 id=87 data-nosnippet>87</a>
+<a href=#88 id=88 data-nosnippet>88</a><span class="doccomment">/// log2 of the number of bytes in the address space
+<a href=#89 id=89 data-nosnippet>89</a></span><span class="kw">pub const </span>LOG_BYTES_IN_ADDRESS_SPACE: u8 = BITS_IN_ADDRESS <span class="kw">as </span>u8;
+<a href=#90 id=90 data-nosnippet>90</a>
+<a href=#91 id=91 data-nosnippet>91</a><span class="doccomment">/// log2 of the minimal object size in bytes.
+<a href=#92 id=92 data-nosnippet>92</a></span><span class="comment">// TODO: this should be VM specific.
+<a href=#93 id=93 data-nosnippet>93</a></span><span class="kw">pub const </span>LOG_MIN_OBJECT_SIZE: u8 = LOG_BYTES_IN_WORD;
+<a href=#94 id=94 data-nosnippet>94</a><span class="doccomment">/// The minimal object size in bytes
+<a href=#95 id=95 data-nosnippet>95</a></span><span class="kw">pub const </span>MIN_OBJECT_SIZE: usize = <span class="number">1 </span>&lt;&lt; LOG_MIN_OBJECT_SIZE;</code></pre></div></section></main></body></html>

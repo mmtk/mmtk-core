@@ -100,39 +100,40 @@
 <a href=#100 id=100 data-nosnippet>100</a>
 <a href=#101 id=101 data-nosnippet>101</a>    <span class="attr">#[test]
 <a href=#102 id=102 data-nosnippet>102</a>    </span><span class="kw">fn </span>test_page_align() {
-<a href=#103 id=103 data-nosnippet>103</a>        <span class="kw">let </span>addr = <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x2345_6789</span>) };
-<a href=#104 id=104 data-nosnippet>104</a>        <span class="macro">assert_eq!</span>(page_align_down(addr), <span class="kw">unsafe </span>{
-<a href=#105 id=105 data-nosnippet>105</a>            Address::from_usize(<span class="number">0x2345_6000</span>)
-<a href=#106 id=106 data-nosnippet>106</a>        });
-<a href=#107 id=107 data-nosnippet>107</a>        <span class="macro">assert!</span>(!is_page_aligned(addr));
-<a href=#108 id=108 data-nosnippet>108</a>        <span class="macro">assert!</span>(is_page_aligned(page_align_down(addr)));
-<a href=#109 id=109 data-nosnippet>109</a>    }
-<a href=#110 id=110 data-nosnippet>110</a>
-<a href=#111 id=111 data-nosnippet>111</a>    <span class="attr">#[test]
-<a href=#112 id=112 data-nosnippet>112</a>    </span><span class="kw">fn </span>test_chunk_align() {
-<a href=#113 id=113 data-nosnippet>113</a>        <span class="kw">let </span>addr = <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x2345_6789</span>) };
-<a href=#114 id=114 data-nosnippet>114</a>        <span class="macro">assert_eq!</span>(chunk_align_down(addr), <span class="kw">unsafe </span>{
-<a href=#115 id=115 data-nosnippet>115</a>            Address::from_usize(<span class="number">0x2340_0000</span>)
-<a href=#116 id=116 data-nosnippet>116</a>        });
-<a href=#117 id=117 data-nosnippet>117</a>        <span class="macro">assert_eq!</span>(chunk_align_up(addr), <span class="kw">unsafe </span>{
-<a href=#118 id=118 data-nosnippet>118</a>            Address::from_usize(<span class="number">0x2380_0000</span>)
-<a href=#119 id=119 data-nosnippet>119</a>        });
-<a href=#120 id=120 data-nosnippet>120</a>    }
-<a href=#121 id=121 data-nosnippet>121</a>
-<a href=#122 id=122 data-nosnippet>122</a>    <span class="attr">#[test]
-<a href=#123 id=123 data-nosnippet>123</a>    </span><span class="kw">fn </span>test_bytes_to_formatted_string() {
-<a href=#124 id=124 data-nosnippet>124</a>        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">0</span>), <span class="string">"0B"</span>);
-<a href=#125 id=125 data-nosnippet>125</a>        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1023</span>), <span class="string">"1023B"</span>);
-<a href=#126 id=126 data-nosnippet>126</a>        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1024</span>), <span class="string">"1KiB"</span>);
-<a href=#127 id=127 data-nosnippet>127</a>        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1025</span>), <span class="string">"1KiB"</span>);
-<a href=#128 id=128 data-nosnippet>128</a>        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">20</span>), <span class="string">"1MiB"</span>);
-<a href=#129 id=129 data-nosnippet>129</a>        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">30</span>), <span class="string">"1GiB"</span>);
-<a href=#130 id=130 data-nosnippet>130</a>        <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
-<a href=#131 id=131 data-nosnippet>131</a>        </span>{
-<a href=#132 id=132 data-nosnippet>132</a>            <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">40</span>), <span class="string">"1TiB"</span>);
-<a href=#133 id=133 data-nosnippet>133</a>            <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">50</span>), <span class="string">"1PiB"</span>);
-<a href=#134 id=134 data-nosnippet>134</a>            <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">60</span>), <span class="string">"1024PiB"</span>);
-<a href=#135 id=135 data-nosnippet>135</a>            <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">63</span>), <span class="string">"8192PiB"</span>);
-<a href=#136 id=136 data-nosnippet>136</a>        }
-<a href=#137 id=137 data-nosnippet>137</a>    }
-<a href=#138 id=138 data-nosnippet>138</a>}</code></pre></div></section></main></body></html>
+<a href=#103 id=103 data-nosnippet>103</a>        <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE;
+<a href=#104 id=104 data-nosnippet>104</a>        <span class="kw">let </span>addr = <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x2345_6789</span>) };
+<a href=#105 id=105 data-nosnippet>105</a>        <span class="macro">assert_eq!</span>(page_align_down(addr), <span class="kw">unsafe </span>{
+<a href=#106 id=106 data-nosnippet>106</a>            Address::from_usize(<span class="number">0x2345_6789 </span>&amp; !(BYTES_IN_PAGE - <span class="number">1</span>))
+<a href=#107 id=107 data-nosnippet>107</a>        });
+<a href=#108 id=108 data-nosnippet>108</a>        <span class="macro">assert!</span>(!is_page_aligned(addr));
+<a href=#109 id=109 data-nosnippet>109</a>        <span class="macro">assert!</span>(is_page_aligned(page_align_down(addr)));
+<a href=#110 id=110 data-nosnippet>110</a>    }
+<a href=#111 id=111 data-nosnippet>111</a>
+<a href=#112 id=112 data-nosnippet>112</a>    <span class="attr">#[test]
+<a href=#113 id=113 data-nosnippet>113</a>    </span><span class="kw">fn </span>test_chunk_align() {
+<a href=#114 id=114 data-nosnippet>114</a>        <span class="kw">let </span>addr = <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x2345_6789</span>) };
+<a href=#115 id=115 data-nosnippet>115</a>        <span class="macro">assert_eq!</span>(chunk_align_down(addr), <span class="kw">unsafe </span>{
+<a href=#116 id=116 data-nosnippet>116</a>            Address::from_usize(<span class="number">0x2340_0000</span>)
+<a href=#117 id=117 data-nosnippet>117</a>        });
+<a href=#118 id=118 data-nosnippet>118</a>        <span class="macro">assert_eq!</span>(chunk_align_up(addr), <span class="kw">unsafe </span>{
+<a href=#119 id=119 data-nosnippet>119</a>            Address::from_usize(<span class="number">0x2380_0000</span>)
+<a href=#120 id=120 data-nosnippet>120</a>        });
+<a href=#121 id=121 data-nosnippet>121</a>    }
+<a href=#122 id=122 data-nosnippet>122</a>
+<a href=#123 id=123 data-nosnippet>123</a>    <span class="attr">#[test]
+<a href=#124 id=124 data-nosnippet>124</a>    </span><span class="kw">fn </span>test_bytes_to_formatted_string() {
+<a href=#125 id=125 data-nosnippet>125</a>        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">0</span>), <span class="string">"0B"</span>);
+<a href=#126 id=126 data-nosnippet>126</a>        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1023</span>), <span class="string">"1023B"</span>);
+<a href=#127 id=127 data-nosnippet>127</a>        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1024</span>), <span class="string">"1KiB"</span>);
+<a href=#128 id=128 data-nosnippet>128</a>        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1025</span>), <span class="string">"1KiB"</span>);
+<a href=#129 id=129 data-nosnippet>129</a>        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">20</span>), <span class="string">"1MiB"</span>);
+<a href=#130 id=130 data-nosnippet>130</a>        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">30</span>), <span class="string">"1GiB"</span>);
+<a href=#131 id=131 data-nosnippet>131</a>        <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
+<a href=#132 id=132 data-nosnippet>132</a>        </span>{
+<a href=#133 id=133 data-nosnippet>133</a>            <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">40</span>), <span class="string">"1TiB"</span>);
+<a href=#134 id=134 data-nosnippet>134</a>            <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">50</span>), <span class="string">"1PiB"</span>);
+<a href=#135 id=135 data-nosnippet>135</a>            <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">60</span>), <span class="string">"1024PiB"</span>);
+<a href=#136 id=136 data-nosnippet>136</a>            <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">63</span>), <span class="string">"8192PiB"</span>);
+<a href=#137 id=137 data-nosnippet>137</a>        }
+<a href=#138 id=138 data-nosnippet>138</a>    }
+<a href=#139 id=139 data-nosnippet>139</a>}</code></pre></div></section></main></body></html>
