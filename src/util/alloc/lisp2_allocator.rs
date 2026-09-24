@@ -6,7 +6,7 @@ use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
-use crate::vm::VMBinding;
+use crate::vm::{ActivePlan, VMBinding};
 
 /// A thin wrapper(specific implementation) of bump allocator
 /// reserve extra bytes when allocating
@@ -57,6 +57,15 @@ impl<VM: VMBinding> Allocator<VM> for Lisp2Allocator<VM> {
         // Check if the result is valid and return the actual object start address
         // Note that `rtn` can be null in the case of OOM
         if !rtn.is_zero() {
+            // If we dont zero our memory for the alloctaion, we still need to make sure the extra header bytes are zero.
+            if !VM::VMActivePlan::NEEDS_MEMORY_ZEROING {
+                if Self::HEADER_RESERVED_IN_BYTES == 8 {
+                    // TODO: Write into this thread's allocation -- non atomic store is fine
+                    unsafe { rtn.store::<u64>(0) };
+                } else {
+                    unimplemented!();
+                }
+            }
             rtn + Self::HEADER_RESERVED_IN_BYTES
         } else {
             rtn
