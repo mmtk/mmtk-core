@@ -55,7 +55,7 @@ jemalloc-sys = { version = "0.5.3", features = [
 lazy_static = "1.1"
 libc = "0.2"
 log = { version = "0.4", features = ["max_level_trace"] }
-mimalloc-sys = { version = "0.1.6", optional = true }
+libmimalloc-sys = { version = "0.1.49", features = ["extended"], optional = true }
 num_cpus = "1.8"
 num-traits = "0.2"
 pfm = { version = "0.1.1", optional = true }
@@ -178,7 +178,7 @@ immix_non_moving = []
 # if `immix_non_moving` is in use.
 sticky_immix_non_moving_nursery = []
 
-# Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
+# Reduce block size for ImmixSpace (8K, or one page if the page is larger).  This mitigates fragmentation when defrag is disabled.
 immix_smaller_block = []
 # Zero the unmarked lines after a GC cycle in immix. This helps debug untraced objects.
 immix_zero_on_release = []
@@ -258,7 +258,7 @@ vo_bit_access = []
 # Group:malloc
 # only one of the following features should be enabled, or none to use the default malloc from libc
 # this does not replace the global Rust allocator, but provides these libraries for GC implementation
-malloc_mimalloc = ["dep:mimalloc-sys"]
+malloc_mimalloc = ["dep:libmimalloc-sys"]
 malloc_jemalloc = ["dep:jemalloc-sys"]
 
 # Use the native mimalloc allocator for malloc. This is not tested by me (Yi) yet, and it is only used to make sure that some code

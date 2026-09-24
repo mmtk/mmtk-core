@@ -148,6 +148,7 @@ Here is a list of supported platforms.
 |-----------------------------|-----------|-----------|-------|
 | x86_64-unknown-linux-gnu    | 1         | 1         |       |
 | i686-unknown-linux-gnu      | 1         | 1         |       |
+| aarch64-apple-darwin        | 1         | 2         |       |
 | aarch64-unknown-linux-gnu   | 1         | 2         |       |
 | x86_64-apple-darwin         | 2         | 2         | (1)   |
 | riscv64gc-unknown-linux-gnu | 2         | 3         |       |
