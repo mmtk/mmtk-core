@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["LOS_BIT_MASK","MARK_BIT","NURSERY_BIT","PAGE_MASK"],"fn":["get_super_page"],"struct":["LargeObjectSpace"]};
+window.SIDEBAR_ITEMS = {"constant":["LOS_BIT_MASK","MARK_BIT","NURSERY_BIT","PAGE_MASK"],"fn":["get_super_page"],"mod":["mark_nursery_bits_states"],"struct":["LargeObjectSpace"]};
