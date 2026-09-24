@@ -55,7 +55,7 @@ jemalloc-sys = { version = "0.5.3", features = [
 lazy_static = "1.1"
 libc = "0.2"
 log = { version = "0.4", features = ["max_level_trace"] }
-mimalloc-sys = { version = "0.1.6", optional = true }
+libmimalloc-sys = { version = "0.1.49", features = ["extended"], optional = true }
 num_cpus = "1.8"
 num-traits = "0.2"
 pfm = { version = "0.1.1", optional = true }
@@ -80,6 +80,10 @@ criterion = "0.7.0"
 
 [build-dependencies]
 built = { version = "0.8.0", features = ["git2"] }
+# yoke-derive (pulled in via built -> git2 -> url -> idna -> yoke) 0.8.3 uses the inherent `str::from_utf8`
+# which requires Rust 1.87, but it does not declare `rust-version`, so the MSRV-aware resolver cannot skip it.
+# We can remove this dependency when we use MSRV 1.87+.
+yoke-derive = "=0.8.2"
 
 [lints.clippy]
 # Allow this. Clippy suggests we should use Sft, Mmtk, rather than SFT and MMTK.
@@ -177,7 +181,7 @@ immix_non_moving = []
 # if `immix_non_moving` is in use.
 sticky_immix_non_moving_nursery = []
 
-# Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
+# Reduce block size for ImmixSpace (8K, or one page if the page is larger).  This mitigates fragmentation when defrag is disabled.
 immix_smaller_block = []
 # Zero the unmarked lines after a GC cycle in immix. This helps debug untraced objects.
 immix_zero_on_release = []
@@ -257,7 +261,7 @@ vo_bit_access = []
 # Group:malloc
 # only one of the following features should be enabled, or none to use the default malloc from libc
 # this does not replace the global Rust allocator, but provides these libraries for GC implementation
-malloc_mimalloc = ["dep:mimalloc-sys"]
+malloc_mimalloc = ["dep:libmimalloc-sys"]
 malloc_jemalloc = ["dep:jemalloc-sys"]
 
 # Use the native mimalloc allocator for malloc. This is not tested by me (Yi) yet, and it is only used to make sure that some code
