@@ -490,6 +490,7 @@ impl<VM: VMBinding, const FULL_GC: bool> DerefMut for LXRStopTheWorldProcessEdge
     }
 }
 
+#[cfg(feature = "non_moving_root")]
 /// Stop-the-world tracing of roots reported as objects rather than as slots.
 pub struct LXRStopTheWorldProcessNodes<VM: VMBinding, const FULL_GC: bool> {
     lxr: &'static LXR<VM>,
@@ -506,8 +507,10 @@ pub struct LXRStopTheWorldProcessNodes<VM: VMBinding, const FULL_GC: bool> {
     closure_bucket: WorkBucketStage,
 }
 
+#[cfg(feature = "non_moving_root")]
 unsafe impl<VM: VMBinding, const FULL_GC: bool> Send for LXRStopTheWorldProcessNodes<VM, FULL_GC> {}
 
+#[cfg(feature = "non_moving_root")]
 impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessNodes<VM, FULL_GC> {
     pub fn new(
         nodes: Vec<ObjectReference>,
@@ -570,6 +573,7 @@ impl<VM: VMBinding, const FULL_GC: bool> LXRStopTheWorldProcessNodes<VM, FULL_GC
     }
 }
 
+#[cfg(feature = "non_moving_root")]
 impl<VM: VMBinding, const FULL_GC: bool> ObjectQueue for LXRStopTheWorldProcessNodes<VM, FULL_GC> {
     fn enqueue(&mut self, object: ObjectReference) {
         let limit: usize = if FULL_GC { 8192 } else { 1024 };
@@ -590,6 +594,7 @@ impl<VM: VMBinding, const FULL_GC: bool> ObjectQueue for LXRStopTheWorldProcessN
     }
 }
 
+#[cfg(feature = "non_moving_root")]
 impl<VM: VMBinding, const FULL_GC: bool> GCWork<VM> for LXRStopTheWorldProcessNodes<VM, FULL_GC> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         self.worker = worker;

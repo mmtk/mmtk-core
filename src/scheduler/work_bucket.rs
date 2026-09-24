@@ -395,6 +395,11 @@ pub enum WorkBucketStage {
     /// roots here (see `root_scanning_stage`); the roots a binding reports as objects rather than
     /// as slots are counted in this stage because there is no slot to write a forwarding pointer
     /// back into.  Counting them before `RCProcessIncs` opens is what keeps them in place.
+    ///
+    /// Only exists with the `non_moving_root` feature.  Without it no root is reported as an
+    /// object, so nothing would ever be put here, and scanning roots one stage ahead of
+    /// `RCProcessIncs` would only stop the two from overlapping.
+    #[cfg(feature = "non_moving_root")]
     RCProcessIncsNonMoving,
     /// Process reference-count increments from the LXR barrier and from root slots.  May
     /// evacuate nursery objects, so it must run after `RCProcessIncsNonMoving`.
@@ -407,8 +412,14 @@ pub enum WorkBucketStage {
     ClearVOBits,
     /// Compute the transtive closure starting from transitively pinning (TP) roots following only strong references.
     /// No objects in this closure are allow to move.
+    ///
+    /// Only exists with the `non_moving_root` feature.
+    #[cfg(feature = "non_moving_root")]
     TPinningClosure,
     /// Trace (non-transitively) pinning roots. Objects pointed by those roots must not move, but their children may. To ensure correctness, these must be processed after TPinningClosure
+    ///
+    /// Only exists with the `non_moving_root` feature.
+    #[cfg(feature = "non_moving_root")]
     PinningRootsTrace,
     /// Compute the transtive closure following only strong references.
     Closure,

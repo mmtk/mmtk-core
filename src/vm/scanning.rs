@@ -132,8 +132,11 @@ pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
     /// This method is useful for conservative stack scanning, or VMs that cannot update some
     /// of the root slots.
     ///
+    /// Only available with the `non_moving_root` feature.
+    ///
     /// Arguments:
     /// * `nodes`: A vector of references to objects pointed by edges from roots.
+    #[cfg(feature = "non_moving_root")]
     fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>);
 
     /// Create work packets to handle transitively pinning (TP) roots.
@@ -141,8 +144,11 @@ pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
     /// Similar to `create_process_pinning_roots_work`, this work packet will not move objects in `nodes`.
     /// Unlike `create_process_pinning_roots_work`, no objects in the transitive closure of `nodes` will be moved, either.
     ///
+    /// Only available with the `non_moving_root` feature.
+    ///
     /// Arguments:
     /// * `nodes`: A vector of references to objects pointed by edges from roots.
+    #[cfg(feature = "non_moving_root")]
     fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>);
 }
 
@@ -151,7 +157,9 @@ pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
 #[repr(usize)]
 pub(crate) enum RootsKind {
     NORMAL = 0,
+    #[cfg(feature = "non_moving_root")]
     PINNING = 1,
+    #[cfg(feature = "non_moving_root")]
     TPINNING = 2,
 }
 
