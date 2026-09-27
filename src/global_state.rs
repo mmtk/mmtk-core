@@ -775,6 +775,37 @@ mod gc_status_tests {
     }
 
     #[test]
+    fn set_concurrent_gc_finished_from_in_concurrent_gc() {
+        let word = GcStatusWord::new(GcStatus::InConcurrentGC);
+        assert!(word.set_concurrent_gc_finished());
+        assert_eq!(word.load(), GcStatus::NotInGC);
+    }
+
+    #[test]
+    fn set_concurrent_gc_finished_does_not_overwrite_a_requested_pause() {
+        // A mutator won the race to request a pause while the concurrent work was draining. The
+        // request must survive, and the caller must be told it did not perform the transition so
+        // it does not report the GC as over.
+        let word = GcStatusWord::new(GcStatus::PauseRequested);
+        assert!(!word.set_concurrent_gc_finished());
+        assert_eq!(word.load(), GcStatus::PauseRequested);
+    }
+
+    #[test]
+    fn set_concurrent_gc_finished_is_a_no_op_outside_a_concurrent_gc() {
+        for status in [
+            GcStatus::NotInGC,
+            GcStatus::InPause,
+            GcStatus::Disabled(1),
+            GcStatus::Uninitialized,
+        ] {
+            let word = GcStatusWord::new(status);
+            assert!(!word.set_concurrent_gc_finished());
+            assert_eq!(word.load(), status);
+        }
+    }
+
+    #[test]
     fn set_not_in_gc_from_in_pause() {
         let word = GcStatusWord::new(GcStatus::InPause);
         word.set_not_in_gc();

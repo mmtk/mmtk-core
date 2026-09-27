@@ -161,7 +161,7 @@ pub trait Collection<VM: VMBinding> {
     /// park. A binding that blocks a thread until the collector is quiescent -- to disable
     /// collection, say -- should wake it here; for a phase that ends in a pause, the
     /// [`Collection::resume_mutators`] call at the end of that pause is the equivalent point.
-    fn concurrent_work_finished() {}
+    fn concurrent_work_finished_no_pause() {}
 
     /// Return the amount of memory (in bytes) which the VM allocated outside the MMTk heap but
     /// wants to include into the current MMTk heap size.  MMTk core will consider the reported

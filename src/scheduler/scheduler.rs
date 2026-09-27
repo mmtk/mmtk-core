@@ -573,12 +573,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
         let Some(goal) = next_goal else {
             // No requests, and the poll above did not ask for one either. If a concurrent phase
-            // was running, its work has now drained without a pause following it -- a `FinalMark`
-            // request would have shown up as a goal here, and the poll is the last chance for one
-            // to be raised. The GC is over, so leave `InConcurrentGC`, and tell the binding:
-            // nothing else will, since `resume_mutators` only runs at the end of a pause.
-            if worker.mmtk.state.gc_status.set_concurrent_gc_finished() {
-                <VM as VMBinding>::VMCollection::concurrent_work_finished();
+            // was running, its work packets have now drained -- a `FinalMark` request would have
+            // shown up as a goal here, and the poll is the last chance for one to be raised. Tell
+            // the plan, which decides whether that ends the GC.
+            if worker.mmtk.state.gc_status.load() == crate::global_state::GcStatus::InConcurrentGC {
+                let plan = worker.mmtk.get_plan().concurrent().unwrap();
+                plan.on_concurrent_work_drained();
             }
             // Park this worker, too.
             return LastParkedResult::ParkSelf;
