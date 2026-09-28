@@ -162,6 +162,26 @@ pub trait Slot: Copy + Send + Sync + Debug + PartialEq + Eq + Hash {
     fn to_address(&self) -> Address {
         unimplemented!()
     }
+
+    /// Whether this slot's referent can only be recovered using information captured when the
+    /// slot was created, rather than from the slot's contents alone.
+    ///
+    /// An offsetted slot is the motivating case: the VM hands out the address of a field holding
+    /// an interior pointer together with the distance from the object's start, and [`Slot::load`]
+    /// recovers the object by subtracting that distance. The distance is only a property of the
+    /// field's value at the moment of creation, so re-reading such a slot later can yield an
+    /// address that is not an object at all.
+    ///
+    /// Slots that report `true` must not be recorded for deferred processing (see LXR's
+    /// coalescing barrier, which re-reads recorded slots at the next pause). They may still be
+    /// loaded and stored immediately, which is all a tracing GC needs in order to fix up the
+    /// interior pointer.
+    ///
+    /// A derived slot never contributes reachability of its own: the referent it names is, by
+    /// construction, some other slot's referent, so declining to record one loses nothing.
+    fn is_derived(&self) -> bool {
+        false
+    }
 }
 
 /// A simple slot implementation that represents a word-sized slot which holds the raw address of

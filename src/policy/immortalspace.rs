@@ -59,6 +59,9 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         if self.common.unlog_allocated_object {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
             if self.common.needs_field_log_bit {
+                // A plan with a field-granularity barrier (LXR) consults a per-field bit
+                // instead of the per-object one, so the object's whole extent has to be
+                // marked unlogged for writes into it to reach the barrier slow path.
                 VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
                     .as_spec()
                     .extract_side_spec()

@@ -573,7 +573,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
         let Some(goal) = next_goal else {
             // No requests, and the poll above did not ask for one either. If a concurrent phase
-            // was running, its work packets have now drained, tell the plan.
+            // was running, its work packets have now drained -- a `FinalMark` request would have
+            // shown up as a goal here, and the poll is the last chance for one to be raised. Tell
+            // the plan, which decides whether that ends the GC.
             if worker.mmtk.state.gc_status.load() == crate::global_state::GcStatus::InConcurrentGC {
                 let plan = worker.mmtk.get_plan().concurrent().unwrap();
                 plan.on_concurrent_work_drained();
