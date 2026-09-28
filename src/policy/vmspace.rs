@@ -286,8 +286,8 @@ impl<VM: VMBinding> VMSpace<VM> {
         &self,
         chunk_start: Address,
         chunk_size: usize,
-        raw_start: Address,
-        raw_size: usize,
+        _raw_start: Address,
+        _raw_size: usize,
     ) {
         self.common
             .metadata
@@ -299,13 +299,13 @@ impl<VM: VMBinding> VMSpace<VM> {
         {
             // Bulk set unlog bits for all addresses in the VM space. This ensures that any
             // modification to the bootimage is logged
-            side.bset_metadata(raw_start, raw_size);
+            side.bset_metadata(_raw_start, _raw_size);
         }
         #[cfg(feature = "set_unlog_bits_vm_space")]
         if self.common.needs_field_log_bit
             && let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
         {
-            side.bset_metadata(raw_start, raw_size);
+            side.bset_metadata(_raw_start, _raw_size);
         }
     }
 

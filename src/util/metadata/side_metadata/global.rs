@@ -31,7 +31,7 @@ pub struct SideMetadataSpec {
     pub offset: usize,
     /// Number of bits needed per region. E.g. 0 = 1 bit, 1 = 2 bit.
     pub log_num_of_bits: usize,
-    /// Number of bytes of the region. E.g. 3 = 8 bytes, 12 = 4096 bytes (page).
+    /// Number of bytes of the region. E.g. 3 = 8 bytes, 12 = 4096 bytes.
     pub log_bytes_in_region: usize,
 }
 

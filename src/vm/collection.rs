@@ -156,6 +156,13 @@ pub trait Collection<VM: VMBinding> {
     /// Inform the VM to do its VM-specific release work at the end of a GC.
     fn vm_release() {}
 
+    /// Inform the VM that a concurrent phase has finished without a pause following it.
+    /// Called with no mutators stopped, on the last GC worker to park.
+    /// If a binding that blocks a thread until the concurrent GC is done, it can unblock
+    /// the thread here (e.g. a mutator may be blocked on a failed transition to disable GC
+    /// and wait until the concurrent GC is done)
+    fn concurrent_work_finished_no_pause() {}
+
     /// Return the amount of memory (in bytes) which the VM allocated outside the MMTk heap but
     /// wants to include into the current MMTk heap size.  MMTk core will consider the reported
     /// memory as part of MMTk heap for the purpose of heap size accounting.
