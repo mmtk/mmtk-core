@@ -20,6 +20,7 @@ use crate::vm::slot::Slot;
 use crate::{
     plan::concurrent::global::ConcurrentPlan,
     plan::concurrent::Pause,
+    plan::global::Plan,
     policy::{immix::block::Block, space::Space},
     scheduler::{GCWork, GCWorker, WorkBucketStage},
     util::{metadata::side_metadata, object_forwarding, ObjectReference},
@@ -194,10 +195,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 block.set_as_in_place_promoted();
             }
             self.rc.promote_with_size(o, size);
-            if copied {
-                self.survival_ratio_predictor_local
-                    .record_copied_promotion(size);
-            }
+            self.survival_ratio_predictor_local
+                .record_promotion(size, copied);
         } else {
             // println!("promote los {:?} {}", o, self.immix().is_marked(o));
         }
@@ -275,6 +274,9 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 cursor += step;
             }
         };
+        // Promotion above arms the per-field unlog bits. Do the same for object log bits.
+        #[cfg(feature = "lxr_object_log")]
+        VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(o, Ordering::SeqCst);
         let obj_in_defrag = !los && Block::in_defrag_block(o);
         let tls = worker.tls.0;
         o.iterate_fields::<VM, _>(tls, |slot| {
@@ -625,13 +627,17 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
         // Process recursively generated buffer
         let mut depth = self.depth;
         let mut incs = vec![];
-        const ACTIVE_PACKET_SPLIT: bool = false;
+        // Incs are processed by the worker that discovered them, unless we split.
+        // Split size defaults to `usize::MAX` (never split).
+        let split_size = *self.lxr.base().options.lxr_min_packet_split_size;
+        // Split depth defaults to 16 (split after 16 recursions).
+        let split_depth = *self.lxr.base().options.lxr_min_packet_split_depth;
         while !self.new_incs.is_empty() {
             self.new_incs_count = 0;
             depth += 1;
             incs.clear();
             self.new_incs.swap(&mut incs);
-            if ACTIVE_PACKET_SPLIT && depth >= 16 && incs.len() > 1 {
+            if depth as usize >= split_depth && incs.len() > split_size {
                 let (a, b) = incs.split_at(incs.len() / 2);
                 let mut w = ProcessIncs::<VM, EDGE_KIND_NURSERY>::new(b.to_vec(), self.lxr);
                 w.depth = depth;

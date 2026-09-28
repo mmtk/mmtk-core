@@ -799,8 +799,13 @@ mod tests {
                     let mut metadata_sanity = SideMetadataSanity::new();
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
+                    // The data size to map has to be page aligned.
+                    let map_size = crate::util::conversions::raw_align_up(
+                        total_size,
+                        constants::BYTES_IN_PAGE,
+                    );
                     metadata
-                        .try_map_metadata_space(data_addr, total_size, "test_space")
+                        .try_map_metadata_space(data_addr, map_size, "test_space")
                         .unwrap();
 
                     metadata_1_spec.bzero_metadata(data_addr, total_size);

@@ -41,6 +41,10 @@ impl<VM: VMBinding> BucketQueue<VM> {
         self.active_queue().is_empty()
     }
 
+    fn len(&self) -> usize {
+        self.active_queue().len()
+    }
+
     pub(super) fn steal(&self) -> Steal<Box<dyn GCWork<VM>>> {
         self.active_queue().steal()
     }
@@ -215,6 +219,10 @@ impl<VM: VMBinding> WorkBucket<VM> {
     /// Test if the bucket is drained
     pub fn is_empty(&self) -> bool {
         self.queue.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.queue.len()
     }
 
     pub fn is_drained(&self) -> bool {

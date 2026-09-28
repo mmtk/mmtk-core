@@ -344,13 +344,17 @@ impl<VM: VMBinding> MMTK<VM> {
     /// This is usually called by the benchmark harness as its last step before the actual benchmark.
     pub fn harness_begin(&self, tls: VMMutatorThread) {
         probe!(mmtk, harness_begin);
-        self.handle_user_collection_request(tls, true, true);
+        let gc_triggered = self.handle_user_collection_request(tls, true, true);
         // Since handle_user_collection_request may not trigger GC if tls is null, we add a
         // block_for_gc to compensate for this because we force a GC in harness begin.
         //
-        // TODO: Fix the API of handle_user_collection_request so that we won't need this
+        // Only do this if a GC was actually triggered. A plan that does not collect garbage
+        // (NoGC) ignores the request and never schedules a GC, so blocking here would wait
+        // forever and deadlock the VM.
+        //
+        // FIXME: Fix the API of handle_user_collection_request so that we won't need this
         // workaround.
-        if tls.0 .0.is_null() {
+        if gc_triggered && tls.0 .0.is_null() {
             use crate::vm::Collection;
             VM::VMCollection::block_for_gc(tls);
         }
@@ -464,7 +468,7 @@ impl<VM: VMBinding> MMTK<VM> {
             // Do not block for GC if the `tls` does not represent a valid mutator thread. This
             // allows non-mutator threads to trigger GC but not block for GC.
             //
-            // TODO: Make a proper API that allows `handle_user_collection_request` to be called by
+            // FIXME: Make a proper API that allows `handle_user_collection_request` to be called by
             // non-mutators and/or not trigger GC.
             if !tls.0 .0.is_null() {
                 VM::VMCollection::block_for_gc(tls);

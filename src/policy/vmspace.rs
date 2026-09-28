@@ -295,6 +295,12 @@ impl<VM: VMBinding> VMSpace<VM> {
                 side.bset_metadata(_raw_start, _raw_size);
             }
         }
+        #[cfg(feature = "set_unlog_bits_vm_space")]
+        if self.common.needs_field_log_bit {
+            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC {
+                side.bset_metadata(_raw_start, _raw_size);
+            }
+        }
     }
 
     pub fn prepare(&mut self) {

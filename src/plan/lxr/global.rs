@@ -83,7 +83,7 @@ pub struct LXR<VM: VMBinding> {
 }
 
 pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints {
-    moves_objects: true,
+    moves_objects: super::NURSERY_EVACUATION || super::MATURE_EVACUATION,
     // Max immix object size is half of a block.
     max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
     barrier: BarrierSelector::FieldBarrier,
@@ -108,13 +108,22 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         if self.concurrent_work_in_progress() && super::concurrent_marking_packets_drained() {
             return true;
         }
+        // Bound the pause by bounding the work it has to do (default to usize::MAX - disabled)
+        if self.rc.inc_buffer_size() >= *self.base().options.lxr_inc_buffer_limit {
+            return true;
+        }
         // Survival limits
         let total_young_alloc_pages =
             self.block_allocation.total_young_allocation_in_bytes() >> LOG_BYTES_IN_MBYTE;
-        let predicted_survival_mb: usize =
-            ((total_young_alloc_pages as f64 * super::SURVIVAL_RATIO_PREDICTOR.ratio()) as usize)
-                << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER;
-        if predicted_survival_mb >= super::MAX_SURVIVAL_MB {
+        // Use copy promotion ratio, or just total promotion ratio.
+        let ratio = if LXR_CONSTRAINTS.moves_objects {
+            super::SURVIVAL_RATIO_PREDICTOR.copy_promote_ratio()
+        } else {
+            super::SURVIVAL_RATIO_PREDICTOR.promote_ratio()
+        };
+        let predicted_survival_mb: usize = ((total_young_alloc_pages as f64 * ratio) as usize)
+            << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER;
+        if predicted_survival_mb >= *self.base().options.lxr_max_survival_mb {
             return true;
         }
         if !self.immix_space.common().contiguous {
@@ -227,7 +236,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        let _new_ratio = super::SURVIVAL_RATIO_PREDICTOR.update_ratio();
+        super::SURVIVAL_RATIO_PREDICTOR.update_ratios();
         let pause = self.current_pause().unwrap();
         if pause == Pause::FinalMark || pause == Pause::Full {
             VM::VMCollection::update_weak_processor(false);
@@ -259,7 +268,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     fn get_collection_reserved_pages(&self) -> usize {
         let survival = {
             let predicted_survival = (self.block_allocation.clean_nursery_mb() as f64
-                * super::SURVIVAL_RATIO_PREDICTOR.ratio())
+                * super::SURVIVAL_RATIO_PREDICTOR.copy_promote_ratio())
                 as usize;
             predicted_survival << LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER
         };
@@ -385,6 +394,28 @@ impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
     fn on_concurrent_work_interrupted(&self) {
         // Do nothing
     }
+
+    fn on_concurrent_work_drained(&self) {
+        // Concurrent marking will end with a pause. We dont need to do anything here.
+        if self.in_concurrent_marking.load(Ordering::Acquire) {
+            return;
+        }
+        // Concurrent marking was not running, so the only concurrent work was lazy decrements
+        // and the lazy sweeping they chain into. `LazySweepingJobs::all_finished` covers both.
+        debug_assert!(
+            super::LazySweepingJobs::all_finished(),
+            "Deferred decrement or sweeping jobs outstanding with every GC worker parked and no work left"
+        );
+        // Leave `InConcurrentGC`.
+        if self
+            .base()
+            .global_state
+            .gc_status
+            .set_concurrent_gc_finished()
+        {
+            <VM as VMBinding>::VMCollection::concurrent_work_finished_no_pause();
+        }
+    }
 }
 
 impl<VM: VMBinding> LXR<VM> {
@@ -394,14 +425,24 @@ impl<VM: VMBinding> LXR<VM> {
             "LXR does not support placing forwarding bits on the side."
         );
         let num_workers = args.scheduler.num_workers();
-        let immix_specs = metadata::extract_side_metadata(&[
+        #[allow(unused_mut)]
+        let mut specs = vec![
             MetadataSpec::OnSide(RC_TABLE),
             MetadataSpec::OnSide(
                 *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
                     .as_spec()
                     .extract_side_spec(),
             ),
-        ]);
+        ];
+        // The per-object log bit has to be registered too, not just the per-field one. LXR's
+        // own barrier only consults the field bits, this can be an issue for the probable write API (no field given).
+        // With `lxr_object_log`, the probable write API also logs the object bit.
+        // TODO: We should examine if we can steal a bit from the field log its as the 'logical' object log bit.
+        // We potentially could use the field log bit at the object start, or (object ref - lower bound) -- there should
+        // be no field at those addresses.
+        #[cfg(feature = "lxr_object_log")]
+        specs.push(*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.as_spec());
+        let immix_specs = metadata::extract_side_metadata(&specs);
         let global_side_metadata_specs = SideMetadataContext::new_global_specs(&immix_specs);
         let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
