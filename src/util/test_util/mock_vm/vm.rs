@@ -118,7 +118,7 @@ where
             let orig_hook = panic::take_hook();
             panic::set_hook(Box::new(move |panic_info| {
                 let current_tls = current_thread_tls();
-                if GC_THREADS.is_thread(current_tls) {
+                if GC_THREADS.contains(current_tls) {
                     use std::backtrace::Backtrace;
                     let bt = Backtrace::force_capture();
 
@@ -366,9 +366,7 @@ impl Default for MockVM {
                 // Just return the number of registered mutator threads
                 MUTATOR_PARK.number_of_threads()
             })),
-            is_mutator: MockMethod::new_fixed(Box::new(|tls: VMThread| {
-                MUTATOR_PARK.is_thread(tls)
-            })),
+            is_mutator: MockMethod::new_fixed(Box::new(|tls: VMThread| MUTATOR_PARK.contains(tls))),
             mutator: MockMethod::new_fixed(Box::new(|tls| tls.as_mock_mutator())),
             mutators: MockMethod::new_fixed(Box::new(|()| {
                 // Just return an iterator over all registered mutators
