@@ -4,10 +4,10 @@
 //! which not only calls [`crate::memory_manager::bind_mutator`], but also registers the returned mutator
 //! to MockVM.
 
-use super::vm;
 use super::MockVM;
-use crate::util::*;
+use super::vm;
 use crate::MMTK;
+use crate::util::*;
 
 /// A singleton MMTK instance for MockVM.
 pub static mut MMTK_SINGLETON: *mut MMTK<MockVM> = std::ptr::null_mut();

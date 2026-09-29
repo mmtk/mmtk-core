@@ -75,7 +75,9 @@ macro_rules! mock_any {
 pub fn init_mockvm(mockvm: MockVM) {
     unsafe {
         if !MOCK_VM_INSTANCE.is_null() {
-            warn!("MockVM is already initialized. Overwriting the existing instance. This may change the behavior of MockVM.");
+            warn!(
+                "MockVM is already initialized. Overwriting the existing instance. This may change the behavior of MockVM."
+            );
         }
         let boxed = Box::new(mockvm);
         MOCK_VM_INSTANCE = Box::into_raw(boxed);
@@ -343,7 +345,7 @@ unsafe impl Send for MutatorHandle {}
 impl VMMutatorThread {
     /// Get a mutable reference to the underlying Mutator<MockVM>.
     pub fn as_mock_mutator(self) -> &'static mut Mutator<MockVM> {
-        unsafe { &mut *(*self.0 .0.to_address().to_mut_ptr::<MutatorHandle>()).ptr }
+        unsafe { &mut *(*self.0.0.to_address().to_mut_ptr::<MutatorHandle>()).ptr }
     }
 }
 
@@ -770,14 +772,18 @@ impl crate::vm::Scanning<MockVM> for MockVM {
         //     mutator,
         //     Box::new(factory)
         // ))
-        warn!("scan_roots_in_mutator_thread is not properly mocked. The default implementation does nothing.");
+        warn!(
+            "scan_roots_in_mutator_thread is not properly mocked. The default implementation does nothing."
+        );
     }
     fn scan_vm_specific_roots(
         _tls: VMWorkerThread,
         _factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
     ) {
         // mock_any!(scan_vm_specific_roots(tls, Box::new(factory)))
-        warn!("scan_vm_specific_roots is not properly mocked. The default implementation does nothing.");
+        warn!(
+            "scan_vm_specific_roots is not properly mocked. The default implementation does nothing."
+        );
     }
     fn notify_initial_thread_scan_complete(partial_scan: bool, tls: VMWorkerThread) {
         mock!(notify_initial_thread_scan_complete(partial_scan, tls))
