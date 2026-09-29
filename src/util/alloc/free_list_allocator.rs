@@ -9,6 +9,7 @@ use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
 use crate::util::Address;
 use crate::util::VMThread;
+use crate::vm::ActivePlan;
 use crate::vm::VMBinding;
 
 /// A MiMalloc free list allocator
@@ -165,16 +166,18 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // Zeroing memory right before we return it.
         // If we move the zeroing to somewhere else, we need to clear the list link here: cell.store::<Address>(Address::ZERO)
         let cell_size = block.load_block_cell_size();
-        crate::util::memory::zero(cell, cell_size);
+        if VM::VMActivePlan::NEEDS_MEMORY_ZEROING {
+            crate::util::memory::zero(cell, cell_size);
 
-        // Make sure the memory is zeroed. This looks silly as we zero the cell right before this check.
-        // But we would need to move the zeroing to somewhere so we can do zeroing at a coarser grainularity.
-        #[cfg(debug_assertions)]
-        {
-            let mut cursor = cell;
-            while cursor < cell + cell_size {
-                debug_assert_eq!(unsafe { cursor.load::<usize>() }, 0);
-                cursor += crate::util::constants::BYTES_IN_ADDRESS;
+            // Make sure the memory is zeroed. This looks silly as we zero the cell right before this check.
+            // But we would need to move the zeroing to somewhere so we can do zeroing at a coarser grainularity.
+            #[cfg(debug_assertions)]
+            {
+                let mut cursor = cell;
+                while cursor < cell + cell_size {
+                    debug_assert_eq!(unsafe { cursor.load::<usize>() }, 0);
+                    cursor += crate::util::constants::BYTES_IN_ADDRESS;
+                }
             }
         }
 
