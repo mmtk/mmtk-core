@@ -496,7 +496,7 @@ impl<VM: VMBinding> MMTK<VM> {
     ///
     /// This is unsafe because the caller must ensure that the plan is not used by other threads.
     #[allow(clippy::mut_from_ref)]
-    pub unsafe fn get_plan_mut(&self) -> &mut Box<dyn Plan<VM = VM>> {
+    pub(crate) unsafe fn get_plan_mut(&self) -> &mut Box<dyn Plan<VM = VM>> {
         unsafe { &mut *self.plan.get() }
     }
 
