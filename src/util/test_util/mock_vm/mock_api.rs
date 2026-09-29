@@ -3,40 +3,52 @@
 //! the APIs from [`crate:memory_manager`]. For example, [`bind_mutator`] is provided here as a wrapped API
 //! which not only calls [`crate::memory_manager::bind_mutator`], but also registers the returned mutator
 //! to MockVM.
+//!
+//! The singleton can be an MMTK instance of any mock VM type (see [`crate::define_mock_vm`]). It is
+//! type-erased, and is checked against the expected type when it is accessed.
 
-use super::vm;
 use super::MockVM;
 use crate::util::*;
+use crate::vm::VMBinding;
 use crate::MMTK;
 
-/// A singleton MMTK instance for MockVM.
-pub static mut MMTK_SINGLETON: *mut MMTK<MockVM> = std::ptr::null_mut();
+use std::any::Any;
+use std::ptr::NonNull;
 
-/// Get the singleton MMTK instance for MockVM.
-pub fn singleton() -> &'static MMTK<MockVM> {
-    unsafe {
-        assert!(!MMTK_SINGLETON.is_null(), "MMTK singleton is not set");
-        &*MMTK_SINGLETON
-    }
+/// A singleton MMTK instance for the mock VM.
+static mut MMTK_SINGLETON: Option<NonNull<dyn Any>> = None;
+
+/// Get the singleton MMTK instance for the mock VM type `VM`.
+pub fn singleton<VM: VMBinding>() -> &'static MMTK<VM> {
+    singleton_mut()
 }
 
-/// Get a mutable reference to the singleton MMTK instance for MockVM.
-pub fn singleton_mut() -> &'static mut MMTK<MockVM> {
-    unsafe {
-        assert!(!MMTK_SINGLETON.is_null(), "MMTK singleton is not set");
-        &mut *MMTK_SINGLETON
-    }
+/// Get a mutable reference to the singleton MMTK instance for the mock VM type `VM`.
+pub fn singleton_mut<VM: VMBinding>() -> &'static mut MMTK<VM> {
+    let ptr = unsafe { MMTK_SINGLETON }.expect("MMTK singleton is not set");
+    unsafe { &mut *ptr.as_ptr() }
+        .downcast_mut::<MMTK<VM>>()
+        .unwrap_or_else(|| {
+            panic!(
+                "MMTK singleton is not a {}",
+                std::any::type_name::<MMTK<VM>>()
+            )
+        })
 }
 
-/// Set the singleton MMTK instance for MockVM. This method should only be called once.
-pub fn set_singleton(mmtk_ptr: *mut MMTK<MockVM>) {
+/// Set the singleton MMTK instance for the mock VM. This method should only be called once.
+pub fn set_singleton<VM: VMBinding>(mmtk_ptr: *mut MMTK<VM>) {
     unsafe {
-        assert!(MMTK_SINGLETON.is_null(), "MMTK singleton is already set");
-        MMTK_SINGLETON = mmtk_ptr;
+        assert!(
+            (*std::ptr::addr_of!(MMTK_SINGLETON)).is_none(),
+            "MMTK singleton is already set"
+        );
+        MMTK_SINGLETON = Some(NonNull::new(mmtk_ptr as *mut dyn Any).unwrap());
     }
 }
 
 /// Bind a mutator thread to the MMTK singleton instance for MockVM.
+/// For a custom mock VM type, use [`super::GenericMockVM::bind_mutator`].
 pub fn bind_mutator() -> VMMutatorThread {
-    vm::MutatorHandle::bind()
+    MockVM::bind_mutator()
 }
