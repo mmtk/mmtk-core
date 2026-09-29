@@ -572,7 +572,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         }
 
         let Some(goal) = next_goal else {
-            // No requests.  Park this worker, too.
+            // No requests, and the poll above did not ask for one either. If a concurrent phase
+            // was running, its work packets have now drained, tell the plan.
+            if worker.mmtk.state.gc_status.load() == crate::global_state::GcStatus::InConcurrentGC {
+                let plan = worker.mmtk.get_plan().concurrent().unwrap();
+                plan.on_concurrent_work_drained();
+            }
+            // Park this worker, too.
             return LastParkedResult::ParkSelf;
         };
 

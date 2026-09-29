@@ -42,7 +42,7 @@ impl ThreadPark {
         state.parked.remove(&tid);
     }
 
-    pub fn is_thread(&self, tid: VMThread) -> bool {
+    pub fn contains(&self, tid: VMThread) -> bool {
         let state = self.inner.lock.lock().unwrap();
         state.parked.contains_key(&tid)
     }
@@ -74,13 +74,21 @@ impl ThreadPark {
         // Notify any waiter that one more thread has parked
         self.inner.cvar.notify_all();
 
-        // Wait until unpark_all() is called
-        state = self.inner.cvar.wait(state).unwrap();
-
-        // Mark this thread as unparked again
-        if let Some(entry) = state.parked.get_mut(&tid) {
-            *entry = false;
-        }
+        // Wait until unpark_all() clears the parked flag of this thread. We need to check the flag,
+        // as the thread may wake up spuriously, or be woken up by the notification above when
+        // another thread parks. The thread cannot be unregistered while it is parked.
+        let _state = self
+            .inner
+            .cvar
+            .wait_while(state, |state| {
+                *state.parked.get(&tid).unwrap_or_else(|| {
+                    panic!(
+                        "Thread {:?} unregistered from {} during park()",
+                        tid, self.name
+                    )
+                })
+            })
+            .unwrap();
     }
 
     /// Unpark all registered threads (wake everyone up).
@@ -94,13 +102,13 @@ impl ThreadPark {
 
     /// Block until all registered threads are parked.
     pub fn wait_all_parked(&self) {
-        let mut state = self.inner.lock.lock().unwrap();
-        loop {
-            let all_parked = !state.parked.is_empty() && state.parked.values().all(|&v| v);
-            if all_parked {
-                break;
-            }
-            state = self.inner.cvar.wait(state).unwrap();
-        }
+        let state = self.inner.lock.lock().unwrap();
+        let _state = self
+            .inner
+            .cvar
+            .wait_while(state, |state| {
+                state.parked.is_empty() || !state.parked.values().all(|&v| v)
+            })
+            .unwrap();
     }
 }

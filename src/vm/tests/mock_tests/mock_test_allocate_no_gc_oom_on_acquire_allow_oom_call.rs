@@ -22,7 +22,8 @@ pub fn allocate_no_gc_oom_on_acquire_allow_oom_call() {
             // Attempt to allocate an object that is larger than the heap size.
             let addr = memory_manager::alloc_with_options(
                 fixture.mutator(),
-                1024 * 10,
+                // The heap size is rounded up to pages. Make sure we request more than that.
+                crate::util::constants::BYTES_IN_PAGE * 10,
                 8,
                 0,
                 AllocationSemantics::Default,
