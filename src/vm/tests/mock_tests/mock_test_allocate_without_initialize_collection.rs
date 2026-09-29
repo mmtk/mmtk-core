@@ -13,7 +13,7 @@ pub fn allocate_without_initialize_collection() {
         default_setup,
         || {
             const MB: usize = 1024 * 1024;
-            let fixture = MMTKFixture::create_with_builder(
+            let _fixture = MMTKFixture::create_with_builder(
                 |builder| {
                     builder
                         .options
@@ -24,22 +24,17 @@ pub fn allocate_without_initialize_collection() {
             ); // Do not initialize collection
 
             // Build mutator
-            let mut mutator = memory_manager::bind_mutator(
-                fixture.get_mmtk(),
-                VMMutatorThread(VMThread::UNINITIALIZED),
-            );
+            let mutator = mock_api::bind_mutator().as_mock_mutator();
 
             // Allocate half MB. It should be fine.
-            let addr =
-                memory_manager::alloc(&mut mutator, MB >> 1, 8, 0, AllocationSemantics::Default);
+            let addr = memory_manager::alloc(mutator, MB >> 1, 8, 0, AllocationSemantics::Default);
             assert!(!addr.is_zero());
 
             // Fill up the heap
-            let _ =
-                memory_manager::alloc(&mut mutator, MB >> 1, 8, 0, AllocationSemantics::Default);
+            let _ = memory_manager::alloc(mutator, MB >> 1, 8, 0, AllocationSemantics::Default);
 
             // Attempt another allocation.
-            let addr = memory_manager::alloc(&mut mutator, MB, 8, 0, AllocationSemantics::Default);
+            let addr = memory_manager::alloc(mutator, MB, 8, 0, AllocationSemantics::Default);
             assert!(!addr.is_zero());
         },
         || {

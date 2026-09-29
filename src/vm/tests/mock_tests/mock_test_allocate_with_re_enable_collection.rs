@@ -1,7 +1,6 @@
 use crate::AllocationSemantics;
 use crate::memory_manager;
 use crate::util::test_util::fixtures::*;
-use crate::util::test_util::mock_method::*;
 use crate::util::test_util::mock_vm::*;
 
 /// This test allocates after calling `initialize_collection()`. When we exceed the heap limit for the first time, MMTk will not trigger GC since GC has been disabled
@@ -20,11 +19,23 @@ pub fn allocate_with_re_enable_collection() {
         },
         || {
             const MB: usize = 1024 * 1024;
-            let mut fixture = MutatorFixture::create_with_heapsize(MB);
+            let fixture = MutatorFixture::create_with_heapsize(MB);
+
+            if *fixture.mmtk().get_plan().options().plan == crate::util::options::PlanSelector::NoGC
+            {
+                // The test triggers GC, which causes a different panic message for NoGC plan.
+                // We just mimic that block_for_gc is called for NoGC
+                write_mockvm(|mock| {
+                    use crate::util::VMMutatorThread;
+                    use crate::util::VMThread;
+                    mock.block_for_gc
+                        .call(VMMutatorThread(VMThread::UNINITIALIZED));
+                });
+            }
 
             // Allocate half MB. It should be fine.
             let addr = memory_manager::alloc(
-                &mut fixture.mutator,
+                fixture.mutator(),
                 MB >> 1,
                 8,
                 0,
@@ -36,12 +47,12 @@ pub fn allocate_with_re_enable_collection() {
             assert_eq!(memory_manager::disable_collection(fixture.mmtk()), Ok(true));
             // Fill up the heap
             let _ =
-                memory_manager::alloc(&mut fixture.mutator, MB, 8, 0, AllocationSemantics::Default);
+                memory_manager::alloc(fixture.mutator(), MB, 8, 0, AllocationSemantics::Default);
             assert!(memory_manager::enable_collection(fixture.mmtk()));
 
             // Attempt another allocation. This will trigger GC since GC is enabled again.
             let addr =
-                memory_manager::alloc(&mut fixture.mutator, MB, 8, 0, AllocationSemantics::Default);
+                memory_manager::alloc(fixture.mutator(), MB, 8, 0, AllocationSemantics::Default);
             assert!(!addr.is_zero());
         },
         || {
