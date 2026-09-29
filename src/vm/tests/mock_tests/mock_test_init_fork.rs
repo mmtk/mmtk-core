@@ -117,7 +117,8 @@ pub fn test_initialize_collection_and_fork() {
         })),
         ..Default::default()
     };
-    write_mockvm(move |mock_vm_ref| *mock_vm_ref = mock_vm);
+    // write_mockvm(move |mock_vm_ref| *mock_vm_ref = mock_vm);
+    init_mockvm(mock_vm);
 
     let test_thread_tls = VMThread(OpaquePointer::from_address(Address::ZERO));
 

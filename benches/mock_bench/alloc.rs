@@ -6,13 +6,13 @@ use mmtk::AllocationSemantics;
 
 pub fn bench(c: &mut Criterion) {
     // Setting a larger heap, although the GC should be disabled below
-    let mut fixture = MutatorFixture::create_with_heapsize(1 << 30);
+    let fixture = MutatorFixture::create_with_heapsize(1 << 30);
     memory_manager::disable_collection(fixture.mmtk()).unwrap();
 
     c.bench_function("alloc", |b| {
         b.iter(|| {
             let _addr =
-                memory_manager::alloc(&mut fixture.mutator, 8, 8, 0, AllocationSemantics::Default);
+                memory_manager::alloc(fixture.mutator(), 8, 8, 0, AllocationSemantics::Default);
         })
     });
 }
