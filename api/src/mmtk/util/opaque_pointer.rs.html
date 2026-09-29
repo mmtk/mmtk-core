@@ -5,7 +5,7 @@
 <a href=#5 id=5 data-nosnippet>5</a>/// For example, a pointer to the thread or the thread local storage is an opaque pointer for MMTK.
 <a href=#6 id=6 data-nosnippet>6</a>/// The type does not provide any method for dereferencing.
 <a href=#7 id=7 data-nosnippet>7</a></span><span class="attr">#[repr(transparent)]
-<a href=#8 id=8 data-nosnippet>8</a>#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+<a href=#8 id=8 data-nosnippet>8</a>#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 <a href=#9 id=9 data-nosnippet>9</a></span><span class="kw">pub struct </span>OpaquePointer(<span class="kw-2">*mut </span>c_void);
 <a href=#10 id=10 data-nosnippet>10</a>
 <a href=#11 id=11 data-nosnippet>11</a><span class="comment">// We never really dereference an opaque pointer in mmtk-core.
@@ -54,7 +54,7 @@
 <a href=#54 id=54 data-nosnippet>54</a>/// so the VM knows the context.
 <a href=#55 id=55 data-nosnippet>55</a>/// A VMThread may be a VMMutatorThread, a VMWorkerThread, or any VMThread.
 <a href=#56 id=56 data-nosnippet>56</a></span><span class="attr">#[repr(transparent)]
-<a href=#57 id=57 data-nosnippet>57</a>#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+<a href=#57 id=57 data-nosnippet>57</a>#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 <a href=#58 id=58 data-nosnippet>58</a></span><span class="kw">pub struct </span>VMThread(<span class="kw">pub </span>OpaquePointer);
 <a href=#59 id=59 data-nosnippet>59</a>
 <a href=#60 id=60 data-nosnippet>60</a><span class="kw">impl </span>VMThread {
@@ -66,12 +66,12 @@
 <a href=#66 id=66 data-nosnippet>66</a>/// When a VMMutatorThread is used as an argument or a field of a type, it generally means
 <a href=#67 id=67 data-nosnippet>67</a>/// the function or the functions for the type is executed in the context of the mutator thread.
 <a href=#68 id=68 data-nosnippet>68</a></span><span class="attr">#[repr(transparent)]
-<a href=#69 id=69 data-nosnippet>69</a>#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+<a href=#69 id=69 data-nosnippet>69</a>#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 <a href=#70 id=70 data-nosnippet>70</a></span><span class="kw">pub struct </span>VMMutatorThread(<span class="kw">pub </span>VMThread);
 <a href=#71 id=71 data-nosnippet>71</a>
 <a href=#72 id=72 data-nosnippet>72</a><span class="doccomment">/// A VMWorkerThread is a VMThread that is associates with a [`crate::scheduler::GCWorker`].
 <a href=#73 id=73 data-nosnippet>73</a>/// When a VMWorkerThread is used as an argument or a field of a type, it generally means
 <a href=#74 id=74 data-nosnippet>74</a>/// the function or the functions for the type is executed in the context of the mutator thread.
 <a href=#75 id=75 data-nosnippet>75</a></span><span class="attr">#[repr(transparent)]
-<a href=#76 id=76 data-nosnippet>76</a>#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+<a href=#76 id=76 data-nosnippet>76</a>#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 <a href=#77 id=77 data-nosnippet>77</a></span><span class="kw">pub struct </span>VMWorkerThread(<span class="kw">pub </span>VMThread);</code></pre></div></section></main></body></html>
