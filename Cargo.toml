@@ -250,6 +250,17 @@ no_mmap_annotation = []
 # only be used if you understand how VO bit works internally. Use at your own risk.
 vo_bit_access = []
 
+# Support roots that the VM reports as objects rather than as slots, i.e.
+# `RootsWorkFactory::create_process_pinning_roots_work` and
+# `create_process_tpinning_roots_work`. Such roots cannot be updated, and have to be pinned,
+# which may need extra work-bucket stages ordered ahead of any stage that may evacuate.
+#
+# Those stages cost more than they look, as they may cause extra synchronization and potential
+# load imbalance. Bindings that report every root as a slot (e.g. OpenJDK) should leave this off,
+# and then none of the above is compiled in. Bindings that do report node roots (e.g. Julia,
+# Ruby) must enable it.
+non_moving_root = []
+
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --
 # Only one feature from each group can be provided. Otherwise build will fail.

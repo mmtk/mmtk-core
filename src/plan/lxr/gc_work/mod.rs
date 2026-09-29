@@ -1,9 +1,11 @@
 use super::global::LXR;
+#[cfg(feature = "non_moving_root")]
 use super::{MATURE_EVACUATION, NURSERY_EVACUATION};
 use crate::plan::tracing::UnsupportedTrace;
 use crate::plan::VectorObjectQueue;
 use crate::scheduler::gc_work::RootKind;
 use crate::scheduler::{GCWorker, WorkBucketStage};
+#[cfg(feature = "non_moving_root")]
 use crate::util::ObjectReference;
 use crate::vm::{RootsWorkFactory, VMBinding};
 use crate::{Plan, MMTK};
@@ -16,7 +18,9 @@ pub mod prepare;
 pub mod rc;
 pub mod tracing;
 
-use rc::{CollectNodeRoots, CollectSlotRoots};
+#[cfg(feature = "non_moving_root")]
+use rc::CollectNodeRoots;
+use rc::CollectSlotRoots;
 
 /// Common base fields shared by LXR's custom root/closure work packets.
 ///
@@ -131,6 +135,7 @@ impl<VM: VMBinding> RootsWorkFactory<VM::VMSlot> for LXRRootsWorkFactory<VM> {
         crate::memory_manager::add_work_packet(self.mmtk, stage, w);
     }
 
+    #[cfg(feature = "non_moving_root")]
     fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         if nodes.is_empty() {
             return;
@@ -142,6 +147,7 @@ impl<VM: VMBinding> RootsWorkFactory<VM::VMSlot> for LXRRootsWorkFactory<VM> {
         );
     }
 
+    #[cfg(feature = "non_moving_root")]
     fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         // Transitive pinning is not supported.
         // Not sure if we can support it for LXR, as RC collections have no notion of transitive closure.
