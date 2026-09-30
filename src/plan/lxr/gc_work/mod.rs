@@ -1,12 +1,12 @@
 use super::global::LXR;
 use super::{MATURE_EVACUATION, NURSERY_EVACUATION};
-use crate::plan::tracing::UnsupportedTrace;
 use crate::plan::VectorObjectQueue;
+use crate::plan::tracing::UnsupportedTrace;
 use crate::scheduler::gc_work::RootKind;
 use crate::scheduler::{GCWorker, WorkBucketStage};
 use crate::util::ObjectReference;
 use crate::vm::{RootsWorkFactory, VMBinding};
-use crate::{Plan, MMTK};
+use crate::{MMTK, Plan};
 use std::marker::PhantomData;
 
 pub mod mature_evac;

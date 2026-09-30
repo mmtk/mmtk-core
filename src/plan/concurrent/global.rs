@@ -1,5 +1,5 @@
-use crate::plan::concurrent::Pause;
 use crate::plan::Plan;
+use crate::plan::concurrent::Pause;
 
 /// Trait for a concurrent plan.
 pub trait ConcurrentPlan: Plan {

@@ -1,17 +1,17 @@
 use std::marker::PhantomData;
 
 use crate::{
+    MMTK,
     plan::{
-        tracing::{
-            gc_work::closure::{ProcessNodes, ProcessSlots},
-            Trace,
-        },
         VectorObjectQueue,
+        tracing::{
+            Trace,
+            gc_work::closure::{ProcessNodes, ProcessSlots},
+        },
     },
-    scheduler::{gc_work::RootKind, GCWork, GCWorker, WorkBucketStage},
+    scheduler::{GCWork, GCWorker, WorkBucketStage, gc_work::RootKind},
     util::ObjectReference,
     vm::{RootsKind, RootsWorkFactory, VMBinding},
-    MMTK,
 };
 
 /// An implementation of [`RootsWorkFactory`] for stop-the-world tracing GC.  It will create work

@@ -8,9 +8,9 @@ use std::ops::*;
 use std::sync::atomic::Ordering;
 
 use crate::mmtk::{MMAPPER, SFT_MAP};
-use crate::util::metadata::log_bit::LOGGED_VALUE;
 use crate::util::VMThread;
 use crate::util::VMWorkerThread;
+use crate::util::metadata::log_bit::LOGGED_VALUE;
 use crate::vm::ObjectModel;
 
 /// size in bytes
@@ -240,7 +240,7 @@ impl Address {
     /// # Safety
     /// This could throw a segment fault if the address is invalid
     pub unsafe fn load<T: Copy>(self) -> T {
-        *(self.0 as *mut T)
+        unsafe { *(self.0 as *mut T) }
     }
 
     /// stores a value of type T to the address
@@ -249,14 +249,14 @@ impl Address {
     pub unsafe fn store<T>(self, value: T) {
         // We use a ptr.write() operation as directly setting the pointer would drop the old value
         // which may result in unexpected behaviour
-        (self.0 as *mut T).write(value);
+        unsafe { (self.0 as *mut T).write(value) };
     }
 
     /// atomic operation: load
     /// # Safety
     /// This could throw a segment fault if the address is invalid
     pub unsafe fn atomic_load<T: Atomic>(self, order: Ordering) -> T::Type {
-        let loc = &*(self.0 as *const T);
+        let loc = unsafe { &*(self.0 as *const T) };
         loc.load(order)
     }
 
@@ -264,7 +264,7 @@ impl Address {
     /// # Safety
     /// This could throw a segment fault if the address is invalid
     pub unsafe fn atomic_store<T: Atomic>(self, val: T::Type, order: Ordering) {
-        let loc = &*(self.0 as *const T);
+        let loc = unsafe { &*(self.0 as *const T) };
         loc.store(val, order)
     }
 
@@ -278,7 +278,7 @@ impl Address {
         success: Ordering,
         failure: Ordering,
     ) -> Result<T::Type, T::Type> {
-        let loc = &*(self.0 as *const T);
+        let loc = unsafe { &*(self.0 as *const T) };
         loc.compare_exchange(old, new, success, failure)
     }
 
@@ -320,7 +320,7 @@ impl Address {
     /// # Safety
     /// The caller must guarantee the address actually points to a Rust object.
     pub unsafe fn as_ref<'a, T>(self) -> &'a T {
-        &*self.to_mut_ptr()
+        unsafe { &*self.to_mut_ptr() }
     }
 
     /// converts the Address to a mutable Rust reference
@@ -328,7 +328,7 @@ impl Address {
     /// # Safety
     /// The caller must guarantee the address actually points to a Rust object.
     pub unsafe fn as_mut_ref<'a, T>(self) -> &'a mut T {
-        &mut *self.to_mut_ptr()
+        unsafe { &mut *self.to_mut_ptr() }
     }
 
     /// converts the Address to a pointer-sized integer
@@ -648,7 +648,7 @@ impl ObjectReference {
             addr.is_aligned_to(Self::ALIGNMENT),
             "ObjectReference is required to be word aligned.  addr: {addr}"
         );
-        ObjectReference(NonZeroUsize::new_unchecked(addr.0))
+        ObjectReference(unsafe { NonZeroUsize::new_unchecked(addr.0) })
     }
 
     /// Get the header base address from an object reference. This method is used by MMTk to get a base address for the
@@ -665,7 +665,13 @@ impl ObjectReference {
     pub fn to_object_start<VM: VMBinding>(self) -> Address {
         use crate::vm::ObjectModel;
         let object_start = VM::VMObjectModel::ref_to_object_start(self);
-        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_object_start() returns {}", self, object_start);
+        debug_assert!(
+            !VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS
+                || object_start == self.to_raw_address(),
+            "The binding claims unified object reference address, but for object reference {}, ref_to_object_start() returns {}",
+            self,
+            object_start
+        );
         debug_assert!(
             self.to_raw_address()
                 >= object_start + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
@@ -753,7 +759,9 @@ impl ObjectReference {
         // See https://github.com/mmtk/mmtk-core/issues/1375
         let fake_tls = VMWorkerThread(VMThread::UNINITIALIZED);
         if !<VM::VMScanning as Scanning<VM>>::support_slot_enqueuing(fake_tls, self) {
-            panic!("SlotIterator::iterate_fields cannot be used on objects that don't support slot-enqueuing");
+            panic!(
+                "SlotIterator::iterate_fields cannot be used on objects that don't support slot-enqueuing"
+            );
         }
         <VM::VMScanning as Scanning<VM>>::scan_object(fake_tls, self, &mut f);
     }

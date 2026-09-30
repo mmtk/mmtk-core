@@ -27,9 +27,9 @@ use atomic::Ordering;
 
 use crate::{
     util::{
-        linear_scan::Region,
-        metadata::{vo_bit, MetadataSpec},
         ObjectReference,
+        linear_scan::Region,
+        metadata::{MetadataSpec, vo_bit},
     },
     vm::{ObjectModel, VMBinding},
 };
@@ -120,12 +120,13 @@ We currently don't have an appropriate strategy for this case."
             let vo_bit_meta = vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 
             assert_eq!(
-                mark_bit_meta.log_bytes_in_region,
-                vo_bit_meta.log_bytes_in_region,
+                mark_bit_meta.log_bytes_in_region, vo_bit_meta.log_bytes_in_region,
                 "The {s:?} strategy requires the mark bits to have the same granularity as the VO bits."
             );
-            assert_eq!(mark_bit_meta.log_num_of_bits, vo_bit_meta.log_num_of_bits,
-                "The {s:?} strategy requires the mark bits to have the same number of bits per object as the VO bits.");
+            assert_eq!(
+                mark_bit_meta.log_num_of_bits, vo_bit_meta.log_num_of_bits,
+                "The {s:?} strategy requires the mark bits to have the same number of bits per object as the VO bits."
+            );
         }
     }
 }

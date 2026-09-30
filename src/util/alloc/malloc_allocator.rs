@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use crate::policy::marksweepspace::malloc_ms::MallocSpace;
 use crate::policy::space::Space;
+use crate::util::Address;
 use crate::util::alloc::Allocator;
 use crate::util::opaque_pointer::*;
-use crate::util::Address;
 use crate::vm::VMBinding;
 
 use super::allocator::AllocatorContext;

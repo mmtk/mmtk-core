@@ -1,15 +1,15 @@
 use crate::mmtk::MMTK;
 use crate::util::options::Options;
-use crate::util::statistics::counter::*;
 use crate::util::statistics::Timer;
+use crate::util::statistics::counter::*;
 use crate::vm::VMBinding;
 
 #[cfg(feature = "perf_counter")]
 use pfm::Perfmon;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 
 /// The default number of phases for statistics.

@@ -3,9 +3,9 @@
 use super::PlanConstraints;
 use crate::global_state::GlobalState;
 use crate::mmtk::MMTK;
+use crate::plan::Mutator;
 use crate::plan::gc_work::{ClearCommonPlanUnlogBits, SetCommonPlanUnlogBits};
 use crate::plan::tracing::ObjectQueue;
-use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::{PlanCreateSpaceArgs, Space};
@@ -14,25 +14,25 @@ use crate::policy::vmspace::VMSpace;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::{CopyConfig, GCWorkerCopyContext};
+use crate::util::heap::HeapMeta;
+use crate::util::heap::VMRequest;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
-use crate::util::heap::HeapMeta;
-use crate::util::heap::VMRequest;
 use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::Options;
 use crate::util::options::PlanSelector;
 use crate::util::statistics::stats::Stats;
-use crate::util::{conversions, ObjectReference};
+use crate::util::{ObjectReference, conversions};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
@@ -257,8 +257,8 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// Notify the plan that an emergency collection will happen. The plan should try to free as much memory as possible.
     /// The default implementation will force a full heap collection for generational plans.
     fn notify_emergency_collection(&self) {
-        if let Some(gen) = self.generational() {
-            gen.force_full_heap_collection();
+        if let Some(r#gen) = self.generational() {
+            r#gen.force_full_heap_collection();
         }
     }
 
@@ -290,10 +290,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
 
         trace!(
             "Reserved pages = {}, used pages: {}, collection reserve: {}, VM live pages: {}",
-            total,
-            used_pages,
-            collection_reserve,
-            vm_live_pages,
+            total, used_pages, collection_reserve, vm_live_pages,
         );
 
         total
@@ -325,9 +322,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         let available_pages = total_pages.saturating_sub(reserved_pages);
         trace!(
             "Total pages = {}, reserved pages = {}, available pages = {}",
-            total_pages,
-            reserved_pages,
-            available_pages,
+            total_pages, reserved_pages, available_pages,
         );
         available_pages
     }

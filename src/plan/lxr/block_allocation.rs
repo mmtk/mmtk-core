@@ -1,7 +1,7 @@
-use super::gc_work::nursery_sweeping::{RCLazySweepNurseryBlocks, RCSTWSweepNurseryBlocks};
 use super::LXR;
-use crate::plan::concurrent::global::ConcurrentPlan;
+use super::gc_work::nursery_sweeping::{RCLazySweepNurseryBlocks, RCSTWSweepNurseryBlocks};
 use crate::plan::concurrent::Pause;
+use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::global::Plan;
 use crate::policy::immix::block::{Block, BlockState};
 use crate::policy::immix::{ImmixHooks, ImmixSpace};
@@ -11,8 +11,8 @@ use crate::util::linear_scan::Region;
 use crate::vm::VMBinding;
 use atomic::{Atomic, Ordering};
 use std::cell::UnsafeCell;
-use std::sync::atomic::AtomicUsize;
 use std::sync::RwLock;
+use std::sync::atomic::AtomicUsize;
 
 struct BlockCache {
     cursor: AtomicUsize,

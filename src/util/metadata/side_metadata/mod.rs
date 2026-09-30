@@ -46,8 +46,8 @@ pub fn initialize_side_metadata<VM: VMBinding>(options: &Options) {
 
 #[cfg(test)]
 pub(crate) fn core_test_initialize_side_metadata() {
-    use crate::util::os::HugePageSupport;
     use crate::util::Address;
+    use crate::util::os::HugePageSupport;
 
     if is_side_metadata_initialized() {
         return;

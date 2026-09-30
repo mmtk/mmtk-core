@@ -7,15 +7,15 @@ use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::AllocatorContext;
 use crate::util::heap::{MonotonePageResource, PageResource};
-use crate::util::metadata::{extract_side_metadata, MetadataSpec};
+use crate::util::metadata::{MetadataSpec, extract_side_metadata};
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::object_forwarding;
 use crate::util::os::*;
-use crate::util::{copy::*, object_enum};
 use crate::util::{Address, ObjectReference};
+use crate::util::{copy::*, object_enum};
 use crate::vm::*;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// This type implements a simple copying space.
 pub struct CopySpace<VM: VMBinding> {

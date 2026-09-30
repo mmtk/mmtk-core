@@ -1,5 +1,6 @@
+use crate::MMTK;
 use crate::plan::tracing::OptionObjectQueue;
-use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
+use crate::policy::gc_work::{TRACE_KIND_TRANSITIVE_PIN, TraceKind};
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::ovc::forwarding;
 use crate::policy::sft::{GCWorkerMutRef, SFT};
@@ -9,15 +10,14 @@ use crate::util::copy::CopySemantics;
 use crate::util::heap::regionpageresource::AllocatedRegion;
 use crate::util::heap::{PageResource, RegionPageResource};
 use crate::util::linear_scan::Region;
+use crate::util::metadata::MetadataSpec;
 use crate::util::metadata::extract_side_metadata;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
-use crate::util::metadata::MetadataSpec;
 use crate::util::object_enum::{self, ObjectEnumerator};
 use crate::util::{Address, ObjectReference};
 use crate::vm::slot::Slot;
-use crate::MMTK;
-use crate::{vm::*, ObjectQueue};
+use crate::{ObjectQueue, vm::*};
 use atomic::Ordering;
 use std::sync::Arc;
 
@@ -275,11 +275,7 @@ impl<VM: VMBinding> OVCSpace<VM> {
                 Ordering::SeqCst,
                 Ordering::Relaxed,
                 |v| {
-                    if v == 0 {
-                        Some(1)
-                    } else {
-                        None
-                    }
+                    if v == 0 { Some(1) } else { None }
                 },
             )
             .is_ok()

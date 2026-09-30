@@ -2,13 +2,13 @@
 
 use criterion::Criterion;
 use mmtk::util::{
+    Address,
     constants::BYTES_IN_PAGE,
     constants::LOG_BYTES_IN_WORD,
     conversions::raw_align_up,
     metadata::side_metadata::SideMetadataSpec,
-    os::{MmapAnnotation, MmapProtection, MmapStrategy, OSMemory, OS},
+    os::{MmapAnnotation, MmapProtection, MmapStrategy, OS, OSMemory},
     test_private::address_to_meta_address,
-    Address,
 };
 use std::hint::black_box;
 

@@ -1,12 +1,12 @@
 use std::collections::HashSet;
+use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
-use std::sync::Mutex;
 use std::vec::Vec;
 
 use crate::plan::is_nursery_gc;
-use crate::plan::tracing::gc_work::DefaultObjectTracerContext;
 use crate::plan::tracing::Trace;
+use crate::plan::tracing::gc_work::DefaultObjectTracerContext;
 use crate::scheduler::WorkBucketStage;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
@@ -331,8 +331,7 @@ impl ReferenceProcessor {
 
                 trace!(
                     " referent: {} (forwarded to {})",
-                    old_referent,
-                    new_referent
+                    old_referent, new_referent
                 );
             }
 
@@ -372,8 +371,7 @@ impl ReferenceProcessor {
 
         trace!(
             "{:?} Reference table is {:?}",
-            self.semantics,
-            sync.references
+            self.semantics, sync.references
         );
 
         //debug_assert!(sync.enqueued_references.is_empty());
@@ -425,8 +423,7 @@ impl ReferenceProcessor {
         debug!("Starting ReferenceProcessor.retain({:?})", self.semantics);
         trace!(
             "{:?} Reference table is {:?}",
-            self.semantics,
-            sync.references
+            self.semantics, sync.references
         );
 
         let num_refs = sync.references.len();
@@ -521,9 +518,9 @@ impl ReferenceProcessor {
     }
 }
 
+use crate::MMTK;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
-use crate::MMTK;
 use std::marker::PhantomData;
 
 #[derive(Default)]

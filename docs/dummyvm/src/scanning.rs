@@ -1,11 +1,11 @@
 use crate::DummyVM;
 use crate::DummyVMSlot;
-use mmtk::util::opaque_pointer::*;
+use mmtk::Mutator;
 use mmtk::util::ObjectReference;
+use mmtk::util::opaque_pointer::*;
 use mmtk::vm::RootsWorkFactory;
 use mmtk::vm::Scanning;
 use mmtk::vm::SlotVisitor;
-use mmtk::Mutator;
 
 pub struct VMScanning {}
 
