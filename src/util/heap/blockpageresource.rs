@@ -343,11 +343,31 @@ impl<B: Region> BlockPool<B> {
         }
     }
 
+    /// Pop a block from the head array under a shared read lock.
+    fn pop_from_head(&self) -> Option<B> {
+        let head_global_freed_blocks = self.head_global_freed_blocks.read();
+        let block = head_global_freed_blocks.as_ref().and_then(|q| q.pop())?;
+        self.count.fetch_sub(1, Ordering::SeqCst);
+        Some(block)
+    }
+
     /// Pop a block from the global pool
     pub fn pop(&self) -> Option<B> {
         if self.len() == 0 {
             return None;
         }
+        // Fast path. Read lock only.
+        if let Some(block) = self.pop_from_head() {
+            return Some(block);
+        }
+        // If there is no global array to refill the head from, the slow path
+        // below would find nothing, so do not take the upgradeable lock for it
+        // and early return instead.
+        if self.global_freed_blocks.read().is_empty() {
+            // Another thread may have just moved the last global array into the head.
+            return self.pop_from_head();
+        }
+        // Slowpath: threads will contend here on head_global_freed_blocks.
         let head_global_freed_blocks = self.head_global_freed_blocks.upgradeable_read();
         if let Some(block) = head_global_freed_blocks.as_ref().and_then(|q| q.pop()) {
             self.count.fetch_sub(1, Ordering::SeqCst);
