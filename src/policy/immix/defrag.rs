@@ -4,6 +4,7 @@ use super::{
     ImmixSpace,
 };
 use crate::util::linear_scan::Region;
+use crate::util::rust_util::atomic_compat::AtomicFetchUpdate;
 use crate::{policy::space::Space, Plan};
 use crate::{util::constants::LOG_BYTES_IN_PAGE, vm::*};
 use spin::Mutex;
@@ -131,7 +132,7 @@ impl Defrag {
     pub fn notify_new_clean_block(&self, copy: bool) {
         if copy {
             let available_clean_pages_for_defrag =
-                self.available_clean_pages_for_defrag.fetch_update(
+                self.available_clean_pages_for_defrag.fetch_update_compat(
                     Ordering::SeqCst,
                     Ordering::SeqCst,
                     |available_clean_pages_for_defrag| {

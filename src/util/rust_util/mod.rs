@@ -3,6 +3,7 @@
 //! to provide.
 
 pub mod atomic_box;
+pub(crate) mod atomic_compat;
 pub mod rev_group;
 pub mod zeroed_alloc;
 
