@@ -208,7 +208,6 @@ pub trait MockVMConfig: 'static + Send + Sync {
 ///
 /// ```ignore
 /// define_mock_vm! {
-///     /// A mock VM with forwarding bits and mark bits on the side.
 ///     type CustomVM = MockVM<CustomConfig> {
 ///         const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec =
 ///             VMLocalForwardingBitsSpec::side_first();
@@ -514,13 +513,8 @@ unsafe impl Sync for MutatorHandle {}
 unsafe impl Send for MutatorHandle {}
 
 impl VMMutatorThread {
-    /// Get a mutable reference to the underlying Mutator<MockVM>.
-    pub fn as_mock_mutator(self) -> &'static mut Mutator<MockVM> {
-        self.as_generic_mock_mutator()
-    }
-
     /// Get a mutable reference to the underlying mutator for a mock VM type.
-    pub fn as_generic_mock_mutator<VM: VMBinding>(self) -> &'static mut Mutator<VM> {
+    pub fn as_mock_mutator<VM: VMBinding>(self) -> &'static mut Mutator<VM> {
         unsafe { &*self.0 .0.to_address().to_ptr::<MutatorHandle>() }.as_mutator()
     }
 }
@@ -545,13 +539,13 @@ impl<C: MockVMConfig> Default for MockVM<C> {
                 MUTATOR_PARK.number_of_threads()
             })),
             is_mutator: MockMethod::new_fixed(Box::new(|tls: VMThread| MUTATOR_PARK.contains(tls))),
-            mutator: MockMethod::new_fixed(Box::new(|tls| tls.as_generic_mock_mutator())),
+            mutator: MockMethod::new_fixed(Box::new(|tls| tls.as_mock_mutator())),
             mutators: MockMethod::new_fixed(Box::new(|()| {
                 // Just return an iterator over all registered mutators
                 let mutators: Vec<&'static mut Mutator<Self>> = MUTATOR_PARK
                     .all_threads()
                     .into_iter()
-                    .map(|tls| VMMutatorThread(tls).as_generic_mock_mutator())
+                    .map(|tls| VMMutatorThread(tls).as_mock_mutator())
                     .collect();
                 Box::new(mutators.into_iter())
             })),
@@ -564,9 +558,10 @@ impl<C: MockVMConfig> Default for MockVM<C> {
                 MUTATOR_PARK.wait_all_parked();
                 info!("All threads are parked.");
 
-                MUTATOR_PARK.all_threads().into_iter().for_each(|tls| {
-                    mutator_visitor(VMMutatorThread(tls).as_generic_mock_mutator())
-                });
+                MUTATOR_PARK
+                    .all_threads()
+                    .into_iter()
+                    .for_each(|tls| mutator_visitor(VMMutatorThread(tls).as_mock_mutator()));
             })),
             resume_mutators: MockMethod::new_fixed(Box::new(|_tls| {
                 info!("Resuming all parked threads...");

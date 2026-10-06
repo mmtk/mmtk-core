@@ -45,7 +45,7 @@ mod tests;
 /// Default min alignment 4 bytes
 pub(crate) const DEFAULT_LOG_MIN_ALIGNMENT: usize = 2;
 /// Default max alignment 8 bytes
-const DEFAULT_LOG_MAX_ALIGNMENT: usize = 3;
+pub(crate) const DEFAULT_LOG_MAX_ALIGNMENT: usize = 3;
 /// Default for [`VMBinding::ALIGNMENT_VALUE`]
 pub(crate) const DEFAULT_ALIGNMENT_VALUE: u8 = 0xab;
 /// Default for [`VMBinding::USE_ALLOCATION_OFFSET`]

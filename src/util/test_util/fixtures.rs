@@ -217,7 +217,7 @@ impl<VM: VMBinding> GenericMutatorFixture<VM> {
     }
 
     pub fn mutator(&self) -> &'static mut Mutator<VM> {
-        self.mutator.as_generic_mock_mutator()
+        self.mutator.as_mock_mutator()
     }
 
     pub fn mutator_tls(&self) -> VMMutatorThread {
