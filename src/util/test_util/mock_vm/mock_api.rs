@@ -7,7 +7,7 @@
 //! The singleton can be an MMTK instance of any mock VM type (see [`crate::define_mock_vm`]). It is
 //! type-erased, and is checked against the expected type when it is accessed.
 
-use super::MockVM;
+use super::{DefaultMockVMConfig, MockVM};
 use crate::util::*;
 use crate::vm::VMBinding;
 use crate::MMTK;
@@ -48,7 +48,7 @@ pub fn set_singleton<VM: VMBinding>(mmtk_ptr: *mut MMTK<VM>) {
 }
 
 /// Bind a mutator thread to the MMTK singleton instance for MockVM.
-/// For a custom mock VM type, use [`super::GenericMockVM::bind_mutator`].
+/// For a custom mock VM type, use [`MockVM::bind_mutator`], e.g. `CustomVM::bind_mutator()`.
 pub fn bind_mutator() -> VMMutatorThread {
-    MockVM::bind_mutator()
+    MockVM::<DefaultMockVMConfig>::bind_mutator()
 }

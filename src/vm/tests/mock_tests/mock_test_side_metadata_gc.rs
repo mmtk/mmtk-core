@@ -6,7 +6,7 @@ use crate::plan::AllocationSemantics;
 
 define_mock_vm! {
     /// A mock VM that places all the metadata that could be on the side on the side.
-    type SideMetadataVM = GenericMockVM<SideMetadataConfig> {
+    type SideMetadataVM = MockVM<SideMetadataConfig> {
         const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::side_first();
         const GLOBAL_FIELD_UNLOG_BIT_SPEC: VMGlobalFieldUnlogBitSpec =
             VMGlobalFieldUnlogBitSpec::side_after(Self::GLOBAL_LOG_BIT_SPEC.as_spec());
