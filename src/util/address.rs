@@ -757,6 +757,29 @@ impl ObjectReference {
         }
         <VM::VMScanning as Scanning<VM>>::scan_object(fake_tls, self, &mut f);
     }
+
+    /// The number of chunks this object can be scanned in, or `None` if the VM can only scan it
+    /// as a whole. See [`crate::vm::Scanning::scan_chunk_count`].
+    pub fn scan_chunk_count<VM: VMBinding>(self) -> Option<usize> {
+        <VM::VMScanning as Scanning<VM>>::scan_chunk_count(
+            VMWorkerThread(VMThread::UNINITIALIZED),
+            self,
+        )
+    }
+
+    /// As [`Self::iterate_fields`], but visiting only the slots in chunks `chunks`.
+    pub fn iterate_fields_in_chunks<VM: VMBinding, F: FnMut(VM::VMSlot)>(
+        self,
+        chunks: std::ops::Range<usize>,
+        mut f: F,
+    ) {
+        <VM::VMScanning as Scanning<VM>>::scan_object_chunks(
+            VMWorkerThread(VMThread::UNINITIALIZED),
+            self,
+            chunks,
+            &mut f,
+        );
+    }
 }
 
 /// allows print Address as upper-case hex value
