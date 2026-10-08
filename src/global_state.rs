@@ -1,6 +1,6 @@
+use atomic::{Atomic, Ordering};
 use atomic_refcell::AtomicRefCell;
 use std::collections::HashMap;
-use atomic::{Atomic, Ordering};
 use std::time::{Duration, Instant};
 
 /// This stores some global states for an MMTK instance.

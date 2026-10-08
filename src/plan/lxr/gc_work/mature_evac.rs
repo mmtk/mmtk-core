@@ -1,6 +1,6 @@
+use atomic::{Atomic, Ordering};
 use std::marker::PhantomData;
 use std::ops::Range;
-use atomic::{Atomic, Ordering};
 
 use super::tracing::LXRStopTheWorldProcessEdges;
 use crate::plan::lxr::mature_evac::MatureEvacuationSet;

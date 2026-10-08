@@ -1,5 +1,5 @@
-use std::marker::PhantomData;
 use atomic::{Atomic, Ordering};
+use std::marker::PhantomData;
 
 use crate::util::linear_scan::Region;
 use crate::util::{metadata::side_metadata::address_to_meta_address, Address};
@@ -44,11 +44,21 @@ static FAST_NURSERY_INCS: Atomic<u32> = Atomic::<u32>::new(0);
 static LOS_INCS: Atomic<u32> = Atomic::<u32>::new(0);
 
 static PROMOTED_OBJECTS: Atomic<u32> = Atomic::<u32>::new(0);
-static PROMOTED_SCALARS: [Atomic<u32>; 3] = [Atomic::<u32>::new(0), Atomic::<u32>::new(0), Atomic::<u32>::new(0)];
-static PROMOTED_PRIM_ARRAYS: [Atomic<u32>; 3] =
-    [Atomic::<u32>::new(0), Atomic::<u32>::new(0), Atomic::<u32>::new(0)];
-static PROMOTED_OBJECT_ARRAYS: [Atomic<u32>; 3] =
-    [Atomic::<u32>::new(0), Atomic::<u32>::new(0), Atomic::<u32>::new(0)];
+static PROMOTED_SCALARS: [Atomic<u32>; 3] = [
+    Atomic::<u32>::new(0),
+    Atomic::<u32>::new(0),
+    Atomic::<u32>::new(0),
+];
+static PROMOTED_PRIM_ARRAYS: [Atomic<u32>; 3] = [
+    Atomic::<u32>::new(0),
+    Atomic::<u32>::new(0),
+    Atomic::<u32>::new(0),
+];
+static PROMOTED_OBJECT_ARRAYS: [Atomic<u32>; 3] = [
+    Atomic::<u32>::new(0),
+    Atomic::<u32>::new(0),
+    Atomic::<u32>::new(0),
+];
 
 /// A zero-sized helper type providing methods to read and update per-object reference count
 /// metadata for LXR's reference counting plan.

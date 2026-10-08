@@ -26,10 +26,10 @@ use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout::BYTES_IN_CHUNK};
 #[cfg(debug_assertions)]
+use atomic::{Atomic, Ordering};
+#[cfg(debug_assertions)]
 use std::collections::HashMap;
 use std::marker::PhantomData;
-#[cfg(debug_assertions)]
-use atomic::{Atomic, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it

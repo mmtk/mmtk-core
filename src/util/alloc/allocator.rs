@@ -6,8 +6,8 @@ use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::options::Options;
 use crate::MMTK;
 
-use std::cell::RefCell;
 use atomic::{Atomic, Ordering};
+use std::cell::RefCell;
 use std::sync::Arc;
 
 use crate::policy::space::Space;

@@ -153,7 +153,8 @@ macro_rules! impl_metadata_value_trait {
             }
 
             unsafe fn store_atomic(addr: Address, value: Self, order: Ordering) {
-                addr.as_ref::<atomic::Atomic<$non_atomic>>().store(value, order)
+                addr.as_ref::<atomic::Atomic<$non_atomic>>()
+                    .store(value, order)
             }
 
             unsafe fn compare_exchange(
@@ -168,19 +169,23 @@ macro_rules! impl_metadata_value_trait {
             }
 
             unsafe fn fetch_add(addr: Address, value: Self, order: Ordering) -> Self {
-                addr.as_ref::<atomic::Atomic<$non_atomic>>().fetch_add(value, order)
+                addr.as_ref::<atomic::Atomic<$non_atomic>>()
+                    .fetch_add(value, order)
             }
 
             unsafe fn fetch_sub(addr: Address, value: Self, order: Ordering) -> Self {
-                addr.as_ref::<atomic::Atomic<$non_atomic>>().fetch_sub(value, order)
+                addr.as_ref::<atomic::Atomic<$non_atomic>>()
+                    .fetch_sub(value, order)
             }
 
             unsafe fn fetch_and(addr: Address, value: Self, order: Ordering) -> Self {
-                addr.as_ref::<atomic::Atomic<$non_atomic>>().fetch_and(value, order)
+                addr.as_ref::<atomic::Atomic<$non_atomic>>()
+                    .fetch_and(value, order)
             }
 
             unsafe fn fetch_or(addr: Address, value: Self, order: Ordering) -> Self {
-                addr.as_ref::<atomic::Atomic<$non_atomic>>().fetch_or(value, order)
+                addr.as_ref::<atomic::Atomic<$non_atomic>>()
+                    .fetch_or(value, order)
             }
 
             unsafe fn fetch_update<F>(

@@ -4,10 +4,10 @@ use super::work_counter::{WorkCounter, WorkCounterBase, WorkDuration};
 use crate::scheduler::work_counter::WorkPerfEvent;
 use crate::vm::VMBinding;
 use crate::MMTK;
+use atomic::{Atomic, Ordering};
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use atomic::{Atomic, Ordering};
 
 /// Merge and print the work-packet level statistics from all worker threads
 #[derive(Default)]

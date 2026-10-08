@@ -29,8 +29,8 @@ use crate::vm::*;
 use crate::ObjectQueue;
 use crate::MMTK;
 
-use enum_map::EnumMap;
 use atomic::{Atomic, Ordering};
+use enum_map::EnumMap;
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 

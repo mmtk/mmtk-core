@@ -1,7 +1,7 @@
 //! The module defines virutal memory layout parameters.
 
-use std::ptr::addr_of;
 use atomic::{Atomic, Ordering};
+use std::ptr::addr_of;
 
 use super::heap_parameters::*;
 use crate::util::constants::*;

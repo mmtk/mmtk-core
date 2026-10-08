@@ -1,9 +1,9 @@
 use super::worker_monitor::WorkerMonitor;
 use super::*;
 use crate::vm::VMBinding;
+use atomic::{Atomic, Ordering};
 use crossbeam::deque::{Injector, Steal, Worker};
 use enum_map::Enum;
-use atomic::{Atomic, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub(super) struct BucketQueue<VM: VMBinding> {

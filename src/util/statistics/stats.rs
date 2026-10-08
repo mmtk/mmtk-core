@@ -4,10 +4,10 @@ use crate::util::statistics::counter::*;
 use crate::util::statistics::Timer;
 use crate::vm::VMBinding;
 
+use atomic::{Atomic, Ordering};
 #[cfg(feature = "perf_counter")]
 use pfm::Perfmon;
 use std::collections::HashMap;
-use atomic::{Atomic, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;

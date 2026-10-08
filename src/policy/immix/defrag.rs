@@ -6,8 +6,8 @@ use super::{
 use crate::util::linear_scan::Region;
 use crate::{policy::space::Space, Plan};
 use crate::{util::constants::LOG_BYTES_IN_PAGE, vm::*};
-use spin::Mutex;
 use atomic::{Atomic, Ordering};
+use spin::Mutex;
 
 pub type Histogram = [usize; Defrag::NUM_BINS];
 
