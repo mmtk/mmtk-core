@@ -1,6 +1,6 @@
 //! This module provides a default implementation of the access functions for in-header metadata.
 
-use atomic::{Atomic, Ordering};
+use atomic::Ordering;
 use std::fmt;
 
 use crate::util::constants::{BITS_IN_BYTE, LOG_BITS_IN_BYTE};
@@ -154,7 +154,7 @@ impl HeaderMetadataSpec {
         let res: T = if self.num_of_bits < 8 {
             let byte_val = unsafe {
                 if let Some(order) = atomic_ordering {
-                    (self.meta_addr(header)).atomic_load::<Atomic<u8>>(order)
+                    (self.meta_addr(header)).atomic_load::<u8>(order)
                 } else {
                     (self.meta_addr(header)).load::<u8>()
                 }
@@ -279,13 +279,13 @@ impl HeaderMetadataSpec {
         if self.num_of_bits < 8 {
             let byte_addr = self.meta_addr(header);
             unsafe {
-                let real_old_byte = byte_addr.atomic_load::<Atomic<u8>>(success_order);
+                let real_old_byte = byte_addr.atomic_load::<u8>(success_order);
                 let expected_old_byte =
                     self.set_bits_to_u8(real_old_byte, old_metadata.to_u8().unwrap());
                 let expected_new_byte =
                     self.set_bits_to_u8(expected_old_byte, new_metadata.to_u8().unwrap());
                 byte_addr
-                    .compare_exchange::<Atomic<u8>>(
+                    .compare_exchange::<u8>(
                         expected_old_byte,
                         expected_new_byte,
                         success_order,

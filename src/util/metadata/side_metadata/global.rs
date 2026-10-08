@@ -9,10 +9,10 @@ use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::os::*;
 use crate::util::Address;
 use crate::MMAPPER;
+use atomic::{Atomic, Ordering};
 use num_traits::FromPrimitive;
 use ranges::BitByteRange;
 use std::fmt;
-use atomic::{Atomic, Ordering};
 
 /// This struct stores the specification of a side metadata bit-set.
 /// It is used as an input to the (inline) functions provided by the side metadata module.
@@ -570,7 +570,7 @@ impl SideMetadataSpec {
                 if bits_num_log < 3 {
                     let lshift = meta_byte_lshift(self, data_addr);
                     let mask = meta_byte_mask(self) << lshift;
-                    let byte_val = unsafe { meta_addr.atomic_load::<Atomic<u8>>(order) };
+                    let byte_val = unsafe { meta_addr.atomic_load::<u8>(order) };
                     FromPrimitive::from_u8((byte_val & mask) >> lshift).unwrap()
                 } else {
                     unsafe { T::load_atomic(meta_addr, order) }
@@ -741,14 +741,14 @@ impl SideMetadataSpec {
                     let lshift = meta_byte_lshift(self, data_addr);
                     let mask = meta_byte_mask(self) << lshift;
 
-                    let real_old_byte = unsafe { meta_addr.atomic_load::<Atomic<u8>>(success_order) };
+                    let real_old_byte = unsafe { meta_addr.atomic_load::<u8>(success_order) };
                     let expected_old_byte =
                         (real_old_byte & !mask) | ((old_metadata.to_u8().unwrap()) << lshift);
                     let expected_new_byte =
                         (expected_old_byte & !mask) | ((new_metadata.to_u8().unwrap()) << lshift);
 
                     unsafe {
-                        meta_addr.compare_exchange::<Atomic<u8>>(
+                        meta_addr.compare_exchange::<u8>(
                             expected_old_byte,
                             expected_new_byte,
                             success_order,

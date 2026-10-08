@@ -33,8 +33,8 @@ use crate::util::heap::HeapMeta;
 use crate::util::os::*;
 use crate::vm::VMBinding;
 
+use atomic::Atomic;
 use std::marker::PhantomData;
-use atomic::{Atomic, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 
