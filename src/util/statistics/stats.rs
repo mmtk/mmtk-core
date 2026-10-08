@@ -69,7 +69,7 @@ impl Stats {
             perfmon
         };
         let shared = Arc::new(SharedStats {
-            phase: Atomic::<usize>::new(0),
+            phase: Atomic::new(0),
             gathering_stats: Atomic::new(false),
         });
         let mut counters: Vec<Arc<Mutex<dyn Counter + Send>>> = vec![];
@@ -109,7 +109,7 @@ impl Stats {
             ))));
         }
         Stats {
-            gc_count: Atomic::<usize>::new(0),
+            gc_count: Atomic::new(0),
             total_time: t,
             #[cfg(feature = "perf_counter")]
             perfmon,

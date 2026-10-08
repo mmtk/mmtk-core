@@ -28,7 +28,7 @@ const BASE_EXPONENT: usize = i32::BITS as usize - MANTISSA_BITS;
 const INDEX_MASK: usize = !TYPE_MASK;
 const INDEX_SHIFT: usize = TYPE_BITS;
 
-static DISCONTIGUOUS_SPACE_INDEX: Atomic<usize> = Atomic::<usize>::new(DISCONTIG_INDEX_INCREMENT);
+static DISCONTIGUOUS_SPACE_INDEX: Atomic<usize> = Atomic::new(DISCONTIG_INDEX_INCREMENT);
 const DISCONTIG_INDEX_INCREMENT: usize = 1 << TYPE_BITS;
 
 #[derive(Copy, Clone, PartialEq, Debug)]

@@ -48,7 +48,7 @@ use std::sync::{Condvar, Mutex, RwLock};
 
 const LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER: usize = 1;
 
-static HEAP_AFTER_GC: Atomic<usize> = Atomic::<usize>::new(0);
+static HEAP_AFTER_GC: Atomic<usize> = Atomic::new(0);
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
@@ -454,7 +454,7 @@ impl<VM: VMBinding> LXR<VM> {
             hint_emergency_gc: Atomic::new(false),
             current_pause: Atomic::new(None),
             previous_pause: Atomic::new(None),
-            avail_pages_at_end_of_last_gc: Atomic::<usize>::new(0),
+            avail_pages_at_end_of_last_gc: Atomic::new(0),
             zeroing_packets_scheduled: Atomic::new(false),
             decide_cycle_collection: (Mutex::new(true), Condvar::new()),
             in_concurrent_marking: Atomic::new(false),

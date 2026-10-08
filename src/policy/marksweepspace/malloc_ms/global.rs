@@ -291,8 +291,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
         let chunk_map = ChunkMap::new(descriptor.get_index());
         MallocSpace {
             phantom: PhantomData,
-            active_bytes: Atomic::<usize>::new(0),
-            active_pages: Atomic::<usize>::new(0),
+            active_bytes: Atomic::new(0),
+            active_pages: Atomic::new(0),
             metadata: SideMetadataContext {
                 global: args.global_side_metadata_specs.clone(),
                 local: metadata::extract_side_metadata(&[
@@ -309,11 +309,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
             #[cfg(debug_assertions)]
-            total_work_packets: Atomic::<u32>::new(0),
+            total_work_packets: Atomic::new(0),
             #[cfg(debug_assertions)]
-            completed_work_packets: Atomic::<u32>::new(0),
+            completed_work_packets: Atomic::new(0),
             #[cfg(debug_assertions)]
-            work_live_bytes: Atomic::<usize>::new(0),
+            work_live_bytes: Atomic::new(0),
         }
     }
 

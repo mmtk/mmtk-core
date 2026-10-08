@@ -32,32 +32,32 @@ pub const RC_STRADDLE_LINES: SideMetadataSpec =
 /// Side metadata spec for the per-object reference count table.
 pub const RC_TABLE: SideMetadataSpec = crate::util::metadata::side_metadata::spec_defs::RC_TABLE;
 
-static INC_BUFFER_SIZE: Atomic<usize> = Atomic::<usize>::new(0);
+static INC_BUFFER_SIZE: Atomic<usize> = Atomic::new(0);
 
-static TOTAL_INCS_PACKETS: Atomic<u32> = Atomic::<u32>::new(0);
+static TOTAL_INCS_PACKETS: Atomic<u32> = Atomic::new(0);
 
-static TOTAL_INCS: Atomic<u32> = Atomic::<u32>::new(0);
-static ROOT_INCS: Atomic<u32> = Atomic::<u32>::new(0);
-static MATURE_INCS: Atomic<u32> = Atomic::<u32>::new(0);
-static NURSERY_INCS: Atomic<u32> = Atomic::<u32>::new(0);
-static FAST_NURSERY_INCS: Atomic<u32> = Atomic::<u32>::new(0);
-static LOS_INCS: Atomic<u32> = Atomic::<u32>::new(0);
+static TOTAL_INCS: Atomic<u32> = Atomic::new(0);
+static ROOT_INCS: Atomic<u32> = Atomic::new(0);
+static MATURE_INCS: Atomic<u32> = Atomic::new(0);
+static NURSERY_INCS: Atomic<u32> = Atomic::new(0);
+static FAST_NURSERY_INCS: Atomic<u32> = Atomic::new(0);
+static LOS_INCS: Atomic<u32> = Atomic::new(0);
 
-static PROMOTED_OBJECTS: Atomic<u32> = Atomic::<u32>::new(0);
+static PROMOTED_OBJECTS: Atomic<u32> = Atomic::new(0);
 static PROMOTED_SCALARS: [Atomic<u32>; 3] = [
-    Atomic::<u32>::new(0),
-    Atomic::<u32>::new(0),
-    Atomic::<u32>::new(0),
+    Atomic::new(0),
+    Atomic::new(0),
+    Atomic::new(0),
 ];
 static PROMOTED_PRIM_ARRAYS: [Atomic<u32>; 3] = [
-    Atomic::<u32>::new(0),
-    Atomic::<u32>::new(0),
-    Atomic::<u32>::new(0),
+    Atomic::new(0),
+    Atomic::new(0),
+    Atomic::new(0),
 ];
 static PROMOTED_OBJECT_ARRAYS: [Atomic<u32>; 3] = [
-    Atomic::<u32>::new(0),
-    Atomic::<u32>::new(0),
-    Atomic::<u32>::new(0),
+    Atomic::new(0),
+    Atomic::new(0),
+    Atomic::new(0),
 ];
 
 /// A zero-sized helper type providing methods to read and update per-object reference count

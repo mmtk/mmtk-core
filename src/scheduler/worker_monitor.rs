@@ -73,7 +73,7 @@ impl WorkerParker {
     fn new(worker_count: usize) -> Self {
         Self {
             worker_count,
-            parked_workers: Atomic::<usize>::new(0),
+            parked_workers: Atomic::new(0),
         }
     }
 
@@ -111,7 +111,7 @@ impl WorkerMonitor {
                 goals: Default::default(),
             }),
             parker: WorkerParker::new(worker_count),
-            active_workers: Atomic::<usize>::new(worker_count),
+            active_workers: Atomic::new(worker_count),
             workers_have_anything_to_do: Default::default(),
             active_worker_number_changed: Default::default(),
         }
@@ -382,7 +382,7 @@ mod tests {
     fn test_last_worker_park_wake_all() {
         let number_threads = 4;
         let worker_monitor = Arc::new(WorkerMonitor::new(number_threads));
-        let on_last_parked_called = Atomic::<usize>::new(0);
+        let on_last_parked_called = Atomic::new(0);
         let should_unpark = Atomic::new(false);
 
         std::thread::scope(|scope| {
@@ -419,8 +419,8 @@ mod tests {
     fn test_last_worker_park_wake_self() {
         let number_threads = 4;
         let worker_monitor = Arc::new(WorkerMonitor::new(number_threads));
-        let on_last_parked_called = Atomic::<usize>::new(0);
-        let threads_running = Atomic::<usize>::new(0);
+        let on_last_parked_called = Atomic::new(0);
+        let threads_running = Atomic::new(0);
         let should_unpark = Atomic::new(false);
 
         std::thread::scope(|scope| {
@@ -469,7 +469,7 @@ mod tests {
         let concurrent_threads = 2;
         let worker_monitor = Arc::new(WorkerMonitor::new(number_threads));
         worker_monitor.set_active_workers(concurrent_threads);
-        let first_wave_unparked = Atomic::<usize>::new(0);
+        let first_wave_unparked = Atomic::new(0);
         let release_everyone = Atomic::new(false);
         let notifier_ran = Atomic::new(false);
 

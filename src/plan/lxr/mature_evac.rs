@@ -60,7 +60,7 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
             global_packets: Mutex::new(vec![]),
             local_packets: vec![],
             _p: PhantomData,
-            size: Atomic::<usize>::new(0),
+            size: Atomic::new(0),
         };
         rs.gc_buffers
             .resize_with(workers, || UnsafeCell::new(vec![]));

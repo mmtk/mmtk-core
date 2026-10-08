@@ -339,7 +339,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             scheduler,
             abandoned: Mutex::new(AbandonedBlockLists::new()),
             abandoned_in_gc: Mutex::new(AbandonedBlockLists::new()),
-            pending_release_packets: Atomic::<usize>::new(0),
+            pending_release_packets: Atomic::new(0),
         }
     }
 
@@ -530,7 +530,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         let space = unsafe { &*(self as *const Self) };
         let epilogue = Arc::new(RecycleBlocks {
             space,
-            counter: Atomic::<usize>::new(0),
+            counter: Atomic::new(0),
         });
         let tasks = self.chunk_map.generate_tasks(|chunk| {
             Box::new(SweepChunk {

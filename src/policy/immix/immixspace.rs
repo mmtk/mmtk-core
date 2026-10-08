@@ -477,10 +477,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             },
             common,
             chunk_map: ChunkMap::new(space_index),
-            line_mark_state: Atomic::<u8>::new(Line::RESET_MARK_STATE),
-            line_unavail_state: Atomic::<u8>::new(Line::RESET_MARK_STATE),
-            lines_consumed: Atomic::<usize>::new(0),
-            reused_lines_consumed: Atomic::<usize>::new(0),
+            line_mark_state: Atomic::new(Line::RESET_MARK_STATE),
+            line_unavail_state: Atomic::new(Line::RESET_MARK_STATE),
+            lines_consumed: Atomic::new(0),
+            reused_lines_consumed: Atomic::new(0),
             reusable_blocks: ReusableBlockPool::new(scheduler.num_workers()),
             defrag: Defrag::default(),
             // Set to the correct mark state when inititialized. We cannot rely on prepare to set it (prepare may get skipped in nursery GCs).
@@ -716,7 +716,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let space = unsafe { &*(self as *const Self) };
         let epilogue = Arc::new(FlushPageResource {
             space,
-            counter: Atomic::<usize>::new(0),
+            counter: Atomic::new(0),
         });
         let tasks = self.chunk_map.generate_tasks(|chunk| {
             Box::new(SweepChunk {

@@ -201,7 +201,7 @@ impl<B: Region> BlockQueue<B> {
         let boxed_slice = zeroed_vec.into_boxed_slice();
         let data = UnsafeCell::new(boxed_slice);
         Self {
-            cursor: Atomic::<usize>::new(0),
+            cursor: Atomic::new(0),
             data,
         }
     }
@@ -313,7 +313,7 @@ impl<B: Region> BlockPool<B> {
             head_global_freed_blocks: RwLock::new(None),
             global_freed_blocks: RwLock::new(vec![]),
             worker_local_freed_blocks: (0..num_workers).map(|_| BlockQueue::new()).collect(),
-            count: Atomic::<usize>::new(0),
+            count: Atomic::new(0),
         }
     }
 

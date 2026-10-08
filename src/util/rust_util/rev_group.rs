@@ -347,19 +347,19 @@ mod tests {
     fn test_internal_mutability() {
         use atomic::{Atomic, Ordering};
         let slab0 = vec![
-            Atomic::<usize>::new(1),
-            Atomic::<usize>::new(3),
-            Atomic::<usize>::new(2),
+            Atomic::new(1),
+            Atomic::new(3),
+            Atomic::new(2),
         ];
         let slab1 = vec![
-            Atomic::<usize>::new(4),
-            Atomic::<usize>::new(6),
-            Atomic::<usize>::new(5),
+            Atomic::new(4),
+            Atomic::new(6),
+            Atomic::new(5),
         ];
         let slab2 = vec![
-            Atomic::<usize>::new(7),
-            Atomic::<usize>::new(9),
-            Atomic::<usize>::new(10),
+            Atomic::new(7),
+            Atomic::new(9),
+            Atomic::new(10),
         ];
 
         // Note: We only take the first two elements from slab2,

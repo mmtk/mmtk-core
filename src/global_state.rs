@@ -253,15 +253,15 @@ impl Default for GlobalState {
             internal_triggered_collection: Atomic::new(false),
             last_internal_triggered_collection: Atomic::new(false),
             allocation_success: Atomic::new(false),
-            max_collection_attempts: Atomic::<usize>::new(0),
-            cur_collection_attempts: Atomic::<usize>::new(0),
-            scanned_stacks: Atomic::<usize>::new(0),
-            allocation_bytes: Atomic::<usize>::new(0),
+            max_collection_attempts: Atomic::new(0),
+            cur_collection_attempts: Atomic::new(0),
+            scanned_stacks: Atomic::new(0),
+            allocation_bytes: Atomic::new(0),
             inside_harness: Atomic::new(false),
             #[cfg(feature = "malloc_counted_size")]
-            malloc_bytes: Atomic::<usize>::new(0),
+            malloc_bytes: Atomic::new(0),
             live_bytes_in_last_gc: AtomicRefCell::new(HashMap::new()),
-            used_pages_after_last_gc: Atomic::<usize>::new(0),
+            used_pages_after_last_gc: Atomic::new(0),
         }
     }
 }
@@ -341,7 +341,7 @@ impl GcStatusWord {
     }
 
     pub(crate) fn new(status: GcStatus) -> Self {
-        GcStatusWord(Atomic::<usize>::new(Self::encode(status)))
+        GcStatusWord(Atomic::new(Self::encode(status)))
     }
 
     /// Read the current status.

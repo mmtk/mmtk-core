@@ -14,8 +14,8 @@ pub struct PageAccounting {
 impl PageAccounting {
     pub fn new() -> Self {
         Self {
-            reserved: Atomic::<usize>::new(0),
-            committed: Atomic::<usize>::new(0),
+            reserved: Atomic::new(0),
+            committed: Atomic::new(0),
         }
     }
 

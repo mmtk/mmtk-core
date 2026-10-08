@@ -133,7 +133,7 @@ mod initialize_once_tests {
         // The test value
         static I: InitializeOnce<usize> = InitializeOnce::new();
         // Count how many times the function is called
-        static INITIALIZE_COUNT: Atomic<usize> = Atomic::<usize>::new(0);
+        static INITIALIZE_COUNT: Atomic<usize> = Atomic::new(0);
         // The function to create initial value
         fn initialize_usize() -> usize {
             INITIALIZE_COUNT.fetch_add(1, Ordering::SeqCst);

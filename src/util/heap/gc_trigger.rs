@@ -735,9 +735,9 @@ impl MemBalancerTrigger {
         Self {
             min_heap_pages,
             max_heap_pages,
-            pending_pages: Atomic::<usize>::new(0),
+            pending_pages: Atomic::new(0),
             // start with min heap
-            current_heap_pages: Atomic::<usize>::new(min_heap_pages),
+            current_heap_pages: Atomic::new(min_heap_pages),
             stats: AtomicRefCell::new(Default::default()),
         }
     }

@@ -23,7 +23,7 @@ use crate::{
 use super::super::mature_evac::RemSetEntry;
 use super::super::LXR;
 
-pub static SELECT_DEFRAG_BLOCK_JOB_COUNTER: Atomic<usize> = Atomic::<usize>::new(0);
+pub static SELECT_DEFRAG_BLOCK_JOB_COUNTER: Atomic<usize> = Atomic::new(0);
 
 pub struct SelectDefragBlocks {
     pub chunks: Range<Chunk>,

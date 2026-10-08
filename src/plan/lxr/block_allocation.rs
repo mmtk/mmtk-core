@@ -21,7 +21,7 @@ struct BlockCache {
 impl BlockCache {
     fn new() -> Self {
         Self {
-            cursor: Atomic::<usize>::new(0),
+            cursor: Atomic::new(0),
             buffer: RwLock::new((0..32768).map(|_| Atomic::new(Block::ZERO)).collect()),
         }
     }

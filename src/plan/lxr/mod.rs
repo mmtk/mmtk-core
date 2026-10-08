@@ -16,7 +16,7 @@ type RwLock<T> = spin::rwlock::RwLock<T>;
 
 // --- LXR-specific global state ---
 
-static NUM_CONCURRENT_TRACING_PACKETS: Atomic<usize> = Atomic::<usize>::new(0);
+static NUM_CONCURRENT_TRACING_PACKETS: Atomic<usize> = Atomic::new(0);
 static DISABLE_LASY_DEC_FOR_CURRENT_GC: Atomic<bool> = Atomic::new(false);
 static NO_EVAC: Atomic<bool> = Atomic::new(false);
 
@@ -139,9 +139,9 @@ impl LazySweepingJobs {
 
     pub fn swap(&mut self) {
         self.prev_decs_counter = self.curr_decs_counter.take();
-        self.curr_decs_counter = Some(Arc::new(Atomic::<usize>::new(0)));
+        self.curr_decs_counter = Some(Arc::new(Atomic::new(0)));
         self.prev_counter = self.curr_counter.take();
-        self.curr_counter = Some(Arc::new(Atomic::<usize>::new(0)));
+        self.curr_counter = Some(Arc::new(Atomic::new(0)));
     }
 }
 
@@ -149,10 +149,10 @@ static LAZY_SWEEPING_JOBS: Lazy<RwLock<LazySweepingJobs>> =
     Lazy::new(|| RwLock::new(LazySweepingJobs::new()));
 
 static SURVIVAL_RATIO_PREDICTOR: SurvivalRatioPredictor = SurvivalRatioPredictor {
-    alloc_vol: Atomic::<usize>::new(0),
-    copy_promote_vol: Atomic::<usize>::new(0),
+    alloc_vol: Atomic::new(0),
+    copy_promote_vol: Atomic::new(0),
     prev_copy_promote_ratio: Atomic::new(0.01),
-    promote_vol: Atomic::<usize>::new(0),
+    promote_vol: Atomic::new(0),
     prev_promote_ratio: Atomic::new(0.01),
 };
 
@@ -211,8 +211,8 @@ struct SurvivalRatioPredictorLocal {
 impl Default for SurvivalRatioPredictorLocal {
     fn default() -> Self {
         Self {
-            copy_promote_vol: Atomic::<usize>::new(0),
-            promote_vol: Atomic::<usize>::new(0),
+            copy_promote_vol: Atomic::new(0),
+            promote_vol: Atomic::new(0),
         }
     }
 }
