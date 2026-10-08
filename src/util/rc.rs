@@ -44,21 +44,9 @@ static FAST_NURSERY_INCS: Atomic<u32> = Atomic::new(0);
 static LOS_INCS: Atomic<u32> = Atomic::new(0);
 
 static PROMOTED_OBJECTS: Atomic<u32> = Atomic::new(0);
-static PROMOTED_SCALARS: [Atomic<u32>; 3] = [
-    Atomic::new(0),
-    Atomic::new(0),
-    Atomic::new(0),
-];
-static PROMOTED_PRIM_ARRAYS: [Atomic<u32>; 3] = [
-    Atomic::new(0),
-    Atomic::new(0),
-    Atomic::new(0),
-];
-static PROMOTED_OBJECT_ARRAYS: [Atomic<u32>; 3] = [
-    Atomic::new(0),
-    Atomic::new(0),
-    Atomic::new(0),
-];
+static PROMOTED_SCALARS: [Atomic<u32>; 3] = [Atomic::new(0), Atomic::new(0), Atomic::new(0)];
+static PROMOTED_PRIM_ARRAYS: [Atomic<u32>; 3] = [Atomic::new(0), Atomic::new(0), Atomic::new(0)];
+static PROMOTED_OBJECT_ARRAYS: [Atomic<u32>; 3] = [Atomic::new(0), Atomic::new(0), Atomic::new(0)];
 
 /// A zero-sized helper type providing methods to read and update per-object reference count
 /// metadata for LXR's reference counting plan.

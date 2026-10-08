@@ -346,21 +346,9 @@ mod tests {
     #[test]
     fn test_internal_mutability() {
         use atomic::{Atomic, Ordering};
-        let slab0 = vec![
-            Atomic::new(1),
-            Atomic::new(3),
-            Atomic::new(2),
-        ];
-        let slab1 = vec![
-            Atomic::new(4),
-            Atomic::new(6),
-            Atomic::new(5),
-        ];
-        let slab2 = vec![
-            Atomic::new(7),
-            Atomic::new(9),
-            Atomic::new(10),
-        ];
+        let slab0 = vec![Atomic::new(1), Atomic::new(3), Atomic::new(2)];
+        let slab1 = vec![Atomic::new(4), Atomic::new(6), Atomic::new(5)];
+        let slab2 = vec![Atomic::new(7), Atomic::new(9), Atomic::new(10)];
 
         // Note: We only take the first two elements from slab2,
         // because the mmapper sometimes processes part of a slab.
