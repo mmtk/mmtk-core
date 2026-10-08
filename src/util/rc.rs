@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicU32, AtomicUsize};
+use std::sync::atomic::AtomicU32;
 
 use crate::util::linear_scan::Region;
 use crate::util::{metadata::side_metadata::address_to_meta_address, Address};
@@ -8,7 +8,7 @@ use crate::{
     util::{metadata::side_metadata::SideMetadataSpec, ObjectReference},
     vm::*,
 };
-use atomic::Ordering;
+use atomic::{Atomic, Ordering};
 
 /// Log2 of the number of bits used to store each object's reference count in the RC table.
 pub const LOG_REF_COUNT_BITS: usize = 1;
@@ -33,7 +33,7 @@ pub const RC_STRADDLE_LINES: SideMetadataSpec =
 /// Side metadata spec for the per-object reference count table.
 pub const RC_TABLE: SideMetadataSpec = crate::util::metadata::side_metadata::spec_defs::RC_TABLE;
 
-static INC_BUFFER_SIZE: AtomicUsize = AtomicUsize::new(0);
+static INC_BUFFER_SIZE: Atomic<usize> = Atomic::new(0);
 
 static TOTAL_INCS_PACKETS: AtomicU32 = AtomicU32::new(0);
 

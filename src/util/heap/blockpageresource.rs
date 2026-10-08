@@ -10,7 +10,7 @@ use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::*;
 use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::vm::*;
-use atomic::Ordering;
+use atomic::{Atomic, Ordering};
 use spin::RwLock;
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
@@ -182,7 +182,7 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
 /// A block list that supports fast lock-free push/pop operations
 struct BlockQueue<B: Region> {
     /// The number of elements in the queue.
-    cursor: AtomicUsize,
+    cursor: Atomic<usize>,
     /// The underlying data storage.
     ///
     /// -   `UnsafeCell<T>`: It may be accessed by multiple threads.
@@ -202,7 +202,7 @@ impl<B: Region> BlockQueue<B> {
         let boxed_slice = zeroed_vec.into_boxed_slice();
         let data = UnsafeCell::new(boxed_slice);
         Self {
-            cursor: AtomicUsize::new(0),
+            cursor: Atomic::new(0),
             data,
         }
     }

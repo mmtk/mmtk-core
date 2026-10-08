@@ -1,3 +1,4 @@
+use atomic::Atomic;
 use atomic_refcell::AtomicRefCell;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -303,7 +304,7 @@ pub enum GcStatus {
 /// compare-and-swap retry loop and asserting that the transition is legal for the status it
 /// finds. Do not add a generic "set the status to X" method: doing so would make it possible to
 /// bypass the state machine's invariants.
-pub(crate) struct GcStatusWord(AtomicUsize);
+pub(crate) struct GcStatusWord(Atomic<usize>);
 
 impl GcStatusWord {
     /// Number of bits used to encode the variant tag. 3 bits is enough to distinguish the 6
@@ -341,7 +342,7 @@ impl GcStatusWord {
     }
 
     pub(crate) fn new(status: GcStatus) -> Self {
-        GcStatusWord(AtomicUsize::new(Self::encode(status)))
+        GcStatusWord(Atomic::new(Self::encode(status)))
     }
 
     /// Read the current status.

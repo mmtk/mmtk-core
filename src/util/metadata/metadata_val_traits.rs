@@ -1,5 +1,5 @@
 use crate::util::Address;
-use core::sync::atomic::*;
+use atomic::{Atomic, Ordering};
 use num_traits::{FromPrimitive, ToPrimitive};
 use num_traits::{Unsigned, WrappingAdd, WrappingSub, Zero};
 
@@ -138,14 +138,14 @@ pub trait MetadataValue:
         F: FnMut(Self) -> Option<Self>;
 }
 macro_rules! impl_metadata_value_trait {
-    ($non_atomic: ty, $atomic: ty) => {
+    ($non_atomic: ty) => {
         impl MetadataValue for $non_atomic {
             unsafe fn load(addr: Address) -> Self {
                 addr.load::<$non_atomic>()
             }
 
             unsafe fn load_atomic(addr: Address, order: Ordering) -> Self {
-                addr.as_ref::<$atomic>().load(order)
+                addr.as_ref::<Atomic<$non_atomic>>().load(order)
             }
 
             unsafe fn store(addr: Address, value: Self) {
@@ -153,7 +153,7 @@ macro_rules! impl_metadata_value_trait {
             }
 
             unsafe fn store_atomic(addr: Address, value: Self, order: Ordering) {
-                addr.as_ref::<$atomic>().store(value, order)
+                addr.as_ref::<Atomic<$non_atomic>>().store(value, order)
             }
 
             unsafe fn compare_exchange(
@@ -163,24 +163,24 @@ macro_rules! impl_metadata_value_trait {
                 success: Ordering,
                 failure: Ordering,
             ) -> Result<Self, Self> {
-                addr.as_ref::<$atomic>()
+                addr.as_ref::<Atomic<$non_atomic>>()
                     .compare_exchange(current, new, success, failure)
             }
 
             unsafe fn fetch_add(addr: Address, value: Self, order: Ordering) -> Self {
-                addr.as_ref::<$atomic>().fetch_add(value, order)
+                addr.as_ref::<Atomic<$non_atomic>>().fetch_add(value, order)
             }
 
             unsafe fn fetch_sub(addr: Address, value: Self, order: Ordering) -> Self {
-                addr.as_ref::<$atomic>().fetch_sub(value, order)
+                addr.as_ref::<Atomic<$non_atomic>>().fetch_sub(value, order)
             }
 
             unsafe fn fetch_and(addr: Address, value: Self, order: Ordering) -> Self {
-                addr.as_ref::<$atomic>().fetch_and(value, order)
+                addr.as_ref::<Atomic<$non_atomic>>().fetch_and(value, order)
             }
 
             unsafe fn fetch_or(addr: Address, value: Self, order: Ordering) -> Self {
-                addr.as_ref::<$atomic>().fetch_or(value, order)
+                addr.as_ref::<Atomic<$non_atomic>>().fetch_or(value, order)
             }
 
             unsafe fn fetch_update<F>(
@@ -192,14 +192,14 @@ macro_rules! impl_metadata_value_trait {
             where
                 F: FnMut(Self) -> Option<Self>,
             {
-                addr.as_ref::<$atomic>()
+                addr.as_ref::<Atomic<$non_atomic>>()
                     .fetch_update(set_order, fetch_order, f)
             }
         }
     };
 }
-impl_metadata_value_trait!(u8, AtomicU8);
-impl_metadata_value_trait!(u16, AtomicU16);
-impl_metadata_value_trait!(u32, AtomicU32);
-impl_metadata_value_trait!(u64, AtomicU64);
-impl_metadata_value_trait!(usize, AtomicUsize);
+impl_metadata_value_trait!(u8);
+impl_metadata_value_trait!(u16);
+impl_metadata_value_trait!(u32);
+impl_metadata_value_trait!(u64);
+impl_metadata_value_trait!(usize);
