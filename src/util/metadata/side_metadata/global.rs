@@ -1019,8 +1019,10 @@ impl SideMetadataSpec {
     /// Search for a data address that has a non zero value in the side metadata. The search starts from the given data address (including this address),
     /// and iterates backwards for the given bytes (non inclusive) before the data address.
     ///
-    /// The data_addr and the corresponding side metadata address may not be mapped. Thus when this function checks the given data address, and
-    /// when it searches back, it needs to check if the address is mapped or not to avoid loading from an unmapped address.
+    /// The side metadata for the searched range may not be mapped. Thus when this function checks the given data address, and
+    /// when it searches back, it needs to check if the side metadata is mapped or not to avoid loading from an unmapped address.
+    /// Note that this function checks whether the side metadata is mapped, rather than whether the data address is mapped.
+    /// Some spaces (e.g. `MallocSpace`) have objects in memory that is not mapped by MMTk, but MMTk still maps side metadata for them.
     ///
     /// This function returns an address that is aligned to the region of this side metadata (`log_bytes_per_region`), and the side metadata
     /// for the address is non zero.
@@ -1072,13 +1074,13 @@ impl SideMetadataSpec {
 
         let mut cursor = start_addr;
         while cursor >= end_addr {
-            // We can cache the "is the cursor mapped?" check because MMTk maps metadata at
-            // chunk-level
+            // We can cache the "is the side metadata for the cursor mapped?" check because MMTk
+            // maps metadata at chunk-level
             if cursor < mapped_grain {
-                if cursor.is_mapped() {
+                if self.is_mapped(cursor) {
                     mapped_grain = cursor.align_down(mmap_granularity);
                 } else {
-                    // We encounter an unmapped address. Just return None.
+                    // We encounter an unmapped side metadata. Just return None.
                     return None;
                 }
             }
@@ -1099,8 +1101,8 @@ impl SideMetadataSpec {
     ) -> Option<Address> {
         debug_assert!(self.uses_contiguous_side_metadata());
 
-        // Quick check if the data address is mapped at all.
-        if !data_addr.is_mapped() {
+        // Quick check if the side metadata for the data address is mapped at all.
+        if !self.is_mapped(data_addr) {
             return None;
         }
         // Quick check if the current data_addr has a non zero value.
@@ -1180,8 +1182,10 @@ impl SideMetadataSpec {
     /// Search forwards for a data address that has a non zero value in the side metadata. The search starts from the given data
     /// address (including this address), and iterates forwards for the given bytes (non inclusive) before the data address.
     ///
-    /// The data_addr and the corresponding side metadata address may not be mapped. Thus when this function checks the given data address, and
-    /// when it searches back, it needs to check if the address is mapped or not to avoid loading from an unmapped address.
+    /// The side metadata for the searched range may not be mapped. Thus when this function checks the given data address, and
+    /// when it searches forwards, it needs to check if the side metadata is mapped or not to avoid loading from an unmapped address.
+    /// Note that this function checks whether the side metadata is mapped, rather than whether the data address is mapped.
+    /// Some spaces (e.g. `MallocSpace`) have objects in memory that is not mapped by MMTk, but MMTk still maps side metadata for them.
     ///
     /// This function returns an address that is aligned to the region of this side metadata (`log_bytes_per_region`), and the side metadata
     /// for the address is non zero.
@@ -1238,13 +1242,13 @@ impl SideMetadataSpec {
 
         let mut cursor = start_addr;
         while cursor < end_addr {
-            // We can cache the "is the cursor mapped?" check because MMTk maps metadata at
-            // chunk-level
+            // We can cache the "is the side metadata for the cursor mapped?" check because MMTk
+            // maps metadata at chunk-level
             if cursor > mapped_grain {
-                if cursor.is_mapped() {
+                if self.is_mapped(cursor) {
                     mapped_grain = cursor.align_up(mmap_granularity) - 0x1;
                 } else {
-                    // We encounter an unmapped address. Just return None.
+                    // We encounter an unmapped side metadata. Just return None.
                     return None;
                 }
             }
@@ -1264,8 +1268,8 @@ impl SideMetadataSpec {
     ) -> Option<Address> {
         debug_assert!(self.uses_contiguous_side_metadata());
 
-        // Quick check if the data address is mapped at all.
-        if !data_addr.is_mapped() {
+        // Quick check if the side metadata for the data address is mapped at all.
+        if !self.is_mapped(data_addr) {
             return None;
         }
         // Quick check if the current data_addr has a non zero value.
@@ -1392,7 +1396,7 @@ impl SideMetadataSpec {
 
         let mut cursor = data_start_addr;
         while cursor < data_end_addr {
-            debug_assert!(cursor.is_mapped());
+            debug_assert!(self.is_mapped(cursor));
 
             // If we find non-zero value, just call back.
             if !unsafe { self.load::<T>(cursor).is_zero() } {
