@@ -619,7 +619,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             acquire_lock: Mutex::new(()),
             global_state: args.plan_args.global_state,
             options: args.plan_args.options.clone(),
-            allocate_as_live: Atomic::<bool>::new(false),
+            allocate_as_live: Atomic::new(false),
             p: PhantomData,
         };
 

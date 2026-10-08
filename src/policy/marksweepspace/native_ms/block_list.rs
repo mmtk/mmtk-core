@@ -25,7 +25,7 @@ impl BlockList {
             first: None,
             last: None,
             size,
-            lock: Atomic::<bool>::new(false),
+            lock: Atomic::new(false),
         }
     }
 

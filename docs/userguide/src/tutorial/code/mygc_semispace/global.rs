@@ -177,7 +177,7 @@ impl<VM: VMBinding> MyGC<VM> {
         };
 
         MyGC {
-            hi: Atomic::<bool>::new(false),
+            hi: Atomic::new(false),
             // ANCHOR: copyspace_new
             copyspace0: CopySpace::new(plan_args.get_normal_space_args("copyspace0", true, false, VMRequest::discontiguous()), false),
             // ANCHOR_END: copyspace_new

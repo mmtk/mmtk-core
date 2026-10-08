@@ -383,7 +383,7 @@ mod tests {
         let number_threads = 4;
         let worker_monitor = Arc::new(WorkerMonitor::new(number_threads));
         let on_last_parked_called = Atomic::<usize>::new(0);
-        let should_unpark = Atomic::<bool>::new(false);
+        let should_unpark = Atomic::new(false);
 
         std::thread::scope(|scope| {
             for ordinal in 0..number_threads {
@@ -421,7 +421,7 @@ mod tests {
         let worker_monitor = Arc::new(WorkerMonitor::new(number_threads));
         let on_last_parked_called = Atomic::<usize>::new(0);
         let threads_running = Atomic::<usize>::new(0);
-        let should_unpark = Atomic::<bool>::new(false);
+        let should_unpark = Atomic::new(false);
 
         std::thread::scope(|scope| {
             for ordinal in 0..number_threads {
@@ -470,8 +470,8 @@ mod tests {
         let worker_monitor = Arc::new(WorkerMonitor::new(number_threads));
         worker_monitor.set_active_workers(concurrent_threads);
         let first_wave_unparked = Atomic::<usize>::new(0);
-        let release_everyone = Atomic::<bool>::new(false);
-        let notifier_ran = Atomic::<bool>::new(false);
+        let release_everyone = Atomic::new(false);
+        let notifier_ran = Atomic::new(false);
 
         std::thread::scope(|scope| {
             for ordinal in 0..number_threads {

@@ -15,7 +15,7 @@ pub(super) struct BucketQueue<VM: VMBinding> {
 impl<VM: VMBinding> BucketQueue<VM> {
     fn new() -> Self {
         Self {
-            flag: Atomic::<bool>::new(false),
+            flag: Atomic::new(false),
             queue0: Injector::new(),
             queue1: Injector::new(),
         }
@@ -167,8 +167,8 @@ pub struct WorkBucket<VM: VMBinding> {
 impl<VM: VMBinding> WorkBucket<VM> {
     pub(crate) fn new(stage: WorkBucketStage, monitor: Arc<WorkerMonitor>) -> Self {
         Self {
-            open: Atomic::<bool>::new(stage.is_open_by_default()),
-            enabled: Atomic::<bool>::new(stage.is_enabled_by_default()),
+            open: Atomic::new(stage.is_open_by_default()),
+            enabled: Atomic::new(stage.is_enabled_by_default()),
             stage,
             queue: BucketQueue::new(),
             monitor,

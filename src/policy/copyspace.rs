@@ -198,7 +198,7 @@ impl<VM: VMBinding> CopySpace<VM> {
                 MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
-            from_space: Atomic::<bool>::new(from_space),
+            from_space: Atomic::new(from_space),
         }
     }
 

@@ -164,7 +164,7 @@ impl<VM: VMBinding> Immix<VM> {
                 space_args,
             ),
             common: CommonPlan::new(plan_args),
-            last_gc_was_defrag: Atomic::<bool>::new(false),
+            last_gc_was_defrag: Atomic::new(false),
         }
     }
 

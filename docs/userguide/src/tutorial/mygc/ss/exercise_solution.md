@@ -35,7 +35,7 @@ In `triplespace/global.rs`:
          let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
          TripleSpace {
-             hi: Atomic::<bool>::new(false),
+             hi: Atomic::new(false),
              copyspace0: CopySpace::new(
                  "copyspace0",
                  false,

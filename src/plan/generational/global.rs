@@ -53,7 +53,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             nursery,
             common,
             gc_full_heap: Atomic::<bool>::default(),
-            next_gc_full_heap: Atomic::<bool>::new(false),
+            next_gc_full_heap: Atomic::new(false),
             full_heap_gc_count,
         }
     }

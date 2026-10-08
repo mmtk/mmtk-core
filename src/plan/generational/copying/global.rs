@@ -224,7 +224,7 @@ impl<VM: VMBinding> GenCopy<VM> {
 
         GenCopy {
             gen: CommonGenPlan::new(plan_args),
-            hi: Atomic::<bool>::new(false),
+            hi: Atomic::new(false),
             copyspace0,
             copyspace1,
         }

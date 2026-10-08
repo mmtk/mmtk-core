@@ -275,8 +275,8 @@ impl<VM: VMBinding> GenImmix<VM> {
         GenImmix {
             gen: CommonGenPlan::new(plan_args),
             immix_space,
-            last_gc_was_defrag: Atomic::<bool>::new(false),
-            last_gc_was_full_heap: Atomic::<bool>::new(false),
+            last_gc_was_defrag: Atomic::new(false),
+            last_gc_was_full_heap: Atomic::new(false),
         }
     }
 

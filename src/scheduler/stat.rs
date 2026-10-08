@@ -200,7 +200,7 @@ impl<C> Default for WorkerLocalStat<C> {
             work_id_name_map: Default::default(),
             work_counts: Default::default(),
             work_counters: Default::default(),
-            enabled: Atomic::<bool>::new(false),
+            enabled: Atomic::new(false),
             _phantom: Default::default(),
         }
     }

@@ -144,7 +144,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
         };
 
         SemiSpace {
-            hi: Atomic::<bool>::new(false),
+            hi: Atomic::new(false),
             copyspace0: CopySpace::new(
                 plan_args.get_normal_space_args(
                     "copyspace0",

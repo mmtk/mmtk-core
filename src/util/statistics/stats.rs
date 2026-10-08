@@ -70,7 +70,7 @@ impl Stats {
         };
         let shared = Arc::new(SharedStats {
             phase: Atomic::<usize>::new(0),
-            gathering_stats: Atomic::<bool>::new(false),
+            gathering_stats: Atomic::new(false),
         });
         let mut counters: Vec<Arc<Mutex<dyn Counter + Send>>> = vec![];
         // We always have a time counter enabled

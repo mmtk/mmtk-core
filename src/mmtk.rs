@@ -234,7 +234,7 @@ impl<VM: VMBinding> MMTK<VM> {
             #[cfg(feature = "sanity")]
             sanity_checker: Mutex::new(SanityChecker::new()),
             #[cfg(feature = "sanity")]
-            inside_sanity: Atomic::<bool>::new(false),
+            inside_sanity: Atomic::new(false),
             #[cfg(feature = "extreme_assertions")]
             slot_logger: SlotLogger::new(),
             #[cfg(feature = "analysis")]

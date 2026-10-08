@@ -17,8 +17,8 @@ type RwLock<T> = spin::rwlock::RwLock<T>;
 // --- LXR-specific global state ---
 
 static NUM_CONCURRENT_TRACING_PACKETS: Atomic<usize> = Atomic::<usize>::new(0);
-static DISABLE_LASY_DEC_FOR_CURRENT_GC: Atomic<bool> = Atomic::<bool>::new(false);
-static NO_EVAC: Atomic<bool> = Atomic::<bool>::new(false);
+static DISABLE_LASY_DEC_FOR_CURRENT_GC: Atomic<bool> = Atomic::new(false);
+static NO_EVAC: Atomic<bool> = Atomic::new(false);
 
 // --- LXR-specific global constants/flags ---
 

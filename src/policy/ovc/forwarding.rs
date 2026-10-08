@@ -117,7 +117,7 @@ pub(crate) const OFFSET_VECTOR_SPEC: SideMetadataSpec = OVC_OFFSET_VECTOR;
 impl<VM: VMBinding> ForwardingMetadata<VM> {
     pub fn new() -> ForwardingMetadata<VM> {
         ForwardingMetadata {
-            calculated: Atomic::<bool>::new(false),
+            calculated: Atomic::new(false),
             vm: PhantomData,
         }
     }

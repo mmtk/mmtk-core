@@ -267,7 +267,7 @@ impl<VM: VMBinding> AllocatorContext<VM> {
         Self {
             alloc_options: AllocationOptionsHolder::new(AllocationOptions::default()),
             state: mmtk.state.clone(),
-            thrown_oom: Atomic::<bool>::new(false),
+            thrown_oom: Atomic::new(false),
             options: mmtk.options.clone(),
             gc_trigger: mmtk.gc_trigger.clone(),
             #[cfg(feature = "analysis")]

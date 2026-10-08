@@ -189,7 +189,7 @@ impl ReferenceProcessor {
                 nursery_index: 0,
             }),
             semantics,
-            allow_new_candidate: Atomic::<bool>::new(true),
+            allow_new_candidate: Atomic::new(true),
         }
     }
 

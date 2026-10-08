@@ -188,7 +188,7 @@ static mut VM_LAYOUT: VMLayout = VMLayout::new_32bit();
 #[cfg(target_pointer_width = "64")]
 static mut VM_LAYOUT: VMLayout = VMLayout::new_64bit();
 
-static VM_LAYOUT_FETCHED: Atomic<bool> = Atomic::<bool>::new(false);
+static VM_LAYOUT_FETCHED: Atomic<bool> = Atomic::new(false);
 
 /// Get the current virtual memory layout in use.
 /// If the binding would like to set a custom virtual memory layout ([`crate::mmtk::MMTKBuilder::set_vm_layout`]), they should not

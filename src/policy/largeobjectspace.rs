@@ -467,7 +467,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             rc_enabled: false,
             rc: RefCountHelper::NEW,
             is_end_of_satb_or_full_gc: false,
-            bump_page_reuse_count: Atomic::<bool>::new(false),
+            bump_page_reuse_count: Atomic::new(false),
         }
     }
 

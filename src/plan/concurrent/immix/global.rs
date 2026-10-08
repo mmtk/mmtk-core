@@ -383,12 +383,12 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
                 immix_args,
             ),
             common: CommonPlan::new(plan_args),
-            last_gc_was_defrag: Atomic::<bool>::new(false),
+            last_gc_was_defrag: Atomic::new(false),
             current_pause: Atomic::new(None),
             previous_pause: Atomic::new(None),
-            should_do_full_gc: Atomic::<bool>::new(false),
-            concurrent_marking_active: Atomic::<bool>::new(false),
-            unfinished_concurrent_marking: Atomic::<bool>::new(false),
+            should_do_full_gc: Atomic::new(false),
+            concurrent_marking_active: Atomic::new(false),
+            unfinished_concurrent_marking: Atomic::new(false),
         }
     }
 
