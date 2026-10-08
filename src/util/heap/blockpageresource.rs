@@ -8,7 +8,6 @@ use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::*;
-use crate::util::rust_util::atomic_compat::AtomicFetchUpdate;
 use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::vm::*;
 use atomic::Ordering;
@@ -242,7 +241,7 @@ impl<B: Region> BlockQueue<B> {
     fn pop(&self) -> Option<B> {
         let i = self
             .cursor
-            .fetch_update_compat(Ordering::SeqCst, Ordering::SeqCst, |i| {
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |i| {
                 if i > 0 {
                     Some(i - 1)
                 } else {

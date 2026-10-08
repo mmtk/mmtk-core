@@ -1,4 +1,3 @@
-use crate::util::rust_util::atomic_compat::AtomicFetchUpdate;
 use crate::util::Address;
 use core::sync::atomic::*;
 use num_traits::{FromPrimitive, ToPrimitive};
@@ -194,7 +193,7 @@ macro_rules! impl_metadata_value_trait {
                 F: FnMut(Self) -> Option<Self>,
             {
                 addr.as_ref::<$atomic>()
-                    .fetch_update_compat(set_order, fetch_order, f)
+                    .fetch_update(set_order, fetch_order, f)
             }
         }
     };

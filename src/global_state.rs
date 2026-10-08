@@ -1,4 +1,3 @@
-use crate::util::rust_util::atomic_compat::AtomicFetchUpdate;
 use atomic_refcell::AtomicRefCell;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -355,7 +354,7 @@ impl GcStatusWord {
     fn transition_inner<F: FnMut(GcStatus) -> GcStatus>(&self, mut f: F) -> GcStatus {
         let old_bits = self
             .0
-            .fetch_update_compat(Ordering::SeqCst, Ordering::SeqCst, |bits| {
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
                 Some(Self::encode(f(Self::decode(bits))))
             })
             .unwrap(); // `f` always returns a status to move to, so this never returns `Err`.
@@ -392,7 +391,7 @@ impl GcStatusWord {
         mut f: F,
     ) -> Result<GcStatus, GcStatus> {
         self.0
-            .fetch_update_compat(Ordering::SeqCst, Ordering::SeqCst, |bits| {
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
                 f(Self::decode(bits)).map(Self::encode)
             })
             .map(Self::decode)

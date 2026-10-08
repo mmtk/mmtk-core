@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU32, AtomicUsize};
 
 use crate::util::linear_scan::Region;
-use crate::util::rust_util::atomic_compat::AtomicFetchUpdate;
 use crate::util::{metadata::side_metadata::address_to_meta_address, Address};
 use crate::{
     policy::immix::{block::Block, line::Line},
@@ -72,7 +71,7 @@ impl<VM: VMBinding> RefCountHelper<VM> {
 
     /// Increases the global increment buffer size counter by `delta`.
     pub fn increase_inc_buffer_size(&self, delta: usize) {
-        let _ = INC_BUFFER_SIZE.fetch_update_compat(Ordering::Relaxed, Ordering::Relaxed, |x| {
+        let _ = INC_BUFFER_SIZE.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |x| {
             Some(x.saturating_add(delta))
         });
     }
