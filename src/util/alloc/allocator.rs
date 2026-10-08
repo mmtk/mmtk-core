@@ -7,7 +7,7 @@ use crate::util::options::Options;
 use crate::MMTK;
 
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, Ordering};
+use atomic::{Atomic, Ordering};
 use std::sync::Arc;
 
 use crate::policy::space::Space;
@@ -255,7 +255,7 @@ pub struct AllocatorContext<VM: VMBinding> {
     pub state: Arc<GlobalState>,
     /// Have we thrown an OOM already?
     /// This value is only set and reset if [`Collection::out_of_memory`] returns.
-    pub thrown_oom: AtomicBool,
+    pub thrown_oom: Atomic<bool>,
     pub options: Arc<Options>,
     pub gc_trigger: Arc<GCTrigger<VM>>,
     #[cfg(feature = "analysis")]
@@ -267,7 +267,7 @@ impl<VM: VMBinding> AllocatorContext<VM> {
         Self {
             alloc_options: AllocationOptionsHolder::new(AllocationOptions::default()),
             state: mmtk.state.clone(),
-            thrown_oom: AtomicBool::new(false),
+            thrown_oom: Atomic::<bool>::new(false),
             options: mmtk.options.clone(),
             gc_trigger: mmtk.gc_trigger.clone(),
             #[cfg(feature = "analysis")]

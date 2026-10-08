@@ -11,18 +11,17 @@ use crate::util::linear_scan::Region;
 use crate::vm::VMBinding;
 use atomic::{Atomic, Ordering};
 use std::cell::UnsafeCell;
-use std::sync::atomic::AtomicUsize;
 use std::sync::RwLock;
 
 struct BlockCache {
-    cursor: AtomicUsize,
+    cursor: Atomic<usize>,
     buffer: RwLock<Vec<Atomic<Block>>>,
 }
 
 impl BlockCache {
     fn new() -> Self {
         Self {
-            cursor: AtomicUsize::new(0),
+            cursor: Atomic::<usize>::new(0),
             buffer: RwLock::new((0..32768).map(|_| Atomic::new(Block::ZERO)).collect()),
         }
     }

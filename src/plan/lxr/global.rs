@@ -44,12 +44,11 @@ use atomic::{Atomic, Ordering};
 use crossbeam::queue::SegQueue;
 use enum_map::EnumMap;
 use spin::Lazy;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Condvar, Mutex, RwLock};
 
 const LOG_CONSERVATIVE_SURVIVAL_RATIO_MULTIPLER: usize = 1;
 
-static HEAP_AFTER_GC: AtomicUsize = AtomicUsize::new(0);
+static HEAP_AFTER_GC: Atomic<usize> = Atomic::<usize>::new(0);
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
@@ -63,22 +62,22 @@ pub struct LXR<VM: VMBinding> {
     pub common: CommonPlan<VM>,
     /// Always true for non-rc immix.
     /// For RC immix, this is used for enable backup tracing.
-    perform_cycle_collection: AtomicBool,
+    perform_cycle_collection: Atomic<bool>,
     current_pause: Atomic<Option<Pause>>,
     previous_pause: Atomic<Option<Pause>>,
-    hint_cycle_gc: AtomicBool,
-    hint_emergency_gc: AtomicBool,
-    avail_pages_at_end_of_last_gc: AtomicUsize,
-    zeroing_packets_scheduled: AtomicBool,
+    hint_cycle_gc: Atomic<bool>,
+    hint_emergency_gc: Atomic<bool>,
+    avail_pages_at_end_of_last_gc: Atomic<usize>,
+    zeroing_packets_scheduled: Atomic<bool>,
     decide_cycle_collection: (Mutex<bool>, Condvar),
-    in_concurrent_marking: AtomicBool,
+    in_concurrent_marking: Atomic<bool>,
     pub prev_roots: RwLock<SegQueue<Vec<ObjectReference>>>,
     pub curr_roots: RwLock<SegQueue<Vec<ObjectReference>>>,
     pub rc: RefCountHelper<VM>,
     block_allocation: BlockAllocation<VM>,
     pub(super) evac_set: MatureEvacuationSet,
     pub(super) mature_evac_remset: MatureEvecRemSet<VM>,
-    pub(super) num_clean_blocks_released_lazy: AtomicUsize,
+    pub(super) num_clean_blocks_released_lazy: Atomic<usize>,
     pub(super) possibly_dead_mature_blocks: SegQueue<(Block, bool)>,
 }
 
@@ -450,15 +449,15 @@ impl<VM: VMBinding> LXR<VM> {
         let mut lxr = Box::new(LXR {
             immix_space,
             common: CommonPlan::new(plan_args),
-            perform_cycle_collection: AtomicBool::new(false),
-            hint_cycle_gc: AtomicBool::new(false),
-            hint_emergency_gc: AtomicBool::new(false),
+            perform_cycle_collection: Atomic::<bool>::new(false),
+            hint_cycle_gc: Atomic::<bool>::new(false),
+            hint_emergency_gc: Atomic::<bool>::new(false),
             current_pause: Atomic::new(None),
             previous_pause: Atomic::new(None),
-            avail_pages_at_end_of_last_gc: AtomicUsize::new(0),
-            zeroing_packets_scheduled: AtomicBool::new(false),
+            avail_pages_at_end_of_last_gc: Atomic::<usize>::new(0),
+            zeroing_packets_scheduled: Atomic::<bool>::new(false),
             decide_cycle_collection: (Mutex::new(true), Condvar::new()),
-            in_concurrent_marking: AtomicBool::new(false),
+            in_concurrent_marking: Atomic::<bool>::new(false),
             prev_roots: Default::default(),
             curr_roots: Default::default(),
             rc: RefCountHelper::NEW,

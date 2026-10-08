@@ -26,7 +26,7 @@ use crate::vm::*;
 use crate::ObjectQueue;
 use crate::MMTK;
 use enum_map::EnumMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use atomic::{Atomic, Ordering};
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
@@ -34,7 +34,7 @@ use mmtk_macros::{HasSpaces, PlanTraceObject};
 pub struct GenCopy<VM: VMBinding> {
     #[parent]
     pub gen: CommonGenPlan<VM>,
-    pub hi: AtomicBool,
+    pub hi: Atomic<bool>,
     #[space]
     #[copy_semantics(CopySemantics::Mature)]
     pub copyspace0: CopySpace<VM>,
@@ -224,7 +224,7 @@ impl<VM: VMBinding> GenCopy<VM> {
 
         GenCopy {
             gen: CommonGenPlan::new(plan_args),
-            hi: AtomicBool::new(false),
+            hi: Atomic::<bool>::new(false),
             copyspace0,
             copyspace1,
         }

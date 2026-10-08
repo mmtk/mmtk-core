@@ -1,7 +1,5 @@
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
+use atomic::{Atomic, Ordering};
+use std::sync::Arc;
 
 use crate::{
     policy::{marksweepspace::native_ms::*, sft::GCWorkerMutRef},
@@ -85,7 +83,7 @@ pub struct MarkSweepSpace<VM: VMBinding> {
     abandoned_in_gc: Mutex<AbandonedBlockLists>,
     /// Count the number of pending `ReleaseMarkSweepSpace` and `ReleaseMutator` work packets during
     /// the `Release` stage.
-    pending_release_packets: AtomicUsize,
+    pending_release_packets: Atomic<usize>,
 }
 
 unsafe impl<VM: VMBinding> Sync for MarkSweepSpace<VM> {}
@@ -341,7 +339,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             scheduler,
             abandoned: Mutex::new(AbandonedBlockLists::new()),
             abandoned_in_gc: Mutex::new(AbandonedBlockLists::new()),
-            pending_release_packets: AtomicUsize::new(0),
+            pending_release_packets: Atomic::<usize>::new(0),
         }
     }
 
@@ -532,7 +530,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         let space = unsafe { &*(self as *const Self) };
         let epilogue = Arc::new(RecycleBlocks {
             space,
-            counter: AtomicUsize::new(0),
+            counter: Atomic::<usize>::new(0),
         });
         let tasks = self.chunk_map.generate_tasks(|chunk| {
             Box::new(SweepChunk {
@@ -657,7 +655,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
 
 struct RecycleBlocks<VM: VMBinding> {
     space: &'static MarkSweepSpace<VM>,
-    counter: AtomicUsize,
+    counter: Atomic<usize>,
 }
 
 impl<VM: VMBinding> RecycleBlocks<VM> {

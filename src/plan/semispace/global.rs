@@ -16,7 +16,7 @@ use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::VMWorkerThread;
 use crate::{plan::global::BasePlan, vm::VMBinding};
-use std::sync::atomic::{AtomicBool, Ordering};
+use atomic::{Atomic, Ordering};
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
@@ -24,7 +24,7 @@ use enum_map::EnumMap;
 
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct SemiSpace<VM: VMBinding> {
-    pub hi: AtomicBool,
+    pub hi: Atomic<bool>,
     #[space]
     #[copy_semantics(CopySemantics::DefaultCopy)]
     pub copyspace0: CopySpace<VM>,
@@ -144,7 +144,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
         };
 
         SemiSpace {
-            hi: AtomicBool::new(false),
+            hi: Atomic::<bool>::new(false),
             copyspace0: CopySpace::new(
                 plan_args.get_normal_space_args(
                     "copyspace0",

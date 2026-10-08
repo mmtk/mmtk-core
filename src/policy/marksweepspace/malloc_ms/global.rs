@@ -29,8 +29,7 @@ use crate::{policy::space::Space, util::heap::layout::vm_layout::BYTES_IN_CHUNK}
 use std::collections::HashMap;
 use std::marker::PhantomData;
 #[cfg(debug_assertions)]
-use std::sync::atomic::AtomicU32;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use atomic::{Atomic, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it
@@ -41,8 +40,8 @@ const ASSERT_ALLOCATION: bool = false;
 /// This space uses malloc to get new memory, and performs mark-sweep for the memory.
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
-    active_bytes: AtomicUsize,
-    active_pages: AtomicUsize,
+    active_bytes: Atomic<usize>,
+    active_pages: Atomic<usize>,
     metadata: SideMetadataContext,
     /// Work packet scheduler
     scheduler: Arc<GCWorkScheduler<VM>>,
@@ -58,11 +57,11 @@ pub struct MallocSpace<VM: VMBinding> {
     // as we need to check how many live bytes exist against `active_bytes` when the last sweep
     // work packet is executed
     #[cfg(debug_assertions)]
-    pub total_work_packets: AtomicU32,
+    pub total_work_packets: Atomic<u32>,
     #[cfg(debug_assertions)]
-    pub completed_work_packets: AtomicU32,
+    pub completed_work_packets: Atomic<u32>,
     #[cfg(debug_assertions)]
-    pub work_live_bytes: AtomicUsize,
+    pub work_live_bytes: Atomic<usize>,
 }
 
 impl<VM: VMBinding> SFT for MallocSpace<VM> {
@@ -292,8 +291,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
         let chunk_map = ChunkMap::new(descriptor.get_index());
         MallocSpace {
             phantom: PhantomData,
-            active_bytes: AtomicUsize::new(0),
-            active_pages: AtomicUsize::new(0),
+            active_bytes: Atomic::<usize>::new(0),
+            active_pages: Atomic::<usize>::new(0),
             metadata: SideMetadataContext {
                 global: args.global_side_metadata_specs.clone(),
                 local: metadata::extract_side_metadata(&[
@@ -310,11 +309,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
             #[cfg(debug_assertions)]
-            total_work_packets: AtomicU32::new(0),
+            total_work_packets: Atomic::<u32>::new(0),
             #[cfg(debug_assertions)]
-            completed_work_packets: AtomicU32::new(0),
+            completed_work_packets: Atomic::<u32>::new(0),
             #[cfg(debug_assertions)]
-            work_live_bytes: AtomicUsize::new(0),
+            work_live_bytes: Atomic::<usize>::new(0),
         }
     }
 

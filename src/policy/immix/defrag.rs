@@ -7,22 +7,22 @@ use crate::util::linear_scan::Region;
 use crate::{policy::space::Space, Plan};
 use crate::{util::constants::LOG_BYTES_IN_PAGE, vm::*};
 use spin::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use atomic::{Atomic, Ordering};
 
 pub type Histogram = [usize; Defrag::NUM_BINS];
 
 #[derive(Debug, Default)]
 pub struct Defrag {
     /// Is current GC a defrag GC?
-    in_defrag_collection: AtomicBool,
+    in_defrag_collection: Atomic<bool>,
     /// Is defrag space exhausted?
-    defrag_space_exhausted: AtomicBool,
+    defrag_space_exhausted: Atomic<bool>,
     /// A list of completed mark histograms reported by workers
     pub mark_histograms: Mutex<Vec<Histogram>>,
     /// A block with number of holes greater than this threshold will be defragmented.
-    pub defrag_spill_threshold: AtomicUsize,
+    pub defrag_spill_threshold: Atomic<usize>,
     /// The number of remaining clean pages in defrag space.
-    available_clean_pages_for_defrag: AtomicUsize,
+    available_clean_pages_for_defrag: Atomic<usize>,
 }
 
 pub struct StatsForDefrag {

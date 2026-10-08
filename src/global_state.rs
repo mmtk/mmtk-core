@@ -1,6 +1,6 @@
 use atomic_refcell::AtomicRefCell;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use atomic::{Atomic, Ordering};
 use std::time::{Duration, Instant};
 
 /// This stores some global states for an MMTK instance.
@@ -23,35 +23,35 @@ pub struct GlobalState {
     pub(crate) pause_start_time: AtomicRefCell<Option<Instant>>,
     /// Is the current GC an emergency collection? Emergency means we may run out of memory soon, and we should
     /// attempt to collect as much as we can.
-    pub(crate) emergency_collection: AtomicBool,
+    pub(crate) emergency_collection: Atomic<bool>,
     /// Is the current GC triggered by the user?
-    pub(crate) user_triggered_collection: AtomicBool,
+    pub(crate) user_triggered_collection: Atomic<bool>,
     /// Is the current GC triggered internally by MMTK? This is unused for now. We may have internally triggered GC
     /// for a concurrent plan.
-    pub(crate) internal_triggered_collection: AtomicBool,
+    pub(crate) internal_triggered_collection: Atomic<bool>,
     /// Is the last GC internally triggered?
-    pub(crate) last_internal_triggered_collection: AtomicBool,
+    pub(crate) last_internal_triggered_collection: Atomic<bool>,
     // Has an allocation succeeded since the emergency collection?
-    pub(crate) allocation_success: AtomicBool,
+    pub(crate) allocation_success: Atomic<bool>,
     // Maximum number of failed attempts by a single thread
-    pub(crate) max_collection_attempts: AtomicUsize,
+    pub(crate) max_collection_attempts: Atomic<usize>,
     // Current collection attempt
-    pub(crate) cur_collection_attempts: AtomicUsize,
+    pub(crate) cur_collection_attempts: Atomic<usize>,
     /// A counter for per-mutator stack scanning
-    pub(crate) scanned_stacks: AtomicUsize,
+    pub(crate) scanned_stacks: Atomic<usize>,
     /// Have we scanned all the stacks?
-    pub(crate) stacks_prepared: AtomicBool,
+    pub(crate) stacks_prepared: Atomic<bool>,
     /// A counter that keeps tracks of the number of bytes allocated since last stress test
-    pub(crate) allocation_bytes: AtomicUsize,
+    pub(crate) allocation_bytes: Atomic<usize>,
     /// Are we inside the benchmark harness?
-    pub(crate) inside_harness: AtomicBool,
+    pub(crate) inside_harness: Atomic<bool>,
     /// A counteer that keeps tracks of the number of bytes allocated by malloc
     #[cfg(feature = "malloc_counted_size")]
-    pub(crate) malloc_bytes: AtomicUsize,
+    pub(crate) malloc_bytes: Atomic<usize>,
     /// This stores the live bytes and the used bytes (by pages) for each space in last GC. This counter is only updated in the GC release phase.
     pub(crate) live_bytes_in_last_gc: AtomicRefCell<HashMap<&'static str, LiveBytesStats>>,
     /// The number of used pages at the end of the last GC. This can be used to estimate how many pages we have allocated since last GC.
-    pub(crate) used_pages_after_last_gc: AtomicUsize,
+    pub(crate) used_pages_after_last_gc: Atomic<usize>,
 }
 
 impl GlobalState {
@@ -247,21 +247,21 @@ impl Default for GlobalState {
             gc_status: GcStatusWord::new(GcStatus::Uninitialized),
             pause_requested_time: AtomicRefCell::new(None),
             pause_start_time: AtomicRefCell::new(None),
-            stacks_prepared: AtomicBool::new(false),
-            emergency_collection: AtomicBool::new(false),
-            user_triggered_collection: AtomicBool::new(false),
-            internal_triggered_collection: AtomicBool::new(false),
-            last_internal_triggered_collection: AtomicBool::new(false),
-            allocation_success: AtomicBool::new(false),
-            max_collection_attempts: AtomicUsize::new(0),
-            cur_collection_attempts: AtomicUsize::new(0),
-            scanned_stacks: AtomicUsize::new(0),
-            allocation_bytes: AtomicUsize::new(0),
-            inside_harness: AtomicBool::new(false),
+            stacks_prepared: Atomic::<bool>::new(false),
+            emergency_collection: Atomic::<bool>::new(false),
+            user_triggered_collection: Atomic::<bool>::new(false),
+            internal_triggered_collection: Atomic::<bool>::new(false),
+            last_internal_triggered_collection: Atomic::<bool>::new(false),
+            allocation_success: Atomic::<bool>::new(false),
+            max_collection_attempts: Atomic::<usize>::new(0),
+            cur_collection_attempts: Atomic::<usize>::new(0),
+            scanned_stacks: Atomic::<usize>::new(0),
+            allocation_bytes: Atomic::<usize>::new(0),
+            inside_harness: Atomic::<bool>::new(false),
             #[cfg(feature = "malloc_counted_size")]
-            malloc_bytes: AtomicUsize::new(0),
+            malloc_bytes: Atomic::<usize>::new(0),
             live_bytes_in_last_gc: AtomicRefCell::new(HashMap::new()),
-            used_pages_after_last_gc: AtomicUsize::new(0),
+            used_pages_after_last_gc: Atomic::<usize>::new(0),
         }
     }
 }
@@ -303,7 +303,7 @@ pub enum GcStatus {
 /// compare-and-swap retry loop and asserting that the transition is legal for the status it
 /// finds. Do not add a generic "set the status to X" method: doing so would make it possible to
 /// bypass the state machine's invariants.
-pub(crate) struct GcStatusWord(AtomicUsize);
+pub(crate) struct GcStatusWord(Atomic<usize>);
 
 impl GcStatusWord {
     /// Number of bits used to encode the variant tag. 3 bits is enough to distinguish the 6
@@ -341,7 +341,7 @@ impl GcStatusWord {
     }
 
     pub(crate) fn new(status: GcStatus) -> Self {
-        GcStatusWord(AtomicUsize::new(Self::encode(status)))
+        GcStatusWord(Atomic::<usize>::new(Self::encode(status)))
     }
 
     /// Read the current status.

@@ -23,8 +23,7 @@ use crate::vm::VMBinding;
 use crate::Plan;
 use crate::MMTK;
 
-use atomic::Ordering;
-use std::sync::atomic::AtomicBool;
+use atomic::{Atomic, Ordering};
 use std::sync::{Arc, Mutex};
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
@@ -36,8 +35,8 @@ use super::gc_work::StickyImmixNurseryGCWorkContext;
 pub struct StickyImmix<VM: VMBinding> {
     #[parent]
     immix: immix::Immix<VM>,
-    gc_full_heap: AtomicBool,
-    next_gc_full_heap: AtomicBool,
+    gc_full_heap: Atomic<bool>,
+    next_gc_full_heap: Atomic<bool>,
     full_heap_gc_count: Arc<Mutex<EventCounter>>,
 }
 
@@ -358,8 +357,8 @@ impl<VM: VMBinding> StickyImmix<VM> {
         );
         Self {
             immix,
-            gc_full_heap: AtomicBool::new(false),
-            next_gc_full_heap: AtomicBool::new(false),
+            gc_full_heap: Atomic::<bool>::new(false),
+            next_gc_full_heap: Atomic::<bool>::new(false),
             full_heap_gc_count,
         }
     }

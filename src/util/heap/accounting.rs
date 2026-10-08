@@ -1,5 +1,4 @@
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
+use atomic::{Atomic, Ordering};
 
 /// The struct is used for page usage.
 /// Both page resource and side metadata uses this struct to do page accounting.
@@ -7,16 +6,16 @@ pub struct PageAccounting {
     /// The reserved pages. This should be incremented when we are about to allocate pages.
     /// Note this is different than quarantining address range. We do not count for quarantined
     /// memory.
-    reserved: AtomicUsize,
+    reserved: Atomic<usize>,
     /// The committed pages. This should be incremented when we successfully allocate pages from the OS.
-    committed: AtomicUsize,
+    committed: Atomic<usize>,
 }
 
 impl PageAccounting {
     pub fn new() -> Self {
         Self {
-            reserved: AtomicUsize::new(0),
-            committed: AtomicUsize::new(0),
+            reserved: Atomic::<usize>::new(0),
+            committed: Atomic::<usize>::new(0),
         }
     }
 

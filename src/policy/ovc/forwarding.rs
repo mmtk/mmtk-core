@@ -5,9 +5,8 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::{Address, ObjectReference};
 use crate::vm::object_model::ObjectModel;
 use crate::vm::VMBinding;
-use atomic::Ordering;
+use atomic::{Atomic, Ordering};
 use std::marker::PhantomData;
-use std::sync::atomic::AtomicBool;
 
 /// A [`OVCRegion`] is the granularity at which [`super::OVCSpace`]
 /// compacts the heap. Objects are allocated inside one region, and are only ever
@@ -92,7 +91,7 @@ impl Transducer {
 }
 
 pub struct ForwardingMetadata<VM: VMBinding> {
-    calculated: AtomicBool,
+    calculated: Atomic<bool>,
     vm: PhantomData<VM>,
 }
 
@@ -118,7 +117,7 @@ pub(crate) const OFFSET_VECTOR_SPEC: SideMetadataSpec = OVC_OFFSET_VECTOR;
 impl<VM: VMBinding> ForwardingMetadata<VM> {
     pub fn new() -> ForwardingMetadata<VM> {
         ForwardingMetadata {
-            calculated: AtomicBool::new(false),
+            calculated: Atomic::<bool>::new(false),
             vm: PhantomData,
         }
     }

@@ -7,7 +7,7 @@ use crate::vm::VMBinding;
 #[cfg(feature = "perf_counter")]
 use pfm::Perfmon;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use atomic::{Atomic, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -18,8 +18,8 @@ pub const MAX_COUNTERS: usize = 100;
 
 /// GC stats shared among counters
 pub struct SharedStats {
-    phase: AtomicUsize,
-    gathering_stats: AtomicBool,
+    phase: Atomic<usize>,
+    gathering_stats: Atomic<bool>,
 }
 
 impl SharedStats {
@@ -45,7 +45,7 @@ impl SharedStats {
 /// The struct holds basic GC statistics, like the GC count,
 /// and an array of counters.
 pub struct Stats {
-    gc_count: AtomicUsize,
+    gc_count: Atomic<usize>,
     total_time: Arc<Mutex<Timer>>,
     // crate `pfm` uses libpfm4 under the hood for parsing perf event names
     // Initialization of libpfm4 is required before we can use `PerfEvent` types
@@ -69,8 +69,8 @@ impl Stats {
             perfmon
         };
         let shared = Arc::new(SharedStats {
-            phase: AtomicUsize::new(0),
-            gathering_stats: AtomicBool::new(false),
+            phase: Atomic::<usize>::new(0),
+            gathering_stats: Atomic::<bool>::new(false),
         });
         let mut counters: Vec<Arc<Mutex<dyn Counter + Send>>> = vec![];
         // We always have a time counter enabled
@@ -109,7 +109,7 @@ impl Stats {
             ))));
         }
         Stats {
-            gc_count: AtomicUsize::new(0),
+            gc_count: Atomic::<usize>::new(0),
             total_time: t,
             #[cfg(feature = "perf_counter")]
             perfmon,

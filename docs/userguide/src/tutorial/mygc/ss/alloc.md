@@ -39,7 +39,7 @@ To the import statement block:
    2. Add `use crate::plan::global::CommonPlan;`. Semispace uses the common
    plan, which includes an immortal space and a large object space, rather 
    than the base plan. Any garbage collected plan should use `CommonPlan`.
-   3. Add `use std::sync::atomic::{AtomicBool, Ordering};`. These are going 
+   3. Add `use std::sync::atomic::{Atomic<bool>, Ordering};`. These are going 
    to be used to store an indicator of which copyspace is the tospace.
    4. Delete `#[allow(unused_imports)]`.
 
@@ -53,7 +53,7 @@ Finished code (step 1):
 Change `pub struct MyGC<VM: VMBinding>` to add new instance variables.
 
    1. Delete the existing fields in the constructor.
-   2. Add `pub hi: AtomicBool,`. This is a thread-safe bool, indicating which 
+   2. Add `pub hi: Atomic<bool>,`. This is a thread-safe bool, indicating which 
    copyspace is the tospace.
    3. Add `pub copyspace0: CopySpace<VM>,` 
    and `pub copyspace1: CopySpace<VM>,`. These are the two copyspaces.
