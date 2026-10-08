@@ -18,7 +18,7 @@ use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
-use std::sync::atomic::{Atomic<bool>, Ordering}; // Add
+use atomic::Atomic; // Add
 // ANCHOR_END: imports_no_gc_work
 
 // Remove #[allow(unused_imports)].

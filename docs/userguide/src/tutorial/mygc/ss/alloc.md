@@ -39,7 +39,7 @@ To the import statement block:
    2. Add `use crate::plan::global::CommonPlan;`. Semispace uses the common
    plan, which includes an immortal space and a large object space, rather 
    than the base plan. Any garbage collected plan should use `CommonPlan`.
-   3. Add `use std::sync::atomic::{Atomic<bool>, Ordering};`. These are going 
+   3. Add `use atomic::{Atomic<bool>, Ordering};`. These are going 
    to be used to store an indicator of which copyspace is the tospace.
    4. Delete `#[allow(unused_imports)]`.
 
