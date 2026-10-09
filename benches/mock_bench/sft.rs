@@ -10,7 +10,7 @@ use mmtk::AllocationSemantics;
 pub fn bench(c: &mut Criterion) {
     let fixture = MutatorFixture::create();
     let addr = memory_manager::alloc(fixture.mutator(), 8, 8, 0, AllocationSemantics::Default);
-    let obj = MockVM::object_start_to_ref(addr);
+    let obj = <MockVM>::object_start_to_ref(addr);
 
     c.bench_function("sft read", |b| {
         b.iter(|| memory_manager::is_in_mmtk_spaces(black_box(obj)))

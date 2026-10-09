@@ -6,6 +6,9 @@ use crate::util::VMWorkerThread;
 use crate::vm::slot::Slot;
 use crate::vm::VMBinding;
 
+/// Default for [`Scanning::UNIQUE_OBJECT_ENQUEUING`]
+pub(crate) const DEFAULT_UNIQUE_OBJECT_ENQUEUING: bool = false;
+
 /// Callback trait of scanning functions that report slots.
 pub trait SlotVisitor<SL: Slot> {
     /// Call this function for each slot.
@@ -170,7 +173,7 @@ pub trait Scanning<VM: VMBinding> {
     /// override this if they need.  For example, some VMs piggyback on object-scanning to visit
     /// objects during a GC, but may have data race if multiple GC workers visit the same object at
     /// the same time.  Such VMs can set this constant to `true` to workaround this problem.
-    const UNIQUE_OBJECT_ENQUEUING: bool = false;
+    const UNIQUE_OBJECT_ENQUEUING: bool = DEFAULT_UNIQUE_OBJECT_ENQUEUING;
 
     /// Return true if the given object supports slot enqueuing.
     ///
