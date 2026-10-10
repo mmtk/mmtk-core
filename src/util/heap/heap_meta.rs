@@ -25,7 +25,11 @@ impl HeapMeta {
         huge_page_option: HugePageSupport,
         anno: &MmapAnnotation,
     ) -> MmapResult<Address> {
-        let start = if top {
+        debug!(
+            "Request to reserve quarantined memory for {} bytes, align {:?}, top={}",
+            extent, align, top
+        );
+        let candidate = if top {
             let raw_start = self.heap_limit - extent;
             if let Some(align) = align {
                 raw_start.align_down(align)
@@ -40,9 +44,27 @@ impl HeapMeta {
                 raw_start
             }
         };
+        debug!(
+            "Preferred address for quarantine reservation is {}",
+        );
+        let actual = if vm_layout().dynamic_heap_range {
+            mmapper.quarantine_address_range_preferred(
+                candidate,
+                crate::util::conversions::bytes_to_pages_up(extent),
+                align,
+                huge_page_option,
+                anno,
+            )?
+        } else {
+            mmapper.quarantine_address_range(
+                candidate,
+                crate::util::conversions::bytes_to_pages_up(extent),
+                huge_page_option,
+                anno,
+            )?;
+            candidate
+        };
 
-        // TODO: The following call do an fixed mmap. We should try to allow the OS to choose the address if the fixed mmap fails.
-        mmapper.quarantine_address_range(
             start,
             crate::util::conversions::bytes_to_pages_up(extent),
             huge_page_option,
@@ -56,13 +78,41 @@ impl HeapMeta {
         }
 
         assert!(
-            self.heap_cursor <= self.heap_limit,
-            "Out of virtual address space after quarantining [{}, {})",
-            start,
-            start + extent,
+            actual >= self.heap_cursor && actual + extent <= self.heap_limit,
+            "Quarantined heap range [{}, {}) is outside available heap range [{}, {})",
+            actual,
+            actual + extent,
+            self.heap_cursor,
+            self.heap_limit,
         );
 
-        Ok(start)
+        if actual == candidate {
+            if top {
+                self.heap_limit = actual;
+            } else {
+                self.heap_cursor = actual + extent;
+            }
+        }
+
+        assert!(
+            self.heap_cursor <= self.heap_limit,
+            "Out of virtual address space after quarantining [{}, {})",
+            actual,
+            actual + extent,
+        );
+
+        debug!(
+            "Reserved quarantined memory [{}, {}) for {} bytes, align {:?}",
+            actual,
+            actual + extent,
+            extent,
+            align
+        );
+        debug!(
+            "Available heap range after reservation is [{}, {})",
+            self.heap_cursor, self.heap_limit
+        );
+        Ok(actual)
     }
 
     pub fn get_discontig_start(&self) -> Address {
