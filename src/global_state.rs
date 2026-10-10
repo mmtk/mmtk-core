@@ -352,6 +352,9 @@ impl GcStatusWord {
     /// Inner implementation of [`Self::transition`], handling encoding, decoding, and atomic RMW
     /// operation.
     fn transition_inner<F: FnMut(GcStatus) -> GcStatus>(&self, mut f: F) -> GcStatus {
+        // `update()` allows infallable atomic update, but is not stablized until 1.95.
+        // Migrate to `update()` after bumping MSRV.
+        #[allow(deprecated)]
         let old_bits = self
             .0
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
@@ -390,6 +393,8 @@ impl GcStatusWord {
         &self,
         mut f: F,
     ) -> Result<GcStatus, GcStatus> {
+        // `try_update()` is not stablized until 1.95.  Migrate to `try_update()` after bumping MSRV.
+        #[allow(deprecated)]
         self.0
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
                 f(Self::decode(bits)).map(Self::encode)
