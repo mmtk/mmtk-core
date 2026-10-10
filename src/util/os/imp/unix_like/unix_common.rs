@@ -59,8 +59,8 @@ fn mmap_aligned(
     annotation: &MmapAnnotation<'_>,
 ) -> MmapResult<Address> {
     debug_assert!(align.is_power_of_two());
-    debug_assert!(align % BYTES_IN_PAGE == 0);
-    debug_assert!(size % BYTES_IN_PAGE == 0);
+    debug_assert!(align.is_multiple_of(BYTES_IN_PAGE));
+    debug_assert!(size.is_multiple_of(BYTES_IN_PAGE));
 
     let aligned_size = raw_align_up(size, align);
     let alloc_size = aligned_size + align;
@@ -84,13 +84,13 @@ fn mmap_aligned(
     let trailing_unaligned_size = alloc_size - leading_unaligned_size - size;
 
     if leading_unaligned_size > 0 {
-        debug_assert!(leading_unaligned_size % BYTES_IN_PAGE == 0);
+        debug_assert!(leading_unaligned_size.is_multiple_of(BYTES_IN_PAGE));
         munmap(start, leading_unaligned_size)
             .map_err(|e| MmapError::new(start, leading_unaligned_size, annotation, e))?;
     }
 
     if trailing_unaligned_size > 0 {
-        debug_assert!(trailing_unaligned_size % BYTES_IN_PAGE == 0);
+        debug_assert!(trailing_unaligned_size.is_multiple_of(BYTES_IN_PAGE));
         let trailing_start = aligned_start + size;
         munmap(trailing_start, trailing_unaligned_size)
             .map_err(|e| MmapError::new(trailing_start, trailing_unaligned_size, annotation, e))?;

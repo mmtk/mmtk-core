@@ -1,33 +1,33 @@
+use crate::MMTK;
+use crate::plan::AllocationSemantics;
+use crate::plan::Plan;
+use crate::plan::PlanConstraints;
+use crate::plan::concurrent::Pause;
 use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::immix::gc_work::ConcurrentImmixGCWorkContext;
 use crate::plan::concurrent::immix::gc_work::ConcurrentImmixSTWGCWorkContext;
-use crate::plan::concurrent::Pause;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::immix::mutator::ALLOCATOR_MAPPING;
 use crate::plan::tracing::gc_work::weakref::VMProcessWeakRefs;
-use crate::plan::AllocationSemantics;
-use crate::plan::Plan;
-use crate::plan::PlanConstraints;
-use crate::policy::immix::defrag::StatsForDefrag;
 use crate::policy::immix::ImmixSpaceArgs;
 use crate::policy::immix::TRACE_KIND_DEFRAG;
 use crate::policy::immix::TRACE_KIND_FAST;
+use crate::policy::immix::defrag::StatsForDefrag;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::Release;
 use crate::scheduler::gc_work::StopMutators;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
+use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use crate::MMTK;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
 
@@ -98,7 +98,9 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         let used_pages_now = self.get_used_pages();
         let allocated = used_pages_now.saturating_sub(used_pages_after_last_gc);
         if !concurrent_marking_in_progress && allocated > threshold {
-            info!("Allocated {allocated} pages since last GC ({used_pages_now} - {used_pages_after_last_gc} > {threshold}): Do concurrent marking");
+            info!(
+                "Allocated {allocated} pages since last GC ({used_pages_now} - {used_pages_after_last_gc} > {threshold}): Do concurrent marking"
+            );
             debug_assert!(
                 self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].is_empty()
             );
@@ -350,7 +352,9 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
 impl<VM: VMBinding> ConcurrentImmix<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
         if *args.options.concurrent_immix_disable_concurrent_marking {
-            warn!("Option 'concurrent_immix_disable_concurrent_marking' is set to true. Concurrent marking is disabled for ConcurrentImmix. This will make ConcurrentImmix behave exactly like full heap Immix.");
+            warn!(
+                "Option 'concurrent_immix_disable_concurrent_marking' is set to true. Concurrent marking is disabled for ConcurrentImmix. This will make ConcurrentImmix behave exactly like full heap Immix."
+            );
         }
 
         let spec = crate::util::metadata::extract_side_metadata(&[

@@ -1,18 +1,18 @@
 use super::gc_work::SSGCWorkContext;
+use crate::plan::AllocationSemantics;
+use crate::plan::Plan;
+use crate::plan::PlanConstraints;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
-use crate::plan::AllocationSemantics;
-use crate::plan::Plan;
-use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
+use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::VMWorkerThread;
 use crate::{plan::global::BasePlan, vm::VMBinding};
@@ -76,7 +76,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 
         self.hi
             .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
-                                                                       // prepare each of the collected regions
+        // prepare each of the collected regions
         let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);

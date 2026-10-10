@@ -1,3 +1,5 @@
+use crate::util::Address;
+use crate::util::VMThread;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::pageresource::{CommonPageResource, PRAllocFail, PRAllocResult};
@@ -5,12 +7,10 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::linear_scan::Region;
 use crate::util::object_enum::ObjectEnumerator;
-use crate::util::Address;
-use crate::util::VMThread;
 use crate::vm::VMBinding;
 use atomic::Atomic;
-use std::sync::atomic::Ordering;
 use std::sync::RwLock;
+use std::sync::atomic::Ordering;
 
 /// A region in a [`RegionPageResource`] and its allocation cursor.
 pub struct AllocatedRegion<R: Region> {

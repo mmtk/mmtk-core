@@ -1,14 +1,16 @@
+use crate::MMTK;
+use crate::Plan;
+use crate::plan::PlanConstraints;
 use crate::plan::generational::global::GenerationalPlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::immix;
-use crate::plan::PlanConstraints;
-use crate::policy::gc_work::TraceKind;
 use crate::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
-use crate::policy::immix::defrag::StatsForDefrag;
+use crate::policy::gc_work::TraceKind;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::immix::TRACE_KIND_FAST;
+use crate::policy::immix::defrag::StatsForDefrag;
 use crate::policy::sft::SFT;
 use crate::policy::space::Space;
 use crate::util::copy::CopyConfig;
@@ -20,8 +22,6 @@ use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::statistics::counter::EventCounter;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use crate::Plan;
-use crate::MMTK;
 
 use atomic::Ordering;
 use std::sync::atomic::AtomicBool;
@@ -210,7 +210,10 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         if self.is_current_gc_nursery() {
             // Every reachable object should be logged
             if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::SeqCst) {
-                error!("Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
+                error!(
+                    "Object {} is not unlogged (all objects that have been traced should be unlogged/mature)",
+                    object
+                );
                 return false;
             }
 

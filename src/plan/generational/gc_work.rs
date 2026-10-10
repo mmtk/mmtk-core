@@ -1,15 +1,15 @@
 use atomic::Ordering;
 
-use crate::plan::tracing::gc_work::closure::{ProcessNodes, ProcessSlots};
-use crate::plan::tracing::Trace;
+use crate::MMTK;
 use crate::plan::PlanTraceObject;
+use crate::plan::tracing::Trace;
+use crate::plan::tracing::gc_work::closure::{ProcessNodes, ProcessSlots};
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
-use crate::util::os::*;
 use crate::util::ObjectReference;
+use crate::util::os::*;
 use crate::vm::slot::MemorySlice;
 use crate::vm::*;
-use crate::MMTK;
 use std::marker::PhantomData;
 
 use super::global::GenerationalPlanExt;
@@ -92,12 +92,12 @@ impl<T: Trace> ProcessModBuf<T> {
 impl<T: Trace> GCWork<T::VM> for ProcessModBuf<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         // Process and scan modbuf only if the current GC is a nursery GC
-        let gen = mmtk.get_plan().generational().unwrap();
-        if gen.is_current_gc_nursery() {
+        let r#gen = mmtk.get_plan().generational().unwrap();
+        if r#gen.is_current_gc_nursery() {
             // Flip the per-object unlogged bits to "unlogged" state.
             for obj in &self.modbuf {
                 debug_assert!(
-                    !gen.is_object_in_nursery(*obj),
+                    !r#gen.is_object_in_nursery(*obj),
                     "{} was logged but is not mature. Dumping process memory maps:\n{}",
                     *obj,
                     OS::get_process_memory_maps().unwrap(),

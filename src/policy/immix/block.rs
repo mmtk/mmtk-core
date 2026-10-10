@@ -1,15 +1,15 @@
+use super::ImmixSpace;
 use super::defrag::Histogram;
 use super::line::{Line, RCArray};
-use super::ImmixSpace;
 use crate::util::constants::*;
 use crate::util::heap::blockpageresource::BlockPool;
 use crate::util::heap::chunk_map::Chunk;
 use crate::util::linear_scan::{Region, RegionIterator, UnstraddlableRegion};
+#[cfg(feature = "object_pinning")]
+use crate::util::metadata::MetadataSpec;
 use crate::util::metadata::side_metadata::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
-#[cfg(feature = "object_pinning")]
-use crate::util::metadata::MetadataSpec;
 use crate::util::object_enum::BlockMayHaveObjects;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;

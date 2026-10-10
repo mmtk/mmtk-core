@@ -6,8 +6,8 @@ use std::marker::PhantomData;
 
 use crate::{
     plan::{
-        tracing::{gc_work::closure::ProcessNodes, Trace},
         VectorObjectQueue,
+        tracing::{Trace, gc_work::closure::ProcessNodes},
     },
     scheduler::{GCWorker, WorkBucketStage},
     util::ObjectReference,

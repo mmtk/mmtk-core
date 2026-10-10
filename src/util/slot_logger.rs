@@ -5,8 +5,8 @@
 //!
 
 use crate::plan::Plan;
-use crate::vm::slot::Slot;
 use crate::vm::VMBinding;
+use crate::vm::slot::Slot;
 use std::collections::HashSet;
 use std::sync::RwLock;
 

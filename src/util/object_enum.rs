@@ -5,10 +5,10 @@ use std::marker::PhantomData;
 use crate::vm::VMBinding;
 
 use super::{
-    heap::{chunk_map::ChunkMap, MonotonePageResource},
+    Address, ObjectReference,
+    heap::{MonotonePageResource, chunk_map::ChunkMap},
     linear_scan::Region,
     metadata::{side_metadata::spec_defs::VO_BIT, vo_bit},
-    Address, ObjectReference,
 };
 
 /// A trait for enumerating objects in spaces, used by [`Space::enumerate_objects`].

@@ -1,14 +1,14 @@
 use std::marker::PhantomData;
 
 use crate::{
+    MMTK,
     plan::{
-        tracing::{gc_work::DefaultObjectTracerContext, SlotOfTrace, Trace},
         VectorObjectQueue, VectorQueue,
+        tracing::{SlotOfTrace, Trace, gc_work::DefaultObjectTracerContext},
     },
     scheduler::{GCWork, GCWorker, GCWorkerShared, WorkBucketStage},
     util::{ObjectReference, VMWorkerThread},
-    vm::{slot::Slot, ObjectTracerContext, Scanning, VMBinding},
-    MMTK,
+    vm::{ObjectTracerContext, Scanning, VMBinding, slot::Slot},
 };
 
 /// A work packet for processing slots during a stop-the-world tracing GC and the final mark pause

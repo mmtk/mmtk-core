@@ -1,15 +1,15 @@
 use crate::global_state::GlobalState;
 use crate::plan::PlanConstraints;
 use crate::scheduler::GCWorkScheduler;
+use crate::util::Address;
+use crate::util::ObjectReference;
 use crate::util::conversions::*;
 use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
 use crate::util::object_enum::ObjectEnumerator;
-use crate::util::Address;
-use crate::util::ObjectReference;
 
-use crate::util::heap::layout::vm_layout::{vm_layout, LOG_BYTES_IN_CHUNK};
+use crate::util::heap::layout::vm_layout::{LOG_BYTES_IN_CHUNK, vm_layout};
 use crate::util::heap::{PageResource, VMRequest};
 use crate::util::options::Options;
 use crate::vm::{ActivePlan, Collection};
@@ -24,19 +24,19 @@ use crate::policy::sft::EMPTY_SFT_NAME;
 use crate::policy::sft::SFT;
 use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::copy::*;
+use crate::util::heap::HeapMeta;
 use crate::util::heap::gc_trigger::GCTrigger;
-use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
+use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
-use crate::util::heap::HeapMeta;
 use crate::util::os::*;
 use crate::vm::VMBinding;
 
 use std::marker::PhantomData;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
 
 use downcast_rs::Downcast;
 
@@ -62,12 +62,13 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn acquire(&self, tls: VMThread, pages: usize, alloc_options: AllocationOptions) -> Address {
         trace!(
             "Space.acquire, tls={:?}, alloc_options={:?}",
-            tls,
-            alloc_options
+            tls, alloc_options
         );
 
         debug_assert!(
-            !self.get_gc_trigger().will_oom_on_alloc(pages << crate::util::constants::LOG_BYTES_IN_PAGE),
+            !self
+                .get_gc_trigger()
+                .will_oom_on_alloc(pages << crate::util::constants::LOG_BYTES_IN_PAGE),
             "The requested pages is larger than the max heap size. Is will_go_oom_on_acquire used before acquring memory?"
         );
 
@@ -309,9 +310,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn grow_space(&self, start: Address, bytes: usize, new_chunk: bool) {
         trace!(
             "Grow space from {} for {} bytes (new chunk = {})",
-            start,
-            bytes,
-            new_chunk
+            start, bytes, new_chunk
         );
 
         // If this is not a new chunk, the SFT for [start, start + bytes) should alreayd be initialized.

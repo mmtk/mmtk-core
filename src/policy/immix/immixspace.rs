@@ -1,9 +1,9 @@
 use super::defrag::StatsForDefrag;
 use super::line::*;
 use super::{block::*, defrag::Defrag};
-use crate::plan::tracing::OptionObjectQueue;
 use crate::plan::Pause;
-use crate::policy::gc_work::{TraceKind, DEFAULT_TRACE, TRACE_KIND_TRANSITIVE_PIN};
+use crate::plan::tracing::OptionObjectQueue;
+use crate::policy::gc_work::{DEFAULT_TRACE, TRACE_KIND_TRANSITIVE_PIN, TraceKind};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::sft_map::SFTMap;
@@ -12,9 +12,9 @@ use crate::scheduler::gc_work::PrepareCollector;
 use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::alloc::allocator::AllocatorContext;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
-use crate::util::heap::chunk_map::*;
 use crate::util::heap::BlockPageResource;
 use crate::util::heap::PageResource;
+use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::{Region, RegionIterator, UnstraddlableRegion};
 use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::metadata::side_metadata::spec_defs::IX_LINE_REUSE_COUNT;
@@ -25,19 +25,19 @@ use crate::util::metadata::{self, MetadataSpec};
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::object_forwarding;
 use crate::util::rc::RefCountHelper;
-use crate::util::{copy::*, epilogue, object_enum};
 use crate::util::{Address, ObjectReference};
+use crate::util::{copy::*, epilogue, object_enum};
 use crate::vm::*;
 use crate::{
+    MMTK,
     plan::ObjectQueue,
     scheduler::{GCWork, GCWorkScheduler, GCWorker, WorkBucketStage},
     util::opaque_pointer::{VMThread, VMWorkerThread},
-    MMTK,
 };
 use atomic::Ordering;
-use std::sync::atomic::AtomicUsize;
 use std::sync::OnceLock;
-use std::sync::{atomic::AtomicU8, Arc};
+use std::sync::atomic::AtomicUsize;
+use std::sync::{Arc, atomic::AtomicU8};
 
 pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
 pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
@@ -286,7 +286,9 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
 
     fn clear_side_log_bits(&self) {
         // Remove the following warning if we have a legitimate use case.
-        warn!("ImmixSpace::clear_side_log_bits is single-treaded.  Consider clearing side metadata in per-chunk work packets.");
+        warn!(
+            "ImmixSpace::clear_side_log_bits is single-treaded.  Consider clearing side metadata in per-chunk work packets."
+        );
 
         let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
         for chunk in self.chunk_map.all_chunks() {
@@ -296,7 +298,9 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
 
     fn set_side_log_bits(&self) {
         // Remove the following warning if we have a legitimate use case.
-        warn!("ImmixSpace::set_side_log_bits is single-treaded.  Consider setting side metadata in per-chunk work packets.");
+        warn!(
+            "ImmixSpace::set_side_log_bits is single-treaded.  Consider setting side metadata in per-chunk work packets."
+        );
 
         let log_bit = VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.extract_side_spec();
         for chunk in self.chunk_map.all_chunks() {
@@ -918,7 +922,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             {
                 if new_object == object {
                     debug_assert!(
-                        self.is_marked(object) || self.defrag.space_exhausted() || self.is_pinned(object),
+                        self.is_marked(object)
+                            || self.defrag.space_exhausted()
+                            || self.is_pinned(object),
                         "Forwarded object is the same as original object {} even though it should have been copied",
                         object,
                     );
@@ -1319,8 +1325,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             cursor += 1;
         }
         let end = search_start.next_nth(cursor - start_cursor);
-        debug_assert!(RegionIterator::<Line>::new(start, end)
-            .all(|line| !line.is_marked(unavail_state) && !line.is_marked(current_state)));
+        debug_assert!(
+            RegionIterator::<Line>::new(start, end)
+                .all(|line| !line.is_marked(unavail_state) && !line.is_marked(current_state))
+        );
         Some((start, end))
     }
 
@@ -1494,20 +1502,20 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             // Note, `block.sweep()` overwrites `DEFRAG_STATE_TABLE` with the number of holes,
             // but we need it to know if a block is a defrag source.
             // We clear forwarding bits before `block.sweep()`.
-            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
-                if is_moving_gc {
-                    let objects_may_move = if is_defrag_gc {
-                        // If it is a defrag GC, we only clear forwarding bits for defrag sources.
-                        block.is_defrag_source()
-                    } else {
-                        // Otherwise, it must be a nursery GC of StickyImmix with copying nursery.
-                        // We don't have information about which block contains moved objects,
-                        // so we have to clear forwarding bits for all blocks.
-                        true
-                    };
-                    if objects_may_move {
-                        side.bzero_metadata(block.start(), Block::BYTES);
-                    }
+            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC
+                && is_moving_gc
+            {
+                let objects_may_move = if is_defrag_gc {
+                    // If it is a defrag GC, we only clear forwarding bits for defrag sources.
+                    block.is_defrag_source()
+                } else {
+                    // Otherwise, it must be a nursery GC of StickyImmix with copying nursery.
+                    // We don't have information about which block contains moved objects,
+                    // so we have to clear forwarding bits for all blocks.
+                    true
+                };
+                if objects_may_move {
+                    side.bzero_metadata(block.start(), Block::BYTES);
                 }
             }
 

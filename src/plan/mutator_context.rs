@@ -1,16 +1,16 @@
 //! Mutator context for each application thread.
 
+use crate::MMTK;
+use crate::plan::AllocationSemantics;
 use crate::plan::barriers::Barrier;
 use crate::plan::global::Plan;
-use crate::plan::AllocationSemantics;
 use crate::policy::space::Space;
+use crate::util::alloc::Allocator;
 use crate::util::alloc::allocator::AllocationOptions;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::alloc::Allocator;
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
-use crate::MMTK;
 
 use enum_map::EnumMap;
 
@@ -298,7 +298,7 @@ impl<VM: VMBinding> Mutator<VM> {
     /// The selector needs to be valid, and points to an allocator that has been initialized.
     /// [`crate::memory_manager::get_allocator_mapping`] can be used to get a selector.
     pub unsafe fn allocator(&self, selector: AllocatorSelector) -> &dyn Allocator<VM> {
-        self.allocators.get_allocator(selector)
+        unsafe { self.allocators.get_allocator(selector) }
     }
 
     /// Get the mutable allocator for the selector.
@@ -307,7 +307,7 @@ impl<VM: VMBinding> Mutator<VM> {
     /// The selector needs to be valid, and points to an allocator that has been initialized.
     /// [`crate::memory_manager::get_allocator_mapping`] can be used to get a selector.
     pub unsafe fn allocator_mut(&mut self, selector: AllocatorSelector) -> &mut dyn Allocator<VM> {
-        self.allocators.get_allocator_mut(selector)
+        unsafe { self.allocators.get_allocator_mut(selector) }
     }
 
     /// Get the allocator of a concrete type for the selector.
@@ -316,7 +316,7 @@ impl<VM: VMBinding> Mutator<VM> {
     /// The selector needs to be valid, and points to an allocator that has been initialized.
     /// [`crate::memory_manager::get_allocator_mapping`] can be used to get a selector.
     pub unsafe fn allocator_impl<T: Allocator<VM>>(&self, selector: AllocatorSelector) -> &T {
-        self.allocators.get_typed_allocator(selector)
+        unsafe { self.allocators.get_typed_allocator(selector) }
     }
 
     /// Get the mutable allocator of a concrete type for the selector.
@@ -328,7 +328,7 @@ impl<VM: VMBinding> Mutator<VM> {
         &mut self,
         selector: AllocatorSelector,
     ) -> &mut T {
-        self.allocators.get_typed_allocator_mut(selector)
+        unsafe { self.allocators.get_typed_allocator_mut(selector) }
     }
 
     /// Get the allocator of a concrete type for the semantic.
@@ -339,7 +339,7 @@ impl<VM: VMBinding> Mutator<VM> {
         &self,
         semantic: AllocationSemantics,
     ) -> &T {
-        self.allocator_impl::<T>(self.config.allocator_mapping[semantic])
+        unsafe { self.allocator_impl::<T>(self.config.allocator_mapping[semantic]) }
     }
 
     /// Get the mutable allocator of a concrete type for the semantic.
@@ -350,7 +350,7 @@ impl<VM: VMBinding> Mutator<VM> {
         &mut self,
         semantic: AllocationSemantics,
     ) -> &mut T {
-        self.allocator_impl_mut::<T>(self.config.allocator_mapping[semantic])
+        unsafe { self.allocator_impl_mut::<T>(self.config.allocator_mapping[semantic]) }
     }
 
     /// Return the base offset from a mutator pointer to the allocator specified by the selector.

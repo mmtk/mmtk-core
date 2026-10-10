@@ -1,18 +1,18 @@
 pub(super) use super::super::ALLOCATOR_MAPPING;
+use crate::MMTK;
+use crate::plan::AllocationSemantics;
 use crate::plan::barriers::ObjectBarrier;
 use crate::plan::generational::barrier::GenObjectBarrierSemantics;
 use crate::plan::generational::create_gen_space_mapping;
 use crate::plan::generational::immix::GenImmix;
-use crate::plan::mutator_context::common_prepare_func;
-use crate::plan::mutator_context::common_release_func;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
-use crate::plan::AllocationSemantics;
+use crate::plan::mutator_context::common_prepare_func;
+use crate::plan::mutator_context::common_release_func;
 use crate::util::alloc::BumpAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
-use crate::MMTK;
 
 pub fn genimmix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
     // reset nursery allocator
@@ -37,7 +37,7 @@ pub fn create_genimmix_mutator<VM: VMBinding>(
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new(create_gen_space_mapping(
             mmtk.get_plan(),
-            &genimmix.gen.nursery,
+            &genimmix.r#gen.nursery,
         )),
         prepare_func: &common_prepare_func,
         release_func: &genimmix_mutator_release,

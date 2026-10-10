@@ -2,15 +2,15 @@
 mod tests {
     use atomic::Ordering;
 
+    use crate::util::Address;
     use crate::util::constants;
     use crate::util::heap::layout::vm_layout;
     use crate::util::heap::layout::vm_layout::vm_layout;
-    use crate::util::metadata::side_metadata::spec_defs;
     use crate::util::metadata::side_metadata::SideMetadataContext;
     use crate::util::metadata::side_metadata::SideMetadataSpec;
+    use crate::util::metadata::side_metadata::spec_defs;
     use crate::util::metadata::side_metadata::*;
     use crate::util::test_util::{serial_test, with_cleanup};
-    use crate::util::Address;
 
     #[cfg(target_pointer_width = "64")]
     fn local_side_metadata_base_offset() -> usize {
@@ -266,9 +266,15 @@ mod tests {
                     let mut metadata_sanity = SideMetadataSanity::new();
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
-                    assert!(metadata
-                        .try_map_metadata_space(heap_start, constants::BYTES_IN_PAGE, "test_space")
-                        .is_ok());
+                    assert!(
+                        metadata
+                            .try_map_metadata_space(
+                                heap_start,
+                                constants::BYTES_IN_PAGE,
+                                "test_space"
+                            )
+                            .is_ok()
+                    );
 
                     gspec.assert_metadata_mapped(heap_start);
                     lspec.assert_metadata_mapped(heap_start);
@@ -292,13 +298,15 @@ mod tests {
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
                     metadata_sanity.reset();
 
-                    assert!(metadata
-                        .try_map_metadata_space(
-                            heap_start + vm_layout::BYTES_IN_CHUNK,
-                            vm_layout::BYTES_IN_CHUNK,
-                            "test_space",
-                        )
-                        .is_ok());
+                    assert!(
+                        metadata
+                            .try_map_metadata_space(
+                                heap_start + vm_layout::BYTES_IN_CHUNK,
+                                vm_layout::BYTES_IN_CHUNK,
+                                "test_space",
+                            )
+                            .is_ok()
+                    );
 
                     gspec.assert_metadata_mapped(heap_start + vm_layout::BYTES_IN_CHUNK);
                     lspec.assert_metadata_mapped(heap_start + vm_layout::BYTES_IN_CHUNK);
@@ -351,9 +359,15 @@ mod tests {
                     let mut metadata_sanity = SideMetadataSanity::new();
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
-                    assert!(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, "test_space",)
-                        .is_ok());
+                    assert!(
+                        metadata
+                            .try_map_metadata_space(
+                                data_addr,
+                                constants::BYTES_IN_PAGE,
+                                "test_space",
+                            )
+                            .is_ok()
+                    );
 
                     let zero =
                         metadata_1_spec.fetch_add_atomic::<u16>(data_addr, 5, Ordering::SeqCst);
@@ -419,9 +433,15 @@ mod tests {
                     let mut metadata_sanity = SideMetadataSanity::new();
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
-                    assert!(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, "test_space",)
-                        .is_ok());
+                    assert!(
+                        metadata
+                            .try_map_metadata_space(
+                                data_addr,
+                                constants::BYTES_IN_PAGE,
+                                "test_space",
+                            )
+                            .is_ok()
+                    );
 
                     let zero =
                         metadata_1_spec.fetch_add_atomic::<u8>(data_addr, 2, Ordering::SeqCst);
@@ -477,9 +497,15 @@ mod tests {
                     let mut metadata_sanity = SideMetadataSanity::new();
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
-                    assert!(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, "test_space",)
-                        .is_ok());
+                    assert!(
+                        metadata
+                            .try_map_metadata_space(
+                                data_addr,
+                                constants::BYTES_IN_PAGE,
+                                "test_space",
+                            )
+                            .is_ok()
+                    );
 
                     let zero =
                         metadata_1_spec.fetch_or_atomic::<u8>(data_addr, 0b11, Ordering::SeqCst);
@@ -560,9 +586,15 @@ mod tests {
                     let mut metadata_sanity = SideMetadataSanity::new();
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
-                    assert!(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, "test_space",)
-                        .is_ok());
+                    assert!(
+                        metadata
+                            .try_map_metadata_space(
+                                data_addr,
+                                constants::BYTES_IN_PAGE,
+                                "test_space",
+                            )
+                            .is_ok()
+                    );
 
                     let zero =
                         metadata_1_spec.fetch_add_atomic::<u16>(data_addr, 5, Ordering::SeqCst);
@@ -629,9 +661,15 @@ mod tests {
                     let mut metadata_sanity = SideMetadataSanity::new();
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
-                    assert!(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, "test_space",)
-                        .is_ok());
+                    assert!(
+                        metadata
+                            .try_map_metadata_space(
+                                data_addr,
+                                constants::BYTES_IN_PAGE,
+                                "test_space",
+                            )
+                            .is_ok()
+                    );
 
                     // First 9 regions
                     let regions = (0..9)
@@ -687,9 +725,15 @@ mod tests {
                     let mut metadata_sanity = SideMetadataSanity::new();
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
-                    assert!(metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE, "test_space",)
-                        .is_ok());
+                    assert!(
+                        metadata
+                            .try_map_metadata_space(
+                                data_addr,
+                                constants::BYTES_IN_PAGE,
+                                "test_space",
+                            )
+                            .is_ok()
+                    );
 
                     // First 9 regions
                     let regions = (0..9)

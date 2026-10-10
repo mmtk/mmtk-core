@@ -3,11 +3,11 @@
 
 use super::mock_test_prelude::*;
 
+use crate::AllocationSemantics;
+use crate::Mutator;
 use crate::util::Address;
 use crate::util::OpaquePointer;
 use crate::util::{VMMutatorThread, VMThread};
-use crate::AllocationSemantics;
-use crate::Mutator;
 
 lazy_static! {
     static ref FIXTURE: Fixture<MMTKFixture> = Fixture::new();

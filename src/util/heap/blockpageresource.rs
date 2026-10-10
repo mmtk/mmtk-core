@@ -2,8 +2,8 @@ use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::{FreeListPageResource, PageResource};
 use crate::util::address::Address;
 use crate::util::constants::*;
-use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::layout::VMMap;
+use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::linear_scan::Region;
@@ -14,8 +14,8 @@ use atomic::Ordering;
 use spin::RwLock;
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
-use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
+use std::sync::atomic::AtomicUsize;
 
 const UNINITIALIZED_WATER_MARK: i32 = -1;
 const LOCAL_BUFFER_SIZE: usize = 128;
@@ -220,7 +220,7 @@ impl<B: Region> BlockQueue<B> {
     ///
     /// It's unsafe unless the array is accessed by only one thread (i.e. used as a thread-local array).
     unsafe fn set_entry(&self, i: usize, block: B) {
-        (*self.data.get())[i].write(block);
+        unsafe { (*self.data.get())[i].write(block) };
     }
 
     /// Non-atomically push an element.
@@ -229,7 +229,7 @@ impl<B: Region> BlockQueue<B> {
     unsafe fn push_relaxed(&self, block: B) -> Result<(), B> {
         let i = self.cursor.load(Ordering::Relaxed);
         if i < Self::CAPACITY {
-            self.set_entry(i, block);
+            unsafe { self.set_entry(i, block) };
             self.cursor.store(i + 1, Ordering::Relaxed);
             Ok(())
         } else {
@@ -242,11 +242,7 @@ impl<B: Region> BlockQueue<B> {
         let i = self
             .cursor
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |i| {
-                if i > 0 {
-                    Some(i - 1)
-                } else {
-                    None
-                }
+                if i > 0 { Some(i - 1) } else { None }
             });
         if let Ok(i) = i {
             Some(self.get_entry(i - 1))
@@ -364,10 +360,12 @@ impl<B: Region> BlockPool<B> {
             let block = blocks.pop().unwrap();
             if !blocks.is_empty() {
                 let mut head_global_freed_blocks = head_global_freed_blocks.upgrade();
-                debug_assert!(head_global_freed_blocks
-                    .as_ref()
-                    .map(|blocks| blocks.is_empty())
-                    .unwrap_or(true));
+                debug_assert!(
+                    head_global_freed_blocks
+                        .as_ref()
+                        .map(|blocks| blocks.is_empty())
+                        .unwrap_or(true)
+                );
                 *head_global_freed_blocks = Some(blocks);
             }
             self.count.fetch_sub(1, Ordering::SeqCst);

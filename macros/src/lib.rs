@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
-use syn::parse_macro_input;
 use syn::DeriveInput;
+use syn::parse_macro_input;
 
 mod has_spaces_impl;
 mod plan_trace_object_impl;

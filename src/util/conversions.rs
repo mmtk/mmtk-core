@@ -1,6 +1,6 @@
+use crate::util::Address;
 use crate::util::constants::*;
 use crate::util::heap::layout::vm_layout::*;
-use crate::util::Address;
 
 /// Is the address aligned to word boundary?
 pub fn is_address_aligned(addr: Address) -> bool {
@@ -95,8 +95,8 @@ pub const fn rshift_align_up(num: usize, bits: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::conversions::*;
     use crate::util::Address;
+    use crate::util::conversions::*;
 
     #[test]
     fn test_page_align() {

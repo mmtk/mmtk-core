@@ -1,6 +1,11 @@
 use super::gc_work::GenCopyGCWorkContext;
 use super::gc_work::GenCopyNurseryGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
+use crate::MMTK;
+use crate::ObjectQueue;
+use crate::plan::AllocationSemantics;
+use crate::plan::Plan;
+use crate::plan::PlanConstraints;
 use crate::plan::generational::global::CommonGenPlan;
 use crate::plan::generational::global::GenerationalPlan;
 use crate::plan::generational::global::GenerationalPlanExt;
@@ -8,23 +13,18 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
-use crate::plan::AllocationSemantics;
-use crate::plan::Plan;
-use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::gc_work::TraceKind;
 use crate::policy::space::Space;
 use crate::scheduler::*;
-use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::copy::*;
-use crate::util::heap::gc_trigger::SpaceStats;
-use crate::util::heap::VMRequest;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
+use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::copy::*;
+use crate::util::heap::VMRequest;
+use crate::util::heap::gc_trigger::SpaceStats;
 use crate::vm::*;
-use crate::ObjectQueue;
-use crate::MMTK;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -33,7 +33,7 @@ use mmtk_macros::{HasSpaces, PlanTraceObject};
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct GenCopy<VM: VMBinding> {
     #[parent]
-    pub gen: CommonGenPlan<VM>,
+    pub r#gen: CommonGenPlan<VM>,
     pub hi: AtomicBool,
     #[space]
     #[copy_semantics(CopySemantics::Mature)]
@@ -71,7 +71,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     where
         Self: Sized,
     {
-        self.gen.collection_required(self, space_full, space)
+        self.r#gen.collection_required(self, space_full, space)
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
@@ -88,8 +88,8 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {
-        let full_heap = !self.gen.is_current_gc_nursery();
-        self.gen.prepare(tls);
+        let full_heap = !self.r#gen.is_current_gc_nursery();
+        self.r#gen.prepare(tls);
         if full_heap {
             self.hi
                 .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
@@ -108,8 +108,8 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        let full_heap = !self.gen.is_current_gc_nursery();
-        self.gen.release(tls);
+        let full_heap = !self.r#gen.is_current_gc_nursery();
+        self.r#gen.release(tls);
         if full_heap {
             if VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_on_side() {
                 self.fromspace().clear_side_log_bits();
@@ -120,16 +120,16 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
     fn on_pause_end(&mut self, mmtk: &'static MMTK<VM>, tls: VMWorkerThread) {
         let next_gc_full_heap = CommonGenPlan::should_next_gc_be_full_heap(self);
-        self.gen.on_pause_end(tls, next_gc_full_heap);
+        self.r#gen.on_pause_end(tls, next_gc_full_heap);
         mmtk.gc_trigger.policy.on_gc_end(mmtk);
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
-        self.gen.get_collection_reserved_pages() + self.tospace().reserved_pages()
+        self.r#gen.get_collection_reserved_pages() + self.tospace().reserved_pages()
     }
 
     fn get_used_pages(&self) -> usize {
-        self.gen.get_used_pages() + self.tospace().reserved_pages()
+        self.r#gen.get_used_pages() + self.tospace().reserved_pages()
     }
 
     fn current_gc_may_move_object(&self) -> bool {
@@ -146,15 +146,15 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn base(&self) -> &BasePlan<VM> {
-        &self.gen.common.base
+        &self.r#gen.common.base
     }
 
     fn base_mut(&mut self) -> &mut BasePlan<Self::VM> {
-        &mut self.gen.common.base
+        &mut self.r#gen.common.base
     }
 
     fn common(&self) -> &CommonPlan<VM> {
-        &self.gen.common
+        &self.r#gen.common
     }
 
     fn generational(&self) -> Option<&dyn GenerationalPlan<VM = Self::VM>> {
@@ -164,15 +164,15 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
 impl<VM: VMBinding> GenerationalPlan for GenCopy<VM> {
     fn is_current_gc_nursery(&self) -> bool {
-        self.gen.is_current_gc_nursery()
+        self.r#gen.is_current_gc_nursery()
     }
 
     fn is_object_in_nursery(&self, object: ObjectReference) -> bool {
-        self.gen.nursery.in_space(object)
+        self.r#gen.nursery.in_space(object)
     }
 
     fn is_address_in_nursery(&self, addr: Address) -> bool {
-        self.gen.nursery.address_in_space(addr)
+        self.r#gen.nursery.address_in_space(addr)
     }
 
     fn get_mature_physical_pages_available(&self) -> usize {
@@ -184,11 +184,11 @@ impl<VM: VMBinding> GenerationalPlan for GenCopy<VM> {
     }
 
     fn force_full_heap_collection(&self) {
-        self.gen.force_full_heap_collection()
+        self.r#gen.force_full_heap_collection()
     }
 
     fn last_collection_full_heap(&self) -> bool {
-        self.gen.last_collection_full_heap()
+        self.r#gen.last_collection_full_heap()
     }
 }
 
@@ -199,7 +199,7 @@ impl<VM: VMBinding> GenerationalPlanExt<VM> for GenCopy<VM> {
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        self.gen
+        self.r#gen
             .trace_object_nursery::<Q, KIND>(queue, object, worker)
     }
 }
@@ -223,7 +223,7 @@ impl<VM: VMBinding> GenCopy<VM> {
         );
 
         GenCopy {
-            gen: CommonGenPlan::new(plan_args),
+            r#gen: CommonGenPlan::new(plan_args),
             hi: AtomicBool::new(false),
             copyspace0,
             copyspace1,
@@ -231,7 +231,7 @@ impl<VM: VMBinding> GenCopy<VM> {
     }
 
     fn requires_full_heap_collection(&self) -> bool {
-        self.gen.requires_full_heap_collection(self)
+        self.r#gen.requires_full_heap_collection(self)
     }
 
     pub fn tospace(&self) -> &CopySpace<VM> {

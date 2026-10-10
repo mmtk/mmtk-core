@@ -1,13 +1,13 @@
+use crate::MMTK;
 use crate::plan::is_nursery_gc;
-use crate::plan::tracing::gc_work::DefaultObjectTracerContext;
 use crate::plan::tracing::Trace;
+use crate::plan::tracing::gc_work::DefaultObjectTracerContext;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
-use crate::util::reference_processor::RescanReferences;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
+use crate::util::reference_processor::RescanReferences;
 use crate::vm::{Collection, ObjectTracer, VMBinding};
 use crate::vm::{Finalizable, ObjectTracerContext};
-use crate::MMTK;
 use std::marker::PhantomData;
 
 /// A special processor for Finalizable objects.

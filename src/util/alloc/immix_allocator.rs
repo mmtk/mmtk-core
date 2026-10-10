@@ -1,18 +1,18 @@
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
-use super::allocator::{align_allocation_no_fill, fill_alignment_gap, AllocatorContext};
 use super::BumpPointer;
+use super::allocator::{AllocatorContext, align_allocation_no_fill, fill_alignment_gap};
+use crate::policy::immix::ImmixSpace;
 use crate::policy::immix::block::Block;
 use crate::policy::immix::line::*;
-use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
-use crate::util::alloc::allocator::get_maximum_aligned_size;
+use crate::util::Address;
 use crate::util::alloc::Allocator;
+use crate::util::alloc::allocator::get_maximum_aligned_size;
 use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::VMThread;
 use crate::util::rust_util::unlikely;
-use crate::util::Address;
 use crate::vm::*;
 
 /// Immix allocator
@@ -92,11 +92,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
             self.bump_pointer.cursor = new_cursor;
             trace!(
                 "{:?}: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}",
-                self.tls,
-                size,
-                result,
-                self.bump_pointer.cursor,
-                self.bump_pointer.limit
+                self.tls, size, result, self.bump_pointer.cursor, self.bump_pointer.limit
             );
             result
         }
@@ -246,11 +242,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                 self.bump_pointer.limit = end_line.start();
                 trace!(
                     "{:?}: acquire_recyclable_lines -> {:?} [{:?}, {:?}) {:?}",
-                    self.tls,
-                    self.line,
-                    start_line,
-                    end_line,
-                    self.tls
+                    self.tls, self.line, start_line, end_line, self.tls
                 );
                 crate::util::memory::zero(
                     self.bump_pointer.cursor,
@@ -379,10 +371,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             self.bump_pointer.limit = new_limit;
             trace!(
                 "{:?}: set_limit_for_stress. normal c {} l {} -> {}",
-                self.tls,
-                self.bump_pointer.cursor,
-                old_limit,
-                new_limit,
+                self.tls, self.bump_pointer.cursor, old_limit, new_limit,
             );
         }
 
@@ -394,10 +383,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             self.large_bump_pointer.limit = new_lg_limit;
             trace!(
                 "{:?}: set_limit_for_stress. large c {} l {} -> {}",
-                self.tls,
-                self.large_bump_pointer.cursor,
-                old_lg_limit,
-                new_lg_limit,
+                self.tls, self.large_bump_pointer.cursor, old_lg_limit, new_lg_limit,
             );
         }
     }
@@ -413,10 +399,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             self.bump_pointer.limit = new_limit;
             trace!(
                 "{:?}: restore_limit_for_stress. normal c {} l {} -> {}",
-                self.tls,
-                self.bump_pointer.cursor,
-                old_limit,
-                new_limit,
+                self.tls, self.bump_pointer.cursor, old_limit, new_limit,
             );
         }
 
@@ -427,10 +410,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             self.large_bump_pointer.limit = new_lg_limit;
             trace!(
                 "{:?}: restore_limit_for_stress. large c {} l {} -> {}",
-                self.tls,
-                self.large_bump_pointer.cursor,
-                old_lg_limit,
-                new_lg_limit,
+                self.tls, self.large_bump_pointer.cursor, old_lg_limit, new_lg_limit,
             );
         }
     }

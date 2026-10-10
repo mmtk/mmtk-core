@@ -1,11 +1,11 @@
 use super::global::OVC;
+use crate::MMTK;
 use crate::plan::tracing::{PlanTrace, UnsupportedTrace};
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::ovc::{OVCSpace, TRACE_KIND_FORWARD_ROOT, TRACE_KIND_MARK};
 use crate::scheduler::gc_work::*;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
 use crate::vm::{ActivePlan, Scanning, VMBinding};
-use crate::MMTK;
 use std::marker::{PhantomData, Send};
 
 /// Generate more packets by calling a method on [`OVCSpace`].
