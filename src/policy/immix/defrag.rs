@@ -6,6 +6,7 @@ use super::{
 use crate::util::linear_scan::Region;
 use crate::{policy::space::Space, Plan};
 use crate::{util::constants::LOG_BYTES_IN_PAGE, vm::*};
+use atomic::Atomic;
 use spin::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -22,7 +23,7 @@ pub struct Defrag {
     /// A block with number of holes greater than this threshold will be defragmented.
     pub defrag_spill_threshold: AtomicUsize,
     /// The number of remaining clean pages in defrag space.
-    available_clean_pages_for_defrag: AtomicUsize,
+    available_clean_pages_for_defrag: Atomic<usize>,
 }
 
 pub struct StatsForDefrag {
