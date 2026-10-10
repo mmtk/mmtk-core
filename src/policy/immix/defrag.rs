@@ -130,16 +130,15 @@ impl Defrag {
     /// Update available_clean_pages_for_defrag counter when a clean block is allocated.
     pub fn notify_new_clean_block(&self, copy: bool) {
         if copy {
+            // `update()` allows infallable atomic update, but is not stablized until 1.95.
+            // Migrate to `update()` after bumping MSRV.
+            #[allow(deprecated)]
             let available_clean_pages_for_defrag =
                 self.available_clean_pages_for_defrag.fetch_update(
                     Ordering::SeqCst,
                     Ordering::SeqCst,
                     |available_clean_pages_for_defrag| {
-                        if available_clean_pages_for_defrag <= Block::PAGES {
-                            Some(0)
-                        } else {
-                            Some(available_clean_pages_for_defrag - Block::PAGES)
-                        }
+                        Some(available_clean_pages_for_defrag.saturating_sub(Block::PAGES))
                     },
                 );
             if available_clean_pages_for_defrag.unwrap() <= Block::PAGES {
