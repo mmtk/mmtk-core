@@ -248,6 +248,16 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         if pause == Pause::InitialMark {
             self.set_concurrent_marking_state(true);
         }
+        if pause == Pause::FinalMark {
+            // All marking must be finished by the end of `FinalMark`.  Work left in the
+            // `Concurrent` bucket would be traced after the heap has been released.
+            let concurrent_bucket = &mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent];
+            assert!(
+                concurrent_bucket.is_empty(),
+                "Concurrent bucket is not empty at the end of FinalMark ({} packets)",
+                concurrent_bucket.len()
+            );
+        }
         self.previous_pause.store(Some(pause), Ordering::SeqCst);
         self.current_pause.store(None, Ordering::SeqCst);
         if pause != Pause::FinalMark {
