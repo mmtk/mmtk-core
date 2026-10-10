@@ -1,4 +1,4 @@
-use atomic::Ordering;
+use atomic::{Atomic, Ordering};
 
 use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 use crate::policy::sft::GCWorkerMutRef;
@@ -18,8 +18,6 @@ use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::AtomicUsize;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -125,7 +123,7 @@ pub struct LargeObjectSpace<VM: VMBinding> {
     in_nursery_gc: bool,
     treadmill: TreadMill,
     clear_log_bit_on_sweep: bool,
-    pub num_pages_released_lazy: AtomicUsize,
+    pub num_pages_released_lazy: Atomic<usize>,
     pub rc_enabled: bool,
     pub(crate) rc: RefCountHelper<VM>,
     pub is_end_of_satb_or_full_gc: bool,
@@ -133,7 +131,7 @@ pub struct LargeObjectSpace<VM: VMBinding> {
     /// remembered-set entries recorded against a page's previous occupant are invalidated. Only
     /// needed while concurrent marking can be validating a remembered set; set/cleared by the
     /// owning plan (currently only LXR) as concurrent marking starts/ends.
-    pub(crate) bump_page_reuse_count: AtomicBool,
+    pub(crate) bump_page_reuse_count: Atomic<bool>,
 }
 
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
@@ -469,7 +467,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             rc_enabled: false,
             rc: RefCountHelper::NEW,
             is_end_of_satb_or_full_gc: false,
-            bump_page_reuse_count: AtomicBool::new(false),
+            bump_page_reuse_count: Atomic::new(false),
         }
     }
 

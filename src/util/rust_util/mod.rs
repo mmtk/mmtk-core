@@ -125,8 +125,7 @@ mod initialize_once_tests {
 
     #[test]
     fn test_threads_compete_initialize() {
-        use std::sync::atomic::AtomicUsize;
-        use std::sync::atomic::Ordering;
+        use atomic::{Atomic, Ordering};
         use std::thread;
 
         // Create multiple threads to initialize the same `InitializeOnce` value
@@ -134,7 +133,7 @@ mod initialize_once_tests {
         // The test value
         static I: InitializeOnce<usize> = InitializeOnce::new();
         // Count how many times the function is called
-        static INITIALIZE_COUNT: AtomicUsize = AtomicUsize::new(0);
+        static INITIALIZE_COUNT: Atomic<usize> = Atomic::new(0);
         // The function to create initial value
         fn initialize_usize() -> usize {
             INITIALIZE_COUNT.fetch_add(1, Ordering::SeqCst);

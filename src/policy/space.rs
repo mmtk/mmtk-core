@@ -33,8 +33,8 @@ use crate::util::heap::HeapMeta;
 use crate::util::os::*;
 use crate::vm::VMBinding;
 
+use atomic::Atomic;
 use std::marker::PhantomData;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -542,7 +542,7 @@ pub struct CommonSpace<VM: VMBinding> {
     pub global_state: Arc<GlobalState>,
     pub options: Arc<Options>,
 
-    pub allocate_as_live: AtomicBool,
+    pub allocate_as_live: Atomic<bool>,
 
     p: PhantomData<VM>,
 }
@@ -619,7 +619,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             acquire_lock: Mutex::new(()),
             global_state: args.plan_args.global_state,
             options: args.plan_args.options.clone(),
-            allocate_as_live: AtomicBool::new(false),
+            allocate_as_live: Atomic::new(false),
             p: PhantomData,
         };
 

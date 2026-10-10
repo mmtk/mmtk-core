@@ -14,14 +14,14 @@ use crate::util::os::*;
 use crate::util::{copy::*, object_enum};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
-use std::sync::atomic::{AtomicBool, Ordering};
+use atomic::{Atomic, Ordering};
 use std::sync::Arc;
 
 /// This type implements a simple copying space.
 pub struct CopySpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
-    from_space: AtomicBool,
+    from_space: Atomic<bool>,
 }
 
 impl<VM: VMBinding> SFT for CopySpace<VM> {
@@ -198,7 +198,7 @@ impl<VM: VMBinding> CopySpace<VM> {
                 MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
-            from_space: AtomicBool::new(from_space),
+            from_space: Atomic::new(from_space),
         }
     }
 

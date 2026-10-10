@@ -10,11 +10,10 @@ use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::*;
 use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::vm::*;
-use atomic::Ordering;
+use atomic::{Atomic, Ordering};
 use spin::RwLock;
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
-use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
 
 const UNINITIALIZED_WATER_MARK: i32 = -1;
@@ -182,7 +181,7 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
 /// A block list that supports fast lock-free push/pop operations
 struct BlockQueue<B: Region> {
     /// The number of elements in the queue.
-    cursor: AtomicUsize,
+    cursor: Atomic<usize>,
     /// The underlying data storage.
     ///
     /// -   `UnsafeCell<T>`: It may be accessed by multiple threads.
@@ -202,7 +201,7 @@ impl<B: Region> BlockQueue<B> {
         let boxed_slice = zeroed_vec.into_boxed_slice();
         let data = UnsafeCell::new(boxed_slice);
         Self {
-            cursor: AtomicUsize::new(0),
+            cursor: Atomic::new(0),
             data,
         }
     }
@@ -304,7 +303,7 @@ pub struct BlockPool<B: Region> {
     /// Thread-local block queues
     worker_local_freed_blocks: Vec<BlockQueue<B>>,
     /// Total number of blocks in the whole BlockQueue
-    count: AtomicUsize,
+    count: Atomic<usize>,
 }
 
 impl<B: Region> BlockPool<B> {
@@ -314,7 +313,7 @@ impl<B: Region> BlockPool<B> {
             head_global_freed_blocks: RwLock::new(None),
             global_freed_blocks: RwLock::new(vec![]),
             worker_local_freed_blocks: (0..num_workers).map(|_| BlockQueue::new()).collect(),
-            count: AtomicUsize::new(0),
+            count: Atomic::new(0),
         }
     }
 

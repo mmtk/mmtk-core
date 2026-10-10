@@ -345,26 +345,14 @@ mod tests {
 
     #[test]
     fn test_internal_mutability() {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-        let slab0 = vec![
-            AtomicUsize::new(1),
-            AtomicUsize::new(3),
-            AtomicUsize::new(2),
-        ];
-        let slab1 = vec![
-            AtomicUsize::new(4),
-            AtomicUsize::new(6),
-            AtomicUsize::new(5),
-        ];
-        let slab2 = vec![
-            AtomicUsize::new(7),
-            AtomicUsize::new(9),
-            AtomicUsize::new(10),
-        ];
+        use atomic::{Atomic, Ordering};
+        let slab0 = vec![Atomic::new(1), Atomic::new(3), Atomic::new(2)];
+        let slab1 = vec![Atomic::new(4), Atomic::new(6), Atomic::new(5)];
+        let slab2 = vec![Atomic::new(7), Atomic::new(9), Atomic::new(10)];
 
         // Note: We only take the first two elements from slab2,
         // because the mmapper sometimes processes part of a slab.
-        let slices: Vec<&[AtomicUsize]> = vec![&slab0[0..3], &slab1[0..3], &slab2[0..2]];
+        let slices: Vec<&[Atomic<usize>]> = vec![&slab0[0..3], &slab1[0..3], &slab2[0..2]];
 
         let mut collected = vec![];
 
@@ -389,7 +377,7 @@ mod tests {
 
         assert_eq!(collected, vec![vec![1, 3], vec![2, 4, 6], vec![5, 7, 9]]);
 
-        let load_all = |slab: Vec<AtomicUsize>| {
+        let load_all = |slab: Vec<Atomic<usize>>| {
             slab.iter()
                 .map(|x| x.load(Ordering::SeqCst))
                 .collect::<Vec<_>>()

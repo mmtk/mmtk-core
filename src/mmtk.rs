@@ -27,12 +27,12 @@ use crate::util::statistics::stats::Stats;
 use crate::vm::object_model::ObjectModel;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
+#[cfg(feature = "sanity")]
+use atomic::Atomic;
+use atomic::Ordering;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::default::Default;
-#[cfg(feature = "sanity")]
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -128,7 +128,7 @@ pub struct MMTK<VM: VMBinding> {
     pub(crate) gc_trigger: Arc<GCTrigger<VM>>,
     pub(crate) stats: Arc<Stats>,
     #[cfg(feature = "sanity")]
-    inside_sanity: AtomicBool,
+    inside_sanity: Atomic<bool>,
     /// Analysis counters. The feature analysis allows us to periodically stop the world and collect some statistics.
     #[cfg(feature = "analysis")]
     pub(crate) analysis_manager: Arc<AnalysisManager<VM>>,
@@ -234,7 +234,7 @@ impl<VM: VMBinding> MMTK<VM> {
             #[cfg(feature = "sanity")]
             sanity_checker: Mutex::new(SanityChecker::new()),
             #[cfg(feature = "sanity")]
-            inside_sanity: AtomicBool::new(false),
+            inside_sanity: Atomic::new(false),
             #[cfg(feature = "extreme_assertions")]
             slot_logger: SlotLogger::new(),
             #[cfg(feature = "analysis")]

@@ -1,6 +1,6 @@
+use atomic::{Atomic, Ordering};
 use std::marker::PhantomData;
 use std::ops::Range;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::tracing::LXRStopTheWorldProcessEdges;
 use crate::plan::lxr::mature_evac::MatureEvacuationSet;
@@ -23,7 +23,7 @@ use crate::{
 use super::super::mature_evac::RemSetEntry;
 use super::super::LXR;
 
-pub static SELECT_DEFRAG_BLOCK_JOB_COUNTER: AtomicUsize = AtomicUsize::new(0);
+pub static SELECT_DEFRAG_BLOCK_JOB_COUNTER: Atomic<usize> = Atomic::new(0);
 
 pub struct SelectDefragBlocks {
     pub chunks: Range<Chunk>,

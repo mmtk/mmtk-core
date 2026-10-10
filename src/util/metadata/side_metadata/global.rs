@@ -9,10 +9,10 @@ use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::os::*;
 use crate::util::Address;
 use crate::MMAPPER;
+use atomic::{Atomic, Ordering};
 use num_traits::FromPrimitive;
 use ranges::BitByteRange;
 use std::fmt;
-use std::sync::atomic::{AtomicU8, Ordering};
 
 /// This struct stores the specification of a side metadata bit-set.
 /// It is used as an input to the (inline) functions provided by the side metadata module.
@@ -171,7 +171,7 @@ impl SideMetadataSpec {
                     // Get a mask that the bits we need to zero are set to zero, and the other bits are 1.
                     let mask: u8 =
                         u8::MAX.checked_shl(bit_end as u32).unwrap_or(0) | !(u8::MAX << bit_start);
-                    unsafe { addr.as_ref::<AtomicU8>() }.fetch_and(mask, Ordering::SeqCst);
+                    unsafe { addr.as_ref::<Atomic<u8>>() }.fetch_and(mask, Ordering::SeqCst);
                     false
                 }
             }
@@ -208,7 +208,7 @@ impl SideMetadataSpec {
                     // Get a mask that the bits we need to set are 1, and the other bits are 0.
                     let mask: u8 = !(u8::MAX.checked_shl(bit_end as u32).unwrap_or(0))
                         & (u8::MAX << bit_start);
-                    unsafe { addr.as_ref::<AtomicU8>() }.fetch_or(mask, Ordering::SeqCst);
+                    unsafe { addr.as_ref::<Atomic<u8>>() }.fetch_or(mask, Ordering::SeqCst);
                     false
                 }
             }
@@ -404,10 +404,10 @@ impl SideMetadataSpec {
                     // we are setting selected bits in one byte
                     let mask: u8 = !(u8::MAX.checked_shl(bit_end as u32).unwrap_or(0))
                         & (u8::MAX << bit_start); // Get a mask that the bits we need to set are 1, and the other bits are 0.
-                    let old_src = unsafe { src.as_ref::<AtomicU8>() }.load(Ordering::Relaxed);
-                    let old_dst = unsafe { dst.as_ref::<AtomicU8>() }.load(Ordering::Relaxed);
+                    let old_src = unsafe { src.as_ref::<Atomic<u8>>() }.load(Ordering::Relaxed);
+                    let old_dst = unsafe { dst.as_ref::<Atomic<u8>>() }.load(Ordering::Relaxed);
                     let new = (old_src & mask) | (old_dst & !mask);
-                    unsafe { dst.as_ref::<AtomicU8>() }.store(new, Ordering::Relaxed);
+                    unsafe { dst.as_ref::<Atomic<u8>>() }.store(new, Ordering::Relaxed);
                     false
                 }
             }
@@ -570,7 +570,7 @@ impl SideMetadataSpec {
                 if bits_num_log < 3 {
                     let lshift = meta_byte_lshift(self, data_addr);
                     let mask = meta_byte_mask(self) << lshift;
-                    let byte_val = unsafe { meta_addr.atomic_load::<AtomicU8>(order) };
+                    let byte_val = unsafe { meta_addr.atomic_load::<u8>(order) };
                     FromPrimitive::from_u8((byte_val & mask) >> lshift).unwrap()
                 } else {
                     unsafe { T::load_atomic(meta_addr, order) }
@@ -741,14 +741,14 @@ impl SideMetadataSpec {
                     let lshift = meta_byte_lshift(self, data_addr);
                     let mask = meta_byte_mask(self) << lshift;
 
-                    let real_old_byte = unsafe { meta_addr.atomic_load::<AtomicU8>(success_order) };
+                    let real_old_byte = unsafe { meta_addr.atomic_load::<u8>(success_order) };
                     let expected_old_byte =
                         (real_old_byte & !mask) | ((old_metadata.to_u8().unwrap()) << lshift);
                     let expected_new_byte =
                         (expected_old_byte & !mask) | ((new_metadata.to_u8().unwrap()) << lshift);
 
                     unsafe {
-                        meta_addr.compare_exchange::<AtomicU8>(
+                        meta_addr.compare_exchange::<u8>(
                             expected_old_byte,
                             expected_new_byte,
                             success_order,

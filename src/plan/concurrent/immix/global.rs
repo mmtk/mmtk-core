@@ -29,7 +29,6 @@ use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
-use std::sync::atomic::AtomicBool;
 
 use atomic::Atomic;
 use atomic::Ordering;
@@ -47,12 +46,12 @@ pub struct ConcurrentImmix<VM: VMBinding> {
     pub immix_space: ImmixSpace<VM>,
     #[parent]
     pub common: CommonPlan<VM>,
-    last_gc_was_defrag: AtomicBool,
+    last_gc_was_defrag: Atomic<bool>,
     current_pause: Atomic<Option<Pause>>,
     previous_pause: Atomic<Option<Pause>>,
-    should_do_full_gc: AtomicBool,
-    concurrent_marking_active: AtomicBool,
-    unfinished_concurrent_marking: AtomicBool,
+    should_do_full_gc: Atomic<bool>,
+    concurrent_marking_active: Atomic<bool>,
+    unfinished_concurrent_marking: Atomic<bool>,
 }
 
 /// The plan constraints for the concurrent immix plan.
@@ -384,12 +383,12 @@ impl<VM: VMBinding> ConcurrentImmix<VM> {
                 immix_args,
             ),
             common: CommonPlan::new(plan_args),
-            last_gc_was_defrag: AtomicBool::new(false),
+            last_gc_was_defrag: Atomic::new(false),
             current_pause: Atomic::new(None),
             previous_pause: Atomic::new(None),
-            should_do_full_gc: AtomicBool::new(false),
-            concurrent_marking_active: AtomicBool::new(false),
-            unfinished_concurrent_marking: AtomicBool::new(false),
+            should_do_full_gc: Atomic::new(false),
+            concurrent_marking_active: Atomic::new(false),
+            unfinished_concurrent_marking: Atomic::new(false),
         }
     }
 

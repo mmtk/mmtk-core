@@ -2,8 +2,7 @@ use super::{Block, BlockState};
 use crate::util::alloc::allocator;
 use crate::util::linear_scan::Region;
 use crate::vm::VMBinding;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
+use atomic::{Atomic, Ordering};
 
 /// List of blocks owned by the allocator
 #[repr(C)]
@@ -11,7 +10,7 @@ pub struct BlockList {
     pub first: Option<Block>,
     pub last: Option<Block>,
     pub size: usize,
-    pub lock: AtomicBool,
+    pub lock: Atomic<bool>,
 }
 
 impl std::fmt::Debug for BlockList {
@@ -26,7 +25,7 @@ impl BlockList {
             first: None,
             last: None,
             size,
-            lock: AtomicBool::new(false),
+            lock: Atomic::new(false),
         }
     }
 

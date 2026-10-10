@@ -34,10 +34,9 @@ use crate::{
     util::opaque_pointer::{VMThread, VMWorkerThread},
     MMTK,
 };
-use atomic::Ordering;
-use std::sync::atomic::AtomicUsize;
+use atomic::{Atomic, Ordering};
+use std::sync::Arc;
 use std::sync::OnceLock;
-use std::sync::{atomic::AtomicU8, Arc};
 
 pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
 pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
@@ -67,16 +66,16 @@ pub struct ImmixSpace<VM: VMBinding> {
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
     /// Current line mark state
-    pub line_mark_state: AtomicU8,
+    pub line_mark_state: Atomic<u8>,
     /// Line mark state in previous GC
-    line_unavail_state: AtomicU8,
+    line_unavail_state: Atomic<u8>,
     /// A list of all reusable blocks
     pub reusable_blocks: ReusableBlockPool,
     /// Defrag utilities
     pub(super) defrag: Defrag,
     /// How many lines have been consumed since last GC?
-    lines_consumed: AtomicUsize,
-    reused_lines_consumed: AtomicUsize,
+    lines_consumed: Atomic<usize>,
+    reused_lines_consumed: Atomic<usize>,
     /// Object mark state
     mark_state: u8,
     /// Work packet scheduler
@@ -478,10 +477,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             },
             common,
             chunk_map: ChunkMap::new(space_index),
-            line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
-            line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
-            lines_consumed: AtomicUsize::new(0),
-            reused_lines_consumed: AtomicUsize::new(0),
+            line_mark_state: Atomic::new(Line::RESET_MARK_STATE),
+            line_unavail_state: Atomic::new(Line::RESET_MARK_STATE),
+            lines_consumed: Atomic::new(0),
+            reused_lines_consumed: Atomic::new(0),
             reusable_blocks: ReusableBlockPool::new(scheduler.num_workers()),
             defrag: Defrag::default(),
             // Set to the correct mark state when inititialized. We cannot rely on prepare to set it (prepare may get skipped in nursery GCs).
@@ -717,7 +716,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let space = unsafe { &*(self as *const Self) };
         let epilogue = Arc::new(FlushPageResource {
             space,
-            counter: AtomicUsize::new(0),
+            counter: Atomic::new(0),
         });
         let tasks = self.chunk_map.generate_tasks(|chunk| {
             Box::new(SweepChunk {
@@ -1545,7 +1544,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
 /// Count number of remaining work pacets, and flush page resource if all packets are finished.
 struct FlushPageResource<VM: VMBinding> {
     space: &'static ImmixSpace<VM>,
-    counter: AtomicUsize,
+    counter: Atomic<usize>,
 }
 
 impl<VM: VMBinding> FlushPageResource<VM> {

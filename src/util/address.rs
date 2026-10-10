@@ -1,11 +1,10 @@
-use atomic_traits::Atomic;
+use atomic::{Atomic, Ordering};
 use bytemuck::NoUninit;
 
 use std::fmt;
 use std::mem;
 use std::num::NonZeroUsize;
 use std::ops::*;
-use std::sync::atomic::Ordering;
 
 use crate::mmtk::{MMAPPER, SFT_MAP};
 use crate::util::metadata::log_bit::LOGGED_VALUE;
@@ -255,30 +254,30 @@ impl Address {
     /// atomic operation: load
     /// # Safety
     /// This could throw a segment fault if the address is invalid
-    pub unsafe fn atomic_load<T: Atomic>(self, order: Ordering) -> T::Type {
-        let loc = &*(self.0 as *const T);
+    pub unsafe fn atomic_load<T: NoUninit>(self, order: Ordering) -> T {
+        let loc = &*(self.0 as *const Atomic<T>);
         loc.load(order)
     }
 
     /// atomic operation: store
     /// # Safety
     /// This could throw a segment fault if the address is invalid
-    pub unsafe fn atomic_store<T: Atomic>(self, val: T::Type, order: Ordering) {
-        let loc = &*(self.0 as *const T);
+    pub unsafe fn atomic_store<T: NoUninit>(self, val: T, order: Ordering) {
+        let loc = &*(self.0 as *const Atomic<T>);
         loc.store(val, order)
     }
 
     /// atomic operation: compare and exchange usize
     /// # Safety
     /// This could throw a segment fault if the address is invalid
-    pub unsafe fn compare_exchange<T: Atomic>(
+    pub unsafe fn compare_exchange<T: NoUninit>(
         self,
-        old: T::Type,
-        new: T::Type,
+        old: T,
+        new: T,
         success: Ordering,
         failure: Ordering,
-    ) -> Result<T::Type, T::Type> {
-        let loc = &*(self.0 as *const T);
+    ) -> Result<T, T> {
+        let loc = &*(self.0 as *const Atomic<T>);
         loc.compare_exchange(old, new, success, failure)
     }
 

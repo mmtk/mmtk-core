@@ -1,6 +1,5 @@
+use atomic::{Atomic, Ordering};
 use std::collections::HashSet;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 use std::vec::Vec;
 
@@ -155,7 +154,7 @@ pub struct ReferenceProcessor {
     // 5. When we trace objects in the node buffer, we will attempt to add WR as a candidate. As we have updated WR to WR' in our reference
     //    table, we would accept WR as a candidate. But we will not trace WR again, and WR will be invalid after this GC.
     // This flag is set to false after Step 4, so in Step 5, we will ignore adding WR.
-    allow_new_candidate: AtomicBool,
+    allow_new_candidate: Atomic<bool>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -190,7 +189,7 @@ impl ReferenceProcessor {
                 nursery_index: 0,
             }),
             semantics,
-            allow_new_candidate: AtomicBool::new(true),
+            allow_new_candidate: Atomic::new(true),
         }
     }
 

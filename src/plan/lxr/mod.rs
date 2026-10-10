@@ -5,7 +5,6 @@ pub(super) mod global;
 mod mature_evac;
 pub(super) mod mutator;
 
-use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
 pub use self::global::LXR;
@@ -17,9 +16,9 @@ type RwLock<T> = spin::rwlock::RwLock<T>;
 
 // --- LXR-specific global state ---
 
-static NUM_CONCURRENT_TRACING_PACKETS: AtomicUsize = AtomicUsize::new(0);
-static DISABLE_LASY_DEC_FOR_CURRENT_GC: AtomicBool = AtomicBool::new(false);
-static NO_EVAC: AtomicBool = AtomicBool::new(false);
+static NUM_CONCURRENT_TRACING_PACKETS: Atomic<usize> = Atomic::new(0);
+static DISABLE_LASY_DEC_FOR_CURRENT_GC: Atomic<bool> = Atomic::new(false);
+static NO_EVAC: Atomic<bool> = Atomic::new(false);
 
 // --- LXR-specific global constants/flags ---
 
@@ -52,8 +51,8 @@ fn disable_lasy_dec_for_current_gc() -> bool {
 // --- Lazy sweeping job counters ---
 
 struct LazySweepingJobsCounter {
-    decs_counter: Option<Arc<AtomicUsize>>,
-    counter: Arc<AtomicUsize>,
+    decs_counter: Option<Arc<Atomic<usize>>>,
+    counter: Arc<Atomic<usize>>,
 }
 impl LazySweepingJobsCounter {
     pub fn new_decs() -> Self {
@@ -108,10 +107,10 @@ impl Drop for LazySweepingJobsCounter {
 }
 
 struct LazySweepingJobs {
-    prev_decs_counter: Option<Arc<AtomicUsize>>,
-    curr_decs_counter: Option<Arc<AtomicUsize>>,
-    prev_counter: Option<Arc<AtomicUsize>>,
-    curr_counter: Option<Arc<AtomicUsize>>,
+    prev_decs_counter: Option<Arc<Atomic<usize>>>,
+    curr_decs_counter: Option<Arc<Atomic<usize>>>,
+    prev_counter: Option<Arc<Atomic<usize>>>,
+    curr_counter: Option<Arc<Atomic<usize>>>,
     pub end_of_decs: Option<Box<dyn Send + Sync + Fn(LazySweepingJobsCounter)>>,
     pub end_of_lazy: Option<Box<dyn Send + Sync + Fn()>>,
 }
@@ -140,9 +139,9 @@ impl LazySweepingJobs {
 
     pub fn swap(&mut self) {
         self.prev_decs_counter = self.curr_decs_counter.take();
-        self.curr_decs_counter = Some(Arc::new(AtomicUsize::new(0)));
+        self.curr_decs_counter = Some(Arc::new(Atomic::new(0)));
         self.prev_counter = self.curr_counter.take();
-        self.curr_counter = Some(Arc::new(AtomicUsize::new(0)));
+        self.curr_counter = Some(Arc::new(Atomic::new(0)));
     }
 }
 
@@ -150,23 +149,23 @@ static LAZY_SWEEPING_JOBS: Lazy<RwLock<LazySweepingJobs>> =
     Lazy::new(|| RwLock::new(LazySweepingJobs::new()));
 
 static SURVIVAL_RATIO_PREDICTOR: SurvivalRatioPredictor = SurvivalRatioPredictor {
-    alloc_vol: AtomicUsize::new(0),
-    copy_promote_vol: AtomicUsize::new(0),
+    alloc_vol: Atomic::new(0),
+    copy_promote_vol: Atomic::new(0),
     prev_copy_promote_ratio: Atomic::new(0.01),
-    promote_vol: AtomicUsize::new(0),
+    promote_vol: Atomic::new(0),
     prev_promote_ratio: Atomic::new(0.01),
 };
 
 /// Predicts how much of the young allocation in the coming cycle will survive.
 struct SurvivalRatioPredictor {
     /// Young allocation over the current cycle: the denominator of both ratios.
-    alloc_vol: AtomicUsize,
+    alloc_vol: Atomic<usize>,
     /// Volume promoted by copying during the current cycle.
-    copy_promote_vol: AtomicUsize,
+    copy_promote_vol: Atomic<usize>,
     /// Smoothed `copy_promote_vol / alloc_vol` over previous cycles.
     prev_copy_promote_ratio: Atomic<f64>,
     /// Volume promoted by any means during the current cycle.
-    promote_vol: AtomicUsize,
+    promote_vol: Atomic<usize>,
     /// Smoothed `promote_vol / alloc_vol` over previous cycles.
     prev_promote_ratio: Atomic<f64>,
 }
@@ -205,15 +204,15 @@ impl SurvivalRatioPredictor {
 }
 
 struct SurvivalRatioPredictorLocal {
-    copy_promote_vol: AtomicUsize,
-    promote_vol: AtomicUsize,
+    copy_promote_vol: Atomic<usize>,
+    promote_vol: Atomic<usize>,
 }
 
 impl Default for SurvivalRatioPredictorLocal {
     fn default() -> Self {
         Self {
-            copy_promote_vol: AtomicUsize::new(0),
-            promote_vol: AtomicUsize::new(0),
+            copy_promote_vol: Atomic::new(0),
+            promote_vol: Atomic::new(0),
         }
     }
 }

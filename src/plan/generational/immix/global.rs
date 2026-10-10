@@ -29,9 +29,8 @@ use crate::vm::*;
 use crate::ObjectQueue;
 use crate::MMTK;
 
+use atomic::{Atomic, Ordering};
 use enum_map::EnumMap;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
@@ -50,9 +49,9 @@ pub struct GenImmix<VM: VMBinding> {
     #[copy_semantics(CopySemantics::Mature)]
     pub immix_space: ImmixSpace<VM>,
     /// Whether the last GC was a defrag GC for the immix space.
-    pub last_gc_was_defrag: AtomicBool,
+    pub last_gc_was_defrag: Atomic<bool>,
     /// Whether the last GC was a full heap GC
-    pub last_gc_was_full_heap: AtomicBool,
+    pub last_gc_was_full_heap: Atomic<bool>,
 }
 
 /// The plan constraints for the generational immix plan.
@@ -276,8 +275,8 @@ impl<VM: VMBinding> GenImmix<VM> {
         GenImmix {
             gen: CommonGenPlan::new(plan_args),
             immix_space,
-            last_gc_was_defrag: AtomicBool::new(false),
-            last_gc_was_full_heap: AtomicBool::new(false),
+            last_gc_was_defrag: Atomic::new(false),
+            last_gc_was_full_heap: Atomic::new(false),
         }
     }
 

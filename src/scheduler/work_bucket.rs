@@ -1,13 +1,13 @@
 use super::worker_monitor::WorkerMonitor;
 use super::*;
 use crate::vm::VMBinding;
+use atomic::{Atomic, Ordering};
 use crossbeam::deque::{Injector, Steal, Worker};
 use enum_map::Enum;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub(super) struct BucketQueue<VM: VMBinding> {
-    flag: AtomicBool,
+    flag: Atomic<bool>,
     queue0: Injector<Box<dyn GCWork<VM>>>,
     queue1: Injector<Box<dyn GCWork<VM>>>,
 }
@@ -15,7 +15,7 @@ pub(super) struct BucketQueue<VM: VMBinding> {
 impl<VM: VMBinding> BucketQueue<VM> {
     fn new() -> Self {
         Self {
-            flag: AtomicBool::new(false),
+            flag: Atomic::new(false),
             queue0: Injector::new(),
             queue1: Injector::new(),
         }
@@ -137,12 +137,12 @@ pub type BucketOpenCondition<VM> = Box<dyn (Fn(&GCWorkScheduler<VM>) -> bool) + 
 
 pub struct WorkBucket<VM: VMBinding> {
     /// Whether this bucket has been opened. Work from an open bucket can be fetched by workers.
-    open: AtomicBool,
+    open: Atomic<bool>,
     /// Whether this bucket is enabled.
     /// A disabled work bucket will behave as if it does not exist in terms of scheduling,
     /// except that users can add work to a disabled bucket, and enable it later to allow those
     /// work to be scheduled.
-    enabled: AtomicBool,
+    enabled: Atomic<bool>,
     /// The stage name of this bucket.
     stage: WorkBucketStage,
     queue: BucketQueue<VM>,
@@ -167,8 +167,8 @@ pub struct WorkBucket<VM: VMBinding> {
 impl<VM: VMBinding> WorkBucket<VM> {
     pub(crate) fn new(stage: WorkBucketStage, monitor: Arc<WorkerMonitor>) -> Self {
         Self {
-            open: AtomicBool::new(stage.is_open_by_default()),
-            enabled: AtomicBool::new(stage.is_enabled_by_default()),
+            open: Atomic::new(stage.is_open_by_default()),
+            enabled: Atomic::new(stage.is_enabled_by_default()),
             stage,
             queue: BucketQueue::new(),
             monitor,
