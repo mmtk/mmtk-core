@@ -493,23 +493,27 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         s: VM::VMSlot,
     ) -> Option<ObjectReference> {
         let o = s.load();
-        // Re-arm the field so the next epoch's first write to it is recorded again. A slot with
-        // no unlog bit has nothing to re-arm, and deriving a metadata address from one would
-        // read unmapped memory, so the mapped-metadata test is the guard.
+        // Re-arm the field so the next epoch's first write to it is recorded again.
         //
-        // It must be *that* test and not "is the slot inside the heap". Objects in the VM space
-        // -- Julia's loaded sysimage, mapped well outside the heap range -- do have field unlog
-        // bits, armed by `VMSpace::set_side_metadata`. Guarding on the heap range meant a
-        // sysimage field was logged by its first barriered write and then never re-armed, so
-        // every later write to it was invisible: references the sysimage stored into the heap
-        // went uncounted and were reclaimed while live. That is the whole `sysbase` stage
-        // failure -- ~2800 undercounted objects at the second collection, with referrers at
-        // `0x740f…` addresses reporting `field_logged=Some(true)` forever.
+        // This used to be guarded by "is the slot inside the heap", which was wrong: objects in
+        // the VM space -- Julia's loaded sysimage, mapped well outside the heap range -- do have
+        // field unlog bits, armed by `VMSpace::set_side_metadata`. Guarding on the heap range
+        // meant a sysimage field was logged by its first barriered write and then never
+        // re-armed, so every later write to it was invisible: references the sysimage stored
+        // into the heap went uncounted and were reclaimed while live. That is the whole
+        // `sysbase` stage failure -- ~2800 undercounted objects at the second collection, with
+        // referrers at `0x740f…` addresses reporting `field_logged=Some(true)` forever.
+        //
+        // It was then guarded by "is the metadata mapped", which is not that question either:
+        // metadata is mapped a page at a time and a page spans 64x the range it was mapped for,
+        // so a foreign address landing in a page's tail passes the test. Every slot that gets
+        // here has a bit, so nothing needs guarding -- see the assertion.
         if K == EDGE_KIND_MATURE {
-            let a = s.to_address();
-            if side_metadata::address_to_meta_address(&Self::UNLOG_BITS, a).is_mapped() {
-                a.unlog_field_relaxed::<VM>();
-            }
+            // A mature edge came from the barrier, so the field is there to re-arm: the
+            // binding keeps slots without a field unlog bit out of the barrier entirely.
+            // Root edges need no such guarantee and are excluded by the `K` test above --
+            // a task's GC shadow-stack slots are roots, and have no field bit either.
+            s.to_address().unlog_field_relaxed::<VM>();
         }
         o
     }
