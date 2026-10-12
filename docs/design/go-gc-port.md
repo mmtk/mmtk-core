@@ -892,7 +892,7 @@ What exists on `mmtk-core-go-gc` and mmtk-openjdk `concurrent-span` after the fi
 | 7 | Scavenger, memory-limit RSS behaviour | Not started |
 | 8 | Real assists (MEP) | Not started |
 
-**Testing.** 34 MockVM test files run with `ConcurrentSpan`, 16 of them specific to it (including real concurrent cycles, stalls, assists, user GCs during marking, Green Tea, a multi-threaded stress test), all passing with Green Tea on and off and with the SATB option. The other plans' mock tests still pass. On OpenJDK (fastdebug, x86_64), `ConcurrentSpan` runs a barrier stress test in the interpreter, C1 and C2, and DaCapo is being validated.
+**Testing.** 34 MockVM test files run with `ConcurrentSpan`, 16 of them specific to it (including real concurrent cycles, stalls, assists, user GCs during marking, Green Tea, a multi-threaded stress test), all passing with Green Tea on and off and with the SATB option. The other plans' mock tests still pass. On OpenJDK (fastdebug, x86_64), `ConcurrentSpan` runs a barrier stress test in the interpreter, C1 and C2, and DaCapo fop, luindex, lusearch (`-s small`) and h2 (`-s small`) pass with C1 only, C2 only and (fop, h2) tiered, with and without `MMTK_HYBRID_BARRIER_DEBUG_ALWAYS_ON`. Default-size lusearch is slow rather than stuck: with `gc_percent=100` its small live heap gives a heap goal of about 27 MB, so thousands of cycles run (as Go would with `GOGC=100`). Fastdebug `-Xint` is too slow for the DaCapo harness.
 
 **Evaluation kit.** `~/Code/concurrent-span-eval` (running-ng configs) compares `ConcurrentSpan` (both heap modes, and the ablations of §10.1) with `ConcurrentImmix`, G1, ZGC and Shenandoah. It needs a release build with the inline allocation fast path before its numbers mean anything.
 
