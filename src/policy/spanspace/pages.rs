@@ -14,6 +14,7 @@
 use super::classes::LOG_BYTES_IN_SPAN_PAGE;
 use crate::util::Address;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 /// Log of the size of the unit in which SpanSpace acquires memory from MMTk.
@@ -87,6 +88,8 @@ impl RegionPages {
 #[derive(Default)]
 pub struct PageAllocator {
     inner: Mutex<Inner>,
+    /// Pages in use, over all regions.  Updated under the lock, read without it.
+    used: AtomicUsize,
 }
 
 #[derive(Default)]
@@ -139,6 +142,7 @@ impl PageAllocator {
                 let needzero = (i..i + npages).any(|p| RegionPages::get(&pages.dirty, p));
                 RegionPages::set_range(&mut pages.dirty, i, npages, true);
                 pages.used += npages;
+                self.used.fetch_add(npages, Ordering::Relaxed);
                 if pages.used == SPAN_PAGES_IN_REGION {
                     inner.nonfull.remove(&start);
                 }
@@ -166,6 +170,7 @@ impl PageAllocator {
         }
         RegionPages::set_range(&mut pages.in_use, i, npages, false);
         pages.used -= npages;
+        self.used.fetch_sub(npages, Ordering::Relaxed);
         if pages.used == 0 {
             inner.regions.remove(&region.as_usize());
             inner.nonfull.remove(&region.as_usize());
@@ -189,13 +194,7 @@ impl PageAllocator {
 
     /// Pages in use, over all regions.
     pub fn used_pages(&self) -> usize {
-        self.inner
-            .lock()
-            .unwrap()
-            .regions
-            .values()
-            .map(|c| c.used)
-            .sum()
+        self.used.load(Ordering::Relaxed)
     }
 }
 

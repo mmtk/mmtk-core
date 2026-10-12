@@ -117,6 +117,13 @@ impl Pacing {
         self.limiter.limiting()
     }
 
+    /// Report the memory counted against the memory limit (see
+    /// [`FeedbackPacer::set_memory_stats`]).
+    pub(super) fn set_memory_stats(&self, mapped_ready: u64, heap_free: u64, heap_alloc: u64) {
+        self.pacer
+            .set_memory_stats(mapped_ready, heap_free, heap_alloc);
+    }
+
     /// A cycle starts (Go: `gcStart`).
     pub(super) fn start_cycle(&self) {
         self.stack_scan.store(0, Ordering::Relaxed);

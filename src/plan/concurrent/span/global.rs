@@ -143,13 +143,26 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
             return self.base().collection_required(self, space_full);
         }
 
-        // The heap size from the GC trigger is the hard limit.
-        if self.base().collection_required(self, space_full) {
-            return true;
+        // The heap size from the GC trigger is the hard limit.  Otherwise the pacer decides (Go:
+        // `gcTrigger.test`, `runtime/mgc.go:706-725`).
+        let required = || {
+            self.base().collection_required(self, space_full) || {
+                self.report_memory_stats();
+                self.pacing.report_heap_live(self.heap_live_bytes());
+                self.pacing.should_start_cycle()
+            }
+        };
+        // Go's `gcStart` (`runtime/mgc.go:767`) first sweeps until the trigger no longer holds:
+        // `for trigger.test() && sweepone() != ^uintptr(0) {}`.  Here this matters most for the
+        // hard limit, which counts the pages of unswept garbage.  Without it, a mutator that
+        // takes pages right after a cycle (for example after an allocation stall) starts the
+        // next cycle at once, and the pause sweeps the heap.
+        while required() {
+            if self.span.sweep_one() == 0 {
+                return true;
+            }
         }
-        // Otherwise the pacer decides (Go: `gcTrigger.test`, `runtime/mgc.go:706-725`).
-        self.pacing.report_heap_live(self.heap_live_bytes());
-        self.pacing.should_start_cycle()
+        false
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
@@ -202,6 +215,16 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
             // scheduler opens it after the pause if it holds work.
             mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(false);
             mmtk.gc_trigger.policy.on_gc_start(mmtk);
+            if log::log_enabled!(log::Level::Info) {
+                info!(
+                    "Heap at cycle start: {} of {} MMTk pages reserved, SpanSpace: {} KiB in spans ({} unswept spans), heap_live {} KiB",
+                    self.get_reserved_pages(),
+                    self.get_total_pages(),
+                    self.span.pages_in_use() * (crate::policy::spanspace::classes::BYTES_IN_SPAN_PAGE >> 10),
+                    self.span.count_unswept(),
+                    self.heap_live_bytes() >> 10,
+                );
+            }
             self.pacing.report_heap_live(self.heap_live_bytes());
             self.pacing.start_cycle();
         } else {
@@ -289,6 +312,7 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
             // finished in the `FinalMark` pause.
             self.soft_refs_strong.store(false, Ordering::SeqCst);
             self.common.on_pause_end(tls);
+            self.report_memory_stats();
             self.pacing.end_cycle(self.heap_marked_bytes());
             if pause == Pause::FinalMark {
                 info!(
@@ -416,6 +440,27 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
     /// The live heap found by the cycle that just ended (Go's `heapMarked`), in bytes: the bytes
     /// marked in `SpanSpace`, including objects allocated black, plus the other spaces' used
     /// pages after the release.
+    /// Tell the pacer how much memory counts against the memory limit, for its memory-limit
+    /// heap goal (Go keeps `mappedReady`, `heapFree` and `totalAlloc - totalFree` up to date).
+    /// Everything MMTk has reserved is `mappedReady`; the free pages of SpanSpace's page regions
+    /// are `heapFree`; `heap_live`, capped at the bytes in spans, stands in for the object bytes.
+    /// What is left (free slots in spans beyond `heap_live`, and metadata) is non-heap memory to
+    /// Go's pacer.
+    fn report_memory_stats(&self) {
+        use crate::policy::spanspace::classes::BYTES_IN_SPAN_PAGE;
+        use crate::util::constants::BYTES_IN_PAGE;
+        let mapped_ready = (self.get_reserved_pages() * BYTES_IN_PAGE) as u64;
+        let span_mapped = (self.span.reserved_pages() * BYTES_IN_PAGE) as u64;
+        let in_spans = (self.span.pages_in_use() * BYTES_IN_SPAN_PAGE) as u64;
+        let heap_free = span_mapped.saturating_sub(in_spans);
+        // Like `heap_live_bytes`, the other spaces' pages (large objects, for example) count as
+        // heap, as Go's large objects are in heap spans.
+        let common = crate::util::conversions::pages_to_bytes(self.common.get_used_pages()) as u64;
+        let heap_alloc = (self.span.heap_live() as u64).min(in_spans) + common;
+        self.pacing
+            .set_memory_stats(mapped_ready, heap_free, heap_alloc);
+    }
+
     fn heap_marked_bytes(&self) -> u64 {
         (self.span.bytes_marked()
             + crate::util::conversions::pages_to_bytes(self.common.get_used_pages())) as u64
