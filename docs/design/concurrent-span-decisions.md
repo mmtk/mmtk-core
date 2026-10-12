@@ -18,6 +18,17 @@ Decisions made without asking the project lead, so that work could continue. Eac
 | D6 | 2026-10-12 | Scope of the first 12-hour session | Breadth over polish (project lead's answer): go as far as possible through the phases, including phase 4, with less OpenJDK validation per phase. Agents work in parallel git worktrees | Yes | accepted |
 | D7 | 2026-10-12 | Which OpenJDK tree to build | A new fastdebug build in `~/Code/openjdk` (project lead's answer). The existing builds in `~/openjdk` are left alone | Yes | accepted |
 | D8 | 2026-10-12 | The development machine has 8 cores and 125 GB, not 24 cores and 31 GB as engineering §6 says | Keep the 16 GB total. With up to three parallel agents, each build or test uses `MemoryMax=5G` and `-j 3` | Yes | for review |
+| D9 | 2026-10-12 | Where does the pacer plug in: a new `GCTriggerSelector::FeedbackPacer` (design §5.10) or the plan? | The plan: `ConcurrentSpan::collection_required` asks the pacer; the GC trigger's heap size stays the hard limit and is the default memory limit | Yes | for review |
+| D10 | 2026-10-12 | How does a mutator stall (design §5.11) without new binding APIs? | A `ConcurrentPlan::stall_instead_of_pause` hook: `GCTrigger::poll_or_stall` reports a stall, and `Space::acquire` blocks in `block_for_gc` until the next pause (FinalMark) ends, then takes its pages | Yes | for review |
+| D11 | 2026-10-12 | Is `System.gc()` a concurrent cycle that blocks the caller (design §5.2)? | No: still a stop-the-world `Pause::Full`, as in `ConcurrentImmix`. Waiting for a concurrent cycle with `block_for_gc` is racy (the cycle may end between the check and the wait) | Yes | for review |
+| D12 | 2026-10-12 | How many times may FinalMark restart concurrent marking? | At most `concurrent_span_max_mark_restarts` (8); then FinalMark finishes the marking in the pause. Go has no limit | Yes | for review |
+| D13 | 2026-10-12 | Where do ragged flush rounds run? | As a `RaggedFlush` packet in `Concurrent`, not in the last-parked-worker callback, which holds the worker monitor lock: a handshake there can deadlock with a mutator requesting a GC. Without `flush_mutators_concurrently`, FinalMark is requested directly | Yes | for review |
+| D14 | 2026-10-12 | `ConcurrentPlan::on_concurrent_work_drained` must be able to add work or ask for a pause | It returns `bool`; `true` makes the last parked worker look again. Changes `ConcurrentImmix` and LXR (return `false`). Candidate upstream change, now inside a port commit | Yes | for review |
+| D15 | 2026-10-12 | Soft references and finalizers make FinalMark trace (design §5.14) | Soft referents are strong in non-emergency cycles (`memory_manager::soft_references_are_strong`, used by mmtk-openjdk); finalizable objects' contents are traced while marking (`ScanFinalizableContents`) | Yes | for review |
+| D16 | 2026-10-12 | Does a pause that closes a concurrent cycle count as a collection attempt for out-of-memory? | No. FinalMark continues the attempt started by InitialMark; otherwise a stalled mutator saw a false emergency and OOM | Yes | for review |
+| D17 | 2026-10-12 | How are assists parked (design §5.11 Stage A)? | New optional `Collection::block_mutator_until` / `wake_blocked_mutators`; mmtk-openjdk blocks the thread in the VM and waits on `gc_lock` (1 ms timed waits) | Yes | for review |
+| D18 | 2026-10-12 | Weak→strong block during mark termination (design §5.14) | Not implemented yet. Weak loads only shade while marking, as with SATB; termination can take extra rounds or restarts | — | open |
+| D19 | 2026-10-12 | Work split between the integrator and agents in this session | Pacer (D20–D23) and SpanSpace (D30–D38) by agents in worktrees, merged by the integrator; mmtk-openjdk `HybridBarrier` (D50–D58) by an agent in the shared checkout | — | for review |
 | D20 | 2026-10-12 | Which `defaultHeapMinimum` (Go has 4 MiB, or 512 KiB under the `HeapMinimum512KiB` experiment)? | 4 MiB, Go's default | Yes | for review |
 | D21 | 2026-10-12 | How is the pacer shared between mutators, workers and pauses? | All fields atomic (`Relaxed`), all methods `&self`; STW-only methods document their precondition | Yes | for review |
 | D22 | 2026-10-12 | Go's `math/rand` source is not in the reference checkout. How are `TestGcPacer`'s random streams ported? | SplitMix64 with the same seeds and amplitudes | Yes | for review |
@@ -31,6 +42,15 @@ Decisions made without asking the project lead, so that work could continue. Eac
 | D36 | 2026-10-12 | IDs for SpanSpace deviations, while other agents edit the same file | Prefix `SP` in a separate table | Yes | for review |
 | D37 | 2026-10-12 | How to run Go's size-class generator without a Go install or network module downloads | `tools/spanspace-sizeclasses/gen.sh` compiles Go's unmodified `mksizeclasses.go` and `constants.go` with a small Rust emitter (`emit_rust.go`), with any Go toolchain; the official go1.25.1 tarball was used, outside the repository | Yes | for review |
 | D38 | 2026-10-12 | What does `is_live` mean for a `SpanSpace` object outside marking? | During marking: the mark bit. Afterwards: the mark bit for unswept spans and the allocation state for swept spans | Yes | for review |
+| D50 | 2026-10-12 | Which flag does compiled code test for `HybridBarrier`? | mmtk-core's own flag, through `memory_manager::barrier_active_address()`, exported to C++ as `mmtk_barrier_active_address()` and embedded as a constant. Not the binding's `CONCURRENT_MARKING_ACTIVE` | Yes | for review |
+| D51 | 2026-10-12 | C2 elides barriers on stores into just-allocated objects (SATB relies on this). Keep it for `HybridBarrier`? | Only for stores of a constant null. A non-null store into a new (black) object keeps its barrier, for the insertion half. Go's compiler elides under the same condition | Yes | for review |
+| D52 | 2026-10-12 | `Object.clone` copies raw words without barriers. What does `HybridBarrier` do? | Shade every reference field of the source before the copy (Go's `bulkBarrierPreWriteSrcOnly`): in `clone_in_heap` and in a flag-gated leaf call before C2's clone. Implemented with `memory_region_copy_pre` and an empty destination slice, so no mmtk-core API change | Yes | for review |
+| D53 | 2026-10-12 | Arraycopy into an uninitialised destination (`IS_DEST_UNINITIALIZED`, e.g. C2 tightly-coupled copies) | Shade the source only; never read the destination, which can hold stale words | Yes | for review |
+| D54 | 2026-10-12 | C1 stores whose field offset needs patching do not know the slot | Call `object_probable_write(src)` (shade all old fields, rescan `src` later) through the existing patching stub | Yes | for review |
+| D55 | 2026-10-12 | `on_slowpath_allocation_exit` (`object_probable_write`) for `HybridBarrier` | No-op, as for SATB: after D51, no non-null store into a new object is unbarriered | Yes | for review |
+| D56 | 2026-10-12 | The SATB weak-reference load barrier (x86 interpreter, C1, C2) is needed again for `HybridBarrier` with another flag | Move it into the shared `MMTkBarrierSet{Assembler,C1,C2}` with the flag address as a parameter; SATB passes `CONCURRENT_MARKING_ACTIVE`. SATB's C1 test changes from `== 1` to `!= 0` (same for a 0/1 flag) | Yes | for review |
+| D57 | 2026-10-12 | How to test barrier paths before concurrent marking exists | Binding-only env var `MMTK_HYBRID_BARRIER_DEBUG_ALWAYS_ON=1` sets the flag once at start-up. mmtk-core drops the buffers while no marking is in progress | Yes | for review |
+| D58 | 2026-10-12 | aarch64 `HybridBarrier` cannot be tested on this machine | Not implemented. Its selection is compiled only on x86_64 (`#ifdef AMD64`); on aarch64, `ConcurrentSpan` fails at start-up with the existing "Unimplemented" guarantee | Yes | open |
 
 ## D1. Location of the engineering documents
 
@@ -96,6 +116,34 @@ Decisions made without asking the project lead, so that work could continue. Eac
 The limits are guesses with headroom. If a legitimate build or run is killed, raise that cap and record the new value here.
 
 **To undo.** Change engineering §6.
+
+## D9. Where the pacer plugs in
+
+**Question.** The design wires the pacer in as `GCTriggerSelector::FeedbackPacer`. On OpenJDK, mmtk-openjdk sets the GC trigger from `-Xms`/`-Xmx` (`FixedHeapSize` or `DynamicHeapSize`), so a new selector would need a binding change.
+
+**Decision.** `ConcurrentSpan::collection_required` asks the pacer (`pacing.rs` around `pacer.rs`). The trigger's heap size is the hard limit, and also the memory limit (`soft_mem_limit` overrides it). Options `gc_percent` (-1 for off) and `soft_mem_limit`. `heapLive` is `SpanSpace`'s refill-charged counter plus other spaces' used pages; the trigger is checked at every span refill (Go's `mallocgc`), not only when pages are acquired.
+
+**To undo.** Add the selector and move `Pacing` into a `GCTriggerPolicy`.
+
+## D10. Allocation stalls
+
+**Decision.** `GCTrigger::poll_or_stall` returns `Stall` when the plan's `stall_instead_of_pause` says so (marking in progress, not done). `Space::acquire` then calls `block_for_gc` and takes the pages afterwards; MMTk's existing block primitive returns at the end of the next pause, which is FinalMark (or a restart, after which the mutator may stall again). While a mutator stalls, all GC workers are active. Option `concurrent_span_allocation_stalls` (on); off gives `ConcurrentImmix`'s behaviour (FinalMark finishes marking stop-the-world).
+
+**To undo.** Turn the option off, or remove the hook.
+
+## D11. `System.gc()`
+
+**Decision.** Stop-the-world `Pause::Full`. A Go-faithful version needs a race-free "wait until this cycle ends" primitive in the binding.
+
+## D13. Ragged flush placement
+
+**Decision.** The plan's `on_concurrent_work_drained` adds a `RaggedFlush` packet (with `add_no_notify`, because the caller holds the worker monitor lock) and returns `true`. The packet calls `Collection::flush_mutators_concurrently` (mmtk-openjdk: `Handshake::execute`) and compares a counter of non-empty barrier flushes before and after.
+
+## D16. Collection attempts and concurrent cycles
+
+**Decision.** `ScheduleCollection` skips `set_collection_kind` when the plan's concurrent work is in progress (the pause closes a cycle). This also affects `ConcurrentImmix`, whose FinalMark no longer counts as an attempt.
+
+**To undo.** Revert the check in `ScheduleCollection` (and stalls then need another fix).
 
 ## D20. Default minimum heap
 
@@ -200,3 +248,80 @@ The limits are guesses with headroom. If a legitimate build or run is killed, ra
 **Decision.** While marking (from `prepare_initial_mark` to `release_after_mark`): the mark bit. Afterwards, per span: unswept (or stale cached) spans answer from the mark bit, swept spans from the allocation state (`index < freeindex` or the alloc bit).
 
 **To undo.** Change `SFT::is_live` in `src/policy/spanspace/global.rs`.
+
+## D50. The flag tested by compiled code
+
+**Question.** The binding already has `CONCURRENT_MARKING_ACTIVE` (set in `resume_mutators` for SATB plans). `HybridBarrier` has its own flag in mmtk-core.
+
+**Options.** 1. Test the binding's flag. 2. Test mmtk-core's flag through `barrier_active_address()`.
+
+**Decision.** Option 2. The barrier's semantics (in mmtk-core) also test that flag, so the fast path and the slow path cannot disagree, and the flag changes exactly when the plan changes it (design §5.6). The C++ side reads the address once (`hybrid_barrier_active_address()`) and embeds it in generated code.
+
+**To undo.** Replace `hybrid_barrier_active_address()` in `mmtkHybridBarrier.hpp` (mmtk-openjdk).
+
+## D51. Barrier elision for new objects in C2
+
+**Question.** `MMTkBarrierSetC2::can_remove_barrier` removes the barrier for any store into a just-allocated object. For SATB that is sound (the old value is null). For a hybrid barrier the new value must still be shaded: the new object is allocated black and is never scanned, and the stored value may only be reachable from a stack that is scanned later.
+
+**Options.** 1. Never elide. 2. Elide only constant-null stores. 3. Elide, and shade the new object's fields on `on_slowpath_allocation_exit` (only covers slow-path allocations, so unsound).
+
+**Decision.** Option 2. Go's `needwb` (`cmd/compile/internal/ssa/writebarrier.go`) elides the barrier on zeroed new objects only when the stored value is not a heap pointer, which is the same condition.
+
+**To undo.** Change `MMTkHybridBarrierSetC2::object_reference_write_pre`.
+
+## D52. `Object.clone`
+
+**Question.** HotSpot clones by copying raw words (`clone_in_heap`, and C2's `clone` intrinsic through a basic `ArrayCopyNode`). SATB does nothing. The clone is a new black object, so the copied references need the insertion half.
+
+**Options.** 1. `object_probable_write(dst)` after the copy (shades the copied values, but also schedules a pointless rescan, and there is no "after" hook in C2's intrinsic without more graph surgery). 2. Shade the source's reference fields before the copy, as Go's `bulkBarrierPreWriteSrcOnly` and Shenandoah's clone barrier do. 3. Add a clone API to mmtk-core.
+
+**Decision.** Option 2, in the binding. Instance fields are shaded per oop map block (each a contiguous slot range), arrays as one range, both through `memory_region_copy_pre` with an empty destination slice (`mmtk_array_copy_pre_src_only`). `HybridBarrierSemantics::memory_region_copy_slow` iterates the two slices independently, so this shades exactly the source values. Object arrays cloned by C2 go through the arraycopy stubs, which are covered by D53. C1 has no clone intrinsic.
+
+**To undo.** Remove `object_clone_pre` (mmtk-openjdk `mmtkBarrierSet.hpp`, `mmtkHybridBarrier.cpp`). If mmtk-core gains a source-only slice API, switch to it.
+
+## D53. Arraycopy into an uninitialised destination
+
+**Question.** C2 skips zeroing a new array that is filled by an arraycopy (`IS_DEST_UNINITIALIZED` stubs). `memory_region_copy_pre` would load the destination's old words, which may be stale pointers to freed cells.
+
+**Decision.** For `IS_DEST_UNINITIALIZED` (stub prologue and runtime), call `mmtk_array_copy_pre_src_only`, which shades the source only. Other barriers keep their behaviour through a new virtual `object_reference_array_copy_pre_dst_uninitialized` that defaults to the old call.
+
+**Note for review.** `SATBBarrier`'s prologue also calls `mmtk_array_copy_pre` for uninitialised destinations, and SATB's `memory_region_copy_slow` reads the destination. On a free-list space this could enqueue a stale word. Not changed here.
+
+**To undo.** Revert the prologue branch in `mmtkHybridBarrierSetAssembler_x86.cpp` and the runtime override.
+
+## D54. C1 stores that need field patching
+
+**Question.** When C1 compiles a store to a field of an unloaded class, the offset is patched on first execution, so the slot address is not known when the barrier stub is generated. The field barrier's patching stub falls back to `object_probable_write(src)`.
+
+**Decision.** Reuse that stub. For `HybridBarrier`, `object_probable_write` shades every old field of `src` (deletion half) and schedules `src` for a rescan when the buffers are flushed, after the store (insertion half). It is rare (only until the code is recompiled).
+
+**To undo.** Implement exact patching in `MMTkC1HybridBarrierStub`.
+
+## D55. `object_probable_write` after C2 slow-path allocation
+
+**Decision.** A no-op for `HybridBarrier`, as for SATB. With D51, the only unbarriered stores into a new object store null.
+
+**To undo.** Implement `MMTkHybridBarrierSetRuntime::object_probable_write`.
+
+## D56. Sharing the weak-reference load barrier
+
+**Question.** `HybridBarrier` needs the same weak-reference load barrier as SATB (interpreter `Reference.get`, C1, C2 including the unknown-referent check), gated by a different flag. Copying it would make a third copy (the field barrier has one).
+
+**Decision.** Move SATB's code into `MMTkBarrierSetAssembler::weak_reference_load_barrier` (x86), `MMTkBarrierSetC1::weak_reference_load_at_resolved` and `MMTkBarrierSetC2::weak_reference_load_at_resolved`, with the flag address as a parameter. SATB and Hybrid call them. aarch64 SATB and the field barrier are untouched. `ConcurrentImmix` was re-run as a regression check.
+
+**To undo.** Revert the refactoring part of the mmtk-openjdk commit.
+
+## D57. Forcing the barrier on for testing
+
+**Decision.** If `MMTK_HYBRID_BARRIER_DEBUG_ALWAYS_ON=1` and the plan uses `HybridBarrier`, the binding stores 1 to the flag after creating MMTk (`openjdk_gc_init`) and prints a line to stderr. Nothing clears it before concurrent marking exists. While no marking is in progress, `HybridBarrierSemantics` drops what it buffers, so this tests that every path reaches mmtk-core with valid arguments, not that marking is correct.
+
+**To undo.** Remove `maybe_force_hybrid_barrier_on` in mmtk-openjdk `mmtk/src/api.rs`.
+
+## D58. aarch64 (open)
+
+**Question.** Design §9 asks for x86_64 and aarch64. aarch64 cannot be built or tested on this machine.
+
+**Decision.** Not implemented. `mmtkHybridBarrier.cpp` and the barrier selection are compiled only under `AMD64`, so aarch64 builds still compile; selecting `ConcurrentSpan` there fails at start-up. Needs an aarch64 port of `mmtkHybridBarrierSetAssembler_x86.cpp` (store pre-barrier, arraycopy prologue, weak load, C1 stub) and a machine to test it.
+
+**To undo.** n/a.
+
