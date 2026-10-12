@@ -1,8 +1,8 @@
 // GITHUB-CI: MMTK_PLAN=ConcurrentSpan
 
-//! Finalizers in a concurrent cycle: the contents of finalizable objects are traced during
-//! concurrent marking, and an unreachable finalizable object is resurrected in `FinalMark`
-//! together with what it references.
+//! Finalizers in a concurrent cycle: an unreachable finalizable object is resurrected in
+//! `FinalMark` together with what it references, also when it is reachable from its own fields
+//! (a cycle), which Go's `gcScanFinalizer` would keep alive forever (decision D88).
 
 use super::mock_test_prelude::*;
 use crate::global_state::GcStatus;
@@ -66,14 +66,19 @@ pub fn concurrent_finalizer() {
                 .unwrap();
 
             // ROOT -> a.  `finalizable` -> `child` are unreachable, and `finalizable` has a
-            // finalizer.
+            // finalizer.  So has `cyclic`, in the unreachable cycle `cyclic` <-> `back`.
             let a = alloc(&fixture);
             let finalizable = alloc(&fixture);
             let child = alloc(&fixture);
+            let cyclic = alloc(&fixture);
+            let back = alloc(&fixture);
             let garbage = alloc(&fixture);
             link(finalizable, child);
+            link(cyclic, back);
+            link(back, cyclic);
             ROOT.store(a.to_raw_address().as_usize(), Ordering::SeqCst);
             memory_manager::add_finalizer(mmtk, finalizable);
+            memory_manager::add_finalizer(mmtk, cyclic);
 
             assert!(mmtk.gc_trigger.poll(true, None));
             MockVM::block_for_gc(tls);
@@ -92,14 +97,18 @@ pub fn concurrent_finalizer() {
             }
             assert!(finished, "The concurrent cycle did not finish");
 
-            for object in [a, finalizable, child] {
+            for object in [a, finalizable, child, cyclic, back] {
                 assert!(memory_manager::is_live_object(object), "{object} is dead");
             }
             assert!(!memory_manager::is_live_object(garbage));
-            assert_eq!(
-                memory_manager::get_finalized_object(mmtk),
-                Some(finalizable)
-            );
+            let mut finalized = vec![];
+            while let Some(object) = memory_manager::get_finalized_object(mmtk) {
+                finalized.push(object);
+            }
+            finalized.sort();
+            let mut expected = vec![finalizable, cyclic];
+            expected.sort();
+            assert_eq!(finalized, expected);
         },
         no_cleanup,
     )

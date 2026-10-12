@@ -59,32 +59,14 @@ impl<VM: VMBinding> GCWork<VM> for RaggedFlush {
     }
 }
 
-/// Scan the contents of every finalizable object, without marking the object itself (Go's
-/// `gcScanFinalizer`, `runtime/mgcmark.go:393-493`).  If such an object turns out to be
-/// unreachable at the end of marking, `Finalization` resurrects it in the `FinalMark` pause, and
-/// everything it references is already marked, so the pause does not have to trace from it.
-pub(super) struct ScanFinalizableContents;
+/// Opens the `Concurrent` bucket after `InitialMark` when the pause left no concurrent work, for
+/// example when stacks are scanned in the pause.  The end of marking is detected when the last
+/// GC worker parks with `Concurrent` drained, and without a packet no worker would wake up to
+/// park again.
+pub(super) struct WakeConcurrentWorkers;
 
-impl<VM: VMBinding> GCWork<VM> for ScanFinalizableContents {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        use crate::plan::concurrent::concurrent_marking_work::ConcurrentTraceObjects;
-        use crate::scheduler::WorkBucketStage;
-        let objects = mmtk
-            .finalizable_processor
-            .lock()
-            .unwrap()
-            .candidate_references();
-        for chunk in objects.chunks(crate::scheduler::EDGES_WORK_BUFFER_SIZE) {
-            // "Already marked" makes the packet scan the objects without marking them.
-            worker.add_work(
-                WorkBucketStage::Concurrent,
-                ConcurrentTraceObjects::<VM, ConcurrentSpan<VM>, DEFAULT_TRACE>::new(
-                    chunk.to_vec(),
-                    true,
-                ),
-            );
-        }
-    }
+impl<VM: VMBinding> GCWork<VM> for WakeConcurrentWorkers {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {}
 }
 
 /// The first packet of a `FinalMark` pause (Go's mark termination, `runtime/mgc.go:1066-1156`).
