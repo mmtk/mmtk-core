@@ -379,6 +379,8 @@ impl<VM: VMBinding> SpanSpace<VM> {
     /// (Go: `gcController.resetLive(work.bytesMarked)`). The plan then schedules sweeping with
     /// [`Self::schedule_sweep`], or leaves it to allocators and [`Self::sweep_one`].
     pub fn release_after_mark(&self) {
+        #[cfg(debug_assertions)]
+        self.assert_bytes_marked();
         self.marking.store(false, Ordering::SeqCst);
         let h = self.sweepgen.load(Ordering::Relaxed);
         self.sweepgen.store(h.wrapping_add(2), Ordering::SeqCst);
@@ -998,6 +1000,21 @@ impl<VM: VMBinding> SpanSpace<VM> {
             }
         }
         false
+    }
+
+    /// At the end of marking, `bytes_marked` must be the size of the marked objects.
+    #[cfg(debug_assertions)]
+    fn assert_bytes_marked(&self) {
+        let marked: usize = self
+            .spans
+            .iter_in_use()
+            .map(|(_, span)| span.count_marked() * span.elemsize())
+            .sum();
+        assert_eq!(
+            self.bytes_marked(),
+            marked,
+            "bytes_marked does not match the mark bits at the end of marking"
+        );
     }
 
     /// Every in-use span is swept (`h`) or swept and cached (`h + 3`).
