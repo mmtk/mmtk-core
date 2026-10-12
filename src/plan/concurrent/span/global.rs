@@ -190,6 +190,10 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
             if !leftover.is_empty() {
                 debug!("Dropped {} background sweep packet(s)", leftover.len());
             }
+            // If background sweeping finished without a pause, `Concurrent` is still enabled.
+            // Close it, or the root packets of this pause would run before `Prepare`.  The
+            // scheduler opens it after the pause if it holds work.
+            mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(false);
             mmtk.gc_trigger.policy.on_gc_start(mmtk);
             self.pacing.report_heap_live(self.heap_live_bytes());
             self.pacing.start_cycle();
