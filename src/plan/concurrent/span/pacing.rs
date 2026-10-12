@@ -17,6 +17,12 @@ pub(super) struct Pacing {
     reported_heap_live: AtomicU64,
     /// The origin of the pacer's clock.
     epoch: Instant,
+    /// Root scan work of the current cycle, in bytes, and the values reported to the pacer as
+    /// the scannable stack and globals size (Go's `maxStackScan` and `globalsScan`).
+    stack_scan: AtomicU64,
+    globals_scan: AtomicU64,
+    reported_stack: AtomicU64,
+    reported_globals: AtomicU64,
 }
 
 impl Pacing {
@@ -34,6 +40,10 @@ impl Pacing {
             procs: num_cpus::get(),
             reported_heap_live: AtomicU64::new(0),
             epoch: Instant::now(),
+            stack_scan: AtomicU64::new(0),
+            globals_scan: AtomicU64::new(0),
+            reported_stack: AtomicU64::new(0),
+            reported_globals: AtomicU64::new(0),
         }
     }
 
@@ -58,14 +68,37 @@ impl Pacing {
         self.pacer.heap_live() >= trigger
     }
 
+    /// Report scan work done while marking, in bytes.
+    pub(super) fn add_scan_work(&self, heap: usize, stack: usize, globals: usize) {
+        self.pacer
+            .add_scan_work(heap as i64, stack as i64, globals as i64);
+        if stack != 0 {
+            self.stack_scan.fetch_add(stack as u64, Ordering::Relaxed);
+        }
+        if globals != 0 {
+            self.globals_scan
+                .fetch_add(globals as u64, Ordering::Relaxed);
+        }
+    }
+
     /// A cycle starts (Go: `gcStart`).
     pub(super) fn start_cycle(&self) {
+        self.stack_scan.store(0, Ordering::Relaxed);
+        self.globals_scan.store(0, Ordering::Relaxed);
         self.pacer.start_cycle(self.now(), self.procs, false);
         self.pacer.set_blacken_enabled(true);
     }
 
     /// Marking is done (Go: `gcMarkDone`).
     pub(super) fn end_marking(&self) {
+        // Go keeps the scannable stack size up to date as stacks grow, and the globals size is
+        // the size of the data and BSS segments.  Here both are what this cycle found.
+        let stack = self.stack_scan.load(Ordering::Relaxed);
+        let old = self.reported_stack.swap(stack, Ordering::Relaxed);
+        self.pacer.add_scannable_stack(stack as i64 - old as i64);
+        let globals = self.globals_scan.load(Ordering::Relaxed);
+        let old = self.reported_globals.swap(globals, Ordering::Relaxed);
+        self.pacer.add_globals(globals as i64 - old as i64);
         self.pacer.set_blacken_enabled(false);
         self.pacer.end_cycle(self.now(), self.procs);
     }

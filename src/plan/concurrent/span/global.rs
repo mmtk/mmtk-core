@@ -521,6 +521,14 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentSpan<VM> {
         self.marking_interrupted.store(true, Ordering::SeqCst);
     }
 
+    fn counts_scan_work(&self) -> bool {
+        true
+    }
+
+    fn add_scan_work(&self, heap: usize, stack: usize, globals: usize) {
+        self.pacing.add_scan_work(heap, stack, globals);
+    }
+
     fn soft_references_are_strong(&self) -> bool {
         self.soft_refs_strong.load(Ordering::SeqCst)
     }

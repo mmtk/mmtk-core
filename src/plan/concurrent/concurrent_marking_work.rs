@@ -50,6 +50,9 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let tls = worker.tls;
         let trace = PlanTrace::<P, KIND>::from_mmtk(mmtk);
+        let plan = mmtk.get_plan().concurrent().unwrap();
+        let count_scan_work = plan.counts_scan_work();
+        let mut scan_work = 0;
 
         // These are initial objects.  They may not have been marked.
         let initial_objects = std::mem::take(&mut self.initial_objects);
@@ -74,6 +77,10 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 
         // Loop until the queue is drained.
         while let Some(object) = queue.pop_back() {
+            if count_scan_work {
+                use crate::vm::ObjectModel;
+                scan_work += VM::VMObjectModel::get_current_size(object);
+            }
             scanning_helper::visit_children_non_moving::<VM>(tls, object, &mut |child| {
                 trace.trace_object(worker, child, &mut |enqueued_child| {
                     debug_assert_eq!(enqueued_child, child);
@@ -98,6 +105,10 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
                 };
                 worker.add_work(stage, w);
             }
+        }
+
+        if count_scan_work {
+            plan.add_scan_work(scan_work, 0, 0);
         }
 
         probe!(
@@ -207,6 +218,17 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 
     fn create_and_schedule_root_nodes_work(&mut self, nodes: Vec<ObjectReference>) {
         let mmtk = self.mmtk;
+        let plan = mmtk.get_plan().concurrent().unwrap();
+        if plan.counts_scan_work() {
+            // Approximate root scan work by the size of the root slots.  Roots reported while
+            // marking come from concurrent stack scanning.
+            let bytes = nodes.len() * crate::util::constants::BYTES_IN_ADDRESS;
+            if plan.current_pause().is_none() {
+                plan.add_scan_work(0, bytes, 0);
+            } else {
+                plan.add_scan_work(0, 0, bytes);
+            }
+        }
         let work_packet = ConcurrentTraceObjects::<VM, P, KIND>::new(nodes, false);
         let bucket = &mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent];
         if mmtk

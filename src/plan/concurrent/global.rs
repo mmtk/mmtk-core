@@ -27,6 +27,14 @@ pub trait ConcurrentPlan: Plan {
     }
     /// Called when a mutator is about to stall (see [`ConcurrentPlan::stall_instead_of_pause`]).
     fn on_allocation_stall(&self) {}
+    /// Return `true` if the plan wants [`ConcurrentPlan::add_scan_work`] to be called.
+    fn counts_scan_work(&self) -> bool {
+        false
+    }
+    /// Report scan work done by concurrent marking, in bytes: heap objects scanned, and roots
+    /// found on stacks and elsewhere (Go's `heapScanWork`, `stackScanWork` and
+    /// `globalsScanWork`).  Only called if [`ConcurrentPlan::counts_scan_work`] returns `true`.
+    fn add_scan_work(&self, _heap: usize, _stack: usize, _globals: usize) {}
     /// See [`crate::memory_manager::soft_references_are_strong`].
     fn soft_references_are_strong(&self) -> bool {
         false
