@@ -48,6 +48,7 @@ mod mock_test_concurrent_span_greentea_graph;
 mod mock_test_concurrent_span_greentea_owned;
 mod mock_test_concurrent_span_hybrid_barrier;
 mod mock_test_concurrent_span_object_index;
+mod mock_test_concurrent_span_reuse;
 mod mock_test_concurrent_span_stall;
 #[cfg(feature = "vo_bit")]
 mod mock_test_conservatism;
