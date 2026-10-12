@@ -9,6 +9,7 @@ mod assist;
 pub(crate) mod cpu_limiter;
 pub(in crate::plan) mod gc_work;
 pub(crate) mod global;
+pub(crate) mod greentea;
 pub(in crate::plan) mod mutator;
 // Some of the pacer's inputs (assists, scan work, worker time) are not wired in yet.
 #[allow(dead_code)]

@@ -56,6 +56,12 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 
         // These are initial objects.  They may not have been marked.
         let initial_objects = std::mem::take(&mut self.initial_objects);
+        // The plan may trace them with its own loop.
+        let Some(initial_objects) =
+            plan.trace_objects_concurrently(worker, initial_objects, self.already_marked)
+        else {
+            return;
+        };
         let num_initial_objects = initial_objects.len();
         let mut num_queued_objects = 0;
 

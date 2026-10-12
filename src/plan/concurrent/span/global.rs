@@ -665,6 +665,20 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentSpan<VM> {
         self.soft_refs_strong.load(Ordering::SeqCst)
     }
 
+    fn trace_objects_concurrently(
+        &self,
+        worker: &mut crate::scheduler::GCWorker<VM>,
+        objects: Vec<crate::util::ObjectReference>,
+        already_marked: bool,
+    ) -> Option<Vec<crate::util::ObjectReference>> {
+        // Green Tea span scanning (design §5.12), unless ablated.
+        if !self.span.green_tea() {
+            return Some(objects);
+        }
+        super::greentea::trace_objects(worker, objects, already_marked);
+        None
+    }
+
     fn stall_instead_of_pause(&self) -> bool {
         // Go has no stop-the-world collection: an allocation that cannot be satisfied during
         // marking waits for the cycle (design §5.11).

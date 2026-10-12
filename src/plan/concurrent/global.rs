@@ -1,5 +1,7 @@
 use crate::plan::concurrent::Pause;
 use crate::plan::Plan;
+use crate::scheduler::GCWorker;
+use crate::util::ObjectReference;
 
 /// Trait for a concurrent plan.
 pub trait ConcurrentPlan: Plan {
@@ -38,5 +40,21 @@ pub trait ConcurrentPlan: Plan {
     /// See [`crate::memory_manager::soft_references_are_strong`].
     fn soft_references_are_strong(&self) -> bool {
         false
+    }
+    /// Let the plan trace a packet of concurrent marking work with its own tracing loop, instead
+    /// of the generic one in [`super::concurrent_marking_work::ConcurrentTraceObjects`]: the root
+    /// nodes, barrier buffers and rescans that `ConcurrentTraceObjects` and `ProcessModBufSATB`
+    /// packets carry.  `already_marked` says whether `objects` are marked (and only need
+    /// scanning) or still have to be traced.
+    ///
+    /// Return `None` if the plan has traced the objects, or give them back to use the generic
+    /// loop (the default).
+    fn trace_objects_concurrently(
+        &self,
+        _worker: &mut GCWorker<Self::VM>,
+        objects: Vec<ObjectReference>,
+        _already_marked: bool,
+    ) -> Option<Vec<ObjectReference>> {
+        Some(objects)
     }
 }
