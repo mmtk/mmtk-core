@@ -18,6 +18,10 @@ Decisions made without asking the project lead, so that work could continue. Eac
 | D6 | 2026-10-12 | Scope of the first 12-hour session | Breadth over polish (project lead's answer): go as far as possible through the phases, including phase 4, with less OpenJDK validation per phase. Agents work in parallel git worktrees | Yes | accepted |
 | D7 | 2026-10-12 | Which OpenJDK tree to build | A new fastdebug build in `~/Code/openjdk` (project lead's answer). The existing builds in `~/openjdk` are left alone | Yes | accepted |
 | D8 | 2026-10-12 | The development machine has 8 cores and 125 GB, not 24 cores and 31 GB as engineering §6 says | Keep the 16 GB total. With up to three parallel agents, each build or test uses `MemoryMax=5G` and `-j 3` | Yes | for review |
+| D20 | 2026-10-12 | Which `defaultHeapMinimum` (Go has 4 MiB, or 512 KiB under the `HeapMinimum512KiB` experiment)? | 4 MiB, Go's default | Yes | for review |
+| D21 | 2026-10-12 | How is the pacer shared between mutators, workers and pauses? | All fields atomic (`Relaxed`), all methods `&self`; STW-only methods document their precondition | Yes | for review |
+| D22 | 2026-10-12 | Go's `math/rand` source is not in the reference checkout. How are `TestGcPacer`'s random streams ported? | SplitMix64 with the same seeds and amplitudes | Yes | for review |
+| D23 | 2026-10-12 | The pacer agent's worktree branch was created from `master`, not `mmtk-core-go-gc`, and a hard reset was refused | Work on a new branch `concurrent-span-pacer` created from `mmtk-core-go-gc` in the same worktree; the original worktree branch is left untouched | Yes | for review |
 
 ## D1. Location of the engineering documents
 
@@ -83,3 +87,41 @@ Decisions made without asking the project lead, so that work could continue. Eac
 The limits are guesses with headroom. If a legitimate build or run is killed, raise that cap and record the new value here.
 
 **To undo.** Change engineering §6.
+
+## D20. Default minimum heap
+
+**Question.** Go's `defaultHeapMinimum` (`runtime/mgcpacer.go:59-60`) is 4 MiB, or 512 KiB when the `HeapMinimum512KiB` experiment is on. The `internal/goexperiment` sources are not in the reference checkout.
+
+**Options.** 1. 4 MiB. 2. 512 KiB. 3. An option.
+
+**Decision.** Option 1: the experiment is off by default in Go, and `TestGcPacer`'s `LargeHeapSlowAlloc` checks the runway against this constant.
+
+**To undo.** Change `DEFAULT_HEAP_MINIMUM` in `src/plan/concurrent/span/pacer.rs`, or make it an option.
+
+## D21. Pacer sharing and memory ordering
+
+**Question.** Go's `gcControllerState` mixes atomics with fields only written with the world stopped. MMTk's `GCTriggerPolicy` is shared and its methods take `&self`.
+
+**Options.** 1. Plain fields behind a `Mutex`. 2. Every field atomic, `&self` methods. 3. Go's split: atomics plus `&mut self` for STW methods.
+
+**Decision.** Option 2, with `Relaxed` ordering. `revise` and `update` run on hot allocation paths during marking and must not take a lock; Go documents the races as benign. Methods that Go only calls with the world stopped (`start_cycle`, `end_cycle`, `reset_live`, `commit`) say so, and the caller provides the exclusion. Recorded as deviation PACER-7.
+
+**To undo.** Wrap the pacer in a `Mutex` in the integration, or change `ORD` in `pacer.rs` to `SeqCst`.
+
+## D22. Random streams in the pacer tests
+
+**Question.** `TestGcPacer`'s `random(amp, seed)` streams use Go's `math/rand`, whose generator needs a 607-entry seed table that is not in the reference checkout and cannot be fetched.
+
+**Options.** 1. Reconstruct Go's generator (needs the table, or about 7.8e12 generator steps to recompute it). 2. Use another deterministic generator with the same seeds and amplitudes. 3. Drop the three scenarios that use it.
+
+**Decision.** Option 2 (SplitMix64). The scenarios check statistical bounds, not exact values, and all three pass Go's tolerances. Recorded as deviation TEST-1.
+
+**To undo.** Port Go's `math/rand` `rngSource` into `pacer/tests.rs` once its source is available.
+
+## D23. Branch for the pacer work
+
+**Question.** The worktree for the pacer agent was created on a branch based on `master`, which lacks the design documents. Resetting that branch to `mmtk-core-go-gc` was refused as destructive.
+
+**Decision.** Create a new branch `concurrent-span-pacer` from `mmtk-core-go-gc` in the same worktree and commit there. The original worktree branch had no commits of ours and is left as it was.
+
+**To undo.** Cherry-pick the pacer commits onto any other branch.
