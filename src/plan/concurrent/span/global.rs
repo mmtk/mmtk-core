@@ -72,6 +72,9 @@ pub struct ConcurrentSpan<VM: VMBinding> {
     marking_interrupted: AtomicBool,
     /// The current `FinalMark` pause found work and restarted concurrent marking.
     restarting: AtomicBool,
+    /// This cycle keeps every softly reachable object, and the binding reports soft referents as
+    /// strong slots (design §5.14).  Decided at `InitialMark`.
+    soft_refs_strong: AtomicBool,
     /// Statistics for the current cycle.
     ragged_rounds: AtomicUsize,
     restarts: AtomicUsize,
@@ -217,6 +220,9 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
         };
 
         if cycle_ended {
+            // Soft references are strong until the end of the cycle, including any marking
+            // finished in the `FinalMark` pause.
+            self.soft_refs_strong.store(false, Ordering::SeqCst);
             self.ms.end_of_gc();
             self.common.on_pause_end(tls);
             // TODO: Use the bytes marked once the space counts them.  The space's size after the
@@ -302,6 +308,7 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
             ragged_rounds: AtomicUsize::new(0),
             restarts: AtomicUsize::new(0),
             stalls: AtomicUsize::new(0),
+            soft_refs_strong: AtomicBool::new(false),
             concurrent_stack_scan,
         }
     }
@@ -337,6 +344,12 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
     /// Go's sweep termination pause (`gcStart`, `runtime/mgc.go:835-930`).
     fn schedule_initial_mark(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.set_ref_closure_buckets_enabled(false);
+        // An emergency cycle clears soft references (as Java requires before running out of
+        // memory), so they are discovered as candidates.  Otherwise they are strong.
+        self.soft_refs_strong.store(
+            !self.base().global_state.is_emergency_collection(),
+            Ordering::SeqCst,
+        );
         let stop_mutators = if self.concurrent_stack_scan {
             // Only VM roots are scanned in the pause.  Stacks are scanned during marking.
             StopMutators::<ConcurrentSpanGCWorkContext<VM>>::new_no_scan_mutator_roots()
@@ -414,8 +427,12 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
             use crate::util::reference_processor::{
                 PhantomRefProcessing, RefEnqueue, SoftRefProcessing, WeakRefProcessing,
             };
-            scheduler.work_buckets[WorkBucketStage::SoftRefClosure]
-                .add(SoftRefProcessing::<RefTracePolicy<VM>>::new());
+            // If soft references were strong in this cycle, the binding discovered none, and
+            // their referents have been traced already.
+            if !self.soft_refs_strong.load(Ordering::SeqCst) {
+                scheduler.work_buckets[WorkBucketStage::SoftRefClosure]
+                    .add(SoftRefProcessing::<RefTracePolicy<VM>>::new());
+            }
             scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
                 .add(WeakRefProcessing::<VM>::new());
             scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
@@ -497,6 +514,10 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentSpan<VM> {
         // finishes the marking in the pause.
         self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(false);
         self.marking_interrupted.store(true, Ordering::SeqCst);
+    }
+
+    fn soft_references_are_strong(&self) -> bool {
+        self.soft_refs_strong.load(Ordering::SeqCst)
     }
 
     fn stall_instead_of_pause(&self) -> bool {

@@ -27,4 +27,8 @@ pub trait ConcurrentPlan: Plan {
     }
     /// Called when a mutator is about to stall (see [`ConcurrentPlan::stall_instead_of_pause`]).
     fn on_allocation_stall(&self) {}
+    /// See [`crate::memory_manager::soft_references_are_strong`].
+    fn soft_references_are_strong(&self) -> bool {
+        false
+    }
 }

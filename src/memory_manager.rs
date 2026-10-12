@@ -833,6 +833,20 @@ pub fn add_weak_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference)
     mmtk.reference_processors.add_weak_candidate(reff);
 }
 
+/// Return `true` if the binding should treat soft references as strong references now: when it
+/// scans a soft reference, it should report the referent as an ordinary (strong) slot instead of
+/// calling [`add_soft_candidate`].
+///
+/// A concurrent plan returns `true` during a cycle that has decided to keep every softly
+/// reachable object, so that their referents are traced during concurrent marking and not in
+/// the final pause.  Bindings that do not call this function keep working, but the plan may
+/// then have to trace softly reachable objects in a pause.
+pub fn soft_references_are_strong<VM: VMBinding>(mmtk: &MMTK<VM>) -> bool {
+    mmtk.get_plan()
+        .concurrent()
+        .is_some_and(|plan| plan.soft_references_are_strong())
+}
+
 /// Add a reference to the list of soft references. A binding may
 /// call this either when a weak reference is created, or when a weak reference is traced during GC.
 ///
