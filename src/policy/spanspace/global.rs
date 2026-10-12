@@ -66,6 +66,10 @@ pub struct SpanSpace<VM: VMBinding> {
     /// charged a whole span's free bytes at refill, corrected at uncache, and reset to the bytes
     /// marked at the end of marking.
     heap_live: AtomicIsize,
+    /// Bytes of allocated objects, dead or alive, until a sweep frees them (Go:
+    /// `totalAlloc - totalFree`): charged like `heap_live`, but never reset; sweeping subtracts
+    /// the freed objects instead.  The pacer's memory-limit goal uses it.
+    alloc_bytes: AtomicIsize,
     /// Bytes marked in this space in the current cycle, including allocate-black (Go:
     /// `work.bytesMarked`). Striped by worker to avoid contention.
     bytes_marked: Box<[CachePadded<AtomicUsize>]>,
@@ -297,6 +301,7 @@ impl<VM: VMBinding> SpanSpace<VM> {
             sweepgen: AtomicU32::new(INITIAL_SWEEPGEN),
             marking: AtomicBool::new(false),
             heap_live: AtomicIsize::new(0),
+            alloc_bytes: AtomicIsize::new(0),
             bytes_marked: (0..stripes)
                 .map(|_| CachePadded::new(AtomicUsize::new(0)))
                 .collect(),
@@ -464,6 +469,12 @@ impl<VM: VMBinding> SpanSpace<VM> {
             .iter()
             .map(|c| c.swap(0, Ordering::Relaxed))
             .sum()
+    }
+
+    /// Bytes of allocated objects, dead or alive, not yet freed by sweeping (Go:
+    /// `totalAlloc - totalFree`). See the field doc.
+    pub fn alloc_bytes(&self) -> usize {
+        self.alloc_bytes.load(Ordering::Relaxed).max(0) as usize
     }
 
     /// Live heap bytes in this space as Go's pacer sees it (Go: `heapLive`). See the field doc.
@@ -889,6 +900,12 @@ impl<VM: VMBinding> SpanSpace<VM> {
         let used = span.alloc_count() * span.elemsize();
         self.heap_live
             .fetch_add((span.bytes() - used) as isize, Ordering::Relaxed);
+        // Go's `totalAlloc` counts slots, so the span's tail, which holds no object, is not
+        // charged (`uncache_span` refunds slots only).
+        self.alloc_bytes.fetch_add(
+            ((span.nelems() - span.alloc_count()) * span.elemsize()) as isize,
+            Ordering::Relaxed,
+        );
         Some(span)
     }
 
@@ -898,6 +915,9 @@ impl<VM: VMBinding> SpanSpace<VM> {
         let sg = self.sweepgen.load(Ordering::Acquire);
         let stale = span.sweepgen() == sg.wrapping_add(1);
         debug_assert!(stale || span.sweepgen() == sg.wrapping_add(3));
+        let unused = (span.nelems() - span.alloc_count()) * span.elemsize();
+        self.alloc_bytes
+            .fetch_sub(unused as isize, Ordering::Relaxed);
         if !stale {
             // Refill conservatively counted unallocated slots in heap_live. Undo this. (A stale
             // span was cached before heap_live was recomputed at mark termination.)
@@ -960,6 +980,8 @@ impl<VM: VMBinding> SpanSpace<VM> {
         });
 
         span.sweepgen.store(sg, Ordering::Release);
+        self.alloc_bytes
+            .fetch_sub((nfreed * span.elemsize()) as isize, Ordering::Relaxed);
         if nfreed > 0 {
             span.needzero.store(true, Ordering::Relaxed);
         }
@@ -982,6 +1004,7 @@ impl<VM: VMBinding> SpanSpace<VM> {
     #[cfg(debug_assertions)]
     fn assert_all_swept(&self) {
         let h = self.sweepgen.load(Ordering::Acquire);
+        let mut alloc_bytes = 0;
         for (id, span) in self.spans.iter_in_use() {
             let state = sweep_state(span.sweepgen(), h);
             assert!(
@@ -989,6 +1012,17 @@ impl<VM: VMBinding> SpanSpace<VM> {
                 "span {id} at {} is {state:?} at sweep termination",
                 span.start()
             );
+            // A cached span is charged in full until it is uncached.
+            alloc_bytes += if state == SweepState::Cached {
+                span.nelems() * span.elemsize()
+            } else {
+                span.alloc_count() * span.elemsize()
+            };
         }
+        assert_eq!(
+            self.alloc_bytes.load(Ordering::Relaxed),
+            alloc_bytes as isize,
+            "alloc_bytes does not match the spans at sweep termination"
+        );
     }
 }

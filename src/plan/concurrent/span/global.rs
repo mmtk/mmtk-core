@@ -217,13 +217,20 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
             mmtk.gc_trigger.policy.on_gc_start(mmtk);
             if log::log_enabled!(log::Level::Info) {
                 info!(
-                    "Heap at cycle start: {} of {} MMTk pages reserved, SpanSpace: {} KiB in spans ({} unswept spans), heap_live {} KiB",
+                    "Heap at cycle start: {} of {} MMTk pages reserved, SpanSpace: {} KiB in spans ({} unswept spans), alloc_bytes {} KiB, heap_live {} KiB",
                     self.get_reserved_pages(),
                     self.get_total_pages(),
                     self.span.pages_in_use() * (crate::policy::spanspace::classes::BYTES_IN_SPAN_PAGE >> 10),
                     self.span.count_unswept(),
+                    self.span.alloc_bytes() >> 10,
                     self.heap_live_bytes() >> 10,
                 );
+                let mut spaces = String::new();
+                use crate::plan::HasSpaces;
+                self.for_each_space(&mut |space: &dyn Space<VM>| {
+                    spaces += &format!(" {}={}", space.get_name(), space.reserved_pages());
+                });
+                info!("Reserved pages per space:{}", spaces);
             }
             self.pacing.report_heap_live(self.heap_live_bytes());
             self.pacing.start_cycle();
@@ -443,9 +450,9 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
     /// Tell the pacer how much memory counts against the memory limit, for its memory-limit
     /// heap goal (Go keeps `mappedReady`, `heapFree` and `totalAlloc - totalFree` up to date).
     /// Everything MMTk has reserved is `mappedReady`; the free pages of SpanSpace's page regions
-    /// are `heapFree`; `heap_live`, capped at the bytes in spans, stands in for the object bytes.
-    /// What is left (free slots in spans beyond `heap_live`, and metadata) is non-heap memory to
-    /// Go's pacer.
+    /// are `heapFree`; SpanSpace's allocated bytes (dead objects included until swept, as in Go)
+    /// plus the other spaces' used pages are the object bytes.  The rest (free slots in spans,
+    /// metadata) is non-heap memory to Go's pacer (D24).
     fn report_memory_stats(&self) {
         use crate::policy::spanspace::classes::BYTES_IN_SPAN_PAGE;
         use crate::util::constants::BYTES_IN_PAGE;
@@ -456,7 +463,7 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
         // Like `heap_live_bytes`, the other spaces' pages (large objects, for example) count as
         // heap, as Go's large objects are in heap spans.
         let common = crate::util::conversions::pages_to_bytes(self.common.get_used_pages()) as u64;
-        let heap_alloc = (self.span.heap_live() as u64).min(in_spans) + common;
+        let heap_alloc = (self.span.alloc_bytes() as u64).min(in_spans) + common;
         self.pacing
             .set_memory_stats(mapped_ready, heap_free, heap_alloc);
     }
