@@ -363,6 +363,19 @@ impl<C: GCWorkContext> GCWork<C::VM> for ConcurrentScanStacks<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("ConcurrentScanStacks");
         let factory = C::make_roots_work_factory(mmtk);
+        if mmtk.state.gc_status.load() == crate::global_state::GcStatus::InPause {
+            // A pause interrupted concurrent marking before this packet ran, and it is now
+            // finishing the marking.  The mutators are stopped, so scan them directly: a VM may
+            // not be able to run its concurrent mechanism (e.g. handshakes) during a pause.
+            for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
+                <C::VM as VMBinding>::VMScanning::scan_roots_in_mutator_thread(
+                    worker.tls,
+                    unsafe { &mut *(mutator as *mut _) },
+                    factory.clone(),
+                );
+            }
+            return;
+        }
         <C::VM as VMBinding>::VMScanning::scan_roots_in_mutator_threads_concurrently(
             worker.tls, factory,
         );

@@ -613,6 +613,11 @@ impl crate::vm::Collection<MockVM> for MockVM {
 
     fn flush_mutators_concurrently(_tls: VMWorkerThread) {
         use crate::vm::ActivePlan;
+        assert_ne!(
+            mock_api::singleton().state.gc_status.load(),
+            crate::global_state::GcStatus::InPause,
+            "Concurrent mutator flush in a pause"
+        );
         for mutator in MockVM::mutators() {
             crate::memory_manager::flush_mutator(mutator);
         }
@@ -833,6 +838,13 @@ impl crate::vm::Scanning<MockVM> for MockVM {
         mut factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
     ) {
         use crate::vm::ActivePlan;
+        // A real VM may not be able to scan concurrently in a pause (handshakes need the VM
+        // thread, which runs the pause).
+        assert_ne!(
+            mock_api::singleton().state.gc_status.load(),
+            crate::global_state::GcStatus::InPause,
+            "Concurrent stack scanning in a pause"
+        );
         let tls_list: Vec<VMMutatorThread> = MockVM::mutators().map(|m| m.mutator_tls).collect();
         for tls in tls_list {
             let slots = mock!(mutator_root_slots(tls));

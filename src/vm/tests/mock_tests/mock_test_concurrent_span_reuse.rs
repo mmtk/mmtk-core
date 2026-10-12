@@ -8,7 +8,6 @@
 use super::concurrent_span_util::*;
 use super::mock_test_prelude::*;
 use crate::global_state::GcStatus;
-use crate::plan::ConcurrentPlan;
 use crate::util::{Address, ObjectReference};
 use crate::vm::Collection;
 use std::sync::Mutex;
@@ -54,6 +53,7 @@ fn run_cycle(fixture: &MutatorFixture) {
 }
 
 #[test]
+#[allow(clippy::needless_range_loop)]
 pub fn reuse_partially_live_spans() {
     with_mockvm(
         || -> MockVM {

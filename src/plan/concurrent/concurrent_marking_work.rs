@@ -215,8 +215,11 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 
         // Roots are scanned during InitialMark, or, if the plan scans stacks concurrently,
         // during concurrent marking.
+        // Or in `FinalMark`, when it finishes interrupted marking whose concurrent stack scan
+        // had not run yet.
         debug_assert!(
             pause == Some(Pause::InitialMark)
+                || pause == Some(Pause::FinalMark)
                 || (pause.is_none() && plan.concurrent_work_in_progress()),
             "Concurrent marking only scans roots during InitialMark or concurrent marking ({pause:?})."
         );
@@ -236,18 +239,18 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
             }
         }
         let work_packet = ConcurrentTraceObjects::<VM, P, KIND>::new(nodes, false);
-        let bucket = &mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent];
-        if mmtk
-            .get_plan()
-            .concurrent()
-            .unwrap()
-            .current_pause()
-            .is_none()
-        {
+        match plan.current_pause() {
             // Roots found during concurrent marking can be traced right away.
-            bucket.add(work_packet);
-        } else {
-            bucket.add_no_notify(work_packet);
+            None => mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].add(work_packet),
+            // Roots found while `FinalMark` finishes interrupted marking (e.g. a concurrent stack
+            // scan that had not run yet) are traced in that pause.
+            Some(Pause::FinalMark) => mmtk.scheduler.work_buckets
+                [WorkBucketStage::FinishConcurrentWork]
+                .add_no_notify(work_packet),
+            // `InitialMark`: traced concurrently after the pause.
+            Some(_) => {
+                mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].add_no_notify(work_packet)
+            }
         }
     }
 }

@@ -1,5 +1,6 @@
 use crate::plan::concurrent::barrier::BARRIER_WORK_FLUSHES;
 use crate::plan::concurrent::concurrent_marking_work::ConcurrentMarkingRootsWorkFactory;
+use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::span::global::ConcurrentSpan;
 use crate::plan::tracing::PlanTrace;
 use crate::policy::gc_work::DEFAULT_TRACE;
@@ -46,6 +47,11 @@ impl<VM: VMBinding> GCWork<VM> for RaggedFlush {
             .get_plan()
             .downcast_ref::<ConcurrentSpan<VM>>()
             .unwrap();
+        if plan.current_pause().is_some() {
+            // A pause interrupted marking before this round ran.  The mutators were flushed when
+            // they stopped, and a VM may not be able to flush them concurrently in a pause.
+            return;
+        }
         let before = BARRIER_WORK_FLUSHES.load(Ordering::SeqCst);
         VM::VMCollection::flush_mutators_concurrently(worker.tls);
         let found_work = BARRIER_WORK_FLUSHES.load(Ordering::SeqCst) != before;
