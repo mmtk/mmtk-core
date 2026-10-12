@@ -383,6 +383,10 @@ impl<VM: VMBinding> Mutator<VM> {
                     offset_of!(Allocators<VM>, lisp2)
                         + size_of::<Lisp2Allocator<VM>>() * index as usize
                 }
+                AllocatorSelector::Span(index) => {
+                    offset_of!(Allocators<VM>, span)
+                        + size_of::<SpanAllocator<VM>>() * index as usize
+                }
                 AllocatorSelector::None => panic!("Expect a valid AllocatorSelector, found None"),
             }
     }
@@ -490,6 +494,7 @@ pub(crate) struct ReservedAllocators {
     pub n_immix: u8,
     pub n_lisp2: u8,
     pub n_free_list: u8,
+    pub n_span: u8,
 }
 
 impl ReservedAllocators {
@@ -500,6 +505,7 @@ impl ReservedAllocators {
         n_immix: 0,
         n_lisp2: 0,
         n_free_list: 0,
+        n_span: 0,
     };
     /// check if the number of each allocator is okay. Panics if any allocator exceeds the max number.
     fn validate(&self) {
@@ -527,6 +533,10 @@ impl ReservedAllocators {
         assert!(
             self.n_free_list as usize <= MAX_FREE_LIST_ALLOCATORS,
             "Allocator mapping declared more free list allocators than the max allowed."
+        );
+        assert!(
+            self.n_span as usize <= MAX_SPAN_ALLOCATORS,
+            "Allocator mapping declared more span allocators than the max allowed."
         );
     }
 
