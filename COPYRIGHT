@@ -8,3 +8,17 @@ Except as otherwise noted (below and/or in individual files), MMTk is
 licensed under the Apache License, Version 2.0 <LICENSE-APACHE> or
 <http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
 <LICENSE-MIT> or <http://opensource.org/licenses/MIT>, at your option.
+
+Exceptions:
+
+The following files are derived from the Go runtime (https://go.dev/,
+commit 2c3c1caad2) and are licensed under the BSD-3-Clause licence of the Go
+project. Each file carries the Go copyright notice and licence text in its
+header. They are a port of Go's code and imply no endorsement by Google or the
+Go contributors.
+
+- src/plan/concurrent/span/pacer.rs (from runtime/mgcpacer.go)
+- src/plan/concurrent/span/pacer/tests.rs (from runtime/mgcpacer_test.go and
+  runtime/export_test.go)
+- src/plan/concurrent/span/cpu_limiter.rs (from runtime/mgclimit.go and
+  runtime/mgclimit_test.go)
