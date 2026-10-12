@@ -51,6 +51,7 @@ mod mock_test_concurrent_span_inline_fastpath;
 mod mock_test_concurrent_span_object_index;
 mod mock_test_concurrent_span_reuse;
 mod mock_test_concurrent_span_stall;
+mod mock_test_concurrent_span_stress;
 mod mock_test_concurrent_span_user_cycle;
 mod mock_test_concurrent_span_user_gc;
 #[cfg(feature = "vo_bit")]
