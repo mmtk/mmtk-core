@@ -75,6 +75,7 @@ pub struct ConcurrentSpan<VM: VMBinding> {
     /// Statistics for the current cycle.
     ragged_rounds: AtomicUsize,
     restarts: AtomicUsize,
+    stalls: AtomicUsize,
     /// Mutator stacks are scanned concurrently, not in `InitialMark`.
     concurrent_stack_scan: bool,
 }
@@ -114,9 +115,9 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
             {
                 return true;
             }
-            // TODO: Stall the allocating mutator instead (design §5.11).  Until then, running
-            // out of heap during marking requests `FinalMark`, which finishes the marking in the
-            // pause, as `ConcurrentImmix` does.
+            // The heap is full during marking.  With allocation stalls (the default), the mutator
+            // waits for the cycle to end (`stall_instead_of_pause`).  Without them, this requests
+            // `FinalMark`, which finishes the marking in the pause, as `ConcurrentImmix` does.
             return self.base().collection_required(self, space_full);
         }
 
@@ -223,9 +224,10 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
             self.pacing.end_cycle(self.heap_live_bytes());
             if pause == Pause::FinalMark {
                 info!(
-                    "Concurrent marking done after {} ragged flush round(s) and {} restart(s)",
+                    "Concurrent marking done after {} ragged flush round(s), {} restart(s) and {} allocation stall(s)",
                     self.ragged_rounds.load(Ordering::SeqCst),
-                    self.restarts.load(Ordering::SeqCst)
+                    self.restarts.load(Ordering::SeqCst),
+                    self.stalls.load(Ordering::SeqCst)
                 );
             }
             mmtk.gc_trigger.policy.on_gc_end(mmtk);
@@ -299,6 +301,7 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
             restarting: AtomicBool::new(false),
             ragged_rounds: AtomicUsize::new(0),
             restarts: AtomicUsize::new(0),
+            stalls: AtomicUsize::new(0),
             concurrent_stack_scan,
         }
     }
@@ -435,6 +438,7 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
         self.marking_interrupted.store(false, Ordering::SeqCst);
         self.ragged_rounds.store(0, Ordering::SeqCst);
         self.restarts.store(0, Ordering::SeqCst);
+        self.stalls.store(0, Ordering::SeqCst);
         self.marking.store(true, Ordering::SeqCst);
         self.set_marking_state(true);
         if self.concurrent_stack_scan {
@@ -462,6 +466,12 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
         )
     }
 
+    /// The number of allocation stalls in the current (or last) cycle.
+    #[cfg(test)]
+    pub(crate) fn stall_count(&self) -> usize {
+        self.stalls.load(Ordering::SeqCst)
+    }
+
     /// Called by [`RaggedFlush`] when a round has flushed every mutator.
     pub(super) fn on_ragged_flush_done(&self, found_work: bool) {
         self.ragged_rounds.fetch_add(1, Ordering::SeqCst);
@@ -487,6 +497,25 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentSpan<VM> {
         // finishes the marking in the pause.
         self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(false);
         self.marking_interrupted.store(true, Ordering::SeqCst);
+    }
+
+    fn stall_instead_of_pause(&self) -> bool {
+        // Go has no stop-the-world collection: an allocation that cannot be satisfied during
+        // marking waits for the cycle (design §5.11).
+        *self.base().options.concurrent_span_allocation_stalls
+            && self.marking.load(Ordering::SeqCst)
+    }
+
+    fn on_allocation_stall(&self) {
+        self.stalls.fetch_add(1, Ordering::SeqCst);
+        // The mutator cannot use its CPU, so give it to marking: activate every GC worker.  The
+        // scheduler goes back to `concurrent_threads` at the end of the next pause.
+        let scheduler = &self.common.base.scheduler;
+        let threads = *self.base().options.threads;
+        if scheduler.num_active_workers() < threads {
+            scheduler.set_active_workers(threads);
+            scheduler.work_buckets[WorkBucketStage::Concurrent].notify_all_workers();
+        }
     }
 
     fn on_concurrent_work_drained(&self) -> bool {

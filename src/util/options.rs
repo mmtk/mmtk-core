@@ -1028,6 +1028,10 @@ options! {
     /// ConcurrentSpan: how many times a FinalMark pause may restart concurrent marking in one
     /// cycle.  After that, FinalMark finishes the marking in the pause.  Go has no limit.
     concurrent_span_max_mark_restarts: usize        [always_valid] = 8,
+    /// ConcurrentSpan: when the heap is full during concurrent marking, make the allocating
+    /// mutator wait for the cycle to end (an allocation stall, as in Go and ZGC).  If false, a
+    /// FinalMark pause finishes the marking stop-the-world instead.
+    concurrent_span_allocation_stalls: bool         [always_valid] = true,
     /// Trigger an LXR pause once this many reference-count increments are pending, bounding the
     /// `RCProcessIncs` work a single pause has to do. Each pending increment is one slot the write
     /// barrier recorded, so the limit is roughly "words of reference stores between pauses".

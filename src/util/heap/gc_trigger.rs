@@ -153,6 +153,14 @@ impl<VM: VMBinding> GCTrigger<VM> {
             .policy
             .is_gc_required(space_full, space.map(|s| SpaceStats::new(s)), plan)
         {
+            if let Some(concurrent_plan) = plan.concurrent() {
+                if concurrent_plan.stall_instead_of_pause() {
+                    // Let the concurrent work finish.  The caller blocks for the next pause
+                    // without requesting one.
+                    concurrent_plan.on_allocation_stall();
+                    return true;
+                }
+            }
             info!(
                 "[POLL] {}{} ({}/{} pages)",
                 if let Some(space) = space {

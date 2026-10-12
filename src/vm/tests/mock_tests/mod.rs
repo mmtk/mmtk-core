@@ -39,6 +39,7 @@ mod mock_test_allocator_info;
 mod mock_test_barrier_slow_path_assertion;
 mod mock_test_concurrent_span_cycle;
 mod mock_test_concurrent_span_hybrid_barrier;
+mod mock_test_concurrent_span_stall;
 #[cfg(feature = "vo_bit")]
 mod mock_test_conservatism;
 mod mock_test_debug_get_object_info;
