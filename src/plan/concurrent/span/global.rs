@@ -706,6 +706,10 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentSpan<VM> {
         }
     }
 
+    fn is_marked_in_concurrent_trace(&self, object: crate::util::ObjectReference) -> bool {
+        self.span.in_space(object) && self.span.is_marked_while_marking(object)
+    }
+
     fn counts_scan_work(&self) -> bool {
         true
     }

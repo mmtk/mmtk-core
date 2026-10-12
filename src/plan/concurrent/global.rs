@@ -50,6 +50,12 @@ pub trait ConcurrentPlan: Plan {
     fn completed_cycles(&self) -> usize {
         0
     }
+    /// Return `true` if `object` is known to be marked by the current concurrent trace, so a
+    /// barrier does not need to shade it (Go: the mark-bit check in `wbBufFlush1`).  `false` is
+    /// always safe.
+    fn is_marked_in_concurrent_trace(&self, _object: crate::util::ObjectReference) -> bool {
+        false
+    }
     /// See [`crate::memory_manager::shade_objects`].
     fn shade_objects(&self, _objects: &[crate::util::ObjectReference]) {}
     /// See [`crate::memory_manager::soft_references_are_strong`].

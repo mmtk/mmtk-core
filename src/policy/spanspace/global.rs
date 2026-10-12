@@ -536,6 +536,18 @@ impl<VM: VMBinding> SpanSpace<VM> {
         }
     }
 
+    /// Return `true` if marking is in progress and `object` is already marked.  The barrier uses
+    /// it to drop objects that need no shading (Go: the mark-bit check in `wbBufFlush1`).
+    pub fn is_marked_while_marking(&self, object: ObjectReference) -> bool {
+        if !self.marking.load(Ordering::Acquire) {
+            return false;
+        }
+        let Some(span) = self.span_of(Self::object_start(object)) else {
+            return false;
+        };
+        span.is_marked(span.obj_index(Self::object_start(object)))
+    }
+
     /// Mark an object (design §5.4, Go: `findObject` + `greyobject`): page map → span →
     /// `div_magic` object index → atomic OR of the mark bit. If the object is newly marked, its
     /// size is added to `bytes_marked`, and it is enqueued for scanning unless its span is

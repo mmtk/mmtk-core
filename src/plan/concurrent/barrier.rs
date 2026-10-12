@@ -237,8 +237,15 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         if self.buf.is_empty() {
             return;
         }
-        let objects = std::mem::replace(&mut self.buf, Vec::with_capacity(Self::BUFFER_SIZE));
+        let mut objects = std::mem::replace(&mut self.buf, Vec::with_capacity(Self::BUFFER_SIZE));
         if self.should_create_packets() {
+            // Drop the objects that are already marked, as Go's `wbBufFlush1` does.  Without
+            // this, the flush in a `FinalMark` pause nearly always finds "work" and restarts
+            // marking.
+            objects.retain(|o| !self.plan.is_marked_in_concurrent_trace(*o));
+            if objects.is_empty() {
+                return;
+            }
             BARRIER_WORK_FLUSHES.fetch_add(1, Ordering::SeqCst);
             self.add_work(ProcessModBufSATB::<VM, P, KIND>::new(objects));
         }
