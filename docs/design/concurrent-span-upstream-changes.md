@@ -12,6 +12,12 @@ Update this file in a separate docs-only commit, never in the change's own commi
 |---|---|---|---|---|---|---|---|
 | U1 | Fix nonmoving `MarkSweepSpace` calling `prepare` in release | Bug fix (suspected) | `src/plan/global.rs` | planned | | | `CommonPlan::release_nonmoving_space` calls `self.nonmoving.prepare(_full_heap)` under `marksweep_as_nonmoving` (`src/plan/global.rs:914-915`), where `release` is expected. There is a FIXME nearby, so confirm it is a bug (and add a test) before fixing. Found while writing design §4 |
 | U2 | Allow mocking root slots in MockVM | Test infrastructure | `src/util/test_util/mock_vm/` | committed | `89569a86bf` | | `scan_roots_in_mutator_thread` and `scan_vm_specific_roots` only logged a warning, so no MockVM test could have roots. Adds `mutator_root_slots` and `vm_root_slots` mock methods (the scanning methods take a plan-typed factory and cannot be mocked directly). Test: `mock_test_mock_roots`. Needed for phase 4 (concurrent stack scanning) and useful for every plan |
+| U3 | Let `on_concurrent_work_drained` ask the last parked worker to look again | API improvement | `src/plan/concurrent/global.rs`, `src/scheduler/scheduler.rs` | planned | | | Returns `bool`. Currently inside the port commit "ConcurrentSpan: concurrent marking with Go-style mark termination"; needs splitting out |
+| U4 | Add `Scanning::scan_roots_in_mutator_threads_concurrently`, `Collection::flush_mutators_concurrently` and `ConcurrentScanStacks` | API addition (MEP) | `src/vm/`, `src/scheduler/gc_work.rs` | planned | | | Same port commit as U3. Defaults keep current behaviour |
+| U5 | Allow more than `concurrent_threads` active workers when a pause starts | Bug fix (assertion) | `src/scheduler/scheduler.rs` | planned | | | Inside "mark assists"; any plan that activates extra workers during concurrent work trips the old assertion |
+| U6 | A pause that closes a concurrent cycle is not a new collection attempt | Bug fix | `src/scheduler/gc_work.rs` | planned | | | Inside "Fix false out-of-memory after an allocation stall". Also changes `ConcurrentImmix`'s FinalMark |
+| U7 | `GCTrigger::poll_or_stall` and `ConcurrentPlan::stall_instead_of_pause` | API addition | `src/util/heap/gc_trigger.rs`, `src/policy/space.rs` | planned | | | Allocation stalls for any concurrent plan |
+| U8 | `Collection::block_mutator_until` / `wake_blocked_mutators` | API addition | `src/vm/collection.rs` | planned | | | Used by assists |
 
 ## Details
 
