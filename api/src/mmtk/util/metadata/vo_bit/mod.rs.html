@@ -188,7 +188,7 @@
 <a href=#188 id=188 data-nosnippet>188</a>    start: Address,
 <a href=#189 id=189 data-nosnippet>189</a>    search_limit_bytes: usize,
 <a href=#190 id=190 data-nosnippet>190</a>) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-<a href=#191 id=191 data-nosnippet>191</a>    <span class="kw">if </span>!start.is_mapped() {
+<a href=#191 id=191 data-nosnippet>191</a>    <span class="kw">if </span>!VO_BIT_SIDE_METADATA_SPEC.is_mapped(start) {
 <a href=#192 id=192 data-nosnippet>192</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
 <a href=#193 id=193 data-nosnippet>193</a>    }
 <a href=#194 id=194 data-nosnippet>194</a>
