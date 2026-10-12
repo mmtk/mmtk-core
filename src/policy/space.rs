@@ -95,7 +95,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     // An allocation stall: wait for the concurrent cycle to end, then take the
                     // pages.  This is not a failed allocation attempt, so it does not count
                     // towards running out of memory.
+                    let start = std::time::Instant::now();
                     VM::VMCollection::block_for_gc(VMMutatorThread(tls));
+                    self.get_gc_trigger()
+                        .on_allocation_stall_finished(start.elapsed());
                     false
                 }
             }

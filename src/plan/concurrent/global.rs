@@ -27,6 +27,8 @@ pub trait ConcurrentPlan: Plan {
     }
     /// Called when a mutator is about to stall (see [`ConcurrentPlan::stall_instead_of_pause`]).
     fn on_allocation_stall(&self) {}
+    /// Called when a stalled mutator resumes, with the time it was stalled.
+    fn on_allocation_stall_finished(&self, _duration: std::time::Duration) {}
     /// Return `true` if the plan wants [`ConcurrentPlan::add_scan_work`] to be called.
     fn counts_scan_work(&self) -> bool {
         false

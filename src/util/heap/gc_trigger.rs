@@ -204,6 +204,13 @@ impl<VM: VMBinding> GCTrigger<VM> {
         PollResult::NoCollection
     }
 
+    /// Tell the plan that a mutator stalled by [`GCTrigger::poll_or_stall`] has resumed.
+    pub(crate) fn on_allocation_stall_finished(&self, duration: std::time::Duration) {
+        if let Some(plan) = self.plan().concurrent() {
+            plan.on_allocation_stall_finished(duration);
+        }
+    }
+
     /// For [`crate::scheduler::GCWorkScheduler::on_last_parked`]'s use when the last parked GC
     /// worker is about to go idle with no mutator-requested goal pending: check if we should poll
     /// from a GC worker.

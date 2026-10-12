@@ -8,6 +8,7 @@ use crate::plan::concurrent::span::gc_work::{
 };
 use crate::plan::concurrent::span::mutator::ALLOCATOR_MAPPING;
 use crate::plan::concurrent::span::pacing::Pacing;
+use crate::plan::concurrent::span::stats::SpanStats;
 use crate::plan::concurrent::Pause;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -70,6 +71,8 @@ pub struct ConcurrentSpan<VM: VMBinding> {
     pacing: Pacing,
     /// Mark assists.
     assists: Assists,
+    /// Statistics for the evaluation.
+    stats: SpanStats,
     /// Assists are on, and the binding can block mutators.
     assists_enabled: bool,
     /// Concurrent marking is in progress: from the end of `InitialMark` until a `FinalMark`
@@ -198,6 +201,7 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
             // that bucket closed during the pause: `FinalMarkCheck` decides what to do with them.
             mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(false);
         }
+        self.stats.pause_started();
         info!("{:?} start", pause);
     }
 
@@ -212,7 +216,8 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
                         .schedule_unlog_bits_op(UnlogBitsOperation::BulkSet);
                 }
                 // Sweep termination: finish the previous cycle's sweeping, start a mark epoch.
-                self.span.prepare_initial_mark();
+                let residue = self.span.prepare_initial_mark();
+                self.stats.sweep_residue(residue);
             }
             Pause::FinalMark | Pause::RefCount => unreachable!(),
         }
@@ -283,6 +288,7 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
             }
             mmtk.gc_trigger.policy.on_gc_end(mmtk);
         }
+        self.stats.pause_ended(pause);
         info!("{:?} end", pause);
     }
 
@@ -314,6 +320,7 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
 impl<VM: VMBinding> ConcurrentSpan<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
         let pacing = Pacing::new(&args.options);
+        let stats = SpanStats::new(args.stats);
         let assists_enabled =
             *args.options.concurrent_span_assists && VM::VMCollection::supports_blocking_mutators();
         let satb = *args.options.concurrent_span_satb_barrier;
@@ -361,6 +368,7 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
             previous_pause: Atomic::new(None),
             pacing,
             assists: Assists::default(),
+            stats,
             assists_enabled,
             marking: AtomicBool::new(false),
             mark_done: AtomicBool::new(false),
@@ -447,6 +455,7 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
             // Go: "restart the world and resume concurrent mark".  The barrier stays on, and the
             // scheduler resumes the mutators into the work left in `Concurrent`.
             self.restarts.fetch_add(1, Ordering::SeqCst);
+            self.stats.mark_restart();
             self.mark_done.store(false, Ordering::SeqCst);
             self.restarting.store(true, Ordering::SeqCst);
             info!(
@@ -583,8 +592,12 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
             return;
         }
         match self.assists.start(&self.pacing.pacer, *credit) {
-            AssistOutcome::Paid(bytes) => *credit += bytes,
+            AssistOutcome::Paid(bytes) => {
+                self.stats.assist(false);
+                *credit += bytes
+            }
             AssistOutcome::Park(request, bytes) => {
+                self.stats.assist(true);
                 // Lend the mutator's CPU to marking: activate one more GC worker.
                 let scheduler = &self.common.base.scheduler;
                 let threads = *self.base().options.threads;
@@ -614,6 +627,7 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
     /// Called by [`RaggedFlush`] when a round has flushed every mutator.
     pub(super) fn on_ragged_flush_done(&self, found_work: bool) {
         self.ragged_rounds.fetch_add(1, Ordering::SeqCst);
+        self.stats.ragged_round();
         if !found_work {
             // Go: `gcMarkDoneFlushed == 0`.  When the last worker parks, `collection_required`
             // requests `FinalMark`.
@@ -689,6 +703,7 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentSpan<VM> {
 
     fn on_allocation_stall(&self) {
         self.stalls.fetch_add(1, Ordering::SeqCst);
+        self.stats.stall();
         // The mutator cannot use its CPU, so give it to marking: activate every GC worker.  The
         // scheduler goes back to `concurrent_threads` at the end of the next pause.
         let scheduler = &self.common.base.scheduler;
@@ -697,6 +712,10 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentSpan<VM> {
             scheduler.set_active_workers(threads);
             scheduler.work_buckets[WorkBucketStage::Concurrent].notify_all_workers();
         }
+    }
+
+    fn on_allocation_stall_finished(&self, duration: std::time::Duration) {
+        self.stats.stall_finished(duration);
     }
 
     fn on_concurrent_work_drained(&self) -> bool {

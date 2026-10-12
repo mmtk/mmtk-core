@@ -14,5 +14,6 @@ pub(in crate::plan) mod mutator;
 #[allow(dead_code)]
 pub(crate) mod pacer;
 mod pacing;
+mod stats;
 
 pub use global::ConcurrentSpan;
