@@ -40,6 +40,15 @@ pub fn hybrid_barrier_logs_old_and_new_values() {
         default_setup,
         || {
             let fixture = MutatorFixture::create();
+            if fixture
+                .mutator()
+                .barrier
+                .downcast_ref::<Barrier>()
+                .is_none()
+            {
+                eprintln!("ConcurrentSpan does not use HybridBarrier (SATB option): test skipped");
+                return;
+            }
             let src = alloc(&fixture);
             let old = alloc(&fixture);
             let new = alloc(&fixture);
