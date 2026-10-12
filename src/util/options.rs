@@ -54,6 +54,8 @@ pub enum PlanSelector {
     LXR,
     /// Concurrent non-moving immix using SATB
     ConcurrentImmix,
+    /// A port of Go's garbage collector: concurrent, non-moving mark-sweep over a size-segregated span heap.
+    ConcurrentSpan,
 }
 
 /// MMTk option for perf events

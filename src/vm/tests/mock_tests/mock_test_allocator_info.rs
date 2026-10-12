@@ -54,6 +54,10 @@ pub fn test_allocator_info() {
                         assert!(matches!(allocator_info, AllocatorInfo::Unimplemented))
                     }
                 }
+                // ConcurrentSpan uses a native free list allocator, which has no info yet.
+                PlanSelector::ConcurrentSpan => {
+                    assert!(matches!(allocator_info, AllocatorInfo::Unimplemented))
+                }
                 // We provide no info for a large object allocator
                 PlanSelector::PageProtect => assert!(matches!(allocator_info, AllocatorInfo::None)),
             }
