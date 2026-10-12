@@ -821,7 +821,8 @@ The riscv port has no SATB barrier today, and would need `HybridBarrier` too, so
 | Pointer-free objects in noscan spans, never scanned | On OpenJDK every object is in a scan span | `NoScan` is not used by mmtk-openjdk | Marking does more work than Go for primitive arrays: a queue push and an empty `scan_object` per object |
 | Specials (finalizers, cleanups, weak handles) processed lazily at sweep | MMTk reference and finalizer processing in FinalMark | Java semantics, and MMTk's own mechanism | The same for every MMTk plan compared. FinalMark includes reference processing |
 | Green Tea scans spans through span-tail pointer bitmaps, with SIMD | Green Tea span queues, but `scan_object` per object | OpenJDK describes reference fields per class, not per span | Green Tea's benefit is understated: locality, but no SIMD |
-| Mark bits in `gcBits` arenas; Green Tea inline marks | Same | Faithful | None |
+| Mark bits in `gcBits` arenas, swapped with the alloc bits at sweep; Green Tea inline marks | Fixed per-span mark and alloc bitmaps in the span descriptor; sweep copies marks into the alloc bits and clears the marks (deviation SP1, decision D31). Green Tea inline marks as in Go | Simpler, same invariant (marks cleared per span by sweeping) | None on GC behaviour; slightly more descriptor memory |
+| Heap grows by 64 MiB arenas; radix-tree page allocator over 4 MiB chunks; free pages kept and scavenged | 128 KiB page regions from MMTk's free-list page resource; linear first fit over regions; empty regions returned to MMTk at once (SP2, D30) | MMTk owns the address space and heap accounting; MockVM tests use 1 MiB heaps | Some tail fragmentation per region; RSS tracks live data more closely than Go without its scavenger |
 | 64 MiB `heapArena` with per-arena page maps | Page-map side metadata over MMTk 4 MiB chunks | MMTk owns the address space layout | Negligible |
 | Randomised heap base, fixed arena hints | MMTk VMMap placement | MMTk owns the layout | Negligible |
 
@@ -851,8 +852,8 @@ The riscv port has no SATB barrier today, and would need `HybridBarrier` too, so
 - Allocation stalls: waking stalled mutators only after FinalMark, raising the worker cap while anyone is stalled, and counting completed cycles correctly for out-of-memory.
 
 **Open questions:**
-1. Page resource for 4 MiB `SpanSpace` chunks: `BlockPageResource` with a chunk-sized block, or an aligned `FreeListPageResource`?
-2. Should `GcBits` arenas use MMTk's side-metadata mmapper, or plain `mmap`? This affects memory accounting.
+1. Page resource for 4 MiB `SpanSpace` chunks: `BlockPageResource` with a chunk-sized block, or an aligned `FreeListPageResource`? *Decided (D30): `FreeListPageResource`, 128 KiB page regions.*
+2. Should `GcBits` arenas use MMTk's side-metadata mmapper, or plain `mmap`? This affects memory accounting. *Decided (D31): no arenas; fixed bitmaps in the span descriptor.*
 3. nmethods registered during concurrent marking: with `HybridBarrier`, registration shades their embedded oops (§5.6). With the SATB option, are they always reachable from the snapshot or newly allocated? `ConcurrentImmix` has the same question today.
 4. Can VM roots (OopStorage, class loader data) and VM weak roots be processed concurrently, as Shenandoah does, to shrink the InitialMark and FinalMark pauses further?
 5. Should we go beyond Go and remove the FinalMark pause entirely (§5.2)? It needs thread-local barrier flags flipped by handshake, an epoch change without stopping threads, and concurrent reference processing with a `Reference.get()` barrier.
