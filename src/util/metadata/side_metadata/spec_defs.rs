@@ -110,6 +110,8 @@ define_side_metadata_specs!(
     OVC_MARK = (global: false, log_num_of_bits: 0, log_bytes_in_region: LOG_BYTES_IN_WORD as usize),
     // Block offset vectors by OVC
     OVC_OFFSET_VECTOR = (global: false, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: crate::policy::ovc::forwarding::Block::LOG_BYTES),
+    // SpanSpace page map: a u32 span id per 8 KiB SpanSpace page.
+    SPAN_PAGE_MAP = (global: false, log_num_of_bits: 5, log_bytes_in_region: crate::policy::spanspace::LOG_BYTES_IN_SPAN_PAGE),
 );
 
 #[cfg(test)]

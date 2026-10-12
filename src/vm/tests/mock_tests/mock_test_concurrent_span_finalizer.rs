@@ -6,7 +6,6 @@
 
 use super::mock_test_prelude::*;
 use crate::global_state::GcStatus;
-use crate::plan::concurrent::span::global::FORCE_CONCURRENT_MARKING_FOR_TEST;
 use crate::plan::concurrent::span::ConcurrentSpan;
 use crate::plan::ConcurrentPlan;
 use crate::util::{Address, ObjectReference};
@@ -76,7 +75,6 @@ pub fn concurrent_finalizer() {
             ROOT.store(a.to_raw_address().as_usize(), Ordering::SeqCst);
             memory_manager::add_finalizer(mmtk, finalizable);
 
-            FORCE_CONCURRENT_MARKING_FOR_TEST.store(true, Ordering::SeqCst);
             assert!(mmtk.gc_trigger.poll(true, None));
             MockVM::block_for_gc(tls);
             assert!(plan.concurrent_work_in_progress());

@@ -17,9 +17,9 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::gc_work::DEFAULT_TRACE;
-use crate::policy::marksweepspace::native_ms::MarkSweepSpace;
-use crate::policy::marksweepspace::native_ms::MAX_OBJECT_SIZE;
 use crate::policy::space::Space;
+use crate::policy::spanspace::SpanSpace;
+use crate::policy::spanspace::MAX_OBJECT_SIZE;
 use crate::scheduler::gc_work::{ConcurrentScanStacks, Prepare, Release, StopMutators};
 use crate::scheduler::{GCWorkScheduler, WorkBucketStage};
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -51,12 +51,15 @@ type HybridBarrierType<VM> =
 ///   concurrently.  Otherwise it processes references and releases the heap (Go's mark
 ///   termination).
 ///
-/// `Pause::Full` (stop-the-world) is only used when the space cannot mark concurrently, and
-/// for user-requested collections.
+/// The heap is `SpanSpace`.  Sweeping follows Go: `sweepgen += 2` at the end of marking, then
+/// sweep packets plus lazy sweeping by allocators.
+///
+/// `Pause::Full` (stop-the-world) is only used for user-requested collections, and when
+/// concurrent marking is disabled.
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct ConcurrentSpan<VM: VMBinding> {
     #[space]
-    pub(in crate::plan) ms: MarkSweepSpace<VM>,
+    pub(in crate::plan) span: SpanSpace<VM>,
     #[parent]
     pub common: CommonPlan<VM>,
     current_pause: Atomic<Option<Pause>>,
@@ -83,16 +86,6 @@ pub struct ConcurrentSpan<VM: VMBinding> {
     /// Mutator stacks are scanned concurrently, not in `InitialMark`.
     concurrent_stack_scan: bool,
 }
-
-/// Whether the space can mark concurrently: it must allocate black and must not sweep against
-/// partial marks.  Native `MarkSweepSpace` does neither (design §4, gaps 1 and 2).
-// TODO: This becomes `true` with `SpanSpace`.
-const SPACE_SUPPORTS_CONCURRENT_MARKING: bool = false;
-
-/// Lets a test run concurrent cycles on a space that cannot mark concurrently.  The test must
-/// not allocate while marking.
-#[cfg(test)]
-pub(crate) static FORCE_CONCURRENT_MARKING_FOR_TEST: AtomicBool = AtomicBool::new(false);
 
 /// The plan constraints for `ConcurrentSpan`.
 pub const CONCURRENT_SPAN_CONSTRAINTS: PlanConstraints = PlanConstraints {
@@ -185,7 +178,8 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
         match self.current_pause().unwrap() {
             Pause::Full | Pause::InitialMark => {
                 self.common.prepare(tls, true);
-                self.ms.prepare(true);
+                // Sweep termination: finish the previous cycle's sweeping, start a mark epoch.
+                self.span.prepare_initial_mark();
             }
             Pause::FinalMark | Pause::RefCount => unreachable!(),
         }
@@ -195,7 +189,12 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
         match self.current_pause().unwrap() {
             Pause::Full | Pause::FinalMark => {
                 self.pacing.end_marking();
-                self.ms.release();
+                // Mark termination: sweepgen += 2.  Mutator release (after this) returns and
+                // sweeps the mutators' cached spans; sweep packets sweep the rest.
+                self.span.release_after_mark();
+                // Safety: the plan, and so the space, lives as long as MMTk.
+                let span: &'static SpanSpace<VM> = unsafe { &*(&self.span as *const _) };
+                span.schedule_sweep(WorkBucketStage::Release);
                 self.common.release(tls, true);
             }
             Pause::InitialMark | Pause::RefCount => unreachable!(),
@@ -224,11 +223,8 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
             // Soft references are strong until the end of the cycle, including any marking
             // finished in the `FinalMark` pause.
             self.soft_refs_strong.store(false, Ordering::SeqCst);
-            self.ms.end_of_gc();
             self.common.on_pause_end(tls);
-            // TODO: Use the bytes marked once the space counts them.  The space's size after the
-            // sweep over-counts the live heap by its fragmentation.
-            self.pacing.end_cycle(self.heap_live_bytes());
+            self.pacing.end_cycle(self.heap_marked_bytes());
             if pause == Pause::FinalMark {
                 info!(
                     "Concurrent marking done after {} ragged flush round(s), {} restart(s) and {} allocation stall(s)",
@@ -247,7 +243,7 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
     }
 
     fn get_used_pages(&self) -> usize {
-        self.ms.reserved_pages() + self.common.get_used_pages()
+        self.span.reserved_pages() + self.common.get_used_pages()
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -274,7 +270,7 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
             && VM::VMScanning::supports_concurrent_stack_scanning();
 
         let mut global_side_metadata_specs = SideMetadataContext::new_global_specs(&[]);
-        MarkSweepSpace::<VM>::extend_global_side_metadata_specs(&mut global_side_metadata_specs);
+        SpanSpace::<VM>::extend_global_side_metadata_specs(&mut global_side_metadata_specs);
 
         let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
@@ -292,7 +288,7 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
         scheduler.work_buckets[WorkBucketStage::Compact].set_enabled(false);
 
         ConcurrentSpan {
-            ms: MarkSweepSpace::new(plan_args.get_normal_space_args(
+            span: SpanSpace::new(plan_args.get_normal_space_args(
                 "span",
                 true,
                 false,
@@ -316,21 +312,25 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
 
     /// Return `true` if cycles mark concurrently.
     fn concurrent_marking_supported(&self) -> bool {
-        #[cfg(test)]
-        if FORCE_CONCURRENT_MARKING_FOR_TEST.load(Ordering::SeqCst) {
-            return true;
-        }
-        SPACE_SUPPORTS_CONCURRENT_MARKING
-            && !*self
-                .base()
-                .options
-                .concurrent_span_disable_concurrent_marking
+        !*self
+            .base()
+            .options
+            .concurrent_span_disable_concurrent_marking
     }
 
-    /// The pacer's live heap estimate (Go's `heapLive`), in bytes.
-    // TODO: Count it at span refill, as Go does, once SpanSpace exists.
+    /// The pacer's live heap estimate (Go's `heapLive`), in bytes.  `SpanSpace` charges it at
+    /// span refill, as Go does.  The other spaces (LOS, immortal) count their used pages.
     fn heap_live_bytes(&self) -> u64 {
-        crate::util::conversions::pages_to_bytes(self.get_used_pages()) as u64
+        (self.span.heap_live()
+            + crate::util::conversions::pages_to_bytes(self.common.get_used_pages())) as u64
+    }
+
+    /// The live heap found by the cycle that just ended (Go's `heapMarked`), in bytes: the bytes
+    /// marked in `SpanSpace`, including objects allocated black, plus the other spaces' used
+    /// pages after the release.
+    fn heap_marked_bytes(&self) -> u64 {
+        (self.span.bytes_marked()
+            + crate::util::conversions::pages_to_bytes(self.common.get_used_pages())) as u64
     }
 
     fn set_ref_closure_buckets_enabled(&self, do_closure: bool) {

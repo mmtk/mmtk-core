@@ -5,6 +5,7 @@ use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::marksweepspace::malloc_ms::MallocSpace;
 use crate::policy::marksweepspace::native_ms::MarkSweepSpace;
 use crate::policy::space::Space;
+use crate::policy::spanspace::SpanSpace;
 use crate::util::alloc::LargeObjectAllocator;
 use crate::util::alloc::MallocAllocator;
 use crate::util::alloc::{Allocator, BumpAllocator, ImmixAllocator};
@@ -16,6 +17,7 @@ use crate::MMTK;
 use super::allocator::AllocatorContext;
 use super::FreeListAllocator;
 use super::Lisp2Allocator;
+use super::SpanAllocator;
 
 pub(crate) const MAX_BUMP_ALLOCATORS: usize = 6;
 pub(crate) const MAX_LARGE_OBJECT_ALLOCATORS: usize = 2;
@@ -23,6 +25,7 @@ pub(crate) const MAX_MALLOC_ALLOCATORS: usize = 1;
 pub(crate) const MAX_IMMIX_ALLOCATORS: usize = 2;
 pub(crate) const MAX_FREE_LIST_ALLOCATORS: usize = 2;
 pub(crate) const MAX_LISP2_ALLOCATORS: usize = 1;
+pub(crate) const MAX_SPAN_ALLOCATORS: usize = 2;
 
 // The allocators set owned by each mutator. We provide a fixed number of allocators for each allocator type in the mutator,
 // and each plan will select part of the allocators to use.
@@ -36,6 +39,7 @@ pub struct Allocators<VM: VMBinding> {
     pub immix: [MaybeUninit<ImmixAllocator<VM>>; MAX_IMMIX_ALLOCATORS],
     pub free_list: [MaybeUninit<FreeListAllocator<VM>>; MAX_FREE_LIST_ALLOCATORS],
     pub lisp2: [MaybeUninit<Lisp2Allocator<VM>>; MAX_LISP2_ALLOCATORS],
+    pub span: [MaybeUninit<SpanAllocator<VM>>; MAX_SPAN_ALLOCATORS],
 }
 
 impl<VM: VMBinding> Allocators<VM> {
@@ -53,6 +57,7 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_ref(),
             AllocatorSelector::FreeList(index) => self.free_list[index as usize].assume_init_ref(),
             AllocatorSelector::Lisp2(index) => self.lisp2[index as usize].assume_init_ref(),
+            AllocatorSelector::Span(index) => self.span[index as usize].assume_init_ref(),
             AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
         }
     }
@@ -80,6 +85,7 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_mut(),
             AllocatorSelector::FreeList(index) => self.free_list[index as usize].assume_init_mut(),
             AllocatorSelector::Lisp2(index) => self.lisp2[index as usize].assume_init_mut(),
+            AllocatorSelector::Span(index) => self.span[index as usize].assume_init_mut(),
             AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
         }
     }
@@ -105,6 +111,7 @@ impl<VM: VMBinding> Allocators<VM> {
             immix: unsafe { MaybeUninit::uninit().assume_init() },
             free_list: unsafe { MaybeUninit::uninit().assume_init() },
             lisp2: unsafe { MaybeUninit::uninit().assume_init() },
+            span: unsafe { MaybeUninit::uninit().assume_init() },
         };
         let context = Arc::new(AllocatorContext::new(mmtk));
 
@@ -153,6 +160,13 @@ impl<VM: VMBinding> Allocators<VM> {
                         context.clone(),
                     ));
                 }
+                AllocatorSelector::Span(index) => {
+                    ret.span[index as usize].write(SpanAllocator::new(
+                        mutator_tls.0,
+                        space.downcast_ref::<SpanSpace<VM>>().unwrap(),
+                        context.clone(),
+                    ));
+                }
                 AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
             }
         }
@@ -189,6 +203,8 @@ pub enum AllocatorSelector {
     Lisp2(u8),
     /// Represents a [`crate::util::alloc::free_list_allocator::FreeListAllocator`].
     FreeList(u8),
+    /// Represents a [`crate::util::alloc::span_allocator::SpanAllocator`].
+    Span(u8),
     /// No allocator found.
     #[default]
     None,
@@ -203,6 +219,27 @@ pub enum AllocatorInfo {
     BumpPointer {
         /// The byte offset from the mutator's pointer to the [`crate::util::alloc::bumpallocator::BumpPointer`].
         bump_pointer_offset: usize,
+    },
+    /// This allocator is a [`crate::util::alloc::SpanAllocator`] (a span-based free-cell
+    /// allocator, Go's `mcache`). A fast path looks up the allocator's cached span for the span
+    /// class of the allocation (`size_class << 1 | noscan`, see
+    /// [`crate::policy::spanspace::classes`]), and allocates the object at index
+    /// `freeindex + ctz(alloc_cache)` if `alloc_cache != 0`, the index is below `nelems`, and the
+    /// next index is not a multiple of 64 (Go's `nextFreeFast`). It then updates `alloc_cache`,
+    /// `freeindex` and `alloc_count`. If the span's `needzero` is set, the object must be zeroed.
+    /// Otherwise it calls the slow path.
+    Span {
+        /// The byte offset from the mutator's pointer to the allocator's array of span pointers,
+        /// indexed by span class.
+        spans_offset: usize,
+        /// Offsets of the fields in a span descriptor.
+        alloc_cache_offset: usize,
+        freeindex_offset: usize,
+        nelems_offset: usize,
+        elemsize_offset: usize,
+        start_offset: usize,
+        alloc_count_offset: usize,
+        needzero_offset: usize,
     },
     /// This allocator uses a fastpath, but we haven't implemented it yet.
     // FIXME: Add free-list fast-path
@@ -247,6 +284,20 @@ impl AllocatorInfo {
             }
 
             AllocatorSelector::FreeList(_) => AllocatorInfo::Unimplemented,
+
+            AllocatorSelector::Span(_) => {
+                use crate::policy::spanspace::Span;
+                AllocatorInfo::Span {
+                    spans_offset: base_offset + offset_of!(SpanAllocator<VM>, alloc),
+                    alloc_cache_offset: offset_of!(Span, alloc_cache),
+                    freeindex_offset: offset_of!(Span, freeindex),
+                    nelems_offset: offset_of!(Span, nelems),
+                    elemsize_offset: offset_of!(Span, elemsize),
+                    start_offset: offset_of!(Span, start),
+                    alloc_count_offset: offset_of!(Span, alloc_count),
+                    needzero_offset: offset_of!(Span, needzero),
+                }
+            }
             _ => AllocatorInfo::None,
         }
     }

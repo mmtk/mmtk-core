@@ -5,7 +5,6 @@
 
 use super::mock_test_prelude::*;
 use crate::global_state::GcStatus;
-use crate::plan::concurrent::span::global::FORCE_CONCURRENT_MARKING_FOR_TEST;
 use crate::plan::concurrent::span::ConcurrentSpan;
 use crate::plan::ConcurrentPlan;
 use crate::util::test_util::mock_vm::mock_api;
@@ -77,14 +76,14 @@ pub fn allocation_stall() {
             unsafe { field(a).store(b) };
             ROOT.store(a.to_raw_address().as_usize(), Ordering::SeqCst);
 
-            FORCE_CONCURRENT_MARKING_FOR_TEST.store(true, Ordering::SeqCst);
             assert!(mmtk.gc_trigger.poll(true, None));
             MockVM::block_for_gc(tls);
             assert!(plan().concurrent_work_in_progress());
 
             // Allocate garbage until the heap is full.  The allocation that does not fit stalls
-            // until `FinalMark` has freed memory, and then succeeds.  (On this space, objects
-            // allocated during marking are not black, so they are garbage anyway.)
+            // until `FinalMark` has freed memory, and then succeeds.  Objects allocated during
+            // marking are black, so the garbage allocated before the stall survives this cycle,
+            // and the stalled allocation fits only after the next cycle.
             let mut allocated = 0;
             while plan().stall_count() == 0 && allocated < 64 * MB {
                 alloc(&fixture, 1024);

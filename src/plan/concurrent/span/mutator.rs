@@ -12,7 +12,7 @@ use crate::plan::mutator_context::ReservedAllocators;
 use crate::plan::AllocationSemantics;
 use crate::policy::gc_work::DEFAULT_TRACE;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::alloc::FreeListAllocator;
+use crate::util::alloc::SpanAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use crate::MMTK;
@@ -20,15 +20,13 @@ use enum_map::EnumMap;
 
 type BarrierSemanticsType<VM> = HybridBarrierSemantics<VM, ConcurrentSpan<VM>, DEFAULT_TRACE>;
 
-fn get_freelist_allocator_mut<VM: VMBinding>(
-    mutator: &mut Mutator<VM>,
-) -> &mut FreeListAllocator<VM> {
+fn get_span_allocator_mut<VM: VMBinding>(mutator: &mut Mutator<VM>) -> &mut SpanAllocator<VM> {
     unsafe {
         mutator
             .allocators
             .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::Default])
     }
-    .downcast_mut::<FreeListAllocator<VM>>()
+    .downcast_mut::<SpanAllocator<VM>>()
     .unwrap()
 }
 
@@ -36,7 +34,7 @@ pub fn concurrent_span_mutator_prepare<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     tls: VMWorkerThread,
 ) {
-    get_freelist_allocator_mut::<VM>(mutator).prepare();
+    get_span_allocator_mut::<VM>(mutator).prepare();
     common_prepare_func(mutator, tls);
 }
 
@@ -44,19 +42,21 @@ pub fn concurrent_span_mutator_release<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     tls: VMWorkerThread,
 ) {
-    get_freelist_allocator_mut::<VM>(mutator).release();
+    // Return (and, if stale, sweep) the cached spans. Runs after the plan's release, which
+    // advanced the space's sweepgen.
+    get_span_allocator_mut::<VM>(mutator).release();
     common_release_func(mutator, tls);
 }
 
 pub(in crate::plan) const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
-    n_free_list: 1,
+    n_span: 1,
     ..ReservedAllocators::DEFAULT
 };
 
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationSemantics, AllocatorSelector> = {
         let mut map = create_allocator_mapping(RESERVED_ALLOCATORS, true);
-        map[AllocationSemantics::Default] = AllocatorSelector::FreeList(0);
+        map[AllocationSemantics::Default] = AllocatorSelector::Span(0);
         map
     };
 }
@@ -73,7 +73,7 @@ pub fn create_concurrent_span_mutator<VM: VMBinding>(
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
-            vec.push((AllocatorSelector::FreeList(0), &plan.ms));
+            vec.push((AllocatorSelector::Span(0), &plan.span));
             vec
         }),
         prepare_func: &concurrent_span_mutator_prepare,

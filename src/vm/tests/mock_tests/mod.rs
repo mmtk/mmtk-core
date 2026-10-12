@@ -23,6 +23,7 @@ pub(crate) mod mock_test_prelude {
     pub use crate::vm::*;
 }
 
+mod concurrent_span_util;
 mod mock_test_allocate_align_offset;
 mod mock_test_allocate_no_gc_oom_on_acquire_allow_oom_call;
 mod mock_test_allocate_no_gc_oom_on_acquire_no_oom_call;
@@ -37,9 +38,13 @@ mod mock_test_allocate_with_re_enable_collection;
 mod mock_test_allocate_without_initialize_collection;
 mod mock_test_allocator_info;
 mod mock_test_barrier_slow_path_assertion;
+mod mock_test_concurrent_span_alloc_sweep;
+mod mock_test_concurrent_span_allocate_black;
 mod mock_test_concurrent_span_cycle;
 mod mock_test_concurrent_span_finalizer;
+mod mock_test_concurrent_span_gc_churn;
 mod mock_test_concurrent_span_hybrid_barrier;
+mod mock_test_concurrent_span_object_index;
 mod mock_test_concurrent_span_stall;
 #[cfg(feature = "vo_bit")]
 mod mock_test_conservatism;
