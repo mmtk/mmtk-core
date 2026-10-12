@@ -81,6 +81,10 @@ impl Pacing {
         }
     }
 
+    pub(super) fn now_ns(&self) -> i64 {
+        self.now()
+    }
+
     /// A cycle starts (Go: `gcStart`).
     pub(super) fn start_cycle(&self) {
         self.stack_scan.store(0, Ordering::Relaxed);

@@ -1,6 +1,7 @@
 use crate::plan::barriers::HybridBarrier;
 use crate::plan::concurrent::barrier::HybridBarrierSemantics;
 use crate::plan::concurrent::global::ConcurrentPlan;
+use crate::plan::concurrent::span::assist::{AssistOutcome, Assists};
 use crate::plan::concurrent::span::gc_work::{
     ConcurrentSpanGCWorkContext, ConcurrentSpanSTWGCWorkContext, FinalMarkCheck, RaggedFlush,
     ScanFinalizableContents,
@@ -66,6 +67,10 @@ pub struct ConcurrentSpan<VM: VMBinding> {
     previous_pause: Atomic<Option<Pause>>,
     /// Decides when a cycle starts.
     pacing: Pacing,
+    /// Mark assists.
+    assists: Assists,
+    /// Assists are on, and the binding can block mutators.
+    assists_enabled: bool,
     /// Concurrent marking is in progress: from the end of `InitialMark` until a `FinalMark`
     /// pause decides that marking is done.
     marking: AtomicBool,
@@ -242,10 +247,12 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
             self.pacing.end_cycle(self.heap_marked_bytes());
             if pause == Pause::FinalMark {
                 info!(
-                    "Concurrent marking done after {} ragged flush round(s), {} restart(s) and {} allocation stall(s)",
+                    "Concurrent marking done after {} ragged flush round(s), {} restart(s), {} allocation stall(s), {} assist(s) ({} parked)",
                     self.ragged_rounds.load(Ordering::SeqCst),
                     self.restarts.load(Ordering::SeqCst),
-                    self.stalls.load(Ordering::SeqCst)
+                    self.stalls.load(Ordering::SeqCst),
+                    self.assists.count.load(Ordering::Relaxed),
+                    self.assists.parked_count.load(Ordering::Relaxed),
                 );
             }
             mmtk.gc_trigger.policy.on_gc_end(mmtk);
@@ -281,6 +288,8 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
 impl<VM: VMBinding> ConcurrentSpan<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
         let pacing = Pacing::new(&args.options);
+        let assists_enabled =
+            *args.options.concurrent_span_assists && VM::VMCollection::supports_blocking_mutators();
         let concurrent_stack_scan = !*args.options.concurrent_span_scan_stacks_in_pause
             && VM::VMScanning::supports_concurrent_stack_scanning();
 
@@ -313,6 +322,8 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
             current_pause: Atomic::new(None),
             previous_pause: Atomic::new(None),
             pacing,
+            assists: Assists::default(),
+            assists_enabled,
             marking: AtomicBool::new(false),
             mark_done: AtomicBool::new(false),
             marking_interrupted: AtomicBool::new(false),
@@ -420,6 +431,10 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
 
         // Marking is done.  New barrier flushes go to the `Closure` bucket of this pause.
         self.marking.store(false, Ordering::SeqCst);
+        // Release the parked assists.  They wake up when the pause ends.
+        if self.assists.release_all() {
+            VM::VMCollection::wake_blocked_mutators();
+        }
         self.set_marking_state(false);
         self.schedule_final_mark_release(mmtk.get_plan().base().scheduler.as_ref());
     }
@@ -472,6 +487,7 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
         self.ragged_rounds.store(0, Ordering::SeqCst);
         self.restarts.store(0, Ordering::SeqCst);
         self.stalls.store(0, Ordering::SeqCst);
+        self.assists.reset_stats();
         self.marking.store(true, Ordering::SeqCst);
         self.set_marking_state(true);
         if !*self.base().options.no_finalizer {
@@ -503,10 +519,55 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
         )
     }
 
+    /// The number of assists, and of parked assists, in the current (or last) cycle.
+    #[cfg(test)]
+    pub(crate) fn assist_stats(&self) -> (usize, usize) {
+        (
+            self.assists.count.load(Ordering::Relaxed),
+            self.assists.parked_count.load(Ordering::Relaxed),
+        )
+    }
+
     /// The number of allocation stalls in the current (or last) cycle.
     #[cfg(test)]
     pub(crate) fn stall_count(&self) -> usize {
         self.stalls.load(Ordering::SeqCst)
+    }
+
+    /// A mutator whose allocation credit (`credit`, Go's `gcAssistBytes`) is negative asks to
+    /// assist.  See [`crate::plan::concurrent::span::assist`].
+    pub(super) fn assist(&self, tls: crate::util::VMThread, credit: &mut isize) {
+        if !self.assists_enabled || !self.marking.load(Ordering::SeqCst) {
+            *credit = 0;
+            return;
+        }
+        match self.assists.start(&self.pacing.pacer, *credit) {
+            AssistOutcome::Paid(bytes) => *credit += bytes,
+            AssistOutcome::Park(request, bytes) => {
+                // Lend the mutator's CPU to marking: activate one more GC worker.
+                let scheduler = &self.common.base.scheduler;
+                let threads = *self.base().options.threads;
+                let active = scheduler.num_active_workers();
+                if active < threads {
+                    scheduler.set_active_workers(active + 1);
+                    scheduler.work_buckets[WorkBucketStage::Concurrent].notify_all_workers();
+                }
+                let start = self.pacing.now_ns();
+                VM::VMCollection::block_mutator_until(crate::util::VMMutatorThread(tls), &|| {
+                    request.is_done() || !self.marking.load(Ordering::SeqCst)
+                });
+                self.assists.unparked();
+                // Stage A counts the time parked as assist time.
+                self.pacing
+                    .pacer
+                    .add_assist_time(self.pacing.now_ns() - start);
+                *credit = if self.marking.load(Ordering::SeqCst) {
+                    *credit + bytes
+                } else {
+                    0
+                };
+            }
+        }
     }
 
     /// Called by [`RaggedFlush`] when a round has flushed every mutator.
@@ -545,6 +606,14 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentSpan<VM> {
 
     fn add_scan_work(&self, heap: usize, stack: usize, globals: usize) {
         self.pacing.add_scan_work(heap, stack, globals);
+        // Pay the parked assists, or add to the background credit (Go: `gcFlushBgCredit`).
+        let work = (heap + stack + globals) as i64;
+        if work > 0
+            && self.assists_enabled
+            && self.assists.flush_bg_credit(&self.pacing.pacer, work)
+        {
+            VM::VMCollection::wake_blocked_mutators();
+        }
     }
 
     fn soft_references_are_strong(&self) -> bool {
@@ -554,8 +623,11 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentSpan<VM> {
     fn stall_instead_of_pause(&self) -> bool {
         // Go has no stop-the-world collection: an allocation that cannot be satisfied during
         // marking waits for the cycle (design §5.11).
+        // Once marking is done, the collection a mutator needs is `FinalMark` itself, so it
+        // requests it instead.
         *self.base().options.concurrent_span_allocation_stalls
             && self.marking.load(Ordering::SeqCst)
+            && !self.mark_done.load(Ordering::SeqCst)
     }
 
     fn on_allocation_stall(&self) {
@@ -582,6 +654,10 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentSpan<VM> {
                 VM::VMCollection::concurrent_work_finished_no_pause();
             }
             return false;
+        }
+        // No work is left to pay the parked assists with (Go: `gcMarkDone` wakes all assists).
+        if self.assists.release_all() {
+            VM::VMCollection::wake_blocked_mutators();
         }
         if self.mark_done.load(Ordering::SeqCst) {
             return false;

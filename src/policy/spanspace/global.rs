@@ -33,6 +33,12 @@ use std::sync::{Arc, OnceLock};
 /// must not block for GC: `GCTrigger::poll` only requests a collection.
 pub type RefillHook = Box<dyn Fn(VMThread, usize) + Send + Sync>;
 
+/// Called by an allocator whose assist credit (Go's `gcAssistBytes`) is negative, at the start
+/// of its slow path, with the credit.  The hook may block the mutator (a mark assist) and should
+/// update the credit.  Nothing is cached or locked when it is called, so a GC pause can happen
+/// while it blocks.
+pub type AssistHook = Box<dyn Fn(VMThread, &mut isize) + Send + Sync>;
+
 /// The number of stripes of the `bytes_marked` counter.
 const BYTES_MARKED_STRIPES: usize = 32;
 
@@ -67,6 +73,7 @@ pub struct SpanSpace<VM: VMBinding> {
     /// Pages swept by the last `prepare_initial_mark` (sweep termination residue).
     last_sweep_residue_pages: AtomicUsize,
     refill_hook: OnceLock<RefillHook>,
+    assist_hook: OnceLock<AssistHook>,
 }
 
 impl<VM: VMBinding> SFT for SpanSpace<VM> {
@@ -267,6 +274,7 @@ impl<VM: VMBinding> SpanSpace<VM> {
             pages_swept: AtomicUsize::new(0),
             last_sweep_residue_pages: AtomicUsize::new(0),
             refill_hook: OnceLock::new(),
+            assist_hook: OnceLock::new(),
         }
     }
 
@@ -425,6 +433,22 @@ impl<VM: VMBinding> SpanSpace<VM> {
     pub fn set_refill_hook(&self, hook: RefillHook) {
         if self.refill_hook.set(hook).is_err() {
             panic!("SpanSpace refill hook already set");
+        }
+    }
+
+    /// Install the assist hook (see [`AssistHook`]) unless one is installed already.
+    pub fn set_assist_hook_once(&self, hook: impl FnOnce() -> AssistHook) {
+        self.assist_hook.get_or_init(hook);
+    }
+
+    /// Whether objects are being allocated black, i.e. marking is in progress.
+    pub(crate) fn is_marking(&self) -> bool {
+        self.should_allocate_as_live()
+    }
+
+    pub(crate) fn call_assist_hook(&self, tls: VMThread, credit: &mut isize) {
+        if let Some(hook) = self.assist_hook.get() {
+            hook(tls, credit);
         }
     }
 

@@ -40,6 +40,7 @@ mod mock_test_allocator_info;
 mod mock_test_barrier_slow_path_assertion;
 mod mock_test_concurrent_span_alloc_sweep;
 mod mock_test_concurrent_span_allocate_black;
+mod mock_test_concurrent_span_assist;
 mod mock_test_concurrent_span_cycle;
 mod mock_test_concurrent_span_finalizer;
 mod mock_test_concurrent_span_gc_churn;

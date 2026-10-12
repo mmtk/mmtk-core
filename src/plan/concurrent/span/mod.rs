@@ -3,6 +3,7 @@
 //! The design is in `docs/design/go-gc-port.md`.  The plan is named after the space it is built
 //! on (`SpanSpace`), the same way `ConcurrentImmix` is named after `ImmixSpace`.
 
+mod assist;
 // The CPU limiter is not wired into the plan yet.
 #[allow(dead_code)]
 pub(crate) mod cpu_limiter;

@@ -69,6 +69,8 @@ pub fn create_concurrent_span_mutator<VM: VMBinding>(
         .get_plan()
         .downcast_ref::<ConcurrentSpan<VM>>()
         .unwrap();
+    plan.span
+        .set_assist_hook_once(|| Box::new(move |tls, credit| plan.assist(tls, credit)));
     let config = MutatorConfig {
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({

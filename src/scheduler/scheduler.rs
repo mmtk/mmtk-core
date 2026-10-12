@@ -764,10 +764,15 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.state.gc_status.set_in_pause();
-        // The number of active workers should be either the configured number of threads or the configured number of concurrent threads.
+        // The number of active workers should be between the configured number of concurrent
+        // threads and the configured number of threads.  A concurrent plan may activate more
+        // than `concurrent_threads` workers during concurrent work, e.g. for mark assists.
+        let active = mmtk.scheduler.num_active_workers();
         assert!(
-            mmtk.scheduler.num_active_workers() == *mmtk.options.threads
-                || mmtk.scheduler.num_active_workers() == *mmtk.options.concurrent_threads
+            active == *mmtk.options.threads
+                || (active >= (*mmtk.options.concurrent_threads).min(*mmtk.options.threads)
+                    && active <= *mmtk.options.threads),
+            "Unexpected number of active workers: {active}"
         );
         // Pause started, use all GC threads.
         mmtk.scheduler.set_active_workers(*mmtk.options.threads);

@@ -36,6 +36,9 @@ pub struct SpanAllocator<VM: VMBinding> {
     noscan: bool,
     space: &'static SpanSpace<VM>,
     context: Arc<AllocatorContext<VM>>,
+    /// Go's `gcAssistBytes`: allocation credit during marking, in bytes.  Refills debit it; a
+    /// negative value means the mutator owes mark work (an assist).
+    pub(crate) assist_credit: isize,
 }
 
 impl<VM: VMBinding> Allocator<VM> for SpanAllocator<VM> {
@@ -70,6 +73,12 @@ impl<VM: VMBinding> Allocator<VM> for SpanAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
+        if self.assist_credit < 0 {
+            // Go: `deductAssistCredit` in `mallocgc`.  Done before touching any span, because
+            // the assist may block through a GC pause.
+            self.space
+                .call_assist_hook(self.tls, &mut self.assist_credit);
+        }
         let (spc, pad) = self.span_class(size, align, offset);
         match self.next_free(spc) {
             Some(cell) => Self::align_in_cell(cell, align, offset, pad),
@@ -94,6 +103,7 @@ impl<VM: VMBinding> SpanAllocator<VM> {
             noscan: false,
             space,
             context,
+            assist_credit: 0,
         }
     }
 
@@ -195,6 +205,9 @@ impl<VM: VMBinding> SpanAllocator<VM> {
         // The trigger point (Go checks the GC trigger after a refill), and later the assist
         // debit point.
         let charged = s.bytes() - s.alloc_count() * s.elemsize();
+        if self.space.is_marking() {
+            self.assist_credit -= charged as isize;
+        }
         self.space.call_refill_hook(self.tls, charged);
         true
     }
@@ -215,7 +228,11 @@ impl<VM: VMBinding> SpanAllocator<VM> {
     /// Called at the start of a GC (`Prepare`). Go does not flush mcaches when marking starts:
     /// objects in cached spans are marked like any others, and the spans stay cached (at
     /// `h + 3`). This does nothing.
-    pub fn prepare(&mut self) {}
+    pub fn prepare(&mut self) {
+        // Go: `gcResetMarkState` zeroes every goroutine's `gcAssistBytes` at the start of a
+        // cycle.
+        self.assist_credit = 0;
+    }
 
     /// Called when a GC releases mutators, after [`SpanSpace::release_after_mark`] (Go: every
     /// P's `mcache.prepareForSweep` after mark termination). Returns and sweeps every cached

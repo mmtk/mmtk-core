@@ -308,6 +308,9 @@ pub struct MockVM {
     /// `flush_mutators_concurrently`.  MockVM does not stop the mutator, so a test must not run
     /// the mutator at the same time.
     pub supports_concurrent_mutator_flush: MockMethod<(), bool>,
+    /// Whether MockVM can block mutators (`block_mutator_until`).  A blocked mutator parks for
+    /// any pause that is requested meanwhile, like `block_for_gc`.
+    pub supports_blocking_mutators: MockMethod<(), bool>,
     pub notify_initial_thread_scan_complete: MockMethod<(bool, VMWorkerThread), ()>,
     pub supports_return_barrier: MockMethod<(), bool>,
     pub prepare_for_roots_re_scanning: MockMethod<(), ()>,
@@ -498,6 +501,7 @@ impl Default for MockVM {
             vm_root_slots: MockMethod::new_fixed(Box::new(|_| vec![])),
             supports_concurrent_stack_scanning: MockMethod::new_fixed(Box::new(|_| false)),
             supports_concurrent_mutator_flush: MockMethod::new_fixed(Box::new(|_| false)),
+            supports_blocking_mutators: MockMethod::new_fixed(Box::new(|_| false)),
             notify_initial_thread_scan_complete: MockMethod::new_fixed(Box::new(|(_, _)| {})),
             supports_return_barrier: MockMethod::new_unimplemented(),
             prepare_for_roots_re_scanning: MockMethod::new_fixed(Box::new(|_| {
@@ -584,6 +588,23 @@ impl crate::vm::Collection<MockVM> for MockVM {
 
     fn resume_mutators(tls: VMWorkerThread) {
         mock!(resume_mutators(tls))
+    }
+
+    fn supports_blocking_mutators() -> bool {
+        mock!(supports_blocking_mutators())
+    }
+
+    fn block_mutator_until(tls: VMMutatorThread, unblocked: &dyn Fn() -> bool) {
+        // MockVM mutators only stop for a pause in `block_for_gc`, so park there whenever a pause
+        // is requested.
+        while !unblocked() {
+            let status = mock_api::singleton().state.gc_status.load();
+            if status == crate::global_state::GcStatus::PauseRequested {
+                MockVM::block_for_gc(tls);
+            } else {
+                std::thread::sleep(std::time::Duration::from_micros(50));
+            }
+        }
     }
 
     fn supports_concurrent_mutator_flush() -> bool {
