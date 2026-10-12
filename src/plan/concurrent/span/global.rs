@@ -163,6 +163,13 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
         // started by the preceding `InitialMark` pause.
         if pause != Pause::FinalMark {
             debug_assert!(!self.marking.load(Ordering::SeqCst));
+            // This pause may have interrupted background sweeping.  `prepare_initial_mark`
+            // sweeps what is left in the pause (Go's sweep termination), so drop the packets.
+            let leftover =
+                mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].drain_all_packets();
+            if !leftover.is_empty() {
+                debug!("Dropped {} background sweep packet(s)", leftover.len());
+            }
             mmtk.gc_trigger.policy.on_gc_start(mmtk);
             self.pacing.report_heap_live(self.heap_live_bytes());
             self.pacing.start_cycle();
@@ -186,7 +193,8 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        match self.current_pause().unwrap() {
+        let pause = self.current_pause().unwrap();
+        match pause {
             Pause::Full | Pause::FinalMark => {
                 self.pacing.end_marking();
                 // Mark termination: sweepgen += 2.  Mutator release (after this) returns and
@@ -194,7 +202,14 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
                 self.span.release_after_mark();
                 // Safety: the plan, and so the space, lives as long as MMTk.
                 let span: &'static SpanSpace<VM> = unsafe { &*(&self.span as *const _) };
-                span.schedule_sweep(WorkBucketStage::Release);
+                // After `FinalMark`, Go's background sweeper runs concurrently with the
+                // mutators (design §5.5).  VO bits must be cleared in a pause.
+                let sweep_stage = if pause == Pause::FinalMark && !cfg!(feature = "vo_bit") {
+                    WorkBucketStage::Concurrent
+                } else {
+                    WorkBucketStage::Release
+                };
+                span.schedule_sweep(sweep_stage);
                 self.common.release(tls, true);
             }
             Pause::InitialMark | Pause::RefCount => unreachable!(),
@@ -515,10 +530,13 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentSpan<VM> {
     }
 
     fn on_concurrent_work_interrupted(&self) {
-        // A pause was requested during concurrent marking (the heap is full).  `FinalMark`
-        // finishes the marking in the pause.
         self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(false);
-        self.marking_interrupted.store(true, Ordering::SeqCst);
+        if self.marking.load(Ordering::SeqCst) {
+            // A pause was requested during concurrent marking (the heap is full and allocation
+            // stalls are off).  `FinalMark` finishes the marking in the pause.
+            self.marking_interrupted.store(true, Ordering::SeqCst);
+        }
+        // Otherwise background sweeping was interrupted by a new cycle.
     }
 
     fn counts_scan_work(&self) -> bool {
@@ -553,7 +571,19 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentSpan<VM> {
     }
 
     fn on_concurrent_work_drained(&self) -> bool {
-        if !self.marking.load(Ordering::SeqCst) || self.mark_done.load(Ordering::SeqCst) {
+        if !self.marking.load(Ordering::SeqCst) {
+            // Background sweeping is done.  Leave the concurrent phase without a pause.
+            if self
+                .base()
+                .global_state
+                .gc_status
+                .set_concurrent_gc_finished()
+            {
+                VM::VMCollection::concurrent_work_finished_no_pause();
+            }
+            return false;
+        }
+        if self.mark_done.load(Ordering::SeqCst) {
             return false;
         }
         if VM::VMCollection::supports_concurrent_mutator_flush() {

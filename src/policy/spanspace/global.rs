@@ -350,7 +350,16 @@ impl<VM: VMBinding> SpanSpace<VM> {
                 }) as _
             })
             .collect();
-        self.scheduler.work_buckets[stage].bulk_add(packets);
+        let bucket = &self.scheduler.work_buckets[stage];
+        if bucket.is_enabled() {
+            bucket.bulk_add(packets);
+        } else {
+            // For example `Concurrent` during a pause.  The scheduler enables it when the pause
+            // ends, because it is not empty.
+            for packet in packets {
+                bucket.add_boxed_no_notify(packet);
+            }
+        }
     }
 
     /// Whether any span is waiting to be swept by a sweeper (spans in the central unswept sets).
