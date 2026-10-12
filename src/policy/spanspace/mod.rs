@@ -15,6 +15,9 @@
 //! - **Central.** Per span class, partial/full × swept/unswept span sets ([`central`]).
 //! - **Allocation.** [`crate::util::alloc::SpanAllocator`] is Go's `mcache`: one cached span per
 //!   span class and a count-trailing-zeros fast path over the span's `alloc_cache`.
+//! - **Green Tea.** While marking concurrently, small objects' spans are queued and scanned
+//!   span-at-a-time ([`span_queue`], design §5.12), unless the option `concurrent_span_green_tea`
+//!   is off.
 //! - **Mark bits and sweeping.** Marks are set per object in the span's mark bitmap. Sweeping
 //!   turns the mark bits into the alloc bits and clears the mark bits, so marks are never cleared
 //!   at Prepare. Sweeping follows Go's `sweepgen` protocol ([`sweep`]), so allocators, sweep
@@ -26,7 +29,7 @@
 //! | When | Call |
 //! |---|---|
 //! | Pause that starts marking (Prepare) | [`SpanSpace::prepare_initial_mark`] |
-//! | While marking | [`SpanSpace::trace_object`]; `set_allocate_as_live(true)` for concurrent marking |
+//! | While marking | [`SpanSpace::trace_object`], or [`SpanSpace::trace_object_for_span_queue`] and [`SpanSpace::scan_span`] (Green Tea); `set_allocate_as_live(true)` for concurrent marking |
 //! | Pause that ends marking (Release) | `set_allocate_as_live(false)`, [`SpanSpace::release_after_mark`], then [`SpanSpace::schedule_sweep`] |
 //! | Mutator release (after the plan's release) | [`crate::util::alloc::SpanAllocator::release`] |
 //! | Before triggering a cycle | [`SpanSpace::has_unswept`], [`SpanSpace::sweep_one`] |
@@ -50,13 +53,16 @@ pub mod pages;
 #[allow(clippy::all, dead_code)]
 pub mod sizeclasses;
 pub mod span;
+pub mod span_queue;
 pub mod sweep;
 
 pub use classes::{SpanClass, BYTES_IN_SPAN_PAGE, LOG_BYTES_IN_SPAN_PAGE, NUM_SPAN_CLASSES};
 #[allow(unused_imports)]
-pub use global::{RefillHook, SpanSpace};
+pub use global::{RefillHook, SpanQueueTrace, SpanSpace};
 pub use sizeclasses::MAX_SMALL_SIZE;
 pub use span::Span;
+#[allow(unused_imports)]
+pub use span_queue::SpanWork;
 
 /// The largest object `SpanSpace` allocates (Go's `maxSmallSize`). Larger objects go to the LOS.
 pub const MAX_OBJECT_SIZE: usize = MAX_SMALL_SIZE;

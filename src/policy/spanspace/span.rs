@@ -76,6 +76,18 @@ pub struct Span {
     pub(crate) alloc_bits: [AtomicU64; BITMAP_WORDS],
     /// One bit per object: marked in the current cycle (Go: `gcmarkBits`).
     pub(crate) mark_bits: [AtomicU64; BITMAP_WORDS],
+    /// Green Tea span scanning (see [`super::span_queue`]): one bit per object, set once the
+    /// object has been scanned, or will be scanned through the object queue, or was allocated
+    /// black (Go: `spanInlineMarkBits.scans`). Only used by spans of [`SpanClass::uses_span_queue`]
+    /// classes, which hold at most [`SPAN_QUEUE_MAX_OBJS`] objects.
+    pub(crate) scan_bits: [AtomicU64; SPAN_QUEUE_BITMAP_WORDS],
+    /// Green Tea: whether a GC worker owns the span for scanning, and how many objects were
+    /// marked since (Go: `spanInlineMarkBits.owned`).
+    pub(crate) owned: AtomicU8,
+    /// An object of this span was allocated with padding inside its cell (an allocation offset),
+    /// so object references cannot be computed from object indices. Such spans do not use the
+    /// span queue. Never set by OpenJDK or Go-like allocation.
+    pub(crate) padded: AtomicBool,
 }
 
 impl Default for Span {
@@ -102,6 +114,9 @@ impl Span {
             needzero: AtomicBool::new(false),
             alloc_bits: [const { AtomicU64::new(0) }; BITMAP_WORDS],
             mark_bits: [const { AtomicU64::new(0) }; BITMAP_WORDS],
+            scan_bits: [const { AtomicU64::new(0) }; SPAN_QUEUE_BITMAP_WORDS],
+            owned: AtomicU8::new(0),
+            padded: AtomicBool::new(false),
         }
     }
 
@@ -123,6 +138,12 @@ impl Span {
             self.alloc_bits[w].store(0, Relaxed);
             self.mark_bits[w].store(0, Relaxed);
         }
+        for w in &self.scan_bits {
+            w.store(0, Relaxed);
+        }
+        debug_assert_eq!(self.owned.load(Relaxed), 0);
+        self.owned.store(0, Relaxed);
+        self.padded.store(false, Relaxed);
         self.refill_alloc_cache(0);
         self.sweepgen.store(sweepgen, Relaxed);
         self.state.store(SpanState::InUse as u8, Release);
@@ -345,6 +366,17 @@ impl Span {
         for w in 0..BITMAP_WORDS {
             let mark = self.mark_bits[w].swap(0, Relaxed);
             self.alloc_bits[w].store(mark, Relaxed);
+        }
+        // Green Tea: no span may still be queued, and the scan bits start the next cycle clear
+        // (Go clears the inline mark bits in `moveInlineMarks`).
+        assert_eq!(
+            self.owned.load(Relaxed),
+            0,
+            "SpanSpace sweep: span {} is still owned for scanning",
+            self.start()
+        );
+        for w in &self.scan_bits {
+            w.store(0, Relaxed);
         }
         self.refill_alloc_cache(0);
         (nalloc, nfreed)

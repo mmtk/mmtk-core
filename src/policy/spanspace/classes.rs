@@ -18,6 +18,17 @@ pub const NUM_SPAN_CLASSES: usize = NUM_SIZE_CLASSES << 1;
 /// Words in a per-span bitmap (alloc bits or mark bits): one bit per object.
 pub const BITMAP_WORDS: usize = MAX_OBJS_PER_SPAN.div_ceil(64);
 
+/// The smallest object size whose spans use Green Tea's span queue (Go:
+/// `gcUsesSpanInlineMarkBits`, `size >= 16`).
+pub const SPAN_QUEUE_MIN_SIZE: usize = 16;
+/// The largest object size whose spans use Green Tea's span queue (Go: `heapBitsInSpan`,
+/// `minSizeForMallocHeader` = 512 B on 64-bit). These classes have one-page spans.
+pub const SPAN_QUEUE_MAX_SIZE: usize = 512;
+/// The most objects in a span that uses the span queue.
+pub const SPAN_QUEUE_MAX_OBJS: usize = BYTES_IN_SPAN_PAGE / SPAN_QUEUE_MIN_SIZE;
+/// Words in a span's scan bitmap (Green Tea).
+pub const SPAN_QUEUE_BITMAP_WORDS: usize = SPAN_QUEUE_MAX_OBJS.div_ceil(64);
+
 /// A span class: `size_class << 1 | noscan` (Go's `spanClass`, `runtime/mheap.go:573-592`).
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SpanClass(pub u8);
@@ -57,6 +68,14 @@ impl SpanClass {
     /// inline mark bits).
     pub const fn nelems(self) -> usize {
         (self.npages() << LOG_BYTES_IN_SPAN_PAGE) / self.elem_size()
+    }
+
+    /// Whether spans of this class are scanned span-at-a-time by Green Tea (Go:
+    /// `gcUsesSpanInlineMarkBits`, restricted to scan spans, since noscan spans are never
+    /// scanned). These are the one-page spans of 16-512 B objects.
+    pub const fn uses_span_queue(self) -> bool {
+        let size = self.elem_size();
+        !self.noscan() && size >= SPAN_QUEUE_MIN_SIZE && size <= SPAN_QUEUE_MAX_SIZE
     }
 
     /// The divide magic for this class (Go: `gc.SizeClassToDivMagic`).
@@ -187,6 +206,24 @@ mod tests {
         }
         assert_eq!(size_to_class_aligned(MAX_SMALL_SIZE + 1, 8), None);
         assert_eq!(size_to_class_aligned(16, 16384), None);
+    }
+
+    #[test]
+    fn span_queue_classes_are_one_page() {
+        for class in 1..NUM_SIZE_CLASSES {
+            for noscan in [false, true] {
+                let spc = SpanClass::new(class, noscan);
+                if spc.uses_span_queue() {
+                    assert_eq!(spc.npages(), 1, "class {class}");
+                    assert!(spc.nelems() <= SPAN_QUEUE_MAX_OBJS);
+                }
+            }
+        }
+        assert!(SpanClass::new(size_to_class(16), false).uses_span_queue());
+        assert!(SpanClass::new(size_to_class(512), false).uses_span_queue());
+        assert!(!SpanClass::new(size_to_class(513), false).uses_span_queue());
+        assert!(!SpanClass::new(size_to_class(8), false).uses_span_queue());
+        assert!(!SpanClass::new(size_to_class(64), true).uses_span_queue());
     }
 
     #[test]
