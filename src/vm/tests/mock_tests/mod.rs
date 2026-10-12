@@ -46,6 +46,7 @@ mod mock_test_concurrent_span_finalizer;
 mod mock_test_concurrent_span_gc_churn;
 mod mock_test_concurrent_span_greentea_graph;
 mod mock_test_concurrent_span_greentea_owned;
+mod mock_test_concurrent_span_heap_limit;
 mod mock_test_concurrent_span_hybrid_barrier;
 mod mock_test_concurrent_span_inline_fastpath;
 mod mock_test_concurrent_span_object_index;

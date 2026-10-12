@@ -85,21 +85,24 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         let gc_triggered = should_poll && {
             trace!("Polling ..");
             use crate::util::heap::gc_trigger::PollResult;
-            match self
-                .get_gc_trigger()
-                .poll_or_stall(false, Some(self.as_space()))
-            {
-                PollResult::NoCollection => false,
-                PollResult::CollectionRequested => true,
-                PollResult::Stall => {
-                    // An allocation stall: wait for the concurrent cycle to end, then take the
-                    // pages.  This is not a failed allocation attempt, so it does not count
-                    // towards running out of memory.
-                    let start = std::time::Instant::now();
-                    VM::VMCollection::block_for_gc(VMMutatorThread(tls));
-                    self.get_gc_trigger()
-                        .on_allocation_stall_finished(start.elapsed());
-                    false
+            loop {
+                match self
+                    .get_gc_trigger()
+                    .poll_or_stall(false, Some(self.as_space()))
+                {
+                    PollResult::NoCollection => break false,
+                    PollResult::CollectionRequested => break true,
+                    PollResult::Stall => {
+                        // An allocation stall: wait for the concurrent cycle to end, then poll
+                        // again.  This is not a failed allocation attempt, so it does not count
+                        // towards running out of memory.  The cycle may not have freed enough
+                        // memory, so the pages are taken only if the heap now has room;
+                        // otherwise the next poll requests a collection, as usual.
+                        let start = std::time::Instant::now();
+                        VM::VMCollection::block_for_gc(VMMutatorThread(tls));
+                        self.get_gc_trigger()
+                            .on_allocation_stall_finished(start.elapsed());
+                    }
                 }
             }
         };
