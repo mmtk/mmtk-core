@@ -230,7 +230,7 @@ impl Span {
                 if freeidx % 64 == 0 && freeidx != nelems {
                     return None;
                 }
-                self.alloc_cache.store(cache >> (the_bit + 1), Relaxed);
+                self.alloc_cache.store(shr(cache, the_bit + 1), Relaxed);
                 self.freeindex.store(freeidx, Relaxed);
                 self.alloc_count.fetch_add(1, Relaxed);
                 return Some(self.object_address(result));
@@ -270,7 +270,7 @@ impl Span {
             return snelems;
         }
 
-        self.alloc_cache.store(a_cache >> (bit_index + 1), Relaxed);
+        self.alloc_cache.store(shr(a_cache, bit_index + 1), Relaxed);
         sfreeindex = result + 1;
 
         if sfreeindex % 64 == 0 && sfreeindex != snelems {
@@ -617,5 +617,24 @@ mod tests {
         t.free_id(b);
         assert_eq!(t.alloc_id(), b);
         assert_eq!(t.iter_in_use().count(), 0);
+    }
+}
+
+/// `x >> n` with Go's semantics: shifting a 64-bit value by 64 or more gives 0 (Rust's `>>`
+/// overflows).
+#[inline(always)]
+fn shr(x: u64, n: usize) -> u64 {
+    x.checked_shr(n as u32).unwrap_or(0)
+}
+
+#[cfg(test)]
+mod shr_tests {
+    use super::shr;
+
+    #[test]
+    fn shr_by_64_is_zero() {
+        assert_eq!(shr(u64::MAX, 64), 0);
+        assert_eq!(shr(u64::MAX, 63), 1);
+        assert_eq!(shr(0b100, 2), 1);
     }
 }
