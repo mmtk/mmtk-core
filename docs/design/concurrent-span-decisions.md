@@ -407,3 +407,59 @@ The limits are guesses with headroom. If a legitimate build or run is killed, ra
 **Decision.** In `on_pause_start`, after dropping left-over sweep packets, disable `Concurrent` for every pause that starts a cycle (it was already disabled for `FinalMark`). The scheduler re-enables it when the pause ends if it holds work. Committed on its own, before the Green Tea commits, so the integrator can take it separately.
 
 **To undo.** Remove the `set_enabled(false)` line in `on_pause_start`.
+
+## D80. The allocate-black flag tested by the inline allocation fast path
+
+**Question.** Go's malloc fast paths bail out while `gcBlackenEnabled` is set (design §5.8). Which flag should mmtk-openjdk's inline `SpanAllocator` fast path test? Candidates: the binding's `CONCURRENT_MARKING_ACTIVE` (set in `resume_mutators` from `concurrent_work_in_progress`), mmtk-core's `HYBRID_BARRIER_ACTIVE` (`barrier_active_address()`, not set in SATB mode), or the space's own `allocate_as_live`, which `SpanSpace::initialize_object_metadata` tests to allocate black.
+
+**Decision.** The space's `allocate_as_live` flag, so that the fast path and the slow path cannot disagree (a mismatch would leave an object allocated during marking unmarked, and it would be freed while live). `policy` is private, so the binding cannot reach the flag itself: `AllocatorInfo::Span` gains `space_offset` (the allocator's `space` pointer, relative to the mutator) and `allocate_black_offset` (the flag, relative to the space). The fast path loads the space pointer from the mutator and tests the byte: one extra dependent, L1-resident load compared with an embedded global address, but no MMTk instance or mutator is needed at code-generation time and other bindings can use it the same way. The flag only changes while mutators are stopped (`ConcurrentSpan::set_marking_state`), and generated code has no safepoint between the test and the allocation.
+
+**To undo.** Remove the two fields from `AllocatorInfo::Span` (mmtk-core) and test another flag in `span_allocate` / `expand_span_allocate` (mmtk-openjdk).
+
+## D81. Size to span class in compiled code
+
+**Question.** Go computes the size class with `size_to_class8` / `size_to_class128` and a branch. The binding needs the span class for constant sizes (most instances in C1/C2) and variable sizes (arrays, the interpreter's `_new`).
+
+**Decision.** mmtk-core exports `span_allocator::span_class_index(size, align, noscan)`, the lookup that `SpanAllocator::alloc` uses. mmtk-openjdk builds a flat 4097-byte table, `size_to_span_class[size >> 3]` for sizes up to 32 KiB with an alignment of 8 and scan spans (OpenJDK allocates with an alignment of one word, no offset, from `Span(0)`). Constant sizes are looked up at compile time and become an immediate offset into the mutator's span array; variable sizes cost one byte load. Sizes with no small class map to class index 0, whose slot always holds the empty span, so the fast path fails safely on it. This is FP-1.
+
+**To undo.** Emit Go's two-table lookup instead (the tables would need exporting).
+
+## D82. Plain increment of `alloc_count` in compiled code
+
+**Question.** `Span::next_free_fast` updates `alloc_count` with `fetch_add(Relaxed)` (a locked instruction on x86). Can compiled code use a plain load/add/store?
+
+**Decision.** Yes. A cached span (`sweepgen` `h+1` or `h+3`) is written only by its owning mutator: sweepers only claim spans at `h-2` by CAS (`sweep_span`), and `uncache_span`/`flush` (which may sweep a stale span) run on the owner or in a pause with the owner stopped. `cache_span` and `refill` read `alloc_count` before the span is cached or on the owner. Other threads only read it in pauses. So the counter has a single writer while it is cached, which is also what Go assumes (`s.allocCount++` in `nextFreeFast`). The same holds for `alloc_cache` and `freeindex`, which the Rust code already writes with plain (relaxed) stores.
+
+**To undo.** Use `lock add` (x86) / a `GetAndAddL` node (C2).
+
+## D83. Zeroing on the inline fast path
+
+**Question.** Go's `mallocgc` zeroes the object if the span's `needzero` is set. Should the binding's fast path test `needzero`?
+
+**Decision.** No, except with `-XX:+ZeroTLAB`. MMTk runs OpenJDK with `UseTLAB` off, so C1 (`initialize_object`) and C2 (`InitializeNode`) always zero the object body after an inline allocation, and the interpreter's `_new` zeroes it unless `ZeroTLAB` is set. The object's bytes are therefore zeroed whatever `needzero` says. With `ZeroTLAB` the interpreter and C2 fast paths take the slow path for `needzero` spans (fresh spans are zero). The cell's tail beyond the object size is not zeroed by the fast path (Go zeroes the whole cell); nothing reads it. On fresh (already zero) spans OpenJDK zeroes the object again, which Go would not. This is FP-3.
+
+**To undo.** Test `needzero_offset` unconditionally in `span_allocate` / `expand_span_allocate`.
+
+## D84. Switching the fast path off
+
+**Decision.** `MMTK_ENABLE_SPAN_ALLOCATION_FASTPATH=false` (mmtk-openjdk) makes every tier call the slow path for `SpanAllocator` allocations, as before this work. The existing `MMTK_ENABLE_ALLOCATION_FASTPATH=false` also does, but it also turns off C2's barrier elision for stores into new objects (`can_remove_barrier`), so it is not a like-for-like comparison. The fast path is also off when C2 has no `CountTrailingZerosL` rule (C2 only). Without BMI2, the x86 variable shift saves and restores `rcx` around the shift (`push`/`pop`) unless the temporary already is `rcx`.
+
+**To undo.** Remove the env var from `MMTkHeap::initialize`.
+
+## D85. Post-allocation work on the inline fast path
+
+**Question.** What does `post_alloc` do for `SpanSpace`, and must the fast path do it?
+
+**Decision.** `SpanSpace::initialize_object_metadata` sets the VO bit (only with the `vo_bit` feature) and, if `allocate_as_live`, allocates black. The fast path is never taken while allocating black (D80). With `MMTK_VO_BIT`, the span fast path is followed by the same inline VO-bit code as the bump-pointer fast path (interpreter, C1, C2); that combination has not been tested. Nothing else is needed: `SpanAllocator::alloc` does no other work after `next_free_fast` for OpenJDK (no padding: alignment 8, no offset).
+
+## D86. aarch64 and the MMTk C1 runtime stubs
+
+**Decision.** Only x86_64 has the inline fast path (interpreter, C1, C2 on x86_64). aarch64's `eden_allocate` still takes the slow path for `TAG_SPAN`. C2's expansion is architecture-neutral IR, but it is enabled only under `#ifdef AMD64` until it has been tested elsewhere.
+
+**To undo / finish.** Port `span_allocate` to `mmtkBarrierSetAssembler_aarch64.cpp`.
+
+## D87. Core API committed inside another commit
+
+**What happened.** The mmtk-core part of the fast path (`AllocatorInfo::Span::{space_offset, allocate_black_offset}`, `span_allocator::span_class_index`, `SpanSpace::allocate_as_live_offset`, `SpanAllocator::space_offset`, and `mock_test_concurrent_span_inline_fastpath`) was left uncommitted in the shared worktree for a few minutes and was picked up by the integrator's commit `67e2dd69f0` ("ConcurrentSpan: wire Go's GC CPU limiter into assists"). The commit was not rewritten (engineering §4). The follow-up `a0260aca83` ("Make the SpanAllocator inline fast-path mock test robust to GCs") records this and finishes the test.
+
+**To undo.** If the branch is split for upstreaming, move these hunks out of `67e2dd69f0` into their own commit.
