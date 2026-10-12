@@ -50,6 +50,7 @@ mod mock_test_concurrent_span_hybrid_barrier;
 mod mock_test_concurrent_span_object_index;
 mod mock_test_concurrent_span_reuse;
 mod mock_test_concurrent_span_stall;
+mod mock_test_concurrent_span_user_cycle;
 mod mock_test_concurrent_span_user_gc;
 #[cfg(feature = "vo_bit")]
 mod mock_test_conservatism;

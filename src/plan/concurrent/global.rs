@@ -39,6 +39,17 @@ pub trait ConcurrentPlan: Plan {
     /// found on stacks and elsewhere (Go's `heapScanWork`, `stackScanWork` and
     /// `globalsScanWork`).  Only called if [`ConcurrentPlan::counts_scan_work`] returns `true`.
     fn add_scan_work(&self, _heap: usize, _stack: usize, _globals: usize) {}
+    /// Return `true` if a user-requested collection should be a concurrent cycle that blocks only
+    /// the requesting mutator until the cycle ends (Go's `runtime.GC()`), instead of a
+    /// stop-the-world collection.  Only used if the VM can block mutators
+    /// ([`crate::vm::Collection::supports_blocking_mutators`]).
+    fn concurrent_user_collection(&self) -> bool {
+        false
+    }
+    /// The number of GC cycles completed so far.  Used to wait for a cycle to end.
+    fn completed_cycles(&self) -> usize {
+        0
+    }
     /// See [`crate::memory_manager::shade_objects`].
     fn shade_objects(&self, _objects: &[crate::util::ObjectReference]) {}
     /// See [`crate::memory_manager::soft_references_are_strong`].

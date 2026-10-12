@@ -73,6 +73,8 @@ pub struct ConcurrentSpan<VM: VMBinding> {
     assists: Assists,
     /// Statistics for the evaluation.
     stats: SpanStats,
+    /// The number of GC cycles completed.
+    completed_cycles: AtomicUsize,
     /// Assists are on, and the binding can block mutators.
     assists_enabled: bool,
     /// Concurrent marking is in progress: from the end of `InitialMark` until a `FinalMark`
@@ -154,9 +156,11 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
         let pause = if self.marking.load(Ordering::SeqCst) {
             Pause::FinalMark
         } else if !self.concurrent_marking_supported()
-            // TODO: Go's `runtime.GC()` runs a concurrent cycle and blocks the caller until it
-            // ends (design §5.2).  For now a user-requested collection is stop-the-world.
-            || self.base().global_state.is_user_triggered_collection()
+            // A user-requested collection is stop-the-world unless it runs as a concurrent cycle
+            // that blocks only the caller (`concurrent_user_collection`).
+            || (self.base().global_state.is_user_triggered_collection()
+                && !(self.concurrent_user_collection()
+                    && VM::VMCollection::supports_blocking_mutators()))
         {
             Pause::Full
         } else {
@@ -275,6 +279,7 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
         };
 
         if cycle_ended {
+            self.completed_cycles.fetch_add(1, Ordering::SeqCst);
             // Soft references are strong until the end of the cycle, including any marking
             // finished in the `FinalMark` pause.
             self.soft_refs_strong.store(false, Ordering::SeqCst);
@@ -373,6 +378,7 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
             pacing,
             assists: Assists::default(),
             stats,
+            completed_cycles: AtomicUsize::new(0),
             assists_enabled,
             marking: AtomicBool::new(false),
             mark_done: AtomicBool::new(false),
@@ -573,6 +579,12 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
         )
     }
 
+    /// The kind of the last pause that ended.
+    #[cfg(test)]
+    pub(crate) fn previous_pause(&self) -> Option<Pause> {
+        self.previous_pause.load(Ordering::SeqCst)
+    }
+
     /// The number of assists, and of parked assists, in the current (or last) cycle.
     #[cfg(test)]
     pub(crate) fn assist_stats(&self) -> (usize, usize) {
@@ -657,6 +669,15 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentSpan<VM> {
             self.marking_interrupted.store(true, Ordering::SeqCst);
         }
         // Otherwise background sweeping was interrupted by a new cycle.
+    }
+
+    fn concurrent_user_collection(&self) -> bool {
+        *self.base().options.concurrent_span_concurrent_user_gc
+            && self.concurrent_marking_supported()
+    }
+
+    fn completed_cycles(&self) -> usize {
+        self.completed_cycles.load(Ordering::SeqCst)
     }
 
     fn shade_objects(&self, objects: &[crate::util::ObjectReference]) {
