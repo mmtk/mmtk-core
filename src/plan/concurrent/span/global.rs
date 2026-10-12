@@ -48,6 +48,7 @@ pub const CONCURRENT_SPAN_CONSTRAINTS: PlanConstraints = PlanConstraints {
     may_trace_duplicate_edges: true,
     // Mutators flush their allocation caches in prepare and release.
     needs_prepare_mutator: true,
+    barrier: crate::BarrierSelector::HybridBarrier,
     ..PlanConstraints::default()
 };
 

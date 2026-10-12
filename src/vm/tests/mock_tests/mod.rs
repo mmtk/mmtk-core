@@ -37,6 +37,7 @@ mod mock_test_allocate_with_re_enable_collection;
 mod mock_test_allocate_without_initialize_collection;
 mod mock_test_allocator_info;
 mod mock_test_barrier_slow_path_assertion;
+mod mock_test_concurrent_span_hybrid_barrier;
 #[cfg(feature = "vo_bit")]
 mod mock_test_conservatism;
 mod mock_test_debug_get_object_info;

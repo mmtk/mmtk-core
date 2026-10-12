@@ -1,3 +1,5 @@
+use crate::plan::barriers::HybridBarrier;
+use crate::plan::concurrent::barrier::HybridBarrierSemantics;
 use crate::plan::concurrent::span::ConcurrentSpan;
 use crate::plan::mutator_context::common_prepare_func;
 use crate::plan::mutator_context::common_release_func;
@@ -8,12 +10,15 @@ use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::ReservedAllocators;
 use crate::plan::AllocationSemantics;
+use crate::policy::gc_work::DEFAULT_TRACE;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::alloc::FreeListAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use crate::MMTK;
 use enum_map::EnumMap;
+
+type BarrierSemanticsType<VM> = HybridBarrierSemantics<VM, ConcurrentSpan<VM>, DEFAULT_TRACE>;
 
 fn get_freelist_allocator_mut<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
@@ -75,5 +80,9 @@ pub fn create_concurrent_span_mutator<VM: VMBinding>(
         release_func: &concurrent_span_mutator_release,
     };
 
-    MutatorBuilder::new(mutator_tls, mmtk, config).build()
+    MutatorBuilder::new(mutator_tls, mmtk, config)
+        .barrier(Box::new(HybridBarrier::new(
+            BarrierSemanticsType::<VM>::new(mmtk, mutator_tls),
+        )))
+        .build()
 }

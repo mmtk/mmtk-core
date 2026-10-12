@@ -305,6 +305,16 @@ pub fn post_alloc<VM: VMBinding>(
     mutator.post_alloc(refer, bytes, semantics);
 }
 
+/// The address of the global flag of the hybrid barrier ([`crate::plan::BarrierSelector::HybridBarrier`]).  The flag is a
+/// byte that is non-zero while the barrier is active.  A binding that implements the barrier
+/// fast path in compiled code can test this byte inline, and only call
+/// [`object_reference_write_slow`] (or the other slow paths) when it is non-zero.
+///
+/// The flag only changes while all mutators are stopped.
+pub fn barrier_active_address() -> Address {
+    Address::from_ref(&crate::plan::HYBRID_BARRIER_ACTIVE)
+}
+
 /// The *subsuming* write barrier by MMTk. For performance reasons, a VM should implement the write barrier
 /// fast-path on their side rather than just calling this function.
 ///

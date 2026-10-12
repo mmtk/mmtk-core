@@ -26,6 +26,11 @@ pub enum BarrierSelector {
     /// Object remembering pre-write barrier with weak reference loading barrier.
     // TODO: We might be able to generalize this to object remembering pre-write barrier.
     SATBBarrier,
+    /// A flag-gated pre-write barrier that logs both the old and the new value of every
+    /// reference store while the flag is set (a hybrid Yuasa/Dijkstra barrier, as in Go).  It has
+    /// no unlog bit.  The flag is a global byte whose address is given by
+    /// [`crate::memory_manager::barrier_active_address`], so a binding can test it inline.
+    HybridBarrier,
 }
 
 impl BarrierSelector {
@@ -438,5 +443,120 @@ impl<S: BarrierSemantics> Barrier<S::VM> for SATBBarrier<S> {
         _dst: <S::VM as VMBinding>::VMMemorySlice,
     ) {
         unimplemented!()
+    }
+}
+
+/// The global flag of [`HybridBarrier`].  Non-zero while the barrier is active.
+///
+/// It is a single byte at a fixed address so that compiled code can test it inline, like Go's
+/// `writeBarrier.enabled`.  It is only changed while all mutators are stopped, which makes the
+/// change visible to every mutator when they resume.
+pub(crate) static HYBRID_BARRIER_ACTIVE: std::sync::atomic::AtomicU8 =
+    std::sync::atomic::AtomicU8::new(0);
+
+/// A hybrid Yuasa/Dijkstra pre-write barrier, ported from Go (`runtime/mbarrier.go`).
+///
+/// While [`HYBRID_BARRIER_ACTIVE`] is set, every reference store logs the old value of the slot
+/// (Yuasa deletion barrier) and the new value (Dijkstra insertion barrier).  Like Go, it does not
+/// implement the "only if the current stack is grey" condition, and always logs both values.
+/// The insertion half is what allows each thread's stack to be scanned once, at some time during
+/// concurrent marking, instead of in the initial pause.
+///
+/// Unlike [`SATBBarrier`], it uses no unlog bit, so the check is per write, not per object.
+pub struct HybridBarrier<S: BarrierSemantics> {
+    semantics: S,
+}
+
+impl<S: BarrierSemantics> HybridBarrier<S> {
+    /// Create a new HybridBarrier with the given semantics.
+    pub fn new(semantics: S) -> Self {
+        Self { semantics }
+    }
+
+    /// Return `true` if the barrier is active (concurrent marking is in progress).
+    #[inline(always)]
+    pub fn is_active() -> bool {
+        HYBRID_BARRIER_ACTIVE.load(Ordering::Relaxed) != 0
+    }
+
+    /// Set the global barrier flag.  Must only be called while mutators are stopped.
+    #[allow(dead_code)] // Used once ConcurrentSpan marks concurrently.
+    pub(crate) fn set_active(active: bool) {
+        HYBRID_BARRIER_ACTIVE.store(active as u8, Ordering::SeqCst);
+    }
+
+    /// The slow-path semantics.
+    #[cfg(test)]
+    pub(crate) fn semantics(&self) -> &S {
+        &self.semantics
+    }
+}
+
+impl<S: BarrierSemantics> Barrier<S::VM> for HybridBarrier<S> {
+    fn flush(&mut self) {
+        self.semantics.flush();
+    }
+
+    fn load_weak_reference(&mut self, o: ObjectReference) {
+        if Self::is_active() {
+            self.semantics.load_weak_reference(o)
+        }
+    }
+
+    fn object_probable_write(&mut self, obj: ObjectReference) {
+        if Self::is_active() {
+            self.semantics.object_probable_write_slow(obj);
+        }
+    }
+
+    fn object_reference_write_pre(
+        &mut self,
+        src: ObjectReference,
+        slot: <S::VM as VMBinding>::VMSlot,
+        target: Option<ObjectReference>,
+    ) {
+        if Self::is_active() {
+            self.semantics
+                .object_reference_write_slow(src, slot, target);
+        }
+    }
+
+    fn object_reference_write_post(
+        &mut self,
+        _src: ObjectReference,
+        _slot: <S::VM as VMBinding>::VMSlot,
+        _target: Option<ObjectReference>,
+    ) {
+    }
+
+    fn object_reference_write_slow(
+        &mut self,
+        src: ObjectReference,
+        slot: <S::VM as VMBinding>::VMSlot,
+        target: Option<ObjectReference>,
+    ) {
+        // The binding calls the slow path after testing the flag inline.  Test it again, because
+        // the slow path may also be reached from code that does not test it.
+        if Self::is_active() {
+            self.semantics
+                .object_reference_write_slow(src, slot, target);
+        }
+    }
+
+    fn memory_region_copy_pre(
+        &mut self,
+        src: <S::VM as VMBinding>::VMMemorySlice,
+        dst: <S::VM as VMBinding>::VMMemorySlice,
+    ) {
+        if Self::is_active() {
+            self.semantics.memory_region_copy_slow(src, dst);
+        }
+    }
+
+    fn memory_region_copy_post(
+        &mut self,
+        _src: <S::VM as VMBinding>::VMMemorySlice,
+        _dst: <S::VM as VMBinding>::VMMemorySlice,
+    ) {
     }
 }
