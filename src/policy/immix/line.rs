@@ -135,9 +135,7 @@ impl Line {
             .extract_side_spec();
         let log_meta_bits_per_line = const {
             Line::LOG_BYTES + LOG_BITS_IN_BYTE as usize
-                - VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
-                    .heap_bytes_per_unlog_byte()
-                    .ilog2() as usize
+                - VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.log_heap_bytes_per_unlog_byte()
         };
         debug_assert!((1 << log_meta_bits_per_line) >= 8);
         let log_meta_bytes_per_line = log_meta_bits_per_line - LOG_BITS_IN_BYTE as usize;
@@ -155,9 +153,7 @@ impl Line {
             .extract_side_spec();
         let log_meta_bits_per_line = const {
             Line::LOG_BYTES + LOG_BITS_IN_BYTE as usize
-                - VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
-                    .heap_bytes_per_unlog_byte()
-                    .ilog2() as usize
+                - VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.log_heap_bytes_per_unlog_byte()
         };
         debug_assert!((1 << log_meta_bits_per_line) >= 8);
         let log_meta_bytes_per_line = log_meta_bits_per_line - LOG_BITS_IN_BYTE as usize;
