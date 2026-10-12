@@ -1,4 +1,4 @@
-// GITHUB-CI: MMTK_PLAN=MarkSweep
+// GITHUB-CI: MMTK_PLAN=MarkSweep,ConcurrentSpan
 
 //! MockVM can report root slots, so a GC keeps the objects they point to alive.
 
