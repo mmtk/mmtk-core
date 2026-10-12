@@ -11,10 +11,13 @@ use crate::util::test_util::mock_vm::mock_api;
 use crate::util::{Address, ObjectReference};
 use crate::vm::Collection;
 use crate::AllocationSemantics;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 /// A root slot.  It holds an object reference as a raw address, or 0 for null.
 static ROOT: AtomicUsize = AtomicUsize::new(0);
+
+/// Marking is held up until a mutator has stalled.  Only in the first cycle.
+static HOLD_UP_MARKING: AtomicBool = AtomicBool::new(true);
 
 fn field(object: ObjectReference) -> Address {
     object.to_raw_address() + 8usize
@@ -52,13 +55,16 @@ pub fn allocation_stall() {
                 scan_object: MockMethod::new_fixed(Box::new(|(_, object, visitor)| {
                     // Hold up marking at the rooted object until a mutator has stalled, so that
                     // marking cannot finish before the heap is full.
-                    if object.to_raw_address().as_usize() == ROOT.load(Ordering::SeqCst) {
+                    if object.to_raw_address().as_usize() == ROOT.load(Ordering::SeqCst)
+                        && HOLD_UP_MARKING.load(Ordering::SeqCst)
+                    {
                         for _ in 0..20_000 {
                             if plan().stall_count() > 0 {
                                 break;
                             }
                             std::thread::sleep(std::time::Duration::from_millis(1));
                         }
+                        HOLD_UP_MARKING.store(false, Ordering::SeqCst);
                     }
                     visitor.visit_slot(field(object));
                 })),

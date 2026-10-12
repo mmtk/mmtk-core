@@ -20,7 +20,7 @@ use crate::util::metadata::side_metadata::spec_defs::SPAN_PAGE_MAP;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::{Address, ObjectReference, VMThread};
-use crate::vm::{ObjectModel, VMBinding};
+use crate::vm::{ActivePlan, ObjectModel, VMBinding};
 use crossbeam::utils::CachePadded;
 use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
@@ -600,6 +600,12 @@ impl<VM: VMBinding> SpanSpace<VM> {
     // ---------------------------------------------------------------------------------------
 
     pub(crate) fn call_refill_hook(&self, tls: VMThread, bytes: usize) {
+        // Go checks the GC trigger after every refill (`mcache.refill`, then `mallocgc`'s
+        // `gcTrigger.test`), not only when the heap grows, because most refills reuse swept
+        // spans.  Polling only requests a collection: it never blocks here.
+        if VM::VMActivePlan::is_mutator(tls) {
+            self.get_gc_trigger().poll(false, Some(self));
+        }
         if let Some(hook) = self.refill_hook.get() {
             hook(tls, bytes);
         }
