@@ -60,7 +60,7 @@ impl VMGlobalLogBitSpec {
 
 impl VMGlobalFieldUnlogBitSpec {
     /// The number of heap bytes covered by one byte of the field unlog side metadata.
-    pub const fn heap_bytes_per_unlog_byte(&self) -> usize {
+    pub(crate) const fn heap_bytes_per_unlog_byte(&self) -> usize {
         let spec = self.as_spec().extract_side_spec();
         (1 << spec.log_bytes_in_region) << (LOG_BITS_IN_BYTE as usize - spec.log_num_of_bits)
     }
