@@ -29,5 +29,6 @@ pub mod lisp2space;
 pub mod lockfreeimmortalspace;
 pub mod marksweepspace;
 pub mod ovc;
+pub mod spanspace;
 #[cfg(feature = "vm_space")]
 pub mod vmspace;
