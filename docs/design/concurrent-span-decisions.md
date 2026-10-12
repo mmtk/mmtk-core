@@ -51,6 +51,8 @@ Decisions made without asking the project lead, so that work could continue. Eac
 | D56 | 2026-10-12 | The SATB weak-reference load barrier (x86 interpreter, C1, C2) is needed again for `HybridBarrier` with another flag | Move it into the shared `MMTkBarrierSet{Assembler,C1,C2}` with the flag address as a parameter; SATB passes `CONCURRENT_MARKING_ACTIVE`. SATB's C1 test changes from `== 1` to `!= 0` (same for a 0/1 flag) | Yes | for review |
 | D57 | 2026-10-12 | How to test barrier paths before concurrent marking exists | Binding-only env var `MMTK_HYBRID_BARRIER_DEBUG_ALWAYS_ON=1` sets the flag once at start-up. mmtk-core drops the buffers while no marking is in progress | Yes | for review |
 | D58 | 2026-10-12 | aarch64 `HybridBarrier` cannot be tested on this machine | Not implemented. Its selection is compiled only on x86_64 (`#ifdef AMD64`); on aarch64, `ConcurrentSpan` fails at start-up with the existing "Unimplemented" guarantee | Yes | open |
+| D59 | 2026-10-12 | How are stores into VM roots (OopStorage, JNI global refs) barriered? | The MMTk `AccessBarrier` implements `oop_store_not_in_heap` and the not-in-heap cmpxchg/xchg; `HybridBarrier` shades the new value with `mmtk_shade_objects` when its flag is set. Only the new value | Yes | for review |
+| D60 | 2026-10-12 | mmtk-openjdk's C++ `MMTkMutatorContext` did not mirror the new `SpanAllocator`, which crashed every plan | Mirror it, check `SPAN_ALLOCATOR_SIZE` and the whole `MUTATOR_SIZE` when binding a mutator, and take the allocation slow path for `TAG_SPAN` until an inline fast path exists | Yes | for review |
 | D70 | 2026-10-12 | Where does Green Tea's per-span state (`scans`, `owned`, `marks`) live? | In the span descriptor, next to the existing mark bits; no inline block at the span page tail, and `nelems` unchanged (deviation GT-1) | Yes | for review |
 | D71 | 2026-10-12 | How does the plan's concurrent marking (roots, barrier flushes, finalizable contents, `FinalMark` finishing) use `SpanTraceObjects` without rewiring every producer? | A `ConcurrentPlan::trace_objects_concurrently` hook, called at the start of `ConcurrentTraceObjects::do_work` (which `ProcessModBufSATB` also runs). `ConcurrentSpan` takes the objects when Green Tea is on. Other plans keep the default | Yes | for review |
 | D72 | 2026-10-12 | What plays the part of Go's stealable span rings (`spanSPMC`)? | MMTk work packets: spilled spans become a new `SpanTraceObjects` packet; "chain empty" means the last spilled packet has started (GT-3) | Yes | for review |
@@ -321,6 +323,8 @@ The limits are guesses with headroom. If a legitimate build or run is killed, ra
 
 **Decision.** If `MMTK_HYBRID_BARRIER_DEBUG_ALWAYS_ON=1` and the plan uses `HybridBarrier`, the binding stores 1 to the flag after creating MMTk (`openjdk_gc_init`) and prints a line to stderr. Nothing clears it before concurrent marking exists. While no marking is in progress, `HybridBarrierSemantics` drops what it buffers, so this tests that every path reaches mmtk-core with valid arguments, not that marking is correct.
 
+**Update.** Now that `ConcurrentSpan` marks concurrently, the plan clears the flag at the end of the first FinalMark, so the variable only forces the barrier on until the first cycle ends. Real marking now exercises the barrier anyway.
+
 **To undo.** Remove `maybe_force_hybrid_barrier_on` in mmtk-openjdk `mmtk/src/api.rs`.
 
 ## D58. aarch64 (open)
@@ -331,6 +335,24 @@ The limits are guesses with headroom. If a legitimate build or run is killed, ra
 
 **To undo.** n/a.
 
+
+## D59. Stores into VM roots
+
+**Question.** VM roots are scanned once, in the InitialMark pause. An object stored into one later (e.g. a new JNI global ref) from a stack that has not been scanned yet is lost if the stack then drops it (design §5.6).
+
+**Options.** 1. Shade the new value in `oop_store_not_in_heap` and the not-in-heap atomics. 2. Rescan VM roots in FinalMark.
+
+**Decision.** Option 1, as the design says. The `AccessBarrier` calls a new runtime hook `object_reference_write_not_in_heap(new_value)` (a no-op for other barriers); the `HybridBarrier` calls `mmtk_shade_objects` (`memory_manager::shade_objects`) with the value when the flag byte is set and the value is not null. The old value is not logged: the root was scanned at InitialMark, and any value stored since was shaded when it was stored. Native (JNI) code reaches roots only through the access API, so this covers JNI handles. Recorded as an extra relative to Go in design §11 (already listed).
+
+**To undo.** Remove the not-in-heap accessors in mmtk-openjdk `mmtkBarrierSet.hpp`.
+
+## D60. C++ mirror of the mutator
+
+**Question.** mmtk-core added `span: [SpanAllocator; 2]` to `Allocators`. The binding's C++ mirror was not updated, so the barrier and config fields were read at wrong offsets and every plan crashed at start-up (`flush_remembered_sets` on GC worker threads). Then ConcurrentSpan hit `Unimplemented allocator fastpath` for the new allocator tag.
+
+**Decision.** Mirror `SpanAllocator` (its `#[repr(C)]` layout) in `mmtkMutator.hpp`; export `SPAN_ALLOCATOR_SIZE` and `MUTATOR_SIZE` from Rust and check them in `MMTkMutatorContext::bind`, so a future change fails loudly; add `TAG_SPAN` (6) and force the allocation slow path for it in the x86 and aarch64 assemblers and C2, as for the free-list allocator. Allocation-heavy measurements of `ConcurrentSpan` therefore measure the slow path until the inline fast path (design §9, phase 2) exists.
+
+**To undo.** Implement the SpanAllocator fast path; the size checks should stay.
 
 ## D70. Green Tea's per-span state
 
