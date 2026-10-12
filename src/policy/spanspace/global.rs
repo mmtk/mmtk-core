@@ -609,7 +609,7 @@ impl<VM: VMBinding> SpanSpace<VM> {
         // Go: if we sweep spanBudget spans without finding any free space, just allocate a fresh
         // span.
         let mut span_budget: isize = 100;
-        let sg = self.sweepgen.load(Ordering::Acquire);
+        let mut sg = self.sweepgen.load(Ordering::Acquire);
 
         let found: Option<&'static Span> = 'have: {
             // Try partial swept spans first.
@@ -657,6 +657,9 @@ impl<VM: VMBinding> SpanSpace<VM> {
             None => {
                 // We failed to get a span from the central sets, so get one from the heap.
                 let (_, s) = self.alloc_span(tls, spc, alloc_options)?;
+                // Acquiring pages may block for a GC cycle (an allocation stall), which advances
+                // `sweepgen`.  The new span belongs to the current generation.
+                sg = self.sweepgen.load(Ordering::Acquire);
                 s
             }
         };
