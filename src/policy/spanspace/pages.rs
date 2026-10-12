@@ -4,7 +4,7 @@
 //! and this allocator hands out runs of 8 KiB pages within those regions. Like Go's, it keeps an
 //! in-use bitmap per region (Go's `pallocBits`, which covers a 4 MiB chunk) and does an
 //! address-ordered first-fit search. Go accelerates the search with a radix tree of summaries;
-//! this is a linear scan over regions for now. A region whose pages are all free is handed back
+//! this scans, in address order, only the regions that have a free page. A region whose pages are all free is handed back
 //! to MMTk, so that other spaces can use it and MMTk's heap accounting sees it as free. See
 //! deviation SP2 and decision D30 in `docs/design/`.
 //!
@@ -13,7 +13,7 @@
 
 use super::classes::LOG_BYTES_IN_SPAN_PAGE;
 use crate::util::Address;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 
 /// Log of the size of the unit in which SpanSpace acquires memory from MMTk.
@@ -86,7 +86,15 @@ impl RegionPages {
 /// Page allocator state, behind one lock (Go's `mheap_.lock` protects `pageAlloc` too).
 #[derive(Default)]
 pub struct PageAllocator {
-    regions: Mutex<BTreeMap<usize, RegionPages>>,
+    inner: Mutex<Inner>,
+}
+
+#[derive(Default)]
+struct Inner {
+    regions: BTreeMap<usize, RegionPages>,
+    /// The regions with at least one free page, so that a nearly full heap is not scanned
+    /// region by region.
+    nonfull: BTreeSet<usize>,
 }
 
 /// The result of freeing pages.
@@ -108,20 +116,21 @@ impl PageAllocator {
     /// zero.
     pub fn add_region(&self, region: Address, zeroed: bool) {
         assert!(region.is_aligned_to(BYTES_IN_PAGE_REGION));
-        let old = self
+        let mut inner = self.inner.lock().unwrap();
+        let old = inner
             .regions
-            .lock()
-            .unwrap()
             .insert(region.as_usize(), RegionPages::new(zeroed));
         debug_assert!(old.is_none(), "region {region} added twice");
+        inner.nonfull.insert(region.as_usize());
     }
 
     /// Allocate `npages` contiguous pages, address-ordered first fit. Returns the start address
     /// and whether any of the pages may hold stale data (Go's `needzero`).
     pub fn alloc(&self, npages: usize) -> Option<(Address, bool)> {
         debug_assert!(npages > 0 && npages <= SPAN_PAGES_IN_REGION);
-        let mut regions = self.regions.lock().unwrap();
-        for (&start, pages) in regions.iter_mut() {
+        let inner = &mut *self.inner.lock().unwrap();
+        for &start in inner.nonfull.iter() {
+            let pages = inner.regions.get_mut(&start).unwrap();
             if SPAN_PAGES_IN_REGION - pages.used < npages {
                 continue;
             }
@@ -130,6 +139,9 @@ impl PageAllocator {
                 let needzero = (i..i + npages).any(|p| RegionPages::get(&pages.dirty, p));
                 RegionPages::set_range(&mut pages.dirty, i, npages, true);
                 pages.used += npages;
+                if pages.used == SPAN_PAGES_IN_REGION {
+                    inner.nonfull.remove(&start);
+                }
                 let addr = unsafe { Address::from_usize(start) } + (i << LOG_BYTES_IN_SPAN_PAGE);
                 return Some((addr, needzero));
             }
@@ -141,8 +153,9 @@ impl PageAllocator {
     pub fn free(&self, addr: Address, npages: usize) -> FreeResult {
         let region = addr.align_down(BYTES_IN_PAGE_REGION);
         let i = (addr - region) >> LOG_BYTES_IN_SPAN_PAGE;
-        let mut regions = self.regions.lock().unwrap();
-        let pages = regions
+        let inner = &mut *self.inner.lock().unwrap();
+        let pages = inner
+            .regions
             .get_mut(&region.as_usize())
             .unwrap_or_else(|| panic!("freeing pages {addr} in an unknown region"));
         for p in i..i + npages {
@@ -154,18 +167,21 @@ impl PageAllocator {
         RegionPages::set_range(&mut pages.in_use, i, npages, false);
         pages.used -= npages;
         if pages.used == 0 {
-            regions.remove(&region.as_usize());
+            inner.regions.remove(&region.as_usize());
+            inner.nonfull.remove(&region.as_usize());
             FreeResult::RegionEmpty(region)
         } else {
+            inner.nonfull.insert(region.as_usize());
             FreeResult::Retained
         }
     }
 
     /// All page regions currently owned by the allocator.
     pub fn regions(&self) -> Vec<Address> {
-        self.regions
+        self.inner
             .lock()
             .unwrap()
+            .regions
             .keys()
             .map(|&a| unsafe { Address::from_usize(a) })
             .collect()
@@ -173,7 +189,13 @@ impl PageAllocator {
 
     /// Pages in use, over all regions.
     pub fn used_pages(&self) -> usize {
-        self.regions.lock().unwrap().values().map(|c| c.used).sum()
+        self.inner
+            .lock()
+            .unwrap()
+            .regions
+            .values()
+            .map(|c| c.used)
+            .sum()
     }
 }
 
