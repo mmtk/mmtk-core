@@ -14,8 +14,7 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::{ObjectModel, VMBinding};
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
+use atomic::{Atomic, Ordering};
 use std::sync::{Arc, Mutex};
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
@@ -32,9 +31,9 @@ pub struct CommonGenPlan<VM: VMBinding> {
     #[parent]
     pub common: CommonPlan<VM>,
     /// Is this GC full heap?
-    pub gc_full_heap: AtomicBool,
+    pub gc_full_heap: Atomic<bool>,
     /// Is next GC full heap?
-    pub next_gc_full_heap: AtomicBool,
+    pub next_gc_full_heap: Atomic<bool>,
     pub full_heap_gc_count: Arc<Mutex<EventCounter>>,
 }
 
@@ -53,8 +52,8 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         CommonGenPlan {
             nursery,
             common,
-            gc_full_heap: AtomicBool::default(),
-            next_gc_full_heap: AtomicBool::new(false),
+            gc_full_heap: Atomic::<bool>::default(),
+            next_gc_full_heap: Atomic::new(false),
             full_heap_gc_count,
         }
     }

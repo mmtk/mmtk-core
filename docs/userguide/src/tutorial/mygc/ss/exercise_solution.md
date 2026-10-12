@@ -14,7 +14,7 @@ In `triplespace/global.rs`:
 
        ```rust
        pub struct TripleSpace<VM: VMBinding> {
-          pub hi: AtomicBool,
+          pub hi: Atomic<bool>,
           pub copyspace0: CopySpace<VM>,
           pub copyspace1: CopySpace<VM>,
           pub youngspace: CopySpace<VM>, // Add this!
@@ -35,7 +35,7 @@ In `triplespace/global.rs`:
          let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
          TripleSpace {
-             hi: AtomicBool::new(false),
+             hi: Atomic::new(false),
              copyspace0: CopySpace::new(
                  "copyspace0",
                  false,

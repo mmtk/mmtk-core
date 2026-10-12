@@ -5,7 +5,7 @@
 //! -   letting the last parked worker take action, and
 //! -   letting workers and mutators notify workers when workers are given things to do.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+use atomic::{Atomic, Ordering};
 use std::sync::{Condvar, Mutex};
 
 use super::{
@@ -43,7 +43,7 @@ pub(crate) struct WorkerMonitor {
     /// `notify_work_available` can read it without acquiring the lock.
     parker: WorkerParker,
     /// The number of workers that are allowed to execute work after being notified.
-    active_workers: AtomicUsize,
+    active_workers: Atomic<usize>,
     /// Active workers wait on this when idle.  A parked *active* worker is notified if workers
     /// have things to do.  That includes:
     /// -   any work packets available, and
@@ -66,14 +66,14 @@ struct WorkerParker {
     worker_count: usize,
     /// Number of parked workers.
     /// The counter can be read without a lock, but can only be mutated while holding the monitor's lock.
-    parked_workers: AtomicUsize,
+    parked_workers: Atomic<usize>,
 }
 
 impl WorkerParker {
     fn new(worker_count: usize) -> Self {
         Self {
             worker_count,
-            parked_workers: AtomicUsize::new(0),
+            parked_workers: Atomic::new(0),
         }
     }
 
@@ -111,7 +111,7 @@ impl WorkerMonitor {
                 goals: Default::default(),
             }),
             parker: WorkerParker::new(worker_count),
-            active_workers: AtomicUsize::new(worker_count),
+            active_workers: Atomic::new(worker_count),
             workers_have_anything_to_do: Default::default(),
             active_worker_number_changed: Default::default(),
         }
@@ -371,10 +371,8 @@ impl WorkerMonitor {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc,
-    };
+    use atomic::{Atomic, Ordering};
+    use std::sync::Arc;
 
     use super::WorkerMonitor;
 
@@ -384,8 +382,8 @@ mod tests {
     fn test_last_worker_park_wake_all() {
         let number_threads = 4;
         let worker_monitor = Arc::new(WorkerMonitor::new(number_threads));
-        let on_last_parked_called = AtomicUsize::new(0);
-        let should_unpark = AtomicBool::new(false);
+        let on_last_parked_called = Atomic::new(0);
+        let should_unpark = Atomic::new(false);
 
         std::thread::scope(|scope| {
             for ordinal in 0..number_threads {
@@ -421,9 +419,9 @@ mod tests {
     fn test_last_worker_park_wake_self() {
         let number_threads = 4;
         let worker_monitor = Arc::new(WorkerMonitor::new(number_threads));
-        let on_last_parked_called = AtomicUsize::new(0);
-        let threads_running = AtomicUsize::new(0);
-        let should_unpark = AtomicBool::new(false);
+        let on_last_parked_called = Atomic::new(0);
+        let threads_running = Atomic::new(0);
+        let should_unpark = Atomic::new(false);
 
         std::thread::scope(|scope| {
             for ordinal in 0..number_threads {
@@ -471,9 +469,9 @@ mod tests {
         let concurrent_threads = 2;
         let worker_monitor = Arc::new(WorkerMonitor::new(number_threads));
         worker_monitor.set_active_workers(concurrent_threads);
-        let first_wave_unparked = AtomicUsize::new(0);
-        let release_everyone = AtomicBool::new(false);
-        let notifier_ran = AtomicBool::new(false);
+        let first_wave_unparked = Atomic::new(0);
+        let release_everyone = Atomic::new(false);
+        let notifier_ran = Atomic::new(false);
 
         std::thread::scope(|scope| {
             for ordinal in 0..number_threads {

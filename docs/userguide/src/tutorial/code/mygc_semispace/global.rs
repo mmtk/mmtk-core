@@ -18,7 +18,7 @@ use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
-use std::sync::atomic::{AtomicBool, Ordering}; // Add
+use atomic::Atomic; // Add
 // ANCHOR_END: imports_no_gc_work
 
 // Remove #[allow(unused_imports)].
@@ -30,7 +30,7 @@ use mmtk_macros::{HasSpaces, PlanTraceObject};
 // ANCHOR: plan_def
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct MyGC<VM: VMBinding> {
-    pub hi: AtomicBool,
+    pub hi: Atomic<bool>,
     #[space]
     #[copy_semantics(CopySemantics::DefaultCopy)]
     pub copyspace0: CopySpace<VM>,
@@ -177,7 +177,7 @@ impl<VM: VMBinding> MyGC<VM> {
         };
 
         MyGC {
-            hi: AtomicBool::new(false),
+            hi: Atomic::new(false),
             // ANCHOR: copyspace_new
             copyspace0: CopySpace::new(plan_args.get_normal_space_args("copyspace0", true, false, VMRequest::discontiguous()), false),
             // ANCHOR_END: copyspace_new

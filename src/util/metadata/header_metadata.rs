@@ -2,7 +2,6 @@
 
 use atomic::Ordering;
 use std::fmt;
-use std::sync::atomic::AtomicU8;
 
 use crate::util::constants::{BITS_IN_BYTE, LOG_BITS_IN_BYTE};
 use crate::util::metadata::metadata_val_traits::*;
@@ -151,11 +150,11 @@ impl HeaderMetadataSpec {
             self.assert_spec::<T>();
         }
 
-        // metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask is required
+        // metadata smaller than 8-bits is special in that more than one metadata value may be included in one Atomic<u8> operation, and extra shift and mask is required
         let res: T = if self.num_of_bits < 8 {
             let byte_val = unsafe {
                 if let Some(order) = atomic_ordering {
-                    (self.meta_addr(header)).atomic_load::<AtomicU8>(order)
+                    (self.meta_addr(header)).atomic_load::<u8>(order)
                 } else {
                     (self.meta_addr(header)).load::<u8>()
                 }
@@ -220,7 +219,7 @@ impl HeaderMetadataSpec {
             self.assert_spec::<T>();
         }
 
-        // metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask, and compare_exchange is required
+        // metadata smaller than 8-bits is special in that more than one metadata value may be included in one Atomic<u8> operation, and extra shift and mask, and compare_exchange is required
         if self.num_of_bits < 8 {
             let val_u8 = val.to_u8().unwrap();
             let byte_addr = self.meta_addr(header);
@@ -276,17 +275,17 @@ impl HeaderMetadataSpec {
     ) -> Result<T, T> {
         #[cfg(debug_assertions)]
         self.assert_spec::<T>();
-        // metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask is required
+        // metadata smaller than 8-bits is special in that more than one metadata value may be included in one Atomic<u8> operation, and extra shift and mask is required
         if self.num_of_bits < 8 {
             let byte_addr = self.meta_addr(header);
             unsafe {
-                let real_old_byte = byte_addr.atomic_load::<AtomicU8>(success_order);
+                let real_old_byte = byte_addr.atomic_load::<u8>(success_order);
                 let expected_old_byte =
                     self.set_bits_to_u8(real_old_byte, old_metadata.to_u8().unwrap());
                 let expected_new_byte =
                     self.set_bits_to_u8(expected_old_byte, new_metadata.to_u8().unwrap());
                 byte_addr
-                    .compare_exchange::<AtomicU8>(
+                    .compare_exchange::<u8>(
                         expected_old_byte,
                         expected_new_byte,
                         success_order,

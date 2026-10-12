@@ -20,9 +20,8 @@ use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
-use std::sync::atomic::AtomicBool;
 
-use atomic::Ordering;
+use atomic::{Atomic, Ordering};
 use enum_map::EnumMap;
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
@@ -35,7 +34,7 @@ pub struct Immix<VM: VMBinding> {
     pub immix_space: ImmixSpace<VM>,
     #[parent]
     pub common: CommonPlan<VM>,
-    last_gc_was_defrag: AtomicBool,
+    last_gc_was_defrag: Atomic<bool>,
 }
 
 /// The plan constraints for the immix plan.
@@ -165,7 +164,7 @@ impl<VM: VMBinding> Immix<VM> {
                 space_args,
             ),
             common: CommonPlan::new(plan_args),
-            last_gc_was_defrag: AtomicBool::new(false),
+            last_gc_was_defrag: Atomic::new(false),
         }
     }
 

@@ -1,4 +1,4 @@
-use atomic::Ordering;
+use atomic::{Atomic, Ordering};
 
 use crate::global_state::{GcStatus, GlobalState};
 use crate::plan::Plan;
@@ -10,7 +10,6 @@ use crate::util::options::{GCTriggerSelector, Options, DEFAULT_MAX_NURSERY, DEFA
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::mem::MaybeUninit;
-use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
 /// GCTrigger is responsible for triggering GCs based on the given policy.
@@ -480,10 +479,10 @@ pub struct MemBalancerTrigger {
     /// The max heap size
     max_heap_pages: usize,
     /// The current heap size
-    current_heap_pages: AtomicUsize,
+    current_heap_pages: Atomic<usize>,
     /// The number of pending allocation pages. The allocation requests for them have failed, and a GC is triggered.
     /// We will need to take them into consideration so that the new heap size can accomodate those allocations.
-    pending_pages: AtomicUsize,
+    pending_pages: Atomic<usize>,
     /// Statistics
     stats: AtomicRefCell<MemBalancerStats>,
 }
@@ -736,9 +735,9 @@ impl MemBalancerTrigger {
         Self {
             min_heap_pages,
             max_heap_pages,
-            pending_pages: AtomicUsize::new(0),
+            pending_pages: Atomic::new(0),
             // start with min heap
-            current_heap_pages: AtomicUsize::new(min_heap_pages),
+            current_heap_pages: Atomic::new(min_heap_pages),
             stats: AtomicRefCell::new(Default::default()),
         }
     }

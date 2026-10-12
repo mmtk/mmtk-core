@@ -4,10 +4,10 @@ use super::work_counter::{WorkCounter, WorkCounterBase, WorkDuration};
 use crate::scheduler::work_counter::WorkPerfEvent;
 use crate::vm::VMBinding;
 use crate::MMTK;
+use atomic::{Atomic, Ordering};
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Merge and print the work-packet level statistics from all worker threads
 #[derive(Default)]
@@ -188,7 +188,7 @@ pub struct WorkerLocalStat<C> {
     work_id_name_map: HashMap<TypeId, &'static str>,
     work_counts: HashMap<TypeId, usize>,
     work_counters: HashMap<TypeId, Vec<Box<dyn WorkCounter>>>,
-    enabled: AtomicBool,
+    enabled: Atomic<bool>,
     _phantom: PhantomData<C>,
 }
 
@@ -200,7 +200,7 @@ impl<C> Default for WorkerLocalStat<C> {
             work_id_name_map: Default::default(),
             work_counts: Default::default(),
             work_counters: Default::default(),
-            enabled: AtomicBool::new(false),
+            enabled: Atomic::new(false),
             _phantom: Default::default(),
         }
     }

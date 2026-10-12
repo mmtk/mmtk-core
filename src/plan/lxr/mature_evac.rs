@@ -21,9 +21,8 @@ use crate::{
 
 use super::gc_work::mature_evac::EvacuateMatureObjects;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
-use atomic::Ordering;
+use atomic::{Atomic, Ordering};
 use crossbeam::queue::SegQueue;
-use std::sync::atomic::AtomicUsize;
 
 #[repr(C)]
 pub struct RemSetEntry<VM: VMBinding>(VM::VMSlot, u8);
@@ -48,7 +47,7 @@ pub struct MatureEvecRemSet<VM: VMBinding> {
     pub global_packets: Mutex<Vec<Box<dyn GCWork<VM>>>>,
     local_packets: Vec<UnsafeCell<Vec<Box<dyn GCWork<VM>>>>>,
     _p: PhantomData<VM>,
-    size: AtomicUsize,
+    size: Atomic<usize>,
 }
 
 unsafe impl<VM: VMBinding> Send for MatureEvecRemSet<VM> {}
@@ -61,7 +60,7 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
             global_packets: Mutex::new(vec![]),
             local_packets: vec![],
             _p: PhantomData,
-            size: AtomicUsize::new(0),
+            size: Atomic::new(0),
         };
         rs.gc_buffers
             .resize_with(workers, || UnsafeCell::new(vec![]));
@@ -124,11 +123,11 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
 #[derive(Default)]
 pub struct MatureEvacuationSet {
     pub fragmented_blocks: SegQueue<Vec<(Block, usize)>>,
-    pub fragmented_blocks_size: AtomicUsize,
+    pub fragmented_blocks_size: Atomic<usize>,
     pub blocks_in_fragmented_chunks: SegQueue<Vec<(Block, usize)>>,
-    pub blocks_in_fragmented_chunks_size: AtomicUsize,
+    pub blocks_in_fragmented_chunks_size: Atomic<usize>,
     pub defrag_blocks: Mutex<Vec<Block>>,
-    pub num_defrag_blocks: AtomicUsize,
+    pub num_defrag_blocks: Atomic<usize>,
 }
 
 impl MatureEvacuationSet {
