@@ -84,7 +84,21 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // If we should not poll, GC is not triggered.
         let gc_triggered = should_poll && {
             trace!("Polling ..");
-            self.get_gc_trigger().poll(false, Some(self.as_space()))
+            use crate::util::heap::gc_trigger::PollResult;
+            match self
+                .get_gc_trigger()
+                .poll_or_stall(false, Some(self.as_space()))
+            {
+                PollResult::NoCollection => false,
+                PollResult::CollectionRequested => true,
+                PollResult::Stall => {
+                    // An allocation stall: wait for the concurrent cycle to end, then take the
+                    // pages.  This is not a failed allocation attempt, so it does not count
+                    // towards running out of memory.
+                    VM::VMCollection::block_for_gc(VMMutatorThread(tls));
+                    false
+                }
+            }
         };
 
         // We can try to get pages if

@@ -44,13 +44,21 @@ pub struct ScheduleCollection;
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        // Determine collection kind
-        let is_emergency = mmtk.state.set_collection_kind(
-            mmtk.get_plan().last_collection_was_exhaustive(),
-            mmtk.gc_trigger.policy.can_heap_size_grow(),
-        );
-        if is_emergency {
-            mmtk.get_plan().notify_emergency_collection();
+        // Determine collection kind.  A pause that closes a concurrent cycle (such as
+        // `FinalMark`) belongs to the collection that the cycle's first pause started, so it is
+        // not another collection attempt.
+        let continues_cycle = mmtk
+            .get_plan()
+            .concurrent()
+            .is_some_and(|plan| plan.concurrent_work_in_progress());
+        if !continues_cycle {
+            let is_emergency = mmtk.state.set_collection_kind(
+                mmtk.get_plan().last_collection_was_exhaustive(),
+                mmtk.gc_trigger.policy.can_heap_size_grow(),
+            );
+            if is_emergency {
+                mmtk.get_plan().notify_emergency_collection();
+            }
         }
         mmtk.state.stacks_prepared.store(false, Ordering::SeqCst);
         // FIXME: This seems to be a weird place to start counting GC statistics.
