@@ -896,6 +896,21 @@ What exists on `mmtk-core-go-gc` and mmtk-openjdk `concurrent-span` after the fi
 
 **Evaluation kit.** `~/Code/concurrent-span-eval` (running-ng configs) compares `ConcurrentSpan` (both heap modes, and the ablations of §10.1) with `ConcurrentImmix`, G1, ZGC and Shenandoah. It needs a release build (with the inline allocation fast path, now merged) before its numbers mean anything.
 
+**First quick evaluation (2026-10-12).** Release build, `concurrent-span-quick.yml`, 3× G1's minimum heap, one invocation, timed iteration (ms):
+
+| Benchmark (heap) | G1 | ZGC | Shenandoah | ConcurrentImmix | ConcurrentSpan, memory limit only | ConcurrentSpan, `GOGC=100` |
+|---|---|---|---|---|---|---|
+| fop (39 MB) | 1860 | 4004 | 2242 | 1817 | 11384 | 16308 |
+| luindex (87 MB) | 7603 | 7363 | 8138 | 7114 | 7346 | 9687 |
+| lusearch (63 MB) | 18905 | 32157 | 34038 | 23921 | 29071 | 48185 |
+
+What this run found and fixed on the way (D24, D25, SP2): page allocation scanned every region (35% of lusearch's CPU near a 1 GiB limit); nothing fed the pacer's memory-limit goal, so the hard limit started every cycle with no runway; unswept garbage counted against the hard limit, so a cycle could start straight after the previous one and sweep the heap in its `InitialMark` pause. fop at 60 MB went from 13 s to 2.4 s (ConcurrentImmix: 1.8 s).
+
+Remaining observations:
+- fop at 39 MB is a capacity limit, not a pacing bug: about 28 MB is marked (allocate-black and floating garbage included) and spans hold about 20% free slots, so the heap is full and the collector runs back to back (350 cycles in the last iteration, up from 63 in the one before). A non-moving, size-segregated heap needs more than 3× G1's minimum here. Go would overshoot its soft limit instead; `-Xmx` is hard.
+- `GOGC=100` is expensive at these heap sizes because the live heaps are small (Go's policy, not a bug); compare at equal memory with the memory-limit mode.
+- During marking every allocation takes the slow path (allocate-black in the binding's fast path is not implemented, FP-4), and lusearch spends 2.3 s in 1087 pauses. Both are next candidates.
+
 ## Appendix A. Go → mmtk-core → OpenJDK concept map
 
 | Go | mmtk-core (`ConcurrentSpan`) | OpenJDK |
