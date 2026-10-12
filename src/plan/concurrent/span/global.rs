@@ -1,6 +1,7 @@
 use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::span::gc_work::ConcurrentSpanSTWGCWorkContext;
 use crate::plan::concurrent::span::mutator::ALLOCATOR_MAPPING;
+use crate::plan::concurrent::span::pacing::Pacing;
 use crate::plan::concurrent::Pause;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -39,6 +40,8 @@ pub struct ConcurrentSpan<VM: VMBinding> {
     pub common: CommonPlan<VM>,
     current_pause: Atomic<Option<Pause>>,
     previous_pause: Atomic<Option<Pause>>,
+    /// Decides when a cycle starts.
+    pacing: Pacing,
 }
 
 /// The plan constraints for `ConcurrentSpan`.
@@ -58,7 +61,13 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
-        self.base().collection_required(self, space_full)
+        // The heap size from the GC trigger is the hard limit.
+        if self.base().collection_required(self, space_full) {
+            return true;
+        }
+        // Otherwise the pacer decides (Go: `gcTrigger.test`, `runtime/mgc.go:706-725`).
+        self.pacing.report_heap_live(self.heap_live_bytes());
+        self.pacing.should_start_cycle()
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
@@ -78,6 +87,8 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
         // started by the preceding `InitialMark` pause.
         if pause != Pause::FinalMark {
             mmtk.gc_trigger.policy.on_gc_start(mmtk);
+            self.pacing.report_heap_live(self.heap_live_bytes());
+            self.pacing.start_cycle();
         }
         info!("{:?} start", pause);
     }
@@ -95,6 +106,7 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
     fn release(&mut self, tls: VMWorkerThread) {
         match self.current_pause().unwrap() {
             Pause::Full => {
+                self.pacing.end_marking();
                 self.ms.release();
                 self.common.release(tls, true);
             }
@@ -110,6 +122,9 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
         self.current_pause.store(None, Ordering::SeqCst);
         // Every pause ends a GC cycle, except `InitialMark`.
         if pause != Pause::InitialMark {
+            // TODO: Use the bytes marked once the space counts them.  The space's size after the
+            // sweep over-counts the live heap by its fragmentation.
+            self.pacing.end_cycle(self.heap_live_bytes());
             mmtk.gc_trigger.policy.on_gc_end(mmtk);
         }
         info!("{:?} end", pause);
@@ -141,7 +156,14 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
 }
 
 impl<VM: VMBinding> ConcurrentSpan<VM> {
+    /// The pacer's live heap estimate (Go's `heapLive`), in bytes.
+    // TODO: Count it at span refill, as Go does, once SpanSpace exists.
+    fn heap_live_bytes(&self) -> u64 {
+        crate::util::conversions::pages_to_bytes(self.get_used_pages()) as u64
+    }
+
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        let pacing = Pacing::new(&args.options);
         let mut global_side_metadata_specs = SideMetadataContext::new_global_specs(&[]);
         MarkSweepSpace::<VM>::extend_global_side_metadata_specs(&mut global_side_metadata_specs);
 
@@ -161,6 +183,7 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
             common: CommonPlan::new(plan_args),
             current_pause: Atomic::new(None),
             previous_pause: Atomic::new(None),
+            pacing,
         }
     }
 }

@@ -9,8 +9,9 @@ pub(crate) mod cpu_limiter;
 pub(in crate::plan) mod gc_work;
 pub(in crate::plan) mod global;
 pub(in crate::plan) mod mutator;
-// The pacer is not wired into a GC trigger yet.
+// Some of the pacer's inputs (assists, scan work, worker time) are not wired in yet.
 #[allow(dead_code)]
 pub(crate) mod pacer;
+mod pacing;
 
 pub use global::ConcurrentSpan;

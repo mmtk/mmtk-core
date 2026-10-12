@@ -1013,6 +1013,13 @@ options! {
     immix_defrag_headroom_percent: usize            [|v: &usize| *v <= 50] = 5,
     /// Disable concurrent marking in ConcurrentImmix. Setting this to true will make ConcurrentImmix behave exactly like full heap Immix. This option is only intended for debugging.
     concurrent_immix_disable_concurrent_marking: bool              [always_valid] = false,
+    /// ConcurrentSpan: the heap growth allowed over the live heap before the next cycle, in
+    /// percent, like Go's `GOGC`.  `-1` turns it off (`GOGC=off`), so only the memory limit
+    /// triggers collections.
+    gc_percent: isize                               [|v: &isize| *v >= -1] = 100,
+    /// ConcurrentSpan: the soft memory limit in bytes, like Go's `GOMEMLIMIT`.  `0`, the default,
+    /// uses the maximum heap size.
+    soft_mem_limit: usize                           [always_valid] = 0,
     /// Trigger an LXR pause once this many reference-count increments are pending, bounding the
     /// `RCProcessIncs` work a single pause has to do. Each pending increment is one slot the write
     /// barrier recorded, so the limit is roughly "words of reference stores between pauses".
