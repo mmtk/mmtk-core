@@ -1,4 +1,4 @@
-use crate::plan::concurrent::barrier::HYBRID_BARRIER_WORK_FLUSHES;
+use crate::plan::concurrent::barrier::BARRIER_WORK_FLUSHES;
 use crate::plan::concurrent::concurrent_marking_work::ConcurrentMarkingRootsWorkFactory;
 use crate::plan::concurrent::span::global::ConcurrentSpan;
 use crate::plan::tracing::PlanTrace;
@@ -46,9 +46,9 @@ impl<VM: VMBinding> GCWork<VM> for RaggedFlush {
             .get_plan()
             .downcast_ref::<ConcurrentSpan<VM>>()
             .unwrap();
-        let before = HYBRID_BARRIER_WORK_FLUSHES.load(Ordering::SeqCst);
+        let before = BARRIER_WORK_FLUSHES.load(Ordering::SeqCst);
         VM::VMCollection::flush_mutators_concurrently(worker.tls);
-        let found_work = HYBRID_BARRIER_WORK_FLUSHES.load(Ordering::SeqCst) != before;
+        let found_work = BARRIER_WORK_FLUSHES.load(Ordering::SeqCst) != before;
         plan.on_ragged_flush_done(found_work);
     }
 }

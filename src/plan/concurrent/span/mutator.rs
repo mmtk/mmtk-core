@@ -1,6 +1,7 @@
-use crate::plan::barriers::HybridBarrier;
-use crate::plan::concurrent::barrier::HybridBarrierSemantics;
+use crate::plan::barriers::{HybridBarrier, SATBBarrier};
+use crate::plan::concurrent::barrier::{HybridBarrierSemantics, SATBBarrierSemantics};
 use crate::plan::concurrent::span::ConcurrentSpan;
+use crate::plan::concurrent::Pause;
 use crate::plan::mutator_context::common_prepare_func;
 use crate::plan::mutator_context::common_release_func;
 use crate::plan::mutator_context::create_allocator_mapping;
@@ -19,6 +20,14 @@ use crate::MMTK;
 use enum_map::EnumMap;
 
 type BarrierSemanticsType<VM> = HybridBarrierSemantics<VM, ConcurrentSpan<VM>, DEFAULT_TRACE>;
+type SATBBarrierType<VM> = SATBBarrier<SATBBarrierSemantics<VM, ConcurrentSpan<VM>, DEFAULT_TRACE>>;
+
+/// With the SATB barrier option, turn its weak-reference barrier on or off.
+fn set_satb_weak_ref_barrier<VM: VMBinding>(mutator: &mut Mutator<VM>, enabled: bool) {
+    if let Some(barrier) = mutator.barrier.downcast_mut::<SATBBarrierType<VM>>() {
+        barrier.set_weak_ref_barrier_enabled(enabled);
+    }
+}
 
 fn get_span_allocator_mut<VM: VMBinding>(mutator: &mut Mutator<VM>) -> &mut SpanAllocator<VM> {
     unsafe {
@@ -35,6 +44,9 @@ pub fn concurrent_span_mutator_prepare<VM: VMBinding>(
     tls: VMWorkerThread,
 ) {
     get_span_allocator_mut::<VM>(mutator).prepare();
+    if mutator.plan.concurrent().unwrap().current_pause() == Some(Pause::InitialMark) {
+        set_satb_weak_ref_barrier(mutator, true);
+    }
     common_prepare_func(mutator, tls);
 }
 
@@ -45,6 +57,7 @@ pub fn concurrent_span_mutator_release<VM: VMBinding>(
     // Return (and, if stale, sweep) the cached spans. Runs after the plan's release, which
     // advanced the space's sweepgen.
     get_span_allocator_mut::<VM>(mutator).release();
+    set_satb_weak_ref_barrier(mutator, false);
     common_release_func(mutator, tls);
 }
 
@@ -82,9 +95,23 @@ pub fn create_concurrent_span_mutator<VM: VMBinding>(
         release_func: &concurrent_span_mutator_release,
     };
 
-    MutatorBuilder::new(mutator_tls, mmtk, config)
-        .barrier(Box::new(HybridBarrier::new(
-            BarrierSemanticsType::<VM>::new(mmtk, mutator_tls),
-        )))
-        .build()
+    let builder = MutatorBuilder::new(mutator_tls, mmtk, config);
+    if plan.satb {
+        let mut mutator = builder
+            .barrier(Box::new(SATBBarrierType::<VM>::new(
+                SATBBarrierSemantics::new(mmtk, mutator_tls),
+            )))
+            .build();
+        set_satb_weak_ref_barrier(
+            &mut mutator,
+            crate::plan::ConcurrentPlan::concurrent_work_in_progress(plan),
+        );
+        mutator
+    } else {
+        builder
+            .barrier(Box::new(HybridBarrier::new(
+                BarrierSemanticsType::<VM>::new(mmtk, mutator_tls),
+            )))
+            .build()
+    }
 }

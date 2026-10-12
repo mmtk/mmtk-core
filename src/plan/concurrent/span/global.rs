@@ -26,9 +26,10 @@ use crate::scheduler::{GCWorkScheduler, WorkBucketStage};
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
+use crate::util::metadata::log_bit::UnlogBitsOperation;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::VMWorkerThread;
-use crate::vm::{Collection, Scanning, VMBinding};
+use crate::vm::{Collection, ObjectModel, Scanning, VMBinding};
 use crate::MMTK;
 
 use atomic::Atomic;
@@ -90,6 +91,8 @@ pub struct ConcurrentSpan<VM: VMBinding> {
     stalls: AtomicUsize,
     /// Mutator stacks are scanned concurrently, not in `InitialMark`.
     concurrent_stack_scan: bool,
+    /// The plan uses the SATB barrier instead of `HybridBarrier`.
+    pub(in crate::plan) satb: bool,
 }
 
 /// The plan constraints for `ConcurrentSpan`.
@@ -103,9 +106,21 @@ pub const CONCURRENT_SPAN_CONSTRAINTS: PlanConstraints = PlanConstraints {
     ..PlanConstraints::default()
 };
 
+/// The plan constraints for `ConcurrentSpan` with the SATB barrier instead of `HybridBarrier`
+/// (option `concurrent_span_satb_barrier`), for comparison runs (design §5.6).
+pub const CONCURRENT_SPAN_SATB_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    barrier: crate::BarrierSelector::SATBBarrier,
+    needs_log_bit: true,
+    ..CONCURRENT_SPAN_CONSTRAINTS
+};
+
 impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
     fn constraints(&self) -> &'static PlanConstraints {
-        &CONCURRENT_SPAN_CONSTRAINTS
+        if self.satb {
+            &CONCURRENT_SPAN_SATB_CONSTRAINTS
+        } else {
+            &CONCURRENT_SPAN_CONSTRAINTS
+        }
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
@@ -190,6 +205,12 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
         match self.current_pause().unwrap() {
             Pause::Full | Pause::InitialMark => {
                 self.common.prepare(tls, true);
+                if self.satb && self.current_pause() == Some(Pause::InitialMark) {
+                    // The SATB barrier logs every object that existed when marking started.
+                    self.span.set_side_log_bits();
+                    self.common
+                        .schedule_unlog_bits_op(UnlogBitsOperation::BulkSet);
+                }
                 // Sweep termination: finish the previous cycle's sweeping, start a mark epoch.
                 self.span.prepare_initial_mark();
             }
@@ -201,6 +222,11 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
         let pause = self.current_pause().unwrap();
         match pause {
             Pause::Full | Pause::FinalMark => {
+                if self.satb && pause == Pause::FinalMark {
+                    self.span.clear_side_log_bits();
+                    self.common
+                        .schedule_unlog_bits_op(UnlogBitsOperation::BulkClear);
+                }
                 self.pacing.end_marking();
                 // Mark termination: sweepgen += 2.  Mutator release (after this) returns and
                 // sweeps the mutators' cached spans; sweep packets sweep the rest.
@@ -290,15 +316,27 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
         let pacing = Pacing::new(&args.options);
         let assists_enabled =
             *args.options.concurrent_span_assists && VM::VMCollection::supports_blocking_mutators();
-        let concurrent_stack_scan = !*args.options.concurrent_span_scan_stacks_in_pause
+        let satb = *args.options.concurrent_span_satb_barrier;
+        // With the SATB barrier, the stacks must be scanned at the start of marking.
+        let concurrent_stack_scan = !satb
+            && !*args.options.concurrent_span_scan_stacks_in_pause
             && VM::VMScanning::supports_concurrent_stack_scanning();
 
-        let mut global_side_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        let log_bit_specs = if satb {
+            crate::util::metadata::extract_side_metadata(&[*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC])
+        } else {
+            vec![]
+        };
+        let mut global_side_metadata_specs = SideMetadataContext::new_global_specs(&log_bit_specs);
         SpanSpace::<VM>::extend_global_side_metadata_specs(&mut global_side_metadata_specs);
 
         let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
-            constraints: &CONCURRENT_SPAN_CONSTRAINTS,
+            constraints: if satb {
+                &CONCURRENT_SPAN_SATB_CONSTRAINTS
+            } else {
+                &CONCURRENT_SPAN_CONSTRAINTS
+            },
             global_side_metadata_specs,
         };
 
@@ -333,6 +371,7 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
             stalls: AtomicUsize::new(0),
             soft_refs_strong: AtomicBool::new(false),
             concurrent_stack_scan,
+            satb,
         }
     }
 
@@ -507,7 +546,9 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
         self.for_each_space(&mut |space: &dyn Space<VM>| {
             space.set_allocate_as_live(active);
         });
-        HybridBarrierType::<VM>::set_active(active);
+        if !self.satb {
+            HybridBarrierType::<VM>::set_active(active);
+        }
     }
 
     /// The number of ragged flush rounds and `FinalMark` restarts in the current (or last) cycle.

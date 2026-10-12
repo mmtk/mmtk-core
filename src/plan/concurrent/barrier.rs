@@ -69,6 +69,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     fn flush_satb(&mut self) {
         if !self.satb.is_empty() {
             if self.should_create_satb_packets() {
+                BARRIER_WORK_FLUSHES.fetch_add(1, Ordering::SeqCst);
                 let satb = self.satb.take();
                 self.add_work(ProcessModBufSATB::<VM, P, KIND>::new(satb));
             } else {
@@ -80,6 +81,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     #[cold]
     fn flush_weak_refs(&mut self) {
         if !self.refs.is_empty() {
+            BARRIER_WORK_FLUSHES.fetch_add(1, Ordering::SeqCst);
             let nodes = self.refs.take();
             self.add_work(ProcessModBufSATB::<VM, P, KIND>::new(nodes));
         }
@@ -166,10 +168,11 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 }
 
-/// The number of non-empty `HybridBarrier` buffers flushed into tracing work so far.  A plan
+/// The number of non-empty barrier buffers (`HybridBarrier` or `SATBBarrier`) flushed into
+/// tracing work so far.  A plan
 /// compares it before and after flushing every mutator, to find out whether the mutators had
 /// any marking work buffered (Go: `gcMarkDoneFlushed`).
-pub(crate) static HYBRID_BARRIER_WORK_FLUSHES: std::sync::atomic::AtomicUsize =
+pub(crate) static BARRIER_WORK_FLUSHES: std::sync::atomic::AtomicUsize =
     std::sync::atomic::AtomicUsize::new(0);
 
 /// The slow-path semantics of `HybridBarrier`.
@@ -236,7 +239,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         }
         let objects = std::mem::replace(&mut self.buf, Vec::with_capacity(Self::BUFFER_SIZE));
         if self.should_create_packets() {
-            HYBRID_BARRIER_WORK_FLUSHES.fetch_add(1, Ordering::SeqCst);
+            BARRIER_WORK_FLUSHES.fetch_add(1, Ordering::SeqCst);
             self.add_work(ProcessModBufSATB::<VM, P, KIND>::new(objects));
         }
     }
@@ -247,7 +250,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         }
         let objects = std::mem::take(&mut self.rescan);
         if self.should_create_packets() {
-            HYBRID_BARRIER_WORK_FLUSHES.fetch_add(1, Ordering::SeqCst);
+            BARRIER_WORK_FLUSHES.fetch_add(1, Ordering::SeqCst);
             // The objects are allocated black, so they are already marked.  Scan their fields.
             self.add_work(super::concurrent_marking_work::ConcurrentTraceObjects::<
                 VM,

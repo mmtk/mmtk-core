@@ -1035,6 +1035,9 @@ options! {
     /// ConcurrentSpan: mark assists.  A mutator that allocates faster than marking progresses
     /// waits while an extra GC worker marks for it.  Only if the binding can block mutators.
     concurrent_span_assists: bool                   [always_valid] = true,
+    /// ConcurrentSpan: use the SATB barrier (as `ConcurrentImmix` does) instead of the hybrid
+    /// barrier, for comparison.  Stacks are then scanned in the InitialMark pause.
+    concurrent_span_satb_barrier: bool              [always_valid] = false,
     /// Trigger an LXR pause once this many reference-count increments are pending, bounding the
     /// `RCProcessIncs` work a single pause has to do. Each pending increment is one slot the write
     /// barrier recorded, so the limit is roughly "words of reference stores between pauses".
