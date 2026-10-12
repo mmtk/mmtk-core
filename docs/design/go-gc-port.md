@@ -588,18 +588,25 @@ Stalls are a fallback. The pacer's job (§5.10) is to finish each cycle before t
 
 ### 5.12 Green Tea span scanning (phase 6)
 
-Green Tea is plan-local. `SpanTraceObjects` already bypasses the generic `ObjectQueue`, so it can hold two queues:
-- a span queue: a local ring of 256 that spills to stealable shared rings;
-- an object queue.
+Green Tea is plan-local (`src/plan/concurrent/span/greentea.rs`, `src/policy/spanspace/span_queue.rs`), and on by default. The option `concurrent_span_green_tea = false` turns it off for ablation, which gives exactly the object-queue marking of phase 4.
 
-For `SpanSpace` one-page spans with 16–512 B objects:
-- `trace_object` sets the mark bit in an inline `SpanInlineMarkBits` block at the span page tail: `scans[63]`, `owned`, `marks[63]`, `class`.
-- It then tries to acquire `owned`. If that succeeds, it pushes the span.
-- `scan_span` computes `marks &^ scans` and scans those objects. At sweep, inline marks are ORed into `mark_bits`.
+`SpanTraceObjects` bypasses the generic `ObjectQueue`, so it holds two queues:
+- a span queue: a local FIFO ring of 256 per packet. As in Go's `spanQueue.put`, it spills half of the ring when full, and up to 16 spans every 64 puts when the last spill has been taken. Spills become new `SpanTraceObjects` packets, which other workers take from MMTk's bucket or steal from the worker's local packet buffer (deviation GT-3);
+- an object queue (LIFO), for larger objects and other spaces, with the same overflow splitting as `ConcurrentTraceObjects`.
+
+It takes local objects first, then local spans, as `gcDrain` does. All concurrent marking packets of the plan (roots, barrier buffer flushes, rescans, finalizable contents, and the work `FinalMark` finishes in the pause) are `ConcurrentTraceObjects` or `ProcessModBufSATB` packets that hand their objects to `SpanTraceObjects` through `ConcurrentPlan::trace_objects_concurrently` (decision D71). Stop-the-world `Full` pauses and reference processing keep the generic trace (GT-6).
+
+For `SpanSpace` one-page spans with 16–512 B scan objects (`SpanClass::uses_span_queue`):
+- `trace_object_for_span_queue` sets the object's mark bit, then tries to acquire the span's `owned` byte with Go's `tryAcquire`. If that succeeds, it pushes the span (with the object's index, for Go's one-mark fast path).
+- `scan_span` releases `owned` first, then scans `marks &^ scans` and sets those scan bits. A mark that raced with the scan is either seen by it or queues the span again.
+- Allocate-black sets the scan bit before the mark bit, so new objects are never scanned. The generic `trace_object` sets the scan bit of an object it enqueues.
+- The scan bits and `owned` are in the span descriptor, next to the mark bits, not in an inline block at the span page tail (deviation GT-1, decision D70). Sweeping clears them. There is nothing to OR into `mark_bits` at sweep, because the marks already are `mark_bits`.
 
 **Object scanning.** Go's span scan reads a span-tail pointer bitmap directly, with SIMD for dense spans. OpenJDK has no per-span pointer bitmap: reference fields are described per class (oop maps). We call `Scanning::scan_object` per marked object. That keeps Green Tea's locality and load-balancing benefit, without the SIMD path. Building pointer bitmaps for OpenJDK objects at allocation is out of scope.
 
-**Layout cost.** Green Tea reserves 128 B for inline marks in each one-page scan span. `nelems` is then computed from the remaining bytes, as in `initSpan` (`mheap.go:1458-1476`), so the generated table's object counts are not used directly for these classes.
+**Layout cost.** Go's Green Tea reserves 128 B for inline marks in each one-page span, and `initSpan` (`mheap.go:1458-1476`) computes `nelems` from the remaining bytes. With the state in the descriptor, `SpanSpace` keeps the generated table's object counts (GT-1).
+
+**Object references.** A span scan finds objects by index, so it has to turn a cell into an object reference. `SpanSpace` learns the offset of object references from their cells from the first object it marks for the span queue, and asserts that it never changes (0 in OpenJDK). Spans with padded cells (an allocation offset, never used by OpenJDK) use the object queue (decision D73).
 
 ### 5.13 Object index lookup
 
@@ -820,8 +827,9 @@ The riscv port has no SATB barrier today, and would need `HybridBarrier` too, so
 | Assists run mark work on the allocating goroutine | The mutator parks and an extra worker runs mark work (Stage A) | Mutators cannot run GC packets without an MEP-level scheduler change | Adds a park and wake per assist, and loses the mutator's cache locality |
 | Pointer-free objects in noscan spans, never scanned | On OpenJDK every object is in a scan span | `NoScan` is not used by mmtk-openjdk | Marking does more work than Go for primitive arrays: a queue push and an empty `scan_object` per object |
 | Specials (finalizers, cleanups, weak handles) processed lazily at sweep | MMTk reference and finalizer processing in FinalMark | Java semantics, and MMTk's own mechanism | The same for every MMTk plan compared. FinalMark includes reference processing |
-| Green Tea scans spans through span-tail pointer bitmaps, with SIMD | Green Tea span queues, but `scan_object` per object | OpenJDK describes reference fields per class, not per span | Green Tea's benefit is understated: locality, but no SIMD |
-| Mark bits in `gcBits` arenas, swapped with the alloc bits at sweep; Green Tea inline marks | Fixed per-span mark and alloc bitmaps in the span descriptor; sweep copies marks into the alloc bits and clears the marks (deviation SP1, decision D31). Green Tea inline marks as in Go | Simpler, same invariant (marks cleared per span by sweeping) | None on GC behaviour; slightly more descriptor memory |
+| Green Tea scans spans through span-tail pointer bitmaps, with SIMD | Green Tea span queues, but `scan_object` per object (GT-2) | OpenJDK describes reference fields per class, not per span | Green Tea's benefit is understated: locality, but no SIMD |
+| Per-P span rings, stealable through `spanSPMC` chains | A span ring per tracing packet; spills become MMTk work packets (GT-3) | MMTk's scheduler owns load balancing | Spans are shared at packet granularity; stealing is coarser than Go's |
+| Mark bits in `gcBits` arenas, swapped with the alloc bits at sweep; Green Tea inline marks | Fixed per-span mark and alloc bitmaps in the span descriptor; sweep copies marks into the alloc bits and clears the marks (deviation SP1, decision D31). Green Tea's scan bits and ownership byte are in the descriptor too (GT-1, D70) | Simpler, same invariant (marks cleared per span by sweeping) | None on GC behaviour; slightly more descriptor memory |
 | Heap grows by 64 MiB arenas; radix-tree page allocator over 4 MiB chunks; free pages kept and scavenged | 128 KiB page regions from MMTk's free-list page resource; linear first fit over regions; empty regions returned to MMTk at once (SP2, D30) | MMTk owns the address space and heap accounting; MockVM tests use 1 MiB heaps | Some tail fragmentation per region; RSS tracks live data more closely than Go without its scavenger |
 | 64 MiB `heapArena` with per-arena page maps | Page-map side metadata over MMTk 4 MiB chunks | MMTk owns the address space layout | Negligible |
 | Randomised heap base, fixed arena hints | MMTk VMMap placement | MMTk owns the layout | Negligible |

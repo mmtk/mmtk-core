@@ -51,6 +51,12 @@ Decisions made without asking the project lead, so that work could continue. Eac
 | D56 | 2026-10-12 | The SATB weak-reference load barrier (x86 interpreter, C1, C2) is needed again for `HybridBarrier` with another flag | Move it into the shared `MMTkBarrierSet{Assembler,C1,C2}` with the flag address as a parameter; SATB passes `CONCURRENT_MARKING_ACTIVE`. SATB's C1 test changes from `== 1` to `!= 0` (same for a 0/1 flag) | Yes | for review |
 | D57 | 2026-10-12 | How to test barrier paths before concurrent marking exists | Binding-only env var `MMTK_HYBRID_BARRIER_DEBUG_ALWAYS_ON=1` sets the flag once at start-up. mmtk-core drops the buffers while no marking is in progress | Yes | for review |
 | D58 | 2026-10-12 | aarch64 `HybridBarrier` cannot be tested on this machine | Not implemented. Its selection is compiled only on x86_64 (`#ifdef AMD64`); on aarch64, `ConcurrentSpan` fails at start-up with the existing "Unimplemented" guarantee | Yes | open |
+| D70 | 2026-10-12 | Where does Green Tea's per-span state (`scans`, `owned`, `marks`) live? | In the span descriptor, next to the existing mark bits; no inline block at the span page tail, and `nelems` unchanged (deviation GT-1) | Yes | for review |
+| D71 | 2026-10-12 | How does the plan's concurrent marking (roots, barrier flushes, finalizable contents, `FinalMark` finishing) use `SpanTraceObjects` without rewiring every producer? | A `ConcurrentPlan::trace_objects_concurrently` hook, called at the start of `ConcurrentTraceObjects::do_work` (which `ProcessModBufSATB` also runs). `ConcurrentSpan` takes the objects when Green Tea is on. Other plans keep the default | Yes | for review |
+| D72 | 2026-10-12 | What plays the part of Go's stealable span rings (`spanSPMC`)? | MMTk work packets: spilled spans become a new `SpanTraceObjects` packet; "chain empty" means the last spilled packet has started (GT-3) | Yes | for review |
+| D73 | 2026-10-12 | A span scan knows object indices; how does it get object references? | Learn the reference offset within the cell from the first object marked for the span queue, and assert it is constant. Spans with padded cells use the object queue (GT-5) | Yes | for review |
+| D74 | 2026-10-12 | Use Green Tea in stop-the-world `Full` pauses and reference processing too? | No: only in the concurrent marking packets. The generic `trace_object` sets scan bits, so both paths can meet in one span (GT-6) | Yes | for review |
+| D75 | 2026-10-12 | Background sweeping that ends without a pause leaves the `Concurrent` bucket enabled, so the next `InitialMark`'s root packets ran inside the pause, before `Prepare` (found by the Green Tea graph test; marking then lost every object) | `on_pause_start` disables `Concurrent` at the start of every pause that starts a cycle, as it already did for `FinalMark`. The scheduler reopens it after the pause if it holds work | Yes | for review |
 
 ## D1. Location of the engineering documents
 
@@ -325,3 +331,55 @@ The limits are guesses with headroom. If a legitimate build or run is killed, ra
 
 **To undo.** n/a.
 
+
+## D70. Green Tea's per-span state
+
+**Question.** Go keeps `spanInlineMarkBits` (`scans[63]`, `owned`, `marks[63]`, `class`) in the last 128 B of each one-page span, uses those marks instead of `gcmarkBits`, and ORs them into `gcmarkBits` at sweep. Design §5.12 planned the same, with `nelems` reduced as in `initSpan`.
+
+**Options.** 1. As Go: an inline block at the page tail, a second mark bitmap, and a merge at sweep. 2. Keep the marks in the descriptor's `mark_bits` (SP1) and add the scan bits and `owned` to the descriptor.
+
+**Decision.** Option 2 (deviation GT-1). The protocol is unchanged (`tryAcquire`, `release`, `marks &^ scans`), there is no second mark bitmap to merge, `is_live` and sweeping are unchanged, and the generated size-class tables stay valid. The cost is that marking touches the descriptor rather than the span page, which can change cache behaviour; this is recorded for the evaluation.
+
+**To undo.** Move `scan_bits`/`owned` (and the marks for these classes) to the span page tail in `span_queue.rs`, reserve 128 B in `SpanClass::nelems` for `uses_span_queue` classes, and OR the marks into `mark_bits` in `Span::sweep_bits`.
+
+## D71. Routing concurrent marking into `SpanTraceObjects`
+
+**Question.** Roots (`ConcurrentMarkingRootsWorkFactory`), barrier buffers (`HybridBarrierSemantics`, `SATBBarrierSemantics`), rescans, `ScanFinalizableContents`, and `FinalMark`'s finishing of left-over packets all create `ConcurrentTraceObjects` or `ProcessModBufSATB` packets, in code shared with `ConcurrentImmix`. The integrator is editing `ConcurrentSpan`'s `global.rs` at the same time.
+
+**Options.** 1. Plan-specific roots factory, barrier semantics and finalizer packet that create `SpanTraceObjects`. 2. One hook in `ConcurrentTraceObjects::do_work` that lets the plan trace the packet's objects with its own loop.
+
+**Decision.** Option 2: `ConcurrentPlan::trace_objects_concurrently(worker, objects, already_marked) -> Option<Vec<ObjectReference>>`, defaulting to "give them back". It covers every producer, including packets moved to `FinishConcurrentWork` by `FinalMark`, and the plan-side change is one trait method. The cost is one dynamic call per packet. With the option off, the hook gives the objects back and the generic loop runs unchanged.
+
+**To undo.** Remove the hook and its call; make the producers create `SpanTraceObjects` directly.
+
+## D72. Stealable span queues
+
+**Question.** Go's span queue spills into a chain of single-producer multi-consumer rings, which idle Ps steal from (`tryStealSpan`, guided by `work.spanqMask`). MMTk has no per-worker stealable queues of arbitrary items, but it has work packets, a per-worker local packet buffer that other workers steal from, and buckets.
+
+**Decision.** Keep Go's ring (256) and spill rule (half when full; up to 16 every 64 puts, only if more than 4 and the previous spill has been taken). A spill is a new `SpanTraceObjects` packet carrying the spans (and holding no ownership change: the spans stay owned by the queue). "The previous spill has been taken" is an `Arc<AtomicBool>` set when that packet starts. A packet drains its own queues before it ends, so no span is ever left queued in a finished packet.
+
+**To undo.** Replace the spill in `greentea.rs` with per-worker SPMC rings and a steal step in the worker loop (a scheduler change).
+
+## D73. Object references from object indices
+
+**Question.** `scan_span` scans objects by index, but `Scanning::scan_object` takes an `ObjectReference`, and MMTk has no API from object start to reference (MockVM's references are 8 bytes into the object; `SpanAllocator` can pad within a cell for an allocation offset).
+
+**Options.** 1. A new `ObjectModel` method (API change). 2. VO bits (a feature that ConcurrentSpan does not require). 3. Learn the offset from marked objects and check it.
+
+**Decision.** Option 3. `SpanSpace` stores the offset of the first object it marks for the span queue and asserts that every later one has the same offset. Allocations padded within their cell set the span's `padded` flag, and such spans use the object queue. Only objects allocated before marking can be found by a span scan (objects allocated during marking have their scan bit), so a span's flag is stable for those objects.
+
+**To undo.** Add `ObjectModel::object_start_to_ref` (or similar) and use it in `SpanSpace::scan_span`.
+
+## D74. Green Tea outside concurrent marking
+
+**Decision.** `Full` pauses (only `System.gc()` and the debug option) and the tracing done by reference processing and finalization in `FinalMark` keep the generic trace. The generic `SpanSpace::trace_object` sets the scan bit of a small object it enqueues, so a span scan never scans it again, and the debug check at sweep (every marked object in a span-queue span has its scan bit) holds on every path.
+
+**To undo.** Give the `Full` pause's work context a trace that uses `SpanTraceObjects`.
+
+## D75. `Concurrent` bucket left enabled after background sweeping
+
+**Question.** When background sweeping drains without a pause, `on_concurrent_work_drained` ends the concurrent phase, but the scheduler only closes `Concurrent` at the end of a pause. The next `InitialMark` added its root packets to an enabled, open bucket, so GC workers traced roots inside the pause before `Prepare`, against the previous cycle's mark bits; `prepare_initial_mark` then swept those marks away and the cycle marked nothing. Found by `mock_test_concurrent_span_greentea_graph` (second cycle), with Green Tea on or off. It is not a Green Tea change.
+
+**Decision.** In `on_pause_start`, after dropping left-over sweep packets, disable `Concurrent` for every pause that starts a cycle (it was already disabled for `FinalMark`). The scheduler re-enables it when the pause ends if it holds work. Committed on its own, before the Green Tea commits, so the integrator can take it separately.
+
+**To undo.** Remove the `set_enabled(false)` line in `on_pause_start`.

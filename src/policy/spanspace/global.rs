@@ -6,6 +6,7 @@ use super::pages::{FreeResult, PageAllocator, BYTES_IN_PAGE_REGION};
 #[cfg(feature = "vo_bit")]
 use super::sizeclasses::MAX_SMALL_SIZE;
 use super::span::{Span, SpanId, SpanTable};
+use super::span_queue::SpanWork;
 use super::sweep::{sweep_state, try_acquire, SweepSpans, SweepState};
 use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
 use crate::policy::gc_work::{PolicyTraceObject, TraceKind};
@@ -74,6 +75,26 @@ pub struct SpanSpace<VM: VMBinding> {
     last_sweep_residue_pages: AtomicUsize,
     refill_hook: OnceLock<RefillHook>,
     assist_hook: OnceLock<AssistHook>,
+    /// Green Tea span scanning is on (option `concurrent_span_green_tea`): the span queue may be
+    /// used, and scan bits are kept for [`SpanClass::uses_span_queue`] spans.
+    green_tea: bool,
+    /// The offset of an object reference from the start of its cell, learned from the first
+    /// object marked for the span queue (`usize::MAX` until then). A span scan finds objects by
+    /// index, so it has to turn cells into object references. Assumed to be the same for every
+    /// object (0 in OpenJDK), and checked.
+    object_ref_offset: AtomicUsize,
+}
+
+/// What [`SpanSpace::trace_object_for_span_queue`] asks its caller to do.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum SpanQueueTrace {
+    /// Nothing: the object was marked already, or needs no scanning, or its span is queued
+    /// already and the owner will scan it.
+    Done,
+    /// Scan the object (put it on the object queue).
+    ScanObject,
+    /// The caller took ownership of the object's span: put the span on the span queue.
+    ScanSpan(SpanWork),
 }
 
 impl<VM: VMBinding> SFT for SpanSpace<VM> {
@@ -258,6 +279,7 @@ impl<VM: VMBinding> SpanSpace<VM> {
             FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
         };
         let stripes = BYTES_MARKED_STRIPES;
+        let green_tea = *common.options.concurrent_span_green_tea;
         SpanSpace {
             common,
             pr,
@@ -275,7 +297,20 @@ impl<VM: VMBinding> SpanSpace<VM> {
             last_sweep_residue_pages: AtomicUsize::new(0),
             refill_hook: OnceLock::new(),
             assist_hook: OnceLock::new(),
+            green_tea,
+            object_ref_offset: AtomicUsize::new(usize::MAX),
         }
+    }
+
+    /// Whether Green Tea span scanning is on.
+    pub fn green_tea(&self) -> bool {
+        self.green_tea
+    }
+
+    /// Whether `span` keeps scan bits and may be queued (Green Tea).
+    #[inline(always)]
+    fn uses_span_queue(&self, span: &Span) -> bool {
+        self.green_tea && span.spanclass().uses_span_queue()
     }
 
     /// SpanSpace needs no global side metadata. (Exists so that plans can treat spaces alike.)
@@ -512,10 +547,112 @@ impl<VM: VMBinding> SpanSpace<VM> {
         if span.try_mark(index) {
             self.add_bytes_marked(span.elemsize());
             if !span.spanclass().noscan() {
+                if self.uses_span_queue(span) {
+                    // Green Tea: the object is scanned through the object queue, so a span scan
+                    // must not scan it again.
+                    span.try_set_scanned(index);
+                }
                 queue.enqueue(object);
             }
         }
         object
+    }
+
+    /// Mark an object for Green Tea tracing (Go: `tryDeferToSpanScan`,
+    /// `runtime/mgcmark_greenteagc.go:258-300`). Like [`Self::trace_object`], but if the object
+    /// is newly marked and its span uses the span queue, the caller tries to take ownership of
+    /// the span, and queues the span instead of the object if it got it. Otherwise the span is
+    /// already queued, and its owner will scan the object.
+    ///
+    /// Only used while Green Tea is on. Unlike Go, the object is counted in `bytes_marked` when
+    /// it is marked, not when its span is scanned (deviation GT-4).
+    #[inline(always)]
+    pub fn trace_object_for_span_queue(&self, object: ObjectReference) -> SpanQueueTrace {
+        debug_assert!(self.green_tea);
+        let addr = Self::object_start(object);
+        let span = self
+            .span_of(addr)
+            .unwrap_or_else(|| panic!("SpanSpace: {object} is not in an in-use span"));
+        let index = span.obj_index(addr);
+        debug_assert!(index < span.nelems());
+        if !span.spanclass().uses_span_queue() || span.padded.load(Ordering::Relaxed) {
+            // Larger objects (and padded cells, which no OpenJDK object has) use the object
+            // queue.
+            if span.try_mark(index) {
+                self.add_bytes_marked(span.elemsize());
+                if !span.spanclass().noscan() {
+                    if span.spanclass().uses_span_queue() {
+                        span.try_set_scanned(index);
+                    }
+                    return SpanQueueTrace::ScanObject;
+                }
+            }
+            return SpanQueueTrace::Done;
+        }
+        if !span.try_mark_for_span_queue(index) {
+            return SpanQueueTrace::Done;
+        }
+        self.add_bytes_marked(span.elemsize());
+        self.check_object_ref_offset(object, span.object_address(index));
+        // Queue up the object (as a representative for its span).
+        if span.try_acquire() {
+            SpanQueueTrace::ScanSpan(SpanWork {
+                id: self.span_id_of(span),
+                index: index as u32,
+            })
+        } else {
+            SpanQueueTrace::Done
+        }
+    }
+
+    /// Learn, or check, the offset of object references from their cells.
+    #[inline(always)]
+    fn check_object_ref_offset(&self, object: ObjectReference, cell: Address) {
+        let offset = object.to_raw_address() - cell;
+        let known = self.object_ref_offset.load(Ordering::Relaxed);
+        if known == offset {
+            return;
+        }
+        if known == usize::MAX {
+            if let Err(other) = self.object_ref_offset.compare_exchange(
+                usize::MAX,
+                offset,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                assert_eq!(other, offset, "SpanSpace: object reference offsets differ");
+            }
+            return;
+        }
+        panic!(
+            "SpanSpace: {object} is {offset} bytes into its cell, but other objects are {known} bytes in. Green Tea span scanning (option concurrent_span_green_tea) needs a constant offset."
+        );
+    }
+
+    /// Scan a queued span (Go: `scanSpan`, `runtime/mgcmark_greenteagc.go:808-905`): release the
+    /// ownership, then call `scan` with every object of the span that is marked and not scanned
+    /// yet, after setting its scan bit. Returns the number of objects.
+    ///
+    /// Go reads a span-tail pointer bitmap and scans the objects itself. Here the caller scans
+    /// each object with `Scanning::scan_object` (deviation GT-2).
+    pub fn scan_span(&self, work: SpanWork, mut scan: impl FnMut(ObjectReference)) -> usize {
+        let span = self.spans.get(work.id);
+        debug_assert!(span.is_in_use() && span.spanclass().uses_span_queue());
+        let offset = self.object_ref_offset.load(Ordering::Relaxed);
+        debug_assert_ne!(offset, usize::MAX);
+        let object_at = |index: usize| {
+            ObjectReference::from_raw_address(span.object_address(index) + offset).unwrap()
+        };
+        if span.release_ownership() == super::span_queue::SPAN_SCAN_ONE_MARK {
+            // Only the object that queued the span was marked: scan it alone.
+            let index = work.index as usize;
+            if span.try_set_scanned(index) {
+                scan(object_at(index));
+                return 1;
+            }
+            return 0;
+        }
+        span.take_unscanned(|index| scan(object_at(index)))
     }
 
     #[inline(always)]
@@ -534,7 +671,14 @@ impl<VM: VMBinding> SpanSpace<VM> {
             .span_of(addr)
             .expect("new object not in an in-use span");
         let index = span.obj_index(addr);
-        if span.try_mark(index) {
+        if self.uses_span_queue(span) {
+            // Go: `gcmarknewobject`.  No need to scan the new object.  The scan bit goes first,
+            // so a span scan never sees the new object marked but not scanned.
+            span.try_set_scanned(index);
+            if span.try_mark_for_span_queue(index) {
+                self.add_bytes_marked(span.elemsize());
+            }
+        } else if span.try_mark(index) {
             self.add_bytes_marked(span.elemsize());
         }
         if self.common.needs_log_bit {
@@ -769,6 +913,14 @@ impl<VM: VMBinding> SpanSpace<VM> {
             sg
         );
         self.pages_swept.fetch_add(span.npages(), Ordering::Relaxed);
+        // Green Tea: every marked object went through the span queue, the object queue or
+        // allocate-black, so every one has its scan bit.
+        debug_assert!(
+            !self.uses_span_queue(span) || span.count_marked_unscanned() == 0,
+            "SpanSpace sweep: span {} has {} marked object(s) that were never scanned",
+            span.start(),
+            span.count_marked_unscanned()
+        );
 
         let (nalloc, nfreed) = span.sweep_bits(|_index| {
             // Clear the VO bits of freed objects. We do not know where in the cell the object

@@ -193,6 +193,10 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
             if !leftover.is_empty() {
                 debug!("Dropped {} background sweep packet(s)", leftover.len());
             }
+            // If background sweeping finished without a pause, `Concurrent` is still enabled.
+            // Close it, or the root packets of this pause would run before `Prepare`.  The
+            // scheduler opens it after the pause if it holds work.
+            mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(false);
             mmtk.gc_trigger.policy.on_gc_start(mmtk);
             self.pacing.report_heap_live(self.heap_live_bytes());
             self.pacing.start_cycle();
@@ -689,6 +693,20 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentSpan<VM> {
 
     fn soft_references_are_strong(&self) -> bool {
         self.soft_refs_strong.load(Ordering::SeqCst)
+    }
+
+    fn trace_objects_concurrently(
+        &self,
+        worker: &mut crate::scheduler::GCWorker<VM>,
+        objects: Vec<crate::util::ObjectReference>,
+        already_marked: bool,
+    ) -> Option<Vec<crate::util::ObjectReference>> {
+        // Green Tea span scanning (design §5.12), unless ablated.
+        if !self.span.green_tea() {
+            return Some(objects);
+        }
+        super::greentea::trace_objects(worker, objects, already_marked);
+        None
     }
 
     fn stall_instead_of_pause(&self) -> bool {

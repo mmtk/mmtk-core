@@ -1038,6 +1038,10 @@ options! {
     /// ConcurrentSpan: use the SATB barrier (as `ConcurrentImmix` does) instead of the hybrid
     /// barrier, for comparison.  Stacks are then scanned in the InitialMark pause.
     concurrent_span_satb_barrier: bool              [always_valid] = false,
+    /// ConcurrentSpan: Green Tea span scanning.  Marking a small object (16-512 B) queues its
+    /// span, and a span is scanned all at once, as in Go's default collector.  If false, every
+    /// object is queued and scanned on its own, for ablation.
+    concurrent_span_green_tea: bool                 [always_valid] = true,
     /// Trigger an LXR pause once this many reference-count increments are pending, bounding the
     /// `RCProcessIncs` work a single pause has to do. Each pending increment is one slot the write
     /// barrier recorded, so the limit is roughly "words of reference stores between pauses".

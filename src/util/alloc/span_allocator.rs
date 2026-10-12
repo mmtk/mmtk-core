@@ -67,7 +67,7 @@ impl<VM: VMBinding> Allocator<VM> for SpanAllocator<VM> {
         let span = self.alloc[spc.index()];
         if let Some(cell) = span.next_free_fast() {
             Self::zero_if_needed(span, cell);
-            return Self::align_in_cell(cell, align, offset, pad);
+            return Self::align_in_cell(span, cell, align, offset, pad);
         }
         self.alloc_slow(size, align, offset)
     }
@@ -81,7 +81,7 @@ impl<VM: VMBinding> Allocator<VM> for SpanAllocator<VM> {
         }
         let (spc, pad) = self.span_class(size, align, offset);
         match self.next_free(spc) {
-            Some(cell) => Self::align_in_cell(cell, align, offset, pad),
+            Some(cell) => Self::align_in_cell(self.alloc[spc.index()], cell, align, offset, pad),
             None => Address::ZERO,
         }
     }
@@ -140,8 +140,16 @@ impl<VM: VMBinding> SpanAllocator<VM> {
     }
 
     #[inline(always)]
-    fn align_in_cell(cell: Address, align: usize, offset: usize, pad: bool) -> Address {
+    fn align_in_cell(
+        span: &Span,
+        cell: Address,
+        align: usize,
+        offset: usize,
+        pad: bool,
+    ) -> Address {
         if pad {
+            // Green Tea cannot find padded objects from their cells.
+            span.padded.store(true, Ordering::Relaxed);
             allocator::align_allocation::<VM>(cell, align, offset)
         } else {
             cell
