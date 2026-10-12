@@ -869,6 +869,33 @@ The riscv port has no SATB barrier today, and would need `HybridBarrier` too, so
 7. Is Stage A close enough to Go for the pacer simulations to hold? The pacer's `u` includes assist time, so park time and extra-worker time must be accounted as assist time.
 8. Should `FeedbackPacer` be usable with other concurrent plans? It can serve `ConcurrentImmix` too, given the same inputs.
 
+## 13. Implementation status (2026-10-12)
+
+What exists on `mmtk-core-go-gc` and mmtk-openjdk `concurrent-span` after the first session. Details and every simplification are in the [decisions](concurrent-span-decisions.md) and [deviations](concurrent-span-go-deviations.md) documents.
+
+| Phase | Item | Status |
+|---|---|---|
+| 1 | `ConcurrentSpan` plan, `FeedbackPacer` (all 18 `TestGcPacer` scenarios pass), CPU limiter | Done. The pacer is driven from the plan (D9), not a `GCTriggerSelector` |
+| 2 | `SpanSpace`: Go size classes (generated), spans, page map, central, `sweepgen`, lazy + background sweeping, allocate-black | Done, with simplifications SP1–SP12 (128 KiB page regions, per-span bitmaps, mutex central lists) |
+| 2 | `AllocationSemantics::NoScan` | Deferred (D33) |
+| 2 | OpenJDK inline allocation fast path | In progress (separate branch `concurrent-span-fastpath`); today every allocation calls into MMTk |
+| 3 | Concurrent marking, InitialMark/FinalMark, SATB option | Done |
+| 3 | Allocation stalls instead of a STW full GC | Done (D10, D16) |
+| 3 | Assists, Stage A (park + extra worker), CPU limiter gating | Done (D17, PLAN-2, PLAN-3) |
+| 3 | `System.gc()` as a concurrent cycle blocking only the caller | Done (D11) |
+| 4 | `HybridBarrier`: core, and mmtk-openjdk interpreter/C1/C2 on x86_64, arraycopy, clone, weak loads, VM-root stores, nmethods | Done on x86_64; aarch64 not implemented (D58) |
+| 4 | Concurrent stack scanning with handshakes; ragged flush; Go-style mark termination with restarts | Done |
+| 4 | Soft references strong while marking; finalizable contents scanned concurrently | Done (D15) |
+| 4 | Weak→strong block during mark termination | Not done (D18) |
+| 5 | `StackWatermark` stack scanning | Not started |
+| 6 | Green Tea span scanning | Done (D70–D75, GT-1..7); no oblets |
+| 7 | Scavenger, memory-limit RSS behaviour | Not started |
+| 8 | Real assists (MEP) | Not started |
+
+**Testing.** 34 MockVM test files for `ConcurrentSpan` (including real concurrent cycles, stalls, assists, user GCs during marking, Green Tea, a multi-threaded stress test), all passing with Green Tea on and off and with the SATB option. The other plans' mock tests still pass. On OpenJDK (fastdebug, x86_64), `ConcurrentSpan` runs a barrier stress test in the interpreter, C1 and C2, and DaCapo is being validated.
+
+**Evaluation kit.** `~/Code/concurrent-span-eval` (running-ng configs) compares `ConcurrentSpan` (both heap modes, and the ablations of §10.1) with `ConcurrentImmix`, G1, ZGC and Shenandoah. It needs a release build with the inline allocation fast path before its numbers mean anything.
+
 ## Appendix A. Go → mmtk-core → OpenJDK concept map
 
 | Go | mmtk-core (`ConcurrentSpan`) | OpenJDK |
