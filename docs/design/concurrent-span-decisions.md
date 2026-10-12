@@ -20,7 +20,7 @@ Decisions made without asking the project lead, so that work could continue. Eac
 | D8 | 2026-10-12 | The development machine has 8 cores and 125 GB, not 24 cores and 31 GB as engineering §6 says | Keep the 16 GB total. With up to three parallel agents, each build or test uses `MemoryMax=5G` and `-j 3` | Yes | for review |
 | D9 | 2026-10-12 | Where does the pacer plug in: a new `GCTriggerSelector::FeedbackPacer` (design §5.10) or the plan? | The plan: `ConcurrentSpan::collection_required` asks the pacer; the GC trigger's heap size stays the hard limit and is the default memory limit | Yes | for review |
 | D10 | 2026-10-12 | How does a mutator stall (design §5.11) without new binding APIs? | A `ConcurrentPlan::stall_instead_of_pause` hook: `GCTrigger::poll_or_stall` reports a stall, and `Space::acquire` blocks in `block_for_gc` until the next pause (FinalMark) ends, then takes its pages | Yes | for review |
-| D11 | 2026-10-12 | Is `System.gc()` a concurrent cycle that blocks the caller (design §5.2)? | No: still a stop-the-world `Pause::Full`, as in `ConcurrentImmix`. Waiting for a concurrent cycle with `block_for_gc` is racy (the cycle may end between the check and the wait) | Yes | for review |
+| D11 | 2026-10-12 | Is `System.gc()` a concurrent cycle that blocks the caller (design §5.2)? | Yes (changed later the same day, 82c520eff0): the caller waits for any cycle in progress, then for a whole new concurrent cycle, through `Collection::block_mutator_until`; option `concurrent_span_concurrent_user_gc`. Without blocking support it is a stop-the-world `Pause::Full` | Yes | for review |
 | D12 | 2026-10-12 | How many times may FinalMark restart concurrent marking? | At most `concurrent_span_max_mark_restarts` (8); then FinalMark finishes the marking in the pause. Go has no limit | Yes | for review |
 | D13 | 2026-10-12 | Where do ragged flush rounds run? | As a `RaggedFlush` packet in `Concurrent`, not in the last-parked-worker callback, which holds the worker monitor lock: a handshake there can deadlock with a mutator requesting a GC. Without `flush_mutators_concurrently`, FinalMark is requested directly | Yes | for review |
 | D14 | 2026-10-12 | `ConcurrentPlan::on_concurrent_work_drained` must be able to add work or ask for a pause | It returns `bool`; `true` makes the last parked worker look again. Changes `ConcurrentImmix` and LXR (return `false`). Candidate upstream change, now inside a port commit | Yes | for review |
@@ -141,7 +141,9 @@ The limits are guesses with headroom. If a legitimate build or run is killed, ra
 
 ## D11. `System.gc()`
 
-**Decision.** Stop-the-world `Pause::Full`. A Go-faithful version needs a race-free "wait until this cycle ends" primitive in the binding.
+**Decision.** First a stop-the-world `Pause::Full`, because waiting for a concurrent cycle with `block_for_gc` is racy. Once `Collection::block_mutator_until` existed (for assists, D17), `System.gc()` became Go's `runtime.GC()`: wait for the cycle in progress, then request a cycle and block only the caller until `completed_cycles` advances.
+
+**To undo.** `MMTK_CONCURRENT_SPAN_CONCURRENT_USER_GC=false`.
 
 ## D13. Ragged flush placement
 
