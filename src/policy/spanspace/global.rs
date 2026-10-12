@@ -267,6 +267,13 @@ impl<VM: VMBinding> PolicyTraceObject<VM> for SpanSpace<VM> {
 }
 
 impl<VM: VMBinding> SpanSpace<VM> {
+    /// The byte offset of the space's allocate-as-live (allocate-black) flag, an `AtomicBool`,
+    /// from the start of the space. An inline allocation fast path tests it (see
+    /// [`crate::util::alloc::AllocatorInfo::Span`]).
+    pub(crate) const fn allocate_as_live_offset() -> usize {
+        std::mem::offset_of!(Self, common) + std::mem::offset_of!(CommonSpace<VM>, allocate_as_live)
+    }
+
     pub fn new(args: PlanCreateSpaceArgs<VM>) -> Self {
         let scheduler = args.scheduler.clone();
         let vm_map = args.vm_map;

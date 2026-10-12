@@ -22,6 +22,7 @@ pub(super) struct SpanStats {
     stall_ns: Counter,
     assists: Counter,
     assists_parked: Counter,
+    assists_limited: Counter,
     sweep_residue_pages: Counter,
     /// When the current pause started.
     pause_start: Mutex<Option<Instant>>,
@@ -43,6 +44,7 @@ impl SpanStats {
             stall_ns: counter("span.stall.ns"),
             assists: counter("span.assists"),
             assists_parked: counter("span.assistsParked"),
+            assists_limited: counter("span.assistsLimited"),
             sweep_residue_pages: counter("span.sweepResiduePages"),
             pause_start: Mutex::new(None),
         }
@@ -95,6 +97,10 @@ impl SpanStats {
         if parked {
             Self::inc(&self.assists_parked, 1);
         }
+    }
+
+    pub(super) fn assist_limited(&self) {
+        Self::inc(&self.assists_limited, 1);
     }
 
     pub(super) fn sweep_residue(&self, pages: usize) {

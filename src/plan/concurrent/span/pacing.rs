@@ -4,13 +4,18 @@
 //! `FixedHeapSize`, which is `-Xmx` on OpenJDK) stays the hard limit, and is also the pacer's
 //! memory limit unless `soft_mem_limit` is set.
 
+use super::cpu_limiter::CpuLimiter;
 use super::pacer::FeedbackPacer;
 use crate::util::options::Options;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::time::Instant;
 
 pub(super) struct Pacing {
     pub(super) pacer: FeedbackPacer,
+    /// Go's GC CPU limiter: suppresses assists when the GC uses too much CPU.
+    pub(super) limiter: CpuLimiter,
+    /// When the current pause started, on the pacer's clock.
+    pause_start: AtomicI64,
     /// Go's `GOMAXPROCS`: the CPUs shared by the application and the GC.
     procs: usize,
     /// The last `heap_live` reported to the pacer, in bytes.
@@ -35,8 +40,11 @@ impl Pacing {
             0 => options.gc_trigger.max_heap_size(),
             limit => limit,
         };
+        let procs = num_cpus::get();
         Self {
             pacer: FeedbackPacer::new(gc_percent, Some(mem_limit as u64)),
+            limiter: CpuLimiter::new(0, procs as i32),
+            pause_start: AtomicI64::new(0),
             procs: num_cpus::get(),
             reported_heap_live: AtomicU64::new(0),
             epoch: Instant::now(),
@@ -83,6 +91,30 @@ impl Pacing {
 
     pub(super) fn now_ns(&self) -> i64 {
         self.now()
+    }
+
+    /// A pause started.
+    pub(super) fn pause_started(&self) {
+        self.pause_start.store(self.now(), Ordering::Relaxed);
+    }
+
+    /// A pause that turned marking on or off has ended (Go: `gcCPULimiter.startGCTransition`
+    /// and `finishGCTransition` around the STW pauses).  The pause counts as GC time on every
+    /// CPU.
+    pub(super) fn limiter_transition(&self, marking: bool) {
+        let start = self.pause_start.load(Ordering::Relaxed);
+        self.limiter.start_gc_transition(marking, start);
+        self.limiter.finish_gc_transition(self.now());
+    }
+
+    /// Return `true` if the CPU limiter is limiting, so assists should not run (Go:
+    /// `gcCPULimiter.limiting()` in `gcAssistAlloc`).  Updates the limiter if it is due.
+    pub(super) fn limiting(&self) -> bool {
+        let now = self.now();
+        if self.limiter.need_update(now) {
+            self.limiter.update(now);
+        }
+        self.limiter.limiting()
     }
 
     /// A cycle starts (Go: `gcStart`).

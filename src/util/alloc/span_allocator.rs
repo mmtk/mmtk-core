@@ -91,7 +91,20 @@ impl<VM: VMBinding> Allocator<VM> for SpanAllocator<VM> {
     }
 }
 
+/// The index in [`SpanAllocator::alloc`] of the span class that a [`SpanAllocator`] allocates in
+/// for `size` bytes aligned to `align` with no allocation offset, or `None` if no small size class
+/// fits. A binding can tabulate this to generate an inline fast path (see
+/// [`crate::util::alloc::AllocatorInfo::Span`]).
+pub fn span_class_index(size: usize, align: usize, noscan: bool) -> Option<usize> {
+    size_to_class_aligned(size, align).map(|class| SpanClass::new(class, noscan).index())
+}
+
 impl<VM: VMBinding> SpanAllocator<VM> {
+    /// The byte offset of the `space` field.
+    pub(crate) const fn space_offset() -> usize {
+        std::mem::offset_of!(Self, space)
+    }
+
     pub(crate) fn new(
         tls: VMThread,
         space: &'static SpanSpace<VM>,

@@ -4,7 +4,7 @@
 //! on (`SpanSpace`), the same way `ConcurrentImmix` is named after `ImmixSpace`.
 
 mod assist;
-// The CPU limiter is not wired into the plan yet.
+// Some of the CPU limiter's inputs (idle time) are not wired in.
 #[allow(dead_code)]
 pub(crate) mod cpu_limiter;
 pub(in crate::plan) mod gc_work;

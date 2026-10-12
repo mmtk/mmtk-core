@@ -210,6 +210,7 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
             mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].set_enabled(false);
         }
         self.stats.pause_started();
+        self.pacing.pause_started();
         info!("{:?} start", pause);
     }
 
@@ -268,6 +269,7 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
         let cycle_ended = match pause {
             Pause::InitialMark => {
                 self.start_concurrent_marking(mmtk);
+                self.pacing.limiter_transition(true);
                 false
             }
             Pause::FinalMark if self.restarting.swap(false, Ordering::SeqCst) => {
@@ -280,6 +282,9 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
 
         if cycle_ended {
             self.completed_cycles.fetch_add(1, Ordering::SeqCst);
+            if pause == Pause::FinalMark {
+                self.pacing.limiter_transition(false);
+            }
             // Soft references are strong until the end of the cycle, including any marking
             // finished in the `FinalMark` pause.
             self.soft_refs_strong.store(false, Ordering::SeqCst);
@@ -607,6 +612,11 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
             *credit = 0;
             return;
         }
+        if self.pacing.limiting() {
+            // The GC is using too much CPU: do not assist (the debt stays).
+            self.stats.assist_limited();
+            return;
+        }
         match self.assists.start(&self.pacing.pacer, *credit) {
             AssistOutcome::Paid(bytes) => {
                 self.stats.assist(false);
@@ -628,9 +638,9 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
                 });
                 self.assists.unparked();
                 // Stage A counts the time parked as assist time.
-                self.pacing
-                    .pacer
-                    .add_assist_time(self.pacing.now_ns() - start);
+                let parked = self.pacing.now_ns() - start;
+                self.pacing.pacer.add_assist_time(parked);
+                self.pacing.limiter.add_assist_time(parked);
                 *credit = if self.marking.load(Ordering::SeqCst) {
                     *credit + bytes
                 } else {

@@ -228,10 +228,23 @@ pub enum AllocatorInfo {
     /// next index is not a multiple of 64 (Go's `nextFreeFast`). It then updates `alloc_cache`,
     /// `freeindex` and `alloc_count`. If the span's `needzero` is set, the object must be zeroed.
     /// Otherwise it calls the slow path.
+    ///
+    /// While the space allocates objects black (concurrent marking), new objects must be marked,
+    /// which only the slow path does. The fast path loads the space pointer at `space_offset` from
+    /// the mutator and takes the slow path if the byte at `allocate_black_offset` from it is not
+    /// zero (Go's malloc fast paths bail out while `gcBlackenEnabled` is set). The flag only
+    /// changes while mutators are stopped.
+    ///
+    /// [`crate::util::alloc::span_allocator::span_class_index`] gives the span class index for an
+    /// allocation size.
     Span {
         /// The byte offset from the mutator's pointer to the allocator's array of span pointers,
         /// indexed by span class.
         spans_offset: usize,
+        /// The byte offset from the mutator's pointer to the allocator's pointer to its space.
+        space_offset: usize,
+        /// The byte offset of the space's allocate-black flag (a byte) from the space pointer.
+        allocate_black_offset: usize,
         /// Offsets of the fields in a span descriptor.
         alloc_cache_offset: usize,
         freeindex_offset: usize,
@@ -289,6 +302,8 @@ impl AllocatorInfo {
                 use crate::policy::spanspace::Span;
                 AllocatorInfo::Span {
                     spans_offset: base_offset + offset_of!(SpanAllocator<VM>, alloc),
+                    space_offset: base_offset + SpanAllocator::<VM>::space_offset(),
+                    allocate_black_offset: SpanSpace::<VM>::allocate_as_live_offset(),
                     alloc_cache_offset: offset_of!(Span, alloc_cache),
                     freeindex_offset: offset_of!(Span, freeindex),
                     nelems_offset: offset_of!(Span, nelems),
