@@ -14,6 +14,7 @@ Decisions made without asking the project lead, so that work could continue. Eac
 | D2 | 2026-10-12 | `define_mock_vm!` (configurable MockVM) is on the `configurable-mock-vm` branch, not on `master`. Do we build on it? | Not at first. Use the default MockVM. If a test needs a different config, cherry-pick that branch's MockVM change onto this branch as a separable commit, and record it here and in the upstream-changes doc | Yes | for review |
 | D3 | 2026-10-12 | How are fixes to existing code kept separable? | One commit per fix, made before the port commits that use it, with the upstream-changes doc updated in a separate docs-only commit | Yes | for review |
 | D4 | 2026-10-12 | Commit the design and engineering docs? | Yes: one docs-only commit on `mmtk-core-go-gc` with the design doc and these four documents | Yes (amend or revert locally; nothing is pushed) | for review |
+| D5 | 2026-10-12 | Which memory caps, and how to enforce them? | cgroup caps through `systemd-run --user --scope`: 8 GB for builds, 4 GB per MockVM test, `-Xmx` + 2 GB per JVM; at most 16 GB at once | Yes | for review |
 
 ## D1. Location of the engineering documents
 
@@ -60,3 +61,22 @@ Decisions made without asking the project lead, so that work could continue. Eac
 **Decision.** Yes, as one docs-only commit on the `mmtk-core-go-gc` branch, which is the port branch in this worktree. Commits are allowed; pushing is not, so this stays local.
 
 **To undo.** `git reset --soft HEAD~1` (or amend). Nothing has left the machine.
+
+## D5. Memory caps
+
+**Question.** Every process must have bounded memory. What mechanism, and what limits?
+
+**Options for the mechanism.**
+1. `ulimit -v`: fails for MMTk, which reserves a large virtual address range up front.
+2. `prlimit --rss`: not enforced by Linux.
+3. A cgroup memory limit through `systemd-run --user --scope -p MemoryMax=...`: limits resident memory for the command and everything it starts. It works on the development machine (a process using 400 MB under a 200 MB cap was killed).
+
+**Decision.** Option 3, with these limits:
+- builds, clippy and unit tests: 8 GB, with `-j 8`;
+- one MockVM test: 4 GB, with a fixed heap of normally 1 GB or less;
+- one OpenJDK run: `-Xmx` + 2 GB;
+- everything running at once: at most 16 GB, half of the machine's 31 GB.
+
+The limits are guesses with headroom. If a legitimate build or run is killed, raise that cap and record the new value here.
+
+**To undo.** Change engineering §6.

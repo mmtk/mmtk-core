@@ -31,12 +31,14 @@ Most of the early work cannot run on OpenJDK yet: the binding work comes later, 
   - Per-test VM configurations (`define_mock_vm!`) exist on the `configurable-mock-vm` branch, not on master. See decision D2.
 - **Then OpenJDK.** Once binding work exists for a phase, run the `sanity`-feature build and a DaCapo subset on OpenJDK (design §10.2). Until then, a phase is not finished, but it can be committed if MockVM tests pass.
 
-**Before every commit:**
+**Before every commit** (with the memory cap from §6):
 ```
+CAP="systemd-run --user --scope -q -p MemoryMax=8G -p MemorySwapMax=0"
 cargo fmt
-cargo clippy --features mock_test --tests --benches
-cargo test                                   # unit tests
-# mock tests that the change can affect, with the plans they need
+$CAP cargo clippy -j 8 --features mock_test --tests --benches
+$CAP cargo test -j 8                         # unit tests
+# mock tests that the change can affect, with the plans they need, each with
+# MMTK_GC_TRIGGER=FixedHeapSize:<bytes> and under $CAP
 ```
 
 ## 2. Separable commits for fixes and improvements
@@ -89,3 +91,33 @@ Work proceeds without stopping to ask. When a question comes up that the project
 3. Carry on.
 
 Things that are never done autonomously, even with a decision record: pushing, publishing, deleting someone else's work, or changing anything outside this worktree. Those are written up as an open item in the decisions doc instead.
+
+## 6. Bounded memory
+
+Never run anything whose memory use is unbounded. The development machine (31 GB RAM, 24 cores) is shared with other work, and a runaway process can take the whole machine down.
+
+**Cap every process's resident memory with a cgroup:**
+```
+systemd-run --user --scope -q -p MemoryMax=<limit> -p MemorySwapMax=0 <command>
+```
+- The limit covers the command and every process it starts. If they go over, the kernel kills them (exit status 137). This has been checked on the development machine.
+- `MemorySwapMax=0` stops the process from escaping the cap by swapping.
+- Do not use `ulimit -v`: MMTk reserves a large virtual address range up front, so it fails even when real memory use is small. Do not rely on `prlimit --rss`: Linux does not enforce it.
+
+**Default limits** (decision D5):
+
+| What | Cap | Also |
+|---|---|---|
+| `cargo build`, `cargo clippy`, `cargo test` | `MemoryMax=8G` | `-j 8` to limit parallel compilers and linkers |
+| A MockVM test | `MemoryMax=4G` | `MMTK_GC_TRIGGER=FixedHeapSize:<bytes>`, normally 1 GB or less |
+| An OpenJDK run | `-Xmx` + 2 GB | Always set `-Xmx` (and `-Xms`). The extra 2 GB covers metaspace, code cache, thread stacks and MMTk side metadata |
+
+**Always bound the heap.** Never run MMTk with an unbounded trigger. MockVM tests use `FixedHeapSize`. `FeedbackPacer` runs always have a maximum heap size (and `soft_mem_limit`), even when measuring Go's default `gc_percent` behaviour.
+
+**Keep the total small.** Processes running at the same time must have caps that add up to at most 16 GB, half the machine. In practice, run one OpenJDK benchmark at a time.
+
+**Bound time too.** Run long jobs under `timeout`, so a hang does not hold memory forever.
+
+**Bound the tests themselves.** A stress test or allocation loop must have a fixed number of iterations or a fixed total allocation, not "until something happens".
+
+**Measure.** For benchmark and stress runs, wrap the command in `/usr/bin/time -v` and record "Maximum resident set size" next to the results.
