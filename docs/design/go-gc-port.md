@@ -368,7 +368,7 @@ Retrofitting all of that would change `MarkSweepSpace` for its current users (Ma
   3. Set `sweepgen = sg + 3`.
 - Refill is also where Go charges `heapLive`. It over-counts by the span's free bytes. Refill is the pacer poll point (§5.10) and the assist debit point (§5.11).
 - Zeroing: a span carries `needzero`. Fresh pages from the mmapper are zero, so only reused spans zero on allocation, as in Go.
-- **OpenJDK fast path.** Until mmtk-openjdk emits the `alloc_cache` ctz fast path in its x86_64 and aarch64 assemblers and C2, every allocation calls into MMTk (gap 9). That is correct but slow, so functional phases can run without it, but performance numbers need it. It needs an `AllocatorInfo` variant for `SpanAllocator` in mmtk-core.
+- **OpenJDK fast path.** Until mmtk-openjdk emits the `alloc_cache` ctz fast path in its x86_64 and aarch64 assemblers and C2, every allocation calls into MMTk (gap 9). That is correct but slow, so functional phases can run without it, but performance numbers need it. It needs an `AllocatorInfo` variant for `SpanAllocator` in mmtk-core. **Status:** done for x86_64 (interpreter, C1, C2) using `AllocatorInfo::Span` (with `space_offset`/`allocate_black_offset` for the allocate-black bail-out) and `span_allocator::span_class_index`; aarch64 still takes the slow path. Decisions D80-D87, deviations FP-1..FP-5.
 
 **Object references.**
 - OpenJDK references always point to the object start, and mmtk-openjdk uses no allocation offset.
