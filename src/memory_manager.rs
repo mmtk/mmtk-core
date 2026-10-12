@@ -833,6 +833,17 @@ pub fn add_weak_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference)
     mmtk.reference_processors.add_weak_candidate(reff);
 }
 
+/// Make sure the given objects are marked in the current concurrent marking, if any (Go's
+/// `shade`).  A binding calls this when a reference is stored somewhere the plan has already
+/// scanned and that has no write barrier, for example into a VM root (such as a JNI global
+/// handle) or a newly registered compiled method, while a concurrent plan is marking.  Outside
+/// concurrent marking, or for plans that do not need it, it does nothing.
+pub fn shade_objects<VM: VMBinding>(mmtk: &MMTK<VM>, objects: &[ObjectReference]) {
+    if let Some(plan) = mmtk.get_plan().concurrent() {
+        plan.shade_objects(objects);
+    }
+}
+
 /// Return `true` if the binding should treat soft references as strong references now: when it
 /// scans a soft reference, it should report the referent as an ordinary (strong) slot instead of
 /// calling [`add_soft_candidate`].

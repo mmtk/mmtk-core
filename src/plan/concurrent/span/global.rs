@@ -641,6 +641,22 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentSpan<VM> {
         // Otherwise background sweeping was interrupted by a new cycle.
     }
 
+    fn shade_objects(&self, objects: &[crate::util::ObjectReference]) {
+        if objects.is_empty() || !self.marking.load(Ordering::SeqCst) {
+            return;
+        }
+        use crate::plan::concurrent::concurrent_marking_work::ProcessModBufSATB;
+        let packet =
+            ProcessModBufSATB::<VM, ConcurrentSpan<VM>, DEFAULT_TRACE>::new(objects.to_vec());
+        let bucket = &self.common.base.scheduler.work_buckets[WorkBucketStage::Concurrent];
+        if bucket.is_enabled() {
+            bucket.add(packet);
+        } else {
+            // In a pause (`FinalMark` checks this bucket for work).
+            bucket.add_no_notify(packet);
+        }
+    }
+
     fn counts_scan_work(&self) -> bool {
         true
     }

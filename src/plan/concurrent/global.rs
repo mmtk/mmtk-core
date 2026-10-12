@@ -35,6 +35,8 @@ pub trait ConcurrentPlan: Plan {
     /// found on stacks and elsewhere (Go's `heapScanWork`, `stackScanWork` and
     /// `globalsScanWork`).  Only called if [`ConcurrentPlan::counts_scan_work`] returns `true`.
     fn add_scan_work(&self, _heap: usize, _stack: usize, _globals: usize) {}
+    /// See [`crate::memory_manager::shade_objects`].
+    fn shade_objects(&self, _objects: &[crate::util::ObjectReference]) {}
     /// See [`crate::memory_manager::soft_references_are_strong`].
     fn soft_references_are_strong(&self) -> bool {
         false

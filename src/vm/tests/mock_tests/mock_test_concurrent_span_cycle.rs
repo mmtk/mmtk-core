@@ -71,6 +71,8 @@ pub fn concurrent_cycle() {
             let b = alloc(&fixture);
             let c = alloc(&fixture);
             let garbage = alloc(&fixture);
+            // Unreachable, but shaded while marking (as a binding does for VM-root stores).
+            let shaded = alloc(&fixture);
             link(a, b);
             link(b, c);
             ROOT.store(a.to_raw_address().as_usize(), Ordering::SeqCst);
@@ -85,6 +87,7 @@ pub fn concurrent_cycle() {
             link(a, c);
             memory_manager::object_reference_write_pre(fixture.mutator(), b, field(b), None);
             unsafe { field(b).store(0usize) };
+            memory_manager::shade_objects(mmtk, &[shaded]);
 
             // Park whenever a pause is requested, until the cycle is over.
             let mut finished = false;
@@ -103,7 +106,7 @@ pub fn concurrent_cycle() {
             info!("ragged rounds: {ragged_rounds}, restarts: {restarts}");
             assert!(ragged_rounds >= 1);
 
-            for object in [a, b, c] {
+            for object in [a, b, c, shaded] {
                 assert!(memory_manager::is_live_object(object), "{object} is dead");
             }
             assert!(!memory_manager::is_live_object(garbage));
