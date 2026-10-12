@@ -720,9 +720,17 @@ impl<VM: VMBinding> SpanSpace<VM> {
         alloc_options: AllocationOptions,
     ) -> Option<(SpanId, &Span)> {
         let npages = spc.npages();
+        let reserved_before = self.pr.reserved_pages();
         let (start, needzero) = loop {
             if let Some(r) = self.pages.alloc(npages) {
                 break r;
+            }
+            // Go: `mheap.alloc` calls `reclaim` to sweep before growing the heap.  Without it,
+            // the pages of unswept garbage count against the heap limit, and allocating right
+            // after a cycle stalls or triggers another cycle.  Stop once a page region has gone
+            // back to MMTk (D30): acquiring a region then does not grow the heap.
+            if self.pr.reserved_pages() >= reserved_before && self.sweep_one() > 0 {
+                continue;
             }
             let region = self.acquire(
                 tls,
