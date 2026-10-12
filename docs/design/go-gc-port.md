@@ -878,7 +878,7 @@ What exists on `mmtk-core-go-gc` and mmtk-openjdk `concurrent-span` after the fi
 | 1 | `ConcurrentSpan` plan, `FeedbackPacer` (all 18 `TestGcPacer` scenarios pass), CPU limiter | Done. The pacer is driven from the plan (D9), not a `GCTriggerSelector` |
 | 2 | `SpanSpace`: Go size classes (generated), spans, page map, central, `sweepgen`, lazy + background sweeping, allocate-black | Done, with simplifications SP1–SP12 (128 KiB page regions, per-span bitmaps, mutex central lists) |
 | 2 | `AllocationSemantics::NoScan` | Deferred (D33) |
-| 2 | OpenJDK inline allocation fast path | In progress (separate branch `concurrent-span-fastpath`); today every allocation calls into MMTk |
+| 2 | OpenJDK inline allocation fast path (`nextFreeFast`) | Done on x86_64 interpreter, C1 and C2 (D80–D87, FP-1..5); bails to the slow path while allocating black. aarch64 not done |
 | 3 | Concurrent marking, InitialMark/FinalMark, SATB option | Done |
 | 3 | Allocation stalls instead of a STW full GC | Done (D10, D16) |
 | 3 | Assists, Stage A (park + extra worker), CPU limiter gating | Done (D17, PLAN-2, PLAN-3) |
@@ -894,7 +894,7 @@ What exists on `mmtk-core-go-gc` and mmtk-openjdk `concurrent-span` after the fi
 
 **Testing.** 34 MockVM test files run with `ConcurrentSpan`, 16 of them specific to it (including real concurrent cycles, stalls, assists, user GCs during marking, Green Tea, a multi-threaded stress test), all passing with Green Tea on and off and with the SATB option. The other plans' mock tests still pass. On OpenJDK (fastdebug, x86_64), `ConcurrentSpan` runs a barrier stress test in the interpreter, C1 and C2, and DaCapo fop, luindex, lusearch (`-s small`) and h2 (`-s small`) pass with C1 only, C2 only and (fop, h2) tiered, with and without `MMTK_HYBRID_BARRIER_DEBUG_ALWAYS_ON`. Default-size lusearch is slow rather than stuck: with `gc_percent=100` its small live heap gives a heap goal of about 27 MB, so thousands of cycles run (as Go would with `GOGC=100`). Fastdebug `-Xint` is too slow for the DaCapo harness. After the barrier began dropping already-marked objects at flush time (as `wbBufFlush1` does), FinalMark restarts on fop fell from 53 in 66 cycles to 0–1.
 
-**Evaluation kit.** `~/Code/concurrent-span-eval` (running-ng configs) compares `ConcurrentSpan` (both heap modes, and the ablations of §10.1) with `ConcurrentImmix`, G1, ZGC and Shenandoah. It needs a release build with the inline allocation fast path before its numbers mean anything.
+**Evaluation kit.** `~/Code/concurrent-span-eval` (running-ng configs) compares `ConcurrentSpan` (both heap modes, and the ablations of §10.1) with `ConcurrentImmix`, G1, ZGC and Shenandoah. It needs a release build (with the inline allocation fast path, now merged) before its numbers mean anything.
 
 ## Appendix A. Go → mmtk-core → OpenJDK concept map
 
