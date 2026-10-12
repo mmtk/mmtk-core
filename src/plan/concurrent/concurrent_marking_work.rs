@@ -86,7 +86,17 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
             if queue.len() >= Self::CONCURRENT_TRACE_OVERFLOW {
                 let offloaded_objects = queue.drain(..Self::SATB_BUFFER_SIZE).collect();
                 let w = Self::new(offloaded_objects, true);
-                worker.add_work(WorkBucketStage::Concurrent, w);
+                // If concurrent marking was interrupted, the remaining marking work runs in the
+                // `FinalMark` pause, where the `Concurrent` bucket is disabled.  Keep the overflow
+                // in the pause, or it would only be traced after this pause's `Release`.
+                let stage = if mmtk.get_plan().concurrent().unwrap().current_pause()
+                    == Some(Pause::FinalMark)
+                {
+                    WorkBucketStage::FinishConcurrentWork
+                } else {
+                    WorkBucketStage::Concurrent
+                };
+                worker.add_work(stage, w);
             }
         }
 

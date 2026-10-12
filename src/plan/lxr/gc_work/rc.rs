@@ -232,11 +232,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         _depth: u32,
         size: usize,
     ) {
-        let heap_bytes_per_unlog_byte = if VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
-            32usize
-        } else {
-            64
-        };
+        let heap_bytes_per_unlog_byte =
+            VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.heap_bytes_per_unlog_byte();
         if los {
             let start =
                 side_metadata::address_to_meta_address(&Self::UNLOG_BITS, o.to_raw_address())
@@ -252,16 +249,12 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
             o.to_raw_address().unlog_field_relaxed::<VM>();
         } else if in_place_promotion {
-            let header_size = if VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
-                12usize
-            } else {
-                16
-            };
+            // Set every unlog bit covering the object. We align to the nearest u32 boundary,
+            // so we may overset unlog bits for adjacent objects.
             let step = heap_bytes_per_unlog_byte << 2;
-            let end = o.to_raw_address() + size;
-            let aligned_end = end.align_up(step);
-            let cursor = o.to_raw_address() + header_size;
-            let mut cursor = cursor.align_down(step);
+            let start = VM::VMObjectModel::ref_to_object_start(o);
+            let aligned_end = (start + size).align_up(step);
+            let mut cursor = start.align_down(step);
             let mut meta = side_metadata::address_to_meta_address(&Self::UNLOG_BITS, cursor);
             while cursor < aligned_end {
                 unsafe { meta.store(0xffffffffu32) }
