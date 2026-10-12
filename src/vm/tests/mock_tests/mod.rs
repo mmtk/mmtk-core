@@ -38,6 +38,7 @@ mod mock_test_allocate_without_initialize_collection;
 mod mock_test_allocator_info;
 mod mock_test_barrier_slow_path_assertion;
 mod mock_test_concurrent_span_cycle;
+mod mock_test_concurrent_span_finalizer;
 mod mock_test_concurrent_span_hybrid_barrier;
 mod mock_test_concurrent_span_stall;
 #[cfg(feature = "vo_bit")]

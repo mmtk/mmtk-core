@@ -3,6 +3,7 @@ use crate::plan::concurrent::barrier::HybridBarrierSemantics;
 use crate::plan::concurrent::global::ConcurrentPlan;
 use crate::plan::concurrent::span::gc_work::{
     ConcurrentSpanGCWorkContext, ConcurrentSpanSTWGCWorkContext, FinalMarkCheck, RaggedFlush,
+    ScanFinalizableContents,
 };
 use crate::plan::concurrent::span::mutator::ALLOCATOR_MAPPING;
 use crate::plan::concurrent::span::pacing::Pacing;
@@ -458,6 +459,10 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
         self.stalls.store(0, Ordering::SeqCst);
         self.marking.store(true, Ordering::SeqCst);
         self.set_marking_state(true);
+        if !*self.base().options.no_finalizer {
+            mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent]
+                .add_no_notify(ScanFinalizableContents);
+        }
         if self.concurrent_stack_scan {
             // The scheduler opens `Concurrent` after this pause because it is not empty.
             mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent]
