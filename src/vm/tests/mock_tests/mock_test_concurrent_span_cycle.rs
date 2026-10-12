@@ -47,6 +47,8 @@ pub fn concurrent_cycle() {
         || -> MockVM {
             MockVM {
                 vm_root_slots: MockMethod::new_fixed(Box::new(|_| vec![Address::from_ref(&ROOT)])),
+                // Scan work counts object sizes.
+                get_object_size: MockMethod::new_fixed(Box::new(|_| 48)),
                 scan_object: MockMethod::new_fixed(Box::new(|(_, object, visitor)| {
                     visitor.visit_slot(field(object));
                 })),
