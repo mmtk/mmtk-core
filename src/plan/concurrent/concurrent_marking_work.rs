@@ -193,19 +193,34 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 
     fn debug_assert_initial_mark(&self) {
-        let pause = self.mmtk.get_plan().concurrent().unwrap().current_pause();
+        let plan = self.mmtk.get_plan().concurrent().unwrap();
+        let pause = plan.current_pause();
 
-        debug_assert_eq!(
-            pause,
-            Some(Pause::InitialMark),
-            "Concurrent marking only scans roots during InitialMark."
+        // Roots are scanned during InitialMark, or, if the plan scans stacks concurrently,
+        // during concurrent marking.
+        debug_assert!(
+            pause == Some(Pause::InitialMark)
+                || (pause.is_none() && plan.concurrent_work_in_progress()),
+            "Concurrent marking only scans roots during InitialMark or concurrent marking ({pause:?})."
         );
     }
 
     fn create_and_schedule_root_nodes_work(&mut self, nodes: Vec<ObjectReference>) {
         let mmtk = self.mmtk;
         let work_packet = ConcurrentTraceObjects::<VM, P, KIND>::new(nodes, false);
-        mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].add_no_notify(work_packet);
+        let bucket = &mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent];
+        if mmtk
+            .get_plan()
+            .concurrent()
+            .unwrap()
+            .current_pause()
+            .is_none()
+        {
+            // Roots found during concurrent marking can be traced right away.
+            bucket.add(work_packet);
+        } else {
+            bucket.add_no_notify(work_packet);
+        }
     }
 }
 

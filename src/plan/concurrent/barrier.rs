@@ -166,6 +166,12 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 }
 
+/// The number of non-empty `HybridBarrier` buffers flushed into tracing work so far.  A plan
+/// compares it before and after flushing every mutator, to find out whether the mutators had
+/// any marking work buffered (Go: `gcMarkDoneFlushed`).
+pub(crate) static HYBRID_BARRIER_WORK_FLUSHES: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
 /// The slow-path semantics of `HybridBarrier`.
 ///
 /// It buffers the objects to shade, like Go's per-P `wbBuf` (`runtime/mwbbuf.go`), and flushes
@@ -230,6 +236,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         }
         let objects = std::mem::replace(&mut self.buf, Vec::with_capacity(Self::BUFFER_SIZE));
         if self.should_create_packets() {
+            HYBRID_BARRIER_WORK_FLUSHES.fetch_add(1, Ordering::SeqCst);
             self.add_work(ProcessModBufSATB::<VM, P, KIND>::new(objects));
         }
     }
@@ -240,6 +247,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         }
         let objects = std::mem::take(&mut self.rescan);
         if self.should_create_packets() {
+            HYBRID_BARRIER_WORK_FLUSHES.fetch_add(1, Ordering::SeqCst);
             // The objects are allocated black, so they are already marked.  Scan their fields.
             self.add_work(super::concurrent_marking_work::ConcurrentTraceObjects::<
                 VM,

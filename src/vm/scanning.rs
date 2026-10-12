@@ -287,6 +287,35 @@ pub trait Scanning<VM: VMBinding> {
     /// Return whether the VM supports return barriers. This is unused at the moment.
     fn supports_return_barrier() -> bool;
 
+    /// Return whether the VM can scan mutator stacks concurrently with
+    /// [`Scanning::scan_roots_in_mutator_threads_concurrently`].
+    fn supports_concurrent_stack_scanning() -> bool {
+        false
+    }
+
+    /// Scan the roots of every mutator thread while the mutators are running, as Go does during
+    /// concurrent marking.  Each mutator must be stopped while its own roots are scanned (for
+    /// example in a per-thread handshake), and can run again as soon as they are scanned.  The
+    /// mutators do not have to be stopped at the same time.  This method returns once the roots
+    /// of every mutator that existed when it was called have been scanned.
+    ///
+    /// Roots can be reported to `factory`, or to clones of it, from any thread, including the
+    /// mutator threads themselves.  The plan only calls this method while a barrier that makes it
+    /// sound is active (such as `HybridBarrier`).  Mutators created while this method runs do not
+    /// need to be scanned.
+    ///
+    /// Only called if [`Scanning::supports_concurrent_stack_scanning`] returns `true`.
+    ///
+    /// Arguments:
+    /// * `tls`: The GC worker thread that calls this method.
+    /// * `factory`: The VM uses it to create work packets for scanning roots.
+    fn scan_roots_in_mutator_threads_concurrently(
+        _tls: VMWorkerThread,
+        _factory: impl RootsWorkFactory<VM::VMSlot>,
+    ) {
+        unimplemented!("The VM does not support concurrent stack scanning")
+    }
+
     /// Prepare for another round of root scanning in the same GC. Some GC algorithms
     /// need multiple transitive closures, and each transitive closure starts from
     /// root scanning. We expect the binding to provide the same root set for every

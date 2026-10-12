@@ -11,5 +11,10 @@ pub trait ConcurrentPlan: Plan {
     fn on_concurrent_work_interrupted(&self);
     /// Called when the concurrent phase's work packets have drained: every GC worker has parked,
     /// so nothing is in progress, and no pause has been requested.
-    fn on_concurrent_work_drained(&self);
+    ///
+    /// Return `true` if the plan added more concurrent work (with `add_no_notify`, because the
+    /// caller holds the lock that the usual notification needs) or changed its state so that a
+    /// pause is now required.  The last parked worker then looks for work again, instead of
+    /// parking.
+    fn on_concurrent_work_drained(&self) -> bool;
 }

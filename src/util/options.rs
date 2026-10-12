@@ -1020,6 +1020,14 @@ options! {
     /// ConcurrentSpan: the soft memory limit in bytes, like Go's `GOMEMLIMIT`.  `0`, the default,
     /// uses the maximum heap size.
     soft_mem_limit: usize                           [always_valid] = 0,
+    /// ConcurrentSpan: always collect stop-the-world.  For debugging.
+    concurrent_span_disable_concurrent_marking: bool [always_valid] = false,
+    /// ConcurrentSpan: scan mutator stacks in the InitialMark pause, instead of concurrently.
+    /// Stacks are also scanned in the pause if the binding cannot scan them concurrently.
+    concurrent_span_scan_stacks_in_pause: bool      [always_valid] = false,
+    /// ConcurrentSpan: how many times a FinalMark pause may restart concurrent marking in one
+    /// cycle.  After that, FinalMark finishes the marking in the pause.  Go has no limit.
+    concurrent_span_max_mark_restarts: usize        [always_valid] = 8,
     /// Trigger an LXR pause once this many reference-count increments are pending, bounding the
     /// `RCProcessIncs` work a single pause has to do. Each pending increment is one slot the write
     /// barrier recorded, so the limit is roughly "words of reference stores between pauses".

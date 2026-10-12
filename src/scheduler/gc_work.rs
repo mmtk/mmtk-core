@@ -249,6 +249,18 @@ impl<C: GCWorkContext> StopMutators<C> {
         me
     }
 
+    /// Create a `StopMutators` work packet that scans VM-specific roots and flushes mutators, but
+    /// does not scan mutator roots.  The mutator roots are scanned later, for example
+    /// concurrently by [`ConcurrentScanStacks`].
+    pub fn new_no_scan_mutator_roots() -> Self {
+        Self {
+            skip_mutator_roots: true,
+            skip_vm_roots: false,
+            flush_mutator: true,
+            phantom: PhantomData,
+        }
+    }
+
     /// Create a `StopMutators` work packet that does not create any root-scanning work packets, and will simply flush mutators.
     pub fn new_no_scan_roots() -> Self {
         Self {
@@ -317,6 +329,35 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
                 false, worker.tls,
             );
         }
+    }
+}
+
+/// Scan the roots of every mutator while mutators are running, with
+/// [`crate::vm::Scanning::scan_roots_in_mutator_threads_concurrently`].  Each mutator stack is
+/// scanned once, while only that mutator is stopped, as Go does during concurrent marking.  The
+/// packet belongs in the `Concurrent` bucket, so the bucket only drains after every stack has
+/// been scanned.
+pub struct ConcurrentScanStacks<C: GCWorkContext>(PhantomData<C>);
+
+impl<C: GCWorkContext> ConcurrentScanStacks<C> {
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<C: GCWorkContext> Default for ConcurrentScanStacks<C> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<C: GCWorkContext> GCWork<C::VM> for ConcurrentScanStacks<C> {
+    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
+        trace!("ConcurrentScanStacks");
+        let factory = C::make_roots_work_factory(mmtk);
+        <C::VM as VMBinding>::VMScanning::scan_roots_in_mutator_threads_concurrently(
+            worker.tls, factory,
+        );
     }
 }
 
