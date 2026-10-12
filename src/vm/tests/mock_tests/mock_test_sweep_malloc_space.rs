@@ -4,6 +4,9 @@
 // MallocSpace allocates objects with libc malloc, so the object addresses are not mapped
 // by MMTk's mmapper. Sweeping linearly scans each chunk by VO bits, and must still find
 // every object. With no roots, all the objects are dead and must be freed by the GC.
+//
+// This test only runs on 64-bit targets.  On 32-bit targets, the local side metadata of
+// MallocSpace together with the mock VM's specs do not fit in the per-chunk metadata space.
 
 use super::mock_test_prelude::*;
 

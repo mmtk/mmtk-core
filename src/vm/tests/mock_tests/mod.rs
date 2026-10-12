@@ -70,7 +70,7 @@ mod mock_test_mmtk_julia_pr_143;
 mod mock_test_nogc_lock_free;
 mod mock_test_shutdown;
 mod mock_test_slots;
-#[cfg(feature = "malloc_mark_sweep")]
+#[cfg(all(target_pointer_width = "64", feature = "malloc_mark_sweep"))]
 mod mock_test_sweep_malloc_space;
 #[cfg(target_pointer_width = "64")]
 mod mock_test_vm_layout_compressed_pointer;
