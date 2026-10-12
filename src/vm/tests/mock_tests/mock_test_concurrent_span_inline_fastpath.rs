@@ -101,7 +101,8 @@ pub fn inline_fastpath() {
             let sizes = [16usize, 24, 40, 64, 200, 1000, 3000, 16384];
             let mut seen = HashSet::new();
             let mut fast = 0;
-            for round in 0..100 {
+            let mut sweepgen = space.sweepgen();
+            for round in 0..300 {
                 for &size in sizes.iter() {
                     let addr = match unsafe { inline_alloc(mutator_addr, &info, size) } {
                         Some(a) => {
@@ -113,6 +114,11 @@ pub fn inline_fastpath() {
                         }
                     };
                     assert!(!addr.is_zero());
+                    if space.sweepgen() != sweepgen {
+                        // A GC (triggered by the pacer) freed the unreachable objects.
+                        sweepgen = space.sweepgen();
+                        seen.clear();
+                    }
                     assert!(
                         seen.insert(addr),
                         "{addr} allocated twice (size {size}, round {round})"
