@@ -9,10 +9,11 @@ use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::policy::marksweepspace::native_ms::MarkSweepSpace;
-use crate::policy::marksweepspace::native_ms::MAX_OBJECT_SIZE;
 use crate::policy::space::Space;
+use crate::policy::spanspace::SpanSpace;
+use crate::policy::spanspace::MAX_OBJECT_SIZE;
 use crate::scheduler::GCWorkScheduler;
+use crate::scheduler::WorkBucketStage;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
@@ -29,12 +30,13 @@ use mmtk_macros::{HasSpaces, PlanTraceObject};
 /// A port of Go's garbage collector: a concurrent, non-moving, non-generational mark-sweep
 /// collector over a size-segregated span heap.  See `docs/design/go-gc-port.md`.
 ///
-/// Phase 1 of the port: the plan runs on native `MarkSweepSpace` with stop-the-world
-/// `Pause::Full` collections only.
+/// Phase 2 of the port: the plan runs on `SpanSpace` with stop-the-world `Pause::Full`
+/// collections only. Sweeping already follows Go: `sweepgen += 2` at the end of marking, then
+/// sweep packets plus lazy sweeping by allocators.
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct ConcurrentSpan<VM: VMBinding> {
     #[space]
-    pub(in crate::plan) ms: MarkSweepSpace<VM>,
+    pub(in crate::plan) span: SpanSpace<VM>,
     #[parent]
     pub common: CommonPlan<VM>,
     current_pause: Atomic<Option<Pause>>,
@@ -85,7 +87,8 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
         match self.current_pause().unwrap() {
             Pause::Full => {
                 self.common.prepare(tls, true);
-                self.ms.prepare(true);
+                // Sweep termination: finish the previous cycle's sweeping, start a mark epoch.
+                self.span.prepare_initial_mark();
             }
             pause => unreachable!("{pause:?} is not implemented yet"),
         }
@@ -94,7 +97,12 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
     fn release(&mut self, tls: VMWorkerThread) {
         match self.current_pause().unwrap() {
             Pause::Full => {
-                self.ms.release();
+                // Mark termination: sweepgen += 2. Mutator release (after this) returns and
+                // sweeps the mutators' cached spans; sweep packets sweep the rest in this pause.
+                self.span.release_after_mark();
+                // Safety: the plan, and so the space, lives as long as MMTk.
+                let span: &'static SpanSpace<VM> = unsafe { &*(&self.span as *const _) };
+                span.schedule_sweep(WorkBucketStage::Release);
                 self.common.release(tls, true);
             }
             pause => unreachable!("{pause:?} is not implemented yet"),
@@ -103,7 +111,6 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
 
     fn on_pause_end(&mut self, mmtk: &'static MMTK<VM>, tls: VMWorkerThread) {
         let pause = self.current_pause().unwrap();
-        self.ms.end_of_gc();
         self.common.on_pause_end(tls);
         self.previous_pause.store(Some(pause), Ordering::SeqCst);
         self.current_pause.store(None, Ordering::SeqCst);
@@ -119,7 +126,7 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
     }
 
     fn get_used_pages(&self) -> usize {
-        self.ms.reserved_pages() + self.common.get_used_pages()
+        self.span.reserved_pages() + self.common.get_used_pages()
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -142,7 +149,7 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
 impl<VM: VMBinding> ConcurrentSpan<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
         let mut global_side_metadata_specs = SideMetadataContext::new_global_specs(&[]);
-        MarkSweepSpace::<VM>::extend_global_side_metadata_specs(&mut global_side_metadata_specs);
+        SpanSpace::<VM>::extend_global_side_metadata_specs(&mut global_side_metadata_specs);
 
         let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
@@ -151,7 +158,7 @@ impl<VM: VMBinding> ConcurrentSpan<VM> {
         };
 
         ConcurrentSpan {
-            ms: MarkSweepSpace::new(plan_args.get_normal_space_args(
+            span: SpanSpace::new(plan_args.get_normal_space_args(
                 "span",
                 true,
                 false,
