@@ -17,9 +17,8 @@ use std::any::Any;
 use std::sync::OnceLock;
 
 struct MMTKSingleton {
-    cell: OnceLock<Box<dyn Any>>,
+    cell: OnceLock<Box<dyn Any + Send + Sync>>,
 }
-unsafe impl Sync for MMTKSingleton {}
 
 impl MMTKSingleton {
     pub const fn new() -> Self {
@@ -33,8 +32,8 @@ impl MMTKSingleton {
     }
 
     pub fn get<VM: VMBinding>(&'static self) -> &'static MMTK<VM> {
-        let cell = &self.cell;
-        let mmtk = cell.get().expect("MMTK singleton is not set") as &'static Box<dyn Any>;
+        let mmtk = self.cell.get().expect("MMTK singleton is not set")
+            as &'static Box<dyn Any + Send + Sync>;
         mmtk.as_ref().downcast_ref::<MMTK<VM>>().unwrap_or_else(|| {
             panic!(
                 "MMTK singleton is not a {}",
