@@ -176,10 +176,6 @@ impl<VM: VMBinding> GenericMMTKFixture<VM> {
     pub fn get_mmtk(&self) -> &'static MMTK<VM> {
         mock_api::singleton()
     }
-
-    // pub fn get_mmtk_mut(&mut self) -> &'static mut MMTK<VM> {
-    //     mock_api::singleton_mut()
-    // }
 }
 
 use crate::plan::Mutator;
