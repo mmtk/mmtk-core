@@ -368,7 +368,7 @@ Retrofitting all of that would change `MarkSweepSpace` for its current users (Ma
   3. Set `sweepgen = sg + 3`.
 - Refill is also where Go charges `heapLive`. It over-counts by the span's free bytes. Refill is the pacer poll point (§5.10) and the assist debit point (§5.11).
 - Zeroing: a span carries `needzero`. Fresh pages from the mmapper are zero, so only reused spans zero on allocation, as in Go.
-- **OpenJDK fast path.** Until mmtk-openjdk emits the `alloc_cache` ctz fast path in its x86_64 and aarch64 assemblers and C2, every allocation calls into MMTk (gap 9). That is correct but slow, so functional phases can run without it, but performance numbers need it. It needs an `AllocatorInfo` variant for `SpanAllocator` in mmtk-core. **Status:** done for x86_64 (interpreter, C1, C2) using `AllocatorInfo::Span` (with `space_offset`/`allocate_black_offset` for the allocate-black bail-out) and `span_allocator::span_class_index`; aarch64 still takes the slow path. Decisions D80-D87, deviations FP-1..FP-5.
+- **OpenJDK fast path.** Until mmtk-openjdk emits the `alloc_cache` ctz fast path in its x86_64 and aarch64 assemblers and C2, every allocation calls into MMTk (gap 9). That is correct but slow, so functional phases can run without it, but performance numbers need it. It needs an `AllocatorInfo` variant for `SpanAllocator` in mmtk-core. **Status:** done for x86_64 (interpreter, C1, C2) using `AllocatorInfo::Span` (with `space_offset`/`allocate_black_offset` and the black-path offsets, §5.8) and `span_allocator::span_class_index`; aarch64 still takes the slow path. Decisions D80-D87, deviations FP-1..FP-5.
 
 **Object references.**
 - OpenJDK references always point to the object start, and mmtk-openjdk uses no allocation offset.
@@ -497,7 +497,7 @@ This mode is useful to compare Go's stack scanning with ZGC/Shenandoah-style pro
 
 While `allocate_as_live` is set (InitialMark end to FinalMark start), `SpanAllocator::post_alloc` marks the object (`mark_bits` OR) and adds `elemsize` to `bytes_marked`. That is `gcmarknewobject`.
 
-Go's size-specialised malloc fast paths bail out to the slow path whenever marking is on (`malloc_stubs.go:82`). We do the same: the inline fast path checks the flag, and the slow path does the marking. That keeps the common fast path branch-light.
+Go's size-specialised malloc fast paths bail out to the general `mallocgc` whenever marking is on (`malloc_stubs.go:82`), and `mallocgc` calls `gcmarknewobject`: an ordinary function call. In mmtk-openjdk the slow path is a call into the VM runtime, which costs far more, so the inline fast path allocates black itself (D92): it sets the scan bit (Green Tea span-queue spans) and the mark bit with atomic ORs, and adds `elemsize` to the allocator's `black_bytes`, which FinalMark moves into `bytes_marked` (Go's per-P `gcWork.bytesMarked`). The interpreter and C1 do this inline; C2 calls a leaf function (`mmtk_span_allocate_black`), as `mallocgc` calls `gcmarknewobject`. With the SATB option (new objects also need log bits) or without BMI2, the fast path still bails out while marking.
 
 LOS already honours `allocate_as_live`.
 
@@ -873,7 +873,7 @@ What exists on `mmtk-core-go-gc` and mmtk-openjdk `concurrent-span` after the fi
 | 1 | `ConcurrentSpan` plan, `FeedbackPacer` (all 18 `TestGcPacer` scenarios pass), CPU limiter | Done. The pacer is driven from the plan (D9), not a `GCTriggerSelector` |
 | 2 | `SpanSpace`: Go size classes (generated), spans, page map, central, `sweepgen`, lazy + background sweeping, allocate-black | Done, with simplifications SP1–SP12 (128 KiB page regions, per-span bitmaps, mutex central lists) |
 | 2 | `AllocationSemantics::NoScan` | Deferred (D33) |
-| 2 | OpenJDK inline allocation fast path (`nextFreeFast`) | Done on x86_64 interpreter, C1 and C2 (D80–D87, FP-1..5); bails to the slow path while allocating black. aarch64 not done |
+| 2 | OpenJDK inline allocation fast path (`nextFreeFast`) | Done on x86_64 interpreter, C1 and C2 (D80–D87, D92, FP-1..5), including allocate-black (§5.8). aarch64 not done |
 | 3 | Concurrent marking, InitialMark/FinalMark, SATB option | Done |
 | 3 | Allocation stalls instead of a STW full GC | Done (D10, D16) |
 | 3 | Assists, Stage A (park + extra worker), CPU limiter gating | Done (D17, PLAN-2, PLAN-3) |
@@ -905,7 +905,6 @@ Remaining observations:
 - fop at 39 MB was slow because of a leak, not a capacity limit (an earlier version of this note said it was). Marked bytes grew by 4-5 MB per iteration under concurrent marking and the heap filled. The cause was the concurrent scan of finalizable objects' contents, which kept finalizable cycles alive (D88, PLAN-7). Fixed by tracing finalizable objects in `FinalMark` instead. After the fix fop at 39 MB takes 2.4 s with 33 pauses (was 11.4 s with 449), against 1.8 s for ConcurrentImmix (one run, loaded machine). The heap also grew past `-Xmx` in that state (15215 of 9984 pages), because an allocation stall took its pages after the cycle even if the cycle had freed nothing. Fixed: `Space::acquire` polls again after a stall (`mock_test_concurrent_span_heap_limit`); a Java program that keeps more than `-Xmx` alive now gets `OutOfMemoryError`.
 - `GOGC=100` is expensive at these heap sizes because the live heaps are small (Go's policy, not a bug); compare at equal memory with the memory-limit mode.
 - Pauses are short: on lusearch the median pause is 1.0 ms (ConcurrentImmix: 6.9 ms) and the total pause time 2.3 s (ConcurrentImmix: 5.6 s). The time lost is mutator time (26.8 s against 18.3 s outside pauses). A profile shows the mutators mostly in JIT-compiled code, with the allocation slow paths at about 4% and the barrier under 0.5%, so the likely cause is locality: size-segregated free-list allocation scatters objects that Immix allocates contiguously. Whole-process user-mode counters (`perf stat`, lusearch, 63 MB, GC threads included) agree: against ConcurrentImmix, ConcurrentSpan has 15% more cycles, 11% more instructions, 7% more L1 data misses, 58% more LLC load misses and 66% more dTLB load misses. Separating mutator from GC counts is the next step.
-- During marking every allocation still takes the slow path (allocate-black in the binding's fast path is not implemented, FP-4).
 
 ## Appendix A. Go → mmtk-core → OpenJDK concept map
 

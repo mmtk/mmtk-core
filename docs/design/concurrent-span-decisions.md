@@ -65,6 +65,7 @@ Decisions made without asking the project lead, so that work could continue. Eac
 | D89 | 2026-10-13 | Implement the weak→strong block (D18)? | No. Blocking needs `Reference.get()` slow paths that can stop for a safepoint in the interpreter, C1 and C2; every HotSpot collector uses leaf calls there | Yes | for review |
 | D90 | 2026-10-13 | Trace finalizable objects concurrently, with a separate "finalizably reachable" mark (ZGC)? | No. `Finalization` keeps tracing in the FinalMark pause | Yes | for review |
 | D91 | 2026-10-13 | Clear weak and phantom references at sweep time, as Go clears weak handles? | No. Reference processing stays in the FinalMark pause. HotSpot's VM weak tables stay strong roots, as the binding has them for every plan | Yes | for review |
+| D92 | 2026-10-13 | Allocate black in the inline allocation fast path? | Yes: scan bit, mark bit (atomic ORs) and a per-mutator `black_bytes` count, inline in the interpreter and C1, a leaf call in C2. Slow path with the SATB option or without BMI2 | Yes | for review |
 
 ## D1. Location of the engineering documents
 
@@ -422,6 +423,8 @@ The limits are guesses with headroom. If a legitimate build or run is killed, ra
 
 **To undo.** Remove the two fields from `AllocatorInfo::Span` (mmtk-core) and test another flag in `span_allocate` / `expand_span_allocate` (mmtk-openjdk).
 
+**Update (D92).** The fast path no longer bails out while the flag is set: it allocates black itself.
+
 ## D81. Size to span class in compiled code
 
 **Question.** Go computes the size class with `size_to_class8` / `size_to_class128` and a branch. The binding needs the span class for constant sizes (most instances in C1/C2) and variable sizes (arrays, the interpreter's `_new`).
@@ -514,3 +517,20 @@ The limits are guesses with headroom. If a legitimate build or run is killed, ra
 **Decision.** Option 3. HotSpot's VM weak tables (string table, JNI weak globals, resolved method table) stay strong roots scanned at InitialMark, as the binding has them for every MMTk plan: they are never cleared and classes are never unloaded. Go has no VM weak tables. Deviation PLAN-8.
 
 **To undo.** Option 1 (closest to Go) together with D90 option 1.
+
+## D92. Allocate-black in the inline allocation fast path
+
+**Question.** While marking, mmtk-openjdk's inline `SpanAllocator` fast path bailed out (D80), so every allocation during marking was a call into the VM runtime and `memory_manager::alloc` (FP-4). Go's specialised malloc stubs also bail out, but to `mallocgc`, an ordinary function that calls `gcmarknewobject`. Should the fast path allocate black itself?
+
+**Options.**
+1. Keep bailing out (Go's structure, much dearer here).
+2. Inline the marking in every tier. C2 has no atomic OR node for raw memory; an atomic add works, because a new object's bits are known to be clear.
+3. Inline in the interpreter and C1 (atomic `lock or`), and a leaf call (no VM transition) in C2, like `mallocgc` calling `gcmarknewobject`.
+
+**Decision.** Option 3.
+- **What the fast path does.** After the usual `nextFreeFast` stores, if the space allocates black: set the scan bit if the span's `black_scan` byte is set (Green Tea on and a span-queue class, fixed when the span is created), then the mark bit (both atomic ORs: GC threads set other bits of the same words), then add `elemsize` to the allocator's `black_bytes` (a plain add: only the mutator writes it).
+- **Counting.** `black_bytes` is Go's per-P `gcWork.bytesMarked`: FinalMark moves every mutator's count into `bytes_marked` before `release_after_mark`, whose debug check compares it with the mark bits. A destroyed mutator flushes its own.
+- **Exceptions.** With the SATB option, new objects also need log bits, so the space's `inline_black` byte is 0 and the fast path bails out as before. The interpreter/C1 sequence uses `shlx`; without BMI2 it bails out.
+- **Interface.** `AllocatorInfo::Span` gains `inline_black_offset`, `black_bytes_offset`, `mark_bits_offset`, `scan_bits_offset` and `black_scan_offset`; `SpanAllocator::allocate_black_inline` is the out-of-line version. `SpanSpace::mark_new_object` is shared with the slow path and asserts (debug) that the bits were clear.
+
+**To undo.** Make the fast path bail out again when `allocate_as_live` is set (`span_allocate`, `expand_span_allocate`).
