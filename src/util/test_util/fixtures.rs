@@ -150,11 +150,10 @@ impl<VM: VMBinding> GenericMMTKFixture<VM> {
         with_builder(&mut builder);
 
         let mmtk = memory_manager::mmtk_init::<VM>(&builder);
-        let mmtk_ptr = Box::into_raw(mmtk);
-        mock_api::set_singleton(mmtk_ptr);
+        mock_api::set_singleton(mmtk);
 
         if initialize_collection {
-            let mmtk_static: &'static MMTK<VM> = unsafe { &*mmtk_ptr };
+            let mmtk_static: &'static MMTK<VM> = mock_api::singleton();
             memory_manager::initialize_collection(mmtk_static, VMThread::UNINITIALIZED);
         }
 
@@ -165,9 +164,9 @@ impl<VM: VMBinding> GenericMMTKFixture<VM> {
         mock_api::singleton()
     }
 
-    pub fn get_mmtk_mut(&mut self) -> &'static mut MMTK<VM> {
-        mock_api::singleton_mut()
-    }
+    // pub fn get_mmtk_mut(&mut self) -> &'static mut MMTK<VM> {
+    //     mock_api::singleton_mut()
+    // }
 }
 
 use crate::plan::Mutator;
