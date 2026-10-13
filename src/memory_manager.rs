@@ -305,6 +305,16 @@ pub fn post_alloc<VM: VMBinding>(
     mutator.post_alloc(refer, bytes, semantics);
 }
 
+/// The address of the global flag of the hybrid barrier ([`crate::plan::BarrierSelector::HybridBarrier`]).  The flag is a
+/// byte that is non-zero while the barrier is active.  A binding that implements the barrier
+/// fast path in compiled code can test this byte inline, and only call
+/// [`object_reference_write_slow`] (or the other slow paths) when it is non-zero.
+///
+/// The flag only changes while all mutators are stopped.
+pub fn barrier_active_address() -> Address {
+    Address::from_ref(&crate::plan::HYBRID_BARRIER_ACTIVE)
+}
+
 /// The *subsuming* write barrier by MMTk. For performance reasons, a VM should implement the write barrier
 /// fast-path on their side rather than just calling this function.
 ///
@@ -821,6 +831,31 @@ pub fn is_mapped_address(address: Address) -> bool {
 /// * `reff`: The weak reference to add.
 pub fn add_weak_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference) {
     mmtk.reference_processors.add_weak_candidate(reff);
+}
+
+/// Make sure the given objects are marked in the current concurrent marking, if any (Go's
+/// `shade`).  A binding calls this when a reference is stored somewhere the plan has already
+/// scanned and that has no write barrier, for example into a VM root (such as a JNI global
+/// handle) or a newly registered compiled method, while a concurrent plan is marking.  Outside
+/// concurrent marking, or for plans that do not need it, it does nothing.
+pub fn shade_objects<VM: VMBinding>(mmtk: &MMTK<VM>, objects: &[ObjectReference]) {
+    if let Some(plan) = mmtk.get_plan().concurrent() {
+        plan.shade_objects(objects);
+    }
+}
+
+/// Return `true` if the binding should treat soft references as strong references now: when it
+/// scans a soft reference, it should report the referent as an ordinary (strong) slot instead of
+/// calling [`add_soft_candidate`].
+///
+/// A concurrent plan returns `true` during a cycle that has decided to keep every softly
+/// reachable object, so that their referents are traced during concurrent marking and not in
+/// the final pause.  Bindings that do not call this function keep working, but the plan may
+/// then have to trace softly reachable objects in a pause.
+pub fn soft_references_are_strong<VM: VMBinding>(mmtk: &MMTK<VM>) -> bool {
+    mmtk.get_plan()
+        .concurrent()
+        .is_some_and(|plan| plan.soft_references_are_strong())
 }
 
 /// Add a reference to the list of soft references. A binding may

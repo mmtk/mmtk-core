@@ -295,6 +295,22 @@ pub struct MockVM {
     >,
     pub scan_roots_in_mutator_thread: Box<dyn MockAny>,
     pub scan_vm_specific_roots: Box<dyn MockAny>,
+    /// The root slots of a mutator, reported by `scan_roots_in_mutator_thread`.  Mocking the
+    /// method itself is not possible because its factory argument has a type chosen by the plan.
+    /// No roots by default.
+    pub mutator_root_slots: MockMethod<VMMutatorThread, Vec<Address>>,
+    /// The VM-specific root slots, reported by `scan_vm_specific_roots`.  No roots by default.
+    pub vm_root_slots: MockMethod<(), Vec<Address>>,
+    /// Whether MockVM scans mutator roots concurrently.  If `true`, it reports
+    /// `mutator_root_slots` of every mutator in `scan_roots_in_mutator_threads_concurrently`.
+    pub supports_concurrent_stack_scanning: MockMethod<(), bool>,
+    /// Whether MockVM flushes mutators concurrently.  If `true`, it flushes every mutator in
+    /// `flush_mutators_concurrently`.  MockVM does not stop the mutator, so a test must not run
+    /// the mutator at the same time.
+    pub supports_concurrent_mutator_flush: MockMethod<(), bool>,
+    /// Whether MockVM can block mutators (`block_mutator_until`).  A blocked mutator parks for
+    /// any pause that is requested meanwhile, like `block_for_gc`.
+    pub supports_blocking_mutators: MockMethod<(), bool>,
     pub notify_initial_thread_scan_complete: MockMethod<(bool, VMWorkerThread), ()>,
     pub supports_return_barrier: MockMethod<(), bool>,
     pub prepare_for_roots_re_scanning: MockMethod<(), ()>,
@@ -481,6 +497,11 @@ impl Default for MockVM {
                 ),
                 (),
             >::new_unimplemented()),
+            mutator_root_slots: MockMethod::new_fixed(Box::new(|_| vec![])),
+            vm_root_slots: MockMethod::new_fixed(Box::new(|_| vec![])),
+            supports_concurrent_stack_scanning: MockMethod::new_fixed(Box::new(|_| false)),
+            supports_concurrent_mutator_flush: MockMethod::new_fixed(Box::new(|_| false)),
+            supports_blocking_mutators: MockMethod::new_fixed(Box::new(|_| false)),
             notify_initial_thread_scan_complete: MockMethod::new_fixed(Box::new(|(_, _)| {})),
             supports_return_barrier: MockMethod::new_unimplemented(),
             prepare_for_roots_re_scanning: MockMethod::new_fixed(Box::new(|_| {
@@ -567,6 +588,39 @@ impl crate::vm::Collection<MockVM> for MockVM {
 
     fn resume_mutators(tls: VMWorkerThread) {
         mock!(resume_mutators(tls))
+    }
+
+    fn supports_blocking_mutators() -> bool {
+        mock!(supports_blocking_mutators())
+    }
+
+    fn block_mutator_until(tls: VMMutatorThread, unblocked: &dyn Fn() -> bool) {
+        // MockVM mutators only stop for a pause in `block_for_gc`, so park there whenever a pause
+        // is requested.
+        while !unblocked() {
+            let status = mock_api::singleton().state.gc_status.load();
+            if status == crate::global_state::GcStatus::PauseRequested {
+                MockVM::block_for_gc(tls);
+            } else {
+                std::thread::sleep(std::time::Duration::from_micros(50));
+            }
+        }
+    }
+
+    fn supports_concurrent_mutator_flush() -> bool {
+        mock!(supports_concurrent_mutator_flush())
+    }
+
+    fn flush_mutators_concurrently(_tls: VMWorkerThread) {
+        use crate::vm::ActivePlan;
+        assert_ne!(
+            mock_api::singleton().state.gc_status.load(),
+            crate::global_state::GcStatus::InPause,
+            "Concurrent mutator flush in a pause"
+        );
+        for mutator in MockVM::mutators() {
+            crate::memory_manager::flush_mutator(mutator);
+        }
     }
 
     fn block_for_gc(tls: VMMutatorThread) {
@@ -759,22 +813,45 @@ impl crate::vm::Scanning<MockVM> for MockVM {
     }
     fn scan_roots_in_mutator_thread(
         _tls: VMWorkerThread,
-        _mutator: &'static mut Mutator<Self>,
-        _factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
+        mutator: &'static mut Mutator<Self>,
+        mut factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
     ) {
-        // mock_any!(scan_roots_in_mutator_thread(
-        //     tls,
-        //     mutator,
-        //     Box::new(factory)
-        // ))
-        warn!("scan_roots_in_mutator_thread is not properly mocked. The default implementation does nothing.");
+        let slots = mock!(mutator_root_slots(mutator.mutator_tls));
+        if !slots.is_empty() {
+            factory.create_process_roots_work(slots);
+        }
     }
     fn scan_vm_specific_roots(
         _tls: VMWorkerThread,
-        _factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
+        mut factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
     ) {
-        // mock_any!(scan_vm_specific_roots(tls, Box::new(factory)))
-        warn!("scan_vm_specific_roots is not properly mocked. The default implementation does nothing.");
+        let slots = mock!(vm_root_slots());
+        if !slots.is_empty() {
+            factory.create_process_roots_work(slots);
+        }
+    }
+    fn supports_concurrent_stack_scanning() -> bool {
+        mock!(supports_concurrent_stack_scanning())
+    }
+    fn scan_roots_in_mutator_threads_concurrently(
+        _tls: VMWorkerThread,
+        mut factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
+    ) {
+        use crate::vm::ActivePlan;
+        // A real VM may not be able to scan concurrently in a pause (handshakes need the VM
+        // thread, which runs the pause).
+        assert_ne!(
+            mock_api::singleton().state.gc_status.load(),
+            crate::global_state::GcStatus::InPause,
+            "Concurrent stack scanning in a pause"
+        );
+        let tls_list: Vec<VMMutatorThread> = MockVM::mutators().map(|m| m.mutator_tls).collect();
+        for tls in tls_list {
+            let slots = mock!(mutator_root_slots(tls));
+            if !slots.is_empty() {
+                factory.create_process_roots_work(slots);
+            }
+        }
     }
     fn notify_initial_thread_scan_complete(partial_scan: bool, tls: VMWorkerThread) {
         mock!(notify_initial_thread_scan_complete(partial_scan, tls))

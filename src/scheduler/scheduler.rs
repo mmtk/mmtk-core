@@ -576,7 +576,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             // was running, its work packets have now drained, tell the plan.
             if worker.mmtk.state.gc_status.load() == crate::global_state::GcStatus::InConcurrentGC {
                 let plan = worker.mmtk.get_plan().concurrent().unwrap();
-                plan.on_concurrent_work_drained();
+                if plan.on_concurrent_work_drained() {
+                    // The plan added work or wants a pause.  Look again.
+                    return LastParkedResult::WakeSelf;
+                }
             }
             // Park this worker, too.
             return LastParkedResult::ParkSelf;
@@ -761,10 +764,15 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.state.gc_status.set_in_pause();
-        // The number of active workers should be either the configured number of threads or the configured number of concurrent threads.
+        // The number of active workers should be between the configured number of concurrent
+        // threads and the configured number of threads.  A concurrent plan may activate more
+        // than `concurrent_threads` workers during concurrent work, e.g. for mark assists.
+        let active = mmtk.scheduler.num_active_workers();
         assert!(
-            mmtk.scheduler.num_active_workers() == *mmtk.options.threads
-                || mmtk.scheduler.num_active_workers() == *mmtk.options.concurrent_threads
+            active == *mmtk.options.threads
+                || (active >= (*mmtk.options.concurrent_threads).min(*mmtk.options.threads)
+                    && active <= *mmtk.options.threads),
+            "Unexpected number of active workers: {active}"
         );
         // Pause started, use all GC threads.
         mmtk.scheduler.set_active_workers(*mmtk.options.threads);

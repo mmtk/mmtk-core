@@ -5,6 +5,7 @@ pub(super) mod global;
 pub use self::global::ConcurrentPlan;
 
 pub mod immix;
+pub mod span;
 
 use bytemuck::NoUninit;
 

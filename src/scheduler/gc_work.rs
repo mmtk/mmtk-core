@@ -44,13 +44,21 @@ pub struct ScheduleCollection;
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        // Determine collection kind
-        let is_emergency = mmtk.state.set_collection_kind(
-            mmtk.get_plan().last_collection_was_exhaustive(),
-            mmtk.gc_trigger.policy.can_heap_size_grow(),
-        );
-        if is_emergency {
-            mmtk.get_plan().notify_emergency_collection();
+        // Determine collection kind.  A pause that closes a concurrent cycle (such as
+        // `FinalMark`) belongs to the collection that the cycle's first pause started, so it is
+        // not another collection attempt.
+        let continues_cycle = mmtk
+            .get_plan()
+            .concurrent()
+            .is_some_and(|plan| plan.concurrent_work_in_progress());
+        if !continues_cycle {
+            let is_emergency = mmtk.state.set_collection_kind(
+                mmtk.get_plan().last_collection_was_exhaustive(),
+                mmtk.gc_trigger.policy.can_heap_size_grow(),
+            );
+            if is_emergency {
+                mmtk.get_plan().notify_emergency_collection();
+            }
         }
         mmtk.state.stacks_prepared.store(false, Ordering::SeqCst);
         // FIXME: This seems to be a weird place to start counting GC statistics.
@@ -249,6 +257,18 @@ impl<C: GCWorkContext> StopMutators<C> {
         me
     }
 
+    /// Create a `StopMutators` work packet that scans VM-specific roots and flushes mutators, but
+    /// does not scan mutator roots.  The mutator roots are scanned later, for example
+    /// concurrently by [`ConcurrentScanStacks`].
+    pub fn new_no_scan_mutator_roots() -> Self {
+        Self {
+            skip_mutator_roots: true,
+            skip_vm_roots: false,
+            flush_mutator: true,
+            phantom: PhantomData,
+        }
+    }
+
     /// Create a `StopMutators` work packet that does not create any root-scanning work packets, and will simply flush mutators.
     pub fn new_no_scan_roots() -> Self {
         Self {
@@ -317,6 +337,48 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
                 false, worker.tls,
             );
         }
+    }
+}
+
+/// Scan the roots of every mutator while mutators are running, with
+/// [`crate::vm::Scanning::scan_roots_in_mutator_threads_concurrently`].  Each mutator stack is
+/// scanned once, while only that mutator is stopped, as Go does during concurrent marking.  The
+/// packet belongs in the `Concurrent` bucket, so the bucket only drains after every stack has
+/// been scanned.
+pub struct ConcurrentScanStacks<C: GCWorkContext>(PhantomData<C>);
+
+impl<C: GCWorkContext> ConcurrentScanStacks<C> {
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<C: GCWorkContext> Default for ConcurrentScanStacks<C> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<C: GCWorkContext> GCWork<C::VM> for ConcurrentScanStacks<C> {
+    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
+        trace!("ConcurrentScanStacks");
+        let factory = C::make_roots_work_factory(mmtk);
+        if mmtk.state.gc_status.load() == crate::global_state::GcStatus::InPause {
+            // A pause interrupted concurrent marking before this packet ran, and it is now
+            // finishing the marking.  The mutators are stopped, so scan them directly: a VM may
+            // not be able to run its concurrent mechanism (e.g. handshakes) during a pause.
+            for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
+                <C::VM as VMBinding>::VMScanning::scan_roots_in_mutator_thread(
+                    worker.tls,
+                    unsafe { &mut *(mutator as *mut _) },
+                    factory.clone(),
+                );
+            }
+            return;
+        }
+        <C::VM as VMBinding>::VMScanning::scan_roots_in_mutator_threads_concurrently(
+            worker.tls, factory,
+        );
     }
 }
 

@@ -163,6 +163,51 @@ pub trait Collection<VM: VMBinding> {
     /// and wait until the concurrent GC is done)
     fn concurrent_work_finished_no_pause() {}
 
+    /// Return whether the VM supports [`Collection::block_mutator_until`].
+    fn supports_blocking_mutators() -> bool {
+        false
+    }
+
+    /// Block the current mutator thread until `unblocked` returns `true`.  The VM calls
+    /// `unblocked` from time to time (or whenever [`Collection::wake_blocked_mutators`] is
+    /// called), on the blocked thread.  While blocked, the thread must not prevent GC pauses,
+    /// handshakes or stack scanning: it must be in the same state as in
+    /// [`Collection::block_for_gc`].
+    ///
+    /// Concurrent plans use this for mark assists: a mutator that allocates faster than the GC
+    /// marks waits until the GC has done enough marking work.
+    ///
+    /// Only called if [`Collection::supports_blocking_mutators`] returns `true`.
+    fn block_mutator_until(_tls: VMMutatorThread, _unblocked: &dyn Fn() -> bool) {
+        unimplemented!("The VM does not support blocking mutators")
+    }
+
+    /// Tell the VM that the condition of some [`Collection::block_mutator_until`] calls may have
+    /// become true.  The default does nothing, so the VM has to poll.
+    fn wake_blocked_mutators() {}
+
+    /// Return whether the VM supports [`Collection::flush_mutators_concurrently`].
+    fn supports_concurrent_mutator_flush() -> bool {
+        false
+    }
+
+    /// Call [`crate::memory_manager::flush_mutator`] for every mutator while the mutators are
+    /// running, like Go's `forEachP`.  Each mutator must be stopped while its own state is
+    /// flushed (for example in a per-thread handshake), but the mutators do not have to be
+    /// stopped at the same time.  The flush can be run by the mutator itself, or by another
+    /// thread on behalf of a mutator that is blocked.  This method returns once every mutator
+    /// that existed when it was called has been flushed.
+    ///
+    /// Concurrent plans use it to detect the end of concurrent marking without a pause.
+    ///
+    /// Only called if [`Collection::supports_concurrent_mutator_flush`] returns `true`.
+    ///
+    /// Arguments:
+    /// * `tls`: The GC worker thread that calls this method.
+    fn flush_mutators_concurrently(_tls: VMWorkerThread) {
+        unimplemented!("The VM does not support flushing mutators concurrently")
+    }
+
     /// Return the amount of memory (in bytes) which the VM allocated outside the MMTk heap but
     /// wants to include into the current MMTk heap size.  MMTk core will consider the reported
     /// memory as part of MMTk heap for the purpose of heap size accounting.

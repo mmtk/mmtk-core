@@ -102,13 +102,32 @@ impl ThreadPark {
 
     /// Block until all registered threads are parked.
     pub fn wait_all_parked(&self) {
-        let state = self.inner.lock.lock().unwrap();
-        let _state = self
-            .inner
-            .cvar
-            .wait_while(state, |state| {
-                state.parked.is_empty() || !state.parked.values().all(|&v| v)
-            })
-            .unwrap();
+        let mut state = self.inner.lock.lock().unwrap();
+        loop {
+            let (new_state, timeout) = self
+                .inner
+                .cvar
+                .wait_timeout_while(state, std::time::Duration::from_secs(10), |state| {
+                    state.parked.is_empty() || !state.parked.values().all(|&v| v)
+                })
+                .unwrap();
+            state = new_state;
+            if !timeout.timed_out() {
+                return;
+            }
+            // Help debugging tests that hang: some registered thread does not park.
+            let unparked: Vec<_> = state
+                .parked
+                .iter()
+                .filter(|(_, &parked)| !parked)
+                .map(|(tid, _)| *tid)
+                .collect();
+            warn!(
+                "{}: still waiting for {:?} to park ({} registered)",
+                self.name,
+                unparked,
+                state.parked.len()
+            );
+        }
     }
 }

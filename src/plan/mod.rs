@@ -15,6 +15,9 @@
 
 mod barriers;
 pub use barriers::BarrierSelector;
+#[cfg(test)]
+pub(crate) use barriers::HybridBarrier;
+pub(crate) use barriers::HYBRID_BARRIER_ACTIVE;
 
 mod gc_work;
 
@@ -44,7 +47,7 @@ mod generational;
 /// Sticky plans (using sticky marks for generational behaviors without a copying nursery)
 mod sticky;
 
-mod concurrent;
+pub(crate) mod concurrent;
 pub use concurrent::{ConcurrentPlan, Pause};
 mod immix;
 mod lxr;

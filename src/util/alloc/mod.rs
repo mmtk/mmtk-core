@@ -32,6 +32,10 @@ pub use self::immix_allocator::ImmixAllocator;
 pub mod free_list_allocator;
 pub use free_list_allocator::FreeListAllocator;
 
+/// Span allocator for SpanSpace (a port of Go's mcache)
+pub mod span_allocator;
+pub use span_allocator::SpanAllocator;
+
 /// Lisp2 allocator (actually a bump pointer allocator with an extra heade word)
 mod lisp2_allocator;
 pub use lisp2_allocator::Lisp2Allocator;

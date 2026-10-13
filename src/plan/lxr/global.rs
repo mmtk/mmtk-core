@@ -395,10 +395,10 @@ impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
         // Do nothing
     }
 
-    fn on_concurrent_work_drained(&self) {
+    fn on_concurrent_work_drained(&self) -> bool {
         // Concurrent marking will end with a pause. We dont need to do anything here.
         if self.in_concurrent_marking.load(Ordering::Acquire) {
-            return;
+            return false;
         }
         // Concurrent marking was not running, so the only concurrent work was lazy decrements
         // and the lazy sweeping they chain into. `LazySweepingJobs::all_finished` covers both.
@@ -415,6 +415,7 @@ impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
         {
             <VM as VMBinding>::VMCollection::concurrent_work_finished_no_pause();
         }
+        false
     }
 }
 

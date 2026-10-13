@@ -13,6 +13,18 @@ use std::mem::MaybeUninit;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
+/// The result of [`GCTrigger::poll_or_stall`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PollResult {
+    /// No collection is needed.
+    NoCollection,
+    /// A collection has been requested.
+    CollectionRequested,
+    /// The heap is full, but the concurrent work in progress will free memory, so the mutator
+    /// should wait for it to finish instead of requesting a pause.
+    Stall,
+}
+
 /// GCTrigger is responsible for triggering GCs based on the given policy.
 /// All the decisions about heap limit and GC triggering should be resolved here.
 /// Depending on the actual policy, we may either forward the calls either to the plan
@@ -144,8 +156,19 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// * `space_full`: Space request failed, must recover pages within 'space'.
     /// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.
     pub fn poll(&self, space_full: bool, space: Option<&dyn Space<VM>>) -> bool {
+        self.poll_or_stall(space_full, space) != PollResult::NoCollection
+    }
+
+    /// Like [`GCTrigger::poll`], but tells an allocation stall apart from a requested
+    /// collection.  On [`PollResult::Stall`], the caller (a mutator) should block for the
+    /// concurrent work in progress to finish, and then try again: no pause was requested.
+    pub(crate) fn poll_or_stall(
+        &self,
+        space_full: bool,
+        space: Option<&dyn Space<VM>>,
+    ) -> PollResult {
         if !self.is_collection_enabled() {
-            return false;
+            return PollResult::NoCollection;
         }
 
         let plan = self.plan();
@@ -153,6 +176,14 @@ impl<VM: VMBinding> GCTrigger<VM> {
             .policy
             .is_gc_required(space_full, space.map(|s| SpaceStats::new(s)), plan)
         {
+            if let Some(concurrent_plan) = plan.concurrent() {
+                if concurrent_plan.stall_instead_of_pause() {
+                    // Let the concurrent work finish.  The caller blocks for the next pause
+                    // without requesting one.
+                    concurrent_plan.on_allocation_stall();
+                    return PollResult::Stall;
+                }
+            }
             info!(
                 "[POLL] {}{} ({}/{} pages)",
                 if let Some(space) = space {
@@ -164,9 +195,20 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 plan.get_reserved_pages(),
                 plan.get_total_pages(),
             );
-            return self.request();
+            return if self.request() {
+                PollResult::CollectionRequested
+            } else {
+                PollResult::NoCollection
+            };
         }
-        false
+        PollResult::NoCollection
+    }
+
+    /// Tell the plan that a mutator stalled by [`GCTrigger::poll_or_stall`] has resumed.
+    pub(crate) fn on_allocation_stall_finished(&self, duration: std::time::Duration) {
+        if let Some(plan) = self.plan().concurrent() {
+            plan.on_allocation_stall_finished(duration);
+        }
     }
 
     /// For [`crate::scheduler::GCWorkScheduler::on_last_parked`]'s use when the last parked GC

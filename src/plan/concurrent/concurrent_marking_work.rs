@@ -50,9 +50,18 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let tls = worker.tls;
         let trace = PlanTrace::<P, KIND>::from_mmtk(mmtk);
+        let plan = mmtk.get_plan().concurrent().unwrap();
+        let count_scan_work = plan.counts_scan_work();
+        let mut scan_work = 0;
 
         // These are initial objects.  They may not have been marked.
         let initial_objects = std::mem::take(&mut self.initial_objects);
+        // The plan may trace them with its own loop.
+        let Some(initial_objects) =
+            plan.trace_objects_concurrently(worker, initial_objects, self.already_marked)
+        else {
+            return;
+        };
         let num_initial_objects = initial_objects.len();
         let mut num_queued_objects = 0;
 
@@ -74,6 +83,10 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
 
         // Loop until the queue is drained.
         while let Some(object) = queue.pop_back() {
+            if count_scan_work {
+                use crate::vm::ObjectModel;
+                scan_work += VM::VMObjectModel::get_current_size(object);
+            }
             scanning_helper::visit_children_non_moving::<VM>(tls, object, &mut |child| {
                 trace.trace_object(worker, child, &mut |enqueued_child| {
                     debug_assert_eq!(enqueued_child, child);
@@ -98,6 +111,10 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
                 };
                 worker.add_work(stage, w);
             }
+        }
+
+        if count_scan_work {
+            plan.add_scan_work(scan_work, 0, 0);
         }
 
         probe!(
@@ -193,19 +210,48 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     }
 
     fn debug_assert_initial_mark(&self) {
-        let pause = self.mmtk.get_plan().concurrent().unwrap().current_pause();
+        let plan = self.mmtk.get_plan().concurrent().unwrap();
+        let pause = plan.current_pause();
 
-        debug_assert_eq!(
-            pause,
-            Some(Pause::InitialMark),
-            "Concurrent marking only scans roots during InitialMark."
+        // Roots are scanned during InitialMark, or, if the plan scans stacks concurrently,
+        // during concurrent marking.
+        // Or in `FinalMark`, when it finishes interrupted marking whose concurrent stack scan
+        // had not run yet.
+        debug_assert!(
+            pause == Some(Pause::InitialMark)
+                || pause == Some(Pause::FinalMark)
+                || (pause.is_none() && plan.concurrent_work_in_progress()),
+            "Concurrent marking only scans roots during InitialMark or concurrent marking ({pause:?})."
         );
     }
 
     fn create_and_schedule_root_nodes_work(&mut self, nodes: Vec<ObjectReference>) {
         let mmtk = self.mmtk;
+        let plan = mmtk.get_plan().concurrent().unwrap();
+        if plan.counts_scan_work() {
+            // Approximate root scan work by the size of the root slots.  Roots reported while
+            // marking come from concurrent stack scanning.
+            let bytes = nodes.len() * crate::util::constants::BYTES_IN_ADDRESS;
+            if plan.current_pause().is_none() {
+                plan.add_scan_work(0, bytes, 0);
+            } else {
+                plan.add_scan_work(0, 0, bytes);
+            }
+        }
         let work_packet = ConcurrentTraceObjects::<VM, P, KIND>::new(nodes, false);
-        mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].add_no_notify(work_packet);
+        match plan.current_pause() {
+            // Roots found during concurrent marking can be traced right away.
+            None => mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].add(work_packet),
+            // Roots found while `FinalMark` finishes interrupted marking (e.g. a concurrent stack
+            // scan that had not run yet) are traced in that pause.
+            Some(Pause::FinalMark) => mmtk.scheduler.work_buckets
+                [WorkBucketStage::FinishConcurrentWork]
+                .add_no_notify(work_packet),
+            // `InitialMark`: traced concurrently after the pause.
+            Some(_) => {
+                mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent].add_no_notify(work_packet)
+            }
+        }
     }
 }
 

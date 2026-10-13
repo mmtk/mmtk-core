@@ -54,6 +54,8 @@ pub enum PlanSelector {
     LXR,
     /// Concurrent non-moving immix using SATB
     ConcurrentImmix,
+    /// A port of Go's garbage collector: concurrent, non-moving mark-sweep over a size-segregated span heap.
+    ConcurrentSpan,
 }
 
 /// MMTk option for perf events
@@ -1011,6 +1013,43 @@ options! {
     immix_defrag_headroom_percent: usize            [|v: &usize| *v <= 50] = 5,
     /// Disable concurrent marking in ConcurrentImmix. Setting this to true will make ConcurrentImmix behave exactly like full heap Immix. This option is only intended for debugging.
     concurrent_immix_disable_concurrent_marking: bool              [always_valid] = false,
+    /// ConcurrentSpan: the heap growth allowed over the live heap before the next cycle, in
+    /// percent, like Go's `GOGC`.  `-1` turns it off (`GOGC=off`), so only the memory limit
+    /// triggers collections.
+    gc_percent: isize                               [|v: &isize| *v >= -1] = 100,
+    /// ConcurrentSpan: the soft memory limit in bytes, like Go's `GOMEMLIMIT`.  `0`, the default,
+    /// uses the maximum heap size.
+    soft_mem_limit: usize                           [always_valid] = 0,
+    /// ConcurrentSpan: always collect stop-the-world.  For debugging.
+    concurrent_span_disable_concurrent_marking: bool [always_valid] = false,
+    /// ConcurrentSpan: scan mutator stacks in the InitialMark pause, instead of concurrently.
+    /// Stacks are also scanned in the pause if the binding cannot scan them concurrently.
+    concurrent_span_scan_stacks_in_pause: bool      [always_valid] = false,
+    /// ConcurrentSpan: how many times a FinalMark pause may restart concurrent marking in one
+    /// cycle.  After that, FinalMark finishes the marking in the pause.  Unlimited by default, as
+    /// in Go.  A limit bounds the number of pauses if mutators keep creating marking work.
+    concurrent_span_max_mark_restarts: usize        [always_valid] = usize::MAX,
+    /// ConcurrentSpan: when the heap is full during concurrent marking, make the allocating
+    /// mutator wait for the cycle to end (an allocation stall, as in Go and ZGC).  If false, a
+    /// FinalMark pause finishes the marking stop-the-world instead.
+    concurrent_span_allocation_stalls: bool         [always_valid] = true,
+    /// ConcurrentSpan: mark assists.  A mutator that allocates faster than marking progresses
+    /// waits while an extra GC worker marks for it.  Only if the binding can block mutators.
+    concurrent_span_assists: bool                   [always_valid] = true,
+    /// ConcurrentSpan: use the SATB barrier (as `ConcurrentImmix` does) instead of the hybrid
+    /// barrier, for comparison.  Stacks are then scanned in the InitialMark pause.
+    concurrent_span_satb_barrier: bool              [always_valid] = false,
+    /// ConcurrentSpan: a user-requested collection (e.g. `System.gc()`) runs a concurrent cycle
+    /// and blocks only the caller until it ends, like Go's `runtime.GC()`.  If false, or if the
+    /// binding cannot block mutators, it is a stop-the-world collection.
+    concurrent_span_concurrent_user_gc: bool        [always_valid] = true,
+    /// ConcurrentSpan: Green Tea span scanning.  Marking a small object (16-512 B) queues its
+    /// span, and a span is scanned all at once, as in Go's default collector.  If false, every
+    /// object is queued and scanned on its own, for ablation.
+    concurrent_span_green_tea: bool                 [always_valid] = true,
+    /// ConcurrentSpan: let a binding's inline allocation fast path allocate black during marking
+    /// (decision D92).  If false, the fast path takes the slow path while allocating black.
+    concurrent_span_inline_allocate_black: bool     [always_valid] = true,
     /// Trigger an LXR pause once this many reference-count increments are pending, bounding the
     /// `RCProcessIncs` work a single pause has to do. Each pending increment is one slot the write
     /// barrier recorded, so the limit is roughly "words of reference stores between pauses".

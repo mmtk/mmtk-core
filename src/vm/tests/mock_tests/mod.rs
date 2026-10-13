@@ -23,6 +23,7 @@ pub(crate) mod mock_test_prelude {
     pub use crate::vm::*;
 }
 
+mod concurrent_span_util;
 mod mock_test_allocate_align_offset;
 mod mock_test_allocate_no_gc_oom_on_acquire_allow_oom_call;
 mod mock_test_allocate_no_gc_oom_on_acquire_no_oom_call;
@@ -30,6 +31,7 @@ mod mock_test_allocate_no_gc_simple;
 mod mock_test_allocate_no_infinite_loop_if_throw_oom_returns;
 mod mock_test_allocate_nonmoving;
 mod mock_test_allocate_oom_unwind_inconsistent_state;
+mod mock_test_allocate_oom_while_others_allocate;
 mod mock_test_allocate_overcommit;
 mod mock_test_allocate_with_disable_collection;
 mod mock_test_allocate_with_initialize_collection;
@@ -37,6 +39,23 @@ mod mock_test_allocate_with_re_enable_collection;
 mod mock_test_allocate_without_initialize_collection;
 mod mock_test_allocator_info;
 mod mock_test_barrier_slow_path_assertion;
+mod mock_test_concurrent_span_alloc_sweep;
+mod mock_test_concurrent_span_allocate_black;
+mod mock_test_concurrent_span_assist;
+mod mock_test_concurrent_span_cycle;
+mod mock_test_concurrent_span_finalizer;
+mod mock_test_concurrent_span_gc_churn;
+mod mock_test_concurrent_span_greentea_graph;
+mod mock_test_concurrent_span_greentea_owned;
+mod mock_test_concurrent_span_heap_limit;
+mod mock_test_concurrent_span_hybrid_barrier;
+mod mock_test_concurrent_span_inline_fastpath;
+mod mock_test_concurrent_span_object_index;
+mod mock_test_concurrent_span_reuse;
+mod mock_test_concurrent_span_stall;
+mod mock_test_concurrent_span_stress;
+mod mock_test_concurrent_span_user_cycle;
+mod mock_test_concurrent_span_user_gc;
 #[cfg(feature = "vo_bit")]
 mod mock_test_conservatism;
 mod mock_test_debug_get_object_info;
@@ -66,6 +85,7 @@ mod mock_test_malloc_counted;
 mod mock_test_malloc_ms;
 #[cfg(all(target_pointer_width = "64", feature = "vm_space"))]
 mod mock_test_mmtk_julia_pr_143;
+mod mock_test_mock_roots;
 #[cfg(feature = "nogc_lock_free")]
 mod mock_test_nogc_lock_free;
 mod mock_test_shutdown;

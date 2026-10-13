@@ -534,8 +534,9 @@ impl<VM: VMBinding> ConcurrentPlan for ConcurrentImmix<VM> {
             .store(true, Ordering::SeqCst);
     }
 
-    fn on_concurrent_work_drained(&self) {
+    fn on_concurrent_work_drained(&self) -> bool {
         // Concurrent marking is the only concurrent work this plan schedules, and it always ends
         // in a `FinalMark` pause. Nothing to do here.
+        false
     }
 }

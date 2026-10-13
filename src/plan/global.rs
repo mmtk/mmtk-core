@@ -64,6 +64,9 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::ConcurrentImmix => {
             crate::plan::concurrent::immix::mutator::create_concurrent_immix_mutator(tls, mmtk)
         }
+        PlanSelector::ConcurrentSpan => {
+            crate::plan::concurrent::span::mutator::create_concurrent_span_mutator(tls, mmtk)
+        }
         PlanSelector::OVC => crate::plan::markcompact::ovc::mutator::create_ovc_mutator(tls, mmtk),
     })
 }
@@ -108,6 +111,10 @@ pub fn create_plan<VM: VMBinding>(
         PlanSelector::LXR => crate::plan::lxr::LXR::new(args) as Box<dyn Plan<VM = VM>>,
         PlanSelector::ConcurrentImmix => {
             Box::new(crate::plan::concurrent::immix::ConcurrentImmix::new(args))
+                as Box<dyn Plan<VM = VM>>
+        }
+        PlanSelector::ConcurrentSpan => {
+            Box::new(crate::plan::concurrent::span::ConcurrentSpan::new(args))
                 as Box<dyn Plan<VM = VM>>
         }
         PlanSelector::OVC => {

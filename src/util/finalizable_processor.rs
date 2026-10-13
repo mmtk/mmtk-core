@@ -97,6 +97,11 @@ impl<F: Finalizable> FinalizableProcessor<F> {
             .for_each(|f| FinalizableProcessor::<F>::forward_finalizable_reference(tracer, f));
     }
 
+    /// The objects of the finalizable candidates.
+    pub(crate) fn candidate_references(&self) -> Vec<ObjectReference> {
+        self.candidates.iter().map(|f| f.get_reference()).collect()
+    }
+
     pub fn get_ready_object(&mut self) -> Option<F> {
         self.ready_for_finalize.pop()
     }

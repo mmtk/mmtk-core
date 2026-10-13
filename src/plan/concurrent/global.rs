@@ -1,5 +1,7 @@
 use crate::plan::concurrent::Pause;
 use crate::plan::Plan;
+use crate::scheduler::GCWorker;
+use crate::util::ObjectReference;
 
 /// Trait for a concurrent plan.
 pub trait ConcurrentPlan: Plan {
@@ -11,5 +13,69 @@ pub trait ConcurrentPlan: Plan {
     fn on_concurrent_work_interrupted(&self);
     /// Called when the concurrent phase's work packets have drained: every GC worker has parked,
     /// so nothing is in progress, and no pause has been requested.
-    fn on_concurrent_work_drained(&self);
+    ///
+    /// Return `true` if the plan added more concurrent work (with `add_no_notify`, because the
+    /// caller holds the lock that the usual notification needs) or changed its state so that a
+    /// pause is now required.  The last parked worker then looks for work again, instead of
+    /// parking.
+    fn on_concurrent_work_drained(&self) -> bool;
+    /// Return `true` if a mutator that needs a collection now (for example because the heap is
+    /// full) should wait for the concurrent work in progress to finish, instead of requesting a
+    /// pause that interrupts it.  The mutator then blocks in
+    /// [`crate::vm::Collection::block_for_gc`] until the next pause ends.  This is an
+    /// *allocation stall*.
+    fn stall_instead_of_pause(&self) -> bool {
+        false
+    }
+    /// Called when a mutator is about to stall (see [`ConcurrentPlan::stall_instead_of_pause`]).
+    fn on_allocation_stall(&self) {}
+    /// Called when a stalled mutator resumes, with the time it was stalled.
+    fn on_allocation_stall_finished(&self, _duration: std::time::Duration) {}
+    /// Return `true` if the plan wants [`ConcurrentPlan::add_scan_work`] to be called.
+    fn counts_scan_work(&self) -> bool {
+        false
+    }
+    /// Report scan work done by concurrent marking, in bytes: heap objects scanned, and roots
+    /// found on stacks and elsewhere (Go's `heapScanWork`, `stackScanWork` and
+    /// `globalsScanWork`).  Only called if [`ConcurrentPlan::counts_scan_work`] returns `true`.
+    fn add_scan_work(&self, _heap: usize, _stack: usize, _globals: usize) {}
+    /// Return `true` if a user-requested collection should be a concurrent cycle that blocks only
+    /// the requesting mutator until the cycle ends (Go's `runtime.GC()`), instead of a
+    /// stop-the-world collection.  Only used if the VM can block mutators
+    /// ([`crate::vm::Collection::supports_blocking_mutators`]).
+    fn concurrent_user_collection(&self) -> bool {
+        false
+    }
+    /// The number of GC cycles completed so far.  Used to wait for a cycle to end.
+    fn completed_cycles(&self) -> usize {
+        0
+    }
+    /// Return `true` if `object` is known to be marked by the current concurrent trace, so a
+    /// barrier does not need to shade it (Go: the mark-bit check in `wbBufFlush1`).  `false` is
+    /// always safe.
+    fn is_marked_in_concurrent_trace(&self, _object: crate::util::ObjectReference) -> bool {
+        false
+    }
+    /// See [`crate::memory_manager::shade_objects`].
+    fn shade_objects(&self, _objects: &[crate::util::ObjectReference]) {}
+    /// See [`crate::memory_manager::soft_references_are_strong`].
+    fn soft_references_are_strong(&self) -> bool {
+        false
+    }
+    /// Let the plan trace a packet of concurrent marking work with its own tracing loop, instead
+    /// of the generic one in [`super::concurrent_marking_work::ConcurrentTraceObjects`]: the root
+    /// nodes, barrier buffers and rescans that `ConcurrentTraceObjects` and `ProcessModBufSATB`
+    /// packets carry.  `already_marked` says whether `objects` are marked (and only need
+    /// scanning) or still have to be traced.
+    ///
+    /// Return `None` if the plan has traced the objects, or give them back to use the generic
+    /// loop (the default).
+    fn trace_objects_concurrently(
+        &self,
+        _worker: &mut GCWorker<Self::VM>,
+        objects: Vec<ObjectReference>,
+        _already_marked: bool,
+    ) -> Option<Vec<ObjectReference>> {
+        Some(objects)
+    }
 }

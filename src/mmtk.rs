@@ -460,6 +460,33 @@ impl<VM: VMBinding> MMTK<VM> {
         force: bool,
         exhaustive: bool,
     ) -> bool {
+        use crate::vm::Collection;
+        if let Some(plan) = self.get_plan().concurrent() {
+            if plan.concurrent_user_collection()
+                && VM::VMCollection::supports_blocking_mutators()
+                && !tls.0 .0.is_null()
+            {
+                // Go's `runtime.GC()`: wait for the cycle in progress, if any, then run a whole
+                // concurrent cycle.  Only the calling mutator waits.
+                if plan.concurrent_work_in_progress() {
+                    let cycles = plan.completed_cycles();
+                    VM::VMCollection::block_mutator_until(tls, &|| {
+                        plan.completed_cycles() != cycles || !plan.concurrent_work_in_progress()
+                    });
+                }
+                let cycles = plan.completed_cycles();
+                if !self
+                    .gc_trigger
+                    .handle_user_collection_request(force, exhaustive)
+                {
+                    return false;
+                }
+                // The first pause of the cycle (`InitialMark`), then the rest of the cycle.
+                VM::VMCollection::block_for_gc(tls);
+                VM::VMCollection::block_mutator_until(tls, &|| plan.completed_cycles() != cycles);
+                return true;
+            }
+        }
         if self
             .gc_trigger
             .handle_user_collection_request(force, exhaustive)

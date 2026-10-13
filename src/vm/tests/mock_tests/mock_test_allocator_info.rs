@@ -54,6 +54,10 @@ pub fn test_allocator_info() {
                         assert!(matches!(allocator_info, AllocatorInfo::Unimplemented))
                     }
                 }
+                // ConcurrentSpan uses the span allocator.
+                PlanSelector::ConcurrentSpan => {
+                    assert!(matches!(allocator_info, AllocatorInfo::Span { .. }))
+                }
                 // We provide no info for a large object allocator
                 PlanSelector::PageProtect => assert!(matches!(allocator_info, AllocatorInfo::None)),
             }

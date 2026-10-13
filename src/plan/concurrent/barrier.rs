@@ -69,6 +69,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     fn flush_satb(&mut self) {
         if !self.satb.is_empty() {
             if self.should_create_satb_packets() {
+                BARRIER_WORK_FLUSHES.fetch_add(1, Ordering::SeqCst);
                 let satb = self.satb.take();
                 self.add_work(ProcessModBufSATB::<VM, P, KIND>::new(satb));
             } else {
@@ -80,6 +81,7 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
     #[cold]
     fn flush_weak_refs(&mut self) {
         if !self.refs.is_empty() {
+            BARRIER_WORK_FLUSHES.fetch_add(1, Ordering::SeqCst);
             let nodes = self.refs.take();
             self.add_work(ProcessModBufSATB::<VM, P, KIND>::new(nodes));
         }
@@ -163,5 +165,188 @@ impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND
         obj.iterate_fields::<VM, _>(self.tls.0, |s| {
             self.enqueue_node(Some(obj), s, None);
         });
+    }
+}
+
+/// The number of non-empty barrier buffers (`HybridBarrier` or `SATBBarrier`) flushed into
+/// tracing work so far.  A plan
+/// compares it before and after flushing every mutator, to find out whether the mutators had
+/// any marking work buffered (Go: `gcMarkDoneFlushed`).
+pub(crate) static BARRIER_WORK_FLUSHES: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+/// The slow-path semantics of `HybridBarrier`.
+///
+/// It buffers the objects to shade, like Go's per-P `wbBuf` (`runtime/mwbbuf.go`), and flushes
+/// the buffer into a [`ProcessModBufSATB`] packet, which marks every unmarked object in it and
+/// traces from it.  That is Go's `wbBufFlush1`.
+pub struct HybridBarrierSemantics<
+    VM: VMBinding,
+    P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>,
+    const KIND: TraceKind,
+> {
+    mmtk: &'static MMTK<VM>,
+    tls: VMMutatorThread,
+    /// Objects to shade: old and new values of reference stores, and loaded weak referents.
+    buf: Vec<ObjectReference>,
+    /// Objects whose fields may be initialised without a barrier
+    /// ([`crate::plan::barriers::Barrier::object_probable_write`]).  Their fields are traced when
+    /// the buffers are flushed from outside the mutator, after those stores have happened.
+    rescan: Vec<ObjectReference>,
+    plan: &'static P,
+}
+
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
+    HybridBarrierSemantics<VM, P, KIND>
+{
+    /// The capacity of the buffer.  Go's `wbBuf` holds 512 pointers (`runtime/mwbbuf.go`).
+    pub const BUFFER_SIZE: usize = 512;
+
+    pub fn new(mmtk: &'static MMTK<VM>, tls: VMMutatorThread) -> Self {
+        Self {
+            mmtk,
+            tls,
+            buf: Vec::with_capacity(Self::BUFFER_SIZE),
+            rescan: vec![],
+            plan: mmtk.get_plan().downcast_ref::<P>().unwrap(),
+        }
+    }
+
+    #[inline(always)]
+    fn shade(&mut self, object: ObjectReference) {
+        self.buf.push(object);
+        if self.buf.len() >= Self::BUFFER_SIZE {
+            self.flush_buf();
+        }
+    }
+
+    /// The objects currently buffered for shading.
+    #[cfg(test)]
+    pub(crate) fn buffered(&self) -> &[ObjectReference] {
+        &self.buf
+    }
+
+    /// Return `true` if the buffers hold any work.  Used to detect mark termination.
+    #[allow(dead_code)] // Used once ConcurrentSpan detects mark termination.
+    pub fn has_work(&self) -> bool {
+        !self.buf.is_empty() || !self.rescan.is_empty()
+    }
+
+    #[cold]
+    fn flush_buf(&mut self) {
+        if self.buf.is_empty() {
+            return;
+        }
+        let mut objects = std::mem::replace(&mut self.buf, Vec::with_capacity(Self::BUFFER_SIZE));
+        if self.should_create_packets() {
+            // Drop the objects that are already marked, as Go's `wbBufFlush1` does.  Without
+            // this, the flush in a `FinalMark` pause nearly always finds "work" and restarts
+            // marking.
+            objects.retain(|o| !self.plan.is_marked_in_concurrent_trace(*o));
+            if objects.is_empty() {
+                return;
+            }
+            BARRIER_WORK_FLUSHES.fetch_add(1, Ordering::SeqCst);
+            self.add_work(ProcessModBufSATB::<VM, P, KIND>::new(objects));
+        }
+    }
+
+    fn flush_rescan(&mut self) {
+        if self.rescan.is_empty() {
+            return;
+        }
+        let objects = std::mem::take(&mut self.rescan);
+        if self.should_create_packets() {
+            BARRIER_WORK_FLUSHES.fetch_add(1, Ordering::SeqCst);
+            // The objects are allocated black, so they are already marked.  Scan their fields.
+            self.add_work(super::concurrent_marking_work::ConcurrentTraceObjects::<
+                VM,
+                P,
+                KIND,
+            >::new(objects, true));
+        }
+    }
+
+    fn add_work(&self, work: impl GCWork<VM>) {
+        let bucket_stage = if self.plan.concurrent_work_in_progress() {
+            WorkBucketStage::Concurrent
+        } else {
+            debug_assert_ne!(self.plan.current_pause(), Some(Pause::InitialMark));
+            WorkBucketStage::Closure
+        };
+        let bucket = &self.mmtk.scheduler.work_buckets[bucket_stage];
+        if bucket.is_enabled() {
+            bucket.add(work);
+        } else {
+            bucket.add_no_notify(work);
+        }
+    }
+
+    fn should_create_packets(&self) -> bool {
+        self.plan.concurrent_work_in_progress()
+            || self.plan.current_pause() == Some(Pause::FinalMark)
+    }
+}
+
+impl<VM: VMBinding, P: ConcurrentPlan<VM = VM> + PlanTraceObject<VM>, const KIND: TraceKind>
+    BarrierSemantics for HybridBarrierSemantics<VM, P, KIND>
+{
+    type VM = VM;
+
+    #[cold]
+    fn flush(&mut self) {
+        self.flush_buf();
+        self.flush_rescan();
+    }
+
+    /// Go: `runtime/mwbbuf.go:221-227` (2c3c1caad2) records both the new and the old value.
+    fn object_reference_write_slow(
+        &mut self,
+        _src: ObjectReference,
+        slot: <Self::VM as VMBinding>::VMSlot,
+        target: Option<ObjectReference>,
+    ) {
+        if let Some(old) = slot.load() {
+            self.shade(old);
+        }
+        if let Some(new) = target {
+            self.shade(new);
+        }
+    }
+
+    /// Go's `bulkBarrierPreWrite` (`runtime/mbitmap.go:388-466`): shade the old values in the
+    /// destination and the values in the source.
+    fn memory_region_copy_slow(
+        &mut self,
+        src: <Self::VM as VMBinding>::VMMemorySlice,
+        dst: <Self::VM as VMBinding>::VMMemorySlice,
+    ) {
+        for s in dst.iter_slots() {
+            if let Some(old) = s.load() {
+                self.shade(old);
+            }
+        }
+        for s in src.iter_slots() {
+            if let Some(new) = s.load() {
+                self.shade(new);
+            }
+        }
+    }
+
+    /// The object's fields are about to be written without a barrier.  Shade the old values now
+    /// (deletion half), and trace the fields again later to catch the new values (insertion half).
+    fn object_probable_write_slow(&mut self, obj: ObjectReference) {
+        obj.iterate_fields::<VM, _>(self.tls.0, |s| {
+            if let Some(old) = s.load() {
+                self.shade(old);
+            }
+        });
+        self.rescan.push(obj);
+    }
+
+    /// Shade the referent of a weak reference that is loaded while marking.  That is Go's
+    /// `shade(ptr)` in `makeStrongFromWeak` (`runtime/mheap.go:2459-2466`).
+    fn load_weak_reference(&mut self, o: ObjectReference) {
+        self.shade(o);
     }
 }
