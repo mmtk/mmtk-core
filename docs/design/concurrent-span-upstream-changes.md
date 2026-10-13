@@ -20,6 +20,7 @@ Update this file in a separate docs-only commit, never in the change's own commi
 | U8 | `Collection::block_mutator_until` / `wake_blocked_mutators` | API addition | `src/vm/collection.rs` | planned | | | Used by assists |
 | U9 | Map64: fail chunk allocation when the free list cannot grow | Bug fix | `src/util/heap/layout/map64.rs` | committed | `32b68dbbbf` | | Found by `mock_test_concurrent_span_stress` with a 4 MiB heap: index out of bounds in `RawMemoryFreeList` |
 | U10 | MockVM: report which threads a GC is waiting for | Test infrastructure | `src/util/test_util/mock_vm/thread_park.rs` | committed | `936c32a839` | | Diagnostic for hanging multi-threaded mock tests |
+| U11 | Count an allocation request that keeps failing as a collection attempt | Bug fix | `src/global_state.rs`, `src/util/alloc/allocator.rs` | committed | `8b368ddd6e` | | A request that cannot be satisfied (a large object that does not fit) never got an emergency collection or an out-of-memory error while other mutators kept allocating, because any successful allocation reset the collection attempts. Found with ConcurrentSpan on cassandra (decision D93), where it livelocked until the benchmark timeout. Test: `mock_test_allocate_oom_while_others_allocate` (fails without the fix with MarkSweep and ConcurrentSpan; Immix passes either way) |
 
 ## Details
 

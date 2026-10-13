@@ -66,6 +66,7 @@ Decisions made without asking the project lead, so that work could continue. Eac
 | D90 | 2026-10-13 | Trace finalizable objects concurrently, with a separate "finalizably reachable" mark (ZGC)? | No. `Finalization` keeps tracing in the FinalMark pause | Yes | for review |
 | D91 | 2026-10-13 | Clear weak and phantom references at sweep time, as Go clears weak handles? | No. Reference processing stays in the FinalMark pause. HotSpot's VM weak tables stay strong roots, as the binding has them for every plan | Yes | for review |
 | D92 | 2026-10-13 | Allocate black in the inline allocation fast path? | Yes: scan bit, mark bit (atomic ORs) and a per-mutator `black_bytes` count, inline in the interpreter and C1, a leaf call in C2. Slow path with the SATB option or without BMI2 | Yes | for review |
+| D93 | 2026-10-13 | A mutator whose large allocation cannot fit stalls cycle after cycle while other mutators allocate small objects. When does it get `OutOfMemoryError`? | Once a request has failed, collections count as attempts for it (so emergency cycles follow), and its second failure after an emergency cycle raises out-of-memory, whatever other mutators allocate (separable commit U11) | Yes | for review |
 
 ## D1. Location of the engineering documents
 
@@ -536,3 +537,19 @@ The limits are guesses with headroom. If a legitimate build or run is killed, ra
 **Switch.** `MMTK_CONCURRENT_SPAN_INLINE_ALLOCATE_BLACK=false` clears the space's `inline_black` byte, so the fast path bails out while marking as before (for A/B runs).
 
 **To undo.** Make the fast path bail out again when `allocate_as_live` is set (`span_allocate`, `expand_span_allocate`).
+
+## D93. Out of memory while other mutators keep allocating
+
+**Question.** On OpenJDK, cassandra at 3x its G1 minimum heap (384 MB) never finished: the cycles ran back to back, thousands of allocation stalls per cycle, until the 2000 s benchmark timeout. Live data was about 160 MB, but SpanSpace held 270 MB of spans with 60-120 MB of objects in them and no empty span, so a 1 MB large object (cassandra's slab buffers) could not get pages (deviation SP13). Small allocations kept succeeding in free cells, and each success reset MMTk's collection attempts (`GlobalState::determine_collection_attempts`), so no cycle became an emergency cycle and no request got an out-of-memory error. Design §5.11 says a mutator that still cannot allocate after a complete cycle gets another one, the last an emergency cycle, then out-of-memory.
+
+**Options.**
+1. Keep MMTk's rule: an attempt counts only if no allocation succeeded since the last collection.
+2. Per request: while a request that has failed is being retried, every collection is another attempt; the request's second failure after an emergency cycle raises out-of-memory even if other allocations succeeded (the first may still be retried, as MMTk lets each OOM "run its course").
+3. A GC-overhead limit, like HotSpot's `UseGCOverheadLimit` (too much time in GC for too little memory recovered).
+4. Let the heap grow past `-Xmx`, as Go's soft `GOMEMLIMIT` and CPU limiter would.
+
+**Decision.** Option 2, as a fix to existing mmtk-core code (U11): it is what §5.11 describes, it changes nothing for a single mutator, and it applies to every plan. Option 4 changes what the evaluation compares (every other collector has a fixed heap) and is for the project lead to decide.
+
+**Effect.** cassandra at 384 MB now fails with `OutOfMemoryError` in its first iteration, about 70 s after starting, instead of hanging. Before, the first iteration passed slowly (it took 16 s against G1's 8.5 s) and the second never finished. batik, avrora, fop and biojava are unchanged, and Immix and ConcurrentImmix still pass batik at 525 MB, which needs emergency collections.
+
+**To undo.** Revert `8b368ddd6e` and `f76aa79bb3`.
