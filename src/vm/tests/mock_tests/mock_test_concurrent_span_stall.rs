@@ -19,6 +19,11 @@ static ROOT: AtomicUsize = AtomicUsize::new(0);
 /// Marking is held up until a mutator has stalled.  Only in the first cycle.
 static HOLD_UP_MARKING: AtomicBool = AtomicBool::new(true);
 
+/// Set when marking sees that a mutator has stalled in the first cycle.  The stall count of the
+/// plan cannot be used after the allocation returns: it is reset by the next cycle, which the
+/// stalled allocation may itself have triggered.
+static STALLED: AtomicBool = AtomicBool::new(false);
+
 fn field(object: ObjectReference) -> Address {
     object.to_raw_address() + 8usize
 }
@@ -60,6 +65,7 @@ pub fn allocation_stall() {
                     {
                         for _ in 0..20_000 {
                             if plan().stall_count() > 0 {
+                                STALLED.store(true, Ordering::SeqCst);
                                 break;
                             }
                             std::thread::sleep(std::time::Duration::from_millis(1));
@@ -89,13 +95,14 @@ pub fn allocation_stall() {
             // Allocate garbage until the heap is full.  The allocation that does not fit stalls
             // until `FinalMark` has freed memory, and then succeeds.  Objects allocated during
             // marking are black, so the garbage allocated before the stall survives this cycle,
-            // and the stalled allocation fits only after the next cycle.
+            // and the stalled allocation fits only after the next cycle.  It triggers that cycle
+            // itself, and that cycle may end before the allocation returns.
             let mut allocated = 0;
-            while plan().stall_count() == 0 && allocated < 64 * MB {
+            while !STALLED.load(Ordering::SeqCst) && allocated < 64 * MB {
                 alloc(&fixture, 1024);
                 allocated += 1024;
             }
-            assert!(plan().stall_count() > 0, "No allocation stalled");
+            assert!(STALLED.load(Ordering::SeqCst), "No allocation stalled");
             assert!(allocated > 4 * MB, "Stalled after only {allocated} bytes");
 
             // The stalled allocation returned after the cycle ended.
