@@ -1026,8 +1026,9 @@ options! {
     /// Stacks are also scanned in the pause if the binding cannot scan them concurrently.
     concurrent_span_scan_stacks_in_pause: bool      [always_valid] = false,
     /// ConcurrentSpan: how many times a FinalMark pause may restart concurrent marking in one
-    /// cycle.  After that, FinalMark finishes the marking in the pause.  Go has no limit.
-    concurrent_span_max_mark_restarts: usize        [always_valid] = 8,
+    /// cycle.  After that, FinalMark finishes the marking in the pause.  Unlimited by default, as
+    /// in Go.  A limit bounds the number of pauses if mutators keep creating marking work.
+    concurrent_span_max_mark_restarts: usize        [always_valid] = usize::MAX,
     /// ConcurrentSpan: when the heap is full during concurrent marking, make the allocating
     /// mutator wait for the cycle to end (an allocation stall, as in Go and ZGC).  If false, a
     /// FinalMark pause finishes the marking stop-the-world instead.
