@@ -146,10 +146,23 @@ impl<VM: VMBinding> GenericMMTKFixture<VM> {
     where
         F: FnOnce(&mut MMTKBuilder),
     {
+        Self::create_with_builder_and_mmtk_init(with_builder, initialize_collection, |_mmtk| {})
+    }
+
+    pub fn create_with_builder_and_mmtk_init<F>(
+        with_builder: F,
+        initialize_collection: bool,
+        mmtk_init: impl FnOnce(&mut MMTK<VM>),
+    ) -> Self
+    where
+        F: FnOnce(&mut MMTKBuilder),
+    {
         let mut builder = MMTKBuilder::new();
         with_builder(&mut builder);
 
-        let mmtk = memory_manager::mmtk_init::<VM>(&builder);
+        let mut mmtk = memory_manager::mmtk_init::<VM>(&builder);
+        mmtk_init(mmtk.as_mut());
+
         mock_api::set_singleton(mmtk);
 
         if initialize_collection {
