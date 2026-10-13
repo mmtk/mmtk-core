@@ -1,4 +1,4 @@
-// GITHUB-CI: MMTK_PLAN=Immix,MarkSweep
+// GITHUB-CI: MMTK_PLAN=Immix,MarkSweep,ConcurrentSpan
 
 //! A mutator whose allocation request cannot be satisfied runs out of memory, even while another
 //! mutator keeps allocating successfully.  The other mutator's allocations used to reset the
