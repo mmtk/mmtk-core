@@ -274,6 +274,12 @@ impl<VM: VMBinding> Plan for ConcurrentSpan<VM> {
                 self.pacing.end_marking();
                 // Mark termination: sweepgen += 2.  Mutator release (after this) returns and
                 // sweeps the mutators' cached spans; sweep packets sweep the rest.
+                // Go: mark termination disposes every P's gcWork, whose `bytesMarked` includes the
+                // objects that `mallocgc` allocated black.
+                use crate::vm::ActivePlan;
+                for mutator in VM::VMActivePlan::mutators() {
+                    super::mutator::flush_black_bytes(mutator);
+                }
                 self.span.release_after_mark();
                 // Safety: the plan, and so the space, lives as long as MMTk.
                 let span: &'static SpanSpace<VM> = unsafe { &*(&self.span as *const _) };

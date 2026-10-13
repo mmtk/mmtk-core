@@ -229,11 +229,20 @@ pub enum AllocatorInfo {
     /// `freeindex` and `alloc_count`. If the span's `needzero` is set, the object must be zeroed.
     /// Otherwise it calls the slow path.
     ///
-    /// While the space allocates objects black (concurrent marking), new objects must be marked,
-    /// which only the slow path does. The fast path loads the space pointer at `space_offset` from
-    /// the mutator and takes the slow path if the byte at `allocate_black_offset` from it is not
-    /// zero (Go's malloc fast paths bail out while `gcBlackenEnabled` is set). The flag only
-    /// changes while mutators are stopped.
+    /// While the space allocates objects black (concurrent marking), new objects must be marked
+    /// (Go's `gcmarknewobject`). The fast path loads the space pointer at `space_offset` from the
+    /// mutator and tests the byte at `allocate_black_offset` from it. If it is not zero:
+    /// - if the byte at `inline_black_offset` from the space pointer is zero, take the slow path;
+    /// - otherwise, after allocating the object at index `i` in span `s`: if the byte at
+    ///   `black_scan_offset` in `s` is not zero, set bit `i` of the bitmap at `scan_bits_offset`
+    ///   in `s`; then set bit `i` of the bitmap at `mark_bits_offset` in `s` (both bitmaps are
+    ///   arrays of 64-bit words, bit `i` is bit `i % 64` of word `i / 64`, and both bit sets must
+    ///   be atomic because GC threads set other bits of the same words; both bits are known to
+    ///   be clear, so an atomic add of the bit also works); and add `s`'s `elemsize` to the
+    ///   word at `black_bytes_offset` from the mutator (a plain add: only the mutator writes it).
+    ///   [`crate::util::alloc::SpanAllocator::allocate_black_inline`] does the same out of line.
+    ///
+    /// Both flags only change while mutators are stopped.
     ///
     /// [`crate::util::alloc::span_allocator::span_class_index`] gives the span class index for an
     /// allocation size.
@@ -245,6 +254,12 @@ pub enum AllocatorInfo {
         space_offset: usize,
         /// The byte offset of the space's allocate-black flag (a byte) from the space pointer.
         allocate_black_offset: usize,
+        /// The byte offset of the space's "the fast path may allocate black" flag (a byte) from
+        /// the space pointer.
+        inline_black_offset: usize,
+        /// The byte offset from the mutator's pointer to the allocator's count of bytes allocated
+        /// black (a `usize`).
+        black_bytes_offset: usize,
         /// Offsets of the fields in a span descriptor.
         alloc_cache_offset: usize,
         freeindex_offset: usize,
@@ -253,6 +268,9 @@ pub enum AllocatorInfo {
         start_offset: usize,
         alloc_count_offset: usize,
         needzero_offset: usize,
+        mark_bits_offset: usize,
+        scan_bits_offset: usize,
+        black_scan_offset: usize,
     },
     /// This allocator uses a fastpath, but we haven't implemented it yet.
     // FIXME: Add free-list fast-path
@@ -304,6 +322,8 @@ impl AllocatorInfo {
                     spans_offset: base_offset + offset_of!(SpanAllocator<VM>, alloc),
                     space_offset: base_offset + SpanAllocator::<VM>::space_offset(),
                     allocate_black_offset: SpanSpace::<VM>::allocate_as_live_offset(),
+                    inline_black_offset: SpanSpace::<VM>::inline_black_offset(),
+                    black_bytes_offset: base_offset + offset_of!(SpanAllocator<VM>, black_bytes),
                     alloc_cache_offset: offset_of!(Span, alloc_cache),
                     freeindex_offset: offset_of!(Span, freeindex),
                     nelems_offset: offset_of!(Span, nelems),
@@ -311,6 +331,9 @@ impl AllocatorInfo {
                     start_offset: offset_of!(Span, start),
                     alloc_count_offset: offset_of!(Span, alloc_count),
                     needzero_offset: offset_of!(Span, needzero),
+                    mark_bits_offset: offset_of!(Span, mark_bits),
+                    scan_bits_offset: offset_of!(Span, scan_bits),
+                    black_scan_offset: offset_of!(Span, black_scan),
                 }
             }
             _ => AllocatorInfo::None,

@@ -88,6 +88,10 @@ pub struct Span {
     /// so object references cannot be computed from object indices. Such spans do not use the
     /// span queue. Never set by OpenJDK or Go-like allocation.
     pub(crate) padded: AtomicBool,
+    /// Whether an object allocated black in this span gets its scan bit set as well (Green Tea
+    /// is on and the class uses the span queue). Set by the space when the span is created, so
+    /// that a binding's inline allocate-black path needs no knowledge of span classes.
+    pub(crate) black_scan: AtomicBool,
 }
 
 impl Default for Span {
@@ -117,6 +121,7 @@ impl Span {
             scan_bits: [const { AtomicU64::new(0) }; SPAN_QUEUE_BITMAP_WORDS],
             owned: AtomicU8::new(0),
             padded: AtomicBool::new(false),
+            black_scan: AtomicBool::new(false),
         }
     }
 
@@ -144,6 +149,7 @@ impl Span {
         debug_assert_eq!(self.owned.load(Relaxed), 0);
         self.owned.store(0, Relaxed);
         self.padded.store(false, Relaxed);
+        self.black_scan.store(false, Relaxed);
         self.refill_alloc_cache(0);
         self.sweepgen.store(sweepgen, Relaxed);
         self.state.store(SpanState::InUse as u8, Release);

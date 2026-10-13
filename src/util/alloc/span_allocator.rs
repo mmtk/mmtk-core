@@ -39,6 +39,11 @@ pub struct SpanAllocator<VM: VMBinding> {
     /// Go's `gcAssistBytes`: allocation credit during marking, in bytes.  Refills debit it; a
     /// negative value means the mutator owes mark work (an assist).
     pub(crate) assist_credit: isize,
+    /// Bytes allocated black by a binding's inline fast path and not yet counted as marked (Go:
+    /// the P's `gcWork.bytesMarked`). The fast path adds each new object's cell size; the plan
+    /// moves the total into the space's marked bytes before marking ends
+    /// ([`SpanAllocator::flush_black_bytes`]).
+    pub black_bytes: usize,
 }
 
 impl<VM: VMBinding> Allocator<VM> for SpanAllocator<VM> {
@@ -87,6 +92,7 @@ impl<VM: VMBinding> Allocator<VM> for SpanAllocator<VM> {
     }
 
     fn on_mutator_destroy(&mut self) {
+        self.flush_black_bytes();
         self.flush();
     }
 }
@@ -105,6 +111,26 @@ impl<VM: VMBinding> SpanAllocator<VM> {
         std::mem::offset_of!(Self, space)
     }
 
+    /// Count the bytes this allocator's inline fast path allocated black as marked (Go: flushing
+    /// a P's `gcWork.bytesMarked`).
+    pub fn flush_black_bytes(&mut self) {
+        self.space
+            .add_black_bytes(std::mem::take(&mut self.black_bytes));
+    }
+
+    /// Allocate-black for an object that a binding's inline fast path allocated at `cell` in
+    /// one of this allocator's cached spans: what the fast path does inline (see
+    /// [`crate::util::alloc::AllocatorInfo::Span`]), for compilers that call it out of line. A
+    /// leaf: it neither blocks nor allocates.
+    pub fn allocate_black_inline(&mut self, cell: Address) {
+        let span = self
+            .space
+            .span_of(cell)
+            .expect("new object not in an in-use span");
+        self.space.mark_new_object(span, span.obj_index(cell));
+        self.black_bytes += span.elemsize();
+    }
+
     pub(crate) fn new(
         tls: VMThread,
         space: &'static SpanSpace<VM>,
@@ -117,6 +143,7 @@ impl<VM: VMBinding> SpanAllocator<VM> {
             space,
             context,
             assist_credit: 0,
+            black_bytes: 0,
         }
     }
 

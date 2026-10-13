@@ -87,6 +87,11 @@ pub struct SpanSpace<VM: VMBinding> {
     /// index, so it has to turn cells into object references. Assumed to be the same for every
     /// object (0 in OpenJDK), and checked.
     object_ref_offset: AtomicUsize,
+    /// Whether a binding's inline allocation fast path may allocate black itself (see
+    /// [`crate::util::alloc::AllocatorInfo::Span`]). False if new objects also need their log
+    /// bits set (the SATB barrier option): the fast path then takes the slow path while
+    /// allocating black.
+    inline_black: bool,
 }
 
 /// What [`SpanSpace::trace_object_for_span_queue`] asks its caller to do.
@@ -291,6 +296,7 @@ impl<VM: VMBinding> SpanSpace<VM> {
         };
         let stripes = BYTES_MARKED_STRIPES;
         let green_tea = *common.options.concurrent_span_green_tea;
+        let inline_black = !common.needs_log_bit;
         SpanSpace {
             common,
             pr,
@@ -311,6 +317,7 @@ impl<VM: VMBinding> SpanSpace<VM> {
             assist_hook: OnceLock::new(),
             green_tea,
             object_ref_offset: AtomicUsize::new(usize::MAX),
+            inline_black,
         }
     }
 
@@ -703,20 +710,46 @@ impl<VM: VMBinding> SpanSpace<VM> {
             .span_of(addr)
             .expect("new object not in an in-use span");
         let index = span.obj_index(addr);
-        if self.uses_span_queue(span) {
-            // Go: `gcmarknewobject`.  No need to scan the new object.  The scan bit goes first,
-            // so a span scan never sees the new object marked but not scanned.
-            span.try_set_scanned(index);
-            if span.try_mark_for_span_queue(index) {
-                self.add_bytes_marked(span.elemsize());
-            }
-        } else if span.try_mark(index) {
-            self.add_bytes_marked(span.elemsize());
-        }
+        self.mark_new_object(span, index);
+        self.add_bytes_marked(span.elemsize());
         if self.common.needs_log_bit {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
                 .bulk_mark_as_logged(span.object_address(index), span.elemsize());
         }
+    }
+
+    /// The marking half of `gcmarknewobject`: set the mark bit of a newly allocated object, and
+    /// first its scan bit if it is in a span-queue span, so that a span scan never sees it marked
+    /// but not scanned. The caller counts its size as marked. A new object's bits are always
+    /// clear: its cell was free, and sweeping cleared the bits of free cells. Bindings' inline
+    /// fast paths rely on this (see [`crate::util::alloc::AllocatorInfo::Span`]).
+    pub(crate) fn mark_new_object(&self, span: &Span, index: usize) {
+        debug_assert_eq!(
+            span.black_scan.load(Ordering::Relaxed),
+            self.uses_span_queue(span)
+        );
+        if span.black_scan.load(Ordering::Relaxed) {
+            let scanned = span.try_set_scanned(index);
+            debug_assert!(scanned, "new object {index} already had its scan bit");
+            let marked = span.try_mark_for_span_queue(index);
+            debug_assert!(marked, "new object {index} was already marked");
+        } else {
+            let marked = span.try_mark(index);
+            debug_assert!(marked, "new object {index} was already marked");
+        }
+    }
+
+    /// Count bytes allocated black by an allocator's inline fast path as marked (Go: a P's
+    /// `gcWork.bytesMarked`, flushed into `work.bytesMarked`).
+    pub(crate) fn add_black_bytes(&self, bytes: usize) {
+        if bytes != 0 {
+            self.add_bytes_marked(bytes);
+        }
+    }
+
+    /// The offset of the flag that allows a binding's inline fast path to allocate black.
+    pub(crate) const fn inline_black_offset() -> usize {
+        std::mem::offset_of!(Self, inline_black)
     }
 
     // ---------------------------------------------------------------------------------------
@@ -767,6 +800,8 @@ impl<VM: VMBinding> SpanSpace<VM> {
         let id = self.spans.alloc_id();
         let span = self.spans.get(id);
         span.init(start, spc, self.sweepgen.load(Ordering::Acquire), needzero);
+        span.black_scan
+            .store(self.green_tea && spc.uses_span_queue(), Ordering::Relaxed);
         self.set_page_map(start, npages, id);
         Some((id, span))
     }

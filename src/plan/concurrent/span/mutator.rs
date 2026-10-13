@@ -39,6 +39,11 @@ fn get_span_allocator_mut<VM: VMBinding>(mutator: &mut Mutator<VM>) -> &mut Span
     .unwrap()
 }
 
+/// Count the bytes the mutator's inline allocation fast path allocated black as marked.
+pub(super) fn flush_black_bytes<VM: VMBinding>(mutator: &mut Mutator<VM>) {
+    get_span_allocator_mut::<VM>(mutator).flush_black_bytes();
+}
+
 pub fn concurrent_span_mutator_prepare<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     tls: VMWorkerThread,
