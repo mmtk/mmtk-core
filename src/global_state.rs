@@ -35,6 +35,10 @@ pub struct GlobalState {
     pub(crate) allocation_success: AtomicBool,
     // Maximum number of failed attempts by a single thread
     pub(crate) max_collection_attempts: AtomicUsize,
+    /// The number of mutator allocation requests that have failed at least once and are still
+    /// being retried.  While there are any, a collection is another attempt for them even if
+    /// other allocations succeeded since the last one.
+    pub(crate) failing_allocation_requests: AtomicUsize,
     // Current collection attempt
     pub(crate) cur_collection_attempts: AtomicUsize,
     /// A counter for per-mutator stack scanning
@@ -87,10 +91,15 @@ impl GlobalState {
     }
 
     fn determine_collection_attempts(&self) -> usize {
-        if !self.allocation_success.load(Ordering::Relaxed) {
+        // Successful allocations by other threads do not help a request that keeps failing.
+        // Without this, a thread whose allocation cannot be satisfied (say, a large object)
+        // never gets an emergency collection or an out-of-memory error while other threads keep
+        // allocating (small objects), and the program makes no progress.
+        let failed = !self.allocation_success.swap(false, Ordering::Relaxed)
+            || self.failing_allocation_requests.load(Ordering::SeqCst) > 0;
+        if failed {
             self.max_collection_attempts.fetch_add(1, Ordering::Relaxed);
         } else {
-            self.allocation_success.store(false, Ordering::Relaxed);
             self.max_collection_attempts.store(1, Ordering::Relaxed);
         }
 
@@ -254,6 +263,7 @@ impl Default for GlobalState {
             last_internal_triggered_collection: AtomicBool::new(false),
             allocation_success: AtomicBool::new(false),
             max_collection_attempts: AtomicUsize::new(0),
+            failing_allocation_requests: AtomicUsize::new(0),
             cur_collection_attempts: AtomicUsize::new(0),
             scanned_stacks: AtomicUsize::new(0),
             allocation_bytes: AtomicUsize::new(0),

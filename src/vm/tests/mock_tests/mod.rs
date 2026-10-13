@@ -31,6 +31,7 @@ mod mock_test_allocate_no_gc_simple;
 mod mock_test_allocate_no_infinite_loop_if_throw_oom_returns;
 mod mock_test_allocate_nonmoving;
 mod mock_test_allocate_oom_unwind_inconsistent_state;
+mod mock_test_allocate_oom_while_others_allocate;
 mod mock_test_allocate_overcommit;
 mod mock_test_allocate_with_disable_collection;
 mod mock_test_allocate_with_initialize_collection;

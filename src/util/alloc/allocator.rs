@@ -288,6 +288,31 @@ impl<VM: VMBinding> AllocatorContext<VM> {
     }
 }
 
+/// Counts a mutator's allocation request in [`GlobalState::failing_allocation_requests`] from
+/// its first failed attempt until it returns (or unwinds).
+struct FailingRequest(Option<Arc<GlobalState>>);
+
+impl FailingRequest {
+    fn count(&mut self, state: &Arc<GlobalState>) {
+        if self.0.is_none() {
+            state
+                .failing_allocation_requests
+                .fetch_add(1, Ordering::SeqCst);
+            self.0 = Some(state.clone());
+        }
+    }
+}
+
+impl Drop for FailingRequest {
+    fn drop(&mut self) {
+        if let Some(state) = self.0.take() {
+            state
+                .failing_allocation_requests
+                .fetch_sub(1, Ordering::SeqCst);
+        }
+    }
+}
+
 fn reset_oom_state<VM: VMBinding, A: Allocator<VM> + ?Sized>(allocator: &A) {
     let context = allocator.get_context();
     // Relaxed store is fine since this is a thread-local boolean.
@@ -447,6 +472,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         // Information about the previous collection.
         let mut emergency_collection = false;
         let mut previous_result_zero = false;
+        // This request has failed: until it returns, collections are attempts for it.
+        let mut failing = FailingRequest(None);
+        // The number of times this request has failed after an emergency collection.
+        let mut emergency_failures = 0;
 
         loop {
             // Try to allocate using the slow path
@@ -557,15 +586,22 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             // the second GC, which is not emergency. In such case, we will give a false OOM.
             // We cannot just rely on the local var. Instead, we get the emergency collection value again,
             // and check both.
+            failing.count(&self.get_context().state);
+
             if emergency_collection && self.get_context().state.is_emergency_collection() {
                 trace!("Emergency collection");
+                emergency_failures += 1;
                 // Report allocation success to assist OutOfMemory handling.
                 // This seems odd, but we must allow each OOM to run its course (and maybe give us back memory)
+                // The first emergency failure of a request may be retried if another
+                // allocation succeeded since the collection, but not the second: other threads
+                // allocating does not make room for this request.
                 let fail_with_oom = !self
                     .get_context()
                     .state
                     .allocation_success
-                    .swap(true, Ordering::SeqCst);
+                    .swap(true, Ordering::SeqCst)
+                    || emergency_failures > 1;
                 trace!("fail with oom={}", fail_with_oom);
                 if fail_with_oom {
                     // Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
