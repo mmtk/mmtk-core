@@ -27,7 +27,7 @@ Decisions made without asking the project lead, so that work could continue. Eac
 | D15 | 2026-10-12 | Soft references and finalizers make FinalMark trace (design §5.14) | Soft referents are strong in non-emergency cycles (`memory_manager::soft_references_are_strong`, used by mmtk-openjdk); finalizable objects' contents were traced while marking (`ScanFinalizableContents`), withdrawn by D88: `Finalization` traces in `FinalMark` | Yes | for review |
 | D16 | 2026-10-12 | Does a pause that closes a concurrent cycle count as a collection attempt for out-of-memory? | No. FinalMark continues the attempt started by InitialMark; otherwise a stalled mutator saw a false emergency and OOM | Yes | for review |
 | D17 | 2026-10-12 | How are assists parked (design §5.11 Stage A)? | New optional `Collection::block_mutator_until` / `wake_blocked_mutators`; mmtk-openjdk blocks the thread in the VM and waits on `gc_lock` (1 ms timed waits) | Yes | for review |
-| D18 | 2026-10-12 | Weak→strong block during mark termination (design §5.14) | Not implemented. It is not needed for correctness: MMTk processes references inside the FinalMark pause, so no mutator can turn a weak reference strong while referents are cleared, and before that pause weak loads shade while the flag is set (until the end of FinalMark). The cost is liveness of termination: a weak→strong load after the work drains creates work, so FinalMark restarts (unlimited by default, D12; `concurrent_span_max_mark_restarts` can cap it). The DaCapo matrix shows no runaway restarts | — | open |
+| D18 | 2026-10-12 | Weak→strong block during mark termination (design §5.14) | Not implemented. It is not needed for correctness: MMTk processes references inside the FinalMark pause, so no mutator can turn a weak reference strong while referents are cleared, and before that pause weak loads shade while the flag is set (until the end of FinalMark). The cost is liveness of termination: a weak→strong load after the work drains creates work, so FinalMark restarts (unlimited by default, D12; `concurrent_span_max_mark_restarts` can cap it). The DaCapo matrix shows no runaway restarts. Kept as is by D89 | — | for review |
 | D19 | 2026-10-12 | Work split between the integrator and agents in this session | Pacer (D20–D23) and SpanSpace (D30–D38) by agents in worktrees, merged by the integrator; mmtk-openjdk `HybridBarrier` (D50–D58) by an agent in the shared checkout | — | for review |
 | D20 | 2026-10-12 | Which `defaultHeapMinimum` (Go has 4 MiB, or 512 KiB under the `HeapMinimum512KiB` experiment)? | 4 MiB, Go's default | Yes | for review |
 | D21 | 2026-10-12 | How is the pacer shared between mutators, workers and pauses? | All fields atomic (`Relaxed`), all methods `&self`; STW-only methods document their precondition | Yes | for review |
@@ -61,6 +61,10 @@ Decisions made without asking the project lead, so that work could continue. Eac
 | D73 | 2026-10-12 | A span scan knows object indices; how does it get object references? | Learn the reference offset within the cell from the first object marked for the span queue, and assert it is constant. Spans with padded cells use the object queue (GT-5) | Yes | for review |
 | D74 | 2026-10-12 | Use Green Tea in stop-the-world `Full` pauses and reference processing too? | No: only in the concurrent marking packets. The generic `trace_object` sets scan bits, so both paths can meet in one span (GT-6) | Yes | for review |
 | D75 | 2026-10-12 | Background sweeping that ends without a pause leaves the `Concurrent` bucket enabled, so the next `InitialMark`'s root packets ran inside the pause, before `Prepare` (found by the Green Tea graph test; marking then lost every object) | `on_pause_start` disables `Concurrent` at the start of every pause that starts a cycle, as it already did for `FinalMark`. The scheduler reopens it after the pause if it holds work | Yes | for review |
+| D88 | 2026-10-13 | Scan finalizable objects' contents during marking (Go's `gcScanFinalizer`)? | No: it never finalized finalizable cycles and leaked fop. `Finalization` traces in the FinalMark pause | Yes | for review |
+| D89 | 2026-10-13 | Implement the weak→strong block (D18)? | No. Blocking needs `Reference.get()` slow paths that can stop for a safepoint in the interpreter, C1 and C2; every HotSpot collector uses leaf calls there | Yes | for review |
+| D90 | 2026-10-13 | Trace finalizable objects concurrently, with a separate "finalizably reachable" mark (ZGC)? | No. `Finalization` keeps tracing in the FinalMark pause | Yes | for review |
+| D91 | 2026-10-13 | Clear weak and phantom references at sweep time, as Go clears weak handles? | No. Reference processing stays in the FinalMark pause. HotSpot's VM weak tables stay strong roots, as the binding has them for every plan | Yes | for review |
 
 ## D1. Location of the engineering documents
 
@@ -472,3 +476,41 @@ The limits are guesses with headroom. If a legitimate build or run is killed, ra
 
 **Decision.** Drop `ScanFinalizableContents`. `Finalization` in `FinalMark` resurrects the unreachable candidates and traces from them in the pause, as in `ConcurrentImmix`. The pause traces what finalizable garbage reaches, which is usually small. A correct concurrent version needs a separate "finalizably reachable" mark (as ZGC has), which is left for later.
 
+## D89. No weak→strong block
+
+**Question.** Go blocks `weak.Pointer.Value()` from the start of mark termination until marking is done (`work.strongFromWeak`, `mheap.go:2416-2487`), so that weak→strong conversions cannot keep creating marking work (D18). Do we do the same for `Reference.get()`?
+
+**Options.**
+1. Block before the referent is returned, as Go does. The barrier's `Reference.get()` slow path is a leaf call in the interpreter, C1 and C2, as in every HotSpot collector, and a thread cannot wait at a safepoint inside a leaf call. All three tiers would need a slow path that can: the interpreter's `Reference.get` entry would leave for a full method frame, C1 would deoptimize and C2 would take an uncommon trap while the block is on.
+2. Block afterwards: the slow path records the thread and a GC thread suspends it with HotSpot's suspend handshake until FinalMark ends. It shares suspend state with JVMTI (debuggers), and the thread runs on with the referent for a while.
+3. Blocking inside an asynchronous handshake that the thread sends itself does not work: HotSpot holds the thread's handshake lock while it runs, so our own handshakes (stack scans, barrier flushes) would wait for the thread, which waits for the end of marking.
+4. No block.
+
+**Decision.** Option 4. Weak loads keep shading the referent, and FinalMark restarts concurrent marking when that creates work (D12, unlimited by default). Not needed for correctness (D18). Restarts are rare: at most 5 in one cycle on luindex and 2 on fop, 0-1 per run on lusearch. Deviation PLAN-6.
+
+**To undo.** Option 1, in mmtk-openjdk only.
+
+## D90. Finalization stays in the FinalMark pause
+
+**Question.** Go traces finalizable objects' contents during marking and needs no tracing after it (PLAN-7). D88 showed that Go's way is wrong for Java. Do we trace finalizable garbage concurrently in a Java-correct way?
+
+**Options.**
+1. ZGC's finalizable marking: during concurrent marking, objects reachable only through finalizable objects get a second, "finalizable" mark (a second per-span bitmap). FinalMark queues the finalizers of objects without the strong mark and traces nothing. Weak references test the strong mark, phantom references either mark.
+2. Keep `Finalization` in the FinalMark pause: it resurrects the unreachable finalizable objects and traces what they reach.
+
+**Decision.** Option 2, to keep the port simple. The FinalMark pause traces finalizable garbage, which is usually small. Deviation PLAN-7.
+
+**To undo.** Option 1. It changes marking, the mark bitmaps and reference processing.
+
+## D91. Java references are processed in the FinalMark pause
+
+**Question.** Go clears a weak handle when the sweeper frees its target: the handle is a special on the target's span, and `Value()` sweeps the span first (`ensureSwept`), so no pause work depends on the number of weak pointers. Do we clear `java.lang.ref` references at sweep time?
+
+**Options.**
+1. Go's way: attach each discovered weak or phantom `Reference` to its referent's span; sweeping a span clears and queues the references whose referents are unmarked; `Reference.get()` returns null for an unmarked referent in an unswept span. This needs D90 option 1 for Java's order (weak references cleared before finalization, phantom references after), and a `Reference.get()` barrier outside marking.
+2. Shenandoah/ZGC's way: concurrent reference processing between FinalMark and the start of sweeping, with a third pause (or handshake) to start sweeping.
+3. Keep MMTk's reference processing in the FinalMark pause (list work, no tracing except D90).
+
+**Decision.** Option 3. HotSpot's VM weak tables (string table, JNI weak globals, resolved method table) stay strong roots scanned at InitialMark, as the binding has them for every MMTk plan: they are never cleared and classes are never unloaded. Go has no VM weak tables. Deviation PLAN-8.
+
+**To undo.** Option 1 (closest to Go) together with D90 option 1.
