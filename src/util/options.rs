@@ -1047,6 +1047,9 @@ options! {
     /// span, and a span is scanned all at once, as in Go's default collector.  If false, every
     /// object is queued and scanned on its own, for ablation.
     concurrent_span_green_tea: bool                 [always_valid] = true,
+    /// ConcurrentSpan: let a binding's inline allocation fast path allocate black during marking
+    /// (decision D92).  If false, the fast path takes the slow path while allocating black.
+    concurrent_span_inline_allocate_black: bool     [always_valid] = true,
     /// Trigger an LXR pause once this many reference-count increments are pending, bounding the
     /// `RCProcessIncs` work a single pause has to do. Each pending increment is one slot the write
     /// barrier recorded, so the limit is roughly "words of reference stores between pauses".

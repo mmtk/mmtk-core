@@ -296,7 +296,8 @@ impl<VM: VMBinding> SpanSpace<VM> {
         };
         let stripes = BYTES_MARKED_STRIPES;
         let green_tea = *common.options.concurrent_span_green_tea;
-        let inline_black = !common.needs_log_bit;
+        let inline_black =
+            !common.needs_log_bit && *common.options.concurrent_span_inline_allocate_black;
         SpanSpace {
             common,
             pr,

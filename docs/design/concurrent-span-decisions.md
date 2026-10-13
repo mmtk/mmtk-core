@@ -533,4 +533,6 @@ The limits are guesses with headroom. If a legitimate build or run is killed, ra
 - **Exceptions.** With the SATB option, new objects also need log bits, so the space's `inline_black` byte is 0 and the fast path bails out as before. The interpreter/C1 sequence uses `shlx`; without BMI2 it bails out.
 - **Interface.** `AllocatorInfo::Span` gains `inline_black_offset`, `black_bytes_offset`, `mark_bits_offset`, `scan_bits_offset` and `black_scan_offset`; `SpanAllocator::allocate_black_inline` is the out-of-line version. `SpanSpace::mark_new_object` is shared with the slow path and asserts (debug) that the bits were clear.
 
+**Switch.** `MMTK_CONCURRENT_SPAN_INLINE_ALLOCATE_BLACK=false` clears the space's `inline_black` byte, so the fast path bails out while marking as before (for A/B runs).
+
 **To undo.** Make the fast path bail out again when `allocate_as_live` is set (`span_allocate`, `expand_span_allocate`).
