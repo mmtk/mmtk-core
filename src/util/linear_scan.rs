@@ -57,38 +57,17 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool> std
                 unsafe { vo_bit::is_vo_bit_set_unsafe(self.cursor) }
             };
 
+            // VO bits can only be set at addresses aligned to `ObjectReference::ALIGNMENT`.
             if let Some(object) = is_object {
                 // The object size may not be a multiple of `ObjectReference::ALIGNMENT`.
-                let object_end =
-                    (self.cursor + S::size(object)).align_up(ObjectReference::ALIGNMENT);
-                self.move_cursor_to_next_vo_bit(object_end);
+                self.cursor = (self.cursor + S::size(object)).align_up(ObjectReference::ALIGNMENT);
                 return Some(object);
             } else {
-                self.move_cursor_to_next_vo_bit(self.cursor + ObjectReference::ALIGNMENT);
+                self.cursor += ObjectReference::ALIGNMENT;
             }
         }
 
         None
-    }
-}
-
-impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool>
-    ObjectIterator<VM, S, ATOMIC_LOAD_VO_BIT>
-{
-    /// Move the cursor to the next address with the VO bit set, searching forwards from `from`
-    /// (inclusive). VO bits can only be set at addresses aligned to `ObjectReference::ALIGNMENT`,
-    /// so we search for the next set bit rather than checking every address. If there is no VO
-    /// bit set before `self.end`, the cursor is moved to `self.end`.
-    fn move_cursor_to_next_vo_bit(&mut self, from: Address) {
-        self.cursor = if from < self.end {
-            unsafe {
-                vo_bit::VO_BIT_SIDE_METADATA_SPEC
-                    .find_next_non_zero_value::<u8>(from, self.end - from)
-            }
-            .unwrap_or(self.end)
-        } else {
-            self.end
-        };
     }
 }
 
