@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["RootsKind"],"trait":["ObjectTracer","ObjectTracerContext","RootsWorkFactory","Scanning","SlotVisitor"]};
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_UNIQUE_OBJECT_ENQUEUING"],"enum":["RootsKind"],"trait":["ObjectTracer","ObjectTracerContext","RootsWorkFactory","Scanning","SlotVisitor"]};

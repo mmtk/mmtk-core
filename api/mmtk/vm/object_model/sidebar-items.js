@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["specs"],"trait":["ObjectModel"]};
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_COMPRESSED_PTR_ENABLED","DEFAULT_NEED_VO_BITS_DURING_TRACING","DEFAULT_UNIFIED_OBJECT_REFERENCE_ADDRESS","DEFAULT_VM_WORST_CASE_COPY_EXPANSION"],"mod":["specs"],"trait":["ObjectModel"]};
