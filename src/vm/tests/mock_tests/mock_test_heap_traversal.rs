@@ -43,7 +43,7 @@ pub fn test_heap_traversal() {
 
                 let mut new_obj = |size: usize, semantics: AllocationSemantics| {
                     let start = memory_manager::alloc(mutator, size, align, 0, semantics);
-                    let object = MockVM::object_start_to_ref(start);
+                    let object = <MockVM>::object_start_to_ref(start);
                     memory_manager::post_alloc(mutator, object, size, semantics);
                     object
                 };

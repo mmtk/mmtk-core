@@ -30,7 +30,7 @@ pub fn malloc_ms_sweep_dead_objects() {
                     let semantics = AllocationSemantics::Default;
                     let start = memory_manager::alloc(mutator, size, BYTES_IN_WORD, 0, semantics);
                     assert!(!start.is_zero());
-                    let object = MockVM::object_start_to_ref(start);
+                    let object = <MockVM>::object_start_to_ref(start);
                     memory_manager::post_alloc(mutator, object, size, semantics);
                     object
                 })
