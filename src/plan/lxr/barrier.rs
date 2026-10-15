@@ -149,9 +149,6 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
                 self.flush_decs_and_satb();
             }
         }
-        // A tracepoint rather than a counter: this runs on every reference store that
-        // reaches the barrier slow path, and a global atomic here is one cache line
-        // ping-ponging between every mutator thread in the program.
         self.incs.push(slot);
         if self.incs.is_full() {
             self.flush_incs();
@@ -201,7 +198,8 @@ impl<VM: VMBinding> LXRFieldBarrierSemantics<VM> {
                     .add(ProcessModBufSATB::new_arc(decs.clone()));
                 ProcessDecs::new_arc(decs, LazySweepingJobsCounter::new_decs())
             } else {
-                ProcessDecs::new(self.decs.take(), LazySweepingJobsCounter::new_decs())
+                let decs = self.decs.take();
+                ProcessDecs::new(decs, LazySweepingJobsCounter::new_decs())
             };
             if super::LAZY_DECREMENTS {
                 self.mmtk.scheduler.work_buckets[WorkBucketStage::Concurrent]
@@ -282,17 +280,6 @@ impl<VM: VMBinding> BarrierSemantics for LXRFieldBarrierSemantics<VM> {
     }
 
     fn object_probable_write_slow(&mut self, obj: ObjectReference) {
-        // No slot was given, so derive the fields by scanning the object. That calls the
-        // binding's own `scan_object`, whose job is to report what this object references --
-        // not necessarily what its *fields* are. A coroutine's scan walks its GC shadow
-        // stack; a scan of a collection whose storage the VM owns walks that storage. Slots
-        // like those have no field unlog bit to coalesce on, and recording one means
-        // re-reading it at the pause, which needs the memory to still be there and still
-        // hold the same field.
-        //
-        // Keeping them out of here is the binding's responsibility, because the binding is
-        // the only party that knows which question `scan_object` is being asked -- MMTk's
-        // signature is the same for a root scan, a trace and this walk.
         obj.iterate_fields::<VM, _>(self.tls.0, |s| {
             let _succ = self.enqueue_node(Some(obj), s, None);
         });

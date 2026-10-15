@@ -90,9 +90,6 @@ pub struct LXR<VM: VMBinding> {
     pub(super) possibly_dead_mature_blocks: SegQueue<(Block, bool)>,
 }
 
-/// The static plan constraints for LXR: it uses a field-level write barrier with
-/// log bits, enables reference counting, and moves objects unless both nursery and
-/// mature evacuation have been disabled at build time.
 pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints {
     moves_objects: super::NURSERY_EVACUATION || super::MATURE_EVACUATION,
     // Max immix object size is half of a block.
@@ -469,9 +466,6 @@ impl<VM: VMBinding> LXR<VM> {
             "LXR does not support placing forwarding bits on the side."
         );
         let num_workers = args.scheduler.num_workers();
-        // Note: `Block::DEFRAG_STATE_TABLE` doesn't need to be listed here; it's already
-        // registered unconditionally by `SideMetadataContext::new_global_specs` since every
-        // Immix-family plan (not just LXR) requires it.
         #[allow(unused_mut)]
         let mut specs = vec![
             MetadataSpec::OnSide(RC_TABLE),
@@ -805,40 +799,6 @@ impl<VM: VMBinding> LXR<VM> {
         scheduler.work_buckets[WorkBucketStage::WeakRefClosure].set_enabled(final_mark_or_full);
         scheduler.work_buckets[WorkBucketStage::FinalRefClosure].set_enabled(final_mark_or_full);
         scheduler.work_buckets[WorkBucketStage::PhantomRefClosure].set_enabled(final_mark_or_full);
-        // The VM's own reference processing, which for Julia is where finalizers are swept.
-        //
-        // This was disabled outright, and with the bucket disabled MMTk never calls
-        // `Scanning::process_weak_refs` at all. Two things then never ran. Finalizer lists
-        // were never swept, so nothing was ever finalized while the program ran; and
-        // `mark_finlist`, which traces the objects still on those lists, never ran either --
-        // and that trace is what keeps a registered object alive until its finalizer has been
-        // scheduled. Registered objects were therefore reclaimed with live entries still
-        // naming them, and `jl_gc_run_all_finalizers` at exit ran every one of those entries
-        // against recycled memory: an invalid `free` on the C finalizer path
-        // (`gc-common.c:174`), a segfault reading the argument's type on the Julia path
-        // (`gc-common.c:180`).
-        //
-        // The same call also schedules `SweepVMSpecific`, so `jl_gc_sweep_weak_processing`,
-        // `jl_gc_mmtk_sweep_malloced_memory` and `jl_gc_sweep_stack_pools_and_mtarraylist_buffers`
-        // were all being skipped as well.
-        //
-        // Still disabled, because enabling it is necessary but not sufficient and the rest is
-        // not yet working. Two further things are needed, both attempted and reverted:
-        //
-        //  1. A packet in the bucket. Plans that use `GCWorkScheduler::schedule_common_work`
-        //     get a `VMProcessWeakRefs` sentinel from there; LXR schedules its own collection,
-        //     and that sentinel is commented out on the upstream LXR branch regardless.
-        //     ConcurrentImmix sets it explicitly with `PlanTrace<_, TRACE_KIND_FAST>`; LXR is
-        //     not a `PlanTraceObject`, so `gc_work::tracing::LXRRefTrace` exists for this.
-        //  2. A liveness predicate that is safe here. `sweep_finalizer_list` asks
-        //     `is_live_object`, and `ImmixSpace::is_live`'s `rc_enabled` branch sends every
-        //     *unmarked* object -- i.e. every dead entry, which is what the sweep is looking
-        //     for -- into `object_forwarding::is_forwarded`. Under `lxr_no_evac` nothing moves,
-        //     that state is never established, and reading it faults. `object_is_live` in
-        //     `mmtk_julia/src/julia_finalizer.rs` answers in LXR's own terms instead.
-        //
-        // With both in place the first tracing pause still segfaults, so this stays off.
-        scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::STWRCDecsAndSweep]
             .set_enabled(!(super::LAZY_DECREMENTS && pause != Pause::Full));
         // Always enabled
@@ -849,6 +809,7 @@ impl<VM: VMBinding> LXR<VM> {
         // pinning roots, where accepted at all, take the ordinary node-root path instead.
         #[cfg(feature = "non_moving_root")]
         scheduler.work_buckets[WorkBucketStage::TPinningClosure].set_enabled(false);
+        scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::SoftRefClosure].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding].set_enabled(false);
@@ -919,8 +880,10 @@ impl<VM: VMBinding> LXR<VM> {
         let prev_roots = self.prev_roots.read().unwrap();
         let mut work_packets: Vec<Box<dyn GCWork<VM>>> = Vec::with_capacity(prev_roots.len());
         while let Some(decs) = prev_roots.pop() {
-            let w = ProcessDecs::new(decs, LazySweepingJobsCounter::new_decs());
-            work_packets.push(Box::new(w))
+            work_packets.push(Box::new(ProcessDecs::new(
+                decs,
+                LazySweepingJobsCounter::new_decs(),
+            )))
         }
         if work_packets.is_empty() {
             work_packets.push(Box::new(ProcessDecs::new(
@@ -964,22 +927,6 @@ impl<VM: VMBinding> LXR<VM> {
         }
     }
 
-    /// Like [`Self::mark`], but takes an explicit `los` flag indicating whether
-    /// the object is in the large object space, avoiding a space lookup.
-    pub fn mark2(&self, o: ObjectReference, los: bool) -> bool {
-        if !los {
-            self.immix_space.attempt_mark(o)
-        } else {
-            self.common.los.attempt_mark(o)
-        }
-    }
-
-    /// Returns whether the object has already been marked as live in whichever
-    /// space (Immix or large object space) it belongs to.
-    ///
-    /// Objects owned by the common plan are never reclaimed, so they are always
-    /// reported as marked. Callers use this to decide whether an object still needs
-    /// to be retained or revisited, and neither is ever true for them.
     pub fn is_marked(&self, o: ObjectReference) -> bool {
         if self.immix_space.in_space(o) {
             self.immix_space.is_marked(o)
