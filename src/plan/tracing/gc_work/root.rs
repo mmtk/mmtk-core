@@ -1,16 +1,18 @@
 use std::marker::PhantomData;
 
+#[cfg(feature = "non_moving_root")]
+use crate::plan::VectorObjectQueue;
+#[cfg(feature = "non_moving_root")]
+use crate::plan::tracing::gc_work::closure::ProcessNodes;
+#[cfg(feature = "non_moving_root")]
+use crate::scheduler::{GCWork, GCWorker};
+#[cfg(feature = "non_moving_root")]
+use crate::util::ObjectReference;
+
 use crate::{
     MMTK,
-    plan::{
-        VectorObjectQueue,
-        tracing::{
-            Trace,
-            gc_work::closure::{ProcessNodes, ProcessSlots},
-        },
-    },
-    scheduler::{GCWork, GCWorker, WorkBucketStage, gc_work::RootKind},
-    util::ObjectReference,
+    plan::tracing::{Trace, gc_work::closure::ProcessSlots},
+    scheduler::{WorkBucketStage, gc_work::RootKind},
     vm::{RootsKind, RootsWorkFactory, VMBinding},
 };
 
@@ -71,6 +73,7 @@ impl<VM: VMBinding, DT: Trace<VM = VM>, PT: Trace<VM = VM>> RootsWorkFactory<VM:
         );
     }
 
+    #[cfg(feature = "non_moving_root")]
     fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         probe!(mmtk, roots, RootsKind::PINNING, nodes.len());
 
@@ -90,6 +93,7 @@ impl<VM: VMBinding, DT: Trace<VM = VM>, PT: Trace<VM = VM>> RootsWorkFactory<VM:
         );
     }
 
+    #[cfg(feature = "non_moving_root")]
     fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         probe!(mmtk, roots, RootsKind::TPINNING, nodes.len());
 
@@ -142,12 +146,14 @@ impl<VM: VMBinding, DT: Trace<VM = VM>, PT: Trace<VM = VM>> DefaultRootsWorkFact
 /// -   If `O2OT` may move objects, then this `ProcessRootsNode<VM, R2OT, O2OT>` work packet will
 ///     only pin the objects in `roots` (because `R2OT` must not move objects anyway), but not their
 ///     descendents.
+#[cfg(feature = "non_moving_root")]
 pub(crate) struct ProcessPinningRoots<VM: VMBinding, R2OT: Trace<VM = VM>, O2OT: Trace<VM = VM>> {
     phantom: PhantomData<(VM, R2OT, O2OT)>,
     roots: Vec<ObjectReference>,
     bucket: WorkBucketStage,
 }
 
+#[cfg(feature = "non_moving_root")]
 impl<VM: VMBinding, R2OT: Trace<VM = VM>, O2OT: Trace<VM = VM>>
     ProcessPinningRoots<VM, R2OT, O2OT>
 {
@@ -160,6 +166,7 @@ impl<VM: VMBinding, R2OT: Trace<VM = VM>, O2OT: Trace<VM = VM>>
     }
 }
 
+#[cfg(feature = "non_moving_root")]
 impl<VM: VMBinding, R2OT: Trace<VM = VM>, O2OT: Trace<VM = VM>> GCWork<VM>
     for ProcessPinningRoots<VM, R2OT, O2OT>
 {

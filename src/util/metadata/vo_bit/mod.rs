@@ -188,7 +188,7 @@ pub(crate) fn find_object_from_internal_pointer<VM: VMBinding>(
     start: Address,
     search_limit_bytes: usize,
 ) -> Option<ObjectReference> {
-    if !start.is_mapped() {
+    if !VO_BIT_SIDE_METADATA_SPEC.is_mapped(start) {
         return None;
     }
 
