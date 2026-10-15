@@ -57,11 +57,13 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool> std
                 unsafe { vo_bit::is_vo_bit_set_unsafe(self.cursor) }
             };
 
+            // VO bits can only be set at addresses aligned to `ObjectReference::ALIGNMENT`.
             if let Some(object) = is_object {
-                self.cursor += S::size(object);
+                // The object size may not be a multiple of `ObjectReference::ALIGNMENT`.
+                self.cursor = (self.cursor + S::size(object)).align_up(ObjectReference::ALIGNMENT);
                 return Some(object);
             } else {
-                self.cursor += VM::MIN_ALIGNMENT;
+                self.cursor += ObjectReference::ALIGNMENT;
             }
         }
 

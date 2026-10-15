@@ -38,7 +38,13 @@ find ./src ./tests -type f -name "mock_test_*" | while read -r file; do
 
     # Run the test with each plan it needs.
     for MMTK_PLAN in $PLANS; do
-        env MMTK_PLAN=$MMTK_PLAN cargo test --features mock_test,"$FEATURES" -- $t;
+        # Currently run all tests with side metadata, except LXR which requires in-header forwarding bits.
+        if [[ $MMTK_PLAN == 'LXR' ]]; then
+            METADATA=mock_test_header_metadata
+        else
+            METADATA=mock_test_side_metadata
+        fi
+        env MMTK_PLAN=$MMTK_PLAN cargo test --features mock_test,$METADATA,"$FEATURES" -- $t;
     done
 done
 

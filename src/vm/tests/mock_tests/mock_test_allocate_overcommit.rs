@@ -14,7 +14,13 @@ pub fn allocate_overcommit() {
         default_setup,
         || {
             const MB: usize = 1024 * 1024;
-            let mut fixture = MutatorFixture::create_with_heapsize(MB);
+            let fixture = MutatorFixture::create_with_heapsize(MB);
+
+            if *fixture.mmtk().get_plan().options().plan == crate::util::options::PlanSelector::NoGC
+            {
+                // Overcommit still triggers GC. For NoGC plan, triggering GC causes panic.
+                return;
+            }
 
             let mut last_result = crate::util::Address::MAX;
 
@@ -22,7 +28,7 @@ pub fn allocate_overcommit() {
             // Run a few more times to test if we set/unset no_gc_on_fail properly.
             for _ in 0..1100 {
                 last_result = memory_manager::alloc_with_options(
-                    &mut fixture.mutator,
+                    fixture.mutator(),
                     1024,
                     8,
                     0,

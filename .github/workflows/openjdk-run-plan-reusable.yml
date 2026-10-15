@@ -54,7 +54,15 @@ jobs:
   run-plan:
     runs-on: [self-hosted, Linux, freq-scaling-off]
     timeout-minutes: 1440
+    env:
+      # Working dir for the gh-pages deploy step below. Kept after the job so it
+      # can be inspected, and removed at the start of the next job on this runner.
+      GH_PAGES_HOME: ${{ github.workspace }}/gh-pages-home
     steps:
+      # Remove the gh-pages clone left by the previous deploy on this runner (see
+      # the deploy step below). It is kept until now so it can be inspected.
+      - name: Clean up previous gh-pages working dir
+        run: rm -rf "${GH_PAGES_HOME:?}"
       - name: Checkout Perf Kit
         uses: actions/checkout@v4
         with:
@@ -109,6 +117,11 @@ jobs:
       - name: Deploy to Github Page
         if: ${{ inputs.deploy }}
         uses: peaceiris/actions-gh-pages@v4
+        env:
+          # The action clones the target branch into $HOME/actions_github_pages_<timestamp>
+          # and never removes it. Give it a dedicated HOME in the workspace, so the
+          # cleanup step at the start of the next job can delete just that folder.
+          HOME: ${{ env.GH_PAGES_HOME }}
         with:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
           external_repository: mmtk/ci-perf-result

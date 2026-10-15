@@ -195,4 +195,11 @@ pub(super) fn try_mmap_metadata_chunk(
     } else {
         MMAPPER.quarantine_address_range(policy_meta_start, pages, HugePageSupport::No, anno)
     }
+    .inspect_err(|_| {
+        warn!(
+            "Failed to mmap per-chunk metadata: {} - {}",
+            policy_meta_start,
+            policy_meta_start + local_per_chunk
+        );
+    })
 }

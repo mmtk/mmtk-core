@@ -4,7 +4,9 @@ use super::super::LXR;
 use super::super::{LAZY_DECREMENTS, MATURE_EVACUATION, NO_EVAC, NURSERY_EVACUATION};
 use super::tracing::LXRConcurrentTraceObjects;
 use super::tracing::LXRStopTheWorldProcessEdges;
+#[cfg(feature = "non_moving_root")]
 use super::tracing::LXRStopTheWorldProcessNodes;
+#[cfg(feature = "non_moving_root")]
 use super::tracing::ProcessModBufSATB;
 use super::ProcessEdgesBase;
 use crate::plan::VectorQueue;
@@ -26,6 +28,7 @@ use crate::{
     MMTK,
 };
 use atomic::Ordering;
+#[cfg(feature = "non_moving_root")]
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
@@ -93,6 +96,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         }
     }
 
+    #[cfg(feature = "non_moving_root")]
     /// Reference-count root objects reported as objects rather than as slots.
     /// Node counterpart of `process_incs::<EDGE_KIND_ROOT>`. Nothing here may move an object.
     fn process_root_nodes(
@@ -133,6 +137,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         (roots, uncounted)
     }
 
+    #[cfg(feature = "non_moving_root")]
     /// Node-shaped counterpart of [`GCWork::do_work`] below for `KIND == EDGE_KIND_ROOT`.
     /// However, the major difference is that we cannot move any of these objects here, as
     /// we don't know their slots.
@@ -253,11 +258,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
         _depth: u32,
         size: usize,
     ) {
-        let heap_bytes_per_unlog_byte = if VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
-            32usize
-        } else {
-            64
-        };
+        let heap_bytes_per_unlog_byte =
+            VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.heap_bytes_per_unlog_byte();
         if los {
             let start =
                 side_metadata::address_to_meta_address(&Self::UNLOG_BITS, o.to_raw_address())
@@ -273,21 +275,8 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
             }
             o.to_raw_address().unlog_field_relaxed::<VM>();
         } else if in_place_promotion {
-            // Arm every unlog bit covering the object, starting from the granule that holds its
-            // first byte.
-            //
-            // This used to start from `o + header_size` and then align *down*, meaning to skip
-            // the header. But aligning down never moves forward, so whenever `o + header_size`
-            // landed in the next granule -- i.e. whenever the reference address sits in the last
-            // `header_size` bytes of one -- arming began one granule late and the bits covering
-            // the object's first fields were never armed at all. A recycled line has those bits
-            // cleared to `LOGGED`, so the barrier then treated those fields as already
-            // snapshotted for the rest of the program: no decrement, no increment, and the
-            // reference stored there was never counted. Objects keeping a reference in their
-            // first words (`TypeMapEntry.next`, `Array.ref_`) were reclaimed while still live.
-            //
-            // Over-arming is harmless -- it only makes the barrier record a field it need not --
-            // so cover the whole allocation and let the granule rounding fall where it may.
+            // Set every unlog bit covering the object. We align to the nearest u32 boundary,
+            // so we may overset unlog bits for adjacent objects.
             let step = heap_bytes_per_unlog_byte << 2;
             let start = VM::VMObjectModel::ref_to_object_start(o);
             let aligned_end = (start + size).align_up(step);
@@ -1007,6 +996,7 @@ impl<VM: VMBinding> DerefMut for CollectSlotRoots<VM> {
     }
 }
 
+#[cfg(feature = "non_moving_root")]
 /// Collects roots reported as objects rather than as slots. Node counterpart of
 /// [`CollectSlotRoots`].
 pub struct CollectNodeRoots<VM: VMBinding> {
@@ -1014,6 +1004,7 @@ pub struct CollectNodeRoots<VM: VMBinding> {
     _p: PhantomData<VM>,
 }
 
+#[cfg(feature = "non_moving_root")]
 impl<VM: VMBinding> CollectNodeRoots<VM> {
     pub fn new(nodes: Vec<ObjectReference>) -> Self {
         Self {
@@ -1023,6 +1014,7 @@ impl<VM: VMBinding> CollectNodeRoots<VM> {
     }
 }
 
+#[cfg(feature = "non_moving_root")]
 impl<VM: VMBinding> GCWork<VM> for CollectNodeRoots<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         if !self.nodes.is_empty() {

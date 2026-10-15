@@ -368,11 +368,8 @@ impl Address {
     /// so that a subsequent write to them will be caught by the field-level write barrier's slow path again.
     pub fn unlog_field_relaxed<VM: VMBinding>(self) {
         debug_assert!(!self.is_zero());
-        let heap_bytes_per_unlog_byte = if VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
-            32usize
-        } else {
-            64
-        };
+        let heap_bytes_per_unlog_byte =
+            VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.heap_bytes_per_unlog_byte();
         let a = self.align_down(heap_bytes_per_unlog_byte);
         unsafe {
             VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC

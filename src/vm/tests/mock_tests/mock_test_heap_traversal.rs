@@ -37,7 +37,7 @@ pub fn test_heap_traversal() {
                 let traversal0 = get_all_objects(mmtk);
                 assert!(traversal0.is_empty());
 
-                let mutator = &mut fixture.mutator;
+                let mutator = fixture.mutator();
 
                 let align = BYTES_IN_WORD;
 
