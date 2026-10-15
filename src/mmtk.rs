@@ -490,14 +490,16 @@ impl<VM: VMBinding> MMTK<VM> {
         unsafe { &**(self.plan.get()) }
     }
 
-    /// Get the plan as a mutable reference.
+    /// Get the plan as mutable reference.
     ///
     /// # Safety
     ///
     /// This is unsafe because the caller must ensure that the plan is not used by other threads.
     #[allow(clippy::mut_from_ref)]
-    pub(crate) unsafe fn get_plan_mut(&self) -> &mut Box<dyn Plan<VM = VM>> {
-        unsafe { &mut *self.plan.get() }
+    pub(crate) unsafe fn get_plan_mut(&self) -> &mut dyn Plan<VM = VM> {
+        let plan_boxed_ptr = self.plan.get();
+        let plan_boxed_ref = unsafe { &mut *plan_boxed_ptr };
+        plan_boxed_ref.as_mut()
     }
 
     /// Get the run time options.
