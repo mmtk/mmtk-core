@@ -23,7 +23,7 @@ pub fn allocate_without_initialize_collection() {
             ); // Do not initialize collection
 
             // Build mutator
-            let mutator = mock_api::bind_mutator().as_mock_mutator();
+            let mutator = mock_api::bind_mutator().as_mock_mutator::<MockVM>();
 
             // Allocate half MB. It should be fine.
             let addr = memory_manager::alloc(mutator, MB >> 1, 8, 0, AllocationSemantics::Default);
