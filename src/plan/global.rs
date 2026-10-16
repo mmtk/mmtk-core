@@ -257,8 +257,8 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// Notify the plan that an emergency collection will happen. The plan should try to free as much memory as possible.
     /// The default implementation will force a full heap collection for generational plans.
     fn notify_emergency_collection(&self) {
-        if let Some(r#gen) = self.generational() {
-            r#gen.force_full_heap_collection();
+        if let Some(gen_plan) = self.generational() {
+            gen_plan.force_full_heap_collection();
         }
     }
 

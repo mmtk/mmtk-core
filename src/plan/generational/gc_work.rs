@@ -92,12 +92,12 @@ impl<T: Trace> ProcessModBuf<T> {
 impl<T: Trace> GCWork<T::VM> for ProcessModBuf<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         // Process and scan modbuf only if the current GC is a nursery GC
-        let r#gen = mmtk.get_plan().generational().unwrap();
-        if r#gen.is_current_gc_nursery() {
+        let gen_plan = mmtk.get_plan().generational().unwrap();
+        if gen_plan.is_current_gc_nursery() {
             // Flip the per-object unlogged bits to "unlogged" state.
             for obj in &self.modbuf {
                 debug_assert!(
-                    !r#gen.is_object_in_nursery(*obj),
+                    !gen_plan.is_object_in_nursery(*obj),
                     "{} was logged but is not mature. Dumping process memory maps:\n{}",
                     *obj,
                     OS::get_process_memory_maps().unwrap(),

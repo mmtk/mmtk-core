@@ -37,7 +37,7 @@ pub fn create_genimmix_mutator<VM: VMBinding>(
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new(create_gen_space_mapping(
             mmtk.get_plan(),
-            &genimmix.r#gen.nursery,
+            &genimmix.common_gen.nursery,
         )),
         prepare_func: &common_prepare_func,
         release_func: &genimmix_mutator_release,

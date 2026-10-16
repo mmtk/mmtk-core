@@ -236,8 +236,8 @@ impl<VM: VMBinding> GCTrigger<VM> {
         if force || !*self.options.ignore_system_gc && self.is_collection_enabled() {
             info!("User triggering collection");
             // TODO: this may not work reliably. If a GC has been triggered, this will not force it to be a full heap GC.
-            if exhaustive && let Some(r#gen) = self.plan().generational() {
-                r#gen.force_full_heap_collection();
+            if exhaustive && let Some(gen_plan) = self.plan().generational() {
+                gen_plan.force_full_heap_collection();
             }
 
             self.state
