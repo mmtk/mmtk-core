@@ -78,24 +78,33 @@ impl<VM: VMBinding> Allocators<VM> {
         selector: AllocatorSelector,
     ) -> &mut dyn Allocator<VM> {
         match selector {
-            AllocatorSelector::BumpPointer(index) => unsafe {
-                self.bump_pointer[index as usize].assume_init_mut()
-            },
-            AllocatorSelector::LargeObject(index) => unsafe {
-                self.large_object[index as usize].assume_init_mut()
-            },
-            AllocatorSelector::Malloc(index) => unsafe {
-                self.malloc[index as usize].assume_init_mut()
-            },
-            AllocatorSelector::Immix(index) => unsafe {
-                self.immix[index as usize].assume_init_mut()
-            },
-            AllocatorSelector::FreeList(index) => unsafe {
-                self.free_list[index as usize].assume_init_mut()
-            },
-            AllocatorSelector::Lisp2(index) => unsafe {
-                self.lisp2[index as usize].assume_init_mut()
-            },
+            AllocatorSelector::BumpPointer(index) => {
+                let slot = &mut self.bump_pointer[index as usize];
+                // Safety: Because `Allocators::new` has initialized all
+                // `MaybeUninit<XxxxAllocator>` that corresond to valid selectors, the invocation of
+                // `assume_init_mut()` will be safe as long as `selector` is valid.
+                unsafe { slot.assume_init_mut() }
+            }
+            AllocatorSelector::LargeObject(index) => {
+                let slot = &mut self.large_object[index as usize];
+                unsafe { slot.assume_init_mut() }
+            }
+            AllocatorSelector::Malloc(index) => {
+                let slot = &mut self.malloc[index as usize];
+                unsafe { slot.assume_init_mut() }
+            }
+            AllocatorSelector::Immix(index) => {
+                let slot = &mut self.immix[index as usize];
+                unsafe { slot.assume_init_mut() }
+            }
+            AllocatorSelector::FreeList(index) => {
+                let slot = &mut self.free_list[index as usize];
+                unsafe { slot.assume_init_mut() }
+            }
+            AllocatorSelector::Lisp2(index) => {
+                let slot = &mut self.lisp2[index as usize];
+                unsafe { slot.assume_init_mut() }
+            }
             AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
         }
     }
