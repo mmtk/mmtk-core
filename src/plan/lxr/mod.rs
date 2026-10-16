@@ -5,14 +5,14 @@ pub(super) mod global;
 mod mature_evac;
 pub(super) mod mutator;
 
-use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 
 pub use self::global::LXR;
 
 use atomic::Atomic;
 use atomic::Ordering;
-use spin::Lazy;
+use spin::LazyLock;
 type RwLock<T> = spin::rwlock::RwLock<T>;
 
 // --- LXR-specific global state ---
@@ -93,16 +93,16 @@ impl LazySweepingJobsCounter {
 impl Drop for LazySweepingJobsCounter {
     fn drop(&mut self) {
         let lazy_sweeping_jobs = LAZY_SWEEPING_JOBS.read();
-        if let Some(decs) = self.decs_counter.as_ref() {
-            if decs.fetch_sub(1, Ordering::SeqCst) == 1 {
-                let f = lazy_sweeping_jobs.end_of_decs.as_ref().unwrap();
-                f(self.clone())
-            }
+        if let Some(decs) = self.decs_counter.as_ref()
+            && decs.fetch_sub(1, Ordering::SeqCst) == 1
+        {
+            let f = lazy_sweeping_jobs.end_of_decs.as_ref().unwrap();
+            f(self.clone())
         }
-        if self.counter.fetch_sub(1, Ordering::SeqCst) == 1 {
-            if let Some(f) = lazy_sweeping_jobs.end_of_lazy.as_ref() {
-                f()
-            }
+        if self.counter.fetch_sub(1, Ordering::SeqCst) == 1
+            && let Some(f) = lazy_sweeping_jobs.end_of_lazy.as_ref()
+        {
+            f()
         }
     }
 }
@@ -146,8 +146,8 @@ impl LazySweepingJobs {
     }
 }
 
-static LAZY_SWEEPING_JOBS: Lazy<RwLock<LazySweepingJobs>> =
-    Lazy::new(|| RwLock::new(LazySweepingJobs::new()));
+static LAZY_SWEEPING_JOBS: LazyLock<RwLock<LazySweepingJobs>> =
+    LazyLock::new(|| RwLock::new(LazySweepingJobs::new()));
 
 static SURVIVAL_RATIO_PREDICTOR: SurvivalRatioPredictor = SurvivalRatioPredictor {
     alloc_vol: AtomicUsize::new(0),

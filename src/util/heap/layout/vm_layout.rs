@@ -6,8 +6,8 @@ use std::sync::atomic::AtomicBool;
 use atomic::Ordering;
 
 use super::heap_parameters::*;
-use crate::util::constants::*;
 use crate::util::Address;
+use crate::util::constants::*;
 
 use crate::util::conversions::{chunk_align_down, chunk_align_up};
 

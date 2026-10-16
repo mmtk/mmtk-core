@@ -1,13 +1,13 @@
-use crate::plan::concurrent::global::ConcurrentPlan;
-use crate::plan::concurrent::Pause;
-use crate::plan::tracing::{PlanTrace, Trace};
+use crate::MMTK;
 use crate::plan::PlanTraceObject;
+use crate::plan::concurrent::Pause;
+use crate::plan::concurrent::global::ConcurrentPlan;
+use crate::plan::tracing::{PlanTrace, Trace};
 use crate::policy::gc_work::TraceKind;
-use crate::scheduler::{gc_work::RootKind, GCWork, GCWorker, WorkBucketStage};
-use crate::util::{scanning_helper, ObjectReference};
+use crate::scheduler::{GCWork, GCWorker, WorkBucketStage, gc_work::RootKind};
+use crate::util::{ObjectReference, scanning_helper};
 use crate::vm::slot::Slot;
 use crate::vm::{RootsKind, RootsWorkFactory, VMBinding};
-use crate::MMTK;
 
 use std::collections::VecDeque;
 use std::marker::PhantomData;

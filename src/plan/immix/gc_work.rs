@@ -1,7 +1,7 @@
 use super::global::Immix;
 use crate::plan::tracing::PlanTrace;
-use crate::policy::gc_work::TraceKind;
 use crate::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
+use crate::policy::gc_work::TraceKind;
 use crate::vm::VMBinding;
 
 pub(super) struct ImmixGCWorkContext<VM: VMBinding, const KIND: TraceKind>(

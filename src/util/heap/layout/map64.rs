@@ -1,5 +1,6 @@
 use super::map::CreateFreeListResult;
 use super::map::VMMap;
+use crate::util::Address;
 use crate::util::constants::*;
 use crate::util::conversions;
 use crate::util::freelist::FreeList;
@@ -8,7 +9,6 @@ use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::os::*;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
-use crate::util::Address;
 use std::cell::UnsafeCell;
 
 const NON_MAP_FRACTION: f64 = 1.0 - 8.0 / 4096.0;
@@ -124,7 +124,7 @@ impl VMMap for Map64 {
         debug_assert!(Self::space_index(descriptor.get_start()).unwrap() == descriptor.get_index());
         // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
         // as each space will update different indices.
-        let self_mut = self.mut_self();
+        let self_mut = unsafe { self.mut_self() };
 
         let index = descriptor.get_index();
         let rtn = self.inner().high_water[index];
@@ -224,7 +224,7 @@ impl Map64 {
     /// In other cases, use mut_self_with_sync().
     #[allow(clippy::mut_from_ref)]
     unsafe fn mut_self(&self) -> &mut Map64Inner {
-        &mut *self.inner.get()
+        unsafe { &mut *self.inner.get() }
     }
 
     fn inner(&self) -> &Map64Inner {

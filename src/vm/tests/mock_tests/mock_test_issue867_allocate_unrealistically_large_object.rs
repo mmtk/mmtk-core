@@ -2,10 +2,10 @@
 
 use super::mock_test_prelude::*;
 
+use crate::MMTK;
+use crate::Mutator;
 use crate::plan::AllocationSemantics;
 use crate::util::Address;
-use crate::Mutator;
-use crate::MMTK;
 
 lazy_static! {
     static ref MUTATOR: Fixture<MutatorFixture> = Fixture::new();
@@ -102,7 +102,7 @@ pub fn allocate_unrealistically_large_object() {
         default_setup,
         || {
             const CHUNK: usize = 4 * 1024 * 1024; // 4MB
-                                                  // Leave some room, so we won't have arithmetic overflow when we compute size and do alignment.
+            // Leave some room, so we won't have arithmetic overflow when we compute size and do alignment.
             let (size, align) = (
                 crate::util::conversions::raw_align_down(usize::MAX - CHUNK, 4096),
                 8,

@@ -2,14 +2,14 @@ use crate::plan::barriers::ObjectBarrier;
 use crate::plan::generational::barrier::GenObjectBarrierSemantics;
 use crate::plan::immix;
 use crate::plan::mutator_context::{
-    common_prepare_func, common_release_func, create_space_mapping, MutatorBuilder, MutatorConfig,
+    MutatorBuilder, MutatorConfig, common_prepare_func, common_release_func, create_space_mapping,
 };
 use crate::plan::sticky::immix::global::StickyImmix;
+use crate::util::VMMutatorThread;
 use crate::util::alloc::AllocatorSelector;
 use crate::util::opaque_pointer::VMWorkerThread;
-use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
-use crate::{Mutator, MMTK};
+use crate::{MMTK, Mutator};
 
 pub fn stickyimmix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
     immix::mutator::immix_mutator_release(mutator, tls);

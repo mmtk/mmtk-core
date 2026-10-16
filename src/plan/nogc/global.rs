@@ -1,21 +1,21 @@
+use crate::MMTK;
+use crate::plan::AllocationSemantics;
+use crate::plan::Plan;
+use crate::plan::PlanConstraints;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
-use crate::plan::AllocationSemantics;
-use crate::plan::Plan;
-use crate::plan::PlanConstraints;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::heap::gc_trigger::SpaceStats;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
+use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
-use crate::MMTK;
 use enum_map::EnumMap;
 use mmtk_macros::HasSpaces;
 

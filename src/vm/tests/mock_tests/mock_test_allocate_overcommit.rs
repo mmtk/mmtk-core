@@ -2,8 +2,8 @@
 
 use super::mock_test_prelude::*;
 
-use crate::util::alloc::allocator::AllocationOptions;
 use crate::AllocationSemantics;
+use crate::util::alloc::allocator::AllocationOptions;
 
 /// This test will do alloc_with_options in a loop, and evetually fill up the heap.
 /// As we require alloc_with_options to over commit, we expect to see valid return values, and no GC is triggered.

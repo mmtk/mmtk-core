@@ -1,6 +1,7 @@
 use std::mem::MaybeUninit;
 use std::sync::Arc;
 
+use crate::MMTK;
 use crate::plan::PlanConstraints;
 use crate::policy::copy_context::PolicyCopyContext;
 use crate::policy::copyspace::CopySpace;
@@ -13,7 +14,6 @@ use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use crate::MMTK;
 
 use enum_map::Enum;
 use enum_map::EnumMap;

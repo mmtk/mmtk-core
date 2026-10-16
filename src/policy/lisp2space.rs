@@ -3,7 +3,7 @@ use std::ops::Range;
 use super::sft::SFT;
 use super::space::{CommonSpace, Space};
 use crate::plan::tracing::{ObjectQueue, OptionObjectQueue};
-use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
+use crate::policy::gc_work::{TRACE_KIND_TRANSITIVE_PIN, TraceKind};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::align_allocation_no_fill;

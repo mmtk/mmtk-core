@@ -1,8 +1,8 @@
 use crate::DummyVM;
+use mmtk::Mutator;
 use mmtk::util::opaque_pointer::*;
 use mmtk::vm::Collection;
 use mmtk::vm::GCThreadContext;
-use mmtk::Mutator;
 
 pub struct VMCollection {}
 

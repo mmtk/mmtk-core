@@ -1,8 +1,8 @@
 use super::mock_test_prelude::*;
 
+use crate::util::Address;
 use crate::util::opaque_pointer::*;
 use crate::util::os::*;
-use crate::util::Address;
 
 #[test]
 pub fn test_handle_mmap_conflict() {
@@ -36,7 +36,10 @@ pub fn test_handle_mmap_conflict() {
             assert!(panic_res.is_err());
             let err = panic_res.err().unwrap();
             assert!(err.is::<&str>());
-            assert_eq!(err.downcast_ref::<&str>().unwrap(), &"Failed to mmap, the address is already mapped. Should MMTk quarantine the address range first?");
+            assert_eq!(
+                err.downcast_ref::<&str>().unwrap(),
+                &"Failed to mmap, the address is already mapped. Should MMTk quarantine the address range first?"
+            );
         },
         no_cleanup,
     )

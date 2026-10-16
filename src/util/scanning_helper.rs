@@ -2,7 +2,7 @@
 
 use crate::{
     util::{ObjectReference, VMWorkerThread},
-    vm::{slot::Slot, ObjectTracer, Scanning, VMBinding},
+    vm::{ObjectTracer, Scanning, VMBinding, slot::Slot},
 };
 
 /// Visit and potentially update the children of `object` using [`Scanning::scan_object`] or

@@ -19,22 +19,22 @@ pub use barriers::BarrierSelector;
 mod gc_work;
 
 mod global;
-pub(crate) use global::create_gc_worker_context;
-pub(crate) use global::create_mutator;
-pub(crate) use global::create_plan;
 pub use global::AllocationSemantics;
 pub(crate) use global::CreateGeneralPlanArgs;
 pub(crate) use global::HasSpaces;
 pub use global::Plan;
 pub(crate) use global::PlanTraceObject;
+pub(crate) use global::create_gc_worker_context;
+pub(crate) use global::create_mutator;
+pub(crate) use global::create_plan;
 
 mod mutator_context;
 pub use mutator_context::Mutator;
 pub use mutator_context::MutatorContext;
 
 mod plan_constraints;
-pub use plan_constraints::PlanConstraints;
 pub(crate) use plan_constraints::DEFAULT_PLAN_CONSTRAINTS;
+pub use plan_constraints::PlanConstraints;
 
 pub(crate) mod tracing;
 pub use tracing::{ObjectQueue, VectorObjectQueue, VectorQueue};
@@ -54,8 +54,8 @@ mod nogc;
 mod pageprotect;
 mod semispace;
 
-pub(crate) use generational::global::is_nursery_gc;
 pub(crate) use generational::global::GenerationalPlan;
+pub(crate) use generational::global::is_nursery_gc;
 
 // Expose plan constraints as public. Though a binding can get them from plan.constraints(),
 // it is possible for performance reasons that they want the constraints as constants.

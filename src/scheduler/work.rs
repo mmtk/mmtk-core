@@ -3,7 +3,7 @@ use crate::plan::tracing::gc_work::root::DefaultRootsWorkFactory;
 use crate::vm::{RootsWorkFactory, VMBinding};
 use crate::{mmtk::MMTK, plan::tracing::Trace};
 #[cfg(feature = "work_packet_stats")]
-use std::any::{type_name, TypeId};
+use std::any::{TypeId, type_name};
 
 /// This defines a GC work packet which are assigned to the [`GCWorker`]s by the scheduler.
 /// Work packets carry payloads that indicate the work to be done. For example, a work packet may
@@ -33,7 +33,11 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
     /// to `do_work()`.
     fn do_work_with_stat(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         debug!("{}", std::any::type_name::<Self>());
-        debug_assert!(!worker.tls.0.0.is_null(), "TLS must be set correctly for a GC worker before the worker does any work. GC Worker {} has no valid tls.", worker.ordinal);
+        debug_assert!(
+            !worker.tls.0.0.is_null(),
+            "TLS must be set correctly for a GC worker before the worker does any work. GC Worker {} has no valid tls.",
+            worker.ordinal
+        );
 
         #[cfg(feature = "work_packet_stats")]
         // Start collecting statistics

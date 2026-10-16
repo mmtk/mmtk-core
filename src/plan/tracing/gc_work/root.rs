@@ -1,18 +1,19 @@
 use std::marker::PhantomData;
 
 #[cfg(feature = "non_moving_root")]
-use crate::plan::tracing::gc_work::closure::ProcessNodes;
-#[cfg(feature = "non_moving_root")]
 use crate::plan::VectorObjectQueue;
+#[cfg(feature = "non_moving_root")]
+use crate::plan::tracing::gc_work::closure::ProcessNodes;
 #[cfg(feature = "non_moving_root")]
 use crate::scheduler::{GCWork, GCWorker};
 #[cfg(feature = "non_moving_root")]
 use crate::util::ObjectReference;
+
 use crate::{
-    plan::tracing::{gc_work::closure::ProcessSlots, Trace},
-    scheduler::{gc_work::RootKind, WorkBucketStage},
-    vm::{RootsKind, RootsWorkFactory, VMBinding},
     MMTK,
+    plan::tracing::{Trace, gc_work::closure::ProcessSlots},
+    scheduler::{WorkBucketStage, gc_work::RootKind},
+    vm::{RootsKind, RootsWorkFactory, VMBinding},
 };
 
 /// An implementation of [`RootsWorkFactory`] for stop-the-world tracing GC.  It will create work

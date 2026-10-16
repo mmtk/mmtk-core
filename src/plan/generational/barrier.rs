@@ -1,15 +1,15 @@
 //! Generational read/write barrier implementations.
 
-use crate::plan::barriers::BarrierSemantics;
-use crate::plan::generational::gc_work::GenNurseryTrace;
+use crate::MMTK;
 use crate::plan::PlanTraceObject;
 use crate::plan::VectorQueue;
+use crate::plan::barriers::BarrierSemantics;
+use crate::plan::generational::gc_work::GenNurseryTrace;
 use crate::policy::gc_work::DEFAULT_TRACE;
 use crate::scheduler::WorkBucketStage;
 use crate::util::*;
-use crate::vm::slot::MemorySlice;
 use crate::vm::VMBinding;
-use crate::MMTK;
+use crate::vm::slot::MemorySlice;
 
 use super::gc_work::ProcessModBuf;
 use super::gc_work::ProcessRegionModBuf;

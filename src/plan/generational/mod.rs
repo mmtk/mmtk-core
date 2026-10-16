@@ -2,10 +2,11 @@
 
 use enum_map::EnumMap;
 
-use crate::plan::barriers::BarrierSelector;
-use crate::plan::mutator_context::create_allocator_mapping;
+use crate::Plan;
 use crate::plan::AllocationSemantics;
 use crate::plan::PlanConstraints;
+use crate::plan::barriers::BarrierSelector;
+use crate::plan::mutator_context::create_allocator_mapping;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::util::alloc::AllocatorSelector;
@@ -13,10 +14,9 @@ use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use crate::Plan;
 
-use super::mutator_context::create_space_mapping;
 use super::mutator_context::ReservedAllocators;
+use super::mutator_context::create_space_mapping;
 
 // Generational plans:
 

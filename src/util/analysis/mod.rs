@@ -1,7 +1,7 @@
+use crate::MMTK;
 use crate::scheduler::*;
 use crate::util::statistics::stats::Stats;
 use crate::vm::VMBinding;
-use crate::MMTK;
 use std::sync::{Arc, Mutex};
 
 pub mod gc_count;

@@ -12,8 +12,8 @@ use crate::util::object_enum::BlockMayHaveObjects;
 use crate::vm::ObjectModel;
 use crate::{
     util::{
-        metadata::side_metadata::SideMetadataSpec, Address, ObjectReference, OpaquePointer,
-        VMThread,
+        Address, ObjectReference, OpaquePointer, VMThread,
+        metadata::side_metadata::SideMetadataSpec,
     },
     vm::VMBinding,
 };
@@ -344,11 +344,7 @@ impl Block {
             };
             trace!(
                 "{:?}: cell = {}, last cell in free list = {}, cursor = {}, potential object = {}",
-                self,
-                cell,
-                last,
-                cursor,
-                potential_object_ref
+                self, cell, last, cursor, potential_object_ref
             );
 
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC

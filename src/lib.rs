@@ -32,9 +32,9 @@ extern crate static_assertions;
 extern crate probe;
 
 mod mmtk;
-pub use mmtk::MMTKBuilder;
 pub(crate) use mmtk::MMAPPER;
 pub use mmtk::MMTK;
+pub use mmtk::MMTKBuilder;
 
 mod global_state;
 pub use crate::global_state::{GcStatus, LiveBytesStats};

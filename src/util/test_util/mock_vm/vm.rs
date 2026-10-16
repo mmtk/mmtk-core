@@ -1,10 +1,11 @@
 // Some mock methods may get really complex
 #![allow(clippy::type_complexity)]
 
-use crate::plan::tracing::gc_work::root::DefaultRootsWorkFactory;
-use crate::plan::tracing::gc_work::DefaultObjectTracerContext;
-use crate::plan::tracing::UnsupportedTrace;
+use crate::Mutator;
 use crate::plan::ObjectQueue;
+use crate::plan::tracing::UnsupportedTrace;
+use crate::plan::tracing::gc_work::DefaultObjectTracerContext;
+use crate::plan::tracing::gc_work::root::DefaultRootsWorkFactory;
 use crate::scheduler::*;
 use crate::util::alloc::AllocationError;
 use crate::util::copy::*;
@@ -13,14 +14,13 @@ use crate::util::opaque_pointer::*;
 use crate::util::test_util;
 use crate::util::test_util::mock_vm::thread_park::ThreadPark;
 use crate::util::{Address, ObjectReference};
-use crate::vm::object_model::specs::*;
 use crate::vm::GCThreadContext;
 use crate::vm::ObjectTracer;
 use crate::vm::ObjectTracerContext;
 use crate::vm::RootsWorkFactory;
 use crate::vm::SlotVisitor;
 use crate::vm::VMBinding;
-use crate::Mutator;
+use crate::vm::object_model::specs::*;
 
 use super::mock_method::*;
 use crate::util::test_util::mock_vm::mock_api;
@@ -515,7 +515,7 @@ unsafe impl Send for MutatorHandle {}
 impl VMMutatorThread {
     /// Get a mutable reference to the underlying mutator for a mock VM type.
     pub fn as_mock_mutator<VM: VMBinding>(self) -> &'static mut Mutator<VM> {
-        unsafe { &*self.0 .0.to_address().to_ptr::<MutatorHandle>() }.as_mutator()
+        unsafe { &*self.0.0.to_address().to_ptr::<MutatorHandle>() }.as_mutator()
     }
 }
 
@@ -550,7 +550,10 @@ impl<C: MockVMConfig> Default for MockVM<C> {
                 Box::new(mutators.into_iter())
             })),
             vm_trace_object: MockMethod::new_fixed(Box::new(|(_, object, _)| {
-                panic!("MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.", object)
+                panic!(
+                    "MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.",
+                    object
+                )
             })),
 
             stop_all_mutators: MockMethod::new_fixed(Box::new(|(_tls, mut mutator_visitor)| {
@@ -896,11 +899,15 @@ impl<C: MockVMConfig> crate::vm::Scanning<MockVM<C>> for MockVM<C> {
         //     mutator,
         //     Box::new(factory)
         // ))
-        warn!("scan_roots_in_mutator_thread is not properly mocked. The default implementation does nothing.");
+        warn!(
+            "scan_roots_in_mutator_thread is not properly mocked. The default implementation does nothing."
+        );
     }
     fn scan_vm_specific_roots(_tls: VMWorkerThread, _factory: impl RootsWorkFactory<C::VMSlot>) {
         // mock_any!(scan_vm_specific_roots(tls, Box::new(factory)))
-        warn!("scan_vm_specific_roots is not properly mocked. The default implementation does nothing.");
+        warn!(
+            "scan_vm_specific_roots is not properly mocked. The default implementation does nothing."
+        );
     }
     fn notify_initial_thread_scan_complete(partial_scan: bool, tls: VMWorkerThread) {
         mock!(notify_initial_thread_scan_complete(partial_scan, tls))
@@ -935,7 +942,9 @@ impl<C: MockVMConfig> MockVM<C> {
     pub fn init_mockvm(mockvm: Self) {
         unsafe {
             if (*std::ptr::addr_of!(MOCK_VM_INSTANCE)).is_some() {
-                warn!("MockVM is already initialized. Overwriting the existing instance. This may change the behavior of MockVM.");
+                warn!(
+                    "MockVM is already initialized. Overwriting the existing instance. This may change the behavior of MockVM."
+                );
             }
             let boxed: Box<dyn Any> = Box::new(mockvm);
             MOCK_VM_INSTANCE = Some(NonNull::new_unchecked(Box::into_raw(boxed)));

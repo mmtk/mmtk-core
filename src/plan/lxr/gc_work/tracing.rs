@@ -1,8 +1,8 @@
 use super::super::LXR;
 use super::ProcessEdgesBase;
-use crate::plan::concurrent::Pause;
 use crate::plan::PlanTraceObject;
 use crate::plan::VectorQueue;
+use crate::plan::concurrent::Pause;
 use crate::policy::gc_work::DEFAULT_TRACE;
 use crate::policy::immix::block::Block;
 use crate::policy::space::Space;
@@ -13,10 +13,10 @@ use crate::util::rc::RefCountHelper;
 use crate::util::{ObjectReference, VMThread};
 use crate::vm::slot::Slot;
 use crate::{
+    MMTK,
     plan::ObjectQueue,
     scheduler::{GCWork, GCWorker, WorkBucketStage},
     vm::*,
-    MMTK,
 };
 use atomic::Ordering;
 use std::ops::{Deref, DerefMut};

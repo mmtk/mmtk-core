@@ -1,4 +1,4 @@
-use crate::util::{os::*, Address};
+use crate::util::{Address, os::*};
 
 pub mod csm;
 

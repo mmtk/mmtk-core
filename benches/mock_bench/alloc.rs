@@ -1,8 +1,8 @@
 use criterion::Criterion;
 
+use mmtk::AllocationSemantics;
 use mmtk::memory_manager;
 use mmtk::util::test_util::fixtures::*;
-use mmtk::AllocationSemantics;
 
 pub fn bench(c: &mut Criterion) {
     // Setting a larger heap, although the GC should be disabled below

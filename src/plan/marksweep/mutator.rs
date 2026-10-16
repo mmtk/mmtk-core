@@ -1,16 +1,16 @@
+use crate::MMTK;
+use crate::plan::AllocationSemantics;
+use crate::plan::Plan;
 use crate::plan::marksweep::MarkSweep;
-use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::ReservedAllocators;
 use crate::plan::mutator_context::SpaceMapping;
-use crate::plan::AllocationSemantics;
-use crate::plan::Plan;
+use crate::plan::mutator_context::create_allocator_mapping;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
-use crate::MMTK;
 
 use enum_map::EnumMap;
 

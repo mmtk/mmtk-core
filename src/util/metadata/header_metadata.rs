@@ -4,9 +4,9 @@ use atomic::Ordering;
 use std::fmt;
 use std::sync::atomic::AtomicU8;
 
+use crate::util::Address;
 use crate::util::constants::{BITS_IN_BYTE, LOG_BITS_IN_BYTE};
 use crate::util::metadata::metadata_val_traits::*;
-use crate::util::Address;
 use num_traits::FromPrimitive;
 
 const LOG_BITS_IN_U16: usize = 4;
@@ -47,7 +47,11 @@ impl HeaderMetadataSpec {
     /// spec should be used with a mask to make sure that we exclude the forwarding bits.
     #[cfg(debug_assertions)]
     fn assert_mask<T: MetadataValue>(&self, mask: Option<T>) {
-        debug_assert!(mask.is_none() || self.num_of_bits >= 8, "optional_mask is only supported for 8X-bits in-header metadata. Problematic MetadataSpec: ({:?})", self);
+        debug_assert!(
+            mask.is_none() || self.num_of_bits >= 8,
+            "optional_mask is only supported for 8X-bits in-header metadata. Problematic MetadataSpec: ({:?})",
+            self
+        );
     }
 
     /// Assert if this is a valid spec.

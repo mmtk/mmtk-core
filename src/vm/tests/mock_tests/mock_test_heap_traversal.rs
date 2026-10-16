@@ -13,7 +13,7 @@ use constants::BYTES_IN_WORD;
 
 use super::mock_test_prelude::*;
 
-use crate::{util::*, AllocationSemantics, MMTK};
+use crate::{AllocationSemantics, MMTK, util::*};
 
 lazy_static! {
     static ref FIXTURE: Fixture<MutatorFixture> = Fixture::new();

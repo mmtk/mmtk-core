@@ -1,7 +1,7 @@
 use bytemuck::Zeroable;
 
-use crate::util::heap::layout::vm_layout::{self, vm_layout};
 use crate::util::Address;
+use crate::util::heap::layout::vm_layout::{self, vm_layout};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 const TYPE_BITS: usize = 2;

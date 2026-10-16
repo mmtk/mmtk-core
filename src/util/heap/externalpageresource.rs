@@ -1,6 +1,6 @@
+use super::PageResource;
 use super::layout::VMMap;
 use super::pageresource::{PRAllocFail, PRAllocResult};
-use super::PageResource;
 use crate::util::address::Address;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::constants::LOG_BYTES_IN_PAGE;

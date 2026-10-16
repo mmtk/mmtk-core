@@ -1,17 +1,17 @@
 use std::sync::{Mutex, MutexGuard};
 
-use super::layout::vm_layout::PAGES_IN_CHUNK;
-use super::layout::VMMap;
-use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::PageResource;
+use super::layout::VMMap;
+use super::layout::vm_layout::PAGES_IN_CHUNK;
+use super::pageresource::{PRAllocFail, PRAllocResult};
 use crate::mmtk::MMAPPER;
 use crate::util::address::Address;
 use crate::util::alloc::embedded_meta_data::*;
 use crate::util::conversions;
 use crate::util::freelist;
 use crate::util::freelist::FreeList;
-use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::layout::CreateFreeListResult;
+use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::opaque_pointer::*;
@@ -373,7 +373,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         let page_offset = conversions::bytes_to_pages_up(freed_page - sync.start);
 
         // may be multiple chunks
-        if pages_freed % PAGES_IN_CHUNK == 0 {
+        if pages_freed.is_multiple_of(PAGES_IN_CHUNK) {
             // necessary, but not sufficient condition
             /* grow a region of chunks, starting with the chunk containing the freed page */
             let mut region_start = page_offset & !(PAGES_IN_CHUNK - 1);

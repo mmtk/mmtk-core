@@ -1,14 +1,14 @@
+use crate::MMTK;
 use crate::global_state::GlobalState;
 use crate::util::address::Address;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::options::Options;
-use crate::MMTK;
 
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::policy::space::Space;
 use crate::util::opaque_pointer::*;
@@ -315,7 +315,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// N*32KB (N>=1). Thus the [`BumpAllocator`](crate::util::alloc::BumpAllocator) returns 32KB for this method.  Only allocators
     /// that do thread local allocation need to implement this method.
     fn get_thread_local_buffer_granularity(&self) -> usize {
-        assert!(self.does_thread_local_allocation(), "An allocator that does not thread local allocation does not have a buffer granularity.");
+        assert!(
+            self.does_thread_local_allocation(),
+            "An allocator that does not thread local allocation does not have a buffer granularity."
+        );
         unimplemented!()
     }
 
@@ -442,7 +445,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         let tls = self.get_tls();
         let is_mutator = VM::VMActivePlan::is_mutator(tls);
         let stress_test = self.get_context().options.is_stress_test_gc_enabled();
-        assert!(!self.get_context().thrown_oom.load(Ordering::Relaxed), "We should not enter alloc_slow_inline if we have already thrown OOM for this allocation request.");
+        assert!(
+            !self.get_context().thrown_oom.load(Ordering::Relaxed),
+            "We should not enter alloc_slow_inline if we have already thrown OOM for this allocation request."
+        );
 
         // Information about the previous collection.
         let mut emergency_collection = false;
@@ -669,7 +675,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         // If an allocator does thread local allocation but does not override this method to
         // provide a correct implementation, we will log a warning.
         if self.does_thread_local_allocation() && need_poll {
-            warn!("{} does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).", std::any::type_name::<Self>());
+            warn!(
+                "{} does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).",
+                std::any::type_name::<Self>()
+            );
         }
         self.alloc_slow_once_traced(size, align, offset)
     }

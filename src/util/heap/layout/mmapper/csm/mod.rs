@@ -1,9 +1,9 @@
+use crate::util::Address;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::conversions::raw_is_aligned;
-use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::layout::Mmapper;
+use crate::util::heap::layout::vm_layout::*;
 use crate::util::os::*;
-use crate::util::Address;
 use bytemuck::NoUninit;
 use std::sync::Mutex;
 
@@ -318,7 +318,7 @@ mod tests {
     use crate::util::constants::LOG_BYTES_IN_PAGE;
     use crate::util::test_util::CHUNK_STATE_MMAPPER_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};
-    use crate::util::{conversions, Address};
+    use crate::util::{Address, conversions};
 
     const FIXED_ADDRESS: Address = CHUNK_STATE_MMAPPER_TEST_REGION.start;
     const MAX_BYTES: usize = CHUNK_STATE_MMAPPER_TEST_REGION.size;

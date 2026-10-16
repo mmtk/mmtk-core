@@ -1,6 +1,6 @@
 use super::layout::vm_layout::*;
-use crate::util::constants::*;
 use crate::util::Address;
+use crate::util::constants::*;
 
 #[derive(Clone, Copy, Debug)]
 pub enum VMRequest {

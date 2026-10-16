@@ -1,8 +1,8 @@
+use crate::util::Address;
+use crate::util::ObjectReference;
 use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::metadata::vo_bit;
-use crate::util::Address;
-use crate::util::ObjectReference;
 use crate::vm::{ObjectModel, VMBinding};
 use std::sync::atomic::Ordering;
 
@@ -27,7 +27,7 @@ pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Ordering) -> 
 }
 
 pub unsafe fn is_marked_unsafe<VM: VMBinding>(object: ObjectReference) -> bool {
-    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load::<VM, u8>(object, None) == 1
+    (unsafe { VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load::<VM, u8>(object, None) }) == 1
 }
 
 /// Set the page mark from 0 to 1. Return true if we set it successfully in this call.
@@ -46,7 +46,7 @@ pub(super) fn is_page_marked(page_addr: Address) -> bool {
 
 #[allow(unused)]
 pub(super) unsafe fn is_page_marked_unsafe(page_addr: Address) -> bool {
-    ACTIVE_PAGE_METADATA_SPEC.load::<u8>(page_addr) == 1
+    (unsafe { ACTIVE_PAGE_METADATA_SPEC.load::<u8>(page_addr) }) == 1
 }
 
 pub fn set_vo_bit(object: ObjectReference) {
@@ -79,21 +79,21 @@ pub(super) fn set_offset_malloc_bit(address: Address) {
 
 /// Unset the offset bit for the allocation. The argument address should be the allocation address (object start)
 pub(super) unsafe fn unset_offset_malloc_bit_unsafe(address: Address) {
-    OFFSET_MALLOC_METADATA_SPEC.store::<u8>(address, 0);
+    unsafe { OFFSET_MALLOC_METADATA_SPEC.store::<u8>(address, 0) };
 }
 
 pub unsafe fn unset_vo_bit_unsafe(object: ObjectReference) {
-    vo_bit::unset_vo_bit_unsafe(object);
+    unsafe { vo_bit::unset_vo_bit_unsafe(object) };
 }
 
 #[allow(unused)]
 pub unsafe fn unset_mark_bit<VM: VMBinding>(object: ObjectReference) {
-    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store::<VM, u8>(object, 0, None);
+    unsafe { VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store::<VM, u8>(object, 0, None) };
 }
 
 #[allow(unused)]
 pub(super) unsafe fn unset_page_mark_unsafe(page_addr: Address) {
-    ACTIVE_PAGE_METADATA_SPEC.store::<u8>(page_addr, 0)
+    unsafe { ACTIVE_PAGE_METADATA_SPEC.store::<u8>(page_addr, 0) }
 }
 
 /// Load u128 bits of side metadata
@@ -106,5 +106,5 @@ pub(super) unsafe fn load128(metadata_spec: &SideMetadataSpec, data_addr: Addres
     #[cfg(all(debug_assertions, feature = "extreme_assertions"))]
     metadata_spec.assert_metadata_mapped(data_addr);
 
-    meta_addr.load::<u128>()
+    unsafe { meta_addr.load::<u128>() }
 }

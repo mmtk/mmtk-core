@@ -6,8 +6,8 @@ use std::{
 
 use super::mock_test_prelude::*;
 use crate::{
-    util::{options::GCTriggerSelector, Address, OpaquePointer, VMThread, VMWorkerThread},
-    MMTKBuilder, MMTK,
+    MMTK, MMTKBuilder,
+    util::{Address, OpaquePointer, VMThread, VMWorkerThread, options::GCTriggerSelector},
 };
 
 #[derive(Default)]

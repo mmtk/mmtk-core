@@ -1,14 +1,14 @@
-#[cfg(target_pointer_width = "32")]
-use crate::util::heap::layout::vm_layout::VMLayout;
+use crate::MMAPPER;
+use crate::util::Address;
 #[cfg(target_pointer_width = "32")]
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
+#[cfg(target_pointer_width = "32")]
+use crate::util::heap::layout::vm_layout::VMLayout;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 #[cfg(target_pointer_width = "64")]
 use crate::util::metadata::side_metadata::side_metadata_offset_after;
-use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::os::{HugePageSupport, MmapAnnotation};
-use crate::util::Address;
 use crate::util::{constants::LOG_BYTES_IN_PAGE, conversions::raw_align_up};
-use crate::MMAPPER;
 use std::sync::OnceLock;
 
 /// The compile-time base offset for global side metadata layout. We treat offsets as relative

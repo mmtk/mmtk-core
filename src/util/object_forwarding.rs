@@ -1,6 +1,6 @@
 use crate::util::copy::*;
 use crate::util::metadata::MetadataSpec;
-use crate::util::{constants, ObjectReference};
+use crate::util::{ObjectReference, constants};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
