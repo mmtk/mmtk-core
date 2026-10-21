@@ -168,7 +168,7 @@ impl std::default::Default for SFTRefStorage {
 #[cfg(target_pointer_width = "64")] // This impl only works for 64 bits: 1. the mask is designed for our 64bit heap range, 2. on 64bits, all our spaces are contiguous.
 mod space_map {
     use super::*;
-    use crate::util::heap::layout::vm_layout::vm_layout;
+    use crate::util::heap::layout::{heap_parameters::SPACE_INDEX_LIMIT, vm_layout::vm_layout};
 
     /// Space map is a small table, and it has one entry for each MMTk space.
     pub struct SFTSpaceMap {
@@ -181,9 +181,8 @@ mod space_map {
 
     impl SFTMap for SFTSpaceMap {
         fn has_sft_entry(&self, addr: Address) -> bool {
-            // An arbitrary address from Address::ZERO to Address::MAX will be cyclically mapped to an index between 0 and 31
-            // Only addresses between the virtual address range we use have valid entries.
-            addr >= self.space_address_start && addr < self.space_address_end
+            // An address has SFT entry if and only if it has a valid space index.
+            Self::addr_to_index(addr).is_some()
         }
 
         fn get_side_metadata(&self) -> Option<&SideMetadataSpec> {
@@ -191,17 +190,17 @@ mod space_map {
         }
 
         fn get_checked(&self, address: Address) -> &dyn SFT {
-            if self.has_sft_entry(address) {
-                // We should be able to map the entire address range to indices in the table.
-                debug_assert!(Self::addr_to_index(address) < self.sft.len());
-                unsafe { self.get_unchecked(address) }
+            if let Some(space_index) = Self::addr_to_index(address) {
+                let cell = &self.sft[space_index];
+                cell.load()
             } else {
                 &EMPTY_SPACE_SFT
             }
         }
 
         unsafe fn get_unchecked(&self, address: Address) -> &dyn SFT {
-            let cell = unsafe { self.sft.get_unchecked(Self::addr_to_index(address)) };
+            let space_index = unsafe { Self::addr_to_index(address).unwrap_unchecked() };
+            let cell = unsafe { self.sft.get_unchecked(space_index) };
             cell.load()
         }
 
@@ -211,7 +210,9 @@ mod space_map {
             start: Address,
             bytes: usize,
         ) {
-            let index = Self::addr_to_index(start);
+            let Some(index) = Self::addr_to_index(start) else {
+                panic!("{start} does not map to a valid heap index");
+            };
             if cfg!(debug_assertions) {
                 // Make sure we only update from empty to a valid space, or overwrite the space
                 let old = self.sft[index].load();
@@ -234,7 +235,9 @@ mod space_map {
         }
 
         unsafe fn clear(&self, addr: Address) {
-            let index = Self::addr_to_index(addr);
+            let Some(index) = Self::addr_to_index(addr) else {
+                panic!("{addr} does not map to a valid heap index");
+            };
             self.sft.get_unchecked(index).store(&EMPTY_SPACE_SFT as _);
         }
     }
@@ -255,8 +258,12 @@ mod space_map {
             }
         }
 
-        fn addr_to_index(addr: Address) -> usize {
-            addr.and(vm_layout().address_mask()) >> vm_layout().log_space_extent
+        /// Get the space index of the space that includes `addr`.
+        ///
+        /// Returns `None` if `addr` is outside the heap range.
+        fn addr_to_index(addr: Address) -> Option<usize> {
+            let index = addr >> vm_layout().log_space_extent;
+            (1..SPACE_INDEX_LIMIT).contains(&index).then_some(index)
         }
 
         fn index_to_space_start(i: usize) -> Address {
@@ -265,6 +272,7 @@ mod space_map {
         }
 
         fn index_to_space_range(i: usize) -> (Address, Address) {
+            // TODO: Consider adding a dedicated SpaceIndex type backed by NonZeroUsize.
             if i == 0 {
                 panic!("Invalid index: there is no space for index 0")
             } else {
@@ -286,14 +294,14 @@ mod space_map {
         #[test]
         fn test_address_arithmetic() {
             // Before 1st space
-            assert_eq!(SFTSpaceMap::addr_to_index(Address::ZERO), 0);
-            assert_eq!(SFTSpaceMap::addr_to_index(vm_layout().heap_start - 1), 0);
+            assert_eq!(SFTSpaceMap::addr_to_index(Address::ZERO), None);
+            assert_eq!(SFTSpaceMap::addr_to_index(vm_layout().heap_start - 1), None);
 
             let assert_for_index = |i: usize| {
                 let (start, end) = SFTSpaceMap::index_to_space_range(i);
                 println!("Space: Index#{} = [{}, {})", i, start, end);
-                assert_eq!(SFTSpaceMap::addr_to_index(start), i);
-                assert_eq!(SFTSpaceMap::addr_to_index(end - 1), i);
+                assert_eq!(SFTSpaceMap::addr_to_index(start), Some(i));
+                assert_eq!(SFTSpaceMap::addr_to_index(end - 1), Some(i));
             };
 
             // Index 1 to 16 (MAX_SPACES)
@@ -308,8 +316,8 @@ mod space_map {
             assert_eq!(last_space_end, vm_layout().heap_end);
 
             // after last space
-            assert_eq!(SFTSpaceMap::addr_to_index(last_space_end), 0);
-            assert_eq!(SFTSpaceMap::addr_to_index(Address::MAX), 15);
+            assert_eq!(SFTSpaceMap::addr_to_index(last_space_end), None);
+            assert_eq!(SFTSpaceMap::addr_to_index(Address::MAX), None);
         }
     }
 }
