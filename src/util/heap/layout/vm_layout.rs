@@ -157,7 +157,7 @@ impl VMLayout {
         let address_space = 1 << log_address_space;
         let log_space_extent = 41;
         let space_extent = 1 << log_space_extent;
-        let heap_start = unsafe { Address::from_usize(space_extent * 1) };
+        let heap_start = unsafe { Address::from_usize(space_extent) };
         let heap_end = unsafe { Address::from_usize(space_extent * SPACE_INDEX_LIMIT) };
 
         assert!(heap_start.is_aligned_to(BYTES_IN_CHUNK));
