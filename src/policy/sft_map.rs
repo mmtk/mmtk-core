@@ -244,14 +244,14 @@ mod space_map {
         #[allow(clippy::assertions_on_constants)] // We assert to make sure the constants
         pub fn new() -> Self {
             use crate::util::heap::layout::heap_parameters::MAX_SPACES;
-            let table_size = Self::addr_to_index(Address::MAX) + 1;
-            debug_assert!(table_size >= MAX_SPACES);
+            use crate::util::heap::layout::heap_parameters::SPACE_INDEX_LIMIT;
+            let table_size = SPACE_INDEX_LIMIT;
             Self {
                 sft: std::iter::repeat_with(SFTRefStorage::default)
                     .take(table_size)
                     .collect(),
                 space_address_start: Self::index_to_space_range(1).0, // the start of the first space
-                space_address_end: Self::index_to_space_range(MAX_SPACES - 1).1, // the end of the last space
+                space_address_end: Self::index_to_space_range(MAX_SPACES).1, // the end of the last space
             }
         }
 
@@ -308,8 +308,8 @@ mod space_map {
             assert_eq!(last_space_end, vm_layout().heap_end);
 
             // after last space
-            assert_eq!(SFTSpaceMap::addr_to_index(last_space_end), 17);
-            assert_eq!(SFTSpaceMap::addr_to_index(Address::MAX), 31);
+            assert_eq!(SFTSpaceMap::addr_to_index(last_space_end), 0);
+            assert_eq!(SFTSpaceMap::addr_to_index(Address::MAX), 15);
         }
     }
 }
