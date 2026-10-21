@@ -49,7 +49,13 @@ impl<VM: VMBinding, B: Region> PageResource<VM> for BlockPageResource<VM, B> {
         required_pages: usize,
         tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail> {
-        self.alloc_pages_fast(space_descriptor, reserved_pages, required_pages, tls)
+        let result = self.alloc_pages_fast(space_descriptor, reserved_pages, required_pages, tls);
+        if let Ok(ref r) = result {
+            info!("alloc_pages: {}", r.start);
+        } else {
+            info!("alloc_pages: failed");
+        }
+        result
     }
 
     fn get_available_physical_pages(&self) -> usize {
@@ -118,10 +124,9 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
         // 2. Take the first block int the chunk as the allocation result
         let first_block = start;
         // 3. Push all remaining blocks to one or more block lists
-        let last_block = start + BYTES_IN_CHUNK;
         let mut array = BlockQueue::new();
-        let mut cursor = start + B::BYTES;
-        while cursor < last_block {
+        for offset in (B::BYTES..BYTES_IN_CHUNK).step_by(B::BYTES).rev() {
+            let cursor = start + offset;
             let result = unsafe { array.push_relaxed(B::from_aligned_address(cursor)) };
             if let Err(block) = result {
                 self.block_queue.add_global_array(array);
@@ -129,7 +134,6 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
                 let result2 = unsafe { array.push_relaxed(block) };
                 debug_assert!(result2.is_ok());
             }
-            cursor += B::BYTES;
         }
         debug_assert!(!array.is_empty());
         // 4. Push the block list to the global pool
