@@ -78,7 +78,15 @@ pub struct LXR<VM: VMBinding> {
     block_allocation: BlockAllocation<VM>,
     pub(super) evac_set: MatureEvacuationSet,
     pub(super) mature_evac_remset: MatureEvecRemSet<VM>,
+    /// Monotonic total of clean blocks released by deferred sweeping, ever.
     pub(super) num_clean_blocks_released_lazy: AtomicUsize,
+    /// Value of the two totals above/in the LOS as of the end of the last pause, so that the
+    /// reclamation attributable to that pause can be read off as a difference. See `gc_pause_end`.
+    lazy_freed_blocks_at_pause_end: AtomicUsize,
+    lazy_freed_los_pages_at_pause_end: AtomicUsize,
+    /// The last cycle for which `on_lazy_sweeping_finished` took a decision, so that a cycle whose
+    /// deferred work drains in more than one wave is only decided once.
+    decided_epoch: AtomicUsize,
     pub(super) possibly_dead_mature_blocks: SegQueue<(Block, bool)>,
 }
 
@@ -96,7 +104,7 @@ pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints
 
 impl<VM: VMBinding> Plan for LXR<VM> {
     fn current_gc_may_move_object(&self) -> bool {
-        true
+        super::NURSERY_EVACUATION || super::MATURE_EVACUATION
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
@@ -156,6 +164,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        super::GC_COUNT.fetch_add(1, Ordering::SeqCst);
         if !super::LazySweepingJobs::all_finished() {
             warn!("LXR Lazy Sweeping Not Finished");
         }
@@ -228,8 +237,10 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             // Select mature evacuation set
             self.schedule_defrag_selection_packets();
         }
-        self.num_clean_blocks_released_lazy
-            .store(0, Ordering::SeqCst);
+        // `num_clean_blocks_released_lazy` is deliberately *not* reset here. It is a monotonic
+        // total; a consumer takes the difference against the snapshot `gc_pause_end` records.
+        // Zeroing it at the start of a pause used to discard the previous cycle's reclamation
+        // before the decision that needed it had been taken. See `gc_pause_end`.
         self.immix_space.prepare_rc(pause);
         self.block_allocation
             .reset_block_mark_for_mutator_reused_blocks(pause);
@@ -238,9 +249,12 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     fn release(&mut self, tls: VMWorkerThread) {
         super::SURVIVAL_RATIO_PREDICTOR.update_ratios();
         let pause = self.current_pause().unwrap();
-        if pause == Pause::FinalMark || pause == Pause::Full {
-            VM::VMCollection::update_weak_processor(false);
-        }
+        // Every pause, not just tracing ones, and before anything is reclaimed: the binding
+        // uses this to drop registered finalizers, which LXR cannot run (see the `VMRefClosure`
+        // comment in `disable_unnecessary_buckets`). Reference counting frees objects in
+        // `RefCount` pauses too, so skipping those would leave a window in which an entry
+        // outlives the object it names -- which is the crash this avoids.
+        VM::VMCollection::update_weak_processor(true);
         <VM as VMBinding>::VMCollection::vm_release();
         self.common.los.is_end_of_satb_or_full_gc = false;
         self.common
@@ -338,7 +352,6 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         }
         self.previous_pause.store(Some(pause), Ordering::SeqCst);
         self.current_pause.store(None, Ordering::SeqCst);
-        LAZY_SWEEPING_JOBS.write().swap();
         if super::LAZY_DECREMENTS {
             let perform_cycle_collection =
                 self.get_available_pages() < super::CYCLE_TRIGGER_THRESHOLD;
@@ -350,6 +363,31 @@ impl<VM: VMBinding> Plan for LXR<VM> {
         self.avail_pages_at_end_of_last_gc
             .store(self.get_available_pages(), Ordering::SeqCst);
         HEAP_AFTER_GC.store(self.get_reserved_pages(), Ordering::SeqCst);
+        // Snapshot the lazy-reclaim totals in the same breath as `HEAP_AFTER_GC`. Everything the
+        // concurrent phase frees from here on is what this cycle reclaimed, so the two always
+        // describe the same instant. They used to be reconstructed from a counter that
+        // `LXR::prepare` zeroed at the start of every pause, which meant a decision taken just
+        // after a pause read this cycle's reserved size against a counter that had just been
+        // cleared -- "the heap is full and the collection freed nothing" -- and hinted an emergency
+        // full trace. That accounted for every emergency pause on `tree_mutable`.
+        self.lazy_freed_blocks_at_pause_end.store(
+            self.num_clean_blocks_released_lazy.load(Ordering::SeqCst),
+            Ordering::SeqCst,
+        );
+        self.lazy_freed_los_pages_at_pause_end.store(
+            self.los().num_pages_released_lazy.load(Ordering::SeqCst),
+            Ordering::SeqCst,
+        );
+        // Close this cycle's wave of deferred jobs and attribute it to this cycle, so that draining
+        // it -- and only that -- reports the cycle's reclamation as complete.
+        let epoch = super::GC_COUNT.load(Ordering::SeqCst);
+        let outstanding = LAZY_SWEEPING_JOBS.write().swap(epoch);
+        if outstanding == 0 {
+            // Nothing was deferred, so no wave will report completion. Everything this cycle freed
+            // is already visible, so decide now; otherwise `select_collection_kind` would block on
+            // `wait_for_decide_cycle_collection` with nobody left to wake it.
+            self.on_lazy_sweeping_finished(epoch);
+        }
 
         self.common_mut().on_pause_end(tls);
 
@@ -420,8 +458,11 @@ impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
 
 impl<VM: VMBinding> LXR<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Box<Self> {
+        // Only evacuation forwards objects, so a binding that never evacuates (e.g. a
+        // non-moving build) is free to keep its forwarding bits on the side.
         assert!(
-            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_in_header(),
+            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_in_header()
+                || !(super::NURSERY_EVACUATION || super::MATURE_EVACUATION),
             "LXR does not support placing forwarding bits on the side."
         );
         let num_workers = args.scheduler.num_workers();
@@ -476,6 +517,9 @@ impl<VM: VMBinding> LXR<VM> {
             mature_evac_remset: MatureEvecRemSet::new(num_workers),
             possibly_dead_mature_blocks: Default::default(),
             num_clean_blocks_released_lazy: Default::default(),
+            lazy_freed_blocks_at_pause_end: Default::default(),
+            lazy_freed_los_pages_at_pause_end: Default::default(),
+            decided_epoch: AtomicUsize::new(usize::MAX),
         });
 
         lxr.gc_init();
@@ -618,14 +662,26 @@ impl<VM: VMBinding> LXR<VM> {
         let emergency_threshold = super::RC_STOP_PERCENT;
         // Calculate mature space size
         let total_pages = self.get_total_pages();
+        // Reserved pages as of the end of the last pause, less everything the concurrent phase has
+        // freed since. Both terms are deltas from the same instant -- see the snapshot in
+        // `gc_pause_end`.
         let mature_space_pages = {
-            let released_los_pages = self.los().num_pages_released_lazy.load(Ordering::SeqCst);
-            HEAP_AFTER_GC
+            let freed_blocks = self
+                .num_clean_blocks_released_lazy
+                .load(Ordering::SeqCst)
+                .saturating_sub(self.lazy_freed_blocks_at_pause_end.load(Ordering::SeqCst));
+            let freed_los_pages = self
+                .los()
+                .num_pages_released_lazy
                 .load(Ordering::SeqCst)
                 .saturating_sub(
-                    self.num_clean_blocks_released_lazy.load(Ordering::SeqCst) << Block::LOG_PAGES,
-                )
-                .saturating_sub(released_los_pages)
+                    self.lazy_freed_los_pages_at_pause_end
+                        .load(Ordering::SeqCst),
+                );
+            HEAP_AFTER_GC
+                .load(Ordering::SeqCst)
+                .saturating_sub(freed_blocks << Block::LOG_PAGES)
+                .saturating_sub(freed_los_pages)
         };
         // Decide next GC kind
         let hint_cycle_gc = self.next_gc_is_cycle_gc(mature_space_pages, pause);
@@ -683,10 +739,35 @@ impl<VM: VMBinding> LXR<VM> {
             return Pause::FinalMark;
         }
 
-        // Either final mark pause or full pause for emergency GC
-        if emergency || user_triggered || hint_emergency_gc {
+        // A real emergency: mmtk-core could not satisfy an allocation even after a collection, or
+        // the user asked for a full collection. Stopping the world for the whole trace is the
+        // correct response -- there is no budget left to trace concurrently in.
+        if emergency || user_triggered {
             return if cm_in_progress {
                 Pause::FinalMark
+            } else {
+                Pause::Full
+            };
+        }
+
+        // Free headroom is below `RC_STOP_PERCENT`, so reference counting alone is not keeping up
+        // and the heap needs a trace to find its cycles. That is a reason to *trace*, not a reason
+        // to stop the world: tracing concurrently is what this plan exists for. An `InitialMark`
+        // pause plus the `FinalMark` that closes it measured ~2.4ms + ~17ms on `tree_mutable`
+        // against ~300ms for the full stop-the-world trace this used to choose, and those full
+        // traces were 70% of all pause time.
+        //
+        // The hint fires readily because the headroom test compares the heap budget against
+        // `HEAP_AFTER_GC` less the whole blocks deferred sweeping returned, and LXR reclaims mostly
+        // by recycling lines inside blocks that stay reserved. Reserved pages therefore sit near the
+        // budget whether or not memory is actually short, so this hint cannot carry the weight of a
+        // whole-heap stop -- and does not need to, since a genuine exhaustion still arrives as
+        // `emergency` above.
+        if hint_emergency_gc {
+            return if cm_in_progress {
+                Pause::FinalMark
+            } else if self.cm_enabled() {
+                Pause::InitialMark
             } else {
                 Pause::Full
             };
@@ -873,17 +954,33 @@ impl<VM: VMBinding> LXR<VM> {
         self.schedule_rc_block_sweeping_tasks(c);
     }
 
-    fn on_lazy_sweeping_finished(&self) {
+    fn on_lazy_sweeping_finished(&self, epoch: super::WaveEpoch) {
+        // Always worth doing: it makes whatever was just freed visible, whichever wave this was.
         self.immix_space.flush_page_resource();
         // Update counters
         if !super::LAZY_DECREMENTS {
             HEAP_AFTER_GC.store(self.get_used_pages(), Ordering::SeqCst);
+        }
+        // Only the wave belonging to the most recent pause means "that cycle's reclamation is
+        // done". A still-open wave draining transiently, or a wave for an older cycle arriving
+        // late, would otherwise pair the latest `HEAP_AFTER_GC` with reclamation that has not
+        // happened yet -- which is what hinted an emergency and forced a full trace.
+        if epoch != super::GC_COUNT.load(Ordering::SeqCst) {
+            return;
+        }
+        // And only once per cycle: two waves can both belong to it.
+        if self.decided_epoch.swap(epoch, Ordering::SeqCst) == epoch {
+            return;
         }
         let pause = match self.current_pause() {
             Some(p) => p,
             None => self.previous_pause().unwrap(),
         };
         self.decide_next_gc_may_perform_cycle_collection(pause);
+        // The flush above is the first moment this cycle's reclamation is visible through
+        // `get_reserved_pages`, so it is the first moment a trigger policy can size the next
+        // heap target from what the collection actually freed.
+        self.base().gc_trigger.policy.on_lazy_reclaim_finished(self);
     }
 
     fn gc_init(&mut self) {
@@ -895,15 +992,16 @@ impl<VM: VMBinding> LXR<VM> {
             me.immix_space.install_hooks(&me.block_allocation);
         }
         let mut lazy_sweeping_jobs = LAZY_SWEEPING_JOBS.write();
-        lazy_sweeping_jobs.swap();
+        // Prime the counters. There is no cycle yet, so the wave this closes belongs to none.
+        lazy_sweeping_jobs.swap(super::WAVE_STILL_OPEN);
         let lxr_ptr = self as *const Self as usize;
         lazy_sweeping_jobs.end_of_decs = Some(Box::new(move |c| {
             let lxr = unsafe { &*(lxr_ptr as *const Self) };
             lxr.on_lazy_decs_finished(c);
         }));
-        lazy_sweeping_jobs.end_of_lazy = Some(Box::new(move || {
+        lazy_sweeping_jobs.end_of_lazy = Some(Box::new(move |epoch| {
             let lxr = unsafe { &*(lxr_ptr as *const Self) };
-            lxr.on_lazy_sweeping_finished();
+            lxr.on_lazy_sweeping_finished(epoch);
         }));
     }
 
