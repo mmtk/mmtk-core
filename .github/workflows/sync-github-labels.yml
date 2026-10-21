@@ -1,0 +1,18 @@
+name: Synchronize Github labels
+
+on:
+  label:
+    types: [created, deleted, edited]
+
+jobs:
+  sync-github-labels:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        repo: [mmtk-openjdk, mmtk-jikesrvm, mmtk-v8, mmtk-ruby, mmtk-julia]
+    steps:
+      - name: Sync to ${{ matrix.repo }}
+        run: |
+          gh label clone mmtk/mmtk-core --repo ${{ matrix.repo }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
