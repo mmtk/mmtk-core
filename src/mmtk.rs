@@ -11,7 +11,7 @@ use crate::util::address::ObjectReference;
 use crate::util::analysis::AnalysisManager;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::gc_trigger::GCTrigger;
-use crate::util::heap::layout::heap_parameters::MAX_SPACES;
+use crate::util::heap::layout::heap_parameters::SPACE_INDEX_LIMIT;
 use crate::util::heap::layout::vm_layout::{vm_layout, VMLayout};
 use crate::util::heap::layout::{self, Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
@@ -559,7 +559,7 @@ impl<VM: VMBinding> MMTK<VM> {
     /// a map of live bytes stats for the spaces.
     pub(crate) fn aggregate_live_bytes_in_last_gc(
         &self,
-        live_bytes_per_space: [usize; MAX_SPACES],
+        live_bytes_per_space: [usize; SPACE_INDEX_LIMIT],
     ) -> HashMap<&'static str, crate::LiveBytesStats> {
         use crate::policy::space::Space;
         let mut ret = HashMap::new();
