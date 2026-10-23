@@ -17,10 +17,10 @@ pub fn interior_pointer_before_object_ref() {
             }
         },
         || {
-            let mut fixture = MutatorFixture::create_with_heapsize(10 * MB);
+            let fixture = MutatorFixture::create_with_heapsize(10 * MB);
 
             let addr = memory_manager::alloc(
-                &mut fixture.mutator,
+                fixture.mutator(),
                 OBJECT_SIZE,
                 8,
                 0,
@@ -28,7 +28,7 @@ pub fn interior_pointer_before_object_ref() {
             );
             assert!(!addr.is_zero());
 
-            let obj = MockVM::object_start_to_ref(addr);
+            let obj = <MockVM>::object_start_to_ref(addr);
             println!(
                 "start = {}, end = {}, obj = {}",
                 addr,
@@ -36,7 +36,7 @@ pub fn interior_pointer_before_object_ref() {
                 obj,
             );
             memory_manager::post_alloc(
-                &mut fixture.mutator,
+                fixture.mutator(),
                 obj,
                 OBJECT_SIZE,
                 AllocationSemantics::Default,

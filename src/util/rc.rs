@@ -71,6 +71,9 @@ impl<VM: VMBinding> RefCountHelper<VM> {
 
     /// Increases the global increment buffer size counter by `delta`.
     pub fn increase_inc_buffer_size(&self, delta: usize) {
+        // `update()` allows infallable atomic update, but is not stablized until 1.95.
+        // Migrate to `update()` after bumping MSRV.
+        #[allow(deprecated)]
         let _ = INC_BUFFER_SIZE.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |x| {
             Some(x.saturating_add(delta))
         });

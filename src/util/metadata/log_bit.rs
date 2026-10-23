@@ -1,7 +1,9 @@
+use crate::util::constants::LOG_BITS_IN_BYTE;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use crate::vm::VMGlobalFieldUnlogBitSpec;
 use crate::vm::VMGlobalLogBitSpec;
 use std::sync::atomic::Ordering;
 
@@ -53,6 +55,19 @@ impl VMGlobalLogBitSpec {
     /// Check if the log bit represents the unlogged state.
     pub fn is_unlogged<VM: VMBinding>(&self, object: ObjectReference, order: Ordering) -> bool {
         self.load_atomic::<VM, u8>(object, None, order) == UNLOGGED_VALUE
+    }
+}
+
+impl VMGlobalFieldUnlogBitSpec {
+    /// The number of heap bytes (in log2) covered by one byte of the field unlog side metadata.
+    pub(crate) const fn log_heap_bytes_per_unlog_byte(&self) -> usize {
+        let spec = self.as_spec().extract_side_spec();
+        spec.log_bytes_in_region + LOG_BITS_IN_BYTE as usize - spec.log_num_of_bits
+    }
+
+    /// The number of heap bytes covered by one byte of the field unlog side metadata.
+    pub(crate) const fn heap_bytes_per_unlog_byte(&self) -> usize {
+        1 << self.log_heap_bytes_per_unlog_byte()
     }
 }
 

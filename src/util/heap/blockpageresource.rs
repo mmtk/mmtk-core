@@ -239,6 +239,8 @@ impl<B: Region> BlockQueue<B> {
 
     /// Atomically pop an element from the array.
     fn pop(&self) -> Option<B> {
+        // `try_update()` is not stablized until 1.95.  Migrate to `try_update()` after bumping MSRV.
+        #[allow(deprecated)]
         let i = self
             .cursor
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |i| {

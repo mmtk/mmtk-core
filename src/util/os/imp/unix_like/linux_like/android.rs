@@ -9,6 +9,8 @@ use std::io::Result;
 pub struct Android;
 
 impl OSMemory for Android {
+    const LOG_BYTES_IN_PAGE: u8 = 12;
+
     fn dzmmap(
         start: Address,
         size: usize,

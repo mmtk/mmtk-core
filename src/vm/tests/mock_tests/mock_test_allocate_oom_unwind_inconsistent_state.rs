@@ -20,6 +20,9 @@ pub fn allocate_oom_unwind_leaves_inconsistent_state() {
                 // We reach the emergency-collection branch by setting `emergency_collection` directly instead,
                 // as there's no real GC scheduler here.
                 block_for_gc: MockMethod::new_default(),
+                // Do not spawn GC workers, so the GC requested when the heap fills up is never
+                // actually run. Otherwise a real GC would race with the OOM state set up below.
+                spawn_gc_thread: MockMethod::new_default(),
                 // A callback that never returns.
                 out_of_memory: MockMethod::new_fixed(Box::new(|(_tls, _err)| {
                     panic!(
@@ -36,7 +39,7 @@ pub fn allocate_oom_unwind_leaves_inconsistent_state() {
             const HEAP: usize = 4 * MB;
             const CHUNK: usize = 4096;
 
-            let mut fixture = MutatorFixture::create_with_heapsize(HEAP);
+            let fixture = MutatorFixture::create_with_heapsize(HEAP);
             let mmtk = fixture.mmtk();
 
             // The heap is filled with `at_safepoint: false` allocations, which return immediately (success
@@ -48,7 +51,7 @@ pub fn allocate_oom_unwind_leaves_inconsistent_state() {
             let mut filled = false;
             for _ in 0..(HEAP / CHUNK + 16) {
                 let addr = memory_manager::alloc_with_options(
-                    &mut fixture.mutator,
+                    fixture.mutator(),
                     CHUNK,
                     8,
                     0,
@@ -76,13 +79,7 @@ pub fn allocate_oom_unwind_leaves_inconsistent_state() {
             // The heap is full, so this hits the emergency-collection branch and calls
             // `Collection::out_of_memory`, which unwinds rather than returns.
             let panic_result = std::panic::catch_unwind(AssertUnwindSafe(|| {
-                memory_manager::alloc(
-                    &mut fixture.mutator,
-                    CHUNK,
-                    8,
-                    0,
-                    AllocationSemantics::Default,
-                )
+                memory_manager::alloc(fixture.mutator(), CHUNK, 8, 0, AllocationSemantics::Default)
             }));
 
             assert!(panic_result.is_err());
@@ -93,7 +90,7 @@ pub fn allocate_oom_unwind_leaves_inconsistent_state() {
             // `thrown_oom` is only set after the callback returns, so it must still be unset.
             let selector =
                 memory_manager::get_allocator_mapping(mmtk, AllocationSemantics::Default);
-            let thrown_oom = unsafe { fixture.mutator.allocator(selector) }
+            let thrown_oom = unsafe { fixture.mutator().allocator(selector) }
                 .get_context()
                 .thrown_oom
                 .load(Ordering::Relaxed);

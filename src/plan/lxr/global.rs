@@ -365,7 +365,16 @@ impl<VM: VMBinding> Plan for LXR<VM> {
     }
 
     fn root_scanning_stage(&self) -> WorkBucketStage {
-        WorkBucketStage::RCProcessIncsNonMoving
+        // With `non_moving_root`, roots reported as objects have to be counted before
+        // `RCProcessIncs` -- which may evacuate -- can move anything, so scanning happens one
+        // stage earlier.  That costs parallelism: it stops root scanning from overlapping with
+        // the increments the barrier already recorded, and root scanning is bounded by the
+        // mutator count.  Without the feature no root is reported as an object, so scan in
+        // `RCProcessIncs` itself and keep the overlap.
+        #[cfg(feature = "non_moving_root")]
+        return WorkBucketStage::RCProcessIncsNonMoving;
+        #[cfg(not(feature = "non_moving_root"))]
+        return WorkBucketStage::RCProcessIncs;
     }
 
     fn concurrent(&self) -> Option<&dyn ConcurrentPlan<VM = VM>> {
@@ -384,6 +393,28 @@ impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
 
     fn on_concurrent_work_interrupted(&self) {
         // Do nothing
+    }
+
+    fn on_concurrent_work_drained(&self) {
+        // Concurrent marking will end with a pause. We dont need to do anything here.
+        if self.in_concurrent_marking.load(Ordering::Acquire) {
+            return;
+        }
+        // Concurrent marking was not running, so the only concurrent work was lazy decrements
+        // and the lazy sweeping they chain into. `LazySweepingJobs::all_finished` covers both.
+        debug_assert!(
+            super::LazySweepingJobs::all_finished(),
+            "Deferred decrement or sweeping jobs outstanding with every GC worker parked and no work left"
+        );
+        // Leave `InConcurrentGC`.
+        if self
+            .base()
+            .global_state
+            .gc_status
+            .set_concurrent_gc_finished()
+        {
+            <VM as VMBinding>::VMCollection::concurrent_work_finished_no_pause();
+        }
     }
 }
 
@@ -675,11 +706,13 @@ impl<VM: VMBinding> LXR<VM> {
 
     fn disable_unnecessary_buckets(&'static self, scheduler: &GCWorkScheduler<VM>, pause: Pause) {
         // Set conditional buckets
+        #[cfg(feature = "non_moving_root")]
         scheduler.work_buckets[WorkBucketStage::RCProcessIncsNonMoving].set_enabled(true);
         scheduler.work_buckets[WorkBucketStage::RCProcessIncs].set_enabled(true);
         scheduler.work_buckets[WorkBucketStage::Prepare].set_enabled(pause != Pause::RefCount);
         let final_mark_or_full = pause == Pause::FinalMark || pause == Pause::Full;
         // Marks roots reported as objects, before `Closure` can evacuate anything.
+        #[cfg(feature = "non_moving_root")]
         scheduler.work_buckets[WorkBucketStage::PinningRootsTrace].set_enabled(final_mark_or_full);
         scheduler.work_buckets[WorkBucketStage::Closure].set_enabled(final_mark_or_full);
         scheduler.work_buckets[WorkBucketStage::WeakRefClosure].set_enabled(final_mark_or_full);
@@ -693,6 +726,7 @@ impl<VM: VMBinding> LXR<VM> {
         // Always disabled
         // LXR never routes work here: it has no transitively pinning closure. Transitive
         // pinning roots, where accepted at all, take the ordinary node-root path instead.
+        #[cfg(feature = "non_moving_root")]
         scheduler.work_buckets[WorkBucketStage::TPinningClosure].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_enabled(false);
         scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_enabled(false);

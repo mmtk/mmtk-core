@@ -15,14 +15,14 @@ pub fn allocate_alignment() {
         default_setup,
         || {
             MUTATOR.with_fixture_mut(|fixture| {
-                let min = MockVM::MIN_ALIGNMENT;
-                let max = MockVM::MAX_ALIGNMENT;
+                let min = <MockVM as VMBinding>::MIN_ALIGNMENT;
+                let max = <MockVM as VMBinding>::MAX_ALIGNMENT;
                 info!("Allowed alignment between {} and {}", min, max);
                 let mut align = min;
                 while align <= max {
                     info!("Test allocation with alignment {}", align);
                     let addr = memory_manager::alloc(
-                        &mut fixture.mutator,
+                        fixture.mutator(),
                         8,
                         align,
                         0,
@@ -49,8 +49,8 @@ pub fn allocate_offset() {
         || {
             MUTATOR.with_fixture_mut(|fixture| {
                 const OFFSET: usize = 4;
-                let min = MockVM::MIN_ALIGNMENT;
-                let max = MockVM::MAX_ALIGNMENT;
+                let min = <MockVM as VMBinding>::MIN_ALIGNMENT;
+                let max = <MockVM as VMBinding>::MAX_ALIGNMENT;
                 info!("Allowed alignment between {} and {}", min, max);
                 let mut align = min;
                 while align <= max {
@@ -59,7 +59,7 @@ pub fn allocate_offset() {
                         align, OFFSET
                     );
                     let addr = memory_manager::alloc(
-                        &mut fixture.mutator,
+                        fixture.mutator(),
                         8,
                         align,
                         OFFSET,

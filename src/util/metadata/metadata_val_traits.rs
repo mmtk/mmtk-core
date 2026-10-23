@@ -192,6 +192,8 @@ macro_rules! impl_metadata_value_trait {
             where
                 F: FnMut(Self) -> Option<Self>,
             {
+                // `try_update()` is not stablized until 1.95.  Migrate to `try_update()` after bumping MSRV.
+                #[allow(deprecated)]
                 addr.as_ref::<$atomic>()
                     .fetch_update(set_order, fetch_order, f)
             }

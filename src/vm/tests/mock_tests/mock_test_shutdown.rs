@@ -78,48 +78,53 @@ fn simple_spawn_gc_thread(
 
 #[test]
 pub fn test_shutdown_stops_gc_threads() {
-    let mut builder = MMTKBuilder::new();
-    let trigger = GCTriggerSelector::FixedHeapSize(1024 * 1024);
-    builder.options.gc_trigger.set(trigger);
-    builder.options.threads.set(NUM_WORKER_THREADS);
-    let mmtk: &'static mut MMTK<MockVM> = Box::leak(Box::new(builder.build::<MockVM>()));
+    with_mockvm(
+        default_setup,
+        || {
+            let mut builder = MMTKBuilder::new();
+            let trigger = GCTriggerSelector::FixedHeapSize(1024 * 1024);
+            builder.options.gc_trigger.set(trigger);
+            builder.options.threads.set(NUM_WORKER_THREADS);
+            let mmtk: &'static MMTK<MockVM> = Box::leak(Box::new(builder.build::<MockVM>()));
 
-    let mock_vm = MockVM {
-        spawn_gc_thread: MockMethod::new_fixed(Box::new(|(vm_thread, context)| {
-            simple_spawn_gc_thread(vm_thread, context, mmtk)
-        })),
-        ..Default::default()
-    };
-    write_mockvm(move |mock_vm_ref| *mock_vm_ref = mock_vm);
+            write_mockvm(|mock_vm| {
+                mock_vm.spawn_gc_thread =
+                    MockMethod::new_fixed(Box::new(move |(vm_thread, context)| {
+                        simple_spawn_gc_thread(vm_thread, context, mmtk)
+                    }));
+            });
 
-    let test_thread_tls = VMThread(OpaquePointer::from_address(Address::ZERO));
-    mmtk.initialize_collection(test_thread_tls);
+            let test_thread_tls = VMThread(OpaquePointer::from_address(Address::ZERO));
+            mmtk.initialize_collection(test_thread_tls);
 
-    let join_handles = {
-        let sync = SHARED.sync.lock().unwrap();
-        let mut sync = wait_timeout_while(sync, &SHARED.all_threads_spawned, |sync| {
-            sync.spawned_threads < NUM_WORKER_THREADS
-        });
-        std::mem::take(&mut sync.join_handles)
-    };
+            let join_handles = {
+                let sync = SHARED.sync.lock().unwrap();
+                let mut sync = wait_timeout_while(sync, &SHARED.all_threads_spawned, |sync| {
+                    sync.spawned_threads < NUM_WORKER_THREADS
+                });
+                std::mem::take(&mut sync.join_handles)
+            };
 
-    assert_eq!(join_handles.len(), NUM_WORKER_THREADS);
+            assert_eq!(join_handles.len(), NUM_WORKER_THREADS);
 
-    memory_manager::mmtk_shutdown(mmtk);
+            memory_manager::mmtk_shutdown(mmtk);
 
-    println!("Waiting for GC worker threads to stop");
+            println!("Waiting for GC worker threads to stop");
 
-    {
-        let sync = SHARED.sync.lock().unwrap();
-        let sync = wait_timeout_while(sync, &SHARED.all_threads_exited, |sync| {
-            sync.exited_threads < NUM_WORKER_THREADS
-        });
-        assert_eq!(sync.exited_threads, NUM_WORKER_THREADS);
-    }
+            {
+                let sync = SHARED.sync.lock().unwrap();
+                let sync = wait_timeout_while(sync, &SHARED.all_threads_exited, |sync| {
+                    sync.exited_threads < NUM_WORKER_THREADS
+                });
+                assert_eq!(sync.exited_threads, NUM_WORKER_THREADS);
+            }
 
-    assert!(!mmtk.state.is_initialized());
+            assert!(!mmtk.state.is_initialized());
 
-    for join_handle in join_handles {
-        join_handle.join().unwrap();
-    }
+            for join_handle in join_handles {
+                join_handle.join().unwrap();
+            }
+        },
+        no_cleanup,
+    )
 }

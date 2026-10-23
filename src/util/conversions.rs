@@ -100,9 +100,10 @@ mod tests {
 
     #[test]
     fn test_page_align() {
+        use crate::util::constants::BYTES_IN_PAGE;
         let addr = unsafe { Address::from_usize(0x2345_6789) };
         assert_eq!(page_align_down(addr), unsafe {
-            Address::from_usize(0x2345_6000)
+            Address::from_usize(0x2345_6789 & !(BYTES_IN_PAGE - 1))
         });
         assert!(!is_page_aligned(addr));
         assert!(is_page_aligned(page_align_down(addr)));

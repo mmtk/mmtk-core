@@ -352,6 +352,9 @@ impl GcStatusWord {
     /// Inner implementation of [`Self::transition`], handling encoding, decoding, and atomic RMW
     /// operation.
     fn transition_inner<F: FnMut(GcStatus) -> GcStatus>(&self, mut f: F) -> GcStatus {
+        // `update()` allows infallable atomic update, but is not stablized until 1.95.
+        // Migrate to `update()` after bumping MSRV.
+        #[allow(deprecated)]
         let old_bits = self
             .0
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
@@ -390,6 +393,8 @@ impl GcStatusWord {
         &self,
         mut f: F,
     ) -> Result<GcStatus, GcStatus> {
+        // `try_update()` is not stablized until 1.95.  Migrate to `try_update()` after bumping MSRV.
+        #[allow(deprecated)]
         self.0
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |bits| {
                 f(Self::decode(bits)).map(Self::encode)
@@ -479,6 +484,16 @@ impl GcStatusWord {
             );
             GcStatus::InConcurrentGC
         });
+    }
+
+    /// `InConcurrentGC` -> `NotInGC`: the concurrent phase's work has drained and no pause
+    /// follows it.
+    pub(crate) fn set_concurrent_gc_finished(&self) -> bool {
+        self.try_transition(|status| match status {
+            GcStatus::InConcurrentGC => Some(GcStatus::NotInGC),
+            _ => None,
+        })
+        .is_ok()
     }
 
     /// `InPause` -> `NotInGC`, e.g. once a GC pause has finished and no concurrent work remains.
@@ -755,6 +770,37 @@ mod gc_status_tests {
     #[should_panic(expected = "invalid status")]
     fn set_in_concurrent_gc_panics_if_not_in_pause() {
         GcStatusWord::new(GcStatus::NotInGC).set_in_concurrent_gc();
+    }
+
+    #[test]
+    fn set_concurrent_gc_finished_from_in_concurrent_gc() {
+        let word = GcStatusWord::new(GcStatus::InConcurrentGC);
+        assert!(word.set_concurrent_gc_finished());
+        assert_eq!(word.load(), GcStatus::NotInGC);
+    }
+
+    #[test]
+    fn set_concurrent_gc_finished_does_not_overwrite_a_requested_pause() {
+        // A mutator won the race to request a pause while the concurrent work was draining. The
+        // request must survive, and the caller must be told it did not perform the transition so
+        // it does not report the GC as over.
+        let word = GcStatusWord::new(GcStatus::PauseRequested);
+        assert!(!word.set_concurrent_gc_finished());
+        assert_eq!(word.load(), GcStatus::PauseRequested);
+    }
+
+    #[test]
+    fn set_concurrent_gc_finished_is_a_no_op_outside_a_concurrent_gc() {
+        for status in [
+            GcStatus::NotInGC,
+            GcStatus::InPause,
+            GcStatus::Disabled(1),
+            GcStatus::Uninitialized,
+        ] {
+            let word = GcStatusWord::new(status);
+            assert!(!word.set_concurrent_gc_finished());
+            assert_eq!(word.load(), status);
+        }
     }
 
     #[test]

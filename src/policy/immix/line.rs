@@ -1,7 +1,7 @@
 use std::ops::Range;
 
 use super::block::Block;
-use crate::util::constants::{LOG_BITS_IN_BYTE, LOG_BYTES_IN_WORD};
+use crate::util::constants::LOG_BITS_IN_BYTE;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::spec_defs::IX_LINE_REUSE_COUNT;
 use crate::util::metadata::side_metadata::*;
@@ -133,12 +133,10 @@ impl Line {
         let unlog_bit = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
             .as_spec()
             .extract_side_spec();
-        let log_meta_bits_per_line = Line::LOG_BYTES - LOG_BYTES_IN_WORD as usize
-            + if !VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
-                0
-            } else {
-                1
-            };
+        let log_meta_bits_per_line = const {
+            Line::LOG_BYTES + LOG_BITS_IN_BYTE as usize
+                - VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.log_heap_bytes_per_unlog_byte()
+        };
         debug_assert!((1 << log_meta_bits_per_line) >= 8);
         let log_meta_bytes_per_line = log_meta_bits_per_line - LOG_BITS_IN_BYTE as usize;
         // FIXME: Performance
@@ -153,12 +151,10 @@ impl Line {
         let unlog_bit = *VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC
             .as_spec()
             .extract_side_spec();
-        let log_meta_bits_per_line = Line::LOG_BYTES - LOG_BYTES_IN_WORD as usize
-            + if !VM::VMObjectModel::COMPRESSED_PTR_ENABLED {
-                0
-            } else {
-                1
-            };
+        let log_meta_bits_per_line = const {
+            Line::LOG_BYTES + LOG_BITS_IN_BYTE as usize
+                - VM::VMObjectModel::GLOBAL_FIELD_UNLOG_BIT_SPEC.log_heap_bytes_per_unlog_byte()
+        };
         debug_assert!((1 << log_meta_bits_per_line) >= 8);
         let log_meta_bytes_per_line = log_meta_bits_per_line - LOG_BITS_IN_BYTE as usize;
         // FIXME: Performance

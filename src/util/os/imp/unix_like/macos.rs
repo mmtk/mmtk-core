@@ -7,6 +7,12 @@ use std::io::Result;
 pub struct MacOS;
 
 impl OSMemory for MacOS {
+    // Apple Silicon uses 16K pages.
+    #[cfg(target_arch = "aarch64")]
+    const LOG_BYTES_IN_PAGE: u8 = 14;
+    #[cfg(not(target_arch = "aarch64"))]
+    const LOG_BYTES_IN_PAGE: u8 = 12;
+
     fn dzmmap(
         start: Address,
         size: usize,

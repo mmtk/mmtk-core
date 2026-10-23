@@ -39,12 +39,22 @@ pub struct VMLayout {
 }
 
 impl VMLayout {
-    #[cfg(target_pointer_width = "32")]
-    /// The maximum virtual memory address space that can be used on the target.
-    pub const LOG_ARCH_ADDRESS_SPACE: usize = 32;
-    #[cfg(target_pointer_width = "64")]
-    /// The maximum virtual memory address space that can be used on the target.
-    pub const LOG_ARCH_ADDRESS_SPACE: usize = 47;
+    cfg_if::cfg_if! {
+        if #[cfg(target_pointer_width = "32")] {
+            /// The maximum virtual memory address space that can be used on the target.
+            pub const LOG_ARCH_ADDRESS_SPACE: usize = 32;
+        } else if #[cfg(all(target_arch = "aarch64", target_os = "linux"))] {
+            /// The maximum virtual memory address space that can be used on the target.
+            /// Linux on AArch64 (with the default `CONFIG_ARM64_VA_BITS=48`) gives user space the
+            /// full 48-bit range (up to 0xffff_ffff_ffff).  Addresses returned by `malloc` (malloc mark sweep)
+            /// can be anywhere in that range, and side metadata must cover them.
+            pub const LOG_ARCH_ADDRESS_SPACE: usize = 48;
+        } else {
+            /// The maximum virtual memory address space that can be used on the target.
+            /// x86_64 Linux and AArch64 macOS limit user space to 47 bits.
+            pub const LOG_ARCH_ADDRESS_SPACE: usize = 47;
+        }
+    }
 
     /// An upper bound on the extent of any space in the
     /// current memory layout
