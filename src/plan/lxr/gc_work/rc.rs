@@ -447,6 +447,10 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 return None;
             }
         };
+        // Skip objects that are not reference counted.
+        if !self.lxr.is_rc_object(o) {
+            return None;
+        }
         // println!(" - inc {:?}: {:?} rc={}", s, o, self.rc.count(o));
         let new = self.process_inc_and_evacuate(worker, o, depth);
         // Put this into remset if this is a mature slot, or a weak root
@@ -574,13 +578,13 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
             let incs = std::mem::take(&mut self.incs);
             self.process_incs::<KIND>(worker, AddressBuffer::Owned(incs), self.depth, false)
         };
-        if let Some(roots) = roots {
+        if let Some(roots) = &roots {
             if self.lxr.cm_enabled()
                 && self.pause == Pause::InitialMark
                 && !self.root_kind.unwrap().should_skip_mark_and_decs()
             {
                 if cfg!(any(feature = "sanity", debug_assertions)) {
-                    for r in &roots {
+                    for r in roots {
                         assert!(
                             r.to_raw_address().is_mapped(),
                             "Invalid object {:?}: address is not mapped",
@@ -591,29 +595,33 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
                 worker.scheduler().work_buckets[WorkBucketStage::ConcurrentResumable]
                     .add(LXRConcurrentTraceObjects::new(roots.clone(), mmtk));
             }
-            if self.pause == Pause::FinalMark || self.pause == Pause::Full {
-                if !root_slots.is_empty() && self.root_kind != Some(RootKind::Weak) {
-                    if self.pause == Pause::FinalMark {
-                        let mut w = LXRStopTheWorldProcessEdges::<_, false>::new(
-                            root_slots,
-                            true,
-                            mmtk,
-                            WorkBucketStage::Closure,
-                        );
-                        w.root_kind = self.root_kind;
-                        worker.add_work(WorkBucketStage::Closure, w)
-                    } else {
-                        let mut w = LXRStopTheWorldProcessEdges::<_, true>::new(
-                            root_slots,
-                            true,
-                            mmtk,
-                            WorkBucketStage::Closure,
-                        );
-                        w.root_kind = self.root_kind;
-                        worker.add_work(WorkBucketStage::Closure, w)
-                    };
-                }
-            } else if !self.root_kind.unwrap().should_skip_decs() {
+        }
+        // Trace from the root slots even if `roots` is `None`: non-RC roots are left out of
+        // `roots`, but objects reachable from them must still be marked.
+        if self.pause == Pause::FinalMark || self.pause == Pause::Full {
+            if !root_slots.is_empty() && self.root_kind != Some(RootKind::Weak) {
+                if self.pause == Pause::FinalMark {
+                    let mut w = LXRStopTheWorldProcessEdges::<_, false>::new(
+                        root_slots,
+                        true,
+                        mmtk,
+                        WorkBucketStage::Closure,
+                    );
+                    w.root_kind = self.root_kind;
+                    worker.add_work(WorkBucketStage::Closure, w)
+                } else {
+                    let mut w = LXRStopTheWorldProcessEdges::<_, true>::new(
+                        root_slots,
+                        true,
+                        mmtk,
+                        WorkBucketStage::Closure,
+                    );
+                    w.root_kind = self.root_kind;
+                    worker.add_work(WorkBucketStage::Closure, w)
+                };
+            }
+        } else if let Some(roots) = roots {
+            if !self.root_kind.unwrap().should_skip_decs() {
                 self.lxr.curr_roots.read().unwrap().push(roots);
             }
         }
@@ -758,6 +766,12 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             }
         });
         let in_ix_space = lxr.immix_space.in_space(o);
+        let in_los = !in_ix_space && lxr.los().in_space(o);
+        debug_assert!(
+            in_ix_space || in_los,
+            "{:?} is not reference counted, so its count can never reach zero",
+            o
+        );
         if in_ix_space {
             // Clear the VO bit if `o` is in the immix space.
             // Note that if the object is in the LOS,
@@ -775,7 +789,7 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             lxr.add_to_possibly_dead_mature_blocks(block, false);
             false
         } else {
-            true
+            in_los
         }
     }
 
