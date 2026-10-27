@@ -39,7 +39,7 @@ pub fn concurrent_immix_mutator_release<VM: VMBinding>(
     .unwrap();
     immix_allocator.reset();
 
-    // NonMoving space also should give up its bump region/free-lists at every pause, or it keeps allocating
+    // NonMoving space also should give up its bump region at every pause, or it keeps allocating
     // into lines that were not marked live for the current marking phase.
     mutator.reset_nonmoving_allocator();
 
@@ -71,7 +71,7 @@ pub fn concurent_immix_mutator_prepare<VM: VMBinding>(
     .unwrap();
     immix_allocator.reset();
 
-    // NonMoving space also should give up its bump region/free-lists at every pause, or it keeps allocating
+    // NonMoving space also should give up its bump region at every pause, or it keeps allocating
     // into lines that were not marked live for the current marking phase.
     mutator.reset_nonmoving_allocator();
 

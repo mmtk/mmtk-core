@@ -396,10 +396,9 @@ impl<VM: VMBinding> Mutator<VM> {
 
         cfg_if::cfg_if! {
             if #[cfg(feature = "immortal_as_nonmoving")] {
-
                 allocator.downcast_mut::<crate::util::alloc::BumpAllocator<VM>>().unwrap().reset();
             } else if #[cfg(feature = "marksweep_as_nonmoving")] {
-                allocator.downcast_mut::<crate::util::alloc::FreeListAllocator<VM>>().unwrap().reset();
+
             } else {
                 allocator.downcast_mut::<crate::util::alloc::ImmixAllocator<VM>>().unwrap().reset();
             }
