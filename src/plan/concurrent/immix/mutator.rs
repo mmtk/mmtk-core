@@ -39,17 +39,9 @@ pub fn concurrent_immix_mutator_release<VM: VMBinding>(
     .unwrap();
     immix_allocator.reset();
 
-    // The non-moving space is a second ImmixSpace. Its allocator must also give up its
-    // bump region at every pause, or it keeps allocating into lines that were not marked
-    // live for the current marking phase.
-    let nonmoving_allocator = unsafe {
-        mutator
-            .allocators
-            .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
-    }
-    .downcast_mut::<ImmixAllocator<VM>>()
-    .unwrap();
-    nonmoving_allocator.reset();
+    // NonMoving space also should give up its bump region/free-lists at every pause, or it keeps allocating
+    // into lines that were not marked live for the current marking phase.
+    mutator.reset_nonmoving_allocator();
 
     // Deactivate SATB
     if current_pause == Pause::Full || current_pause == Pause::FinalMark {
@@ -79,17 +71,9 @@ pub fn concurent_immix_mutator_prepare<VM: VMBinding>(
     .unwrap();
     immix_allocator.reset();
 
-    // The non-moving space is a second ImmixSpace. Its allocator must also give up its
-    // bump region at every pause, or it keeps allocating into lines that were not marked
-    // live for the current marking phase.
-    let nonmoving_allocator = unsafe {
-        mutator
-            .allocators
-            .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::NonMoving])
-    }
-    .downcast_mut::<ImmixAllocator<VM>>()
-    .unwrap();
-    nonmoving_allocator.reset();
+    // NonMoving space also should give up its bump region/free-lists at every pause, or it keeps allocating
+    // into lines that were not marked live for the current marking phase.
+    mutator.reset_nonmoving_allocator();
 
     // Activate SATB
     if current_pause == Pause::InitialMark {

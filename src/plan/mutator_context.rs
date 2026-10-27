@@ -386,6 +386,25 @@ impl<VM: VMBinding> Mutator<VM> {
                 AllocatorSelector::None => panic!("Expect a valid AllocatorSelector, found None"),
             }
     }
+
+    /// Reset NonMoving space allocator in current mutator.
+    pub(crate) fn reset_nonmoving_allocator(&mut self) {
+        let allocator = unsafe {
+            self.allocators
+                .get_allocator_mut(self.config.allocator_mapping[AllocationSemantics::NonMoving])
+        };
+
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "immortal_as_nonmoving")] {
+
+                allocator.downcast_mut::<crate::util::alloc::BumpAllocator<VM>>().unwrap().reset();
+            } else if #[cfg(feature = "marksweep_as_nonmoving")] {
+                allocator.downcast_mut::<crate::util::alloc::FreeListAllocator<VM>>().unwrap().reset();
+            } else {
+                allocator.downcast_mut::<crate::util::alloc::ImmixAllocator<VM>>().unwrap().reset();
+            }
+        }
+    }
 }
 
 /// Each GC plan should provide their implementation of a MutatorContext. *Note that this trait is no longer needed as we removed
