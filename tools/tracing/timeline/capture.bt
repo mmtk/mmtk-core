@@ -18,6 +18,10 @@ END {
     system("rm $TMP_FILE");
 }
 
+// We only set up the harness_begin/harness_end probes when the -H option is set.
+// Some VM bindings don't implement harness_begin/harness_end, and those trace points don't exist.
+// The user will see error if they add the -H option.
+//////// BEGIN:HARNESS
 usdt:$MMTK:mmtk:harness_begin {
     if (@harness) {
         //begin collecting data at harness_begin (start of final iteration)
@@ -32,6 +36,7 @@ usdt:$MMTK:mmtk:harness_end {
         exit();
     }
 }
+//////// END:HARNESS
 
 usdt:$MMTK:mmtk:gc_start {
     // Close the "GC_REQUEST_WAIT" span opened at `gc_requested`, right before opening "GC".
@@ -102,13 +107,13 @@ usdt:$MMTK:mmtk:roots {
     printf("roots,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
 }
 
-//////// BEGIN:PROCESS_ROOT_NODES
-usdt:$MMTK:mmtk:process_root_nodes {
+//////// BEGIN:PROCESS_PINNING_ROOTS
+usdt:$MMTK:mmtk:process_pinning_roots {
     if (@enable_print) {
-        printf("process_root_nodes,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+        printf("process_pinning_roots,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
     }
 }
-//////// END:PROCESS_ROOT_NODES
+//////// END:PROCESS_PINNING_ROOTS
 
 usdt:$MMTK:mmtk:process_slots {
     if (@enable_print) {
