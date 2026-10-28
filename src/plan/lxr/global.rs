@@ -96,7 +96,7 @@ pub static LXR_CONSTRAINTS: Lazy<PlanConstraints> = Lazy::new(|| PlanConstraints
 
 impl<VM: VMBinding> Plan for LXR<VM> {
     fn current_gc_may_move_object(&self) -> bool {
-        true
+        LXR_CONSTRAINTS.moves_objects
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
@@ -420,9 +420,14 @@ impl<VM: VMBinding> ConcurrentPlan for LXR<VM> {
 
 impl<VM: VMBinding> LXR<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Box<Self> {
+        // Only evacuation forwards objects, so a build without evacuation can keep the
+        // forwarding bits on the side.
+        // TODO: LXR should be able to use side forwarding bits -- it needs to make sure side
+        // forwarding bits are cleared properly for dead/forwarded objects.
         assert!(
-            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_in_header(),
-            "LXR does not support placing forwarding bits on the side."
+            VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_in_header()
+                || !LXR_CONSTRAINTS.moves_objects,
+            "LXR does not support placing forwarding bits on the side unless evacuation is disabled."
         );
         let num_workers = args.scheduler.num_workers();
         #[allow(unused_mut)]
