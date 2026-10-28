@@ -249,7 +249,7 @@ class LogProcessor:
         # bpftrace may drop events.  Be conservative.
         if wp is not None:
             match name:
-                case "process_root_nodes":
+                case "process_pinning_roots":
                     wp["args"] |= {
                         "num_roots": int(args[0]),
                         "num_enqueued_nodes": int(args[1]),
