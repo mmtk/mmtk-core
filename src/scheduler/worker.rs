@@ -183,7 +183,6 @@ impl<VM: VMBinding> GCWorker<VM> {
         self.local_work_buffer.push(Box::new(work));
         probe!(mmtk, local_cache, self.local_work_buffer.len());
         self.scheduler.worker_monitor.notify_work_available(false);
-
     }
 
     /// Get the scheduler. There is only one scheduler per MMTk instance.

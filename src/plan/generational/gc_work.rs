@@ -112,7 +112,7 @@ impl<T: Trace> GCWork<T::VM> for ProcessModBuf<T> {
             // Scan objects in the modbuf and forward pointers
             let modbuf = std::mem::take(&mut self.modbuf);
             GCWork::do_work(
-                &mut ProcessNodes::<T>::new(modbuf, WorkBucketStage::Closure),
+                &mut ProcessNodes::<T>::new(modbuf.into(), WorkBucketStage::Closure),
                 worker,
                 mmtk,
             )

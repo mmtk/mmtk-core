@@ -100,7 +100,7 @@ impl<'w, T: Trace> DefaultObjectTracer<'w, T> {
     fn flush(&mut self) {
         let next_nodes = self.queue.take();
         assert!(!next_nodes.is_empty());
-        let work_packet = ProcessNodes::<T>::new(next_nodes, self.stage);
+        let work_packet = ProcessNodes::<T>::new(next_nodes.into(), self.stage);
         self.worker.scheduler().work_buckets[self.stage].add(work_packet);
     }
 }

@@ -127,6 +127,12 @@ usdt:$MMTK:mmtk:process_nodes {
     }
 }
 
+usdt:$MMTK:mmtk:do_node_enqueuing_tracing {
+    if (@enable_print) {
+        printf("do_node_enqueuing_tracing,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+    }
+}
+
 usdt:$MMTK:mmtk:plan_end_of_gc_begin {
     if (@enable_print) {
         printf("plan_end_of_gc,B,%d,%lu\n", tid, nsecs);
