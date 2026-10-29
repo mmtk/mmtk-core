@@ -264,10 +264,22 @@ impl Mmapper for ChunkStateMmapper {
         prot: MmapProtection,
         anno: &MmapAnnotation,
     ) -> MmapResult<()> {
-        let _guard = self.transition_lock.lock().unwrap();
-
         let bytes = pages << LOG_BYTES_IN_PAGE;
         let range = ChunkRange::new_unaligned(start, bytes);
+
+        // Fast path: `Mapped` is a terminal state, so if every chunk is already mapped there is
+        // nothing to do and no need to take the global transition lock. Allocators call this for
+        // every block they acquire, so the lock is otherwise heavily contended.
+        let chunks = range.bytes >> LOG_BYTES_IN_CHUNK;
+        if (0..chunks).all(|i| {
+            self.storage
+                .get_state(range.start + (i << LOG_BYTES_IN_CHUNK))
+                == MapState::Mapped
+        }) {
+            return Ok(());
+        }
+
+        let _guard = self.transition_lock.lock().unwrap();
 
         let mmap_strategy = MmapStrategy::default()
             .huge_page(huge_page_option)
