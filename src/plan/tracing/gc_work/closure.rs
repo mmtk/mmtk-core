@@ -34,9 +34,9 @@ impl<T: Trace> ProcessSlots<T> {
     /// pushing elements without reaching the capacity.
     const PUSHES_BEFORE_SPLIT: usize = Self::CAPACITY;
 
-    pub fn new(slots: Vec<SlotOfTrace<T>>, bucket: WorkBucketStage) -> Self {
-        let mut slot_queue = VecDeque::with_capacity(Self::CAPACITY);
-        slot_queue.extend(slots);
+    pub fn from_vec(slots: Vec<SlotOfTrace<T>>, bucket: WorkBucketStage) -> Self {
+        let mut slot_queue = VecDeque::from(slots);
+        slot_queue.reserve(Self::CAPACITY.saturating_sub(slot_queue.len()));
         Self::from_deque(slot_queue, bucket)
     }
 
@@ -184,7 +184,13 @@ impl<T: Trace> ProcessNodes<T> {
     /// pushing elements without reaching the capacity.
     const PUSHES_BEFORE_SPLIT: usize = Self::CAPACITY;
 
-    pub fn new(object_queue: VecDeque<ObjectReference>, bucket: WorkBucketStage) -> Self {
+    pub fn from_vec(slots: Vec<ObjectReference>, bucket: WorkBucketStage) -> Self {
+        let mut slot_queue = VecDeque::from(slots);
+        slot_queue.reserve(Self::CAPACITY.saturating_sub(slot_queue.len()));
+        Self::from_deque(slot_queue, bucket)
+    }
+
+    pub fn from_deque(object_queue: VecDeque<ObjectReference>, bucket: WorkBucketStage) -> Self {
         Self {
             object_queue,
             bucket,
@@ -197,7 +203,7 @@ impl<T: Trace> ProcessNodes<T> {
 
         let flush = |slots: &mut VectorQueue<_>, worker: &mut GCWorker<T::VM>| {
             let buffer = slots.take();
-            let work_packet = ProcessSlots::<T>::new(buffer, self.bucket);
+            let work_packet = ProcessSlots::<T>::from_vec(buffer, self.bucket);
             worker.add_work(self.bucket, work_packet);
         };
 
@@ -307,7 +313,7 @@ impl<T: Trace> ProcessNodes<T> {
         let mut remaining_parts = divider - 1; // Leave one part for myself.
         while remaining_parts > 0 && self.object_queue.len() > split_len {
             let split_queue = self.object_queue.split_off(split_len);
-            let work = Self::new(split_queue, self.bucket);
+            let work = Self::from_deque(split_queue, self.bucket);
             worker.add_work(self.bucket, work);
 
             remaining_parts -= 1;
