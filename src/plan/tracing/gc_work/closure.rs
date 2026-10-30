@@ -173,6 +173,17 @@ pub struct ProcessNodes<T: Trace> {
 }
 
 impl<T: Trace> ProcessNodes<T> {
+    /// The nominative capacity of the deque.
+    ///
+    /// It will try to split the work packet if the deque has too many elements.
+    const CAPACITY: usize = EDGES_WORK_BUFFER_SIZE / 4;
+
+    /// The number of slots to push before it proactively splits the work packet.
+    ///
+    /// The purpose of this is preventing a pathological case where one worker keeps popping and
+    /// pushing elements without reaching the capacity.
+    const PUSHES_BEFORE_SPLIT: usize = Self::CAPACITY;
+
     pub fn new(object_queue: VecDeque<ObjectReference>, bucket: WorkBucketStage) -> Self {
         Self {
             object_queue,
@@ -240,6 +251,8 @@ impl<T: Trace> ProcessNodes<T> {
 
         let mut num_visited_nodes = 0;
         let mut num_visited_edges = 0;
+        let mut num_pushes = 0;
+        let mut num_splits = 0;
 
         while let Some(object) = self.object_queue.pop_back() {
             num_visited_nodes += 1;
@@ -252,19 +265,53 @@ impl<T: Trace> ProcessNodes<T> {
                     num_visited_edges += 1;
                     let new_target = trace.trace_object(worker, target, &mut |enqueued_object| {
                         self.object_queue.push_back(enqueued_object);
+
+                        num_pushes += 1;
                     });
                     new_target
                 },
             );
+
             trace.post_scan_object(object);
+
+            // Split the work packet if needed.
+            if num_pushes >= Self::PUSHES_BEFORE_SPLIT || self.object_queue.len() >= Self::CAPACITY
+            {
+                self.split(worker);
+                num_splits += 1;
+                num_pushes = 0;
+            }
         }
 
         probe!(
             mmtk,
             do_node_enqueuing_tracing,
             num_visited_nodes,
-            num_visited_edges
+            num_visited_edges,
+            num_splits,
         );
+    }
+
+    fn split(&mut self, worker: &mut GCWorker<T::VM>) {
+        debug_assert!(!self.object_queue.is_empty());
+
+        let parked_workers_sloppy = worker.scheduler().worker_monitor.parked_workers_sloppy();
+
+        // Divide the current work packet into two parts by default, but add one more part for every
+        // idle worker.
+        let divider = 2 + parked_workers_sloppy;
+
+        // Each part has at least one element.
+        let split_len = (self.object_queue.len() / divider).max(1);
+
+        let mut remaining_parts = divider - 1; // Leave one part for myself.
+        while remaining_parts > 0 && self.object_queue.len() > split_len {
+            let split_queue = self.object_queue.split_off(split_len);
+            let work = Self::new(split_queue, self.bucket);
+            worker.add_work(self.bucket, work);
+
+            remaining_parts -= 1;
+        }
     }
 }
 

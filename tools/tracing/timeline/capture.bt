@@ -129,7 +129,7 @@ usdt:$MMTK:mmtk:process_nodes {
 
 usdt:$MMTK:mmtk:do_node_enqueuing_tracing {
     if (@enable_print) {
-        printf("do_node_enqueuing_tracing,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+        printf("do_node_enqueuing_tracing,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
     }
 }
 

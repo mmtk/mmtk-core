@@ -290,11 +290,13 @@ class LogProcessor:
                 case "do_node_enqueuing_tracing":
                     num_visited_nodes = int(args[0])
                     num_visited_edges = int(args[1])
+                    num_splits = int(args[2])
                     wp["args"] |= {
                         # Put args in a group.  See comments in "process_slots".
                         "do_node_enqueuing_tracing": {
                             "num_visited_nodes": num_visited_nodes,
                             "num_visited_edges": num_visited_edges,
+                            "splits": num_splits,
                         }
                     }
 
