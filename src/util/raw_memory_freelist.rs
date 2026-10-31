@@ -49,6 +49,11 @@ impl FreeList for RawMemoryFreeList {
                 b = self.base,
                 sl = self.slice.len()
             );
+            debug_assert!(
+                (index as usize) < self.slice.len(),
+                "free-list entry {index} outside mapped slice ({})",
+                self.slice.len()
+            );
         }
         self.slice[index as usize]
     }
@@ -65,6 +70,11 @@ impl FreeList for RawMemoryFreeList {
                 h = self.high_water,
                 b = self.base,
                 sl = self.slice.len()
+            );
+            debug_assert!(
+                (index as usize) < self.slice.len(),
+                "free-list entry {index} outside mapped slice ({})",
+                self.slice.len()
             );
         }
         self.slice[index as usize] = value;
@@ -93,9 +103,6 @@ impl FreeList for RawMemoryFreeList {
 impl RawMemoryFreeList {
     fn units_per_block(&self) -> i32 {
         (conversions::pages_to_bytes(self.pages_per_block as _) >> LOG_BYTES_IN_UNIT) as _
-    }
-    fn units_in_first_block(&self) -> i32 {
-        self.units_per_block() - self.heads - 1
     }
     pub fn default_block_size(units: i32, heads: i32) -> i32 {
         usize::min(Self::size_in_pages(units, heads) as _, 16) as _
@@ -136,9 +143,9 @@ impl RawMemoryFreeList {
     }
 
     fn current_capacity(&self) -> i32 {
-        let list_blocks = conversions::bytes_to_pages_up(self.high_water - self.base) as i32
-            / self.pages_per_block;
-        self.units_in_first_block() + (list_blocks - 1) * self.units_per_block()
+        // Mapped units minus top and bottom sentinels
+        let mapped_units = ((self.high_water - self.base) >> LOG_BYTES_IN_UNIT) as i32;
+        (mapped_units - self.heads - 1).max(0)
     }
 
     pub fn grow_freelist(&mut self, units: i32) -> bool {
@@ -146,8 +153,11 @@ impl RawMemoryFreeList {
         if required_units > self.max_units {
             return false;
         }
-        let blocks = if required_units > self.current_capacity() {
-            let units_requested = required_units - self.current_capacity();
+        // Size by metadata units including sentinels
+        let mapped_units = ((self.high_water - self.base) >> LOG_BYTES_IN_UNIT) as i32;
+        let required_mapped = required_units + self.heads() + 1;
+        let blocks = if required_mapped > mapped_units {
+            let units_requested = required_mapped - mapped_units;
             (units_requested + self.units_per_block() - 1) / self.units_per_block()
         } else {
             0
@@ -166,6 +176,14 @@ impl RawMemoryFreeList {
         }
 
         let len = (self.high_water - self.base) >> LOG_BYTES_IN_ENTRY;
+
+        assert!(
+            (new_max as usize + self.heads as usize + 1) * 2 <= len,
+            "free-list metadata too small for new_max: need {} entries, mapped {}",
+            (new_max + self.heads + 1) * 2,
+            len
+        );
+
         // SAFETY: The memory is mapped and valid after `raise_high_water`.
         self.slice = unsafe { std::slice::from_raw_parts_mut(self.base.to_mut_ptr::<i32>(), len) };
 
@@ -216,7 +234,8 @@ impl RawMemoryFreeList {
             "Attempt to grow FreeList beyond limit"
         );
         if self.high_water + grow_extent > self.limit {
-            grow_extent = self.high_water - self.limit;
+            // Clamp to the remaining range
+            grow_extent = self.limit - self.high_water;
         }
         self.mmap(self.high_water, grow_extent);
         self.high_water += grow_extent;
@@ -584,5 +603,13 @@ mod tests {
 
         let res4 = l.alloc(1);
         assert_eq!(res4, 4);
+    }
+
+    /// Growing past `max_units` fails cleanly instead of indexing the slice.
+    #[test]
+    fn grow_beyond_max_units_returns_false() {
+        let (_guard, mut l, list_size, _, _) = new_raw_memory_freelist(6, 2);
+        assert!(!l.grow_freelist(list_size as i32 + 1));
+        assert!(l.current_capacity() >= list_size as i32 - 1);
     }
 }
