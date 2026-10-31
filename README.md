@@ -73,8 +73,9 @@ You can find up-to-date full API documentation for mmtk-core [here](https://docs
 We maintain three VM bindings for MMTk. These bindings are accessible in the following repositories:
 
 * [OpenJDK](https://github.com/mmtk/mmtk-openjdk),
+* [Ruby](https://github.com/mmtk/mmtk-ruby),
+* [Julia](https://github.com/JuliaLang/julia/tree/master/src/gc-mmtk)
 * [JikesRVM](https://github.com/mmtk/mmtk-jikesrvm),
-* [V8](https://github.com/mmtk/mmtk-v8).
 
 For more information on these bindings, please visit their repositories.
 
@@ -103,13 +104,24 @@ We use both unit tests and VM binding tests to test MMTk in the CI.
 
 ### Unit tests
 
-MMTk uses Rust's testing framework for unit tests. For example, you can use the following to run unit tests.
+MMTk uses Rust's built-in testing framework for unit tests. For example, you can use the following to run unit tests.
 
 ```console
 $ cargo test
 ```
 
-A full list of all the unit tests we run in our CI can be found [here](.github/scripts/ci-test.sh).
+### Mock tests
+
+MMTk is also tested with a [MockVM](https://github.com/mmtk/mmtk-core/tree/master/src/util/test_util/mock_vm). `MockVM` allows
+MMTk's GCs to be tested under controlled configurations and scenarios, enabling faster development and debugging iterations without a real VM binding.
+
+Mock tests are also implemented using Rust's testing framework, but each mock test file must be run in a separate process.
+
+```console
+$ cargo test --features mock_test -- path/to/mock/vm/test
+```
+
+We run both unit tests and mock tests in CI with the script [here](.github/scripts/ci-test.sh).
 
 ### VM binding tests
 

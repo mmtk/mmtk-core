@@ -39,6 +39,10 @@ pub fn concurrent_immix_mutator_release<VM: VMBinding>(
     .unwrap();
     immix_allocator.reset();
 
+    // NonMoving space also should give up its bump region at every pause, or it keeps allocating
+    // into lines that were not marked live for the current marking phase.
+    mutator.reset_nonmoving_allocator();
+
     // Deactivate SATB
     if current_pause == Pause::Full || current_pause == Pause::FinalMark {
         debug!("Deactivate SATB barrier active for {:?}", mutator as *mut _);
@@ -66,6 +70,10 @@ pub fn concurent_immix_mutator_prepare<VM: VMBinding>(
     .downcast_mut::<ImmixAllocator<VM>>()
     .unwrap();
     immix_allocator.reset();
+
+    // NonMoving space also should give up its bump region at every pause, or it keeps allocating
+    // into lines that were not marked live for the current marking phase.
+    mutator.reset_nonmoving_allocator();
 
     // Activate SATB
     if current_pause == Pause::InitialMark {

@@ -502,10 +502,7 @@ impl<VM: VMBinding, const KIND: EdgeKind> ProcessIncs<VM, KIND> {
                 return None;
             }
         };
-        // Objects the plan never reclaims carry no reference count, so there is
-        // nothing to increment and nothing to evacuate. Reporting them as absent also
-        // keeps them out of the recorded root set, which exists so that the matching
-        // decrements can be applied later.
+        // Skip objects that are not reference counted.
         if !self.lxr.is_rc_object(o) {
             return None;
         }
@@ -645,42 +642,13 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
             let incs = std::mem::take(&mut self.incs);
             self.process_incs::<KIND>(worker, AddressBuffer::Owned(incs), self.depth, false)
         };
-        // Seed the stop-the-world trace from the root *slots*, independently of whether any
-        // of them turned out to hold a reference counted object. `process_incs` reports only
-        // the counted objects, and a packet holding nothing but sysimage roots reports none
-        // at all -- so gating the trace on that result silently dropped those roots from
-        // marking, and anything held only by them was swept while reachable.
-        if (self.pause == Pause::FinalMark || self.pause == Pause::Full)
-            && !root_slots.is_empty()
-            && self.root_kind != Some(RootKind::Weak)
-        {
-            if self.pause == Pause::FinalMark {
-                let mut w = LXRStopTheWorldProcessEdges::<_, false>::new(
-                    root_slots,
-                    true,
-                    mmtk,
-                    WorkBucketStage::Closure,
-                );
-                w.root_kind = self.root_kind;
-                worker.add_work(WorkBucketStage::Closure, w)
-            } else {
-                let mut w = LXRStopTheWorldProcessEdges::<_, true>::new(
-                    root_slots,
-                    true,
-                    mmtk,
-                    WorkBucketStage::Closure,
-                );
-                w.root_kind = self.root_kind;
-                worker.add_work(WorkBucketStage::Closure, w)
-            };
-        }
-        if let Some(roots) = roots {
+        if let Some(roots) = &roots {
             if self.lxr.cm_enabled()
                 && self.pause == Pause::InitialMark
                 && !self.root_kind.unwrap().should_skip_mark_and_decs()
             {
                 if cfg!(any(feature = "sanity", debug_assertions)) {
-                    for r in &roots {
+                    for r in roots {
                         assert!(
                             r.to_raw_address().is_mapped(),
                             "Invalid object {:?}: address is not mapped",
@@ -691,10 +659,33 @@ impl<VM: VMBinding, const KIND: EdgeKind> GCWork<VM> for ProcessIncs<VM, KIND> {
                 worker.scheduler().work_buckets[WorkBucketStage::ConcurrentResumable]
                     .add(LXRConcurrentTraceObjects::new(roots.clone(), mmtk));
             }
-            if self.pause != Pause::FinalMark
-                && self.pause != Pause::Full
-                && !self.root_kind.unwrap().should_skip_decs()
-            {
+        }
+        // Trace from the root slots even if `roots` is `None`: non-RC roots are left out of
+        // `roots`, but objects reachable from them must still be marked.
+        if self.pause == Pause::FinalMark || self.pause == Pause::Full {
+            if !root_slots.is_empty() && self.root_kind != Some(RootKind::Weak) {
+                if self.pause == Pause::FinalMark {
+                    let mut w = LXRStopTheWorldProcessEdges::<_, false>::new(
+                        root_slots,
+                        true,
+                        mmtk,
+                        WorkBucketStage::Closure,
+                    );
+                    w.root_kind = self.root_kind;
+                    worker.add_work(WorkBucketStage::Closure, w)
+                } else {
+                    let mut w = LXRStopTheWorldProcessEdges::<_, true>::new(
+                        root_slots,
+                        true,
+                        mmtk,
+                        WorkBucketStage::Closure,
+                    );
+                    w.root_kind = self.root_kind;
+                    worker.add_work(WorkBucketStage::Closure, w)
+                };
+            }
+        } else if let Some(roots) = roots {
+            if !self.root_kind.unwrap().should_skip_decs() {
                 self.lxr.curr_roots.read().unwrap().push(roots);
             }
         }
@@ -862,8 +853,6 @@ impl<VM: VMBinding> ProcessDecs<VM> {
             lxr.add_to_possibly_dead_mature_blocks(block, false);
             false
         } else {
-            // Only the large object space frees objects individually, and the caller
-            // uses this to decide whether to ask it to.
             in_los
         }
     }

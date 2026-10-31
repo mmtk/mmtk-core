@@ -28,7 +28,7 @@ pub fn interior_pointer_before_object_ref() {
             );
             assert!(!addr.is_zero());
 
-            let obj = MockVM::object_start_to_ref(addr);
+            let obj = <MockVM>::object_start_to_ref(addr);
             println!(
                 "start = {}, end = {}, obj = {}",
                 addr,

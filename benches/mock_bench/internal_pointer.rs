@@ -35,7 +35,7 @@ pub fn bench(c: &mut Criterion) {
                 0,
                 AllocationSemantics::Default,
             );
-            let obj_ref = MockVM::object_start_to_ref(addr);
+            let obj_ref = <MockVM>::object_start_to_ref(addr);
             memory_manager::post_alloc(
                 fixture.mutator(),
                 obj_ref,
@@ -72,7 +72,7 @@ pub fn bench(c: &mut Criterion) {
                 0,
                 AllocationSemantics::Los,
             );
-            let obj_ref = MockVM::object_start_to_ref(addr);
+            let obj_ref = <MockVM>::object_start_to_ref(addr);
             memory_manager::post_alloc(
                 fixture.mutator(),
                 obj_ref,

@@ -109,7 +109,7 @@ pub fn mmtk_shutdown<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 /// and all the address ranges passed as arguments in the function will be considered as part of the VM space.
 /// Currently we do not allow removing regions from VM space.
 #[cfg(feature = "vm_space")]
-pub fn set_vm_space<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, start: Address, size: usize) {
+pub fn set_vm_space<VM: VMBinding>(mmtk: &mut MMTK<VM>, start: Address, size: usize) {
     unsafe { mmtk.get_plan_mut() }
         .base_mut()
         .vm_space

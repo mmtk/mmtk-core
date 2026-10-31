@@ -14,13 +14,17 @@ fn test_set_vm_space() {
     with_mockvm(
         default_setup,
         || {
-            let mut fixture = MMTKFixture::create();
+            let _fixture = MMTKFixture::create_with_builder_and_mmtk_init(
+                |_builder| {},
+                true,
+                |mmtk| {
+                    let start_addr = unsafe { Address::from_usize(0x78624DC00000) };
+                    let end_addr = unsafe { Address::from_usize(0x786258000000) };
+                    let size = end_addr - start_addr;
 
-            let start_addr = unsafe { Address::from_usize(0x78624DC00000) };
-            let end_addr = unsafe { Address::from_usize(0x786258000000) };
-            let size = end_addr - start_addr;
-
-            memory_manager::set_vm_space::<MockVM>(fixture.get_mmtk_mut(), start_addr, size);
+                    memory_manager::set_vm_space::<MockVM>(mmtk, start_addr, size);
+                },
+            );
         },
         no_cleanup,
     )
