@@ -129,7 +129,6 @@ impl VMMap for Map64 {
         let index = descriptor.get_index();
         let rtn = self.inner().high_water[index];
         let extent = chunks << LOG_BYTES_IN_CHUNK;
-        self_mut.high_water[index] = rtn + extent;
 
         if let Some(freelist) = maybe_freelist {
             let Some(rmfl) = freelist.downcast_mut::<RawMemoryFreeList>() else {
@@ -139,7 +138,11 @@ impl VMMap for Map64 {
                 // accommodate the new chunks.  Currently only `RawMemoryFreeList` can grow.
                 panic!("Map64 requires a growable free list implementation (RawMemoryFreeList).");
             };
-            rmfl.grow_freelist(conversions::bytes_to_pages_up(extent) as _);
+            // Growth can fail at the metadata-reserved cap. Leave the high
+            // water unchanged. Otherwise caller will access unmapped metadata
+            if !rmfl.grow_freelist(conversions::bytes_to_pages_up(extent) as _) {
+                return Address::ZERO;
+            }
             let base_page = conversions::bytes_to_pages_up(rtn - self.inner().base_address[index]);
             for offset in (0..(chunks * PAGES_IN_CHUNK)).step_by(PAGES_IN_CHUNK) {
                 rmfl.set_uncoalescable((base_page + offset) as _);
@@ -147,6 +150,7 @@ impl VMMap for Map64 {
                 rmfl.alloc_from_unit(PAGES_IN_CHUNK as _, (base_page + offset) as _);
             }
         }
+        self_mut.high_water[index] = rtn + extent;
         rtn
     }
 
