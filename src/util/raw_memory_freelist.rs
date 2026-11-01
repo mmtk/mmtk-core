@@ -609,7 +609,7 @@ mod tests {
     #[test]
     fn grow_beyond_max_units_returns_false() {
         let (_guard, mut l, list_size, _, _) = new_raw_memory_freelist(6, 2);
-        assert!(!l.grow_freelist(list_size as i32 + 1));
-        assert!(l.current_capacity() >= list_size as i32 - 1);
+        assert!(!l.grow_freelist(list_size + 1));
+        assert!(l.current_capacity() >= list_size - 1);
     }
 }
