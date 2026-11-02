@@ -19,4 +19,4 @@ Generally we expect a pull request to meeting the following requirements before 
 
 ## Using AI tools
 
-You may use AI tools, such as large language models (LLMs), to help with your contributions. A human must submit the contribution, review it, and is responsible for all of its content. See our [AI policy](docs/contribute/ai_policy.md) for details.
+You may responsibly use AI tools, such as large language models (LLMs), to help with your contributions. Contributions must be submitted by a human, who is responsible for all of their content. See our [AI policy](docs/contribute/ai_policy.md) for details.
