@@ -6,7 +6,7 @@ use crate::{
         VectorQueue,
     },
     scheduler::{GCWork, GCWorker, GCWorkerShared, WorkBucketStage, EDGES_WORK_BUFFER_SIZE},
-    util::{ObjectReference, VMWorkerThread},
+    util::{scanning_helper::visit_children_moving, ObjectReference, VMWorkerThread},
     vm::{slot::Slot, Scanning, VMBinding},
     MMTK,
 };
@@ -44,6 +44,25 @@ impl<T: Trace> ProcessSlots<T> {
         Self { slot_queue, bucket }
     }
 
+    fn try_enqueue_nodes(&mut self, worker: &mut GCWorker<T::VM>, _tls: VMWorkerThread, trace: &T) {
+        let mut enqueued_objects = VecDeque::with_capacity(self.slot_queue.len());
+        for slot in self.slot_queue.drain(..) {
+            if let Some(target) = slot.load() {
+                let new_target = trace.trace_object(worker, target, &mut |enqueued_object| {
+                    enqueued_objects.push_back(enqueued_object);
+                });
+                if new_target != target {
+                    slot.store(new_target);
+                }
+            }
+        }
+
+        if !enqueued_objects.is_empty() {
+            let work_packet = ProcessNodes::<T>::from_deque(enqueued_objects, self.bucket);
+            worker.add_work(self.bucket, work_packet);
+        }
+    }
+
     fn split(&mut self, worker: &mut GCWorker<T::VM>) {
         debug_assert!(!self.slot_queue.is_empty());
 
@@ -71,6 +90,10 @@ impl<T: Trace> GCWork<T::VM> for ProcessSlots<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
         let tls = worker.tls;
         let trace = T::from_mmtk(mmtk);
+
+        if <T::VM as VMBinding>::VMScanning::PREFER_NODE_ENQUEUING {
+            self.try_enqueue_nodes(worker, tls, &trace);
+        }
 
         // The number of slots at the beginning of the work packet.
         let num_initial_slots = self.slot_queue.len();
@@ -264,19 +287,15 @@ impl<T: Trace> ProcessNodes<T> {
             num_visited_nodes += 1;
 
             // Scan objects and trace their outgoing edges at the same time.
-            <T::VM as VMBinding>::VMScanning::scan_object_and_trace_edges(
-                tls,
-                object,
-                &mut |target| {
-                    num_visited_edges += 1;
-                    let new_target = trace.trace_object(worker, target, &mut |enqueued_object| {
-                        self.object_queue.push_back(enqueued_object);
+            visit_children_moving::<T::VM>(tls, object, &mut |target| {
+                num_visited_edges += 1;
+                let new_target = trace.trace_object(worker, target, &mut |enqueued_object| {
+                    self.object_queue.push_back(enqueued_object);
 
-                        num_pushes += 1;
-                    });
-                    new_target
-                },
-            );
+                    num_pushes += 1;
+                });
+                new_target
+            });
 
             trace.post_scan_object(object);
 
