@@ -94,9 +94,6 @@ impl RawMemoryFreeList {
     fn units_per_block(&self) -> i32 {
         (conversions::pages_to_bytes(self.pages_per_block as _) >> LOG_BYTES_IN_UNIT) as _
     }
-    fn units_in_first_block(&self) -> i32 {
-        self.units_per_block() - self.heads - 1
-    }
     pub fn default_block_size(units: i32, heads: i32) -> i32 {
         usize::min(Self::size_in_pages(units, heads) as _, 16) as _
     }
@@ -136,9 +133,8 @@ impl RawMemoryFreeList {
     }
 
     fn current_capacity(&self) -> i32 {
-        let list_blocks = conversions::bytes_to_pages_up(self.high_water - self.base) as i32
-            / self.pages_per_block;
-        self.units_in_first_block() + (list_blocks - 1) * self.units_per_block()
+        let list_units = ((self.high_water - self.base) >> LOG_BYTES_IN_UNIT) as i32;
+        list_units - self.heads - 1
     }
 
     pub fn grow_freelist(&mut self, units: i32) -> bool {
@@ -584,5 +580,33 @@ mod tests {
 
         let res4 = l.alloc(1);
         assert_eq!(res4, 4);
+    }
+
+    #[test]
+    fn grow_into_partial_last_block() {
+        let _guard = match MUTEX.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let start = crate::util::test_util::RAW_MEMORY_FREELIST_TEST_REGION.start;
+        let units = 12264;
+        let grain = 1024;
+        let pages = RawMemoryFreeList::size_in_pages(units, 1);
+        let pages_per_block = RawMemoryFreeList::default_block_size(units, 1);
+        // The limit falls in the middle of a block, so the last growth is clamped.
+        assert_ne!(pages % pages_per_block, 0);
+        let mut l = RawMemoryFreeList::new(
+            start,
+            start + conversions::pages_to_bytes(pages as _),
+            pages_per_block,
+            units,
+            grain,
+            1,
+            MmapStrategy::TEST,
+        );
+        for _ in 0..units / grain {
+            assert!(l.grow_freelist(grain));
+        }
+        assert!(!l.grow_freelist(grain));
     }
 }
