@@ -216,7 +216,7 @@ impl RawMemoryFreeList {
             "Attempt to grow FreeList beyond limit"
         );
         if self.high_water + grow_extent > self.limit {
-            grow_extent = self.high_water - self.limit;
+            grow_extent = self.limit - self.high_water;
         }
         self.mmap(self.high_water, grow_extent);
         self.high_water += grow_extent;
