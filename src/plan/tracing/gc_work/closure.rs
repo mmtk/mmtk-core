@@ -91,7 +91,7 @@ impl<T: Trace> GCWork<T::VM> for ProcessSlots<T> {
         let tls = worker.tls;
         let trace = T::from_mmtk(mmtk);
 
-        if <T::VM as VMBinding>::VMScanning::PREFER_NODE_ENQUEUING {
+        if <T::VM as VMBinding>::VMScanning::prefer_node_enqueuing() {
             self.try_enqueue_nodes(worker, tls, &trace);
         }
 
@@ -349,7 +349,7 @@ impl<T: Trace> GCWork<T::VM> for ProcessNodes<T> {
 
         let total_objects = self.object_queue.len();
 
-        if !<T::VM as VMBinding>::VMScanning::PREFER_NODE_ENQUEUING {
+        if !<T::VM as VMBinding>::VMScanning::prefer_node_enqueuing() {
             // Go through the object list and scan objects that supports slot-enququing.
             self.try_enqueue_slots(worker, tls, &trace)
         };

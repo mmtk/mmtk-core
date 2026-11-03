@@ -186,7 +186,9 @@ pub trait Scanning<VM: VMBinding> {
     /// Set to true if the VM binding prefers node enqueuing over slot enqueuing.
     ///
     /// VM bindings that has to use [`Scanning::scan_object_and_trace_edges`] generally prefers this.
-    const PREFER_NODE_ENQUEUING: bool = false;
+    fn prefer_node_enqueuing() -> bool {
+        false
+    }
 
     /// Return true if the given object supports slot enqueuing.
     ///
