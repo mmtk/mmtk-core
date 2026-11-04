@@ -7,6 +7,11 @@ on:
     branches:
     - master
 
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
 jobs:
   # Figure out the PR that is merged.
   get-merged-pr:
@@ -51,6 +56,8 @@ jobs:
     needs: get-merged-pr
     with:
       pull_request: ${{ needs.get-merged-pr.outputs.pr }}
+      # The jobs below push a commit to the binding PR's branch, so a pinned commit is no use.
+      require_branch_ref: true
 
   check-merge-openjdk11-pr:
     uses: ./.github/workflows/auto-merge-inner.yml
@@ -62,7 +69,8 @@ jobs:
       base_ref: ${{ needs.binding-refs.outputs.openjdk11_binding_ref_default }}
       core_commit: ${{ needs.get-merged-pr.outputs.commit }}
       update_lockfile: cargo build
-    secrets: inherit
+    secrets:
+      CI_ACCESS_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
 
   check-merge-openjdk21-pr:
     uses: ./.github/workflows/auto-merge-inner.yml
@@ -74,7 +82,8 @@ jobs:
       base_ref: ${{ needs.binding-refs.outputs.openjdk21_binding_ref_default }}
       core_commit: ${{ needs.get-merged-pr.outputs.commit }}
       update_lockfile: cargo build
-    secrets: inherit
+    secrets:
+      CI_ACCESS_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
 
   check-merge-jikesrvm-pr:
     uses: ./.github/workflows/auto-merge-inner.yml
@@ -90,7 +99,8 @@ jobs:
       # that are generated during its build process. Unless we want to do a full build for JikesRVM, we cannot
       # use `cargo build`. So use `cargo generate-lockfile` instead.
       update_lockfile: cargo generate-lockfile
-    secrets: inherit
+    secrets:
+      CI_ACCESS_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
 
   check-merge-v8-pr:
     uses: ./.github/workflows/auto-merge-inner.yml
@@ -102,7 +112,8 @@ jobs:
       base_ref: ${{ needs.binding-refs.outputs.v8_binding_ref_default }}
       core_commit: ${{ needs.get-merged-pr.outputs.commit }}
       update_lockfile: cargo build --features nogc
-    secrets: inherit
+    secrets:
+      CI_ACCESS_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
 
   check-merge-ruby-pr:
     uses: ./.github/workflows/auto-merge-inner.yml
@@ -114,4 +125,5 @@ jobs:
       base_ref: ${{ needs.binding-refs.outputs.ruby_binding_ref_default }}
       core_commit: ${{ needs.get-merged-pr.outputs.commit }}
       update_lockfile: cargo build
-    secrets: inherit
+    secrets:
+      CI_ACCESS_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}

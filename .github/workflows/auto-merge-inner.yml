@@ -11,7 +11,7 @@ on:
       base_repo:
         required: true
         type: string
-      # The branch name for the PR
+      # The checkout ref, with branches qualified under refs/heads/.
       ref:
         required: true
         type: string
@@ -27,79 +27,109 @@ on:
       update_lockfile:
         required: true
         type: string
+    secrets:
+      CI_ACCESS_TOKEN:
+        required: true
 
-env:
-  MMTK_CORE_WORK_DIR: mmtk-core
-  BINDING_WORK_DIR: mmtk-binding-repo
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
 
 jobs:
-  process-pr:
+  prepare:
     runs-on: ubuntu-latest
+    cache-mode: none
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      skip: ${{ steps.prepare.outputs.skip }}
+      branch: ${{ steps.prepare.outputs.branch }}
+      head_sha: ${{ steps.prepare.outputs.head_sha }}
+      pr_number: ${{ steps.prepare.outputs.pr_number }}
+      artifact_name: ${{ steps.prepare.outputs.artifact_name }}
     steps:
-      - name: Check input conditions
-        id: check-input
+      # github.sha belongs to the caller; only trust helpers from core master pushes.
+      - name: Check caller context
         run: |
-          if [[ "${{ inputs.repo }}" == ${{ inputs.base_repo }} ]] && [[ "${{ inputs.ref }}" == "${{ inputs.base_ref }}" ]]; then
-            echo "Conditions not met"
-            echo "skip=true" >> $GITHUB_OUTPUT
-          else
-            echo "skip=false" >> $GITHUB_OUTPUT
-          fi
-        shell: bash
-
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v4
-        if: steps.check-input.outputs.skip == 'false'
-        with:
-          path: ${{ env.MMTK_CORE_WORK_DIR }}
-      - name: Checkout repository
-        if: steps.check-input.outputs.skip == 'false'
+          test "$GITHUB_REPOSITORY" = mmtk/mmtk-core
+          test "$GITHUB_EVENT_NAME" = push
+          test "$GITHUB_REF" = refs/heads/master
+      - name: Checkout workflow helpers
         uses: actions/checkout@v4
         with:
-          repository: ${{ inputs.repo }}
-          path: ${{ env.BINDING_WORK_DIR }}
-          ref: ${{ inputs.ref }}
-          # Check out with CI_ACCESS_TOKEN so we can push to it.
-          token: ${{ secrets.CI_ACCESS_TOKEN }}
-
-      - name: Get PR number
-        if: steps.check-input.outputs.skip == 'false'
-        id: get-pr
-        run: |
-          PR_NUMBER=$(gh pr list --head ${{ inputs.ref }} --repo ${{ inputs.base_repo }} --json number --jq '.[0].number')
-          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-        shell: bash
+          ref: ${{ github.sha }}
+          path: workflow
+          persist-credentials: false
+      - name: Resolve binding pull request
+        id: prepare
+        uses: actions/github-script@v7
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BINDING_REPO: ${{ inputs.repo }}
+          BINDING_REF: ${{ inputs.ref }}
+          BASE_REPO: ${{ inputs.base_repo }}
+          BASE_REF: ${{ inputs.base_ref }}
+          CORE_COMMIT: ${{ inputs.core_commit }}
+          UPDATE_LOCKFILE: ${{ inputs.update_lockfile }}
+        with:
+          script: |
+            await require('./workflow/.github/scripts/auto-merge.cjs').prepare({github, context, core});
 
-      - name: Update mmtk dependency
-        if: steps.check-input.outputs.skip == 'false'
-        working-directory: ${{ env.MMTK_CORE_WORK_DIR }}
-        run: |
-          export MANIFEST_PATH=../${{ env.BINDING_WORK_DIR }}/mmtk/Cargo.toml
-          ./.github/scripts/ci-replace-mmtk-dep.sh $MANIFEST_PATH --mmtk-core-git https://github.com/mmtk/mmtk-core.git --mmtk-core-rev ${{ inputs.core_commit }}
-          ${{ inputs.update_lockfile }} --manifest-path $MANIFEST_PATH
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.skip == 'false'
+    cache-mode: read
+    permissions:
+      contents: read
+    # No secrets are forwarded to the nested build workflow.
+    uses: ./.github/workflows/auto-merge-build.yml
+    with:
+      repo: ${{ inputs.repo }}
+      head_sha: ${{ needs.prepare.outputs.head_sha }}
+      core_commit: ${{ inputs.core_commit }}
+      update_lockfile: ${{ inputs.update_lockfile }}
+      artifact_name: ${{ needs.prepare.outputs.artifact_name }}
 
-      - name: Push a new commit
-        if: steps.check-input.outputs.skip == 'false'
-        working-directory: ${{ env.BINDING_WORK_DIR }}
-        run: |
-          git config user.name "mmtkgc-bot"
-          git config user.email "mmtkgc.bot@gmail.com"
-          git add mmtk/Cargo.toml
-          git add mmtk/Cargo.lock
-          git commit -m "Update mmtk-core to ${{ inputs.core_commit }}"
-          git push
-
-      # Apply a delay before we attempt to merge and retry if we fail: there is a small period of time that we cannot merge a PR after we update it.
-      - name: Enable auto-merge for the PR
-        if: steps.check-input.outputs.skip == 'false'
-        run: |
-          for n in {1..5}; do
-            echo "Wait 30s then try merge"
-            sleep 30
-            gh pr merge ${{ steps.get-pr.outputs.pr_number }} --auto --repo ${{ inputs.base_repo }} --squash && break
-            echo "Failed to merge the PR. Retry..."
-          done
+  publish:
+    needs: [prepare, build]
+    if: needs.prepare.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    cache-mode: none
+    env:
+      BINDING_REPO: ${{ inputs.repo }}
+      BINDING_BRANCH: ${{ needs.prepare.outputs.branch }}
+      BASE_REPO: ${{ inputs.base_repo }}
+      BASE_REF: ${{ inputs.base_ref }}
+      CORE_COMMIT: ${{ inputs.core_commit }}
+      HEAD_SHA: ${{ needs.prepare.outputs.head_sha }}
+      PR_NUMBER: ${{ needs.prepare.outputs.pr_number }}
+      ARTIFACT_NAME: ${{ needs.prepare.outputs.artifact_name }}
+    steps:
+      # Never restore the build workspace or execute files supplied by the binding or artifact.
+      - name: Checkout workflow helpers
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: workflow
+          persist-credentials: false
+      - name: Download metadata for validation
+        id: download
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await require('./workflow/.github/scripts/auto-merge.cjs').download({github, context, core});
+      - name: Validate dependency update
         env:
-          GITHUB_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
+          UPDATE_DIRECTORY: ${{ steps.download.outputs.directory }}
+        run: |
+          python3 -I workflow/.github/scripts/validate-binding-update.py "$UPDATE_DIRECTORY"
+
+      - name: Commit update and enable auto-merge
+        uses: actions/github-script@v7
+        env:
+          UPDATE_DIRECTORY: ${{ steps.download.outputs.directory }}
+        with:
+          github-token: ${{ secrets.CI_ACCESS_TOKEN }}
+          script: |
+            await require('./workflow/.github/scripts/auto-merge.cjs').publish({github, core});
