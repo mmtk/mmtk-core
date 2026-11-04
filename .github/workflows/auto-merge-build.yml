@@ -1,0 +1,68 @@
+name: Build Binding Dependency Update
+
+on:
+  workflow_call:
+    inputs:
+      repo:
+        required: true
+        type: string
+      head_sha:
+        required: true
+        type: string
+      core_commit:
+        required: true
+        type: string
+      update_lockfile:
+        required: true
+        type: string
+      artifact_name:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    cache-mode: read
+    steps:
+      - name: Check cache restriction
+        run: test "$ACTIONS_CACHE_MODE" = read
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.core_commit }}
+          path: mmtk-core
+          persist-credentials: false
+      - name: Checkout binding at resolved commit
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repo }}
+          ref: ${{ inputs.head_sha }}
+          path: mmtk-binding-repo
+          persist-credentials: false
+      - name: Update mmtk dependency and lockfile
+        working-directory: mmtk-core
+        env:
+          CORE_COMMIT: ${{ inputs.core_commit }}
+          UPDATE_LOCKFILE: ${{ inputs.update_lockfile }}
+        run: |
+          manifest=../mmtk-binding-repo/mmtk/Cargo.toml
+          ./.github/scripts/ci-replace-mmtk-dep.sh "$manifest" --mmtk-core-git https://github.com/mmtk/mmtk-core.git --mmtk-core-rev "$CORE_COMMIT"
+          case "$UPDATE_LOCKFILE" in
+            'cargo build') cargo build --manifest-path "$manifest" ;;
+            'cargo build --features nogc') cargo build --features nogc --manifest-path "$manifest" ;;
+            'cargo generate-lockfile') cargo generate-lockfile --manifest-path "$manifest" ;;
+            *) echo '::error::Unsupported lockfile update command'; exit 1 ;;
+          esac
+      - name: Upload dependency metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: |
+            mmtk-binding-repo/mmtk/Cargo.toml
+            mmtk-binding-repo/mmtk/Cargo.lock
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
