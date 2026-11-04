@@ -16,3 +16,7 @@ Generally we expect a pull request to meeting the following requirements before 
 3. The PR does not introduce unsafe Rust code unless necessary. Whenever introducing unsafe code, the contributor must elaborate why it is necessary.
 4. The PR passes the mmtk-core unit tests and complies with the coding style. We have scripts in `.github/scripts` that are used by our Github action to run those checks for each PR.
 5. The PR passes all the binding tests. We run benchmarks with bindings to test mmtk-core. A new pull request should not break bindings, as we ensure that our supported bindings always work with the latest mmtk-core. If a pull request makes changes that require the bindings to be updated correspondingly, you can approach the MMTk team on [our Zulip](https://mmtk.zulipchat.com/) and seek help from them to update the bindings.
+
+## Using AI tools
+
+You may responsibly use AI tools, such as large language models (LLMs), to help with your contributions. Contributions must be submitted by a human, who is responsible for all of their content. See our [AI policy](docs/contribute/ai_policy.md) for details.
