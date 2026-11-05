@@ -1,13 +1,13 @@
-use std::marker::PhantomData;
+use std::{collections::VecDeque, marker::PhantomData};
 
 use crate::{
     plan::{
-        tracing::{gc_work::DefaultObjectTracerContext, SlotOfTrace, Trace},
-        VectorObjectQueue, VectorQueue,
+        tracing::{SlotOfTrace, Trace},
+        VectorQueue,
     },
-    scheduler::{GCWork, GCWorker, GCWorkerShared, WorkBucketStage},
-    util::{ObjectReference, VMWorkerThread},
-    vm::{slot::Slot, ObjectTracerContext, Scanning, VMBinding},
+    scheduler::{GCWork, GCWorker, GCWorkerShared, WorkBucketStage, EDGES_WORK_BUFFER_SIZE},
+    util::{scanning_helper::visit_children_moving, ObjectReference, VMWorkerThread},
+    vm::{slot::Slot, Scanning, VMBinding},
     MMTK,
 };
 
@@ -18,69 +18,165 @@ use crate::{
 /// moved or forwarded.  It will spawn or immediately run the [`ProcessNodes`] work packet to
 /// scan newly traced objects.
 pub struct ProcessSlots<T: Trace> {
-    slots: Vec<SlotOfTrace<T>>,
+    slot_queue: VecDeque<SlotOfTrace<T>>,
     bucket: WorkBucketStage,
 }
 
 impl<T: Trace> ProcessSlots<T> {
-    const SCAN_OBJECTS_IMMEDIATELY: bool = true;
+    /// The nominative capacity of the deque.
+    ///
+    /// It will try to split the work packet if the deque has too many elements.
+    const CAPACITY: usize = EDGES_WORK_BUFFER_SIZE;
 
-    pub fn new(slots: Vec<SlotOfTrace<T>>, bucket: WorkBucketStage) -> Self {
-        Self { slots, bucket }
+    /// The number of slots to push before it proactively splits the work packet.
+    ///
+    /// The purpose of this is preventing a pathological case where one worker keeps popping and
+    /// pushing elements without reaching the capacity.
+    const PUSHES_BEFORE_SPLIT: usize = Self::CAPACITY;
+
+    pub fn from_vec(slots: Vec<SlotOfTrace<T>>, bucket: WorkBucketStage) -> Self {
+        let mut slot_queue = VecDeque::from(slots);
+        slot_queue.reserve(Self::CAPACITY.saturating_sub(slot_queue.len()));
+        Self::from_deque(slot_queue, bucket)
     }
 
-    fn process_slots(
-        &mut self,
-        worker: &mut GCWorker<T::VM>,
-        trace: T,
-    ) -> VectorQueue<ObjectReference> {
-        let mut queue = VectorObjectQueue::new();
+    pub fn from_deque(slot_queue: VecDeque<SlotOfTrace<T>>, bucket: WorkBucketStage) -> Self {
+        Self { slot_queue, bucket }
+    }
 
-        for slot in self.slots.iter() {
-            if let Some(object) = slot.load() {
-                let new_object = trace.trace_object(worker, object, &mut queue);
-                if T::may_move_objects() && new_object != object {
-                    slot.store(new_object);
+    fn try_enqueue_nodes(&mut self, worker: &mut GCWorker<T::VM>, _tls: VMWorkerThread, trace: &T) {
+        let mut enqueued_objects = VecDeque::with_capacity(self.slot_queue.len());
+        for slot in self.slot_queue.drain(..) {
+            if let Some(target) = slot.load() {
+                let new_target = trace.trace_object(worker, target, &mut |enqueued_object| {
+                    enqueued_objects.push_back(enqueued_object);
+                });
+                if new_target != target {
+                    slot.store(new_target);
                 }
             }
         }
 
-        queue
+        if !enqueued_objects.is_empty() {
+            let work_packet = ProcessNodes::<T>::from_deque(enqueued_objects, self.bucket);
+            worker.add_work(self.bucket, work_packet);
+        }
     }
 
-    fn flush(&mut self, worker: &mut GCWorker<T::VM>, mut queue: VectorQueue<ObjectReference>) {
-        if queue.is_empty() {
-            return;
-        }
+    fn split(&mut self, worker: &mut GCWorker<T::VM>) {
+        debug_assert!(!self.slot_queue.is_empty());
 
-        let queued_objects = queue.take();
-        let mut work = ProcessNodes::<T>::new(queued_objects, self.bucket);
+        let parked_workers_sloppy = worker.scheduler().worker_monitor.parked_workers_sloppy();
 
-        if Self::SCAN_OBJECTS_IMMEDIATELY {
-            work.do_work(worker, worker.mmtk);
-        } else {
+        // Divide the current work packet into two parts by default, but add one more part for every
+        // idle worker.
+        let divider = 2 + parked_workers_sloppy;
+
+        // Each part has at least one element.
+        let split_len = (self.slot_queue.len() / divider).max(1);
+
+        let mut remaining_parts = divider - 1; // Leave one part for myself.
+        while remaining_parts > 0 && self.slot_queue.len() > split_len {
+            let split_queue = self.slot_queue.split_off(split_len);
+            let work = Self::from_deque(split_queue, self.bucket);
             worker.add_work(self.bucket, work);
+
+            remaining_parts -= 1;
         }
     }
 }
 
 impl<T: Trace> GCWork<T::VM> for ProcessSlots<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
-        probe!(mmtk, process_slots, self.slots.len());
-
+        let tls = worker.tls;
         let trace = T::from_mmtk(mmtk);
 
-        #[cfg(feature = "extreme_assertions")]
-        if crate::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {
-            for slot in self.slots.iter() {
+        if <T::VM as VMBinding>::VMScanning::prefer_node_enqueuing() {
+            self.try_enqueue_nodes(worker, tls, &trace);
+        }
+
+        // The number of slots at the beginning of the work packet.
+        let num_initial_slots = self.slot_queue.len();
+        // The number of slots visited.
+        let mut num_visited_slots = 0;
+        // The number of slots enqueued.
+        let mut num_enqueued_slots = 0;
+        // The number of empty slots visited
+        let mut num_empty_slots = 0;
+        // The number of objects scanned.
+        let mut num_scanned_objects = 0;
+        // The number of times we split the work packet.
+        let mut num_splits = 0;
+
+        // The number of slots pushed since we create or split the work packet.
+        let mut num_pushes = 0;
+
+        while let Some(slot) = self.slot_queue.pop_back() {
+            num_visited_slots += 1;
+
+            #[cfg(feature = "extreme_assertions")]
+            if crate::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {
                 // log slot, panic if already logged
                 mmtk.slot_logger.log_slot(*slot);
             }
+
+            // Skip empty slot.
+            let Some(target) = slot.load() else {
+                num_empty_slots += 1;
+                continue;
+            };
+
+            // trace.trace_object borrows the `worker`, preventing us from flushing the queue inside
+            // (which also requires the worker).  We store the reference to a local variable, first.
+            let mut enqueued_object = None;
+            let new_target = trace.trace_object(worker, target, &mut enqueued_object);
+
+            // Store back to the slot if the object is moved.
+            if T::may_move_objects() && new_target != target {
+                slot.store(new_target);
+            }
+
+            // Scan the object if it is enqueued.
+            if let Some(enqueued_object) = enqueued_object {
+                num_scanned_objects += 1;
+
+                // If there is any object that does not support slot enqueuing, the VM binding
+                // should choose `ProcessNodes` as the default tracing strategy.
+                debug_assert!(
+                    <T::VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, enqueued_object),
+                    "Object {enqueued_object} does not support slot enqueuing."
+                );
+
+                trace!("Scan object {} for slots...", enqueued_object);
+                <T::VM as VMBinding>::VMScanning::scan_object(tls, enqueued_object, &mut |slot| {
+                    self.slot_queue.push_back(slot);
+                    num_enqueued_slots += 1;
+                    num_pushes += 1;
+
+                    // Split the work packet if needed.
+                    if num_pushes >= Self::PUSHES_BEFORE_SPLIT
+                        || self.slot_queue.len() >= Self::CAPACITY
+                    {
+                        self.split(worker);
+                        num_splits += 1;
+                        num_pushes = 0;
+                    }
+                });
+
+                trace.post_scan_object(enqueued_object);
+            }
         }
 
-        let queue = self.process_slots(worker, trace);
-
-        self.flush(worker, queue);
+        probe!(
+            mmtk,
+            process_slots,
+            num_initial_slots,
+            num_visited_slots,
+            num_enqueued_slots,
+            num_empty_slots,
+            num_scanned_objects,
+            num_splits
+        );
     }
 }
 
@@ -94,34 +190,43 @@ impl<T: Trace> GCWork<T::VM> for ProcessSlots<T> {
 /// [`Scanning::scan_object_and_trace_edges`] to update the references to point to the new addresses
 /// in such a case.
 pub struct ProcessNodes<T: Trace> {
-    objects: Vec<ObjectReference>,
+    object_queue: VecDeque<ObjectReference>,
     bucket: WorkBucketStage,
     phantom_data: PhantomData<T>,
 }
 
 impl<T: Trace> ProcessNodes<T> {
-    pub fn new(objects: Vec<ObjectReference>, bucket: WorkBucketStage) -> Self {
+    /// The nominative capacity of the deque.
+    ///
+    /// It will try to split the work packet if the deque has too many elements.
+    const CAPACITY: usize = EDGES_WORK_BUFFER_SIZE / 4;
+
+    /// The number of slots to push before it proactively splits the work packet.
+    ///
+    /// The purpose of this is preventing a pathological case where one worker keeps popping and
+    /// pushing elements without reaching the capacity.
+    const PUSHES_BEFORE_SPLIT: usize = Self::CAPACITY;
+
+    pub fn from_vec(slots: Vec<ObjectReference>, bucket: WorkBucketStage) -> Self {
+        let mut slot_queue = VecDeque::from(slots);
+        slot_queue.reserve(Self::CAPACITY.saturating_sub(slot_queue.len()));
+        Self::from_deque(slot_queue, bucket)
+    }
+
+    pub fn from_deque(object_queue: VecDeque<ObjectReference>, bucket: WorkBucketStage) -> Self {
         Self {
-            objects,
+            object_queue,
             bucket,
             phantom_data: PhantomData,
         }
     }
 
-    fn try_enqueue_slots(
-        &mut self,
-        worker: &mut GCWorker<T::VM>,
-        tls: VMWorkerThread,
-        trace: &T,
-    ) -> Vec<ObjectReference> {
-        // We record objects that don't support slot-enqueuing tracing and process them later.
-        let mut scan_later = Vec::new();
-
+    fn try_enqueue_slots(&mut self, worker: &mut GCWorker<T::VM>, tls: VMWorkerThread, trace: &T) {
         let mut slots = VectorQueue::new();
 
         let flush = |slots: &mut VectorQueue<_>, worker: &mut GCWorker<T::VM>| {
             let buffer = slots.take();
-            let work_packet = ProcessSlots::<T>::new(buffer, self.bucket);
+            let work_packet = ProcessSlots::<T>::from_vec(buffer, self.bucket);
             worker.add_work(self.bucket, work_packet);
         };
 
@@ -136,38 +241,31 @@ impl<T: Trace> ProcessNodes<T> {
         if crate::util::rust_util::unlikely(*worker.mmtk.get_options().count_live_bytes_in_gc) {
             // Borrow before the loop.
             let mut live_bytes_stats = worker.shared.live_bytes_per_space.borrow_mut();
-            for object in self.objects.iter().copied() {
+            for object in self.object_queue.iter().copied() {
                 GCWorkerShared::<T::VM>::increase_live_bytes(&mut live_bytes_stats, object);
             }
         }
 
-        for object in self.objects.iter().copied() {
-            if <T::VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, object) {
+        self.object_queue.retain(|object| {
+            if <T::VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, *object) {
                 trace!("Scan object (slot) {}", object);
                 // If an object supports slot-enqueuing, we enqueue its slots.
-                <T::VM as VMBinding>::VMScanning::scan_object(tls, object, &mut |slot| {
+                <T::VM as VMBinding>::VMScanning::scan_object(tls, *object, &mut |slot| {
                     slots.push(slot);
                     if slots.is_full() {
                         flush(&mut slots, worker);
                     }
                 });
-                trace.post_scan_object(object);
+                trace.post_scan_object(*object);
+                false
             } else {
-                // If an object does not support slot-enqueuing, we have to use
-                // `Scanning::scan_object_and_trace_edges` and offload the job of updating the
-                // reference field to the VM.
-                //
-                // TODO: We may refactor this work packet to do slot-enqueuing and node-enqueuing in
-                // one loop.
-                scan_later.push(object);
+                true
             }
-        }
+        });
 
         if !slots.is_empty() {
             flush(&mut slots, worker);
         }
-
-        scan_later
     }
 
     fn do_node_enqueuing_tracing(
@@ -175,26 +273,70 @@ impl<T: Trace> ProcessNodes<T> {
         worker: &mut GCWorker<T::VM>,
         tls: VMWorkerThread,
         trace: T,
-        scan_later: Vec<ObjectReference>,
     ) {
-        if scan_later.is_empty() {
+        if self.object_queue.is_empty() {
             return;
         }
 
-        let object_tracer_context = DefaultObjectTracerContext::<T>::new(self.bucket);
+        let mut num_visited_nodes = 0;
+        let mut num_visited_edges = 0;
+        let mut num_pushes = 0;
+        let mut num_splits = 0;
 
-        object_tracer_context.with_tracer(worker, |object_tracer| {
+        while let Some(object) = self.object_queue.pop_back() {
+            num_visited_nodes += 1;
+
             // Scan objects and trace their outgoing edges at the same time.
-            for object in scan_later.iter().copied() {
-                trace!("Scan object (node) {}", object);
-                <T::VM as VMBinding>::VMScanning::scan_object_and_trace_edges(
-                    tls,
-                    object,
-                    object_tracer,
-                );
-                trace.post_scan_object(object);
+            visit_children_moving::<T::VM>(tls, object, &mut |target| {
+                num_visited_edges += 1;
+                let new_target = trace.trace_object(worker, target, &mut |enqueued_object| {
+                    self.object_queue.push_back(enqueued_object);
+
+                    num_pushes += 1;
+                });
+                new_target
+            });
+
+            trace.post_scan_object(object);
+
+            // Split the work packet if needed.
+            if num_pushes >= Self::PUSHES_BEFORE_SPLIT || self.object_queue.len() >= Self::CAPACITY
+            {
+                self.split(worker);
+                num_splits += 1;
+                num_pushes = 0;
             }
-        });
+        }
+
+        probe!(
+            mmtk,
+            do_node_enqueuing_tracing,
+            num_visited_nodes,
+            num_visited_edges,
+            num_splits,
+        );
+    }
+
+    fn split(&mut self, worker: &mut GCWorker<T::VM>) {
+        debug_assert!(!self.object_queue.is_empty());
+
+        let parked_workers_sloppy = worker.scheduler().worker_monitor.parked_workers_sloppy();
+
+        // Divide the current work packet into two parts by default, but add one more part for every
+        // idle worker.
+        let divider = 2 + parked_workers_sloppy;
+
+        // Each part has at least one element.
+        let split_len = (self.object_queue.len() / divider).max(1);
+
+        let mut remaining_parts = divider - 1; // Leave one part for myself.
+        while remaining_parts > 0 && self.object_queue.len() > split_len {
+            let split_queue = self.object_queue.split_off(split_len);
+            let work = Self::from_deque(split_queue, self.bucket);
+            worker.add_work(self.bucket, work);
+
+            remaining_parts -= 1;
+        }
     }
 }
 
@@ -205,15 +347,18 @@ impl<T: Trace> GCWork<T::VM> for ProcessNodes<T> {
         let tls = worker.tls;
         let trace = T::from_mmtk(mmtk);
 
-        // Go through the object list and scan objects that supports slot-enququing.
-        let scan_later = self.try_enqueue_slots(worker, tls, &trace);
+        let total_objects = self.object_queue.len();
 
-        let total_objects = self.objects.len();
-        let scan_and_trace = scan_later.len();
+        if !<T::VM as VMBinding>::VMScanning::prefer_node_enqueuing() {
+            // Go through the object list and scan objects that supports slot-enququing.
+            self.try_enqueue_slots(worker, tls, &trace)
+        };
+
+        let scan_and_trace = self.object_queue.len();
         probe!(mmtk, process_nodes, total_objects, scan_and_trace);
 
         // If any objects do not support slot-enqueuing, we process them now.
-        self.do_node_enqueuing_tracing(worker, tls, trace, scan_later);
+        self.do_node_enqueuing_tracing(worker, tls, trace);
 
         trace!("ScanObjects End");
     }

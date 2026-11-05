@@ -166,6 +166,8 @@ impl<VM: VMBinding> GCWorker<VM> {
             return;
         }
         self.local_work_buffer.push(work);
+        probe!(mmtk, local_cache, self.local_work_buffer.len());
+        self.scheduler.worker_monitor.notify_work_available(false);
     }
 
     /// Add a work packet to the work queue.
@@ -179,6 +181,8 @@ impl<VM: VMBinding> GCWorker<VM> {
             return;
         }
         self.local_work_buffer.push(Box::new(work));
+        probe!(mmtk, local_cache, self.local_work_buffer.len());
+        self.scheduler.worker_monitor.notify_work_available(false);
     }
 
     /// Get the scheduler. There is only one scheduler per MMTk instance.
@@ -203,6 +207,8 @@ impl<VM: VMBinding> GCWorker<VM> {
         }
 
         if let Some(work) = self.local_work_buffer.pop() {
+            // panic!("This shouldn't happen! {:?}", work.get_type_name());
+            probe!(mmtk, local_cache, self.local_work_buffer.len());
             return Ok(work);
         }
 

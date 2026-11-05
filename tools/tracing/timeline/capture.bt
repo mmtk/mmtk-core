@@ -117,7 +117,7 @@ usdt:$MMTK:mmtk:process_pinning_roots {
 
 usdt:$MMTK:mmtk:process_slots {
     if (@enable_print) {
-        printf("process_slots,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+        printf("process_slots,meta,%d,%lu,%lu,%lu,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2, arg3, arg4, arg5);
     }
 }
 
@@ -126,6 +126,14 @@ usdt:$MMTK:mmtk:process_nodes {
         printf("process_nodes,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
     }
 }
+
+//////// BEGIN:DO_NODE_ENQUEUING_TRACING
+usdt:$MMTK:mmtk:do_node_enqueuing_tracing {
+    if (@enable_print) {
+        printf("do_node_enqueuing_tracing,meta,%d,%lu,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1, arg2);
+    }
+}
+//////// END:DO_NODE_ENQUEUING_TRACING
 
 usdt:$MMTK:mmtk:plan_end_of_gc_begin {
     if (@enable_print) {
@@ -206,4 +214,10 @@ usdt:$MMTK:mmtk:immix_prepare_block_state {
     // It is printed per Immix defrag GC which rarely happens.
     // We ignore @enable_print.
     printf("immix_prepare_block_state,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+}
+
+usdt:$MMTK:mmtk:local_cache {
+    if (@enable_print) {
+        printf("local_cache,C,%d,%lu,%lu\n", tid, nsecs, arg0);
+    }
 }

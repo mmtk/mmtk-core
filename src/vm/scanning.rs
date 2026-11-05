@@ -183,6 +183,13 @@ pub trait Scanning<VM: VMBinding> {
     /// the same time.  Such VMs can set this constant to `true` to workaround this problem.
     const UNIQUE_OBJECT_ENQUEUING: bool = DEFAULT_UNIQUE_OBJECT_ENQUEUING;
 
+    /// Set to true if the VM binding prefers node enqueuing over slot enqueuing.
+    ///
+    /// VM bindings that has to use [`Scanning::scan_object_and_trace_edges`] generally prefers this.
+    fn prefer_node_enqueuing() -> bool {
+        false
+    }
+
     /// Return true if the given object supports slot enqueuing.
     ///
     /// -   If this returns true, MMTk core will call `scan_object` on the object.

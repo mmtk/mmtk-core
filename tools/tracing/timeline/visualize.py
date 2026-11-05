@@ -186,6 +186,12 @@ class LogProcessor:
                     "total_pages": int(args[1]),
                 }
 
+            case "local_cache":
+                result["name"] = "local_cache {}".format(tid)
+                result["args"] |= {
+                    "num_work_packets": int(args[0]),
+                }
+
             case _:
                 if self.enrich_event_extra is not None:
                     # Call ``enrich_event_extra`` in the extension script if defined.
@@ -256,12 +262,16 @@ class LogProcessor:
                     }
 
                 case "process_slots":
+                    initial_slots, visited_slots, enqueued_slots, empty_slots, scanned_objects, splits = [int(a) for a in args]
+                    non_empty_slots = visited_slots - empty_slots
                     wp["args"] |= {
-                        # Group args by "process_slots" and "process_nodes" because a ProcessSlots
-                        # work packet may do both if SCAN_OBJECTS_IMMEDIATELY is true.
-                        "process_slots": {
-                            "num_slots": int(args[0]),
-                        },
+                        "initial_slots": initial_slots,
+                        "visited_slots": visited_slots,
+                        "enqueued_slots": enqueued_slots,
+                        "empty_slots": empty_slots,
+                        "non_empty_slots": non_empty_slots,
+                        "scanned_objects": scanned_objects,
+                        "splits": splits,
                     }
 
                 case "process_nodes":
@@ -274,6 +284,19 @@ class LogProcessor:
                             "total_scanned": total_scanned,
                             "scan_for_slots": scan_for_slots,
                             "scan_and_trace": scan_and_trace,
+                        }
+                    }
+
+                case "do_node_enqueuing_tracing":
+                    num_visited_nodes = int(args[0])
+                    num_visited_edges = int(args[1])
+                    num_splits = int(args[2])
+                    wp["args"] |= {
+                        # Put args in a group.  See comments in "process_slots".
+                        "do_node_enqueuing_tracing": {
+                            "num_visited_nodes": num_visited_nodes,
+                            "num_visited_edges": num_visited_edges,
+                            "splits": num_splits,
                         }
                     }
 

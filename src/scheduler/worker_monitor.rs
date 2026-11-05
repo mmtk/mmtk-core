@@ -367,6 +367,15 @@ impl WorkerMonitor {
         let mut sync = self.sync.try_lock().unwrap();
         sync.goals.on_current_goal_completed();
     }
+
+    /// Load the parked worker counter.
+    ///
+    /// This function is allowed to be called at any time, therefore the result is sloppy because GC
+    /// workers may park and unpark while the current thread calls this function.  However, it is
+    /// enough to be used as a heuristics for load-balancing when creating/splitting work packets
+    pub fn parked_workers_sloppy(&self) -> usize {
+        self.parker.parked_workers()
+    }
 }
 
 #[cfg(test)]
