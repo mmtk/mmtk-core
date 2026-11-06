@@ -243,20 +243,19 @@ mod space_map {
         /// Create a new space map.
         #[allow(clippy::assertions_on_constants)] // We assert to make sure the constants
         pub fn new() -> Self {
-            use crate::util::heap::layout::heap_parameters::MAX_SPACES;
-            let table_size = Self::addr_to_index(Address::MAX) + 1;
-            debug_assert!(table_size >= MAX_SPACES);
+            let table_size = vm_layout().addressable_spaces();
             Self {
                 sft: std::iter::repeat_with(SFTRefStorage::default)
                     .take(table_size)
                     .collect(),
-                space_address_start: Self::index_to_space_range(1).0, // the start of the first space
-                space_address_end: Self::index_to_space_range(MAX_SPACES - 1).1, // the end of the last space
+                space_address_start: Self::index_to_space_range(0).0, // the start of the first space
+                space_address_end: vm_layout().heap_end,
             }
         }
 
         fn addr_to_index(addr: Address) -> usize {
-            addr.and(vm_layout().address_mask()) >> vm_layout().log_space_extent
+            debug_assert!(addr >= vm_layout().heap_start && addr < vm_layout().heap_end);
+            (addr - vm_layout().heap_start) >> vm_layout().log_space_extent
         }
 
         fn index_to_space_start(i: usize) -> Address {
@@ -265,29 +264,25 @@ mod space_map {
         }
 
         fn index_to_space_range(i: usize) -> (Address, Address) {
-            if i == 0 {
-                panic!("Invalid index: there is no space for index 0")
-            } else {
-                let start = Address::ZERO.add(i << vm_layout().log_space_extent);
-                let extent = 1 << vm_layout().log_space_extent;
-                (start, start.add(extent))
-            }
+            let start = vm_layout().heap_start.add(i << vm_layout().log_space_extent);
+            let extent = 1 << vm_layout().log_space_extent;
+            (start, start.add(extent))
         }
     }
 
     #[cfg(test)]
     mod tests {
         use super::*;
-        use crate::util::heap::layout::heap_parameters::MAX_SPACES;
         use crate::util::heap::layout::vm_layout::vm_layout;
 
         // If the test `test_address_arithmetic()` fails, it is possible due to change of our heap range, max space extent, or max number of spaces.
         // We need to update the code and the constants for the address arithemtic.
         #[test]
         fn test_address_arithmetic() {
+            let map = SFTSpaceMap::new();
             // Before 1st space
-            assert_eq!(SFTSpaceMap::addr_to_index(Address::ZERO), 0);
-            assert_eq!(SFTSpaceMap::addr_to_index(vm_layout().heap_start - 1), 0);
+            assert!(!map.has_sft_entry(Address::ZERO));
+            assert!(!map.has_sft_entry(vm_layout().heap_start - 1));
 
             let assert_for_index = |i: usize| {
                 let (start, end) = SFTSpaceMap::index_to_space_range(i);
@@ -296,20 +291,20 @@ mod space_map {
                 assert_eq!(SFTSpaceMap::addr_to_index(end - 1), i);
             };
 
-            // Index 1 to 16 (MAX_SPACES)
-            for i in 1..=MAX_SPACES {
+            // Index 0 to the last addressable 2TB slot.
+            for i in 0..vm_layout().addressable_spaces() {
                 assert_for_index(i);
             }
 
-            // assert space end
-            let (_, last_space_end) = SFTSpaceMap::index_to_space_range(MAX_SPACES);
+            // assert addressable space end
+            let (_, last_space_end) =
+                SFTSpaceMap::index_to_space_range(vm_layout().addressable_spaces() - 1);
             println!("Space end = {}", last_space_end);
-            println!("Heap  end = {}", vm_layout().heap_end);
+            println!("Addr  end = {}", vm_layout().heap_end);
             assert_eq!(last_space_end, vm_layout().heap_end);
 
-            // after last space
-            assert_eq!(SFTSpaceMap::addr_to_index(last_space_end), 17);
-            assert_eq!(SFTSpaceMap::addr_to_index(Address::MAX), 31);
+            // Addresses outside the heap range should not have SFT entries.
+            assert!(!SFTSpaceMap::new().has_sft_entry(last_space_end));
         }
     }
 }
