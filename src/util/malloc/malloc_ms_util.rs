@@ -1,10 +1,12 @@
 use crate::util::constants::BYTES_IN_ADDRESS;
 use crate::util::malloc::library::*;
 use crate::util::Address;
+use crate::vm::ActivePlan;
 use crate::vm::VMBinding;
 
-/// Allocate with alignment. This also guarantees the memory is zero initialized.
-pub fn align_alloc(size: usize, align: usize) -> Address {
+/// Allocate with alignment. This also guarantees the memory is zero initialized (unless the VM
+/// binding opts out of memory zeroing via [`crate::vm::ActivePlan::NEEDS_MEMORY_ZEROING`]).
+pub fn align_alloc<VM: VMBinding>(size: usize, align: usize) -> Address {
     let mut ptr = std::ptr::null_mut::<libc::c_void>();
     let ptr_ptr = std::ptr::addr_of_mut!(ptr);
     let result = unsafe { posix_memalign(ptr_ptr, align, size) };
@@ -12,7 +14,9 @@ pub fn align_alloc(size: usize, align: usize) -> Address {
         return Address::ZERO;
     }
     let address = Address::from_mut_ptr(ptr);
-    crate::util::memory::zero(address, size);
+    if VM::VMActivePlan::NEEDS_MEMORY_ZEROING {
+        crate::util::memory::zero(address, size);
+    }
     address
 }
 
@@ -76,7 +80,7 @@ pub fn alloc<VM: VMBinding>(size: usize, align: usize, offset: usize) -> (Addres
         address = Address::from_mut_ptr(raw);
         debug_assert!(address.is_aligned_to(align));
     } else if align > 16 && offset == 0 {
-        address = align_alloc(size, align);
+        address = align_alloc::<VM>(size, align);
         debug_assert!(
             address.is_aligned_to(align),
             "Address: {:x} is not aligned to the given alignment: {}",
