@@ -44,8 +44,10 @@ This script is the second part of GC visualization.  It takes the output from
 `./capture.py` as input, and format it into a JSON file suitable to be consumed
 by Perfetto UI.
 """)
-    parser.add_argument("-x", "--extra", metavar="S", type=str,
+    parser.add_argument("-x", "--extra", metavar="PATH", type=str,
                         help="path to extra log line handler")
+    parser.add_argument("-o", "--output", metavar="PATH", type=str,
+                        help="override the output file name")
     parser.add_argument("input", type=str, help="Input file"),
     return parser.parse_args()
 
@@ -256,13 +258,22 @@ class LogProcessor:
                     }
 
                 case "process_slots":
+                    num_slots = int(args[0])
                     wp["args"] |= {
                         # Group args by "process_slots" and "process_nodes" because a ProcessSlots
                         # work packet may do both if SCAN_OBJECTS_IMMEDIATELY is true.
                         "process_slots": {
-                            "num_slots": int(args[0]),
+                            "num_slots": num_slots,
                         },
                     }
+
+                    if gc is not None:
+                        self.add_aggregatable_arg(gc, "closure", {
+                            "num_edges": num_slots,
+                            # TODO: Split root edges and inter-object edges.
+                            # FIXME: Root edges are already counted in the root scanning events.
+                            # We should exclude the slots here if they are root slots.
+                        })
 
                 case "process_nodes":
                     total_scanned = int(args[0])
@@ -276,6 +287,12 @@ class LogProcessor:
                             "scan_and_trace": scan_and_trace,
                         }
                     }
+
+                    if gc is not None:
+                        self.add_aggregatable_arg(gc, "closure", {
+                            "num_nodes": total_scanned,
+                            # TODO: Include the number of traced slots as edges
+                        })
 
                 case "concurrent_trace_objects":
                     initial = int(args[0])
@@ -362,6 +379,11 @@ class LogProcessor:
                         }
                     self.add_aggregatable_arg(gc, "roots", aggregate_dict)
 
+                    # Note: Pinning roots are edges, too, although they are represented as obj refs.
+                    self.add_aggregatable_arg(gc, "closure", {
+                        "num_edges": num,
+                    })
+
             case "immix_prepare_block_state":
                 num_blocks_prepared, num_defrag_source_blocks = [int(arg) for arg in args]
 
@@ -421,7 +443,7 @@ class LogProcessor:
         old_dict = args[key]
 
         for k, v in value_dict.items():
-            if k in args:
+            if k in old_dict:
                 old_dict[k] = old_dict[k] + v
             else:
                 old_dict[k] = v
@@ -431,7 +453,14 @@ class LogProcessor:
             "traceEvents": self.results,
         }, outfile)
 
-    def run(self, input_file):
+    def run(self, input_file, output_file):
+        if output_file is not None:
+            output_name = output_file
+            print(f"Overriding output file name: {output_name}")
+        else:
+            output_name = input_file + ".json.gz"
+            print(f"Deriving output file name from input file: {output_name}")
+
         print("Parsing lines...")
         with open(input_file) as f:
             started = False
@@ -446,8 +475,6 @@ class LogProcessor:
                     # Some recent versions of bpftrace print warning messages in the beginning of stdout.
                     # We skip lines until we see the marker.
                     started = True
-
-        output_name = input_file + ".json.gz"
 
         print("Resolving work packet type names...")
         self.resolve_results()
@@ -467,7 +494,7 @@ def main():
         extra_handler_module = sfl.load_module()
         log_processor.set_extra_handler(extra_handler_module)
 
-    log_processor.run(args.input)
+    log_processor.run(args.input, args.output)
 
 
 if __name__ == '__main__':
