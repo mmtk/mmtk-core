@@ -338,18 +338,20 @@ class LogProcessor:
                 kind_id = int(args[0])
                 num = int(args[1])
 
+                entry_dict = None
+                aggregate_dict = None
+                match kind_id:
+                    case RootsKind.NORMAL.value:
+                        aggregate_dict = {"normal_roots": num}
+                    case RootsKind.PINNING.value:
+                        aggregate_dict = {"pinning_roots": num}
+                    case RootsKind.TPINNING.value:
+                        aggregate_dict = {"tpinning_roots": num}
+
                 if wp is not None:
                     if "roots" not in wp["args"]:
                         wp["args"]["roots"] = []
-                    roots_list = wp["args"]["roots"]
-                    match kind_id:
-                        case RootsKind.NORMAL.value:
-                            root_dict = {"kind": "normal_roots", "num_slots": num}
-                        case RootsKind.PINNING.value:
-                            root_dict = {"kind": "pinning_roots", "num_nodes": num}
-                        case RootsKind.TPINNING.value:
-                            root_dict = {"kind": "tpinning_roots", "num_nodes": num}
-                    roots_list.append(root_dict)
+                    wp["args"]["roots"].append(aggregate_dict)
 
                 if gc is not None:
                     if "roots" not in gc["args"]:
@@ -358,52 +360,36 @@ class LogProcessor:
                             "pinning_roots": 0,
                             "tpinning_roots": 0,
                         }
-                    match kind_id:
-                        case RootsKind.NORMAL.value:
-                            gc["args"]["roots"]["normal_roots"] += num
-                        case RootsKind.PINNING.value:
-                            gc["args"]["roots"]["pinning_roots"] += num
-                        case RootsKind.TPINNING.value:
-                            gc["args"]["roots"]["tpinning_roots"] += num
+                    self.add_aggregatable_arg(gc, "roots", aggregate_dict)
 
             case "immix_prepare_block_state":
                 num_blocks_prepared, num_defrag_source_blocks = [int(arg) for arg in args]
 
+                aggregate_dict = {
+                    "num_blocks_prepared": num_blocks_prepared,
+                    "num_defrag_source_blocks": num_defrag_source_blocks,
+                }
+
                 if wp is not None:
-                    wp["args"] |= {
-                        "num_blocks_prepared": num_blocks_prepared,
-                        "num_defrag_source_blocks": num_defrag_source_blocks,
-                    }
+                    self.add_aggregatable_arg(wp, name, aggregate_dict)
 
                 if gc is not None:
-                    if "immix_prepare_block_state" not in gc["args"]:
-                        gc["args"]["immix_prepare_block_state"] = {
-                            "num_blocks_prepared": 0,
-                            "num_defrag_source_blocks": 0,
-                        }
-                    gc["args"]["immix_prepare_block_state"]["num_blocks_prepared"] += num_blocks_prepared
-                    gc["args"]["immix_prepare_block_state"]["num_defrag_source_blocks"] += num_defrag_source_blocks
+                    self.add_aggregatable_arg(gc, name, aggregate_dict)
 
             case "sweep_chunk_immix":
                 swept_blocks, reused_blocks, unreused_blocks = [int(arg) for arg in args]
 
+                aggregate_dict = {
+                    "swept_blocks": swept_blocks,
+                    "reused_blocks": reused_blocks,
+                    "unreused_blocks": unreused_blocks,
+                }
+
                 if wp is not None:
-                    wp["args"] |= {
-                        "swept_blocks": swept_blocks,
-                        "reused_blocks": reused_blocks,
-                        "unreused_blocks": unreused_blocks,
-                    }
+                    self.add_aggregatable_arg(wp, name, aggregate_dict)
 
                 if gc is not None:
-                    if "sweep_chunk_immix" not in gc["args"]:
-                        gc["args"]["sweep_chunk_immix"] = {
-                            "swept_blocks": 0,
-                            "reused_blocks": 0,
-                            "unreused_blocks": 0,
-                        }
-                    gc["args"]["sweep_chunk_immix"]["swept_blocks"] += swept_blocks
-                    gc["args"]["sweep_chunk_immix"]["reused_blocks"] += reused_blocks
-                    gc["args"]["sweep_chunk_immix"]["unreused_blocks"] += unreused_blocks
+                    self.add_aggregatable_arg(gc, name, aggregate_dict)
 
         # Regardless whether we have processed the GC or work packet blocks,
         # we always give the extension script a chance to inspect them.
@@ -419,6 +405,26 @@ class LogProcessor:
                 if type_name == UNKNOWN_TYPE:
                     type_name = f"(unknown:{type_id})"
                 result["name"] = type_name
+
+    def add_aggregatable_arg(self, block, key: str, value_dict: dict[str, int|float]):
+        """
+        Aggregate `value_dict` into `block["args"][key]`
+
+        For every `k, v` pair in `value_dict`, add `v` to `block["args"][key][k]`.
+        If `k` does not exist in `block["args"][key]`, it is assumed to be 0.
+        """
+
+        args = block["args"]
+        if key not in block["args"]:
+            args[key] = {}
+
+        old_dict = args[key]
+
+        for k, v in value_dict.items():
+            if k in args:
+                old_dict[k] = old_dict[k] + v
+            else:
+                old_dict[k] = v
 
     def output(self, outfile):
         json.dump({
