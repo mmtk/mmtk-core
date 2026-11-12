@@ -291,7 +291,20 @@ class LogProcessor:
                     if gc is not None:
                         self.add_aggregatable_arg(gc, "closure", {
                             "num_nodes": total_scanned,
-                            # TODO: Include the number of traced slots as edges
+                        })
+
+                case "do_node_enqueuing_tracing":
+                    num_visited_slots = int(args[0])
+                    wp["args"] |= {
+                        "do_node_enqueuing_tracing": {
+                            "num_visited_slots": num_visited_slots,
+                        }
+                    }
+
+                    if gc is not None:
+                        self.add_aggregatable_arg(gc, "closure", {
+                            "num_edges_total": num_visited_slots,
+                            "num_edges_inter_object": num_visited_slots,
                         })
 
                 case "concurrent_trace_objects":

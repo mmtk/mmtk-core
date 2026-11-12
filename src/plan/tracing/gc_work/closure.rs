@@ -7,7 +7,7 @@ use crate::{
     },
     scheduler::{GCWork, GCWorker, GCWorkerShared, WorkBucketStage},
     util::{ObjectReference, VMWorkerThread},
-    vm::{slot::Slot, ObjectTracerContext, Scanning, VMBinding},
+    vm::{slot::Slot, ObjectTracer, ObjectTracerContext, Scanning, VMBinding},
     MMTK,
 };
 
@@ -186,6 +186,8 @@ impl<T: Trace> ProcessNodes<T> {
             return;
         }
 
+        let mut num_visited_slots = 0;
+
         let object_tracer_context = DefaultObjectTracerContext::<T>::new(self.bucket);
 
         object_tracer_context.with_tracer(worker, |object_tracer| {
@@ -195,11 +197,16 @@ impl<T: Trace> ProcessNodes<T> {
                 <T::VM as VMBinding>::VMScanning::scan_object_and_trace_edges(
                     tls,
                     object,
-                    object_tracer,
+                    &mut |child| {
+                        num_visited_slots += 1;
+                        object_tracer.trace_object(child)
+                    },
                 );
                 trace.post_scan_object(object);
             }
         });
+
+        probe!(mmtk, do_node_enqueuing_tracing, num_visited_slots);
     }
 }
 
