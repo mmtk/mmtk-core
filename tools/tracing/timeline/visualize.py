@@ -44,8 +44,10 @@ This script is the second part of GC visualization.  It takes the output from
 `./capture.py` as input, and format it into a JSON file suitable to be consumed
 by Perfetto UI.
 """)
-    parser.add_argument("-x", "--extra", metavar="S", type=str,
+    parser.add_argument("-x", "--extra", metavar="PATH", type=str,
                         help="path to extra log line handler")
+    parser.add_argument("-o", "--output", metavar="PATH", type=str,
+                        help="override the output file name")
     parser.add_argument("input", type=str, help="Input file"),
     return parser.parse_args()
 
@@ -256,13 +258,22 @@ class LogProcessor:
                     }
 
                 case "process_slots":
+                    num_slots = int(args[0])
+                    roots = bool(int(args[1]))
                     wp["args"] |= {
                         # Group args by "process_slots" and "process_nodes" because a ProcessSlots
                         # work packet may do both if SCAN_OBJECTS_IMMEDIATELY is true.
                         "process_slots": {
-                            "num_slots": int(args[0]),
+                            "num_slots": num_slots,
+                            "roots": roots,
                         },
                     }
+
+                    if gc is not None and not roots:
+                        self.add_aggregatable_arg(gc, "closure", {
+                            "num_edges_total": num_slots,
+                            "num_edges_inter_object": num_slots,
+                        })
 
                 case "process_nodes":
                     total_scanned = int(args[0])
@@ -276,6 +287,25 @@ class LogProcessor:
                             "scan_and_trace": scan_and_trace,
                         }
                     }
+
+                    if gc is not None:
+                        self.add_aggregatable_arg(gc, "closure", {
+                            "num_nodes": total_scanned,
+                        })
+
+                case "do_node_enqueuing_tracing":
+                    num_visited_slots = int(args[0])
+                    wp["args"] |= {
+                        "do_node_enqueuing_tracing": {
+                            "num_visited_slots": num_visited_slots,
+                        }
+                    }
+
+                    if gc is not None:
+                        self.add_aggregatable_arg(gc, "closure", {
+                            "num_edges_total": num_visited_slots,
+                            "num_edges_inter_object": num_visited_slots,
+                        })
 
                 case "concurrent_trace_objects":
                     initial = int(args[0])
@@ -338,18 +368,20 @@ class LogProcessor:
                 kind_id = int(args[0])
                 num = int(args[1])
 
+                entry_dict = None
+                aggregate_dict = None
+                match kind_id:
+                    case RootsKind.NORMAL.value:
+                        aggregate_dict = {"normal_roots": num}
+                    case RootsKind.PINNING.value:
+                        aggregate_dict = {"pinning_roots": num}
+                    case RootsKind.TPINNING.value:
+                        aggregate_dict = {"tpinning_roots": num}
+
                 if wp is not None:
                     if "roots" not in wp["args"]:
                         wp["args"]["roots"] = []
-                    roots_list = wp["args"]["roots"]
-                    match kind_id:
-                        case RootsKind.NORMAL.value:
-                            root_dict = {"kind": "normal_roots", "num_slots": num}
-                        case RootsKind.PINNING.value:
-                            root_dict = {"kind": "pinning_roots", "num_nodes": num}
-                        case RootsKind.TPINNING.value:
-                            root_dict = {"kind": "tpinning_roots", "num_nodes": num}
-                    roots_list.append(root_dict)
+                    wp["args"]["roots"].append(aggregate_dict)
 
                 if gc is not None:
                     if "roots" not in gc["args"]:
@@ -358,52 +390,40 @@ class LogProcessor:
                             "pinning_roots": 0,
                             "tpinning_roots": 0,
                         }
-                    match kind_id:
-                        case RootsKind.NORMAL.value:
-                            gc["args"]["roots"]["normal_roots"] += num
-                        case RootsKind.PINNING.value:
-                            gc["args"]["roots"]["pinning_roots"] += num
-                        case RootsKind.TPINNING.value:
-                            gc["args"]["roots"]["tpinning_roots"] += num
+                    self.add_aggregatable_arg(gc, "roots", aggregate_dict)
+                    self.add_aggregatable_arg(gc, "closure", {
+                        "num_edges_total": num,
+                        "num_edges_root": num,
+                    })
 
             case "immix_prepare_block_state":
                 num_blocks_prepared, num_defrag_source_blocks = [int(arg) for arg in args]
 
+                aggregate_dict = {
+                    "num_blocks_prepared": num_blocks_prepared,
+                    "num_defrag_source_blocks": num_defrag_source_blocks,
+                }
+
                 if wp is not None:
-                    wp["args"] |= {
-                        "num_blocks_prepared": num_blocks_prepared,
-                        "num_defrag_source_blocks": num_defrag_source_blocks,
-                    }
+                    self.add_aggregatable_arg(wp, name, aggregate_dict)
 
                 if gc is not None:
-                    if "immix_prepare_block_state" not in gc["args"]:
-                        gc["args"]["immix_prepare_block_state"] = {
-                            "num_blocks_prepared": 0,
-                            "num_defrag_source_blocks": 0,
-                        }
-                    gc["args"]["immix_prepare_block_state"]["num_blocks_prepared"] += num_blocks_prepared
-                    gc["args"]["immix_prepare_block_state"]["num_defrag_source_blocks"] += num_defrag_source_blocks
+                    self.add_aggregatable_arg(gc, name, aggregate_dict)
 
             case "sweep_chunk_immix":
                 swept_blocks, reused_blocks, unreused_blocks = [int(arg) for arg in args]
 
+                aggregate_dict = {
+                    "swept_blocks": swept_blocks,
+                    "reused_blocks": reused_blocks,
+                    "unreused_blocks": unreused_blocks,
+                }
+
                 if wp is not None:
-                    wp["args"] |= {
-                        "swept_blocks": swept_blocks,
-                        "reused_blocks": reused_blocks,
-                        "unreused_blocks": unreused_blocks,
-                    }
+                    self.add_aggregatable_arg(wp, name, aggregate_dict)
 
                 if gc is not None:
-                    if "sweep_chunk_immix" not in gc["args"]:
-                        gc["args"]["sweep_chunk_immix"] = {
-                            "swept_blocks": 0,
-                            "reused_blocks": 0,
-                            "unreused_blocks": 0,
-                        }
-                    gc["args"]["sweep_chunk_immix"]["swept_blocks"] += swept_blocks
-                    gc["args"]["sweep_chunk_immix"]["reused_blocks"] += reused_blocks
-                    gc["args"]["sweep_chunk_immix"]["unreused_blocks"] += unreused_blocks
+                    self.add_aggregatable_arg(gc, name, aggregate_dict)
 
         # Regardless whether we have processed the GC or work packet blocks,
         # we always give the extension script a chance to inspect them.
@@ -420,12 +440,50 @@ class LogProcessor:
                     type_name = f"(unknown:{type_id})"
                 result["name"] = type_name
 
+    def add_aggregatable_arg(self, block, key: str, value: int|float|dict[str, int|float]):
+        """
+        Aggregate `value` into `block["args"][key]`.
+
+        If `value` is a scalar value, it assumes `block["args"][key]` is a scalar value, too,
+        and `value` is added to it.  If `block["args"][key]` doesn't exist, it's assumed to be 0.
+
+        If `value` is a dict, it assumes `block["args"][key]` is a dict, too,
+        and every `k, v` pair in `value` is added to `block["args"][key][k]`.
+        If `k` does not exist in `block["args"][key]`, it is assumed to be 0.
+        """
+
+        args = block["args"]
+
+        if isinstance(value, dict):
+            if key not in args:
+                args[key] = {}
+
+            old_dict = args[key]
+
+            for k, v in value.items():
+                if k not in old_dict:
+                    old_dict[k] = 0
+
+                old_dict[k] += v
+        else:
+            if key not in args:
+                args[key] = 0
+
+            args[key] += value
+
     def output(self, outfile):
         json.dump({
             "traceEvents": self.results,
         }, outfile)
 
-    def run(self, input_file):
+    def run(self, input_file, output_file):
+        if output_file is not None:
+            output_name = output_file
+            print(f"Overriding output file name: {output_name}")
+        else:
+            output_name = input_file + ".json.gz"
+            print(f"Deriving output file name from input file: {output_name}")
+
         print("Parsing lines...")
         with open(input_file) as f:
             started = False
@@ -440,8 +498,6 @@ class LogProcessor:
                     # Some recent versions of bpftrace print warning messages in the beginning of stdout.
                     # We skip lines until we see the marker.
                     started = True
-
-        output_name = input_file + ".json.gz"
 
         print("Resolving work packet type names...")
         self.resolve_results()
@@ -461,7 +517,7 @@ def main():
         extra_handler_module = sfl.load_module()
         log_processor.set_extra_handler(extra_handler_module)
 
-    log_processor.run(args.input)
+    log_processor.run(args.input, args.output)
 
 
 if __name__ == '__main__':

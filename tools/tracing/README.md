@@ -41,8 +41,8 @@ Currently, the core provides the following tracepoints.
     `len` is the number of slots or nodes reported.
 -   `mmtk:process_pinning_roots(num_roots: int, num_enqueued_nodes: int)`: a ProcessPinningRoots work
     packet which processes pinning root edges represented as object references to the target objects.
--   `mmtk:process_slots(num_slots: int)`: an invocation of the `process_slots`
-    method. The argument is the number of slots to be processed.
+-   `mmtk:process_slots(num_slots: int, roots: bool)`: an invocation of the `process_slots`
+    method. The argument is the number of slots to be processed, and whether they are root slots.
 -   `mmtk:process_nodes(total_objects: int, scan_and_trace: int)`: an invocation of the
     `ProcessNodes::do_work` method.  `total_objects` is the total number of objects in the
     work packet, and `scan_and_trace` is the number of objects scanned using the

@@ -7,7 +7,7 @@ use crate::{
     },
     scheduler::{GCWork, GCWorker, GCWorkerShared, WorkBucketStage},
     util::{ObjectReference, VMWorkerThread},
-    vm::{slot::Slot, ObjectTracerContext, Scanning, VMBinding},
+    vm::{slot::Slot, ObjectTracer, ObjectTracerContext, Scanning, VMBinding},
     MMTK,
 };
 
@@ -20,13 +20,18 @@ use crate::{
 pub struct ProcessSlots<T: Trace> {
     slots: Vec<SlotOfTrace<T>>,
     bucket: WorkBucketStage,
+    roots: bool,
 }
 
 impl<T: Trace> ProcessSlots<T> {
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
 
-    pub fn new(slots: Vec<SlotOfTrace<T>>, bucket: WorkBucketStage) -> Self {
-        Self { slots, bucket }
+    pub fn new(slots: Vec<SlotOfTrace<T>>, bucket: WorkBucketStage, roots: bool) -> Self {
+        Self {
+            slots,
+            bucket,
+            roots,
+        }
     }
 
     fn process_slots(
@@ -66,7 +71,7 @@ impl<T: Trace> ProcessSlots<T> {
 
 impl<T: Trace> GCWork<T::VM> for ProcessSlots<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
-        probe!(mmtk, process_slots, self.slots.len());
+        probe!(mmtk, process_slots, self.slots.len(), self.roots);
 
         let trace = T::from_mmtk(mmtk);
 
@@ -121,7 +126,7 @@ impl<T: Trace> ProcessNodes<T> {
 
         let flush = |slots: &mut VectorQueue<_>, worker: &mut GCWorker<T::VM>| {
             let buffer = slots.take();
-            let work_packet = ProcessSlots::<T>::new(buffer, self.bucket);
+            let work_packet = ProcessSlots::<T>::new(buffer, self.bucket, false);
             worker.add_work(self.bucket, work_packet);
         };
 
@@ -181,6 +186,8 @@ impl<T: Trace> ProcessNodes<T> {
             return;
         }
 
+        let mut num_visited_slots = 0;
+
         let object_tracer_context = DefaultObjectTracerContext::<T>::new(self.bucket);
 
         object_tracer_context.with_tracer(worker, |object_tracer| {
@@ -190,11 +197,16 @@ impl<T: Trace> ProcessNodes<T> {
                 <T::VM as VMBinding>::VMScanning::scan_object_and_trace_edges(
                     tls,
                     object,
-                    object_tracer,
+                    &mut |child| {
+                        num_visited_slots += 1;
+                        object_tracer.trace_object(child)
+                    },
                 );
                 trace.post_scan_object(object);
             }
         });
+
+        probe!(mmtk, do_node_enqueuing_tracing, num_visited_slots);
     }
 }
 
