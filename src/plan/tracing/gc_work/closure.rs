@@ -20,13 +20,18 @@ use crate::{
 pub struct ProcessSlots<T: Trace> {
     slots: Vec<SlotOfTrace<T>>,
     bucket: WorkBucketStage,
+    roots: bool,
 }
 
 impl<T: Trace> ProcessSlots<T> {
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
 
-    pub fn new(slots: Vec<SlotOfTrace<T>>, bucket: WorkBucketStage) -> Self {
-        Self { slots, bucket }
+    pub fn new(slots: Vec<SlotOfTrace<T>>, bucket: WorkBucketStage, roots: bool) -> Self {
+        Self {
+            slots,
+            bucket,
+            roots,
+        }
     }
 
     fn process_slots(
@@ -66,7 +71,7 @@ impl<T: Trace> ProcessSlots<T> {
 
 impl<T: Trace> GCWork<T::VM> for ProcessSlots<T> {
     fn do_work(&mut self, worker: &mut GCWorker<T::VM>, mmtk: &'static MMTK<T::VM>) {
-        probe!(mmtk, process_slots, self.slots.len());
+        probe!(mmtk, process_slots, self.slots.len(), self.roots);
 
         let trace = T::from_mmtk(mmtk);
 
@@ -121,7 +126,7 @@ impl<T: Trace> ProcessNodes<T> {
 
         let flush = |slots: &mut VectorQueue<_>, worker: &mut GCWorker<T::VM>| {
             let buffer = slots.take();
-            let work_packet = ProcessSlots::<T>::new(buffer, self.bucket);
+            let work_packet = ProcessSlots::<T>::new(buffer, self.bucket, false);
             worker.add_work(self.bucket, work_packet);
         };
 

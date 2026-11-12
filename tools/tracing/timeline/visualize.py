@@ -259,20 +259,20 @@ class LogProcessor:
 
                 case "process_slots":
                     num_slots = int(args[0])
+                    roots = bool(int(args[1]))
                     wp["args"] |= {
                         # Group args by "process_slots" and "process_nodes" because a ProcessSlots
                         # work packet may do both if SCAN_OBJECTS_IMMEDIATELY is true.
                         "process_slots": {
                             "num_slots": num_slots,
+                            "roots": roots,
                         },
                     }
 
-                    if gc is not None:
+                    if gc is not None and not roots:
                         self.add_aggregatable_arg(gc, "closure", {
-                            "num_edges": num_slots,
-                            # TODO: Split root edges and inter-object edges.
-                            # FIXME: Root edges are already counted in the root scanning events.
-                            # We should exclude the slots here if they are root slots.
+                            "num_edges_total": num_slots,
+                            "num_edges_inter_object": num_slots,
                         })
 
                 case "process_nodes":
@@ -378,10 +378,9 @@ class LogProcessor:
                             "tpinning_roots": 0,
                         }
                     self.add_aggregatable_arg(gc, "roots", aggregate_dict)
-
-                    # Note: Pinning roots are edges, too, although they are represented as obj refs.
                     self.add_aggregatable_arg(gc, "closure", {
-                        "num_edges": num,
+                        "num_edges_total": num,
+                        "num_edges_root": num,
                     })
 
             case "immix_prepare_block_state":
