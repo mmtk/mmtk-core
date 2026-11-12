@@ -428,25 +428,36 @@ class LogProcessor:
                     type_name = f"(unknown:{type_id})"
                 result["name"] = type_name
 
-    def add_aggregatable_arg(self, block, key: str, value_dict: dict[str, int|float]):
+    def add_aggregatable_arg(self, block, key: str, value: int|float|dict[str, int|float]):
         """
-        Aggregate `value_dict` into `block["args"][key]`
+        Aggregate `value` into `block["args"][key]`.
 
-        For every `k, v` pair in `value_dict`, add `v` to `block["args"][key][k]`.
+        If `value` is a scalar value, it assumes `block["args"][key]` is a scalar value, too,
+        and `value` is added to it.  If `block["args"][key]` doesn't exist, it's assumed to be 0.
+
+        If `value` is a dict, it assumes `block["args"][key]` is a dict, too,
+        and every `k, v` pair in `value` is added to `block["args"][key][k]`.
         If `k` does not exist in `block["args"][key]`, it is assumed to be 0.
         """
 
         args = block["args"]
-        if key not in block["args"]:
-            args[key] = {}
 
-        old_dict = args[key]
+        if isinstance(value, dict):
+            if key not in args:
+                args[key] = {}
 
-        for k, v in value_dict.items():
-            if k in old_dict:
-                old_dict[k] = old_dict[k] + v
-            else:
-                old_dict[k] = v
+            old_dict = args[key]
+
+            for k, v in value.items():
+                if k not in old_dict:
+                    old_dict[k] = 0
+
+                old_dict[k] += v
+        else:
+            if key not in args:
+                args[key] = 0
+
+            args[key] += value
 
     def output(self, outfile):
         json.dump({
