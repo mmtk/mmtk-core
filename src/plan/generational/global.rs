@@ -1,18 +1,18 @@
-use crate::plan::global::CommonPlan;
-use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::ObjectQueue;
 use crate::plan::Plan;
+use crate::plan::global::CommonPlan;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::policy::copyspace::CopySpace;
-use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
+use crate::policy::gc_work::{TRACE_KIND_TRANSITIVE_PIN, TraceKind};
 use crate::policy::space::Space;
 use crate::scheduler::*;
-use crate::util::copy::CopySemantics;
-use crate::util::heap::gc_trigger::SpaceStats;
-use crate::util::heap::VMRequest;
-use crate::util::statistics::counter::EventCounter;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
+use crate::util::copy::CopySemantics;
+use crate::util::heap::VMRequest;
+use crate::util::heap::gc_trigger::SpaceStats;
+use crate::util::statistics::counter::EventCounter;
 use crate::vm::{ObjectModel, VMBinding};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -121,9 +121,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         let nursery_full = cur_nursery >= max_nursery;
         trace!(
             "nursery_full = {:?} (nursery = {}, max_nursery = {})",
-            nursery_full,
-            cur_nursery,
-            max_nursery,
+            nursery_full, cur_nursery, max_nursery,
         );
         if nursery_full {
             return true;
@@ -266,9 +264,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         let next_gc_full_heap = available < min_nursery;
         trace!(
             "next gc will be full heap? {}, available pages = {}, min nursery = {}",
-            next_gc_full_heap,
-            available,
-            min_nursery
+            next_gc_full_heap, available, min_nursery
         );
         next_gc_full_heap
     }

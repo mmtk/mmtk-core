@@ -55,7 +55,7 @@ mod libc_malloc {
     #[cfg(target_os = "linux")]
     pub use libc::malloc_usable_size;
     #[cfg(target_os = "macos")]
-    extern "C" {
+    unsafe extern "C" {
         pub fn malloc_size(ptr: *const libc::c_void) -> usize;
     }
     #[cfg(target_os = "macos")]

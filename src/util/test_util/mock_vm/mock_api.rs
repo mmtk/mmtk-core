@@ -9,9 +9,9 @@
 
 use super::DefaultMockVMConfig;
 use super::MockVM;
+use crate::MMTK;
 use crate::util::*;
 use crate::vm::VMBinding;
-use crate::MMTK;
 
 use std::any::Any;
 use std::sync::OnceLock;

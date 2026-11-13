@@ -1,7 +1,7 @@
 use super::header_metadata::HeaderMetadataSpec;
+use crate::util::ObjectReference;
 use crate::util::metadata::metadata_val_traits::*;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::ObjectReference;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use atomic::Ordering;
@@ -55,10 +55,12 @@ impl MetadataSpec {
         mask: Option<T>,
     ) -> T {
         match self {
-            MetadataSpec::OnSide(metadata_spec) => metadata_spec.load(object.to_raw_address()),
-            MetadataSpec::InHeader(metadata_spec) => {
+            MetadataSpec::OnSide(metadata_spec) => unsafe {
+                metadata_spec.load(object.to_raw_address())
+            },
+            MetadataSpec::InHeader(metadata_spec) => unsafe {
                 VM::VMObjectModel::load_metadata::<T>(metadata_spec, object, mask)
-            }
+            },
         }
     }
 
@@ -105,11 +107,11 @@ impl MetadataSpec {
     ) {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.store(object.to_raw_address(), val);
+                unsafe { metadata_spec.store(object.to_raw_address(), val) };
             }
-            MetadataSpec::InHeader(metadata_spec) => {
+            MetadataSpec::InHeader(metadata_spec) => unsafe {
                 VM::VMObjectModel::store_metadata::<T>(metadata_spec, object, val, mask)
-            }
+            },
         }
     }
 

@@ -3,8 +3,8 @@
 
 use super::mock_test_prelude::*;
 
-use crate::util::*;
 use crate::AllocationSemantics;
+use crate::util::*;
 
 #[test]
 pub fn interior_pointer_in_normal_object() {

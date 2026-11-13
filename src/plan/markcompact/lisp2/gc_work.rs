@@ -1,15 +1,15 @@
 use super::global::Lisp2;
+use crate::MMTK;
 use crate::plan::tracing::{PlanTrace, UnsupportedTrace};
 use crate::policy::lisp2space::Lisp2Space;
 use crate::policy::lisp2space::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
-use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
 use crate::scheduler::WorkBucketStage;
+use crate::scheduler::gc_work::*;
 use crate::vm::ActivePlan;
 use crate::vm::Scanning;
 use crate::vm::VMBinding;
-use crate::MMTK;
 use std::marker::PhantomData;
 
 /// iterate through the heap and calculate the new location of live objects

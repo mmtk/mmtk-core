@@ -1,6 +1,6 @@
+use crate::util::Address;
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::os::*;
-use crate::util::Address;
 use std::default::Default;
 use std::fmt::Debug;
 use std::str::FromStr;
@@ -309,10 +309,16 @@ impl Options {
                         panic!("Invalid Options key: {}", key);
                     }
                     SetOptionByStringError::ValueParseError => {
-                        eprintln!("Warn: unable to set {}={:?}. Can't parse value. Default value will be used.", key, val);
+                        eprintln!(
+                            "Warn: unable to set {}={:?}. Can't parse value. Default value will be used.",
+                            key, val
+                        );
                     }
                     SetOptionByStringError::ValueValidationError => {
-                        eprintln!("Warn: unable to set {}={:?}. Invalid value. Default value will be used.", key, val);
+                        eprintln!(
+                            "Warn: unable to set {}={:?}. Invalid value. Default value will be used.",
+                            key, val
+                        );
                     }
                 }
                 return false;
@@ -338,10 +344,16 @@ impl Options {
                             /* Silently skip unrecognized keys. */
                         }
                         SetOptionByStringError::ValueParseError => {
-                            eprintln!("Warn: unable to set {}={:?}. Can't parse value. Default value will be used.", key, val);
+                            eprintln!(
+                                "Warn: unable to set {}={:?}. Can't parse value. Default value will be used.",
+                                key, val
+                            );
                         }
                         SetOptionByStringError::ValueValidationError => {
-                            eprintln!("Warn: unable to set {}={:?}. Invalid value. Default value will be used.", key, val);
+                            eprintln!(
+                                "Warn: unable to set {}={:?}. Invalid value. Default value will be used.",
+                                key, val
+                            );
                         }
                     }
                 }
@@ -442,37 +454,33 @@ impl AffinityKind {
 
         // Split on ',' first and then split on '-' if there is a range
         for split in cpulist.split(',') {
-            if !split.contains('-') {
-                if !split.is_empty() {
-                    if let Ok(core) = split.parse::<u16>() {
-                        cpuset.push(core);
-                        cpuset.sort_unstable();
-                        cpuset.dedup();
-                        continue;
-                    }
+            if !split.contains('-') && !split.is_empty() {
+                if let Ok(core) = split.parse::<u16>() {
+                    cpuset.push(core);
+                    cpuset.sort_unstable();
+                    cpuset.dedup();
+                    continue;
                 }
             } else {
                 // Contains a range
                 let range: Vec<&str> = split.split('-').collect();
-                if range.len() == 2 {
-                    if let Ok(start) = range[0].parse::<u16>() {
-                        if let Ok(end) = range[1].parse::<u16>() {
-                            if start >= end {
-                                return Err(
-                                    "Starting core id in range should be less than the end"
-                                        .to_string(),
-                                );
-                            }
-
-                            for cpu in start..=end {
-                                cpuset.push(cpu);
-                                cpuset.sort_unstable();
-                                cpuset.dedup();
-                            }
-
-                            continue;
-                        }
+                if range.len() == 2
+                    && let Ok(start) = range[0].parse::<u16>()
+                    && let Ok(end) = range[1].parse::<u16>()
+                {
+                    if start >= end {
+                        return Err(
+                            "Starting core id in range should be less than the end".to_string()
+                        );
                     }
+
+                    for cpu in start..=end {
+                        cpuset.push(cpu);
+                        cpuset.sort_unstable();
+                        cpuset.dedup();
+                    }
+
+                    continue;
                 }
             }
 
@@ -1056,14 +1064,14 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    std::env::set_var("MMTK_STRESS_FACTOR", "4096");
+                    unsafe { std::env::set_var("MMTK_STRESS_FACTOR", "4096") };
 
                     let mut options = Options::default();
                     options.read_env_var_settings();
                     assert_eq!(*options.stress_factor, 4096);
                 },
                 || {
-                    std::env::remove_var("MMTK_STRESS_FACTOR");
+                    unsafe { std::env::remove_var("MMTK_STRESS_FACTOR") };
                 },
             )
         })
@@ -1074,8 +1082,8 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    std::env::set_var("MMTK_STRESS_FACTOR", "4096");
-                    std::env::set_var("MMTK_NO_FINALIZER", "true");
+                    unsafe { std::env::set_var("MMTK_STRESS_FACTOR", "4096") };
+                    unsafe { std::env::set_var("MMTK_NO_FINALIZER", "true") };
 
                     let mut options = Options::default();
                     options.read_env_var_settings();
@@ -1083,8 +1091,8 @@ mod tests {
                     assert!(*options.no_finalizer);
                 },
                 || {
-                    std::env::remove_var("MMTK_STRESS_FACTOR");
-                    std::env::remove_var("MMTK_NO_FINALIZER");
+                    unsafe { std::env::remove_var("MMTK_STRESS_FACTOR") };
+                    unsafe { std::env::remove_var("MMTK_NO_FINALIZER") };
                 },
             )
         })
@@ -1096,14 +1104,14 @@ mod tests {
             with_cleanup(
                 || {
                     // invalid value, we cannot parse the value, so use the default value
-                    std::env::set_var("MMTK_STRESS_FACTOR", "abc");
+                    unsafe { std::env::set_var("MMTK_STRESS_FACTOR", "abc") };
 
                     let mut options = Options::default();
                     options.read_env_var_settings();
                     assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
-                    std::env::remove_var("MMTK_STRESS_FACTOR");
+                    unsafe { std::env::remove_var("MMTK_STRESS_FACTOR") };
                 },
             )
         })
@@ -1115,14 +1123,14 @@ mod tests {
             with_cleanup(
                 || {
                     // invalid value, we cannot parse the value, so use the default value
-                    std::env::set_var("MMTK_ABC", "42");
+                    unsafe { std::env::set_var("MMTK_ABC", "42") };
 
                     let mut options = Options::default();
                     options.read_env_var_settings();
                     assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
-                    std::env::remove_var("MMTK_ABC");
+                    unsafe { std::env::remove_var("MMTK_ABC") };
                 },
             )
         })
@@ -1133,14 +1141,14 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    std::env::set_var("MMTK_STRESS_FACTOR", "42");
+                    unsafe { std::env::set_var("MMTK_STRESS_FACTOR", "42") };
 
                     let options = Options::default();
                     // Not calling read_env_var_settings here.
                     assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
-                    std::env::remove_var("MMTK_STRESS_FACTOR");
+                    unsafe { std::env::remove_var("MMTK_STRESS_FACTOR") };
                 },
             )
         })
@@ -1289,7 +1297,9 @@ mod tests {
             with_cleanup(
                 || {
                     // We did not enable the perf_counter feature. The option will be invalid anyway, and will be set to empty.
-                    std::env::set_var("MMTK_PHASE_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES,0,-1");
+                    unsafe {
+                        std::env::set_var("MMTK_PHASE_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES,0,-1")
+                    };
 
                     let mut options = Options::default();
                     options.read_env_var_settings();
@@ -1300,7 +1310,7 @@ mod tests {
                     );
                 },
                 || {
-                    std::env::remove_var("MMTK_PHASE_PERF_EVENTS");
+                    unsafe { std::env::remove_var("MMTK_PHASE_PERF_EVENTS") };
                 },
             )
         })
@@ -1311,7 +1321,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    std::env::set_var("MMTK_THREAD_AFFINITY", "0-");
+                    unsafe { std::env::set_var("MMTK_THREAD_AFFINITY", "0-") };
 
                     let mut options = Options::default();
                     options.read_env_var_settings();
@@ -1319,7 +1329,7 @@ mod tests {
                     assert_eq!(*options.thread_affinity, AffinityKind::OsDefault);
                 },
                 || {
-                    std::env::remove_var("MMTK_THREAD_AFFINITY");
+                    unsafe { std::env::remove_var("MMTK_THREAD_AFFINITY") };
                 },
             )
         })
@@ -1331,7 +1341,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    std::env::set_var("MMTK_THREAD_AFFINITY", "0");
+                    unsafe { std::env::set_var("MMTK_THREAD_AFFINITY", "0") };
 
                     let mut options = Options::default();
                     options.read_env_var_settings();
@@ -1341,7 +1351,7 @@ mod tests {
                     );
                 },
                 || {
-                    std::env::remove_var("MMTK_THREAD_AFFINITY");
+                    unsafe { std::env::remove_var("MMTK_THREAD_AFFINITY") };
                 },
             )
         })
@@ -1363,13 +1373,13 @@ mod tests {
                         vec.push(cpu);
                     }
 
-                    std::env::set_var("MMTK_THREAD_AFFINITY", cpu_list);
+                    unsafe { std::env::set_var("MMTK_THREAD_AFFINITY", cpu_list) };
                     let mut options = Options::default();
                     options.read_env_var_settings();
                     assert_eq!(*options.thread_affinity, AffinityKind::RoundRobin(vec));
                 },
                 || {
-                    std::env::remove_var("MMTK_THREAD_AFFINITY");
+                    unsafe { std::env::remove_var("MMTK_THREAD_AFFINITY") };
                 },
             )
         })

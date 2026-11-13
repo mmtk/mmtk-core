@@ -1,6 +1,6 @@
+use crate::util::Address;
 use crate::util::constants::BYTES_IN_ADDRESS;
 use crate::util::malloc::library::*;
-use crate::util::Address;
 use crate::vm::VMBinding;
 
 /// Allocate with alignment. This also guarantees the memory is zero initialized.

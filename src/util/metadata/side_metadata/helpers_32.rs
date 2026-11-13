@@ -1,16 +1,16 @@
 use super::SideMetadataSpec;
 use crate::util::{
+    Address,
     constants::{self, LOG_BITS_IN_BYTE},
     heap::layout::vm_layout::{BYTES_IN_CHUNK, CHUNK_MASK, LOG_BYTES_IN_CHUNK},
     os::*,
-    Address,
 };
 
 #[cfg(test)]
 use super::ensure_munmap_metadata;
 use super::layout::{
-    local_side_metadata_base_address, LOCAL_SIDE_METADATA_PER_CHUNK,
-    LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
+    LOCAL_SIDE_METADATA_PER_CHUNK, LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
+    local_side_metadata_base_address,
 };
 use crate::MMAPPER;
 
@@ -146,10 +146,7 @@ pub(super) fn try_map_per_chunk_metadata_space(
             }
             trace!(
                 "try_map_per_chunk_metadata_space({}, 0x{:x}, 0x{:x}) -> {:#?}",
-                start,
-                size,
-                local_per_chunk,
-                res
+                start, size, local_per_chunk, res
             );
             return Err(res.err().unwrap());
         }
@@ -165,9 +162,7 @@ pub(super) fn try_map_per_chunk_metadata_space(
 
     trace!(
         "try_map_per_chunk_metadata_space({}, 0x{:x}, 0x{:x}) -> OK(())",
-        start,
-        size,
-        local_per_chunk
+        start, size, local_per_chunk
     );
     Ok(total_mapped)
 }

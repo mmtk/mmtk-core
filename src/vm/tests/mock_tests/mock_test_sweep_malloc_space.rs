@@ -10,10 +10,10 @@
 
 use super::mock_test_prelude::*;
 
+use crate::AllocationSemantics;
+use crate::util::ObjectReference;
 use crate::util::constants::BYTES_IN_WORD;
 use crate::util::metadata::vo_bit;
-use crate::util::ObjectReference;
-use crate::AllocationSemantics;
 
 #[test]
 pub fn malloc_ms_sweep_dead_objects() {

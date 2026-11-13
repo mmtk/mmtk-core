@@ -1,5 +1,5 @@
 use proc_macro_error::abort;
-use syn::{spanned::Spanned, Attribute, Field, FieldsNamed};
+use syn::{Attribute, Field, FieldsNamed, spanned::Spanned};
 
 pub fn get_field_attribute<'f>(field: &'f Field, attr_name: &str) -> Option<&'f Attribute> {
     let attrs = field

@@ -1,9 +1,9 @@
 //! Statistics for work packets
 use super::work_counter::{WorkCounter, WorkCounterBase, WorkDuration};
+use crate::MMTK;
 #[cfg(feature = "perf_counter")]
 use crate::scheduler::work_counter::WorkPerfEvent;
 use crate::vm::VMBinding;
-use crate::MMTK;
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::marker::PhantomData;

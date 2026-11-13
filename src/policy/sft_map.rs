@@ -1,6 +1,6 @@
 use super::sft::*;
-use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::Address;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 
 use std::sync::atomic::Ordering;
 
@@ -54,7 +54,7 @@ pub trait SFTMap {
         start: Address,
         bytes: usize,
     ) {
-        self.update(space, start, bytes);
+        unsafe { self.update(space, start, bytes) };
     }
 
     /// Clear SFT for the address. The address must have a valid SFT entry in the table.
@@ -215,7 +215,9 @@ mod space_map {
             if cfg!(debug_assertions) {
                 // Make sure we only update from empty to a valid space, or overwrite the space
                 let old = self.sft[index].load();
-                assert!((*old).name() == EMPTY_SFT_NAME || (*old).name() == (*space).name());
+                assert!(
+                    (*old).name() == EMPTY_SFT_NAME || (*old).name() == unsafe { (*space).name() }
+                );
                 // Make sure the range is in the space
                 let space_start = Self::index_to_space_start(index);
                 assert!(start >= space_start);
@@ -230,12 +232,12 @@ mod space_map {
                 );
             }
 
-            self.sft.get_unchecked(index).store(space);
+            unsafe { self.sft.get_unchecked(index).store(space) };
         }
 
         unsafe fn clear(&self, addr: Address) {
             let index = Self::addr_to_index(addr);
-            self.sft.get_unchecked(index).store(&EMPTY_SPACE_SFT as _);
+            unsafe { self.sft.get_unchecked(index).store(&EMPTY_SPACE_SFT as _) };
         }
     }
 
@@ -367,9 +369,10 @@ mod dense_chunk_map {
         }
 
         unsafe fn get_unchecked(&self, address: Address) -> &dyn SFT {
-            let cell = self
-                .sft
-                .get_unchecked(Self::addr_to_index(address) as usize);
+            let cell = unsafe {
+                self.sft
+                    .get_unchecked(Self::addr_to_index(address) as usize)
+            };
             cell.load()
         }
 
@@ -397,7 +400,7 @@ mod dense_chunk_map {
                     panic!("failed to mmap metadata memory: {e}");
                 });
 
-            self.update(space, start, bytes);
+            unsafe { self.update(space, start, bytes) };
         }
 
         unsafe fn update(
@@ -406,7 +409,7 @@ mod dense_chunk_map {
             start: Address,
             bytes: usize,
         ) {
-            let index: u8 = *self.index_map.get((*space).name()).unwrap() as u8;
+            let index: u8 = *self.index_map.get(unsafe { (*space).name() }).unwrap() as u8;
 
             // Iterate through the chunks and record the space index in the side metadata.
             let first_chunk = conversions::chunk_align_down(start);
@@ -459,8 +462,8 @@ mod sparse_chunk_map {
     use super::*;
     use crate::util::conversions;
     use crate::util::conversions::*;
-    use crate::util::heap::layout::vm_layout::vm_layout;
     use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
+    use crate::util::heap::layout::vm_layout::vm_layout;
 
     /// The chunk map is a sparse table. It has one entry for each chunk in the address space we may use.
     pub struct SFTSparseChunkMap {
@@ -487,7 +490,7 @@ mod sparse_chunk_map {
         }
 
         unsafe fn get_unchecked(&self, address: Address) -> &dyn SFT {
-            let cell = self.sft.get_unchecked(address.chunk_index());
+            let cell = unsafe { self.sft.get_unchecked(address.chunk_index()) };
             cell.load()
         }
 
@@ -501,12 +504,12 @@ mod sparse_chunk_map {
             bytes: usize,
         ) {
             if DEBUG_SFT {
-                self.log_update(&*space, start, bytes);
+                self.log_update(unsafe { &*space }, start, bytes);
             }
             let first = start.chunk_index();
             let last = conversions::chunk_align_up(start + bytes).chunk_index();
             for chunk in first..last {
-                self.set(chunk, &*space);
+                self.set(chunk, unsafe { &*space });
             }
             if DEBUG_SFT {
                 self.trace_sft_map();

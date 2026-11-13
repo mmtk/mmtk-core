@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use super::allocator::AllocatorContext;
 use super::BumpAllocator;
+use super::allocator::AllocatorContext;
 use crate::policy::space::Space;
+use crate::util::Address;
 use crate::util::alloc::Allocator;
 use crate::util::opaque_pointer::*;
-use crate::util::Address;
 use crate::vm::VMBinding;
 
 /// A thin wrapper(specific implementation) of bump allocator

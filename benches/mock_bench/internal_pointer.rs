@@ -26,8 +26,8 @@ pub fn bench(c: &mut Criterion) {
     c.bench_function("internal pointer - normal objects", |_b| {
         #[cfg(feature = "vo_bit")]
         {
-            use mmtk::memory_manager;
             use mmtk::AllocationSemantics;
+            use mmtk::memory_manager;
             let addr = memory_manager::alloc(
                 fixture.mutator(),
                 NORMAL_OBJECT_SIZE,
@@ -63,8 +63,8 @@ pub fn bench(c: &mut Criterion) {
     c.bench_function("internal pointer - large objects", |_b| {
         #[cfg(feature = "vo_bit")]
         {
-            use mmtk::memory_manager;
             use mmtk::AllocationSemantics;
+            use mmtk::memory_manager;
             let addr = memory_manager::alloc(
                 fixture.mutator(),
                 LARGE_OBJECT_SIZE,

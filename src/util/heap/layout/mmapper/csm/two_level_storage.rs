@@ -4,13 +4,13 @@
 //! this module is only available on 64-bit machines.
 
 use super::MapState;
+use crate::util::Address;
 use crate::util::heap::layout::mmapper::csm::{ChunkRange, MapStateStorage};
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::os::MmapResult;
 use crate::util::rust_util::atomic_box::OnceOptionBox;
 use crate::util::rust_util::rev_group::RevisitableGroupByForIterator;
 use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
-use crate::util::Address;
 use atomic::{Atomic, Ordering};
 use std::fmt;
 
@@ -27,10 +27,7 @@ const MAPPABLE_ADDRESS_LIMIT: Address = unsafe { Address::from_usize(MAPPABLE_BY
 /// mean of [`LOG_MAPPABLE_BYTES`] and [`LOG_BYTES_IN_CHUNK`] in order to make [`MMAP_SLAB_BYTES`]
 /// the geometric mean of [`MAPPABLE_BYTES`] and [`BYTES_IN_CHUNK`].  This will balance the array
 /// size of [`TwoLevelStateStorage::slabs`] and [`Slab`].
-///
-/// TODO: Use `usize::midpoint` after bumping MSRV to 1.85
-const LOG_MMAP_SLAB_BYTES: usize =
-    LOG_BYTES_IN_CHUNK + (LOG_MAPPABLE_BYTES - LOG_BYTES_IN_CHUNK) / 2;
+const LOG_MMAP_SLAB_BYTES: usize = usize::midpoint(LOG_BYTES_IN_CHUNK, LOG_MAPPABLE_BYTES);
 /// Number of bytes per slab.
 const MMAP_SLAB_BYTES: usize = 1 << LOG_MMAP_SLAB_BYTES;
 

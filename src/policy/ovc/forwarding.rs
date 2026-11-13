@@ -1,10 +1,10 @@
 use crate::util::constants::BYTES_IN_WORD;
 use crate::util::linear_scan::{Region, RegionIterator};
-use crate::util::metadata::side_metadata::spec_defs::{OVC_MARK, OVC_OFFSET_VECTOR};
 use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::metadata::side_metadata::spec_defs::{OVC_MARK, OVC_OFFSET_VECTOR};
 use crate::util::{Address, ObjectReference};
-use crate::vm::object_model::ObjectModel;
 use crate::vm::VMBinding;
+use crate::vm::object_model::ObjectModel;
 use atomic::Ordering;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicBool;

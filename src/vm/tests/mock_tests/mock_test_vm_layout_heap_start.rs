@@ -2,8 +2,8 @@
 
 use super::mock_test_prelude::*;
 use super::mock_test_vm_layout_default::test_with_vm_layout;
-use crate::util::heap::vm_layout::VMLayout;
 use crate::util::Address;
+use crate::util::heap::vm_layout::VMLayout;
 
 #[test]
 fn test_vm_layout_heap_start() {

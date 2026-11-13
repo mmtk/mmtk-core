@@ -8,8 +8,8 @@
 //! and the compiler usually fails to make the right decision given that those functions are not
 //! used often, and we don't compile the benchmarks using feedback-directed optimizations.
 
-pub use crate::util::metadata::side_metadata::helpers::scan_non_zero_bits_in_metadata_bytes;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
+pub use crate::util::metadata::side_metadata::helpers::scan_non_zero_bits_in_metadata_bytes;
 use crate::vm::VMBinding;
 
 use super::Address;

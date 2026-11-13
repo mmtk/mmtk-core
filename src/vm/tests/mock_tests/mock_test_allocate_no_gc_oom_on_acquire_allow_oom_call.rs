@@ -1,7 +1,7 @@
 use super::mock_test_prelude::*;
 
-use crate::util::alloc::allocator::AllocationOptions;
 use crate::AllocationSemantics;
+use crate::util::alloc::allocator::AllocationOptions;
 
 /// This test will allocate an object that is larger than the heap size. The call will fail.
 /// It will call `Collection::out_of_memory` and return null.

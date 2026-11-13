@@ -2,7 +2,7 @@ use crate::util::alloc::AllocationError;
 use crate::util::heap::gc_trigger::GCTriggerPolicy;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
-use crate::{scheduler::*, Mutator};
+use crate::{Mutator, scheduler::*};
 
 /// Thread context for the spawned GC thread.  It is used by `spawn_gc_thread`.
 /// Currently, `GCWorker` is the only kind of thread that mmtk-core will create.

@@ -1,6 +1,7 @@
 use super::map::CreateFreeListResult;
 use super::map::VMMap;
 use crate::mmtk::SFT_MAP;
+use crate::util::Address;
 use crate::util::conversions;
 use crate::util::freelist::FreeList;
 use crate::util::heap::layout::heap_parameters::*;
@@ -8,7 +9,6 @@ use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::int_array_freelist::IntArrayFreeList;
 use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
-use crate::util::Address;
 use std::cell::UnsafeCell;
 use std::sync::{Mutex, MutexGuard};
 
@@ -116,7 +116,7 @@ impl VMMap for Map32 {
         let (_sync, self_mut) = self.mut_self_with_sync();
         let chunk = self_mut.region_map.alloc(chunks as _);
         if chunk == -1 {
-            return Address::zero();
+            return unsafe { Address::zero() };
         }
         self_mut.total_available_discontiguous_chunks -= chunks;
         let rtn = conversions::chunk_index_to_address(chunk as _);
@@ -270,7 +270,7 @@ impl Map32 {
     /// In other cases, use mut_self_with_sync().
     #[allow(clippy::mut_from_ref)]
     unsafe fn mut_self(&self) -> &mut Map32Inner {
-        &mut *self.inner.get()
+        unsafe { &mut *self.inner.get() }
     }
 
     /// Get a mutable reference to the inner Map32Inner with a lock.

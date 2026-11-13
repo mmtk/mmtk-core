@@ -1,8 +1,8 @@
 use crate::util::address::{Address, ByteSize};
 use crate::util::heap::layout::vm_layout::*;
 use std::panic;
-use std::sync::mpsc;
 use std::sync::Mutex;
+use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 

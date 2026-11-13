@@ -1,20 +1,20 @@
 use crate::plan::barriers::SATBBarrier;
+use crate::plan::concurrent::Pause;
 use crate::plan::concurrent::barrier::SATBBarrierSemantics;
 use crate::plan::concurrent::immix::ConcurrentImmix;
-use crate::plan::concurrent::Pause;
 use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::create_space_mapping;
 
+use crate::MMTK;
+use crate::plan::AllocationSemantics;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorBuilder;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::ReservedAllocators;
-use crate::plan::AllocationSemantics;
-use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::alloc::ImmixAllocator;
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::opaque_pointer::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
-use crate::MMTK;
 use enum_map::EnumMap;
 
 type BarrierSemanticsType<VM> =

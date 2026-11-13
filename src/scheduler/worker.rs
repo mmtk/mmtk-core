@@ -2,10 +2,10 @@ use super::stat::WorkerLocalStat;
 use super::work_bucket::*;
 use super::*;
 use crate::mmtk::MMTK;
+use crate::util::ObjectReference;
 use crate::util::copy::GCWorkerCopyContext;
 use crate::util::heap::layout::heap_parameters::MAX_SPACES;
 use crate::util::opaque_pointer::*;
-use crate::util::ObjectReference;
 use crate::vm::{Collection, GCThreadContext, VMBinding};
 use atomic::Atomic;
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
@@ -424,7 +424,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     /// This function returns `true` if all workers returned their `GCWorker` structs.
     pub fn surrender_gc_worker(&self, worker: Box<GCWorker<VM>>) -> bool {
         let mut state = self.state.lock().unwrap();
-        let WorkerCreationState::Surrendered { ref mut workers } = state.as_mut().unwrap() else {
+        let WorkerCreationState::Surrendered { workers } = state.as_mut().unwrap() else {
             panic!("GCWorker structs have not been created, yet.");
         };
         let ordinal = worker.ordinal;

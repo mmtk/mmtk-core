@@ -1,7 +1,7 @@
 use crate::util::address::Address;
 use crate::util::os::imp::unix_like::unix_common;
 use crate::util::os::*;
-use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_COUNT, CPU_SET, CPU_ZERO};
+use libc::{CPU_COUNT, CPU_SET, CPU_ZERO, cpu_set_t, sched_getaffinity, sched_setaffinity};
 use std::io::Result;
 
 pub fn set_vma_name(start: Address, size: usize, annotation: &MmapAnnotation) {

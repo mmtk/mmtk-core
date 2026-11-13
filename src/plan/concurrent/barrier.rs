@@ -1,18 +1,18 @@
 use std::sync::atomic::Ordering;
 
-use super::{concurrent_marking_work::ProcessModBufSATB, Pause};
+use super::{Pause, concurrent_marking_work::ProcessModBufSATB};
 use crate::plan::global::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
 use crate::util::VMMutatorThread;
 use crate::{
-    plan::{barriers::BarrierSemantics, concurrent::global::ConcurrentPlan, VectorQueue},
+    MMTK,
+    plan::{VectorQueue, barriers::BarrierSemantics, concurrent::global::ConcurrentPlan},
     scheduler::{GCWork, WorkBucketStage},
     util::ObjectReference,
     vm::{
-        slot::{MemorySlice, Slot},
         VMBinding,
+        slot::{MemorySlice, Slot},
     },
-    MMTK,
 };
 
 pub struct SATBBarrierSemantics<

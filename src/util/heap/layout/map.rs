@@ -1,6 +1,6 @@
+use crate::util::Address;
 use crate::util::freelist::FreeList;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
-use crate::util::Address;
 
 /// The result of creating free list.
 ///

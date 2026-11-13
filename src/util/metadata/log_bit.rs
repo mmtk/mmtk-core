@@ -1,6 +1,6 @@
-use crate::util::constants::LOG_BITS_IN_BYTE;
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::util::constants::LOG_BITS_IN_BYTE;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::vm::VMGlobalFieldUnlogBitSpec;

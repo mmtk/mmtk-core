@@ -1,5 +1,5 @@
 use super::*;
-use crate::util::statistics::stats::{SharedStats, DEFAULT_NUM_PHASES};
+use crate::util::statistics::stats::{DEFAULT_NUM_PHASES, SharedStats};
 use std::fmt;
 use std::sync::Arc;
 

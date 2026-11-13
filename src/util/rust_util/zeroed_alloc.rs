@@ -20,7 +20,7 @@
 //!
 //! The [`new_zeroed_vec`] function in this module can allocate zeroed vectors as fast as `vec![0;
 //! LEN]`;
-use std::alloc::{alloc_zeroed, handle_alloc_error, Layout};
+use std::alloc::{Layout, alloc_zeroed, handle_alloc_error};
 
 use bytemuck::Zeroable;
 
