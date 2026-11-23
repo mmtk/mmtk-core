@@ -1,3 +1,7 @@
+config = {
+    missing_probes = warn
+}
+
 BEGIN {
     @harness = $HARNESS;
 
@@ -18,10 +22,6 @@ END {
     system("rm $TMP_FILE");
 }
 
-// We only set up the harness_begin/harness_end probes when the -H option is set.
-// Some VM bindings don't implement harness_begin/harness_end, and those trace points don't exist.
-// The user will see error if they add the -H option.
-//////// BEGIN:HARNESS
 usdt:$MMTK:mmtk:harness_begin {
     if (@harness) {
         //begin collecting data at harness_begin (start of final iteration)
@@ -36,7 +36,6 @@ usdt:$MMTK:mmtk:harness_end {
         exit();
     }
 }
-//////// END:HARNESS
 
 usdt:$MMTK:mmtk:gc_start {
     // Close the "GC_REQUEST_WAIT" span opened at `gc_requested`, right before opening "GC".
@@ -107,13 +106,11 @@ usdt:$MMTK:mmtk:roots {
     printf("roots,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
 }
 
-//////// BEGIN:PROCESS_PINNING_ROOTS
 usdt:$MMTK:mmtk:process_pinning_roots {
     if (@enable_print) {
         printf("process_pinning_roots,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
     }
 }
-//////// END:PROCESS_PINNING_ROOTS
 
 usdt:$MMTK:mmtk:process_slots {
     if (@enable_print) {
@@ -145,13 +142,11 @@ usdt:$MMTK:mmtk:plan_end_of_gc_end {
     }
 }
 
-//////// BEGIN:SWEEP_CHUNK_MS
 usdt:$MMTK:mmtk:sweep_chunk_ms {
     if (@enable_print) {
         printf("sweep_chunk_ms,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
     }
 }
-//////// END:SWEEP_CHUNK_MS
 
 usdt:$MMTK:mmtk:sweep_chunk_immix {
     // Swept chunks are relatively few compared to the work packets for transitive closure.
