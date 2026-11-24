@@ -90,7 +90,7 @@ impl VMLayout {
     /// We can't express this constant in a 32-bit environment, hence the
     /// conditional definition.
     pub(crate) fn space_mask_64(&self) -> usize {
-        ((1 << LOG_MAX_SPACES) - 1) << self.space_shift_64()
+        SPACE_INDEX_MASK << self.space_shift_64()
     }
     /// Size of each space in the 64-bit memory layout
     /// We can't express this constant in a 32-bit environment, hence the
@@ -111,7 +111,7 @@ impl VMLayout {
     /// This mask extracts a few bits from address, and use it as index to the space map table.
     /// When masked with this constant, the index is 1 to 16. If we mask any arbitrary address with this mask, we will get 0 to 31 (32 entries).
     pub(crate) fn address_mask(&self) -> usize {
-        0x1f << self.log_space_extent
+        SPACE_INDEX_MASK << self.log_space_extent
     }
 
     const fn validate(&self) {
@@ -121,7 +121,7 @@ impl VMLayout {
         assert!(self.log_address_space <= Self::LOG_ARCH_ADDRESS_SPACE);
         assert!(self.log_space_extent <= self.log_address_space);
         if self.force_use_contiguous_spaces {
-            assert!(self.log_space_extent <= (self.log_address_space - LOG_MAX_SPACES));
+            assert!(self.log_space_extent <= (self.log_address_space - SPACE_INDEX_BITS));
             assert!(self.heap_start.is_aligned_to(self.max_space_extent()));
         }
     }
@@ -153,13 +153,22 @@ impl VMLayout {
     /// Normal 64-bit configuration
     #[cfg(target_pointer_width = "64")]
     pub const fn new_64bit() -> Self {
+        let log_address_space = 47;
+        let address_space = 1 << log_address_space;
+        let log_space_extent = 41;
+        let space_extent = 1 << log_space_extent;
+        let heap_start = unsafe { Address::from_usize(space_extent) };
+        let heap_end = unsafe { Address::from_usize(space_extent * SPACE_INDEX_LIMIT) };
+
+        assert!(heap_start.is_aligned_to(BYTES_IN_CHUNK));
+        assert!(heap_end.is_aligned_to(BYTES_IN_CHUNK));
+        assert!(heap_end.as_usize() <= address_space);
+
         let layout64 = Self {
-            log_address_space: 47,
-            heap_start: chunk_align_down(unsafe {
-                Address::from_usize(0x0000_0200_0000_0000usize)
-            }),
-            heap_end: chunk_align_up(unsafe { Address::from_usize(0x0000_2200_0000_0000usize) }),
-            log_space_extent: 41,
+            log_address_space,
+            heap_start,
+            heap_end,
+            log_space_extent,
             force_use_contiguous_spaces: true,
         };
         layout64.validate();

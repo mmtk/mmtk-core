@@ -57,7 +57,7 @@ impl ChunkState {
 
     /// Create a new ChunkState that represents being allocated in the given space
     pub fn allocated(space_index: usize) -> ChunkState {
-        debug_assert!(space_index < crate::util::heap::layout::heap_parameters::MAX_SPACES);
+        debug_assert!(space_index < crate::util::heap::layout::heap_parameters::SPACE_INDEX_LIMIT);
         let mut encode = space_index as u8;
         encode |= Self::ALLOC_BIT_MASK;
         ChunkState(encode)
@@ -78,7 +78,7 @@ impl ChunkState {
     pub fn get_space_index(&self) -> usize {
         debug_assert!(self.is_allocated());
         let index = (self.0 & Self::SPACE_INDEX_MASK) as usize;
-        debug_assert!(index < crate::util::heap::layout::heap_parameters::MAX_SPACES);
+        debug_assert!(index < crate::util::heap::layout::heap_parameters::SPACE_INDEX_LIMIT);
         index
     }
 }

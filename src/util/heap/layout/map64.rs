@@ -29,16 +29,16 @@ unsafe impl Sync for Map64 {}
 
 impl Map64 {
     pub fn new() -> Self {
-        let mut high_water = vec![Address::ZERO; MAX_SPACES];
-        let mut base_address = vec![Address::ZERO; MAX_SPACES];
+        let mut high_water = vec![Address::ZERO; SPACE_INDEX_LIMIT];
+        let mut base_address = vec![Address::ZERO; SPACE_INDEX_LIMIT];
 
-        for i in 0..MAX_SPACES {
+        for i in 0..SPACE_INDEX_LIMIT {
             let base = unsafe { Address::from_usize(i << vm_layout().log_space_extent) };
             high_water[i] = base;
             base_address[i] = base;
         }
 
-        let descriptor_map = vec![SpaceDescriptor::UNINITIALIZED; MAX_SPACES];
+        let descriptor_map = vec![SpaceDescriptor::UNINITIALIZED; SPACE_INDEX_LIMIT];
 
         Self {
             inner: UnsafeCell::new(Map64Inner {

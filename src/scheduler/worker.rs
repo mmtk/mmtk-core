@@ -3,7 +3,7 @@ use super::work_bucket::*;
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::copy::GCWorkerCopyContext;
-use crate::util::heap::layout::heap_parameters::MAX_SPACES;
+use crate::util::heap::layout::heap_parameters::SPACE_INDEX_LIMIT;
 use crate::util::opaque_pointer::*;
 use crate::util::ObjectReference;
 use crate::vm::{Collection, GCThreadContext, VMBinding};
@@ -42,7 +42,7 @@ pub struct GCWorkerShared<VM: VMBinding> {
     /// objects, we increase the live bytes. We get this value from each worker
     /// at the end of a GC, and reset this counter.
     /// The live bytes are stored in an array. The index is the index from the space descriptor.
-    pub live_bytes_per_space: AtomicRefCell<[usize; MAX_SPACES]>,
+    pub live_bytes_per_space: AtomicRefCell<[usize; SPACE_INDEX_LIMIT]>,
     /// A queue of GCWork that can only be processed by the owned thread.
     pub designated_work: ArrayQueue<Box<dyn GCWork<VM>>>,
     /// Handle for stealing packets from the current worker
@@ -55,14 +55,14 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
     pub fn new(stealer: Option<Stealer<Box<dyn GCWork<VM>>>>) -> Self {
         Self {
             stat: Default::default(),
-            live_bytes_per_space: AtomicRefCell::new([0; MAX_SPACES]),
+            live_bytes_per_space: AtomicRefCell::new([0; SPACE_INDEX_LIMIT]),
             designated_work: ArrayQueue::new(16),
             stealer,
         }
     }
 
     pub(crate) fn increase_live_bytes(
-        live_bytes_per_space: &mut [usize; MAX_SPACES],
+        live_bytes_per_space: &mut [usize; SPACE_INDEX_LIMIT],
         object: ObjectReference,
     ) {
         use crate::mmtk::VM_MAP;
@@ -75,10 +75,10 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
         if space_descriptor != crate::util::heap::space_descriptor::SpaceDescriptor::UNINITIALIZED {
             let space_index = space_descriptor.get_index();
             debug_assert!(
-                space_index < MAX_SPACES,
+                space_index < SPACE_INDEX_LIMIT,
                 "Space index {} is not in the range of [0, {})",
                 space_index,
-                MAX_SPACES
+                SPACE_INDEX_LIMIT
             );
             // Accumulate the live bytes for the index
             live_bytes_per_space[space_index] += bytes;
@@ -451,8 +451,8 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     }
 
     /// Get the live bytes data from the worker, and clear the local data.
-    pub fn get_and_clear_worker_live_bytes(&self) -> [usize; MAX_SPACES] {
-        let mut ret = [0; MAX_SPACES];
+    pub fn get_and_clear_worker_live_bytes(&self) -> [usize; SPACE_INDEX_LIMIT] {
+        let mut ret = [0; SPACE_INDEX_LIMIT];
         self.workers_shared.iter().for_each(|w| {
             let mut live_bytes_per_space = w.live_bytes_per_space.borrow_mut();
             for (idx, val) in live_bytes_per_space.iter_mut().enumerate() {
