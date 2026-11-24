@@ -162,17 +162,21 @@ impl RawMemoryFreeList {
         } else {
             0
         };
-        self.grow_list_by_blocks(blocks, required_units);
-        true
+        self.grow_list_by_blocks(blocks, required_units)
     }
-    fn grow_list_by_blocks(&mut self, blocks: i32, new_max: i32) {
+
+    /// Returns `false` (without modifying the list) if the metadata cannot be extended
+    /// within the address range limit.
+    fn grow_list_by_blocks(&mut self, blocks: i32, new_max: i32) -> bool {
         debug_assert!(
             (new_max <= self.grain) || (((new_max / self.grain) * self.grain) == new_max)
         );
 
         if blocks > 0 {
             // Allocate more VM from the OS
-            self.raise_high_water(blocks);
+            if !self.raise_high_water(blocks) {
+                return false;
+            }
         }
 
         let len = (self.high_water - self.base) >> LOG_BYTES_IN_ENTRY;
@@ -209,7 +213,7 @@ impl RawMemoryFreeList {
         }
 
         if new_max == 0 {
-            return;
+            return true;
         }
 
         // Set a sentinel at the top of the new range
@@ -225,20 +229,19 @@ impl RawMemoryFreeList {
             self.add_to_free(cursor);
             cursor -= grain;
         }
+        true
     }
 
-    fn raise_high_water(&mut self, blocks: i32) {
-        let mut grow_extent = conversions::pages_to_bytes((self.pages_per_block * blocks) as _);
-        assert_ne!(
-            self.high_water, self.limit,
-            "Attempt to grow FreeList beyond limit"
-        );
+    /// Map `blocks` more blocks of metadata. Returns `false` if this would exceed the limit,
+    /// in which case nothing is mapped and the caller must report the failure.
+    fn raise_high_water(&mut self, blocks: i32) -> bool {
+        let grow_extent = conversions::pages_to_bytes((self.pages_per_block * blocks) as _);
         if self.high_water + grow_extent > self.limit {
-            // Clamp to the remaining range
-            grow_extent = self.limit - self.high_water;
+            return false;
         }
         self.mmap(self.high_water, grow_extent);
         self.high_water += grow_extent;
+        true
     }
 
     fn mmap(&self, start: Address, bytes: usize) {
