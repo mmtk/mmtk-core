@@ -58,6 +58,29 @@ Not API change, but worth noting:
     bindings, or benchmark/CI configuration keyed by plan name) must be updated from
     `"MarkCompact"`/`"Compressor"` to `"Lisp2"`/`"OVC"`.
 
+### Free-list allocator fast path: `AllocatorInfo::FreeList`
+
+```admonish tldr
+`AllocatorInfo` has a new variant `FreeList` for the mark-sweep (`native_ms`) free-list allocator,
+which used to report `Unimplemented`.  VM bindings that `match` on `AllocatorInfo` need to handle
+it. Bindings may optionally inline the fast path.
+```
+
+API changes:
+
+*   enum `util::alloc::AllocatorInfo`
+    -   `FreeList { cursors_offset, limits_offset }` is added.
+        +   `FreeListAllocator` now has a bump region per bin: `cursors[bin]` and `limits[bin]`.
+            To allocate, pick the bin, load the cursor and limit, and if
+            `cursor + cell_size <= limit`, store `cursor + cell_size` back and use the cell at
+            `cursor`. Otherwise call the allocation slow path.
+        +   Inlined allocations do not zero the cell. The binding must zero it.
+        +   Use `util::alloc::free_list_allocator::free_list_size_class` to get the bin and the cell
+            size for a given size and alignment.
+    -   `Unimplemented` is no longer returned for `FreeListAllocator`.
+*   module `policy::marksweepspace::native_ms`
+    -   `MAX_BIN`, `BIN_SIZES` and `size_class()` are now public.
+
 ## 0.33.0
 
 ### `GCTriggerPolicy::on_gc_start/on_gc_end` repurposed for GC cycles

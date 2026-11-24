@@ -204,8 +204,21 @@ pub enum AllocatorInfo {
         /// The byte offset from the mutator's pointer to the [`crate::util::alloc::bumpallocator::BumpPointer`].
         bump_pointer_offset: usize,
     },
+    /// A [`crate::util::alloc::free_list_allocator::FreeListAllocator`]: per size class (bin),
+    /// a bump region of free cells. To allocate `size` bytes with alignment `align`, a binding
+    /// picks `(bin, cell_size)` with
+    /// [`crate::util::alloc::free_list_allocator::free_list_size_class`] (usually when it generates
+    /// code), loads `cursor` and `limit` from the mutator at `cursors_offset + 8 * bin` and
+    /// `limits_offset + 8 * bin`, and if `cursor + cell_size <= limit` stores
+    /// `cursor + cell_size` back and uses the cell at `cursor`. The binding must zero the cell.
+    /// Otherwise it calls the allocation slow path.
+    FreeList {
+        /// The byte offset from the mutator's pointer to the allocator's `cursors` array.
+        cursors_offset: usize,
+        /// The byte offset from the mutator's pointer to the allocator's `limits` array.
+        limits_offset: usize,
+    },
     /// This allocator uses a fastpath, but we haven't implemented it yet.
-    // FIXME: Add free-list fast-path
     Unimplemented,
     /// This allocator does not have a fastpath.
     #[default]
@@ -246,7 +259,10 @@ impl AllocatorInfo {
                 }
             }
 
-            AllocatorSelector::FreeList(_) => AllocatorInfo::Unimplemented,
+            AllocatorSelector::FreeList(_) => AllocatorInfo::FreeList {
+                cursors_offset: base_offset + offset_of!(FreeListAllocator<VM>, cursors),
+                limits_offset: base_offset + offset_of!(FreeListAllocator<VM>, limits),
+            },
             _ => AllocatorInfo::None,
         }
     }

@@ -4,7 +4,7 @@ use atomic::Ordering;
 
 use super::BlockList;
 use super::MarkSweepSpace;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::constants::{BYTES_IN_ADDRESS, LOG_BYTES_IN_PAGE};
 use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
 use crate::util::linear_scan::UnstraddlableRegion;
@@ -219,6 +219,47 @@ impl Block {
         }))
     }
 
+    /// Take the first run of free cells, `[start, end)`, off this block's free list.
+    ///
+    /// The free list is a list of runs of adjacent free cells:
+    /// an allocator bumps through a run instead of popping one cell at a time. See
+    /// [`RunListBuilder`] for the encoding.
+    pub fn pop_run(&self) -> Option<(Address, Address)> {
+        let head = self.load_free_list();
+        if head.is_zero() {
+            return None;
+        }
+        let word = unsafe { head.load::<usize>() };
+        let next = unsafe { Address::from_usize(word & !RUN_SINGLE_CELL) };
+        let end = if word & RUN_SINGLE_CELL != 0 {
+            head + self.load_block_cell_size()
+        } else {
+            unsafe { (head + BYTES_IN_ADDRESS).load::<Address>() }
+        };
+        debug_assert!(
+            head < end && end <= self.end(),
+            "bad run {head}..{end} in {self:?}"
+        );
+        debug_assert!(
+            next.is_zero() || (next >= end && next < self.end()),
+            "bad next run {next} after {head}..{end} in {self:?}"
+        );
+        self.store_free_list(next);
+        Some((head, end))
+    }
+
+    /// Put the run `[start, end)` back at the front of this block's free list.
+    pub fn push_run(&self, start: Address, end: Address) {
+        debug_assert!(start < end && self.includes_address(start) && end <= self.end());
+        write_run(
+            start,
+            end,
+            self.load_block_cell_size(),
+            self.load_free_list(),
+        );
+        self.store_free_list(start);
+    }
+
     pub fn has_free_cells(&self) -> bool {
         !self.load_free_list().is_zero()
     }
@@ -291,7 +332,7 @@ impl Block {
         let cell_size = self.load_block_cell_size();
         debug_assert_ne!(cell_size, 0);
         let mut cell = self.start();
-        let mut last = unsafe { Address::zero() };
+        let mut runs = RunListBuilder::new(cell_size);
         while cell + cell_size <= self.start() + Block::BYTES {
             // The invariants we checked earlier ensures that we can use cell and object reference interchangably
             // We may not really have an object in this cell, but if we do, this object reference is correct.
@@ -305,15 +346,12 @@ impl Block {
                 // we unset the bit anyway.
                 #[cfg(feature = "vo_bit")]
                 crate::util::metadata::vo_bit::unset_vo_bit_nocheck(potential_object);
-                unsafe {
-                    cell.store::<Address>(last);
-                }
-                last = cell;
+                runs.add(cell);
             }
             cell += cell_size;
         }
 
-        self.store_free_list(last);
+        self.store_free_list(runs.finish());
     }
 
     /// This is a naive implementation that is inefficient but should be correct.
@@ -327,8 +365,8 @@ impl Block {
         let cell_size = self.load_block_cell_size();
         // Current cell
         let mut cell = self.start();
-        // Last free cell in the free list
-        let mut last = Address::ZERO;
+        // The free list being built
+        let mut runs = RunListBuilder::new(cell_size);
         // Current cursor
         let mut cursor = cell;
 
@@ -343,10 +381,9 @@ impl Block {
                 )
             };
             trace!(
-                "{:?}: cell = {}, last cell in free list = {}, cursor = {}, potential object = {}",
+                "{:?}: cell = {}, cursor = {}, potential object = {}",
                 self,
                 cell,
-                last,
                 cursor,
                 potential_object_ref
             );
@@ -365,28 +402,20 @@ impl Block {
 
                 if cursor >= cell + cell_size {
                     // We now stepped to the next cell. This means we did not find mark bit in the current cell, and we can add this cell to free list.
-                    debug!(
-                        "{:?} Free cell: {}, last cell in freelist is {}",
-                        self, cell, last
-                    );
+                    debug!("{:?} Free cell: {}", self, cell);
 
                     // Clear VO bit: we don't know where the object reference actually is, so we bulk zero the cell.
                     #[cfg(feature = "vo_bit")]
                     crate::util::metadata::vo_bit::bzero_vo_bit(cell, cell_size);
 
-                    // store the previous cell to make the free list
-                    debug_assert!(last.is_zero() || (last >= self.start() && last < self.end()));
-                    unsafe {
-                        cell.store::<Address>(last);
-                    }
-                    last = cell;
+                    runs.add(cell);
                     cell += cell_size;
                     debug_assert_eq!(cursor, cell);
                 }
             }
         }
 
-        self.store_free_list(last);
+        self.store_free_list(runs.finish());
     }
 
     /// Get the chunk containing the block.
@@ -443,5 +472,84 @@ impl From<BlockState> for u8 {
             BlockState::Unmarked => BlockState::MARK_UNMARKED,
             BlockState::Marked => BlockState::MARK_MARKED,
         }
+    }
+}
+
+/// Tag bit in the first word of a run: the run is a single cell, and it has no end word.
+const RUN_SINGLE_CELL: usize = 1;
+
+/// Write the header of the run `[start, end)`: its first word is the address of the next run,
+/// with [`RUN_SINGLE_CELL`] set if the run is one cell, and otherwise its second word is `end`.
+fn write_run(start: Address, end: Address, cell_size: usize, next: Address) {
+    unsafe {
+        if end == start + cell_size {
+            start.store::<usize>(next.as_usize() | RUN_SINGLE_CELL);
+        } else {
+            start.store::<Address>(next);
+            (start + BYTES_IN_ADDRESS).store::<Address>(end);
+        }
+    }
+}
+
+/// Builds a block's free list from free cells visited in address order, merging adjacent ones
+/// into runs.
+pub(crate) struct RunListBuilder {
+    cell_size: usize,
+    head: Address,
+    /// The last run that was written, whose next field is patched when another run follows.
+    last: Address,
+    /// The run being extended, `[run_start, run_end)`; empty when `run_start` is zero.
+    run_start: Address,
+    run_end: Address,
+}
+
+impl RunListBuilder {
+    pub(crate) fn new(cell_size: usize) -> Self {
+        Self {
+            cell_size,
+            head: Address::ZERO,
+            last: Address::ZERO,
+            run_start: Address::ZERO,
+            run_end: Address::ZERO,
+        }
+    }
+
+    /// Add the free cell at `cell`. Cells must be added in increasing address order.
+    pub(crate) fn add(&mut self, cell: Address) {
+        if !self.run_start.is_zero() && cell == self.run_end {
+            self.run_end = cell + self.cell_size;
+            return;
+        }
+        self.close_run();
+        self.run_start = cell;
+        self.run_end = cell + self.cell_size;
+    }
+
+    /// Add the free run `[start, end)`, whose length is a multiple of the cell size.
+    pub(crate) fn add_run(&mut self, start: Address, end: Address) {
+        debug_assert_eq!((end - start) % self.cell_size, 0);
+        self.add(start);
+        self.run_end = end;
+    }
+
+    fn close_run(&mut self) {
+        if self.run_start.is_zero() {
+            return;
+        }
+        write_run(self.run_start, self.run_end, self.cell_size, Address::ZERO);
+        if self.last.is_zero() {
+            self.head = self.run_start;
+        } else {
+            let tag = unsafe { self.last.load::<usize>() } & RUN_SINGLE_CELL;
+            unsafe { self.last.store::<usize>(self.run_start.as_usize() | tag) };
+        }
+        self.last = self.run_start;
+        self.run_start = Address::ZERO;
+    }
+
+    /// Finish and return the head of the list (zero if no cell was added).
+    pub(crate) fn finish(mut self) -> Address {
+        self.close_run();
+        self.head
     }
 }

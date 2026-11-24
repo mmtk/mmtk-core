@@ -50,8 +50,19 @@ pub fn test_allocator_info() {
                         // We provide no info for a malloc allocator
                         assert!(matches!(allocator_info, AllocatorInfo::None))
                     } else {
-                        // We haven't implemented for a free list allocator
-                        assert!(matches!(allocator_info, AllocatorInfo::Unimplemented))
+                        let AllocatorInfo::FreeList {
+                            cursors_offset,
+                            limits_offset,
+                        } = allocator_info
+                        else {
+                            panic!("Expected AllocatorInfo for a free list allocator");
+                        };
+                        // `limits` follows `cursors`, one word per bin.
+                        assert_eq!(
+                            limits_offset - cursors_offset,
+                            crate::util::constants::BYTES_IN_ADDRESS
+                                * (crate::policy::marksweepspace::native_ms::MAX_BIN + 1)
+                        );
                     }
                 }
                 // We provide no info for a large object allocator
