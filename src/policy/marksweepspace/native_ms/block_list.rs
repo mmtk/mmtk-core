@@ -170,7 +170,7 @@ impl BlockList {
             // We should not have unallocated blocks in a block list
             debug_assert_ne!(block.get_state(), BlockState::Unallocated);
             if !block.attempt_release(space) {
-                block.sweep::<VM>();
+                block.sweep(space);
             }
         }
     }
@@ -210,7 +210,7 @@ const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE * 8;
 /// Number of bins in BlockLists. Reserve bin0 as an empty bin.
 pub(crate) const MI_BIN_FULL: usize = MAX_BIN + 1;
 /// The largest valid bin.
-pub const MAX_BIN: usize = 48;
+pub(crate) const MAX_BIN: usize = 48;
 
 /// Largest object size allowed with our mimalloc implementation, in bytes
 pub(crate) const MI_LARGE_OBJ_SIZE_MAX: usize =
@@ -230,7 +230,7 @@ pub type BlockLists = Box<[BlockList; MAX_BIN + 1]>;
 /// Public so that a binding can pick the bin of an allocation with a size known when it
 /// generates code, and emit the free-list fast path for it (see
 /// [`crate::util::alloc::AllocatorInfo::FreeList`]).
-pub const BIN_SIZES: [usize; MAX_BIN + 1] = [
+pub(crate) const BIN_SIZES: [usize; MAX_BIN + 1] = [
     MI_INTPTR_SIZE,
     MI_INTPTR_SIZE,
     2 * MI_INTPTR_SIZE,
@@ -283,7 +283,7 @@ pub const BIN_SIZES: [usize; MAX_BIN + 1] = [
 ];
 
 /// The bin and cell size for an allocation of `size` bytes with alignment `align`.
-pub fn size_class<VM: VMBinding>(size: usize, align: usize) -> (usize, usize) {
+pub(crate) fn size_class<VM: VMBinding>(size: usize, align: usize) -> (usize, usize) {
     let bin = mi_bin::<VM>(size, align);
     (bin, BIN_SIZES[bin])
 }

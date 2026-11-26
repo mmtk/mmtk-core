@@ -219,39 +219,33 @@ impl Block {
         }))
     }
 
-    /// Take the first run of free cells, `[start, end)`, off this block's free list.
+    /// Take the first interval of free cells, `[start, end)`, off this block's free list.
     ///
-    /// The free list is a list of runs of adjacent free cells:
-    /// an allocator bumps through a run instead of popping one cell at a time. See
-    /// [`RunListBuilder`] for the encoding.
-    pub fn pop_run(&self) -> Option<(Address, Address)> {
+    /// The free list is a list of intervals of adjacent free cells:
+    /// an allocator bumps through an interval instead of popping one cell at a time. See
+    /// [`IntervalListBuilder`] for the encoding.
+    pub fn pop_interval(&self) -> Option<(Address, Address)> {
         let head = self.load_free_list();
         if head.is_zero() {
             return None;
         }
-        let word = unsafe { head.load::<usize>() };
-        let next = unsafe { Address::from_usize(word & !RUN_SINGLE_CELL) };
-        let end = if word & RUN_SINGLE_CELL != 0 {
-            head + self.load_block_cell_size()
-        } else {
-            unsafe { (head + BYTES_IN_ADDRESS).load::<Address>() }
-        };
+        let (end, next) = read_interval(head, self.load_block_cell_size());
         debug_assert!(
             head < end && end <= self.end(),
-            "bad run {head}..{end} in {self:?}"
+            "bad interval {head}..{end} in {self:?}"
         );
         debug_assert!(
-            next.is_zero() || (next >= end && next < self.end()),
-            "bad next run {next} after {head}..{end} in {self:?}"
+            next.is_zero() || (self.includes_address(next) && (next >= end || next < head)),
+            "bad next interval {next} after {head}..{end} in {self:?}"
         );
         self.store_free_list(next);
         Some((head, end))
     }
 
-    /// Put the run `[start, end)` back at the front of this block's free list.
-    pub fn push_run(&self, start: Address, end: Address) {
+    /// Put the interval `[start, end)` back at the front of this block's free list.
+    pub fn push_interval(&self, start: Address, end: Address) {
         debug_assert!(start < end && self.includes_address(start) && end <= self.end());
-        write_run(
+        write_interval(
             start,
             end,
             self.load_block_cell_size(),
@@ -295,7 +289,8 @@ impl Block {
     }
 
     /// Sweep the block. This is done either lazily in the allocation phase, or eagerly at the end of a GC.
-    pub fn sweep<VM: VMBinding>(&self) {
+    pub fn sweep<VM: VMBinding>(&self, space: &MarkSweepSpace<VM>) {
+        let coalesce = space.coalesce_free_cells();
         // The important point here is that we need to distinguish cell address, allocation address, and object reference.
         // We only know cell addresses here. We do not know the allocation address, and we also do not know the object reference.
         // The mark bit is set for object references, and we need to use the mark bit to decide whether a cell is live or not.
@@ -318,21 +313,21 @@ impl Block {
             && VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS
         {
             // In this case, we can use the simplest and the most efficicent sweep.
-            self.simple_sweep::<VM>()
+            self.simple_sweep::<VM>(coalesce)
         } else {
             // Otherwise we fallback to a generic but slow sweep. This roughly has ~10% mutator overhead for lazy sweeping.
-            self.naive_brute_force_sweep::<VM>()
+            self.naive_brute_force_sweep::<VM>(coalesce)
         }
     }
 
     /// This implementation uses object reference and cell address interchangably. This is not correct for most cases.
     /// However, in certain cases, such as OpenJDK, this is correct, and efficient. See the sweep method for the invariants
     /// that we need to use this method correctly.
-    fn simple_sweep<VM: VMBinding>(&self) {
+    fn simple_sweep<VM: VMBinding>(&self, coalesce: bool) {
         let cell_size = self.load_block_cell_size();
         debug_assert_ne!(cell_size, 0);
         let mut cell = self.start();
-        let mut runs = RunListBuilder::new(cell_size);
+        let mut intervals = IntervalListBuilder::new(cell_size, coalesce);
         while cell + cell_size <= self.start() + Block::BYTES {
             // The invariants we checked earlier ensures that we can use cell and object reference interchangably
             // We may not really have an object in this cell, but if we do, this object reference is correct.
@@ -346,19 +341,19 @@ impl Block {
                 // we unset the bit anyway.
                 #[cfg(feature = "vo_bit")]
                 crate::util::metadata::vo_bit::unset_vo_bit_nocheck(potential_object);
-                runs.add(cell);
+                intervals.add(cell);
             }
             cell += cell_size;
         }
 
-        self.store_free_list(runs.finish());
+        self.store_free_list(intervals.finish());
     }
 
     /// This is a naive implementation that is inefficient but should be correct.
     /// In this implementation, we simply go through each possible object
     /// reference and see if it has the mark bit set. If we find mark bit, that means the cell is alive. If we didn't find
     /// the mark bit in the entire cell, it means the cell is dead.
-    fn naive_brute_force_sweep<VM: VMBinding>(&self) {
+    fn naive_brute_force_sweep<VM: VMBinding>(&self, coalesce: bool) {
         use crate::util::constants::MIN_OBJECT_SIZE;
 
         // Cell size for this block.
@@ -366,7 +361,7 @@ impl Block {
         // Current cell
         let mut cell = self.start();
         // The free list being built
-        let mut runs = RunListBuilder::new(cell_size);
+        let mut intervals = IntervalListBuilder::new(cell_size, coalesce);
         // Current cursor
         let mut cursor = cell;
 
@@ -408,14 +403,14 @@ impl Block {
                     #[cfg(feature = "vo_bit")]
                     crate::util::metadata::vo_bit::bzero_vo_bit(cell, cell_size);
 
-                    runs.add(cell);
+                    intervals.add(cell);
                     cell += cell_size;
                     debug_assert_eq!(cursor, cell);
                 }
             }
         }
 
-        self.store_free_list(runs.finish());
+        self.store_free_list(intervals.finish());
     }
 
     /// Get the chunk containing the block.
@@ -475,15 +470,15 @@ impl From<BlockState> for u8 {
     }
 }
 
-/// Tag bit in the first word of a run: the run is a single cell, and it has no end word.
-const RUN_SINGLE_CELL: usize = 1;
+/// Tag bit in the first word of an interval: the interval is a single cell, and it has no end word.
+const INTERVAL_SINGLE_CELL: usize = 1;
 
-/// Write the header of the run `[start, end)`: its first word is the address of the next run,
-/// with [`RUN_SINGLE_CELL`] set if the run is one cell, and otherwise its second word is `end`.
-fn write_run(start: Address, end: Address, cell_size: usize, next: Address) {
+/// Write the header of the interval `[start, end)`: its first word is the address of the next interval,
+/// with [`INTERVAL_SINGLE_CELL`] set if the interval is one cell, and otherwise its second word is `end`.
+fn write_interval(start: Address, end: Address, cell_size: usize, next: Address) {
     unsafe {
         if end == start + cell_size {
-            start.store::<usize>(next.as_usize() | RUN_SINGLE_CELL);
+            start.store::<usize>(next.as_usize() | INTERVAL_SINGLE_CELL);
         } else {
             start.store::<Address>(next);
             (start + BYTES_IN_ADDRESS).store::<Address>(end);
@@ -491,65 +486,103 @@ fn write_run(start: Address, end: Address, cell_size: usize, next: Address) {
     }
 }
 
-/// Builds a block's free list from free cells visited in address order, merging adjacent ones
-/// into runs.
-pub(crate) struct RunListBuilder {
-    cell_size: usize,
-    head: Address,
-    /// The last run that was written, whose next field is patched when another run follows.
-    last: Address,
-    /// The run being extended, `[run_start, run_end)`; empty when `run_start` is zero.
-    run_start: Address,
-    run_end: Address,
+/// Read the header of the interval starting at `start`, and return its end and the next interval.
+fn read_interval(start: Address, cell_size: usize) -> (Address, Address) {
+    let word = unsafe { start.load::<usize>() };
+    let next = unsafe { Address::from_usize(word & !INTERVAL_SINGLE_CELL) };
+    let end = if word & INTERVAL_SINGLE_CELL != 0 {
+        start + cell_size
+    } else {
+        unsafe { (start + BYTES_IN_ADDRESS).load::<Address>() }
+    };
+    (end, next)
 }
 
-impl RunListBuilder {
-    pub(crate) fn new(cell_size: usize) -> Self {
+/// Builds a block's free list from free cells visited in address order.
+///
+/// When `coalesce` is set, adjacent free cells are merged into intervals and the list is in
+/// address order. Otherwise every cell is an interval of its own and is pushed to the front of
+/// the list, so the list is a canonical free list of cells, highest address first.
+pub(crate) struct IntervalListBuilder {
+    cell_size: usize,
+    coalesce: bool,
+    head: Address,
+    /// The last interval that was written, whose next field is patched when another interval follows.
+    last: Address,
+    /// The interval being extended, `[interval_start, interval_end)`; empty when `interval_start` is zero.
+    interval_start: Address,
+    interval_end: Address,
+}
+
+impl IntervalListBuilder {
+    pub(crate) fn new(cell_size: usize, coalesce: bool) -> Self {
         Self {
             cell_size,
+            coalesce,
             head: Address::ZERO,
             last: Address::ZERO,
-            run_start: Address::ZERO,
-            run_end: Address::ZERO,
+            interval_start: Address::ZERO,
+            interval_end: Address::ZERO,
         }
     }
 
     /// Add the free cell at `cell`. Cells must be added in increasing address order.
     pub(crate) fn add(&mut self, cell: Address) {
-        if !self.run_start.is_zero() && cell == self.run_end {
-            self.run_end = cell + self.cell_size;
+        if !self.coalesce {
+            write_interval(cell, cell + self.cell_size, self.cell_size, self.head);
+            self.head = cell;
             return;
         }
-        self.close_run();
-        self.run_start = cell;
-        self.run_end = cell + self.cell_size;
+        if !self.interval_start.is_zero() && cell == self.interval_end {
+            self.interval_end = cell + self.cell_size;
+            return;
+        }
+        self.close_interval();
+        self.interval_start = cell;
+        self.interval_end = cell + self.cell_size;
     }
 
-    /// Add the free run `[start, end)`, whose length is a multiple of the cell size.
-    pub(crate) fn add_run(&mut self, start: Address, end: Address) {
+    /// Add the free interval `[start, end)`, whose length is a multiple of the cell size.
+    pub(crate) fn add_interval(&mut self, start: Address, end: Address) {
         debug_assert_eq!((end - start) % self.cell_size, 0);
-        self.add(start);
-        self.run_end = end;
-    }
-
-    fn close_run(&mut self) {
-        if self.run_start.is_zero() {
+        if !self.coalesce {
+            let mut cell = start;
+            while cell < end {
+                self.add(cell);
+                cell += self.cell_size;
+            }
             return;
         }
-        write_run(self.run_start, self.run_end, self.cell_size, Address::ZERO);
-        if self.last.is_zero() {
-            self.head = self.run_start;
-        } else {
-            let tag = unsafe { self.last.load::<usize>() } & RUN_SINGLE_CELL;
-            unsafe { self.last.store::<usize>(self.run_start.as_usize() | tag) };
+        self.add(start);
+        self.interval_end = end;
+    }
+
+    fn close_interval(&mut self) {
+        if self.interval_start.is_zero() {
+            return;
         }
-        self.last = self.run_start;
-        self.run_start = Address::ZERO;
+        write_interval(
+            self.interval_start,
+            self.interval_end,
+            self.cell_size,
+            Address::ZERO,
+        );
+        if self.last.is_zero() {
+            self.head = self.interval_start;
+        } else {
+            let tag = unsafe { self.last.load::<usize>() } & INTERVAL_SINGLE_CELL;
+            unsafe {
+                self.last
+                    .store::<usize>(self.interval_start.as_usize() | tag)
+            };
+        }
+        self.last = self.interval_start;
+        self.interval_start = Address::ZERO;
     }
 
     /// Finish and return the head of the list (zero if no cell was added).
     pub(crate) fn finish(mut self) -> Address {
-        self.close_run();
+        self.close_interval();
         self.head
     }
 }

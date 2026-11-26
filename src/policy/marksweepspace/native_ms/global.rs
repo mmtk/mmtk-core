@@ -345,6 +345,12 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         }
     }
 
+    /// Whether sweeping merges adjacent free cells into intervals for bump allocation. See the
+    /// option [`crate::util::options::Options::marksweep_free_intervals`].
+    pub(crate) fn coalesce_free_cells(&self) -> bool {
+        *self.common.options.marksweep_free_intervals
+    }
+
     /// Mark an object non-atomically.  If multiple GC worker threads attempt to mark the same
     /// object, more than one of them may return `true`.
     fn attempt_mark_non_atomic(&self, object: ObjectReference) -> bool {
@@ -643,7 +649,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             // We have released unmarked blocks in `ReleaseMarkSweepSpace` and `ReleaseMutator`.
             // We shouldn't see any unmarked blocks now.
             debug_assert_eq!(block.get_state(), BlockState::Marked);
-            block.sweep::<VM>();
+            block.sweep(self.space);
             allocated_blocks += 1;
         }
         probe!(mmtk, sweep_chunk_ms, allocated_blocks);

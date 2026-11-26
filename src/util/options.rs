@@ -1000,6 +1000,10 @@ options! {
     transparent_hugepages:  bool                    [|v: &bool| !v || cfg!(target_os = "linux")] = false,
     /// Count live bytes for objects in each space during a GC.
     count_live_bytes_in_gc: bool                    [always_valid] = false,
+    /// For the mark-sweep free-list allocator: merge adjacent free cells in a block into intervals,
+    /// and let each size class bump-allocate through an interval. When false, every free cell
+    /// is a single interval of its own, so allocation is just popping a single cell at a time.
+    marksweep_free_intervals: bool                  [always_valid] = true,
     /// Make every GC a defragment GC. (for debugging)
     immix_always_defrag: bool                       [always_valid] = false,
     /// Mark every allocated block as defragmentation source before GC. (for debugging)

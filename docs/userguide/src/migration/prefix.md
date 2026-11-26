@@ -78,8 +78,10 @@ API changes:
         +   Use `util::alloc::free_list_allocator::free_list_size_class` to get the bin and the cell
             size for a given size and alignment.
     -   `Unimplemented` is no longer returned for `FreeListAllocator`.
-*   module `policy::marksweepspace::native_ms`
-    -   `MAX_BIN`, `BIN_SIZES` and `size_class()` are now public.
+*   struct `util::options::Options`
+    -   `marksweep_free_intervals` is added, and defaults to `true`. Set it to `false` to make the
+        free-list allocator take one cell at a time from free list of cells, as it
+        did before. 
 
 ## 0.33.0
 
