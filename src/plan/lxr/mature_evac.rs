@@ -84,8 +84,8 @@ impl<VM: VMBinding> MatureEvecRemSet<VM> {
                 mature_evac_remsets.push(Box::new(EvacuateMatureObjects::new(remset)));
             }
         }
-        for id in 0..self.local_packets.len() {
-            let buf = unsafe { &mut *self.local_packets[id].get() };
+        for local in self.local_packets.iter() {
+            let buf = unsafe { &mut *local.get() };
             if !buf.is_empty() {
                 let packets = std::mem::take(buf);
                 for p in packets {

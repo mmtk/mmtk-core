@@ -170,7 +170,7 @@ impl BlockList {
             // We should not have unallocated blocks in a block list
             debug_assert_ne!(block.get_state(), BlockState::Unallocated);
             if !block.attempt_release(space) {
-                block.sweep::<VM>();
+                block.sweep(space);
             }
         }
     }
@@ -225,59 +225,72 @@ pub(crate) const MAX_BIN_SIZE: usize = 8192 * MI_INTPTR_SIZE;
 // just put them behind a boxed pointer.
 pub type BlockLists = Box<[BlockList; MAX_BIN + 1]>;
 
+/// The cell size of each bin, in bytes. Bin 0 is reserved and never used.
+///
+/// Public so that a binding can pick the bin of an allocation with a size known when it
+/// generates code, and emit the free-list fast path for it (see
+/// [`crate::util::alloc::AllocatorInfo::FreeList`]).
+pub(crate) const BIN_SIZES: [usize; MAX_BIN + 1] = [
+    MI_INTPTR_SIZE,
+    MI_INTPTR_SIZE,
+    2 * MI_INTPTR_SIZE,
+    3 * MI_INTPTR_SIZE,
+    4 * MI_INTPTR_SIZE,
+    5 * MI_INTPTR_SIZE,
+    6 * MI_INTPTR_SIZE,
+    7 * MI_INTPTR_SIZE,
+    8 * MI_INTPTR_SIZE,
+    10 * MI_INTPTR_SIZE,
+    12 * MI_INTPTR_SIZE,
+    14 * MI_INTPTR_SIZE,
+    16 * MI_INTPTR_SIZE,
+    20 * MI_INTPTR_SIZE,
+    24 * MI_INTPTR_SIZE,
+    28 * MI_INTPTR_SIZE,
+    32 * MI_INTPTR_SIZE,
+    40 * MI_INTPTR_SIZE,
+    48 * MI_INTPTR_SIZE,
+    56 * MI_INTPTR_SIZE,
+    64 * MI_INTPTR_SIZE,
+    80 * MI_INTPTR_SIZE,
+    96 * MI_INTPTR_SIZE,
+    112 * MI_INTPTR_SIZE,
+    128 * MI_INTPTR_SIZE,
+    160 * MI_INTPTR_SIZE,
+    192 * MI_INTPTR_SIZE,
+    224 * MI_INTPTR_SIZE,
+    256 * MI_INTPTR_SIZE,
+    320 * MI_INTPTR_SIZE,
+    384 * MI_INTPTR_SIZE,
+    448 * MI_INTPTR_SIZE,
+    512 * MI_INTPTR_SIZE,
+    640 * MI_INTPTR_SIZE,
+    768 * MI_INTPTR_SIZE,
+    896 * MI_INTPTR_SIZE,
+    1024 * MI_INTPTR_SIZE,
+    1280 * MI_INTPTR_SIZE,
+    1536 * MI_INTPTR_SIZE,
+    1792 * MI_INTPTR_SIZE,
+    2048 * MI_INTPTR_SIZE,
+    2560 * MI_INTPTR_SIZE,
+    3072 * MI_INTPTR_SIZE,
+    3584 * MI_INTPTR_SIZE,
+    4096 * MI_INTPTR_SIZE,
+    5120 * MI_INTPTR_SIZE,
+    6144 * MI_INTPTR_SIZE,
+    7168 * MI_INTPTR_SIZE,
+    8192 * MI_INTPTR_SIZE,
+];
+
+/// The bin and cell size for an allocation of `size` bytes with alignment `align`.
+pub(crate) fn size_class<VM: VMBinding>(size: usize, align: usize) -> (usize, usize) {
+    let bin = mi_bin::<VM>(size, align);
+    (bin, BIN_SIZES[bin])
+}
+
 /// Create an empty set of block lists of different size classes (bins)
 pub(crate) fn new_empty_block_lists() -> BlockLists {
-    let ret = Box::new([
-        BlockList::new(MI_INTPTR_SIZE),
-        BlockList::new(MI_INTPTR_SIZE),
-        BlockList::new(2 * MI_INTPTR_SIZE),
-        BlockList::new(3 * MI_INTPTR_SIZE),
-        BlockList::new(4 * MI_INTPTR_SIZE),
-        BlockList::new(5 * MI_INTPTR_SIZE),
-        BlockList::new(6 * MI_INTPTR_SIZE),
-        BlockList::new(7 * MI_INTPTR_SIZE),
-        BlockList::new(8 * MI_INTPTR_SIZE), /* 8 */
-        BlockList::new(10 * MI_INTPTR_SIZE),
-        BlockList::new(12 * MI_INTPTR_SIZE),
-        BlockList::new(14 * MI_INTPTR_SIZE),
-        BlockList::new(16 * MI_INTPTR_SIZE),
-        BlockList::new(20 * MI_INTPTR_SIZE),
-        BlockList::new(24 * MI_INTPTR_SIZE),
-        BlockList::new(28 * MI_INTPTR_SIZE),
-        BlockList::new(32 * MI_INTPTR_SIZE), /* 16 */
-        BlockList::new(40 * MI_INTPTR_SIZE),
-        BlockList::new(48 * MI_INTPTR_SIZE),
-        BlockList::new(56 * MI_INTPTR_SIZE),
-        BlockList::new(64 * MI_INTPTR_SIZE),
-        BlockList::new(80 * MI_INTPTR_SIZE),
-        BlockList::new(96 * MI_INTPTR_SIZE),
-        BlockList::new(112 * MI_INTPTR_SIZE),
-        BlockList::new(128 * MI_INTPTR_SIZE), /* 24 */
-        BlockList::new(160 * MI_INTPTR_SIZE),
-        BlockList::new(192 * MI_INTPTR_SIZE),
-        BlockList::new(224 * MI_INTPTR_SIZE),
-        BlockList::new(256 * MI_INTPTR_SIZE),
-        BlockList::new(320 * MI_INTPTR_SIZE),
-        BlockList::new(384 * MI_INTPTR_SIZE),
-        BlockList::new(448 * MI_INTPTR_SIZE),
-        BlockList::new(512 * MI_INTPTR_SIZE), /* 32 */
-        BlockList::new(640 * MI_INTPTR_SIZE),
-        BlockList::new(768 * MI_INTPTR_SIZE),
-        BlockList::new(896 * MI_INTPTR_SIZE),
-        BlockList::new(1024 * MI_INTPTR_SIZE),
-        BlockList::new(1280 * MI_INTPTR_SIZE),
-        BlockList::new(1536 * MI_INTPTR_SIZE),
-        BlockList::new(1792 * MI_INTPTR_SIZE),
-        BlockList::new(2048 * MI_INTPTR_SIZE), /* 40 */
-        BlockList::new(2560 * MI_INTPTR_SIZE),
-        BlockList::new(3072 * MI_INTPTR_SIZE),
-        BlockList::new(3584 * MI_INTPTR_SIZE),
-        BlockList::new(4096 * MI_INTPTR_SIZE),
-        BlockList::new(5120 * MI_INTPTR_SIZE),
-        BlockList::new(6144 * MI_INTPTR_SIZE),
-        BlockList::new(7168 * MI_INTPTR_SIZE),
-        BlockList::new(8192 * MI_INTPTR_SIZE), /* 48 */
-    ]);
+    let ret: BlockLists = Box::new(std::array::from_fn(|bin| BlockList::new(BIN_SIZES[bin])));
 
     debug_assert_eq!(
         ret[MAX_BIN].size, MAX_BIN_SIZE,

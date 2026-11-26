@@ -11,11 +11,23 @@ use crate::util::Address;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
 
+/// The bin and cell size [`FreeListAllocator`] uses for an allocation of `size` bytes.
+pub fn free_list_size_class<VM: VMBinding>(size: usize, align: usize) -> (usize, usize) {
+    size_class::<VM>(size, align)
+}
+
 /// A MiMalloc free list allocator
+///
+/// Free cells are kept as intervals of adjacent cells. Each bin bumps through one interval,
+/// `[cursors[bin], limits[bin])`. See [`crate::util::alloc::AllocatorInfo::FreeList`].
 #[repr(C)]
 pub struct FreeListAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
+    /// Per bin: the next free cell of the current interval. Zero when the bin has no interval.
+    pub cursors: [Address; MI_BIN_FULL],
+    /// Per bin: the end of the current interval.
+    pub limits: [Address; MI_BIN_FULL],
     space: &'static MarkSweepSpace<VM>,
     context: Arc<AllocatorContext<VM>>,
     /// blocks with free space
@@ -45,7 +57,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         &self.context
     }
 
-    // Find a block with free space and allocate to it
+    // Bump through the bin's current interval, or take the next interval and bump through that.
     fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
         debug_assert!(
             size <= MAX_BIN_SIZE,
@@ -55,27 +67,22 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         debug_assert!(align <= VM::MAX_ALIGNMENT);
         debug_assert!(align >= VM::MIN_ALIGNMENT);
 
+        let (bin, cell_size) = size_class::<VM>(size, align);
+        let cell = self.cursors[bin];
+        if cell + cell_size <= self.limits[bin] {
+            self.cursors[bin] = cell + cell_size;
+            crate::util::memory::zero(cell, cell_size);
+            return self.finish_alloc(cell, cell_size, size, align, offset);
+        }
+
         if let Some(block) = self.find_free_block_local(size, align) {
-            let cell = self.block_alloc(block);
-            if !cell.is_zero() {
+            if let Some(cell) = self.take_interval(block, bin, false) {
                 // We succeeded in fastpath alloc, this cannot be precise stress test
                 debug_assert!(
                     !(*self.context.options.precise_stress
                         && self.context.options.is_stress_test_gc_enabled())
                 );
-
-                let res = allocator::align_allocation::<VM>(cell, align, offset);
-                // Make sure that the allocation region is within the cell
-                #[cfg(debug_assertions)]
-                {
-                    let cell_size = block.load_block_cell_size();
-                    debug_assert!(
-                        res + size <= cell + cell_size,
-                        "Allocating (size = {}, align = {}, offset = {}) to the cell {} of size {}, but the end of the allocation region {} is beyond the cell end {}",
-                        size, align, offset, cell, cell_size, res + size, cell + cell_size
-                    );
-                }
-                return res;
+                return self.finish_alloc(cell, cell_size, size, align, offset);
             }
         }
 
@@ -85,7 +92,13 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
         // Try get a block from the space
         if let Some(block) = self.acquire_global_block(size, align, false) {
-            let addr = self.block_alloc(block);
+            let bin = mi_bin::<VM>(size, align);
+            let addr = self
+                .take_interval(block, bin, false)
+                .unwrap_or(Address::ZERO);
+            if addr.is_zero() {
+                return addr;
+            }
             allocator::align_allocation::<VM>(addr, align, offset)
         } else {
             Address::ZERO
@@ -114,7 +127,11 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
 
         // mimic what fastpath allocation does, except that we allocate from available_blocks_stress.
         if let Some(block) = self.find_free_block_stress(size, align) {
-            let cell = self.block_alloc(block);
+            // Take one cell only, so that the next allocation comes here again.
+            let bin = mi_bin::<VM>(size, align);
+            let Some(cell) = self.take_interval(block, bin, true) else {
+                return Address::ZERO;
+            };
             allocator::align_allocation::<VM>(cell, align, offset)
         } else {
             Address::ZERO
@@ -122,6 +139,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     fn on_mutator_destroy(&mut self) {
+        self.return_intervals();
         let mut global = self.space.get_abandoned_block_lists().lock().unwrap();
         self.abandon_blocks(&mut global);
     }
@@ -136,6 +154,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     ) -> Self {
         FreeListAllocator {
             tls,
+            cursors: [Address::ZERO; MI_BIN_FULL],
+            limits: [Address::ZERO; MI_BIN_FULL],
             space,
             context,
             available_blocks: new_empty_block_lists(),
@@ -145,40 +165,67 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         }
     }
 
-    // Find a free cell within a given block
-    fn block_alloc(&mut self, block: Block) -> Address {
-        let cell = block.load_free_list();
-        if cell.is_zero() {
-            return cell; // return failed allocation
-        }
-        let next_cell = unsafe { cell.load::<Address>() };
-        // Clear the link
-        unsafe { cell.store::<Address>(Address::ZERO) };
+    /// Align the allocation in the cell just taken and check it fits.
+    #[inline(always)]
+    fn finish_alloc(
+        &self,
+        cell: Address,
+        cell_size: usize,
+        size: usize,
+        align: usize,
+        offset: usize,
+    ) -> Address {
+        let res = allocator::align_allocation::<VM>(cell, align, offset);
         debug_assert!(
-            next_cell.is_zero() || block.includes_address(next_cell),
-            "next_cell {} is not in {:?}",
-            next_cell,
-            block
+            res + size <= cell + cell_size,
+            "Allocating (size = {}, align = {}, offset = {}) to the cell {} of size {}, but the end of the allocation region {} is beyond the cell end {}",
+            size, align, offset, cell, cell_size, res + size, cell + cell_size
         );
-        block.store_free_list(next_cell);
+        res
+    }
 
-        // Zeroing memory right before we return it.
-        // If we move the zeroing to somewhere else, we need to clear the list link here: cell.store::<Address>(Address::ZERO)
+    /// Take the next interval from `block` and return its zeroed first cell. The rest becomes the
+    /// bin's bump region, or goes back to the block if `one_cell` is set (precise stress GC).
+    fn take_interval(&mut self, block: Block, bin: usize, one_cell: bool) -> Option<Address> {
+        let (start, end) = block.pop_interval()?;
         let cell_size = block.load_block_cell_size();
-        crate::util::memory::zero(cell, cell_size);
-
-        // Make sure the memory is zeroed. This looks silly as we zero the cell right before this check.
-        // But we would need to move the zeroing to somewhere so we can do zeroing at a coarser grainularity.
-        #[cfg(debug_assertions)]
-        {
-            let mut cursor = cell;
-            while cursor < cell + cell_size {
-                debug_assert_eq!(unsafe { cursor.load::<usize>() }, 0);
-                cursor += crate::util::constants::BYTES_IN_ADDRESS;
-            }
+        debug_assert_eq!(
+            cell_size,
+            crate::policy::marksweepspace::native_ms::BIN_SIZES[bin]
+        );
+        let end = if one_cell && start + cell_size < end {
+            block.push_interval(start + cell_size, end);
+            start + cell_size
+        } else {
+            end
+        };
+        crate::util::memory::zero(start, cell_size);
+        if one_cell {
+            debug_assert_eq!(end, start + cell_size);
+        } else {
+            self.return_interval(bin);
+            self.cursors[bin] = start + cell_size;
+            self.limits[bin] = end;
         }
+        Some(start)
+    }
 
-        cell
+    /// Give the unused part of `bin`'s bump region back to its block.
+    fn return_interval(&mut self, bin: usize) {
+        let (cursor, limit) = (self.cursors[bin], self.limits[bin]);
+        self.cursors[bin] = Address::ZERO;
+        self.limits[bin] = Address::ZERO;
+        if cursor < limit {
+            Block::from_unaligned_address(cursor).push_interval(cursor, limit);
+        }
+    }
+
+    /// Give every bump region back to its block. Called at the start of a GC's prepare and
+    /// release, so that sweeping, block release and allocate-black see every free cell.
+    fn return_intervals(&mut self) {
+        for bin in 0..MI_BIN_FULL {
+            self.return_interval(bin);
+        }
     }
 
     // Find an available block when stress GC is enabled. This includes getting a block from the space.
@@ -267,7 +314,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
                 let block = self.unswept_blocks.get_mut(bin).unwrap().pop()?;
 
-                block.sweep::<VM>();
+                block.sweep(self.space);
                 if block.has_free_cells() {
                     // recyclable block
                     self.add_to_available_blocks(
@@ -322,7 +369,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::AbandonedUnswept(block) => {
                     debug!("Acquire global block: AbandonedUnswep {:?}", block);
                     block.store_tls(self.tls);
-                    block.sweep::<VM>();
+                    block.sweep(self.space);
                     if block.has_free_cells() {
                         self.add_to_available_blocks(bin, block, stress_test);
                         return Some(block);
@@ -338,23 +385,14 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         debug_assert_ne!(cell_size, 0);
         self.space.record_new_block(block);
 
-        // construct free list
-        let block_end = block.start() + Block::BYTES;
-        let mut old_cell = unsafe { Address::zero() };
-        let mut new_cell = block.start();
-
-        let final_cell = loop {
-            unsafe {
-                new_cell.store::<Address>(old_cell);
-            }
-            old_cell = new_cell;
-            new_cell += cell_size;
-            if new_cell + cell_size > block_end {
-                break old_cell;
-            };
-        };
-
-        block.store_free_list(final_cell);
+        // The whole block is one interval of free cells.
+        let cells = Block::BYTES / cell_size;
+        let mut intervals = IntervalListBuilder::new(cell_size, self.space.coalesce_free_cells());
+        if cells > 0 {
+            // Adding the first and the last cell spans the interval; cells in between are implied.
+            intervals.add_interval(block.start(), block.start() + cells * cell_size);
+        }
+        block.store_free_list(intervals.finish());
         block.store_block_cell_size(cell_size);
         #[cfg(feature = "malloc_native_mimalloc")]
         {
@@ -412,9 +450,12 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         block.store_tls(self.tls);
     }
 
-    pub(crate) fn prepare(&mut self) {}
+    pub(crate) fn prepare(&mut self) {
+        self.return_intervals();
+    }
 
     pub(crate) fn release(&mut self) {
+        self.return_intervals();
         for bin in 0..MI_BIN_FULL {
             let unswept = self.unswept_blocks.get_mut(bin).unwrap();
 

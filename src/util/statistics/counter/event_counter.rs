@@ -102,13 +102,7 @@ impl Counter for EventCounter {
 
     fn get_total(&self, other: Option<bool>) -> u64 {
         match other {
-            None => {
-                let mut total = 0;
-                for p in 0..=self.stats.get_phase() {
-                    total += self.count[p];
-                }
-                total
-            }
+            None => self.count[..=self.stats.get_phase()].iter().sum(),
             Some(m) => {
                 let mut total = 0;
                 let mut p = !m as usize;
