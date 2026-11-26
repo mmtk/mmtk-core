@@ -55,8 +55,8 @@ impl MapStateStorage for ByteMapStateStorage {
 
         let index_start = range.start >> LOG_BYTES_IN_CHUNK;
         let index_limit = range.limit() >> LOG_BYTES_IN_CHUNK;
-        for index in index_start..index_limit {
-            self.mapped[index].store(state, Ordering::Relaxed);
+        for entry in &self.mapped[index_start..index_limit] {
+            entry.store(state, Ordering::Relaxed);
         }
     }
 
@@ -94,8 +94,8 @@ impl MapStateStorage for ByteMapStateStorage {
             let group_bytes = group.len << LOG_BYTES_IN_CHUNK;
             let group_range = ChunkRange::new_aligned(group_start_addr, group_bytes);
             if let Some(new_state) = update_fn(group_range, state)? {
-                for index in group_start..group_end {
-                    self.mapped[index].store(new_state, Ordering::Relaxed);
+                for entry in &self.mapped[group_start..group_end] {
+                    entry.store(new_state, Ordering::Relaxed);
                 }
             }
             group_start = group_end;
