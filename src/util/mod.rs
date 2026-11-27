@@ -48,11 +48,13 @@ pub mod test_util;
 /// An analysis framework for collecting data and profiling in GC.
 #[cfg(feature = "analysis")]
 pub(crate) mod analysis;
+pub(crate) mod deadline;
 pub(crate) mod epilogue;
 /// Non-generic refs to generic types of `<VM>`.
 pub(crate) mod erase_vm;
 /// Finalization implementation.
 pub(crate) mod finalizable_processor;
+pub(crate) mod gray_pool;
 /// Logger initialization
 pub(crate) mod logger;
 pub(crate) mod object_enum;

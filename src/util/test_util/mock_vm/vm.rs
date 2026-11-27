@@ -457,6 +457,7 @@ pub struct MockVM<C: MockVMConfig = DefaultMockVMConfig> {
     >,
     pub scan_roots_in_mutator_thread: Box<dyn MockAny>,
     pub scan_vm_specific_roots: Box<dyn MockAny>,
+    pub vm_specific_root_slots: MockMethod<(), Vec<C::VMSlot>>,
     pub notify_initial_thread_scan_complete: MockMethod<(bool, VMWorkerThread), ()>,
     pub supports_return_barrier: MockMethod<(), bool>,
     pub prepare_for_roots_re_scanning: MockMethod<(), ()>,
@@ -645,6 +646,7 @@ impl<C: MockVMConfig> Default for MockVM<C> {
                 ),
                 (),
             >::new_unimplemented()),
+            vm_specific_root_slots: MockMethod::new_fixed(Box::new(|()| vec![])),
             notify_initial_thread_scan_complete: MockMethod::new_fixed(Box::new(|(_, _)| {})),
             supports_return_barrier: MockMethod::new_unimplemented(),
             prepare_for_roots_re_scanning: MockMethod::new_fixed(Box::new(|_| {
@@ -898,9 +900,15 @@ impl<C: MockVMConfig> crate::vm::Scanning<MockVM<C>> for MockVM<C> {
         // ))
         warn!("scan_roots_in_mutator_thread is not properly mocked. The default implementation does nothing.");
     }
-    fn scan_vm_specific_roots(_tls: VMWorkerThread, _factory: impl RootsWorkFactory<C::VMSlot>) {
+    fn scan_vm_specific_roots(_tls: VMWorkerThread, mut factory: impl RootsWorkFactory<C::VMSlot>) {
         // mock_any!(scan_vm_specific_roots(tls, Box::new(factory)))
-        warn!("scan_vm_specific_roots is not properly mocked. The default implementation does nothing.");
+        let slots: Vec<C::VMSlot> = mock!(vm_specific_root_slots());
+        if slots.is_empty() {
+            warn!("scan_vm_specific_roots is not properly mocked. The default implementation does nothing.");
+        }
+        for chunk in slots.chunks(256) {
+            factory.create_process_roots_work(chunk.to_vec());
+        }
     }
     fn notify_initial_thread_scan_complete(partial_scan: bool, tls: VMWorkerThread) {
         mock!(notify_initial_thread_scan_complete(partial_scan, tls))

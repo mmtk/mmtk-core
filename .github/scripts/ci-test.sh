@@ -38,6 +38,7 @@ find ./src ./tests -type f -name "mock_test_*" | while read -r file; do
 
     # Run the test with each plan it needs.
     for MMTK_PLAN in $PLANS; do
+        if [[ $MMTK_PLAN == IncrementalMarkSweep && $FEATURES != *eager_sweeping* ]]; then continue; fi
         env MMTK_PLAN=$MMTK_PLAN cargo test --features mock_test,"$FEATURES" -- $t;
     done
 done

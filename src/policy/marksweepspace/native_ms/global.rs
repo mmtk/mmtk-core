@@ -1,5 +1,5 @@
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
+    atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc,
 };
 
@@ -67,6 +67,11 @@ pub enum BlockAcquireResult {
 /// |                | Eager: Sweep local blocks                       | Eager: Sweep global blocks                   |           |
 /// |                | Both: Return local blocks to a temp global list |                                              |           |
 /// | GC - End of GC | -                                               | Merge the temp global lists                  | -         |
+///
+/// A plan may defer eager sweeping of a collection with [`MarkSweepSpace::set_defer_sweep`]: the
+/// release phase then moves the marked blocks to the global unswept lists. They are swept by
+/// [`MarkSweepSpace::sweep_unswept_blocks`], or by an allocator that takes one. All of them must be
+/// swept, or the next collection started, before mark bits change again.
 pub struct MarkSweepSpace<VM: VMBinding> {
     pub common: CommonSpace<VM>,
     pr: BlockPageResource<VM, Block>,
@@ -86,6 +91,9 @@ pub struct MarkSweepSpace<VM: VMBinding> {
     /// Count the number of pending `ReleaseMarkSweepSpace` and `ReleaseMutator` work packets during
     /// the `Release` stage.
     pending_release_packets: AtomicUsize,
+    /// The current collection leaves marked blocks unswept. See
+    /// [`MarkSweepSpace::set_defer_sweep`].
+    defer_sweep: AtomicBool,
 }
 
 unsafe impl<VM: VMBinding> Sync for MarkSweepSpace<VM> {}
@@ -125,6 +133,21 @@ impl AbandonedBlockLists {
             if cfg!(not(feature = "eager_sweeping")) {
                 self.unswept[i].append(&mut self.available[i]);
                 self.unswept[i].append(&mut self.consumed[i]);
+            }
+        }
+    }
+
+    fn defer_sweep(&mut self) {
+        for i in 0..MI_BIN_FULL {
+            self.unswept[i].append(&mut self.available[i]);
+            self.unswept[i].append(&mut self.consumed[i]);
+        }
+    }
+
+    fn cancel_deferred_sweep(&mut self) {
+        if cfg!(feature = "eager_sweeping") {
+            for i in 0..MI_BIN_FULL {
+                self.consumed[i].append(&mut self.unswept[i]);
             }
         }
     }
@@ -191,9 +214,15 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
         true
     }
 
-    fn initialize_object_metadata(&self, _object: crate::util::ObjectReference, _bytes: usize) {
+    fn initialize_object_metadata(&self, object: crate::util::ObjectReference, _bytes: usize) {
         #[cfg(feature = "vo_bit")]
-        crate::util::metadata::vo_bit::set_vo_bit(_object);
+        crate::util::metadata::vo_bit::set_vo_bit(object);
+        // Incremental/concurrent plans (IncrementalMarkSweep) allocate objects black while
+        // marking.
+        if self.should_allocate_as_live() {
+            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.mark::<VM>(object, Ordering::SeqCst);
+            Block::containing(object).set_state(BlockState::Marked);
+        }
     }
 
     #[cfg(feature = "vo_bit")]
@@ -342,6 +371,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             abandoned: Mutex::new(AbandonedBlockLists::new()),
             abandoned_in_gc: Mutex::new(AbandonedBlockLists::new()),
             pending_release_packets: AtomicUsize::new(0),
+            defer_sweep: AtomicBool::new(false),
         }
     }
 
@@ -429,6 +459,9 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn prepare(&mut self, _full_heap: bool) {
         #[cfg(debug_assertions)]
         self.abandoned_in_gc.lock().unwrap().assert_empty();
+
+        // Blocks that a deferred sweep has not reached are swept by this collection instead.
+        self.abandoned.lock().unwrap().cancel_deferred_sweep();
 
         // # Safety: MarkSweepSpace reference is always valid within this collection cycle.
         let space = unsafe { &*(self as *const Self) };
@@ -522,7 +555,9 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn release_packet_done(&self) {
         let old = self.pending_release_packets.fetch_sub(1, Ordering::SeqCst);
         if old == 1 {
-            if cfg!(feature = "eager_sweeping") {
+            if cfg!(feature = "eager_sweeping") && self.can_defer_sweep() {
+                self.defer_sweeping();
+            } else if cfg!(feature = "eager_sweeping") {
                 // When doing eager sweeping, we start sweeing now.
                 // After sweeping, we will recycle blocks.
                 let work_packets = self.generate_sweep_tasks();
@@ -530,6 +565,85 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             } else {
                 // When doing lazy sweeping, we recycle blocks now.
                 self.recycle_blocks();
+            }
+        }
+    }
+
+    /// Set whether the current collection defers sweeping of marked blocks. Only meaningful with
+    /// the `eager_sweeping` feature. Call before [`MarkSweepSpace::release`].
+    pub(crate) fn set_defer_sweep(&self, defer: bool) {
+        self.defer_sweep.store(defer, Ordering::SeqCst);
+    }
+
+    fn can_defer_sweep(&self) -> bool {
+        // VO bits of dead objects must be cleared in this GC, which we can only do in bulk with
+        // side mark bits.
+        self.defer_sweep.load(Ordering::SeqCst)
+            && (!cfg!(feature = "vo_bit") || VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side())
+    }
+
+    fn defer_sweeping(&self) {
+        {
+            let mut abandoned = self.abandoned.try_lock().unwrap();
+            let mut abandoned_in_gc = self.abandoned_in_gc.try_lock().unwrap();
+            abandoned.merge(&mut abandoned_in_gc);
+            abandoned.defer_sweep();
+        }
+        self.pr.flush_all();
+
+        #[cfg(feature = "vo_bit")]
+        {
+            // # Safety: MarkSweepSpace reference is always valid within this collection cycle.
+            let space = unsafe { &*(self as *const Self) };
+            let work_packets = self
+                .chunk_map
+                .generate_tasks(|chunk| Box::new(ClearDeadVOBits { space, chunk }));
+            self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+        }
+    }
+
+    /// Whether a deferred sweep still has blocks to sweep.
+    pub(crate) fn has_unswept_blocks(&self) -> bool {
+        let abandoned = self.abandoned.lock().unwrap();
+        (0..MI_BIN_FULL).any(|bin| !abandoned.unswept[bin].is_empty())
+    }
+
+    /// Sweep blocks left by a deferred sweep until `should_yield` returns true or none are left.
+    /// May be called by several GC workers at once, while mutators are stopped.
+    pub(crate) fn sweep_unswept_blocks(&self, mut should_yield: impl FnMut() -> bool) {
+        /// Blocks taken per lock acquisition, and between two yield checks.
+        const BATCH: usize = 16;
+        let mut batch = Vec::with_capacity(BATCH);
+        loop {
+            {
+                let mut abandoned = self.abandoned.lock().unwrap();
+                for bin in 0..MI_BIN_FULL {
+                    while batch.len() < BATCH {
+                        let Some(block) = abandoned.unswept[bin].pop() else {
+                            break;
+                        };
+                        batch.push((bin, block));
+                    }
+                }
+            }
+            if batch.is_empty() {
+                return;
+            }
+            for (_, block) in &batch {
+                block.sweep(self);
+            }
+            {
+                let mut abandoned = self.abandoned.lock().unwrap();
+                for (bin, block) in batch.drain(..) {
+                    if block.has_free_cells() {
+                        abandoned.available[bin].push(block);
+                    } else {
+                        abandoned.consumed[bin].push(block);
+                    }
+                }
+            }
+            if should_yield() {
+                return;
             }
         }
     }
@@ -622,6 +736,31 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseMarkSweepSpace<VM> {
         }
 
         self.space.release_packet_done();
+    }
+}
+
+/// Clears the VO bits of dead objects in a chunk whose sweep is deferred.
+#[cfg(feature = "vo_bit")]
+struct ClearDeadVOBits<VM: VMBinding> {
+    space: &'static MarkSweepSpace<VM>,
+    chunk: Chunk,
+}
+
+#[cfg(feature = "vo_bit")]
+impl<VM: VMBinding> GCWork<VM> for ClearDeadVOBits<VM> {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        debug_assert!(self.space.chunk_map.get(self.chunk).unwrap().is_allocated());
+        // Unmarked blocks have been released, so every allocated block has valid mark bits.
+        for block in self
+            .chunk
+            .iter_region::<Block>()
+            .filter(|block| block.get_state() != BlockState::Unallocated)
+        {
+            crate::util::metadata::vo_bit::bcopy_vo_bit_from_mark_bit::<VM>(
+                block.start(),
+                Block::BYTES,
+            );
+        }
     }
 }
 

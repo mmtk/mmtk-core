@@ -212,6 +212,13 @@ pub enum AllocatorInfo {
     /// `limits_offset + 8 * bin`, and if `cursor + cell_size <= limit` stores
     /// `cursor + cell_size` back and uses the cell at `cursor`. The binding must zero the cell.
     /// Otherwise it calls the allocation slow path.
+    ///
+    /// While the byte at [`crate::memory_manager::get_allocate_as_live_flag_address`] is nonzero
+    /// (an incremental mark is in progress), a fast-path object must be marked live, which is
+    /// what [`crate::memory_manager::post_alloc`] does: either call `post_alloc`, or set the
+    /// object's [`crate::vm::ObjectModel::LOCAL_MARK_BIT_SPEC`] bit (in the header, or on the
+    /// side at the address given by
+    /// [`crate::memory_manager::get_local_mark_bit_side_metadata`]).
     FreeList {
         /// The byte offset from the mutator's pointer to the allocator's `cursors` array.
         cursors_offset: usize,

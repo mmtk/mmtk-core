@@ -8,6 +8,7 @@ use crate::util::constants::{BYTES_IN_ADDRESS, LOG_BYTES_IN_PAGE};
 use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
 use crate::util::linear_scan::UnstraddlableRegion;
+use crate::util::metadata::MetadataSpec;
 use crate::util::object_enum::BlockMayHaveObjects;
 use crate::vm::ObjectModel;
 use crate::{
@@ -300,6 +301,13 @@ impl Block {
             unimplemented!()
         }
 
+        // With contiguous side mark bits, we can skip over dead cells a metadata word at a time.
+        if let MetadataSpec::OnSide(mark_bits) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+            if mark_bits.uses_contiguous_side_metadata() && mark_bits.log_num_of_bits == 0 {
+                return self.side_mark_sweep::<VM>(&mark_bits, coalesce);
+            }
+        }
+
         // Check if we can treat it as the simple case: cell address === object reference.
         // If the binding does not use allocation offset, and they use the same allocation alignment which the cell size is aligned to,
         // then we have cell address === allocation address.
@@ -318,6 +326,45 @@ impl Block {
             // Otherwise we fallback to a generic but slow sweep. This roughly has ~10% mutator overhead for lazy sweeping.
             self.naive_brute_force_sweep::<VM>(coalesce)
         }
+    }
+
+    /// Sweep by visiting only the set mark bits: the cells between two live cells are free. The
+    /// cost depends on the number of live objects, not on the number of cells.
+    fn side_mark_sweep<VM: VMBinding>(&self, mark_bits: &SideMetadataSpec, coalesce: bool) {
+        let cell_size = self.load_block_cell_size();
+        debug_assert_ne!(cell_size, 0);
+        let offset = VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND;
+        let cells_end = self.start() + (Block::BYTES / cell_size) * cell_size;
+        let mut intervals = IntervalListBuilder::new(cell_size, coalesce);
+        // The start of the first cell that is not yet known to be live or free.
+        let mut next = self.start();
+        let mut free = |start: Address, end: Address| {
+            // We don't know where the dead object references are, so we bulk zero the cells.
+            #[cfg(feature = "vo_bit")]
+            crate::util::metadata::vo_bit::bzero_vo_bit(start, end - start);
+            intervals.add_interval(start, end);
+        };
+
+        // An object reference is inside its cell, at least `offset` bytes from the cell start.
+        mark_bits.scan_non_zero_values::<u8>(
+            self.start().offset(offset),
+            self.end(),
+            &mut |object| {
+                let cell_index = (object.offset(-offset) - self.start()) / cell_size;
+                let cell = self.start() + cell_index * cell_size;
+                if cell >= next {
+                    if cell > next {
+                        free(next, cell);
+                    }
+                    next = cell + cell_size;
+                }
+            },
+        );
+        if next < cells_end {
+            free(next, cells_end);
+        }
+
+        self.store_free_list(intervals.finish());
     }
 
     /// This implementation uses object reference and cell address interchangably. This is not correct for most cases.

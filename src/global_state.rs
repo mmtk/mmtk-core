@@ -550,6 +550,18 @@ impl GcStatusWord {
             _ => panic!("Trying to request a GC pause in invalid status: {status:?}"),
         })
     }
+
+    /// Like [`Self::try_request_pause`], but `InPause` is reported as `Err(InPause)` instead
+    /// of panicking.
+    pub(crate) fn try_request_pause_from_internal(&self) -> Result<GcStatus, GcStatus> {
+        self.try_transition(|status| match status {
+            GcStatus::Disabled(_)
+            | GcStatus::Uninitialized
+            | GcStatus::PauseRequested
+            | GcStatus::InPause => None,
+            GcStatus::NotInGC | GcStatus::InConcurrentGC => Some(GcStatus::PauseRequested),
+        })
+    }
 }
 
 #[cfg(test)]

@@ -45,7 +45,7 @@ pub fn test_allocator_info() {
                         bump_pointer_offset
                     );
                 }
-                PlanSelector::MarkSweep => {
+                PlanSelector::MarkSweep | PlanSelector::IncrementalMarkSweep => {
                     if cfg!(feature = "malloc_mark_sweep") {
                         // We provide no info for a malloc allocator
                         assert!(matches!(allocator_info, AllocatorInfo::None))

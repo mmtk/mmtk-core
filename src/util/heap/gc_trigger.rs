@@ -109,6 +109,29 @@ impl<VM: VMBinding> GCTrigger<VM> {
         }
     }
 
+    /// Request a GC pause from an MMTk-internal thread that is neither a mutator nor a GC
+    /// worker, such as the IncrementalMarkSweep alarm thread. The plan decides what kind of
+    /// pause to run in `schedule_collection`. Returns `true` if a pause is now requested or
+    /// running.
+    pub(crate) fn request_from_internal_thread(&self) -> bool {
+        match self.state.gc_status.try_request_pause_from_internal() {
+            Ok(cur_status) => {
+                if cur_status == GcStatus::InConcurrentGC {
+                    self.plan()
+                        .concurrent()
+                        .unwrap()
+                        .on_concurrent_work_interrupted();
+                }
+                probe!(mmtk, gc_requested);
+                self.state.record_pause_requested_time();
+                self.scheduler.request_schedule_collection();
+                true
+            }
+            Err(GcStatus::PauseRequested) | Err(GcStatus::InPause) => true,
+            Err(_) => false,
+        }
+    }
+
     /// Disable collection. On success, returns `Ok(true)` if this call actually switched
     /// collection from enabled to disabled, `Ok(false)` if it only increased the nesting depth of
     /// an already-disabled status. If MMTk is unable to disable GC right now (possibly a GC is in

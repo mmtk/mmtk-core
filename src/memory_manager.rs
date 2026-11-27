@@ -489,6 +489,38 @@ pub fn get_allocator_mapping<VM: VMBinding>(
     mmtk.get_plan().get_allocator_mapping()[semantics]
 }
 
+/// Return the address of the allocate-as-live flag of the space that `mutator` allocates
+/// `semantics` objects into. The flag is one byte, nonzero while new objects must be allocated
+/// live (marked), for example during an incremental mark. It only changes during a GC pause and
+/// its address is fixed for the lifetime of the MMTk instance, so a compiler may embed it.
+///
+/// See [`crate::util::alloc::AllocatorInfo::FreeList`] for how a free-list fast path uses it.
+pub fn get_allocate_as_live_flag_address<VM: VMBinding>(
+    mutator: &Mutator<VM>,
+    semantics: AllocationSemantics,
+) -> Address {
+    let selector = mutator.config.allocator_mapping[semantics];
+    let space = unsafe { mutator.allocators.get_allocator(selector) }.get_space();
+    Address::from_ptr(&space.common().allocate_as_live)
+}
+
+/// If the local mark bit ([`crate::vm::ObjectModel::LOCAL_MARK_BIT_SPEC`]) is side metadata,
+/// return `(base, log_bytes_per_bit)`: the mark bit of the object reference `o` is bit
+/// `(o >> log_bytes_per_bit) & 7` of the byte at `base + (o >> (log_bytes_per_bit + 3))`. Set
+/// it with an atomic OR, as neighbouring objects share the byte. Return `None` if the mark bit
+/// is in the header.
+#[cfg(target_pointer_width = "64")]
+pub fn get_local_mark_bit_side_metadata<VM: VMBinding>() -> Option<(Address, usize)> {
+    use crate::vm::ObjectModel;
+    let spec = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC;
+    if !spec.is_on_side() {
+        return None;
+    }
+    let side = spec.extract_side_spec();
+    debug_assert_eq!(side.log_num_of_bits, 0);
+    Some((side.get_starting_address(), side.log_bytes_in_region))
+}
+
 /// The standard malloc. MMTk either uses its own allocator, or forward the call to a
 /// library malloc.
 pub fn malloc(size: usize) -> Address {

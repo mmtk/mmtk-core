@@ -54,6 +54,9 @@ pub enum PlanSelector {
     LXR,
     /// Concurrent non-moving immix using SATB
     ConcurrentImmix,
+    /// Non-moving mark-sweep with time-sliced incremental SATB marking scheduled to meet a target
+    /// mutator utilization. A port of OpenJ9's `metronome` GC policy.
+    IncrementalMarkSweep,
 }
 
 /// MMTk option for perf events
@@ -1036,7 +1039,21 @@ options! {
     /// consider splitting. Early generations are small and near the roots, where splitting costs a
     /// work packet and buys little; the chain only gets long enough to matter further down. Zero
     /// considers every generation.
-    lxr_min_packet_split_depth: usize               [always_valid] = 16
+    lxr_min_packet_split_depth: usize               [always_valid] = 16,
+    /// GC quantum length in microseconds, defaults to 3000.
+    incremental_marksweep_beat_us: usize                    [|v: &usize| *v >= 100] = 3000,
+    /// Utilization window in microseconds. 0 = 20 x beat, defaults to 60000.
+    incremental_marksweep_window_us: usize                  [always_valid] = 0,
+    /// Target mutator utilization in percent, defaults to 70.
+    incremental_marksweep_target_utilization: usize         [|v: &usize| *v >= 1 && *v <= 99] = 70,
+    /// Start a cycle when used bytes exceed this percentage of the heap.
+    incremental_marksweep_trigger_percent: usize            [|v: &usize| *v >= 1 && *v <= 100] = 50,
+    /// Headroom bytes added to live bytes when re-arming the trigger, defaults to 1MiB.
+    incremental_marksweep_headroom_bytes: usize             [always_valid] = 1 << 20,
+    /// On allocation failure, finish the current cycle synchronously.
+    incremental_marksweep_synchronous_gc_on_oom: bool       [always_valid] = true,
+    /// Tracing cost units between deadline checks.
+    incremental_marksweep_trace_cost_to_check_yield: usize  [|v: &usize| *v >= 1] = 500
 }
 
 #[cfg(test)]

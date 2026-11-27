@@ -211,6 +211,10 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn initialize_object_metadata(&self, _object: ObjectReference, _bytes: usize) {
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit(_object);
+
+        if self.should_allocate_as_live() {
+            self.attempt_mark(_object);
+        }
     }
     #[cfg(feature = "vo_bit")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {

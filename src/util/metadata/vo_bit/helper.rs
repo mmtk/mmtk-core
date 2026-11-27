@@ -191,8 +191,8 @@ pub(crate) fn on_region_swept<VM: VMBinding, R: Region>(region: &R, is_occupied:
         VOBitUpdateStrategy::CopyFromMarkBits => {
             // In this strategy, we need to update the VO bits state after marking.
             if is_occupied {
-                // If the block has live objects, copy the VO bits from mark bits.
-                vo_bit::bcopy_vo_bit_from_mark_bit::<VM>(region.start(), R::BYTES);
+                // If the block has live objects, keep the VO bits of the marked ones.
+                vo_bit::and_vo_bit_with_mark_bit::<VM>(region.start(), R::BYTES);
             } else {
                 // If the block has no live objects, simply clear the VO bits.
                 vo_bit::bzero_vo_bit(region.start(), R::BYTES);

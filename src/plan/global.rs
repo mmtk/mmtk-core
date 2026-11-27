@@ -65,6 +65,11 @@ pub fn create_mutator<VM: VMBinding>(
             crate::plan::concurrent::immix::mutator::create_concurrent_immix_mutator(tls, mmtk)
         }
         PlanSelector::OVC => crate::plan::markcompact::ovc::mutator::create_ovc_mutator(tls, mmtk),
+        PlanSelector::IncrementalMarkSweep => {
+            crate::plan::incremental_marksweep::mutator::create_incremental_marksweep_mutator(
+                tls, mmtk,
+            )
+        }
     })
 }
 
@@ -112,6 +117,10 @@ pub fn create_plan<VM: VMBinding>(
         }
         PlanSelector::OVC => {
             Box::new(crate::plan::markcompact::ovc::OVC::new(args)) as Box<dyn Plan<VM = VM>>
+        }
+        PlanSelector::IncrementalMarkSweep => {
+            Box::new(crate::plan::incremental_marksweep::IncrementalMarkSweep::new(args))
+                as Box<dyn Plan<VM = VM>>
         }
     }
 }
@@ -253,6 +262,15 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         );
         mmtk.gc_trigger.policy.on_gc_end(mmtk);
     }
+
+    /// Called once, at the end of [`crate::MMTK::initialize_collection`], after the GC
+    /// worker threads have been spawned. Plans that need their own helper threads (e.g. the
+    /// IncrementalMarkSweep alarm thread) start them here.
+    fn on_collection_initialized(&'static self, _mmtk: &'static MMTK<Self::VM>) {}
+
+    /// Called at the start of [`crate::MMTK::shutdown`], before GC worker threads are
+    /// stopped. Plans stop any helper threads they started in [`Plan::on_collection_initialized`].
+    fn on_shutdown(&self) {}
 
     /// Notify the plan that an emergency collection will happen. The plan should try to free as much memory as possible.
     /// The default implementation will force a full heap collection for generational plans.

@@ -265,11 +265,13 @@ impl<VM: VMBinding> MMTK<VM> {
         self.scheduler.spawn_gc_threads(self, tls);
         self.state.gc_status.set_initialized();
         probe!(mmtk, collection_initialized);
+        self.get_plan().on_collection_initialized(self);
     }
 
     /// Shut down all GC worker threads.
     pub fn shutdown(&'static self) {
         if self.state.is_initialized() {
+            self.get_plan().on_shutdown();
             self.scheduler.shutdown_gc_threads();
             self.state.gc_status.set_uninitialized();
         }

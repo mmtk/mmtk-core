@@ -169,6 +169,32 @@ pub(crate) fn bcopy_vo_bit_from_mark_bit<VM: VMBinding>(start: Address, size: us
     VO_BIT_SIDE_METADATA_SPEC.bcopy_metadata_contiguous(start, size, side_mark_bit_spec);
 }
 
+/// Clear the VO bits of the objects in `[start, start + size)` whose mark bits are clear.
+///
+/// Unlike [`bcopy_vo_bit_from_mark_bit`], marks without an object (concurrent Immix bulk-marks
+/// the lines it allocates into while marking) do not create VO bits.
+pub(crate) fn and_vo_bit_with_mark_bit<VM: VMBinding>(start: Address, size: usize) {
+    use crate::util::metadata::side_metadata::address_to_meta_address;
+    let mark = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec();
+    debug_assert_eq!(
+        mark.log_num_of_bits,
+        VO_BIT_SIDE_METADATA_SPEC.log_num_of_bits
+    );
+    debug_assert_eq!(
+        mark.log_bytes_in_region,
+        VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region
+    );
+    let vo = address_to_meta_address(&VO_BIT_SIDE_METADATA_SPEC, start);
+    let vo_end = address_to_meta_address(&VO_BIT_SIDE_METADATA_SPEC, start + size);
+    let mark = address_to_meta_address(mark, start);
+    for i in 0..(vo_end - vo) {
+        unsafe {
+            let v = (vo + i).to_mut_ptr::<u8>();
+            *v &= (mark + i).load::<u8>();
+        }
+    }
+}
+
 use crate::util::constants::{LOG_BITS_IN_BYTE, LOG_BYTES_IN_ADDRESS};
 
 /// How many data memory bytes does 1 word in the VO bit side metadata represents?

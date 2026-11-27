@@ -173,6 +173,7 @@ impl<VM: VMBinding> Plan for LXR<VM> {
             .store(pause != Pause::RefCount, Ordering::SeqCst);
         // Schedule work
         match pause {
+            Pause::Increment => unreachable!(),
             Pause::Full => self.schedule_emergency_full_heap_collection(scheduler),
             Pause::RefCount => self.schedule_rc_collection(scheduler),
             Pause::InitialMark => self.schedule_concurrent_marking_initial_pause(scheduler),

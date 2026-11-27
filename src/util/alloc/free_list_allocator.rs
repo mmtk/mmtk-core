@@ -200,6 +200,9 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             end
         };
         crate::util::memory::zero(start, cell_size);
+        if crate::policy::space::Space::should_allocate_as_live(self.space) {
+            block.set_state(BlockState::Marked);
+        }
         if one_cell {
             debug_assert_eq!(end, start + cell_size);
         } else {

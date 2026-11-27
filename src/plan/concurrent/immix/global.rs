@@ -161,6 +161,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         probe!(mmtk, concurrent_pause_determined, pause as usize);
 
         match pause {
+            Pause::Increment => unreachable!(),
             Pause::Full => {
                 // Ref closure buckets is disabled by initial mark, and needs to be re-enabled for full GC before
                 // we reuse the normal Immix scheduling.
@@ -184,6 +185,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
     fn prepare(&mut self, tls: VMWorkerThread) {
         let pause = self.current_pause().unwrap();
         match pause {
+            Pause::Increment => unreachable!(),
             Pause::Full => {
                 self.common.prepare(tls, true);
                 self.immix_space.prepare(
@@ -214,6 +216,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
     fn release(&mut self, tls: VMWorkerThread) {
         let pause = self.current_pause().unwrap();
         match pause {
+            Pause::Increment => unreachable!(),
             Pause::InitialMark => (),
             Pause::Full | Pause::FinalMark => {
                 self.immix_space.release(
@@ -306,6 +309,7 @@ impl<VM: VMBinding> Plan for ConcurrentImmix<VM> {
         use crate::vm::ActivePlan;
         let pause = self.current_pause().unwrap();
         match pause {
+            Pause::Increment => unreachable!(),
             Pause::Full => {
                 self.set_concurrent_marking_state(false);
             }
