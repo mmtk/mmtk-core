@@ -55,8 +55,8 @@
 <a href=#55 id=55 data-nosnippet>55</a>
 <a href=#56 id=56 data-nosnippet>56</a>        <span class="kw">let </span>index_start = range.start &gt;&gt; LOG_BYTES_IN_CHUNK;
 <a href=#57 id=57 data-nosnippet>57</a>        <span class="kw">let </span>index_limit = range.limit() &gt;&gt; LOG_BYTES_IN_CHUNK;
-<a href=#58 id=58 data-nosnippet>58</a>        <span class="kw">for </span>index <span class="kw">in </span>index_start..index_limit {
-<a href=#59 id=59 data-nosnippet>59</a>            <span class="self">self</span>.mapped[index].store(state, Ordering::Relaxed);
+<a href=#58 id=58 data-nosnippet>58</a>        <span class="kw">for </span>entry <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.mapped[index_start..index_limit] {
+<a href=#59 id=59 data-nosnippet>59</a>            entry.store(state, Ordering::Relaxed);
 <a href=#60 id=60 data-nosnippet>60</a>        }
 <a href=#61 id=61 data-nosnippet>61</a>    }
 <a href=#62 id=62 data-nosnippet>62</a>
@@ -94,8 +94,8 @@
 <a href=#94 id=94 data-nosnippet>94</a>            <span class="kw">let </span>group_bytes = group.len &lt;&lt; LOG_BYTES_IN_CHUNK;
 <a href=#95 id=95 data-nosnippet>95</a>            <span class="kw">let </span>group_range = ChunkRange::new_aligned(group_start_addr, group_bytes);
 <a href=#96 id=96 data-nosnippet>96</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(new_state) = update_fn(group_range, state)<span class="question-mark">? </span>{
-<a href=#97 id=97 data-nosnippet>97</a>                <span class="kw">for </span>index <span class="kw">in </span>group_start..group_end {
-<a href=#98 id=98 data-nosnippet>98</a>                    <span class="self">self</span>.mapped[index].store(new_state, Ordering::Relaxed);
+<a href=#97 id=97 data-nosnippet>97</a>                <span class="kw">for </span>entry <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.mapped[group_start..group_end] {
+<a href=#98 id=98 data-nosnippet>98</a>                    entry.store(new_state, Ordering::Relaxed);
 <a href=#99 id=99 data-nosnippet>99</a>                }
 <a href=#100 id=100 data-nosnippet>100</a>            }
 <a href=#101 id=101 data-nosnippet>101</a>            group_start = group_end;

@@ -84,8 +84,8 @@
 <a href=#84 id=84 data-nosnippet>84</a>                mature_evac_remsets.push(Box::new(EvacuateMatureObjects::new(remset)));
 <a href=#85 id=85 data-nosnippet>85</a>            }
 <a href=#86 id=86 data-nosnippet>86</a>        }
-<a href=#87 id=87 data-nosnippet>87</a>        <span class="kw">for </span>id <span class="kw">in </span><span class="number">0</span>..<span class="self">self</span>.local_packets.len() {
-<a href=#88 id=88 data-nosnippet>88</a>            <span class="kw">let </span>buf = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span><span class="self">self</span>.local_packets[id].get() };
+<a href=#87 id=87 data-nosnippet>87</a>        <span class="kw">for </span>local_packets <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.local_packets {
+<a href=#88 id=88 data-nosnippet>88</a>            <span class="kw">let </span>buf = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>local_packets.get() };
 <a href=#89 id=89 data-nosnippet>89</a>            <span class="kw">if </span>!buf.is_empty() {
 <a href=#90 id=90 data-nosnippet>90</a>                <span class="kw">let </span>packets = std::mem::take(buf);
 <a href=#91 id=91 data-nosnippet>91</a>                <span class="kw">for </span>p <span class="kw">in </span>packets {
