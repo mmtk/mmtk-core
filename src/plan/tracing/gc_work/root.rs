@@ -68,7 +68,7 @@ impl<VM: VMBinding, DT: Trace<VM = VM>, PT: Trace<VM = VM>> RootsWorkFactory<VM:
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,
-            ProcessSlots::<DT>::new(slots, WorkBucketStage::Closure),
+            ProcessSlots::<DT>::new(slots, WorkBucketStage::Closure, true),
         );
     }
 

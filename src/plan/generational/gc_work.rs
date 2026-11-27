@@ -156,7 +156,7 @@ impl<T: Trace> GCWork<T::VM> for ProcessRegionModBuf<T> {
             }
             // Forward entries
             GCWork::do_work(
-                &mut ProcessSlots::<T>::new(slots, WorkBucketStage::Closure),
+                &mut ProcessSlots::<T>::new(slots, WorkBucketStage::Closure, true),
                 worker,
                 mmtk,
             )

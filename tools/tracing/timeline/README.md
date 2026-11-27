@@ -19,7 +19,7 @@ Suite.
 Run the following command with a **normal** user (*not* as `root` or using `sudo`):
 
 ```shell
-./capture.py -e 47 -m /path/to/libmmtk_openjdk.so --no-pinning-roots
+./capture.py -e 47 -m /path/to/libmmtk_openjdk.so
 ```
 
 `-e 47` means we only capture one GC in every 47 GCs because otherwise it will have to print too
@@ -36,8 +36,6 @@ us an illusion of "all GCs are nursery GC" or "all GCs are full-heap GC".  This 
 [aliasing effect].
 
 [aliasing effect]: https://en.wikipedia.org/wiki/Aliasing
-
-`--no-pinning-roots` skips the `process_pinning_roots` USDT which does not exist in `libmmtk_openjdk.so`.
 
 Replace `/path/to/libmmtk_openjdk.so` with the actual path to the `.so` that contains MMTk and its
 binding.
@@ -124,7 +122,7 @@ This means things are working properly.  Now re-run `./capture.py` again, but pi
 file.
 
 ```
-./capture.py -e 47 -m /path/to/libmmtk_openjdk.so --no-pinning-roots > mybenchmark.log
+./capture.py -e 47 -m /path/to/libmmtk_openjdk.so > mybenchmark.log
 ```
 
 Type the root password if prompted.
